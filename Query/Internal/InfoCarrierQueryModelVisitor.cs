@@ -9,6 +9,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
+    using Modeling;
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
@@ -76,10 +77,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IKey key,
             //Func<IEntityType, ValueBuffer, object> materializer,
             bool queryStateManager)
-            where TEntity : class
+            where TEntity : Entity
         {
-            throw new NotImplementedException();
-            //return ((InfoCarrierQueryContext)queryContext).Store
+            return ((InfoCarrierQueryContext)queryContext).ServerContext.DataContext.All<TEntity>();
             //    .GetTables(entityType)
             //    .SelectMany(t =>
             //        t.Rows.Select(vs =>

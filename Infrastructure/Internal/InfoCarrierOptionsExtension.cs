@@ -11,10 +11,10 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
 
         public InfoCarrierOptionsExtension(InfoCarrierOptionsExtension copyFrom)
         {
-            this.StoreName = copyFrom.StoreName;
+            this.ServerContext = copyFrom.ServerContext;
         }
 
-        public string StoreName { get; set; }
+        public ServerContext ServerContext { get; set; }
 
         public virtual void ApplyServices(IServiceCollection services)
         {

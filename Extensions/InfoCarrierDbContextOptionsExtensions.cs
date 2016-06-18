@@ -10,15 +10,15 @@ namespace InfoCarrier.Core.Client
     {
         public static DbContextOptionsBuilder<TContext> UseInfoCarrierBackend<TContext>(
             this DbContextOptionsBuilder<TContext> optionsBuilder,
-            string databaseName,
+            ServerContext serverContext,
             Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
             where TContext : DbContext
             => (DbContextOptionsBuilder<TContext>)UseInfoCarrierBackend(
-                (DbContextOptionsBuilder)optionsBuilder, databaseName, infoCarrierOptionsAction);
+                (DbContextOptionsBuilder)optionsBuilder, serverContext, infoCarrierOptionsAction);
 
         public static DbContextOptionsBuilder UseInfoCarrierBackend(
             this DbContextOptionsBuilder optionsBuilder,
-            string databaseName,
+            ServerContext serverContext,
             Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
         {
             var extension = optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>();
@@ -27,30 +27,9 @@ namespace InfoCarrier.Core.Client
                 ? new InfoCarrierOptionsExtension(extension)
                 : new InfoCarrierOptionsExtension();
 
-            if (databaseName != null)
-            {
-                extension.StoreName = databaseName;
-            }
+            extension.ServerContext = serverContext;
 
             ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
-
-            infoCarrierOptionsAction?.Invoke(new InfoCarrierDbContextOptionsBuilder(optionsBuilder));
-
-            return optionsBuilder;
-        }
-
-        public static DbContextOptionsBuilder<TContext> UseInfoCarrierBackend<TContext>(
-            this DbContextOptionsBuilder<TContext> optionsBuilder,
-            Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
-            where TContext : DbContext
-            => (DbContextOptionsBuilder<TContext>)UseInfoCarrierBackend(
-                (DbContextOptionsBuilder)optionsBuilder, infoCarrierOptionsAction);
-
-        public static DbContextOptionsBuilder UseInfoCarrierBackend(
-            this DbContextOptionsBuilder optionsBuilder,
-            Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
-        {
-            ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(new InfoCarrierOptionsExtension());
 
             infoCarrierOptionsAction?.Invoke(new InfoCarrierDbContextOptionsBuilder(optionsBuilder));
 

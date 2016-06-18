@@ -89,6 +89,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Query\ExpressionVisitors\Internal\InfoCarrierEntityQueryableExpressionVisitor.cs" />
     <Compile Include="Query\ExpressionVisitors\Internal\InfoCarrierEntityQueryableExpressionVisitorFactory.cs" />
+    <Compile Include="Query\Internal\InfoCarrierQueryContext.cs" />
     <Compile Include="Query\Internal\InfoCarrierQueryContextFactory.cs" />
     <Compile Include="Query\Internal\InfoCarrierQueryModelVisitor.cs" />
     <Compile Include="Query\Internal\InfoCarrierQueryModelVisitorFactory.cs" />
@@ -106,6 +107,28 @@
     <Analyzer Include="..\packages\StyleCop.Analyzers.1.0.0\analyzers\dotnet\cs\Newtonsoft.Json.dll" />
     <Analyzer Include="..\packages\StyleCop.Analyzers.1.0.0\analyzers\dotnet\cs\StyleCop.Analyzers.CodeFixes.dll" />
     <Analyzer Include="..\packages\StyleCop.Analyzers.1.0.0\analyzers\dotnet\cs\StyleCop.Analyzers.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\3rdparty\trackable\Source\TrackableEntities.Client.Net4\TrackableEntities.Client.Net4.csproj">
+      <Project>{b4a05a5b-fe50-4dd0-87ce-c3e2d63e2c66}</Project>
+      <Name>TrackableEntities.Client.Net4</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\3rdparty\trackable\Source\TrackableEntities.Common\TrackableEntities.Common.csproj">
+      <Project>{a59939c3-b823-43d1-84f1-74d6a9ddc598}</Project>
+      <Name>TrackableEntities.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\InfoCarrier.Core.Client\InfoCarrier.Core.Client.csproj">
+      <Project>{1af678f7-4c70-4b19-959a-4454b7d7ca3d}</Project>
+      <Name>InfoCarrier.Core.Client</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\InfoCarrier.Core.Common\InfoCarrier.Core.Common.csproj">
+      <Project>{37206ab3-f5e9-4581-8026-e7bfb8b0a3cc}</Project>
+      <Name>InfoCarrier.Core.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\InfoCarrier.Core.Modeling\InfoCarrier.Core.Modeling.csproj">
+      <Project>{21D5FDAE-DD2C-4AC1-ACD1-AE22236141DF}</Project>
+      <Name>InfoCarrier.Core.Modeling</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
