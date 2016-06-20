@@ -2,6 +2,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Reflection;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -71,7 +72,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             //    .SelectMany(t => t.Rows.Select(vs => new ValueBuffer(vs)));
         }
 
-        private static IEnumerable<TEntity> EntityQuery<TEntity>(
+        private static IQueryable<TEntity> EntityQuery<TEntity>(
             QueryContext queryContext,
             IEntityType entityType,
             IKey key,
