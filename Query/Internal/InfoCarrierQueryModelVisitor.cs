@@ -80,7 +80,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             bool queryStateManager)
             where TEntity : Entity
         {
-            return ((InfoCarrierQueryContext)queryContext).ServerContext.DataContext.All<TEntity>();
+            ServerContext sctx = ((InfoCarrierQueryContext)queryContext).ServerContext;
+            var dummy = sctx.DataContext; // UGLY: force creation of DataContext
+            return new ClientDataQueryProviderNoPass(typeof(TEntity), sctx).CreateQuery<TEntity>(null);
             //    .GetTables(entityType)
             //    .SelectMany(t =>
             //        t.Rows.Select(vs =>
@@ -97,6 +99,21 @@ namespace InfoCarrier.Core.Client.Query.Internal
             //                    queryStateManager,
             //                    throwOnNullKey: false);
             //        }));
+        }
+
+        private class ClientDataQueryProviderNoPass : ClientDataQueryProvider
+        {
+            public ClientDataQueryProviderNoPass(
+                Type elementType,
+                ServerContext serverContext)
+                : base(elementType, serverContext)
+            {
+            }
+
+            protected override object PassThroughIdentityMap(object graph)
+            {
+                return graph;
+            }
         }
     }
 }
