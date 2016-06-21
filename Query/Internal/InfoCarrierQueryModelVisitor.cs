@@ -85,7 +85,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             where TEntity : Entity
         {
             ServerContext sctx = ((InfoCarrierQueryContext)queryContext).ServerContext;
-            var dataContext = sctx.DataContext; // UGLY: force creation of DataContext
 
             IQueryable qry = RemoteQueryable.Create(
                 typeof(TEntity),
@@ -117,7 +116,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                         vr =>
                                         {
                                             IEntity instance = (IEntity)Activator.CreateInstance(targetType, true);
-                                            instance.EntityContext = dataContext;
+                                            instance.EntityContext = sctx.DataContext;
                                             return instance;
                                         }),
                                     queryStateManager,
@@ -148,7 +147,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             return Activator.CreateInstance(
                                 typeof(ChangeTrackingCollection<>).MakeGenericType(targetType.GenericTypeArguments),
                                 list,
-                                !dataContext.ChangeTrackingEnabled);
+                                !sctx.DataContext.ChangeTrackingEnabled);
                         }
 
                         return mapper.MapFromDynamicObjectGraphDefaultImpl(obj, targetType);
