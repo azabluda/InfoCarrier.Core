@@ -4,6 +4,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
+    using Aqua.Dynamic;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -11,6 +12,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Modeling;
+    using Remote.Linq;
+    using TrackableEntities.Client;
+    using Utils;
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
@@ -81,38 +85,101 @@ namespace InfoCarrier.Core.Client.Query.Internal
             where TEntity : Entity
         {
             ServerContext sctx = ((InfoCarrierQueryContext)queryContext).ServerContext;
-            var dummy = sctx.DataContext; // UGLY: force creation of DataContext
-            return new ClientDataQueryProviderNoPass(typeof(TEntity), sctx).CreateQuery<TEntity>(null);
-            //    .GetTables(entityType)
-            //    .SelectMany(t =>
-            //        t.Rows.Select(vs =>
-            //        {
-            //            var valueBuffer = new ValueBuffer(vs);
+            var dataContext = sctx.DataContext; // UGLY: force creation of DataContext
 
-            //            return (TEntity)queryContext
-            //                .QueryBuffer
-            //                .GetEntity(
-            //                    key,
-            //                    new EntityLoadInfo(
-            //                        valueBuffer,
-            //                        vr => materializer(t.EntityType, vr)),
-            //                    queryStateManager,
-            //                    throwOnNullKey: false);
-            //        }));
+            IQueryable qry = RemoteQueryable.Create(
+                typeof(TEntity),
+                sctx.QueryData,
+                null,
+                new DynamicObjectEntityMapper(
+                    (obj, targetType, mapper) =>
+                    {
+                        foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
+                        {
+                            if (!typeof(IEntity).IsAssignableFrom(targetType))
+                            {
+                                continue;
+                            }
+
+                            // TODO: may not work if the key properties are not the first, or there exists more than one key
+                            var keyValueBuffer = new ValueBuffer(
+                                key.Properties
+                                    .Select(p => mapper.MapFromDynamicObjectGraphCustomImpl(dobj.Get(p.Name), p.ClrType))
+                                    .ToList());
+
+                            // Get/create instance of entity from EFC's identity map
+                            object entity = queryContext
+                                .QueryBuffer
+                                .GetEntity(
+                                    key,
+                                    new EntityLoadInfo(
+                                        keyValueBuffer,
+                                        vr =>
+                                        {
+                                            IEntity instance = (IEntity)Activator.CreateInstance(targetType, true);
+                                            instance.EntityContext = dataContext;
+                                            return instance;
+                                        }),
+                                    queryStateManager,
+                                    throwOnNullKey: false);
+
+                            // Set entity properties
+                            var targetProperties = entity.GetType().GetProperties().Where(p => p.CanWrite);
+                            foreach (PropertyInfo property in targetProperties)
+                            {
+                                object rawValue;
+                                if (dobj.TryGet(property.Name, out rawValue))
+                                {
+                                    object value = mapper.MapFromDynamicObjectGraphCustomImpl(rawValue, property.PropertyType);
+                                    property.SetValue(entity, value);
+                                }
+                            }
+
+                            return entity;
+                        }
+
+                        if (targetType.IsGenericType &&
+                            targetType.GetGenericTypeDefinition() == typeof(ChangeTrackingCollection<>))
+                        {
+                            object list = mapper.MapFromDynamicObjectGraphDefaultImpl(
+                                obj,
+                                typeof(List<>).MakeGenericType(targetType.GenericTypeArguments));
+
+                            return Activator.CreateInstance(
+                                typeof(ChangeTrackingCollection<>).MakeGenericType(targetType.GenericTypeArguments),
+                                list,
+                                !dataContext.ChangeTrackingEnabled);
+                        }
+
+                        return mapper.MapFromDynamicObjectGraphDefaultImpl(obj, targetType);
+                    }));
+
+            return qry.Cast<TEntity>();
         }
 
-        private class ClientDataQueryProviderNoPass : ClientDataQueryProvider
+        private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
         {
-            public ClientDataQueryProviderNoPass(
-                Type elementType,
-                ServerContext serverContext)
-                : base(elementType, serverContext)
+            private readonly Func<object, Type, DynamicObjectEntityMapper, object> materializer;
+
+            public DynamicObjectEntityMapper(Func<object, Type, DynamicObjectEntityMapper, object> materializer)
+                : base(formatPrimitiveTypesAsString: true)
             {
+                this.materializer = materializer;
             }
 
-            protected override object PassThroughIdentityMap(object graph)
+            public object MapFromDynamicObjectGraphCustomImpl(object obj, Type targetType)
             {
-                return graph;
+                return this.MapFromDynamicObjectGraph(obj, targetType);
+            }
+
+            public object MapFromDynamicObjectGraphDefaultImpl(object obj, Type targetType)
+            {
+                return base.MapFromDynamicObjectGraph(obj, targetType);
+            }
+
+            protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
+            {
+                return this.materializer(obj, targetType, this);
             }
         }
     }
