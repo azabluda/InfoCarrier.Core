@@ -34,8 +34,8 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
         {
             var entityType = this.model.FindEntityType(elementType);
 
-            if (this.QueryModelVisitor.QueryCompilationContext
-                .QuerySourceRequiresMaterialization(this.querySource))
+            //if (this.QueryModelVisitor.QueryCompilationContext
+            //    .QuerySourceRequiresMaterialization(this.querySource))
             {
                 //var materializer = _materializerFactory.CreateMaterializer(entityType);
 
@@ -48,10 +48,10 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
                     Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));
             }
 
-            return Expression.Call(
-                InfoCarrierQueryModelVisitor.ProjectionQueryMethodInfo,
-                EntityQueryModelVisitor.QueryContextParameter,
-                Expression.Constant(entityType));
+            //return Expression.Call(
+            //    InfoCarrierQueryModelVisitor.ProjectionQueryMethodInfo,
+            //    EntityQueryModelVisitor.QueryContextParameter,
+            //    Expression.Constant(entityType));
         }
     }
 }

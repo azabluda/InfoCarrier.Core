@@ -58,23 +58,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
             //_materializerFactory = materializerFactory;
         }
 
-        public static MethodInfo ProjectionQueryMethodInfo { get; }
-            = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
-                .GetDeclaredMethod(nameof(ProjectionQuery));
+        //public static MethodInfo ProjectionQueryMethodInfo { get; }
+        //    = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
+        //        .GetDeclaredMethod(nameof(ProjectionQuery));
 
         public static MethodInfo EntityQueryMethodInfo { get; }
             = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
                 .GetDeclaredMethod(nameof(EntityQuery));
 
-        private static IEnumerable<ValueBuffer> ProjectionQuery(
-            QueryContext queryContext,
-            IEntityType entityType)
-        {
-            throw new NotImplementedException();
-            //return ((InfoCarrierQueryContext)queryContext).Store
-            //    .GetTables(entityType)
-            //    .SelectMany(t => t.Rows.Select(vs => new ValueBuffer(vs)));
-        }
+        //private static IEnumerable<ValueBuffer> ProjectionQuery(
+        //    QueryContext queryContext,
+        //    IEntityType entityType)
+        //{
+        //    throw new NotImplementedException();
+        //    //return ((InfoCarrierQueryContext)queryContext).Store
+        //    //    .GetTables(entityType)
+        //    //    .SelectMany(t => t.Rows.Select(vs => new ValueBuffer(vs)));
+        //}
 
         private static IQueryable<TEntity> EntityQuery<TEntity>(
             QueryContext queryContext,
@@ -86,8 +86,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             ServerContext sctx = ((InfoCarrierQueryContext)queryContext).ServerContext;
 
-            IQueryable qry = RemoteQueryable.Create(
-                typeof(TEntity),
+            IQueryable<TEntity> qry = RemoteQueryable.Create<TEntity>(
                 sctx.QueryData,
                 null,
                 new DynamicObjectEntityMapper(
@@ -153,7 +152,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return mapper.MapFromDynamicObjectGraphDefaultImpl(obj, targetType);
                     }));
 
-            return qry.Cast<TEntity>();
+            return qry;
         }
 
         private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
