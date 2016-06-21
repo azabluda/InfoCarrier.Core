@@ -27,8 +27,8 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
             this.querySource = querySource;
         }
 
-        private new InfoCarrierQueryModelVisitor QueryModelVisitor
-            => (InfoCarrierQueryModelVisitor)base.QueryModelVisitor;
+        //private new InfoCarrierQueryModelVisitor QueryModelVisitor
+        //    => (InfoCarrierQueryModelVisitor)base.QueryModelVisitor;
 
         protected override Expression VisitEntityQueryable(Type elementType)
         {
