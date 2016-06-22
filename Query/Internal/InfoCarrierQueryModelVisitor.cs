@@ -3,16 +3,20 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Linq.Expressions;
     using System.Reflection;
     using Aqua.Dynamic;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.Internal;
+    using Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Modeling;
     using Remote.Linq;
+    using Remotion.Linq;
     using TrackableEntities.Client;
     using Utils;
 
@@ -155,6 +159,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
             return qry;
         }
 
+        protected override void IncludeNavigations(QueryModel queryModel)
+        {
+            if (queryModel.GetOutputDataInfo() is Remotion.Linq.Clauses.StreamedData.StreamedScalarValueInfo)
+            {
+                return;
+            }
+
+            foreach (var incl in this.QueryCompilationContext.QueryAnnotations.OfType<IncludeResultOperator>())
+            {
+                this.Expression = new InfoCarrierIncludeExpressionVisitor(incl).Visit(this.Expression);
+            }
+        }
+
         private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
         {
             private readonly Func<object, Type, DynamicObjectEntityMapper, object> materializer;
@@ -178,6 +195,45 @@ namespace InfoCarrier.Core.Client.Query.Internal
             protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
             {
                 return this.materializer(obj, targetType, this);
+            }
+        }
+
+        private class InfoCarrierIncludeExpressionVisitor : ExpressionVisitorBase
+        {
+            private readonly IncludeResultOperator includeResultOperator;
+
+            public InfoCarrierIncludeExpressionVisitor(IncludeResultOperator includeResultOperator)
+            {
+                this.includeResultOperator = includeResultOperator;
+            }
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (node.Method.MethodIsClosedFormOf(EntityQueryMethodInfo))
+                {
+                    return this.ApplyTopLevelInclude(node);
+                }
+
+                // TODO: apply Include to Select and OfType nodes
+                return base.VisitMethodCall(node);
+            }
+
+            private Expression ApplyTopLevelInclude(MethodCallExpression methodCallExpression)
+            {
+                // TODO: includeResultOperator.ChainedNavigationProperties => ThenInclude
+                Type elementType = methodCallExpression.Type.GetGenericArguments().First();
+
+                var arg = Expression.Parameter(elementType, "x");
+                var pathExpression = Expression.Lambda(
+                    Expression.MakeMemberAccess(arg, this.includeResultOperator.NavigationPropertyPath.Member),
+                    arg);
+
+                return Expression.Call(
+                    SymbolExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
+                        .GetGenericMethodDefinition()
+                        .MakeGenericMethod(elementType, this.includeResultOperator.NavigationPropertyPath.Type),
+                    methodCallExpression,
+                    pathExpression);
             }
         }
     }
