@@ -170,6 +170,20 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 this.Expression = new InfoCarrierIncludeExpressionVisitor(incl).Visit(this.Expression);
             }
+
+            // Although we have already added .Include to this.Expression, we have to call the base implementation
+            // which will perform QueryCompilationContext.AddTrackableInclude. To avoid NotImplementedException we
+            // have to override another overload of IncludeNavigations with empty body. This is a bit unclean.
+            base.IncludeNavigations(queryModel);
+        }
+
+        protected override void IncludeNavigations(
+            IncludeSpecification includeSpecification,
+            Type resultType,
+            LambdaExpression accessorLambda,
+            bool querySourceRequiresTracking)
+        {
+            // EMPTY: see comment above
         }
 
         private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
