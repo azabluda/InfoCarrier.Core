@@ -82,8 +82,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private static IQueryable<TEntity> EntityQuery<TEntity>(
             QueryContext queryContext,
-            IEntityType entityType,
-            IKey key,
+            IModel model,
             //Func<IEntityType, ValueBuffer, object> materializer,
             bool queryStateManager)
             where TEntity : Entity
@@ -102,6 +101,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             {
                                 continue;
                             }
+
+                            IKey key = model.FindEntityType(targetType).FindPrimaryKey();
 
                             // TODO: may not work if the key properties are not the first, or there exists more than one key
                             var keyValueBuffer = new ValueBuffer(

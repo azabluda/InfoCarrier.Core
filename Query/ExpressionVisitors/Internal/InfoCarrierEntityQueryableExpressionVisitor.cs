@@ -32,7 +32,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitEntityQueryable(Type elementType)
         {
-            var entityType = this.model.FindEntityType(elementType);
+            //var entityType = this.model.FindEntityType(elementType);
 
             //if (this.QueryModelVisitor.QueryCompilationContext
             //    .QuerySourceRequiresMaterialization(this.querySource))
@@ -42,8 +42,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
                 return Expression.Call(
                     InfoCarrierQueryModelVisitor.EntityQueryMethodInfo.MakeGenericMethod(elementType),
                     EntityQueryModelVisitor.QueryContextParameter,
-                    Expression.Constant(entityType),
-                    Expression.Constant(entityType.FindPrimaryKey()),
+                    Expression.Constant(this.model),
                     //materializer,
                     Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));
             }
