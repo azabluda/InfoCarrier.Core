@@ -37,10 +37,5 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             throw new NotImplementedException();
         }
-
-        public override Func<QueryContext, IAsyncEnumerable<TResult>> CompileAsyncQuery<TResult>(QueryModel queryModel)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
