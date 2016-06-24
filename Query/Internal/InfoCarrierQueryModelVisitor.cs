@@ -88,6 +88,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             where TEntity : Entity
         {
             ServerContext sctx = ((InfoCarrierQueryContext)queryContext).ServerContext;
+            Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
 
             IQueryable<TEntity> qry = RemoteQueryable.Create<TEntity>(
                 sctx.QueryData,
@@ -102,6 +103,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 continue;
                             }
 
+                            object entity;
+                            if (map.TryGetValue(dobj, out entity))
+                            {
+                                return entity;
+                            }
+
                             IKey key = model.FindEntityType(targetType).FindPrimaryKey();
 
                             // TODO: may not work if the key properties are not the first, or there exists more than one key
@@ -111,7 +118,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                     .ToList());
 
                             // Get/create instance of entity from EFC's identity map
-                            object entity = queryContext
+                            entity = queryContext
                                 .QueryBuffer
                                 .GetEntity(
                                     key,
@@ -125,6 +132,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                         }),
                                     queryStateManager,
                                     throwOnNullKey: false);
+
+                            map.Add(dobj, entity);
 
                             // Set entity properties
                             var targetProperties = entity.GetType().GetProperties().Where(p => p.CanWrite);
@@ -235,20 +244,60 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private Expression ApplyTopLevelInclude(MethodCallExpression methodCallExpression)
             {
-                // TODO: includeResultOperator.ChainedNavigationProperties => ThenInclude
-                Type elementType = methodCallExpression.Type.GetGenericArguments().First();
+                Type entityType = methodCallExpression.Type.GetGenericArguments().First();
+                Type toType = this.includeResultOperator.NavigationPropertyPath.Type;
 
-                var arg = Expression.Parameter(elementType, "x");
-                var pathExpression = Expression.Lambda(
-                    Expression.MakeMemberAccess(arg, this.includeResultOperator.NavigationPropertyPath.Member),
-                    arg);
+                var arg = Expression.Parameter(entityType, "x");
 
-                return Expression.Call(
+                methodCallExpression = Expression.Call(
                     SymbolExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
                         .GetGenericMethodDefinition()
-                        .MakeGenericMethod(elementType, this.includeResultOperator.NavigationPropertyPath.Type),
+                        .MakeGenericMethod(entityType, toType),
                     methodCallExpression,
-                    pathExpression);
+                    Expression.Lambda(
+                        Expression.MakeMemberAccess(arg, this.includeResultOperator.NavigationPropertyPath.Member),
+                        arg));
+
+                if (this.includeResultOperator.ChainedNavigationProperties == null)
+                {
+                    return methodCallExpression;
+                }
+
+                foreach (PropertyInfo inclProp in this.includeResultOperator.ChainedNavigationProperties)
+                {
+                    Type collElementType =
+                        toType.GetInterfaces()
+                            .SingleOrDefault(
+                                i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>))?
+                            .GenericTypeArguments.Single();
+
+                    IIncludableQueryable<object, object> refArg = null;
+                    IIncludableQueryable<object, ICollection<object>> collArg = null;
+
+                    MethodInfo miThenInclude;
+                    Type prevType;
+                    if (collElementType != null)
+                    {
+                        prevType = collElementType;
+                        miThenInclude =
+                            SymbolExtensions.GetMethodInfo(() => collArg.ThenInclude<object, object, object>(null));
+                    }
+                    else
+                    {
+                        prevType = toType;
+                        miThenInclude =
+                            SymbolExtensions.GetMethodInfo(() => refArg.ThenInclude<object, object, object>(null));
+                    }
+
+                    toType = inclProp.PropertyType;
+
+                    methodCallExpression = Expression.Call(
+                        miThenInclude.GetGenericMethodDefinition().MakeGenericMethod(entityType, prevType, toType),
+                        methodCallExpression,
+                        Expression.Lambda(Expression.Property(arg, inclProp), arg));
+                }
+
+                return methodCallExpression;
             }
         }
     }
