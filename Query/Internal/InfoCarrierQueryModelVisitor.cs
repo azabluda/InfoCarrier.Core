@@ -6,6 +6,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Linq.Expressions;
     using System.Reflection;
     using Aqua.Dynamic;
+    using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -90,9 +91,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
             Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
 
             IQueryable<TEntity> qry = RemoteQueryable.Create<TEntity>(
-                sctx.QueryData,
-                null,
-                new DynamicObjectEntityMapper(
+                dataProvider: arg =>
+                {
+                    sctx.GetLogger(sctx).Debug($"Execute query on the server: {arg}");
+
+                    using (var xmlMsg = new ServiceMessage(sctx.SessionId, sctx.ServerPublicKey))
+                    {
+                        using (ServiceMessage.SecureBody bodyWriter = xmlMsg.CreateBodyWriter(sctx.ServerPublicKey))
+                        {
+                            RemoteLinqHelper.SaveToStream(bodyWriter.Stream, arg);
+                        }
+
+                        using (ServiceMessage cresp = sctx.ServiceDispatcher.QueryData(xmlMsg))
+                        {
+                            using (ServiceMessage.SecureBody bodyReader = cresp.CreateBodyReader(sctx.ClientPrivateKey))
+                            {
+                                return Serializer.LoadFromStream<IEnumerable<DynamicObject>>(bodyReader.Stream);
+                            }
+                        }
+                    }
+                },
+                mapper: new DynamicObjectEntityMapper(
                     (obj, targetType, mapper) =>
                     {
                         foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
