@@ -6,6 +6,7 @@
     using System.Linq.Expressions;
     using System.Reflection;
     using Microsoft.EntityFrameworkCore.Query.Internal;
+    using Remotion.Linq.Clauses;
     using Utils;
 
     internal class InfoCarrierLinqOperatorProvider : LinqOperatorProvider
@@ -136,7 +137,7 @@
                 GetMethod(() => Queryable.OfType<object>(null));
 
             public static readonly MethodInfo OrderBy =
-                GetMethod(() => Queryable.OrderBy<object, object>(null, null));
+                GetMethod(() => OrderByImpl<object, object>(null, null, OrderingDirection.Asc));
 
             public static readonly MethodInfo Select =
                 GetMethod(() => Queryable.Select(null, DummyPredicate));
@@ -157,7 +158,7 @@
                 GetMethod(() => Queryable.Take<object>(null, 1));
 
             public static readonly MethodInfo ThenBy =
-                GetMethod(() => Queryable.ThenBy<object, object>(null, null));
+                GetMethod(() => ThenByImpl<object, object>(null, null, OrderingDirection.Asc));
 
             public static readonly MethodInfo Union =
                 GetMethod(() => Queryable.Union<object>(null, null));
@@ -170,6 +171,18 @@
                 MethodInfo mi = SymbolExtensions.GetMethodInfo(expression);
                 return mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi;
             }
+
+            private static IOrderedQueryable<TSource> OrderByImpl<TSource, TKey>(
+                IQueryable<TSource> source, Expression<Func<TSource, TKey>> expression, OrderingDirection orderingDirection)
+                => orderingDirection == OrderingDirection.Asc
+                    ? source.OrderBy(expression)
+                    : source.OrderByDescending(expression);
+
+            private static IOrderedQueryable<TSource> ThenByImpl<TSource, TKey>(
+                IOrderedQueryable<TSource> source, Expression<Func<TSource, TKey>> expression, OrderingDirection orderingDirection)
+                => orderingDirection == OrderingDirection.Asc
+                    ? source.ThenBy(expression)
+                    : source.ThenByDescending(expression);
         }
     }
 }
