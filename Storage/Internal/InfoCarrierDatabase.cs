@@ -8,7 +8,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.Logging;
-    using Remotion.Linq;
 
     public class InfoCarrierDatabase : Database, IInfoCarrierDatabase
     {

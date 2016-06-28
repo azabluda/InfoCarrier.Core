@@ -2,7 +2,6 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 {
     using System;
     using System.Linq.Expressions;
-    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;

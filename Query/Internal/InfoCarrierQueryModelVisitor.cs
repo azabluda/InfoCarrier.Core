@@ -17,7 +17,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Modeling;
     using Remote.Linq;
     using Remotion.Linq;
-    using TrackableEntities.Client;
     using Utils;
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
@@ -98,7 +97,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     {
                         foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
                         {
-                            if (!typeof(IEntity).IsAssignableFrom(targetType))
+                            if (!typeof(Entity).IsAssignableFrom(targetType))
                             {
                                 continue;
                             }
@@ -124,12 +123,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                     key,
                                     new EntityLoadInfo(
                                         keyValueBuffer,
-                                        vr =>
-                                        {
-                                            IEntity instance = (IEntity)Activator.CreateInstance(targetType, true);
-                                            instance.EntityContext = sctx.DataContext;
-                                            return instance;
-                                        }),
+                                        vr => Activator.CreateInstance(targetType, true)),
                                     queryStateManager,
                                     throwOnNullKey: false);
 
@@ -151,16 +145,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         }
 
                         if (targetType.IsGenericType &&
-                            targetType.GetGenericTypeDefinition() == typeof(ChangeTrackingCollection<>))
+                            targetType.GetGenericTypeDefinition() == typeof(ICollection<>))
                         {
-                            object list = mapper.MapFromDynamicObjectGraphDefaultImpl(
+                            return mapper.MapFromDynamicObjectGraphDefaultImpl(
                                 obj,
                                 typeof(List<>).MakeGenericType(targetType.GenericTypeArguments));
-
-                            return Activator.CreateInstance(
-                                typeof(ChangeTrackingCollection<>).MakeGenericType(targetType.GenericTypeArguments),
-                                list,
-                                !sctx.DataContext.ChangeTrackingEnabled);
                         }
 
                         return mapper.MapFromDynamicObjectGraphDefaultImpl(obj, targetType);
@@ -266,7 +255,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 foreach (PropertyInfo inclProp in this.includeResultOperator.ChainedNavigationProperties)
                 {
                     Type collElementType =
-                        toType.GetInterfaces()
+                        (toType.IsInterface ? toType.Yield() : toType.GetInterfaces())
                             .SingleOrDefault(
                                 i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>))?
                             .GenericTypeArguments.Single();
