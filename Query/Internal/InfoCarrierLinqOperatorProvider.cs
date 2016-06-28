@@ -19,8 +19,6 @@
 
         public override MethodInfo Concat => Impl.Concat;
 
-        public override MethodInfo Contains => Impl.Contains;
-
         public override MethodInfo Count => Impl.Count;
 
         public override MethodInfo DefaultIfEmpty => Impl.DefaultIfEmpty;
@@ -87,9 +85,6 @@
 
             public static readonly MethodInfo Concat =
                 GetMethod(() => Queryable.Concat<object>(null, null));
-
-            public static readonly MethodInfo Contains =
-                GetMethod(() => Queryable.Contains<object>(null, null));
 
             public static readonly MethodInfo Count =
                 GetMethod(() => Queryable.Count<object>(null));
