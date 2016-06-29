@@ -3,6 +3,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
+    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
 
     public class InfoCarrierQueryModelVisitorFactory : EntityQueryModelVisitorFactory

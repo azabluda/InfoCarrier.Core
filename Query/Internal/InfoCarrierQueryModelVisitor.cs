@@ -12,6 +12,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
+    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
@@ -198,7 +199,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         protected override void IncludeNavigations(
             IncludeSpecification includeSpecification,
             Type resultType,
-            LambdaExpression accessorLambda,
+            Expression accessorExpression,
             bool querySourceRequiresTracking)
         {
             // EMPTY: see comment above
