@@ -3,6 +3,7 @@ namespace InfoCarrier.Core.Client
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Storage;
+    using Microsoft.EntityFrameworkCore.ValueGeneration.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
     using Query.ExpressionVisitors.Internal;
@@ -24,7 +25,7 @@ namespace InfoCarrier.Core.Client
                 //.AddSingleton<IInfoCarrierStoreSource, InfoCarrierStoreSource>()
                 //.AddSingleton<IInfoCarrierTableFactory, InfoCarrierTableFactory>()
                 .AddSingleton<InfoCarrierModelSource>()
-                //.AddScoped<InfoCarrierValueGeneratorSelector>()
+                .AddScoped<InMemoryValueGeneratorSelector>()
                 .AddScoped<InfoCarrierDatabaseProviderServices>()
                 .AddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
                 .AddScoped<InfoCarrierTransactionManager>()
