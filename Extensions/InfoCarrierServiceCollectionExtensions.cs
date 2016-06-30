@@ -24,7 +24,7 @@ namespace InfoCarrier.Core.Client
                 //.AddSingleton<IInfoCarrierStoreSource, InfoCarrierStoreSource>()
                 //.AddSingleton<IInfoCarrierTableFactory, InfoCarrierTableFactory>()
                 .AddSingleton<InfoCarrierModelSource>()
-                //.AddScoped<InfoCarrierValueGeneratorSelector>()
+                .AddScoped<InfoCarrierValueGeneratorSelector>()
                 .AddScoped<InfoCarrierDatabaseProviderServices>()
                 .AddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
                 .AddScoped<InfoCarrierTransactionManager>()

@@ -29,7 +29,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
         public override IDatabaseCreator Creator => this.GetService<InfoCarrierDatabaseCreator>();
 
-        //public override IValueGeneratorSelector ValueGeneratorSelector => GetService<InfoCarrierValueGeneratorSelector>();
+        public override IValueGeneratorSelector ValueGeneratorSelector => this.GetService<InfoCarrierValueGeneratorSelector>();
 
         public override IModelSource ModelSource => this.GetService<InfoCarrierModelSource>();
 
