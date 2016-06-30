@@ -2,8 +2,15 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Common;
+    using Common.Errors;
+    using Infrastructure.Internal;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
@@ -11,23 +18,54 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
     public class InfoCarrierDatabase : Database, IInfoCarrierDatabase
     {
-        //private readonly IInfoCarrierStore _store;
+        private readonly ServerContext serverContext;
         private readonly ILogger<InfoCarrierDatabase> logger;
 
         public InfoCarrierDatabase(
             IQueryCompilationContextFactory queryCompilationContextFactory,
-            //IInfoCarrierStoreSource storeSource,
-            //IDbContextOptions options,
+            IDbContextOptions options,
             ILogger<InfoCarrierDatabase> logger)
             : base(queryCompilationContextFactory)
         {
             this.logger = logger;
-            //_store = storeSource.GetStore(options);
+            this.serverContext = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
         }
 
         public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
-            throw new NotImplementedException();
+            var saveChanges = new SaveChangesRequest();
+            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new DataTransferObject(e)));
+
+            SaveChangesResult result;
+            try
+            {
+                result = this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChanges(saveChanges);
+            }
+            catch (TransportableException ex)
+            {
+                throw new DbUpdateException(ex.Message, ex.InnerException);
+            }
+
+            // Merge the results / update properties modified during SaveChanges on the server-side
+            foreach (var merge in entries.Zip(result.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
+            {
+                foreach (IProperty prop in merge.Entry.EntityType.GetProperties())
+                {
+                    DataTransferObject.PropertyData propData;
+                    if (!merge.Dto.Properties.TryGetValue(prop.Name, out propData))
+                    {
+                        continue;
+                    }
+
+                    // Arguable: merge only temp values
+                    if (merge.Entry.HasTemporaryValue(prop))
+                    {
+                        merge.Entry.SetCurrentValue(prop, propData.GetCurrentValueAs(prop.ClrType));
+                    }
+                }
+            }
+
+            return result.CountPersisted;
         }
 
         public override Task<int> SaveChangesAsync(
