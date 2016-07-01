@@ -3,54 +3,70 @@
 
 namespace InfoCarrier.Core.Client.Storage.Internal
 {
+    using System;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Infrastructure.Internal;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Logging;
 
     public class InfoCarrierTransactionManager : IDbContextTransactionManager
     {
-        private static readonly DummyTransaction StubTransaction = new DummyTransaction();
-
-        private readonly ILogger<InfoCarrierTransactionManager> logger;
-
-        public InfoCarrierTransactionManager(ILogger<InfoCarrierTransactionManager> logger)
+        public InfoCarrierTransactionManager(
+            IDbContextOptions options,
+            ILogger<InfoCarrierTransactionManager> logger)
         {
-            this.logger = logger;
+            this.Logger = logger;
+            this.ServerContext = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
         }
+
+        internal ServerContext ServerContext { get; }
+
+        internal ILogger<InfoCarrierTransactionManager> Logger { get; }
+
+        public virtual IDbContextTransaction CurrentTransaction { get; protected set; }
 
         public virtual IDbContextTransaction BeginTransaction()
         {
-            return StubTransaction;
+            if (this.CurrentTransaction != null)
+            {
+                throw new InvalidOperationException("RelationalStrings.TransactionAlreadyStarted");
+            }
+
+            return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 
-        public virtual Task<IDbContextTransaction> BeginTransactionAsync(
-            CancellationToken cancellationToken = default(CancellationToken))
+        public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            return Task.FromResult<IDbContextTransaction>(StubTransaction);
+            throw new NotImplementedException();
         }
 
         public virtual void CommitTransaction()
         {
+            if (this.CurrentTransaction == null)
+            {
+                throw new InvalidOperationException("RelationalStrings.NoActiveTransaction");
+            }
+
+            this.CurrentTransaction.Commit();
         }
 
         public virtual void RollbackTransaction()
         {
+            if (this.CurrentTransaction == null)
+            {
+                throw new InvalidOperationException("RelationalStrings.NoActiveTransaction");
+            }
+
+            this.CurrentTransaction.Rollback();
         }
 
-        private class DummyTransaction : IDbContextTransaction
+        internal void ClearTransaction()
         {
-            public virtual void Commit()
-            {
-            }
-
-            public virtual void Rollback()
-            {
-            }
-
-            public virtual void Dispose()
-            {
-            }
+            this.CurrentTransaction?.Dispose();
+            this.CurrentTransaction = null;
         }
     }
 }
