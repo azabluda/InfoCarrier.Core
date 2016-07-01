@@ -9,21 +9,16 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     public class InfoCarrierEntityQueryableExpressionVisitorFactory : IEntityQueryableExpressionVisitorFactory
     {
         private readonly IModel model;
-        //private readonly IMaterializerFactory _materializerFactory;
 
-        public InfoCarrierEntityQueryableExpressionVisitorFactory(
-            IModel model)
-            //IMaterializerFactory materializerFactory)
+        public InfoCarrierEntityQueryableExpressionVisitorFactory(IModel model)
         {
             this.model = model;
-            //_materializerFactory = materializerFactory;
         }
 
         public virtual ExpressionVisitor Create(
             EntityQueryModelVisitor queryModelVisitor, IQuerySource querySource)
             => new InfoCarrierEntityQueryableExpressionVisitor(
                 this.model,
-                //_materializerFactory,
                 queryModelVisitor,
                 querySource);
     }

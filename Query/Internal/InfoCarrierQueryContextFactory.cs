@@ -14,7 +14,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public InfoCarrierQueryContextFactory(
             IStateManager stateManager,
             IConcurrencyDetector concurrencyDetector,
-            //IInfoCarrierStoreSource storeSource,
             IChangeDetector changeDetector,
             IDbContextOptions contextOptions)
             : base(stateManager, concurrencyDetector, changeDetector)

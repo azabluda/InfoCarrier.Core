@@ -23,7 +23,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IResultOperatorHandler resultOperatorHandler,
             IEntityMaterializerSource entityMaterializerSource,
             IExpressionPrinter expressionPrinter)
-            //IMaterializerFactory materializerFactory)
             : base(
                 queryOptimizer,
                 navigationRewritingExpressionVisitorFactory,
@@ -40,10 +39,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 entityMaterializerSource,
                 expressionPrinter)
         {
-            //MaterializerFactory = materializerFactory;
         }
-
-        //protected virtual IMaterializerFactory MaterializerFactory { get; }
 
         public override EntityQueryModelVisitor Create(
                 QueryCompilationContext queryCompilationContext, EntityQueryModelVisitor parentEntityQueryModelVisitor)
@@ -62,7 +58,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 this.ResultOperatorHandler,
                 this.EntityMaterializerSource,
                 this.ExpressionPrinter,
-                //MaterializerFactory,
                 queryCompilationContext);
     }
 }

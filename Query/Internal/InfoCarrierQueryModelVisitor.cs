@@ -23,8 +23,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
-        //private readonly IMaterializerFactory _materializerFactory;
-
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
             INavigationRewritingExpressionVisitorFactory navigationRewritingExpressionVisitorFactory,
@@ -40,7 +38,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IResultOperatorHandler resultOperatorHandler,
             IEntityMaterializerSource entityMaterializerSource,
             IExpressionPrinter expressionPrinter,
-            //IMaterializerFactory materializerFactory,
             QueryCompilationContext queryCompilationContext)
             : base(
                 queryOptimizer,
@@ -57,10 +54,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 resultOperatorHandler,
                 entityMaterializerSource,
                 expressionPrinter,
-                //IMaterializerFactory materializerFactory,
                 queryCompilationContext)
         {
-            //_materializerFactory = materializerFactory;
         }
 
         //public static MethodInfo ProjectionQueryMethodInfo { get; }
@@ -84,7 +79,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private static IQueryable<TEntity> EntityQuery<TEntity>(
             QueryContext queryContext,
             IModel model,
-            //Func<IEntityType, ValueBuffer, object> materializer,
             bool queryStateManager)
             where TEntity : Entity
         {

@@ -11,18 +11,15 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     public class InfoCarrierEntityQueryableExpressionVisitor : EntityQueryableExpressionVisitor
     {
         private readonly IModel model;
-        //private readonly IMaterializerFactory _materializerFactory;
         private readonly IQuerySource querySource;
 
         public InfoCarrierEntityQueryableExpressionVisitor(
             IModel model,
-            //IMaterializerFactory materializerFactory,
             EntityQueryModelVisitor entityQueryModelVisitor,
             IQuerySource querySource)
             : base(entityQueryModelVisitor)
         {
             this.model = model;
-            //_materializerFactory = materializerFactory;
             this.querySource = querySource;
         }
 
@@ -36,13 +33,10 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
             //if (this.QueryModelVisitor.QueryCompilationContext
             //    .QuerySourceRequiresMaterialization(this.querySource))
             {
-                //var materializer = _materializerFactory.CreateMaterializer(entityType);
-
                 return Expression.Call(
                     InfoCarrierQueryModelVisitor.EntityQueryMethodInfo.MakeGenericMethod(elementType),
                     EntityQueryModelVisitor.QueryContextParameter,
                     Expression.Constant(this.model),
-                    //materializer,
                     Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));
             }
 

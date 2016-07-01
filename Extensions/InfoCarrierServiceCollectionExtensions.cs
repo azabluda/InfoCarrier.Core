@@ -21,8 +21,6 @@ namespace InfoCarrier.Core.Client
 
             services.TryAdd(new ServiceCollection()
                 .AddSingleton<InfoCarrierValueGeneratorCache>()
-                //.AddSingleton<IInfoCarrierStoreSource, InfoCarrierStoreSource>()
-                //.AddSingleton<IInfoCarrierTableFactory, InfoCarrierTableFactory>()
                 .AddSingleton<InfoCarrierModelSource>()
                 .AddScoped<InfoCarrierValueGeneratorSelector>()
                 .AddScoped<InfoCarrierDatabaseProviderServices>()
@@ -36,7 +34,6 @@ namespace InfoCarrier.Core.Client
 
         private static IServiceCollection AddQuery(this IServiceCollection serviceCollection)
             => serviceCollection
-                //.AddScoped<IMaterializerFactory, MaterializerFactory>()
                 .AddScoped<InfoCarrierQueryCompilationContextFactory>()
                 .AddScoped<InfoCarrierQueryContextFactory>()
                 .AddScoped<InfoCarrierQueryModelVisitorFactory>()
