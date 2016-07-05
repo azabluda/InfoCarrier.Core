@@ -53,7 +53,7 @@
 
         public override MethodInfo Select => Impl.Select;
 
-        //public override MethodInfo SelectMany => Impl.SelectMany;
+        public override MethodInfo SelectMany => Impl.SelectMany;
 
         //public override MethodInfo Single => Impl.Single;
 

@@ -19,6 +19,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Modeling;
     using Remote.Linq;
     using Remotion.Linq;
+    using Remotion.Linq.Clauses;
     using Utils;
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
@@ -178,6 +179,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // execute any statements locally. Proper optimization will take place on the server-side.
         }
 
+        public override void VisitAdditionalFromClause(
+            AdditionalFromClause fromClause,
+            QueryModel queryModel,
+            int index)
+        {
+            Expression fromExpression = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
+
+            Type collElementType = GetSequenceType(fromExpression.Type);
+
+            MethodInfo miSelectMany =
+                this.LinqOperatorProvider.SelectMany
+                    .MakeGenericMethod(this.CurrentParameter.Type, collElementType);
+
+            Type firstParamDelegateType = miSelectMany.GetParameters()[1].ParameterType.GenericTypeArguments[0];
+
+            this.Expression = Expression.Call(
+                miSelectMany,
+                this.Expression,
+                Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter));
+        }
+
         protected override void IncludeNavigations(QueryModel queryModel)
         {
             if (queryModel.GetOutputDataInfo() is Remotion.Linq.Clauses.StreamedData.StreamedScalarValueInfo)
@@ -204,6 +226,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             // EMPTY: see comment above
         }
+
+        // Simplified version of
+        // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Shared/SharedTypeExtensions.cs#L97
+        private static Type GetSequenceType(Type type) =>
+            (type.IsInterface ? type.Yield() : type.GetInterfaces())
+                .SingleOrDefault(
+                    i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>))?
+                .GenericTypeArguments.Single();
 
         private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
         {
@@ -274,11 +304,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 foreach (PropertyInfo inclProp in this.includeResultOperator.ChainedNavigationProperties)
                 {
-                    Type collElementType =
-                        (toType.IsInterface ? toType.Yield() : toType.GetInterfaces())
-                            .SingleOrDefault(
-                                i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>))?
-                            .GenericTypeArguments.Single();
+                    Type collElementType = GetSequenceType(toType);
 
                     IIncludableQueryable<object, object> refArg = null;
                     IIncludableQueryable<object, ICollection<object>> collArg = null;
