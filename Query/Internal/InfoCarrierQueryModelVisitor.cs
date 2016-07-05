@@ -172,6 +172,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
             return qry;
         }
 
+        protected override void OptimizeQueryModel(QueryModel queryModel)
+        {
+            // Suppress query optimization (flattening of subqueries, etc.), because we are not going to
+            // execute any statements locally. Proper optimization will take place on the server-side.
+        }
+
         protected override void IncludeNavigations(QueryModel queryModel)
         {
             if (queryModel.GetOutputDataInfo() is Remotion.Linq.Clauses.StreamedData.StreamedScalarValueInfo)
