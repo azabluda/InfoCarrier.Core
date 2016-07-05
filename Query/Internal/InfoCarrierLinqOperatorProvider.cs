@@ -11,61 +11,61 @@
 
     internal class InfoCarrierLinqOperatorProvider : LinqOperatorProvider
     {
-        public override MethodInfo All => Impl.All;
+        //public override MethodInfo All => Impl.All;
 
-        public override MethodInfo Any => Impl.Any;
+        //public override MethodInfo Any => Impl.Any;
 
-        public override MethodInfo Cast => Impl.Cast;
+        //public override MethodInfo Cast => Impl.Cast;
 
-        public override MethodInfo Concat => Impl.Concat;
+        //public override MethodInfo Concat => Impl.Concat;
 
-        public override MethodInfo Count => Impl.Count;
+        //public override MethodInfo Count => Impl.Count;
 
-        public override MethodInfo DefaultIfEmpty => Impl.DefaultIfEmpty;
+        //public override MethodInfo DefaultIfEmpty => Impl.DefaultIfEmpty;
 
-        public override MethodInfo DefaultIfEmptyArg => Impl.DefaultIfEmptyArg;
+        //public override MethodInfo DefaultIfEmptyArg => Impl.DefaultIfEmptyArg;
 
-        public override MethodInfo Distinct => Impl.Distinct;
+        //public override MethodInfo Distinct => Impl.Distinct;
 
-        public override MethodInfo Except => Impl.Except;
+        //public override MethodInfo Except => Impl.Except;
 
         public override MethodInfo First => Impl.First;
 
-        public override MethodInfo FirstOrDefault => Impl.FirstOrDefault;
+        //public override MethodInfo FirstOrDefault => Impl.FirstOrDefault;
 
-        public override MethodInfo GroupBy => Impl.GroupBy;
+        //public override MethodInfo GroupBy => Impl.GroupBy;
 
-        public override MethodInfo GroupJoin => Impl.GroupJoin;
+        //public override MethodInfo GroupJoin => Impl.GroupJoin;
 
-        public override MethodInfo Intersect => Impl.Intersect;
+        //public override MethodInfo Intersect => Impl.Intersect;
 
-        public override MethodInfo Join => Impl.Join;
+        //public override MethodInfo Join => Impl.Join;
 
-        public override MethodInfo Last => Impl.Last;
+        //public override MethodInfo Last => Impl.Last;
 
-        public override MethodInfo LastOrDefault => Impl.LastOrDefault;
+        //public override MethodInfo LastOrDefault => Impl.LastOrDefault;
 
-        public override MethodInfo LongCount => Impl.LongCount;
+        //public override MethodInfo LongCount => Impl.LongCount;
 
-        public override MethodInfo OfType => Impl.OfType;
+        //public override MethodInfo OfType => Impl.OfType;
 
         public override MethodInfo OrderBy => Impl.OrderBy;
 
         public override MethodInfo Select => Impl.Select;
 
-        public override MethodInfo SelectMany => Impl.SelectMany;
+        //public override MethodInfo SelectMany => Impl.SelectMany;
 
-        public override MethodInfo Single => Impl.Single;
+        //public override MethodInfo Single => Impl.Single;
 
-        public override MethodInfo SingleOrDefault => Impl.SingleOrDefault;
+        //public override MethodInfo SingleOrDefault => Impl.SingleOrDefault;
 
-        public override MethodInfo Skip => Impl.Skip;
+        //public override MethodInfo Skip => Impl.Skip;
 
-        public override MethodInfo Take => Impl.Take;
+        //public override MethodInfo Take => Impl.Take;
 
         public override MethodInfo ThenBy => Impl.ThenBy;
 
-        public override MethodInfo Union => Impl.Union;
+        //public override MethodInfo Union => Impl.Union;
 
         public override MethodInfo Where => Impl.Where;
 
