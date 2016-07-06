@@ -89,7 +89,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IQueryable<TEntity> qry = RemoteQueryable.Create<TEntity>(
                 dataProvider: arg =>
                 {
-                    sctx.GetLogger(sctx).Debug($"Execute query on the server: {arg}");
+                    IInfoCarrierLogger logger = sctx.GetLogger(sctx);
+                    logger.Debug("Execute query on the server");
+                    logger.Debug(arg);
 
                     using (var xmlMsg = new ServiceMessage(sctx.SessionId, sctx.ServerPublicKey))
                     {
