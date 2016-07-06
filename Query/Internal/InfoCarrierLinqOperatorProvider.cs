@@ -31,7 +31,7 @@
 
         public override MethodInfo First => Impl.First;
 
-        //public override MethodInfo FirstOrDefault => Impl.FirstOrDefault;
+        public override MethodInfo FirstOrDefault => Impl.FirstOrDefault;
 
         //public override MethodInfo GroupBy => Impl.GroupBy;
 
@@ -41,9 +41,9 @@
 
         //public override MethodInfo Join => Impl.Join;
 
-        //public override MethodInfo Last => Impl.Last;
+        public override MethodInfo Last => Impl.Last;
 
-        //public override MethodInfo LastOrDefault => Impl.LastOrDefault;
+        public override MethodInfo LastOrDefault => Impl.LastOrDefault;
 
         //public override MethodInfo LongCount => Impl.LongCount;
 
@@ -55,9 +55,9 @@
 
         public override MethodInfo SelectMany => Impl.SelectMany;
 
-        //public override MethodInfo Single => Impl.Single;
+        public override MethodInfo Single => Impl.Single;
 
-        //public override MethodInfo SingleOrDefault => Impl.SingleOrDefault;
+        public override MethodInfo SingleOrDefault => Impl.SingleOrDefault;
 
         //public override MethodInfo Skip => Impl.Skip;
 
