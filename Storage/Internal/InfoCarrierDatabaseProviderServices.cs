@@ -38,7 +38,5 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public override IEntityQueryableExpressionVisitorFactory EntityQueryableExpressionVisitorFactory => this.GetService<InfoCarrierEntityQueryableExpressionVisitorFactory>();
 
         public override IEntityQueryModelVisitorFactory EntityQueryModelVisitorFactory => this.GetService<InfoCarrierQueryModelVisitorFactory>();
-
-        public override IQueryCompilationContextFactory QueryCompilationContextFactory => this.GetService<InfoCarrierQueryCompilationContextFactory>();
     }
 }

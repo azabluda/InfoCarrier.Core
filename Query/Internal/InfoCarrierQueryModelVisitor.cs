@@ -24,6 +24,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
+        private readonly ILinqOperatorProvider queryableLinqOperatorProvider = new InfoCarrierLinqOperatorProvider();
+
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
             INavigationRewritingExpressionVisitorFactory navigationRewritingExpressionVisitorFactory,
@@ -57,6 +59,28 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 expressionPrinter,
                 queryCompilationContext)
         {
+        }
+
+        private bool ExpressionIsQueryable =>
+            this.Expression != null
+            && IsQueryable(this.Expression.Type);
+
+        public override ILinqOperatorProvider LinqOperatorProvider
+        {
+            get
+            {
+                if (!this.ExpressionIsQueryable)
+                {
+                    return base.LinqOperatorProvider;
+                }
+
+                if (base.LinqOperatorProvider is AsyncLinqOperatorProvider)
+                {
+                    throw new NotImplementedException();
+                }
+
+                return this.queryableLinqOperatorProvider;
+            }
         }
 
         //public static MethodInfo ProjectionQueryMethodInfo { get; }
@@ -186,6 +210,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
             QueryModel queryModel,
             int index)
         {
+            if (!this.ExpressionIsQueryable)
+            {
+                base.VisitAdditionalFromClause(fromClause, queryModel, index);
+                return;
+            }
+
             Expression fromExpression = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
 
             Type collElementType = GetSequenceType(fromExpression.Type);
@@ -236,6 +266,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 .SingleOrDefault(
                     i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>))?
                 .GenericTypeArguments.Single();
+
+        private static bool IsQueryable(Type type)
+        {
+            if (type.IsInterface
+                && type.IsGenericType
+                && type.GetGenericTypeDefinition() == typeof(IQueryable<>))
+            {
+                return true;
+            }
+
+            return type.IsGenericType
+                && type.GetGenericTypeDefinition().GetInterfaces().Contains(typeof(IQueryable<>));
+        }
 
         private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
         {
