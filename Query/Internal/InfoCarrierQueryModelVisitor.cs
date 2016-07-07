@@ -74,7 +74,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return base.LinqOperatorProvider;
                 }
 
-                if (base.LinqOperatorProvider is AsyncLinqOperatorProvider)
+                if (!(base.LinqOperatorProvider is LinqOperatorProvider))
                 {
                     throw new NotImplementedException();
                 }

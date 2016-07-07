@@ -34,6 +34,7 @@ namespace InfoCarrier.Core.Client
 
         private static IServiceCollection AddQuery(this IServiceCollection serviceCollection)
             => serviceCollection
+                .AddScoped<InfoCarrierQueryCompilationContextFactory>()
                 .AddScoped<InfoCarrierQueryContextFactory>()
                 .AddScoped<InfoCarrierQueryModelVisitorFactory>()
                 .AddScoped<InfoCarrierEntityQueryableExpressionVisitorFactory>();
