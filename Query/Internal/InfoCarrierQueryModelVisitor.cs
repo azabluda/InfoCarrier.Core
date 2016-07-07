@@ -24,8 +24,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
     public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
-        private readonly ILinqOperatorProvider queryableLinqOperatorProvider = new InfoCarrierLinqOperatorProvider();
-
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
             INavigationRewritingExpressionVisitorFactory navigationRewritingExpressionVisitorFactory,
@@ -65,23 +63,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.Expression != null
             && IsQueryable(this.Expression.Type);
 
-        public override ILinqOperatorProvider LinqOperatorProvider
-        {
-            get
-            {
-                if (!this.ExpressionIsQueryable)
-                {
-                    return base.LinqOperatorProvider;
-                }
-
-                if (!(base.LinqOperatorProvider is LinqOperatorProvider))
-                {
-                    throw new NotImplementedException();
-                }
-
-                return this.queryableLinqOperatorProvider;
-            }
-        }
+        public override ILinqOperatorProvider LinqOperatorProvider =>
+            this.ExpressionIsQueryable
+            ? InfoCarrierQueryableLinqOperatorProvider.Instance
+            : InfoCarrierEnumerableLinqOperatorProvider.Instance;
 
         //public static MethodInfo ProjectionQueryMethodInfo { get; }
         //    = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
