@@ -195,12 +195,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             QueryModel queryModel,
             int index)
         {
-            if (!this.ExpressionIsQueryable)
-            {
-                base.VisitAdditionalFromClause(fromClause, queryModel, index);
-                return;
-            }
-
             Expression fromExpression = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
 
             Type collElementType = GetSequenceType(fromExpression.Type);
@@ -209,12 +203,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 this.LinqOperatorProvider.SelectMany
                     .MakeGenericMethod(this.CurrentParameter.Type, collElementType);
 
-            Type firstParamDelegateType = miSelectMany.GetParameters()[1].ParameterType.GenericTypeArguments[0];
+            Type firstParamDelegateType = miSelectMany.GetParameters()[1].ParameterType;
+            if (this.ExpressionIsQueryable)
+            {
+                firstParamDelegateType = firstParamDelegateType.GenericTypeArguments[0];
+            }
 
             this.Expression = Expression.Call(
                 miSelectMany,
                 this.Expression,
                 Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter));
+
+            // TODO: We can't reimplement the following line of base.VisitAdditionalFromClause. May this be a problem?
+            // > IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
         }
 
         protected override void IncludeNavigations(QueryModel queryModel)
