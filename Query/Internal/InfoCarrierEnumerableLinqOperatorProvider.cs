@@ -35,6 +35,9 @@
         public override MethodInfo Concat { get; } =
             GetMethod(() => Enumerable.Concat<object>(null, null));
 
+        public override MethodInfo Contains { get; } =
+            GetMethod(() => Enumerable.Contains<object>(null, null));
+
         public override MethodInfo Count { get; } =
             GetMethod(() => Enumerable.Count<object>(null));
 

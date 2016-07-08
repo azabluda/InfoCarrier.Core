@@ -35,6 +35,9 @@
         public override MethodInfo Concat { get; } =
             GetMethod(() => Queryable.Concat<object>(null, null));
 
+        public override MethodInfo Contains { get; } =
+            GetMethod(() => Queryable.Contains<object>(null, null));
+
         public override MethodInfo Count { get; } =
             GetMethod(() => Queryable.Count<object>(null));
 
