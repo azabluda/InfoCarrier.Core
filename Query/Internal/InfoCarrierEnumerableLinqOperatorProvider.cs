@@ -6,22 +6,22 @@
     using System.Linq.Expressions;
     using System.Reflection;
     using Microsoft.EntityFrameworkCore.Query.Internal;
-    using Remotion.Linq.Clauses;
     using Utils;
 
-    internal class InfoCarrierEnumerableLinqOperatorProvider : LinqOperatorProvider
+    internal class InfoCarrierEnumerableLinqOperatorProvider : LinqOperatorProvider,
+        IInfoCarrierLinqOperatorProvider
     {
         private static readonly Func<object, bool> DummyPredicate = null;
         private static readonly Func<object, IEnumerable<object>> DummyPredicateEnum = null;
 
-        private static readonly Lazy<ILinqOperatorProvider> Inst =
-            new Lazy<ILinqOperatorProvider>(() => new InfoCarrierEnumerableLinqOperatorProvider());
+        private static readonly Lazy<IInfoCarrierLinqOperatorProvider> Inst =
+            new Lazy<IInfoCarrierLinqOperatorProvider>(() => new InfoCarrierEnumerableLinqOperatorProvider());
 
         private InfoCarrierEnumerableLinqOperatorProvider()
         {
         }
 
-        public static ILinqOperatorProvider Instance => Inst.Value;
+        public static IInfoCarrierLinqOperatorProvider Instance => Inst.Value;
 
         public override MethodInfo All { get; } =
             GetMethod(() => Enumerable.All<object>(null, null));
@@ -84,7 +84,10 @@
             GetMethod(() => Enumerable.OfType<object>(null));
 
         public override MethodInfo OrderBy { get; } =
-            GetMethod(() => OrderByImpl<object, object>(null, null, OrderingDirection.Asc));
+            GetMethod(() => Enumerable.OrderBy<object, object>(null, null));
+
+        public virtual MethodInfo OrderByDescending { get; } =
+            GetMethod(() => Enumerable.OrderByDescending<object, object>(null, null));
 
         public override MethodInfo Select { get; } =
             GetMethod(() => Enumerable.Select(null, DummyPredicate));
@@ -105,7 +108,10 @@
             GetMethod(() => Enumerable.Take<object>(null, 1));
 
         public override MethodInfo ThenBy { get; } =
-            GetMethod(() => ThenByImpl<object, object>(null, null, OrderingDirection.Asc));
+            GetMethod(() => Enumerable.ThenBy<object, object>(null, null));
+
+        public virtual MethodInfo ThenByDescending { get; } =
+            GetMethod(() => Enumerable.ThenByDescending<object, object>(null, null));
 
         public override MethodInfo Union { get; } =
             GetMethod(() => Enumerable.Union<object>(null, null));
@@ -118,17 +124,5 @@
             MethodInfo mi = SymbolExtensions.GetMethodInfo(expression);
             return mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi;
         }
-
-        private static IOrderedEnumerable<TSource> OrderByImpl<TSource, TKey>(
-            IEnumerable<TSource> source, Func<TSource, TKey> expression, OrderingDirection orderingDirection)
-            => orderingDirection == OrderingDirection.Asc
-                ? source.OrderBy(expression)
-                : source.OrderByDescending(expression);
-
-        private static IOrderedEnumerable<TSource> ThenByImpl<TSource, TKey>(
-            IOrderedEnumerable<TSource> source, Func<TSource, TKey> expression, OrderingDirection orderingDirection)
-            => orderingDirection == OrderingDirection.Asc
-                ? source.ThenBy(expression)
-                : source.ThenByDescending(expression);
     }
 }

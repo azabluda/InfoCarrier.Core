@@ -63,10 +63,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.Expression != null
             && IsQueryable(this.Expression.Type);
 
-        public override ILinqOperatorProvider LinqOperatorProvider =>
+        internal virtual IInfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
             this.ExpressionIsQueryable
             ? InfoCarrierQueryableLinqOperatorProvider.Instance
             : InfoCarrierEnumerableLinqOperatorProvider.Instance;
+
+        public override ILinqOperatorProvider LinqOperatorProvider =>
+            this.InfoCarrierLinqOperatorProvider;
 
         //public static MethodInfo ProjectionQueryMethodInfo { get; }
         //    = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
@@ -218,6 +221,25 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // > IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
         }
 
+        public override void VisitOrdering(Ordering ordering, QueryModel queryModel, OrderByClause orderByClause, int index)
+        {
+            Expression expression = this.ReplaceClauseReferences(ordering.Expression);
+
+            MethodInfo miOrdering = index == 0
+                ? (ordering.OrderingDirection == OrderingDirection.Asc
+                    ? this.InfoCarrierLinqOperatorProvider.OrderBy
+                    : this.InfoCarrierLinqOperatorProvider.OrderByDescending)
+                : (ordering.OrderingDirection == OrderingDirection.Asc
+                    ? this.InfoCarrierLinqOperatorProvider.ThenBy
+                    : this.InfoCarrierLinqOperatorProvider.ThenByDescending);
+
+            this.Expression
+                = Expression.Call(
+                    miOrdering.MakeGenericMethod(this.CurrentParameter.Type, expression.Type),
+                    this.Expression,
+                    Expression.Lambda(expression, this.CurrentParameter));
+        }
+
         protected override void IncludeNavigations(QueryModel queryModel)
         {
             if (queryModel.GetOutputDataInfo() is Remotion.Linq.Clauses.StreamedData.StreamedScalarValueInfo)
@@ -262,8 +284,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return true;
             }
 
-            return type.IsGenericType
-                && type.GetGenericTypeDefinition().GetInterfaces().Contains(typeof(IQueryable<>));
+            return type.GetInterfaces().Any(IsQueryable);
         }
 
         private sealed class DynamicObjectEntityMapper : DynamicObjectMapper

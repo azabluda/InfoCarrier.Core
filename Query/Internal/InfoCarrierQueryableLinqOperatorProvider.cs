@@ -6,22 +6,22 @@
     using System.Linq.Expressions;
     using System.Reflection;
     using Microsoft.EntityFrameworkCore.Query.Internal;
-    using Remotion.Linq.Clauses;
     using Utils;
 
-    internal class InfoCarrierQueryableLinqOperatorProvider : LinqOperatorProvider
+    internal class InfoCarrierQueryableLinqOperatorProvider : LinqOperatorProvider,
+        IInfoCarrierLinqOperatorProvider
     {
         private static readonly Expression<Func<object, bool>> DummyPredicate = null;
         private static readonly Expression<Func<object, IEnumerable<object>>> DummyPredicateEnum = null;
 
-        private static readonly Lazy<ILinqOperatorProvider> Inst =
-            new Lazy<ILinqOperatorProvider>(() => new InfoCarrierQueryableLinqOperatorProvider());
+        private static readonly Lazy<IInfoCarrierLinqOperatorProvider> Inst =
+            new Lazy<IInfoCarrierLinqOperatorProvider>(() => new InfoCarrierQueryableLinqOperatorProvider());
 
         private InfoCarrierQueryableLinqOperatorProvider()
         {
         }
 
-        public static ILinqOperatorProvider Instance => Inst.Value;
+        public static IInfoCarrierLinqOperatorProvider Instance => Inst.Value;
 
         public override MethodInfo All { get; } =
             GetMethod(() => Queryable.All<object>(null, null));
@@ -85,7 +85,10 @@
             GetMethod(() => Queryable.OfType<object>(null));
 
         public override MethodInfo OrderBy { get; } =
-            GetMethod(() => OrderByImpl<object, object>(null, null, OrderingDirection.Asc));
+            GetMethod(() => Queryable.OrderBy<object, object>(null, null));
+
+        public virtual MethodInfo OrderByDescending { get; } =
+            GetMethod(() => Queryable.OrderByDescending<object, object>(null, null));
 
         public override MethodInfo Select { get; } =
             GetMethod(() => Queryable.Select(null, DummyPredicate));
@@ -106,7 +109,10 @@
             GetMethod(() => Queryable.Take<object>(null, 1));
 
         public override MethodInfo ThenBy { get; } =
-            GetMethod(() => ThenByImpl<object, object>(null, null, OrderingDirection.Asc));
+            GetMethod(() => Queryable.ThenBy<object, object>(null, null));
+
+        public virtual MethodInfo ThenByDescending { get; } =
+            GetMethod(() => Queryable.ThenByDescending<object, object>(null, null));
 
         public override MethodInfo Union { get; } =
             GetMethod(() => Queryable.Union<object>(null, null));
@@ -119,17 +125,5 @@
             MethodInfo mi = SymbolExtensions.GetMethodInfo(expression);
             return mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi;
         }
-
-        private static IOrderedQueryable<TSource> OrderByImpl<TSource, TKey>(
-            IQueryable<TSource> source, Expression<Func<TSource, TKey>> expression, OrderingDirection orderingDirection)
-            => orderingDirection == OrderingDirection.Asc
-                ? source.OrderBy(expression)
-                : source.OrderByDescending(expression);
-
-        private static IOrderedQueryable<TSource> ThenByImpl<TSource, TKey>(
-            IOrderedQueryable<TSource> source, Expression<Func<TSource, TKey>> expression, OrderingDirection orderingDirection)
-            => orderingDirection == OrderingDirection.Asc
-                ? source.ThenBy(expression)
-                : source.ThenByDescending(expression);
     }
 }
