@@ -60,7 +60,7 @@
             GetMethod(() => Enumerable.FirstOrDefault<object>(null));
 
         public override MethodInfo GroupBy { get; } =
-            GetMethod(() => Enumerable.GroupBy(null, DummyPredicate, DummyPredicate));
+            GetMethod(() => Enumerable.GroupBy<object, object, bool>(null, null, DummyPredicate));
 
         public override MethodInfo GroupJoin { get; } =
             GetMethod(() => Enumerable.GroupJoin<object, object, object, object>(null, null, null, null, null));
@@ -93,7 +93,7 @@
             GetMethod(() => Enumerable.Select(null, DummyPredicate));
 
         public override MethodInfo SelectMany { get; } =
-            GetMethod(() => Enumerable.SelectMany(null, DummyPredicateEnum));
+            GetMethod(() => Enumerable.SelectMany<object, object, object>(null, DummyPredicateEnum, null));
 
         public override MethodInfo Single { get; } =
             GetMethod(() => Enumerable.Single<object>(null));

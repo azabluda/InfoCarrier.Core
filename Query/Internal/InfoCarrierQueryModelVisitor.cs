@@ -22,7 +22,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remotion.Linq.Clauses;
     using Utils;
 
-    public class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
+    public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
@@ -198,13 +198,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
             QueryModel queryModel,
             int index)
         {
-            Expression fromExpression = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
+            var fromExpression
+                = CompileAdditionalFromClauseExpression(fromClause, queryModel);
 
-            Type collElementType = GetSequenceType(fromExpression.Type);
+            var innerItemParameter
+                = Expression.Parameter(
+                    GetSequenceType(fromExpression.Type), fromClause.ItemName);
 
-            MethodInfo miSelectMany =
-                this.LinqOperatorProvider.SelectMany
-                    .MakeGenericMethod(this.CurrentParameter.Type, collElementType);
+            var transparentIdentifierType
+                = typeof(TransparentIdentifier<,>)
+                    .MakeGenericType(CurrentParameter.Type, innerItemParameter.Type);
+
+            MethodInfo miSelectMany
+                = LinqOperatorProvider.SelectMany
+                    .MakeGenericMethod(
+                        CurrentParameter.Type,
+                        innerItemParameter.Type,
+                        transparentIdentifierType);
 
             Type firstParamDelegateType = miSelectMany.GetParameters()[1].ParameterType;
             if (this.ExpressionIsQueryable)
@@ -212,13 +222,18 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 firstParamDelegateType = firstParamDelegateType.GenericTypeArguments[0];
             }
 
-            this.Expression = Expression.Call(
-                miSelectMany,
-                this.Expression,
-                Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter));
+            this.Expression
+                = Expression.Call(
+                    miSelectMany,
+                    this.Expression,
+                    Expression.Lambda(firstParamDelegateType, fromExpression, CurrentParameter),
+                    Expression.Lambda(
+                        CallCreateTransparentIdentifier(
+                            transparentIdentifierType, CurrentParameter, innerItemParameter),
+                        CurrentParameter,
+                        innerItemParameter));
 
-            // TODO: We can't reimplement the following line of base.VisitAdditionalFromClause. May this be a problem?
-            // > IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
+            IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
         }
 
         public override void VisitOrdering(Ordering ordering, QueryModel queryModel, OrderByClause orderByClause, int index)
@@ -238,6 +253,54 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     miOrdering.MakeGenericMethod(this.CurrentParameter.Type, expression.Type),
                     this.Expression,
                     Expression.Lambda(expression, this.CurrentParameter));
+        }
+
+        public override void VisitJoinClause(JoinClause joinClause, QueryModel queryModel, int index)
+        {
+            var outerKeySelectorExpression
+                = ReplaceClauseReferences(joinClause.OuterKeySelector, joinClause);
+
+            var innerSequenceExpression
+                = CompileJoinClauseInnerSequenceExpression(joinClause, queryModel);
+
+            var innerItemParameter
+                = Expression.Parameter(
+                    GetSequenceType(innerSequenceExpression.Type), joinClause.ItemName);
+
+            if (!this.QueryCompilationContext.QuerySourceMapping.ContainsMapping(joinClause))
+            {
+                this.QueryCompilationContext.QuerySourceMapping
+                    .AddMapping(joinClause, innerItemParameter);
+            }
+
+            var innerKeySelectorExpression
+                = ReplaceClauseReferences(joinClause.InnerKeySelector, joinClause);
+
+            var transparentIdentifierType
+                = typeof(TransparentIdentifier<,>)
+                    .MakeGenericType(CurrentParameter.Type, innerItemParameter.Type);
+
+            this.Expression
+                = Expression.Call(
+                    LinqOperatorProvider.Join
+                        .MakeGenericMethod(
+                            CurrentParameter.Type,
+                            innerItemParameter.Type,
+                            outerKeySelectorExpression.Type,
+                            transparentIdentifierType),
+                    this.Expression,
+                    innerSequenceExpression,
+                    Expression.Lambda(outerKeySelectorExpression, CurrentParameter),
+                    Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
+                    Expression.Lambda(
+                        CallCreateTransparentIdentifier(
+                            transparentIdentifierType,
+                            CurrentParameter,
+                            innerItemParameter),
+                        CurrentParameter,
+                        innerItemParameter));
+
+            IntroduceTransparentScope(joinClause, queryModel, index, transparentIdentifierType);
         }
 
         protected override void IncludeNavigations(QueryModel queryModel)

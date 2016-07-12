@@ -61,7 +61,7 @@
             GetMethod(() => Queryable.FirstOrDefault<object>(null));
 
         public override MethodInfo GroupBy { get; } =
-            GetMethod(() => Queryable.GroupBy(null, DummyPredicate, DummyPredicate));
+            GetMethod(() => Queryable.GroupBy<object, object, bool>(null, null, DummyPredicate));
 
         public override MethodInfo GroupJoin { get; } =
             GetMethod(() => Queryable.GroupJoin<object, object, object, object>(null, null, null, null, null));
@@ -94,7 +94,7 @@
             GetMethod(() => Queryable.Select(null, DummyPredicate));
 
         public override MethodInfo SelectMany { get; } =
-            GetMethod(() => Queryable.SelectMany(null, DummyPredicateEnum));
+            GetMethod(() => Queryable.SelectMany<object, object, object>(null, DummyPredicateEnum, null));
 
         public override MethodInfo Single { get; } =
             GetMethod(() => Queryable.Single<object>(null));
