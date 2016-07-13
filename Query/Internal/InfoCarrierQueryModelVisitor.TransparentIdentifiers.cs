@@ -1,56 +1,58 @@
 ﻿namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
+    using Utils;
 
     // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L1027
     public partial class InfoCarrierQueryModelVisitor
     {
-        private const string CreateTransparentIdentifierMethodName = "CreateTransparentIdentifier";
         private int _transparentParameterCounter;
 
-        private struct TransparentIdentifier<TOuter, TInner>
+        private Type GetTransparentIdentifierType(Type outer, Type inner)
         {
-            public static TransparentIdentifier<TOuter, TInner> CreateTransparentIdentifier(TOuter outer, TInner inner)
-                => new TransparentIdentifier<TOuter, TInner>(outer, inner);
+            return SymbolExtensions.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
+                .GetGenericMethodDefinition()
+                .MakeGenericMethod(outer, inner)
+                .ToDelegate<Func<Type>>()
+                .Invoke();
+        }
 
-            private TransparentIdentifier(TOuter outer, TInner inner)
-            {
-                Outer = outer;
-                Inner = inner;
-            }
-
-            public TOuter Outer;
-
-            public TInner Inner;
+        private static Type GetTransparentIdentifierType<TOuter, TInner>()
+        {
+            var transparentIdentifier = new {Outer = default(TOuter), Inner = default(TInner)};
+            return transparentIdentifier.GetType();
         }
 
         private static Expression CallCreateTransparentIdentifier(
             Type transparentIdentifierType, Expression outerExpression, Expression innerExpression)
         {
-            var createTransparentIdentifierMethodInfo
-                = transparentIdentifierType.GetTypeInfo().GetDeclaredMethod(CreateTransparentIdentifierMethodName);
-
-            return Expression.Call(createTransparentIdentifierMethodInfo, outerExpression, innerExpression);
+            ConstructorInfo ctor = transparentIdentifierType.GetTypeInfo().DeclaredConstructors.Single();
+            return Expression.New(
+                ctor,
+                new[] {outerExpression, innerExpression},
+                transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer"),
+                transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner"));
         }
 
         private static Expression AccessOuterTransparentField(
             Type transparentIdentifierType, Expression targetExpression)
         {
-            var fieldInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredField("Outer");
+            var propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer");
 
-            return Expression.Field(targetExpression, fieldInfo);
+            return Expression.Property(targetExpression, propertyInfo);
         }
 
         private static Expression AccessInnerTransparentField(
             Type transparentIdentifierType, Expression targetExpression)
         {
-            var fieldInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredField("Inner");
+            var propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner");
 
-            return Expression.Field(targetExpression, fieldInfo);
+            return Expression.Property(targetExpression, propertyInfo);
         }
 
         private void IntroduceTransparentScope(

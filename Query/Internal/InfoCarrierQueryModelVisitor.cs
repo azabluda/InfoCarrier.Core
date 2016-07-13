@@ -205,9 +205,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 = Expression.Parameter(
                     GetSequenceType(fromExpression.Type), fromClause.ItemName);
 
-            var transparentIdentifierType
-                = typeof(TransparentIdentifier<,>)
-                    .MakeGenericType(CurrentParameter.Type, innerItemParameter.Type);
+            var transparentIdentifierType = GetTransparentIdentifierType(
+                CurrentParameter.Type,
+                innerItemParameter.Type);
 
             MethodInfo miSelectMany
                 = LinqOperatorProvider.SelectMany
@@ -276,9 +276,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             var innerKeySelectorExpression
                 = ReplaceClauseReferences(joinClause.InnerKeySelector, joinClause);
 
-            var transparentIdentifierType
-                = typeof(TransparentIdentifier<,>)
-                    .MakeGenericType(CurrentParameter.Type, innerItemParameter.Type);
+            var transparentIdentifierType = GetTransparentIdentifierType(
+                CurrentParameter.Type,
+                innerItemParameter.Type);
 
             this.Expression
                 = Expression.Call(
@@ -330,13 +330,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // EMPTY: see comment above
         }
 
-        // Simplified version of
-        // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Shared/SharedTypeExtensions.cs#L97
-        private static Type GetSequenceType(Type type) =>
-            (type.IsInterface ? type.Yield() : type.GetInterfaces())
-                .SingleOrDefault(
-                    i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>))?
-                .GenericTypeArguments.Single();
+        private static Type GetSequenceType(Type type)
+        {
+            Type result = Aqua.TypeSystem.TypeHelper.GetElementType(type);
+            return result == type ? null : result;
+        }
 
         private static bool IsQueryable(Type type)
         {
