@@ -303,6 +303,64 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.IntroduceTransparentScope(joinClause, queryModel, index, transparentIdentifierType);
         }
 
+        public override void VisitGroupJoinClause(GroupJoinClause groupJoinClause, QueryModel queryModel, int index)
+        {
+            var outerKeySelectorExpression
+                = this.ReplaceClauseReferences(groupJoinClause.JoinClause.OuterKeySelector, groupJoinClause);
+
+            var innerSequenceExpression
+                = this.CompileGroupJoinInnerSequenceExpression(groupJoinClause, queryModel);
+
+            var innerItemParameter
+                = Expression.Parameter(
+                    GetSequenceType(innerSequenceExpression.Type),
+                    groupJoinClause.JoinClause.ItemName);
+
+            if (!this.QueryCompilationContext.QuerySourceMapping.ContainsMapping(groupJoinClause.JoinClause))
+            {
+                this.QueryCompilationContext.QuerySourceMapping
+                    .AddMapping(groupJoinClause.JoinClause, innerItemParameter);
+            }
+            else
+            {
+                this.QueryCompilationContext.QuerySourceMapping
+                    .ReplaceMapping(groupJoinClause.JoinClause, innerItemParameter);
+            }
+
+            var innerKeySelectorExpression
+                = this.ReplaceClauseReferences(groupJoinClause.JoinClause.InnerKeySelector, groupJoinClause);
+
+            var innerItemsParameter
+                = Expression.Parameter(
+                    this.LinqOperatorProvider.MakeSequenceType(innerItemParameter.Type),
+                    groupJoinClause.ItemName);
+
+            var transparentIdentifierType
+                = GetTransparentIdentifierType(this.CurrentParameter.Type, innerItemsParameter.Type);
+
+            this.Expression
+                = Expression.Call(
+                    this.LinqOperatorProvider.GroupJoin
+                        .MakeGenericMethod(
+                            this.CurrentParameter.Type,
+                            innerItemParameter.Type,
+                            outerKeySelectorExpression.Type,
+                            transparentIdentifierType),
+                    this.Expression,
+                    innerSequenceExpression,
+                    Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
+                    Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
+                    Expression.Lambda(
+                        CallCreateTransparentIdentifier(
+                            transparentIdentifierType,
+                            this.CurrentParameter,
+                            innerItemsParameter),
+                        this.CurrentParameter,
+                        innerItemsParameter));
+
+            this.IntroduceTransparentScope(groupJoinClause, queryModel, index, transparentIdentifierType);
+        }
+
         protected override void IncludeNavigations(QueryModel queryModel)
         {
             if (queryModel.GetOutputDataInfo() is Remotion.Linq.Clauses.StreamedData.StreamedScalarValueInfo)
