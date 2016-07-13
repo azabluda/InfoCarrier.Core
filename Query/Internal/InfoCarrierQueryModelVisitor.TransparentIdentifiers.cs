@@ -11,9 +11,9 @@
     // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L1027
     public partial class InfoCarrierQueryModelVisitor
     {
-        private int _transparentParameterCounter;
+        private int transparentParameterCounter;
 
-        private Type GetTransparentIdentifierType(Type outer, Type inner)
+        private static Type GetTransparentIdentifierType(Type outer, Type inner)
         {
             return SymbolExtensions.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
                 .GetGenericMethodDefinition()
@@ -24,7 +24,7 @@
 
         private static Type GetTransparentIdentifierType<TOuter, TInner>()
         {
-            var transparentIdentifier = new {Outer = default(TOuter), Inner = default(TInner)};
+            var transparentIdentifier = new { Outer = default(TOuter), Inner = default(TInner) };
             return transparentIdentifier.GetType();
         }
 
@@ -34,7 +34,7 @@
             ConstructorInfo ctor = transparentIdentifierType.GetTypeInfo().DeclaredConstructors.Single();
             return Expression.New(
                 ctor,
-                new[] {outerExpression, innerExpression},
+                new[] { outerExpression, innerExpression },
                 transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer"),
                 transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner"));
         }
@@ -42,7 +42,7 @@
         private static Expression AccessOuterTransparentField(
             Type transparentIdentifierType, Expression targetExpression)
         {
-            var propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer");
+            PropertyInfo propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer");
 
             return Expression.Property(targetExpression, propertyInfo);
         }
@@ -50,7 +50,7 @@
         private static Expression AccessInnerTransparentField(
             Type transparentIdentifierType, Expression targetExpression)
         {
-            var propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner");
+            PropertyInfo propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner");
 
             return Expression.Property(targetExpression, propertyInfo);
         }
@@ -58,13 +58,13 @@
         private void IntroduceTransparentScope(
             IQuerySource fromClause, QueryModel queryModel, int index, Type transparentIdentifierType)
         {
-            CurrentParameter
-                = Expression.Parameter(transparentIdentifierType, $"t{_transparentParameterCounter++}");
+            this.CurrentParameter
+                = Expression.Parameter(transparentIdentifierType, $"t{this.transparentParameterCounter++}");
 
-            var outerAccessExpression
-                = AccessOuterTransparentField(transparentIdentifierType, CurrentParameter);
+            Expression outerAccessExpression
+                = AccessOuterTransparentField(transparentIdentifierType, this.CurrentParameter);
 
-            RescopeTransparentAccess(queryModel.MainFromClause, outerAccessExpression);
+            this.RescopeTransparentAccess(queryModel.MainFromClause, outerAccessExpression);
 
             for (var i = 0; i < index; i++)
             {
@@ -72,16 +72,16 @@
 
                 if (querySource != null)
                 {
-                    RescopeTransparentAccess(querySource, outerAccessExpression);
+                    this.RescopeTransparentAccess(querySource, outerAccessExpression);
                 }
             }
 
-            AddOrUpdateMapping(fromClause, AccessInnerTransparentField(transparentIdentifierType, CurrentParameter));
+            this.AddOrUpdateMapping(fromClause, AccessInnerTransparentField(transparentIdentifierType, this.CurrentParameter));
         }
 
         private void RescopeTransparentAccess(IQuerySource querySource, Expression targetExpression)
         {
-            var memberAccessExpression
+            Expression memberAccessExpression
                 = ShiftMemberAccess(
                     targetExpression,
                     this.QueryCompilationContext.QuerySourceMapping.GetExpression(querySource));

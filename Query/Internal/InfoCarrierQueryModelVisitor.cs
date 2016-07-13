@@ -199,20 +199,20 @@ namespace InfoCarrier.Core.Client.Query.Internal
             int index)
         {
             var fromExpression
-                = CompileAdditionalFromClauseExpression(fromClause, queryModel);
+                = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
 
             var innerItemParameter
                 = Expression.Parameter(
                     GetSequenceType(fromExpression.Type), fromClause.ItemName);
 
             var transparentIdentifierType = GetTransparentIdentifierType(
-                CurrentParameter.Type,
+                this.CurrentParameter.Type,
                 innerItemParameter.Type);
 
             MethodInfo miSelectMany
-                = LinqOperatorProvider.SelectMany
+                = this.LinqOperatorProvider.SelectMany
                     .MakeGenericMethod(
-                        CurrentParameter.Type,
+                        this.CurrentParameter.Type,
                         innerItemParameter.Type,
                         transparentIdentifierType);
 
@@ -226,14 +226,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 = Expression.Call(
                     miSelectMany,
                     this.Expression,
-                    Expression.Lambda(firstParamDelegateType, fromExpression, CurrentParameter),
+                    Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter),
                     Expression.Lambda(
                         CallCreateTransparentIdentifier(
-                            transparentIdentifierType, CurrentParameter, innerItemParameter),
-                        CurrentParameter,
+                            transparentIdentifierType, this.CurrentParameter, innerItemParameter),
+                        this.CurrentParameter,
                         innerItemParameter));
 
-            IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
+            this.IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
         }
 
         public override void VisitOrdering(Ordering ordering, QueryModel queryModel, OrderByClause orderByClause, int index)
@@ -258,10 +258,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public override void VisitJoinClause(JoinClause joinClause, QueryModel queryModel, int index)
         {
             var outerKeySelectorExpression
-                = ReplaceClauseReferences(joinClause.OuterKeySelector, joinClause);
+                = this.ReplaceClauseReferences(joinClause.OuterKeySelector, joinClause);
 
             var innerSequenceExpression
-                = CompileJoinClauseInnerSequenceExpression(joinClause, queryModel);
+                = this.CompileJoinClauseInnerSequenceExpression(joinClause, queryModel);
 
             var innerItemParameter
                 = Expression.Parameter(
@@ -274,33 +274,33 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
 
             var innerKeySelectorExpression
-                = ReplaceClauseReferences(joinClause.InnerKeySelector, joinClause);
+                = this.ReplaceClauseReferences(joinClause.InnerKeySelector, joinClause);
 
             var transparentIdentifierType = GetTransparentIdentifierType(
-                CurrentParameter.Type,
+                this.CurrentParameter.Type,
                 innerItemParameter.Type);
 
             this.Expression
                 = Expression.Call(
-                    LinqOperatorProvider.Join
+                    this.LinqOperatorProvider.Join
                         .MakeGenericMethod(
-                            CurrentParameter.Type,
+                            this.CurrentParameter.Type,
                             innerItemParameter.Type,
                             outerKeySelectorExpression.Type,
                             transparentIdentifierType),
                     this.Expression,
                     innerSequenceExpression,
-                    Expression.Lambda(outerKeySelectorExpression, CurrentParameter),
+                    Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
                     Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
                     Expression.Lambda(
                         CallCreateTransparentIdentifier(
                             transparentIdentifierType,
-                            CurrentParameter,
+                            this.CurrentParameter,
                             innerItemParameter),
-                        CurrentParameter,
+                        this.CurrentParameter,
                         innerItemParameter));
 
-            IntroduceTransparentScope(joinClause, queryModel, index, transparentIdentifierType);
+            this.IntroduceTransparentScope(joinClause, queryModel, index, transparentIdentifierType);
         }
 
         protected override void IncludeNavigations(QueryModel queryModel)
