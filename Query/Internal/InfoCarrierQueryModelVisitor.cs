@@ -42,7 +42,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             QueryCompilationContext queryCompilationContext)
             : base(
                 queryOptimizer,
-                navigationRewritingExpressionVisitorFactory,
+                new SuppressNavigationRewritingFactory(), // Suppress navigation rewriting
                 subQueryMemberPushDownExpressionVisitor,
                 querySourceTracingExpressionVisitorFactory,
                 entityResultFindingExpressionVisitorFactory,
@@ -185,12 +185,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }));
 
             return qry;
-        }
-
-        protected override void OptimizeQueryModel(QueryModel queryModel)
-        {
-            // Suppress query optimization (flattening of subqueries, etc.), because we are not going to
-            // execute any statements locally. Proper optimization will take place on the server-side.
         }
 
         public override void VisitAdditionalFromClause(
@@ -443,7 +437,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
-                if (node.Method.MethodIsClosedFormOf(EntityQueryMethodInfo))
+                if (node.Method.MethodIsClosedFormOf(EntityQueryMethodInfo)
+                    && GetSequenceType(node.Type) == this.includeResultOperator.QuerySource.ItemType) // TODO: too imprecise
                 {
                     return this.ApplyTopLevelInclude(node);
                 }
@@ -504,6 +499,26 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 return methodCallExpression;
+            }
+        }
+
+        private class SuppressNavigationRewritingFactory : INavigationRewritingExpressionVisitorFactory
+        {
+            public NavigationRewritingExpressionVisitor Create(EntityQueryModelVisitor queryModelVisitor)
+            {
+                return new SuppressNavigationRewriting(queryModelVisitor);
+            }
+        }
+
+        private class SuppressNavigationRewriting : NavigationRewritingExpressionVisitor
+        {
+            public SuppressNavigationRewriting(EntityQueryModelVisitor queryModelVisitor)
+                : base(queryModelVisitor)
+            {
+            }
+
+            public override void Rewrite(QueryModel queryModel)
+            {
             }
         }
     }
