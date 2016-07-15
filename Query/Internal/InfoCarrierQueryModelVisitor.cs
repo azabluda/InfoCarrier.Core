@@ -496,6 +496,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     toType = inclProp.PropertyType;
+                    arg = Expression.Parameter(prevType, "x");
 
                     methodCallExpression = Expression.Call(
                         miThenInclude.GetGenericMethodDefinition().MakeGenericMethod(entityType, prevType, toType),
