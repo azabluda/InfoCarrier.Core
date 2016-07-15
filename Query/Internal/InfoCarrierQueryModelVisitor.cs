@@ -138,7 +138,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 return entity;
                             }
 
-                            IKey key = model.FindEntityType(targetType).FindPrimaryKey();
+                            IEntityType entityType = model.FindEntityType(targetType);
+                            IKey key = entityType.FindPrimaryKey();
 
                             // TODO: may not work if the key properties are not the first, or there exists more than one key
                             var keyValueBuffer = new ValueBuffer(
@@ -147,17 +148,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                     .ToList());
 
                             // Get/create instance of entity from EFC's identity map
+                            bool createdNew = false;
                             entity = queryContext
                                 .QueryBuffer
                                 .GetEntity(
                                     key,
                                     new EntityLoadInfo(
                                         keyValueBuffer,
-                                        vr => Activator.CreateInstance(targetType, true)),
+                                        vr =>
+                                        {
+                                            createdNew = true;
+                                            return Activator.CreateInstance(targetType);
+                                        }),
                                     queryStateManager,
                                     throwOnNullKey: false);
 
                             map.Add(dobj, entity);
+
+                            if (!createdNew)
+                            {
+                                return entity;
+                            }
 
                             // Set entity properties
                             var targetProperties = entity.GetType().GetProperties().Where(p => p.CanWrite);
