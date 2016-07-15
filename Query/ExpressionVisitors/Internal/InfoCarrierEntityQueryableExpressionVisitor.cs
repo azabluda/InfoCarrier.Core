@@ -35,6 +35,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
             {
                 return Expression.Call(
                     InfoCarrierQueryModelVisitor.EntityQueryMethodInfo.MakeGenericMethod(elementType),
+                    Expression.Constant(this.querySource),
                     EntityQueryModelVisitor.QueryContextParameter,
                     Expression.Constant(this.model),
                     Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));

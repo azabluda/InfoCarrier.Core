@@ -90,6 +90,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         //}
 
         private static IQueryable<TEntity> EntityQuery<TEntity>(
+            IQuerySource querySource,
             QueryContext queryContext,
             IModel model,
             bool queryStateManager)
@@ -437,10 +438,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
-                if (node.Method.MethodIsClosedFormOf(EntityQueryMethodInfo)
-                    && GetSequenceType(node.Type) == this.includeResultOperator.QuerySource.ItemType) // TODO: too imprecise
+                if (node.Method.MethodIsClosedFormOf(EntityQueryMethodInfo))
                 {
-                    return this.ApplyTopLevelInclude(node);
+                    var querySource = ((ConstantExpression)node.Arguments[0]).Value as IQuerySource;
+                    if (querySource != null
+                        && querySource == this.includeResultOperator.QuerySource)
+                    {
+                        return this.ApplyTopLevelInclude(node);
+                    }
                 }
 
                 // TODO: apply Include to Select and OfType nodes
@@ -452,7 +457,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 Type entityType = methodCallExpression.Type.GetGenericArguments().First();
                 Type toType = this.includeResultOperator.NavigationPropertyPath.Type;
 
-                var arg = Expression.Parameter(entityType, "x");
+                var arg = Expression.Parameter(entityType, this.includeResultOperator.QuerySource.ItemName);
 
                 methodCallExpression = Expression.Call(
                     SymbolExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
