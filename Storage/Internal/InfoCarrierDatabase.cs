@@ -8,7 +8,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Common;
     using Common.Errors;
     using Infrastructure.Internal;
-    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
@@ -41,9 +40,10 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             {
                 result = this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChanges(saveChanges);
             }
-            catch (TransportableException ex)
+            catch (TransportableDbUpdateException ex)
             {
-                throw new DbUpdateException(ex.Message, ex.InnerException);
+                ex.ReThrow(entries);
+                throw; // suppress compiler error
             }
 
             // Merge the results / update properties modified during SaveChanges on the server-side
