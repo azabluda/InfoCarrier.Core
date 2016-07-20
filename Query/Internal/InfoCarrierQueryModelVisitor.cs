@@ -141,11 +141,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             IEntityType entityType = model.FindEntityType(targetType);
                             IKey key = entityType.FindPrimaryKey();
 
-                            // TODO: may not work if the key properties are not the first, or there exists more than one key
-                            var keyValueBuffer = new ValueBuffer(
-                                key.Properties
-                                    .Select(p => mapper.MapFromDynamicObjectGraphCustomImpl(dobj.Get(p.Name), p.ClrType))
-                                    .ToList());
+                            // TRICKY: We need ValueBuffer containing only key values (for entity identity lookup)
+                            // and shadow property values for InternalMixedEntityEntry.
+                            // We will set other properties with our own algorithm.
+                            var keyAndShadowProps = entityType.GetProperties().Where(p => p.IsKey() || p.IsShadowProperty).ToList();
+                            var nulls = Enumerable.Repeat<object>(null, 1 + keyAndShadowProps.Select(p => p.GetIndex()).DefaultIfEmpty(-1).Max());
+                            var valueBuffer = new ValueBuffer(nulls.ToList());
+                            foreach (IProperty p in keyAndShadowProps)
+                            {
+                                valueBuffer[p.GetIndex()] = mapper.MapFromDynamicObjectGraphCustomImpl(dobj.Get(p.Name), p.ClrType);
+                            }
 
                             // Get/create instance of entity from EFC's identity map
                             bool createdNew = false;
@@ -154,7 +159,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 .GetEntity(
                                     key,
                                     new EntityLoadInfo(
-                                        keyValueBuffer,
+                                        valueBuffer,
                                         vr =>
                                         {
                                             createdNew = true;
