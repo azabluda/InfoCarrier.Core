@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Common;
     using Common.Errors;
     using Infrastructure.Internal;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
@@ -57,11 +58,13 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                         continue;
                     }
 
-                    // Arguable: merge only temp values
-                    if (merge.Entry.HasTemporaryValue(prop))
+                    // Can not (and need not) merge non-temporary PK values
+                    if (prop.IsKey() && !merge.Entry.HasTemporaryValue(prop))
                     {
-                        merge.Entry.SetCurrentValue(prop, propData.GetCurrentValueAs(prop.ClrType));
+                        continue;
                     }
+
+                    merge.Entry.SetCurrentValue(prop, propData.GetCurrentValueAs(prop.ClrType));
                 }
             }
 
