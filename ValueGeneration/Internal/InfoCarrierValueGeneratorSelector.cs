@@ -18,37 +18,34 @@
 
         public override ValueGenerator Create(IProperty property, IEntityType entityType)
         {
-            //if (property.ValueGenerated != ValueGenerated.Never)
+            Type propertyType = property.ClrType.UnwrapNullableType().UnwrapEnumType();
+
+            if (propertyType.IsInteger()
+                || (propertyType == typeof(decimal))
+                || (propertyType == typeof(float))
+                || (propertyType == typeof(double)))
             {
-                var propertyType = property.ClrType.UnwrapNullableType().UnwrapEnumType();
+                return this.numberFactory.Create(property);
+            }
 
-                if (propertyType.IsInteger()
-                    || (propertyType == typeof(decimal))
-                    || (propertyType == typeof(float))
-                    || (propertyType == typeof(double)))
-                {
-                    return this.numberFactory.Create(property);
-                }
+            if (propertyType == typeof(string))
+            {
+                return new StringValueGenerator(generateTemporaryValues: true);
+            }
 
-                if (propertyType == typeof(string))
-                {
-                    return new StringValueGenerator(generateTemporaryValues: true);
-                }
+            if (propertyType == typeof(byte[]))
+            {
+                return new BinaryValueGenerator(generateTemporaryValues: true);
+            }
 
-                if (propertyType == typeof(byte[]))
-                {
-                    return new BinaryValueGenerator(generateTemporaryValues: true);
-                }
+            if (propertyType == typeof(DateTime))
+            {
+                return new TemporaryDateTimeOffsetValueGenerator();
+            }
 
-                if (propertyType == typeof(DateTime))
-                {
-                    return new TemporaryDateTimeOffsetValueGenerator();
-                }
-
-                if (propertyType == typeof(DateTimeOffset))
-                {
-                    return new TemporaryDateTimeOffsetValueGenerator();
-                }
+            if (propertyType == typeof(DateTimeOffset))
+            {
+                return new TemporaryDateTimeOffsetValueGenerator();
             }
 
             return base.Create(property, entityType);

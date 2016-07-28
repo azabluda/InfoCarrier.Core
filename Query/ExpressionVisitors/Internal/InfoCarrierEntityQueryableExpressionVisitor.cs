@@ -23,28 +23,14 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
             this.querySource = querySource;
         }
 
-        //private new InfoCarrierQueryModelVisitor QueryModelVisitor
-        //    => (InfoCarrierQueryModelVisitor)base.QueryModelVisitor;
-
         protected override Expression VisitEntityQueryable(Type elementType)
         {
-            //var entityType = this.model.FindEntityType(elementType);
-
-            //if (this.QueryModelVisitor.QueryCompilationContext
-            //    .QuerySourceRequiresMaterialization(this.querySource))
-            {
-                return Expression.Call(
-                    InfoCarrierQueryModelVisitor.EntityQueryMethodInfo.MakeGenericMethod(elementType),
-                    Expression.Constant(this.querySource),
-                    EntityQueryModelVisitor.QueryContextParameter,
-                    Expression.Constant(this.model),
-                    Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));
-            }
-
-            //return Expression.Call(
-            //    InfoCarrierQueryModelVisitor.ProjectionQueryMethodInfo,
-            //    EntityQueryModelVisitor.QueryContextParameter,
-            //    Expression.Constant(entityType));
+            return Expression.Call(
+                InfoCarrierQueryModelVisitor.EntityQueryMethodInfo.MakeGenericMethod(elementType),
+                Expression.Constant(this.querySource),
+                EntityQueryModelVisitor.QueryContextParameter,
+                Expression.Constant(this.model),
+                Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));
         }
     }
 }

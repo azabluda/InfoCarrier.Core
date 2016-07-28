@@ -71,23 +71,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public override ILinqOperatorProvider LinqOperatorProvider =>
             this.InfoCarrierLinqOperatorProvider;
 
-        //public static MethodInfo ProjectionQueryMethodInfo { get; }
-        //    = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
-        //        .GetDeclaredMethod(nameof(ProjectionQuery));
-
         public static MethodInfo EntityQueryMethodInfo { get; }
             = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
                 .GetDeclaredMethod(nameof(EntityQuery));
-
-        //private static IEnumerable<ValueBuffer> ProjectionQuery(
-        //    QueryContext queryContext,
-        //    IEntityType entityType)
-        //{
-        //    throw new NotImplementedException();
-        //    //return ((InfoCarrierQueryContext)queryContext).Store
-        //    //    .GetTables(entityType)
-        //    //    .SelectMany(t => t.Rows.Select(vs => new ValueBuffer(vs)));
-        //}
 
         private static IQueryable<TEntity> EntityQuery<TEntity>(
             IQuerySource querySource,
