@@ -38,7 +38,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             SaveChangesResult result;
             try
             {
-                result = this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChanges(saveChanges);
+                result = this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChangesAsync(saveChanges).Result;
             }
             catch (TransportableDbUpdateException ex)
             {
