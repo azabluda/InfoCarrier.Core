@@ -5,6 +5,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Common;
     using Microsoft.EntityFrameworkCore;
@@ -65,8 +67,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         internal virtual IInfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
             this.ExpressionIsQueryable
-            ? InfoCarrierQueryableLinqOperatorProvider.Instance
-            : InfoCarrierEnumerableLinqOperatorProvider.Instance;
+                ? InfoCarrierQueryableLinqOperatorProvider.Instance
+                : InfoCarrierEnumerableLinqOperatorProvider.Instance;
 
         public override ILinqOperatorProvider LinqOperatorProvider =>
             this.InfoCarrierLinqOperatorProvider;
@@ -74,6 +76,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public static MethodInfo EntityQueryMethodInfo { get; }
             = typeof(InfoCarrierQueryModelVisitor).GetTypeInfo()
                 .GetDeclaredMethod(nameof(EntityQuery));
+
+        public override Func<QueryContext, IAsyncEnumerable<TResult>> CreateAsyncQueryExecutor<TResult>(QueryModel queryModel)
+        {
+            var syncExecutor = this.CreateQueryExecutor<TResult>(queryModel);
+            return context => new AsyncEnumerableAdapter<TResult>(syncExecutor(context));
+        }
 
         private static IQueryable<TEntity> EntityQuery<TEntity>(
             IQuerySource querySource,
@@ -527,6 +535,39 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public override void Rewrite(QueryModel queryModel)
             {
+            }
+        }
+
+        private class AsyncEnumerableAdapter<T> : IAsyncEnumerable<T>
+        {
+            private readonly IEnumerable<T> source;
+
+            public AsyncEnumerableAdapter(IEnumerable<T> source)
+            {
+                this.source = source;
+            }
+
+            public IAsyncEnumerator<T> GetEnumerator()
+                => new AsyncEnumerator(this.source.GetEnumerator());
+
+            private class AsyncEnumerator : IAsyncEnumerator<T>
+            {
+                private readonly IEnumerator<T> source;
+
+                public AsyncEnumerator(IEnumerator<T> source)
+                {
+                    this.source = source;
+                }
+
+                public T Current => this.source.Current;
+
+                public void Dispose()
+                {
+                    this.source.Dispose();
+                }
+
+                public Task<bool> MoveNext(CancellationToken cancellationToken)
+                    => Task.FromResult(this.source.MoveNext());
             }
         }
     }

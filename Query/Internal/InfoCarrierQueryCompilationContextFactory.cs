@@ -1,6 +1,5 @@
 ﻿namespace InfoCarrier.Core.Client.Query.Internal
 {
-    using System;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
@@ -27,11 +26,6 @@
 
         public override QueryCompilationContext Create(bool async)
         {
-            if (async)
-            {
-                throw new NotImplementedException();
-            }
-
             return new InfoCarrierQueryCompilationContext(
                 this.Model,
                 this.Logger,
