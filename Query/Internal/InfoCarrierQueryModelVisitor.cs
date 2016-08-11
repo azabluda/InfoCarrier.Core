@@ -107,7 +107,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             RemoteLinqHelper.SaveToStream(bodyWriter.Stream, arg);
                         }
 
-                        using (ServiceMessage cresp = sctx.ServiceDispatcher.QueryData(xmlMsg))
+                        using (ServiceMessage cresp = sctx.ServiceDispatcher.QueryDataAsync(xmlMsg).Result)
                         {
                             using (ServiceMessage.SecureBody bodyReader = cresp.CreateBodyReader(sctx.ClientPrivateKey))
                             {
