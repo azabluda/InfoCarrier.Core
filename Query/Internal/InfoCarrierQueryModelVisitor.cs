@@ -416,7 +416,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private readonly Func<object, Type, DynamicObjectEntityMapper, object> materializer;
 
             public DynamicObjectEntityMapper(Func<object, Type, DynamicObjectEntityMapper, object> materializer)
-                : base(formatPrimitiveTypesAsString: true)
+                : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
                 this.materializer = materializer;
             }
