@@ -44,9 +44,8 @@
         public override MethodInfo DefaultIfEmpty { get; } =
             GetMethod(() => Queryable.DefaultIfEmpty<object>(null));
 
-        // Use Enumerable based definition of DefaultIfEmptyArg to force its local evaluation.
         public override MethodInfo DefaultIfEmptyArg { get; } =
-            GetMethod(() => Enumerable.DefaultIfEmpty<object>(null, null));
+            GetMethod(() => Queryable.DefaultIfEmpty<object>(null, null));
 
         public override MethodInfo Distinct { get; } =
             GetMethod(() => Queryable.Distinct<object>(null));

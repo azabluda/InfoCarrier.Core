@@ -147,7 +147,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 using (ServiceMessage.SecureBody bodyWriter = xmlMsg.CreateBodyWriter(serverContext.ServerPublicKey))
                 {
-                    RemoteLinqHelper.SaveToStream(bodyWriter.Stream, rlinq);
+                    RemoteLinqHelper.SaveToStream(bodyWriter.Stream, rlinq, serverContext.ModuleManager.DataContractSerializer);
                 }
 
                 using (ServiceMessage cresp = await serverContext.ServiceDispatcher.QueryDataAsync(xmlMsg))
