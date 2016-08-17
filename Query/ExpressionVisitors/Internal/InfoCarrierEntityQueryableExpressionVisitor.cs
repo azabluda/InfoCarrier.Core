@@ -1,36 +1,90 @@
 namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 {
     using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Linq.Expressions;
-    using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
-    using Query.Internal;
+    using Remote.Linq;
     using Remotion.Linq.Clauses;
+    using Utils;
 
     public class InfoCarrierEntityQueryableExpressionVisitor : EntityQueryableExpressionVisitor
     {
-        private readonly IModel model;
         private readonly IQuerySource querySource;
 
         public InfoCarrierEntityQueryableExpressionVisitor(
-            IModel model,
             EntityQueryModelVisitor entityQueryModelVisitor,
             IQuerySource querySource)
             : base(entityQueryModelVisitor)
         {
-            this.model = model;
             this.querySource = querySource;
         }
 
         protected override Expression VisitEntityQueryable(Type elementType)
         {
-            return Expression.Call(
-                InfoCarrierQueryModelVisitor.EntityQueryMethodInfo.MakeGenericMethod(elementType),
-                Expression.Constant(this.querySource),
-                EntityQueryModelVisitor.QueryContextParameter,
-                Expression.Constant(this.model),
-                Expression.Constant(this.QueryModelVisitor.QueryCompilationContext.IsTrackingQuery));
+            IQueryable stub = SymbolExtensions.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
+                .GetGenericMethodDefinition()
+                .MakeGenericMethod(elementType)
+                .ToDelegate<Func<IQuerySource, IQueryable>>()
+                .Invoke(this.querySource);
+
+            return Expression.Constant(stub);
+        }
+
+        internal abstract class RemoteQueryableStub : IRemoteQueryable
+        {
+            internal RemoteQueryableStub(IQuerySource querySource)
+            {
+                this.QuerySource = querySource;
+            }
+
+            internal IQuerySource QuerySource { get; }
+
+            public abstract Type ElementType { get; }
+
+            public Expression Expression
+            {
+                get
+                {
+                    throw new NotImplementedException();
+                }
+            }
+
+            public IQueryProvider Provider
+            {
+                get
+                {
+                    throw new NotImplementedException();
+                }
+            }
+
+            public IEnumerator GetEnumerator()
+            {
+                throw new NotImplementedException();
+            }
+
+            internal static IQueryable<T> Create<T>(IQuerySource querySource)
+            {
+                return new RemoteQueryableStub<T>(querySource);
+            }
+        }
+
+        private class RemoteQueryableStub<T> : RemoteQueryableStub, IQueryable<T>
+        {
+            public RemoteQueryableStub(IQuerySource querySource)
+                : base(querySource)
+            {
+            }
+
+            public override Type ElementType => typeof(T);
+
+            IEnumerator<T> IEnumerable<T>.GetEnumerator()
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }
