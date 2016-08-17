@@ -144,8 +144,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             bool queryStateManager)
         {
             ServerContext sctx = ((InfoCarrierQueryContext)queryContext).ServerContext;
-            Func<Remote.Linq.Expressions.Expression, IEnumerable<DynamicObject>> dataProvider =
-                arg =>
+            Func<Remote.Linq.Expressions.Expression, Task<IEnumerable<DynamicObject>>> dataProvider =
+                async arg =>
                 {
                     IInfoCarrierLogger logger = sctx.GetLogger(sctx);
                     logger.Debug("Execute query on the server");
@@ -158,7 +158,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             RemoteLinqHelper.SaveToStream(bodyWriter.Stream, arg);
                         }
 
-                        using (ServiceMessage cresp = sctx.ServiceDispatcher.QueryDataAsync(xmlMsg).Result)
+                        using (ServiceMessage cresp = await sctx.ServiceDispatcher.QueryDataAsync(xmlMsg))
                         {
                             using (ServiceMessage.SecureBody bodyReader = cresp.CreateBodyReader(sctx.ClientPrivateKey))
                             {
@@ -259,11 +259,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 .ReplaceQueryableByResourceDescriptors()
                 .ReplaceGenericQueryArgumentsByNonGenericArguments();
             var dataRecords = dataProvider(rlinq);
-            var result = object.Equals(null, dataRecords)
-                ? default(TResult).Yield()
-                : resultMapper.Map<TResult>(dataRecords);
 
-            return new AsyncEnumerableAdapter<TResult>(result);
+            return new AsyncEnumerableAdapter<TResult>(dataRecords, resultMapper);
         }
 
         protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
@@ -598,34 +595,57 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private class AsyncEnumerableAdapter<T> : IAsyncEnumerable<T>
         {
-            private readonly IEnumerable<T> source;
+            private readonly Func<IAsyncEnumerator<T>> enumeratorFactory;
 
-            public AsyncEnumerableAdapter(IEnumerable<T> source)
+            public AsyncEnumerableAdapter(
+                Task<IEnumerable<DynamicObject>> asyncResult,
+                IDynamicObjectMapper mapper)
             {
-                this.source = source;
+                this.enumeratorFactory =
+                    () => new AsyncEnumerator(MapResultsAsync(asyncResult, mapper));
             }
 
-            public IAsyncEnumerator<T> GetEnumerator()
-                => new AsyncEnumerator(this.source.GetEnumerator());
+            private static async Task<IEnumerable<T>> MapResultsAsync(
+                Task<IEnumerable<DynamicObject>> asyncResult,
+                IDynamicObjectMapper mapper)
+            {
+                IEnumerable<DynamicObject> dataRecords = await asyncResult;
+                return dataRecords == null
+                    ? default(T).Yield()
+                    : mapper.Map<T>(dataRecords);
+            }
+
+            public IAsyncEnumerator<T> GetEnumerator() => this.enumeratorFactory();
 
             private class AsyncEnumerator : IAsyncEnumerator<T>
             {
-                private readonly IEnumerator<T> source;
+                private readonly Task<IEnumerable<T>> asyncResult;
+                private IEnumerator<T> enumerator;
 
-                public AsyncEnumerator(IEnumerator<T> source)
+                public AsyncEnumerator(Task<IEnumerable<T>> asyncResult)
                 {
-                    this.source = source;
+                    this.asyncResult = asyncResult;
                 }
 
-                public T Current => this.source.Current;
+                public T Current =>
+                    this.enumerator == null
+                    ? default(T)
+                    : this.enumerator.Current;
 
                 public void Dispose()
                 {
-                    this.source.Dispose();
+                    this.enumerator?.Dispose();
                 }
 
-                public Task<bool> MoveNext(CancellationToken cancellationToken)
-                    => Task.FromResult(this.source.MoveNext());
+                public async Task<bool> MoveNext(CancellationToken cancellationToken)
+                {
+                    if (this.enumerator == null)
+                    {
+                        this.enumerator = (await this.asyncResult).GetEnumerator();
+                    }
+
+                    return this.enumerator.MoveNext();
+                }
             }
         }
     }
