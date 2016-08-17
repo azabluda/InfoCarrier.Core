@@ -1,6 +1,5 @@
 namespace InfoCarrier.Core.Client.Storage.Internal
 {
-    using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading;
@@ -30,7 +29,9 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             this.serverContext = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
         }
 
-        public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
+        public override async Task<int> SaveChangesAsync(
+            IReadOnlyList<IUpdateEntry> entries,
+            CancellationToken cancellationToken = default(CancellationToken))
         {
             var saveChanges = new SaveChangesRequest();
             saveChanges.DataTransferObjects.AddRange(entries.Select(e => new DataTransferObject(e)));
@@ -38,7 +39,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             SaveChangesResult result;
             try
             {
-                result = this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChangesAsync(saveChanges).Result;
+                result = await this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChangesAsync(saveChanges);
             }
             catch (TransportableDbUpdateException ex)
             {
@@ -65,11 +66,9 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             return result.CountPersisted;
         }
 
-        public override Task<int> SaveChangesAsync(
-            IReadOnlyList<IUpdateEntry> entries,
-            CancellationToken cancellationToken = default(CancellationToken))
+        public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
-            throw new NotImplementedException();
+            return this.SaveChangesAsync(entries).Result;
         }
     }
 }
