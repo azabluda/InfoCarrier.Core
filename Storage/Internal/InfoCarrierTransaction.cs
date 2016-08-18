@@ -13,16 +13,6 @@
         public InfoCarrierTransaction(InfoCarrierTransactionManager transactionManager)
         {
             this.transactionManager = transactionManager;
-
-            try
-            {
-                this.TransactionManager.BeginTransaction();
-            }
-            catch (Exception)
-            {
-                this.ClearTransaction();
-                throw;
-            }
         }
 
         private ITransactionManager TransactionManager =>

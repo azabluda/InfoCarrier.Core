@@ -30,17 +30,16 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
         public virtual IDbContextTransaction BeginTransaction()
         {
-            if (this.CurrentTransaction != null)
-            {
-                throw new InvalidOperationException("RelationalStrings.TransactionAlreadyStarted");
-            }
-
+            this.CheckNoTransaction();
+            this.ServerContext.GetServiceInterface<Common.ITransactionManager>().BeginTransactionAsync().Wait();
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 
-        public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            throw new NotImplementedException();
+            this.CheckNoTransaction();
+            await this.ServerContext.GetServiceInterface<Common.ITransactionManager>().BeginTransactionAsync();
+            return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 
         public virtual void CommitTransaction()
@@ -61,6 +60,14 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             }
 
             this.CurrentTransaction.Rollback();
+        }
+
+        private void CheckNoTransaction()
+        {
+            if (this.CurrentTransaction != null)
+            {
+                throw new InvalidOperationException("RelationalStrings.TransactionAlreadyStarted");
+            }
         }
 
         internal void ClearTransaction()
