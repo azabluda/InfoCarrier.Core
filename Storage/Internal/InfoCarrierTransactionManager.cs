@@ -31,7 +31,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public virtual IDbContextTransaction BeginTransaction()
         {
             this.CheckNoTransaction();
-            this.ServerContext.GetServiceInterface<Common.ITransactionManager>().BeginTransactionAsync().Wait();
+            this.ServerContext.GetServiceInterface<Common.ITransactionManager>().BeginTransaction();
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 

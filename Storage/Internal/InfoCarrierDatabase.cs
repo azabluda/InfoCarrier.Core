@@ -29,6 +29,27 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             this.serverContext = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
         }
 
+        public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
+        {
+            var saveChanges = new SaveChangesRequest();
+            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new DataTransferObject(e)));
+
+            SaveChangesResult result;
+            try
+            {
+                result = this.serverContext.GetServiceInterface<ISaveChangesService>().SaveChanges(saveChanges);
+            }
+            catch (TransportableDbUpdateException ex)
+            {
+                ex.ReThrow(entries);
+                throw; // suppress compiler error
+            }
+
+            MergeResults(entries, result);
+
+            return result.CountPersisted;
+        }
+
         public override async Task<int> SaveChangesAsync(
             IReadOnlyList<IUpdateEntry> entries,
             CancellationToken cancellationToken = default(CancellationToken))
@@ -47,6 +68,13 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 throw; // suppress compiler error
             }
 
+            MergeResults(entries, result);
+
+            return result.CountPersisted;
+        }
+
+        private static void MergeResults(IReadOnlyList<IUpdateEntry> entries, SaveChangesResult result)
+        {
             // Merge the results / update properties modified during SaveChanges on the server-side
             foreach (var merge in entries.Zip(result.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
             {
@@ -62,13 +90,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                     merge.Entry.SetCurrentValue(prop.EfProperty, prop.CurrentValue);
                 }
             }
-
-            return result.CountPersisted;
-        }
-
-        public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
-        {
-            return this.SaveChangesAsync(entries).Result;
         }
     }
 }

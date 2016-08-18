@@ -15,7 +15,7 @@
             ILogger logger,
             IEntityQueryModelVisitorFactory entityQueryModelVisitorFactory,
             IRequiresMaterializationExpressionVisitorFactory requiresMaterializationExpressionVisitorFactory,
-            ILinqOperatorProvider linqOperatorProvider,
+            bool async,
             Type contextType,
             bool trackQueryResults)
             : base(
@@ -23,11 +23,14 @@
                 logger,
                 entityQueryModelVisitorFactory,
                 requiresMaterializationExpressionVisitorFactory,
-                linqOperatorProvider,
+                new LinqOperatorProvider(),
                 contextType,
                 trackQueryResults)
         {
+            this.Async = async;
         }
+
+        internal bool Async { get; }
 
         public override void FindQuerySourcesRequiringMaterialization(EntityQueryModelVisitor queryModelVisitor, QueryModel queryModel)
         {

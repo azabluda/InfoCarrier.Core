@@ -31,7 +31,7 @@
                 this.Logger,
                 this.EntityQueryModelVisitorFactory,
                 this.RequiresMaterializationExpressionVisitorFactory,
-                new LinqOperatorProvider(),
+                async,
                 this.ContextType,
                 this.TrackQueryResults);
         }
