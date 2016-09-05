@@ -20,7 +20,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
-    using Modeling;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
     using Remotion.Linq;
