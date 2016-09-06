@@ -433,7 +433,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
                 {
-                    if (!typeof(Entity).IsAssignableFrom(targetType))
+                    IEntityType entityType = this.queryContext.StateManager.Context.Model.FindEntityType(targetType);
+                    if (entityType == null)
                     {
                         continue;
                     }
@@ -444,7 +445,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return entity;
                     }
 
-                    IEntityType entityType = this.queryContext.StateManager.Context.Model.FindEntityType(targetType);
                     IKey key = entityType.FindPrimaryKey();
 
                     // TRICKY: We need ValueBuffer containing only key values (for entity identity lookup)
