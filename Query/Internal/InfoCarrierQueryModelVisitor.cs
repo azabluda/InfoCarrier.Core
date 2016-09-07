@@ -109,81 +109,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
         }
 
-        private static Remote.Linq.Expressions.Expression TranslateToRlinq<TResult>(
-            QueryContext queryContext,
-            Expression expression)
-        {
-            // Substitute query parameters
-            expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
-
-            // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
-            // but allows for async execution of query
-            var rlinq = expression
-                .ToRemoteLinqExpression()
-                .ReplaceQueryableByResourceDescriptors()
-                .ReplaceGenericQueryArgumentsByNonGenericArguments();
-            return rlinq;
-        }
-
-        private static async Task<IEnumerable<DynamicObject>> QueryDataAsync(
-            ServerContext serverContext,
-            Remote.Linq.Expressions.Expression rlinq)
-        {
-            IInfoCarrierLogger logger = serverContext.GetLogger(serverContext);
-            logger.Debug("Execute asynchronous query on the server");
-            logger.Debug(rlinq);
-
-            using (var xmlMsg = new ServiceMessage(serverContext.SessionId, serverContext.ServerPublicKey))
-            {
-                using (ServiceMessage.SecureBody bodyWriter = xmlMsg.CreateBodyWriter(serverContext.ServerPublicKey))
-                {
-                    RemoteLinqHelper.SaveToStream(bodyWriter.Stream, rlinq, serverContext.ModuleManager.DataContractSerializer);
-                }
-
-                using (ServiceMessage cresp = await serverContext.ServiceDispatcher.QueryDataAsync(xmlMsg))
-                {
-                    using (ServiceMessage.SecureBody bodyReader = cresp.CreateBodyReader(serverContext.ClientPrivateKey))
-                    {
-                        return Serializer.LoadFromStream<IEnumerable<DynamicObject>>(bodyReader.Stream);
-                    }
-                }
-            }
-        }
-
-        private static IEnumerable<DynamicObject> QueryData(
-            ServerContext serverContext,
-            Remote.Linq.Expressions.Expression rlinq)
-        {
-            IInfoCarrierLogger logger = serverContext.GetLogger(serverContext);
-            logger.Debug("Execute synchronous query on the server");
-            logger.Debug(rlinq);
-
-            using (var xmlMsg = new ServiceMessage(serverContext.SessionId, serverContext.ServerPublicKey))
-            {
-                using (ServiceMessage.SecureBody bodyWriter = xmlMsg.CreateBodyWriter(serverContext.ServerPublicKey))
-                {
-                    RemoteLinqHelper.SaveToStream(bodyWriter.Stream, rlinq, serverContext.ModuleManager.DataContractSerializer);
-                }
-
-                using (ServiceMessage cresp = serverContext.ServiceDispatcher.QueryData(xmlMsg))
-                {
-                    using (ServiceMessage.SecureBody bodyReader = cresp.CreateBodyReader(serverContext.ClientPrivateKey))
-                    {
-                        return Serializer.LoadFromStream<IEnumerable<DynamicObject>>(bodyReader.Stream);
-                    }
-                }
-            }
-        }
-
         private static IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>(
             QueryContext queryContext,
             Expression expression,
             bool queryStateManager)
         {
-            var rlinq = TranslateToRlinq<TResult>(queryContext, expression);
-            return new AsyncEnumerableAdapter<TResult>(
-                QueryDataAsync(((InfoCarrierQueryContext)queryContext).ServerContext, rlinq),
-                new DynamicObjectEntityMapper(queryContext, queryStateManager));
+            return new QueryExecutor<TResult>(queryContext, expression, queryStateManager)
+                .ExecuteAsyncQuery();
         }
 
         private static IEnumerable<TResult> ExecuteQuery<TResult>(
@@ -191,11 +123,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             Expression expression,
             bool queryStateManager)
         {
-            var rlinq = TranslateToRlinq<TResult>(queryContext, expression);
-            IEnumerable<DynamicObject> dataRecords = QueryData(((InfoCarrierQueryContext)queryContext).ServerContext, rlinq);
-            return dataRecords == null
-                ? Enumerable.Empty<TResult>()
-                : new DynamicObjectEntityMapper(queryContext, queryStateManager).Map<TResult>(dataRecords);
+            return new QueryExecutor<TResult>(queryContext, expression, queryStateManager)
+                .ExecuteQuery();
         }
 
         protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
@@ -416,17 +345,92 @@ namespace InfoCarrier.Core.Client.Query.Internal
             return type.GetInterfaces().Any(i => ImplementsGenericInterface(i, interfaceType));
         }
 
-        private sealed class DynamicObjectEntityMapper : DynamicObjectMapper
+        private sealed class QueryExecutor<TResult> : DynamicObjectMapper
         {
             private readonly QueryContext queryContext;
             private readonly bool queryStateManager;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
+            private readonly ServerContext serverContext;
+            private readonly Remote.Linq.Expressions.Expression rlinq;
 
-            public DynamicObjectEntityMapper(QueryContext queryContext, bool queryStateManager)
+            public QueryExecutor(
+                QueryContext queryContext,
+                Expression expression,
+                bool queryStateManager)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
                 this.queryContext = queryContext;
                 this.queryStateManager = queryStateManager;
+                this.serverContext = ((InfoCarrierQueryContext)queryContext).ServerContext;
+
+                // Substitute query parameters
+                expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
+
+                // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
+                this.rlinq = expression
+                    .ToRemoteLinqExpression()
+                    .ReplaceQueryableByResourceDescriptors()
+                    .ReplaceGenericQueryArgumentsByNonGenericArguments();
+            }
+
+            public IEnumerable<TResult> ExecuteQuery()
+            {
+                IEnumerable<DynamicObject> dataRecords = this.QueryData();
+                return dataRecords == null
+                    ? Enumerable.Empty<TResult>()
+                    : this.Map<TResult>(dataRecords);
+            }
+
+            public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
+            {
+                return new AsyncEnumerableAdapter<TResult>(this.QueryDataAsync(), this);
+            }
+
+            private IEnumerable<DynamicObject> QueryData()
+            {
+                using (ServiceMessage xmlMsg = this.CreateQueryDataRequest())
+                {
+                    using (ServiceMessage cresp = this.serverContext.ServiceDispatcher.QueryData(xmlMsg))
+                    {
+                        return this.ParseQueryResult(cresp);
+                    }
+                }
+            }
+
+            private async Task<IEnumerable<DynamicObject>> QueryDataAsync()
+            {
+                using (ServiceMessage xmlMsg = this.CreateQueryDataRequest())
+                {
+                    using (ServiceMessage cresp = await this.serverContext.ServiceDispatcher.QueryDataAsync(xmlMsg))
+                    {
+                        return this.ParseQueryResult(cresp);
+                    }
+                }
+            }
+
+            private IEnumerable<DynamicObject> ParseQueryResult(ServiceMessage queryResultMessage)
+            {
+                using (ServiceMessage.SecureBody bodyReader = queryResultMessage.CreateBodyReader(this.serverContext.ClientPrivateKey))
+                {
+                    return Serializer.LoadFromStream<IEnumerable<DynamicObject>>(bodyReader.Stream);
+                }
+            }
+
+            private ServiceMessage CreateQueryDataRequest()
+            {
+                IInfoCarrierLogger logger = this.serverContext.GetLogger(this.serverContext);
+                logger.Debug("Execute query on the server");
+                logger.Debug(this.rlinq);
+
+                using (var request = DisposableGuard.Create(new ServiceMessage(this.serverContext.SessionId, this.serverContext.ServerPublicKey)))
+                {
+                    using (ServiceMessage.SecureBody bodyWriter = request.Value.CreateBodyWriter(this.serverContext.ServerPublicKey))
+                    {
+                        RemoteLinqHelper.SaveToStream(bodyWriter.Stream, this.rlinq, this.serverContext.ModuleManager.DataContractSerializer);
+                    }
+
+                    return request.Release();
+                }
             }
 
             protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
