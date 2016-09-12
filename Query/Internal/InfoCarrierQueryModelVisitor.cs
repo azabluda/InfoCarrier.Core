@@ -425,7 +425,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     using (ServiceMessage.SecureBody bodyWriter = request.Value.CreateBodyWriter(this.serverContext.ServerPublicKey))
                     {
-                        RemoteLinqHelper.SaveToStream(bodyWriter.Stream, this.rlinq, this.serverContext.ModuleManager.DataContractSerializer);
+                        RemoteLinqHelper.SaveToStream(bodyWriter.Stream, this.rlinq, this.serverContext.ModuleManager);
                     }
 
                     return request.Release();
