@@ -45,7 +45,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
             public abstract Type ElementType { get; }
 
-            public Expression Expression
+            protected static dynamic NotImplemented
             {
                 get
                 {
@@ -53,18 +53,11 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
                 }
             }
 
-            public IQueryProvider Provider
-            {
-                get
-                {
-                    throw new NotImplementedException();
-                }
-            }
+            public Expression Expression => NotImplemented;
 
-            public IEnumerator GetEnumerator()
-            {
-                throw new NotImplementedException();
-            }
+            public IQueryProvider Provider => NotImplemented;
+
+            public IEnumerator GetEnumerator() => NotImplemented;
 
             internal static IQueryable<T> Create<T>(IQuerySource querySource)
             {
@@ -81,10 +74,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
             public override Type ElementType => typeof(T);
 
-            IEnumerator<T> IEnumerable<T>.GetEnumerator()
-            {
-                throw new NotImplementedException();
-            }
+            IEnumerator<T> IEnumerable<T>.GetEnumerator() => NotImplemented;
         }
     }
 }
