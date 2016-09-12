@@ -9,7 +9,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Common;
-    using ExpressionVisitors;
     using ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Metadata;
@@ -71,7 +70,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.Expression != null
             && ImplementsGenericInterface(this.Expression.Type, typeof(IAsyncEnumerable<>));
 
-        internal virtual IInfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
+        internal virtual InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
             this.ExpressionIsQueryable
                 ? InfoCarrierQueryableLinqOperatorProvider.Instance
                 : InfoCarrierEnumerableLinqOperatorProvider.Instance;

@@ -3,25 +3,23 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Linq.Expressions;
     using System.Reflection;
-    using Microsoft.EntityFrameworkCore.Query.Internal;
-    using Utils;
 
-    internal class InfoCarrierEnumerableLinqOperatorProvider : LinqOperatorProvider,
-        IInfoCarrierLinqOperatorProvider
+    internal class InfoCarrierEnumerableLinqOperatorProvider : InfoCarrierLinqOperatorProvider
     {
         private static readonly Func<object, bool> DummyPredicate = null;
         private static readonly Func<object, IEnumerable<object>> DummyPredicateEnum = null;
 
-        private static readonly Lazy<IInfoCarrierLinqOperatorProvider> Inst =
-            new Lazy<IInfoCarrierLinqOperatorProvider>(() => new InfoCarrierEnumerableLinqOperatorProvider());
+        private static readonly Lazy<InfoCarrierLinqOperatorProvider> Inst =
+            new Lazy<InfoCarrierLinqOperatorProvider>(
+                () => new InfoCarrierEnumerableLinqOperatorProvider(),
+                true);
 
         private InfoCarrierEnumerableLinqOperatorProvider()
         {
         }
 
-        public static IInfoCarrierLinqOperatorProvider Instance => Inst.Value;
+        public static InfoCarrierLinqOperatorProvider Instance => Inst.Value;
 
         public override MethodInfo All { get; } =
             GetMethod(() => Enumerable.All<object>(null, null));
@@ -86,7 +84,7 @@
         public override MethodInfo OrderBy { get; } =
             GetMethod(() => Enumerable.OrderBy<object, object>(null, null));
 
-        public virtual MethodInfo OrderByDescending { get; } =
+        public override MethodInfo OrderByDescending { get; } =
             GetMethod(() => Enumerable.OrderByDescending<object, object>(null, null));
 
         public override MethodInfo Select { get; } =
@@ -110,7 +108,7 @@
         public override MethodInfo ThenBy { get; } =
             GetMethod(() => Enumerable.ThenBy<object, object>(null, null));
 
-        public virtual MethodInfo ThenByDescending { get; } =
+        public override MethodInfo ThenByDescending { get; } =
             GetMethod(() => Enumerable.ThenByDescending<object, object>(null, null));
 
         public override MethodInfo Union { get; } =
@@ -118,11 +116,5 @@
 
         public override MethodInfo Where { get; } =
             GetMethod(() => Enumerable.Where(null, DummyPredicate));
-
-        private static MethodInfo GetMethod(Expression<Action> expression)
-        {
-            MethodInfo mi = SymbolExtensions.GetMethodInfo(expression);
-            return mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi;
-        }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace InfoCarrier.Core.Client.Query.ExpressionVisitors
+﻿namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 {
     using System;
     using System.Linq;
