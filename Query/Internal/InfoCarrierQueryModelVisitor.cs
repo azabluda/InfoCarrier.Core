@@ -154,6 +154,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
             QueryModel queryModel,
             int index)
         {
+            // UGLY: this method is a shameless copy-and-paste of
+            // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L709
+            // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
+            // otherwise Remote.Linq's serializaion would fail.
+            // Additionally we determine and use 'firstParamDelegateType' in ExpressionIsQueryable case.
             var fromExpression
                 = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
 
@@ -213,6 +218,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         public override void VisitJoinClause(JoinClause joinClause, QueryModel queryModel, int index)
         {
+            // UGLY: this method is a shameless copy-and-paste of
+            // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L765
+            // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
+            // otherwise Remote.Linq's serializaion would fail.
             var outerKeySelectorExpression
                 = this.ReplaceClauseReferences(joinClause.OuterKeySelector, joinClause);
 
@@ -261,6 +270,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         public override void VisitGroupJoinClause(GroupJoinClause groupJoinClause, QueryModel queryModel, int index)
         {
+            // UGLY: this method is a shameless copy-and-paste of
+            // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L838
+            // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
+            // otherwise Remote.Linq's serializaion would fail.
             var outerKeySelectorExpression
                 = this.ReplaceClauseReferences(groupJoinClause.JoinClause.OuterKeySelector, groupJoinClause);
 
