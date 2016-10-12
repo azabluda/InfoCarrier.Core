@@ -474,9 +474,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         valueBuffer[p.GetIndex()] = this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType);
                     }
 
-                    // Get/create instance of entity from EFC's identity map
-                    bool createdNew = false;
-                    entity = this.queryContext
+                    // Get entity instance from EFC's identity map, or create a new one
+                    return this.queryContext
                         .QueryBuffer
                         .GetEntity(
                             key,
@@ -484,32 +483,25 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 valueBuffer,
                                 vr =>
                                 {
-                                    createdNew = true;
-                                    return Activator.CreateInstance(targetType);
+                                    object newEntity = Activator.CreateInstance(targetType);
+                                    this.map.Add(dobj, newEntity);
+
+                                    // Set regular (non-shadow) properties
+                                    var targetProperties = newEntity.GetType().GetProperties().Where(p => p.CanWrite);
+                                    foreach (PropertyInfo property in targetProperties)
+                                    {
+                                        object value;
+                                        if (dobj.TryGet(property.Name, out value))
+                                        {
+                                            value = this.MapFromDynamicObjectGraph(value, property.PropertyType);
+                                            property.SetValue(newEntity, value);
+                                        }
+                                    }
+
+                                    return newEntity;
                                 }),
                             this.queryStateManager,
                             throwOnNullKey: false);
-
-                    this.map.Add(dobj, entity);
-
-                    if (!createdNew)
-                    {
-                        return entity;
-                    }
-
-                    // Set entity properties
-                    var targetProperties = entity.GetType().GetProperties().Where(p => p.CanWrite);
-                    foreach (PropertyInfo property in targetProperties)
-                    {
-                        object rawValue;
-                        if (dobj.TryGet(property.Name, out rawValue))
-                        {
-                            object value = this.MapFromDynamicObjectGraph(rawValue, property.PropertyType);
-                            property.SetValue(entity, value);
-                        }
-                    }
-
-                    return entity;
                 }
 
                 if (obj != null &&
