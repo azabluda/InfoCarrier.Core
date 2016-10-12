@@ -365,10 +365,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private readonly ServerContext serverContext;
             private readonly Remote.Linq.Expressions.Expression rlinq;
 
-            // Instantiate ICollectionTypeFactory directly rather than using DI
-            // https://github.com/aspnet/EntityFramework/issues/6616
-            private static readonly ICollectionTypeFactory CollectionTypeFactory = new CollectionTypeFactory();
-
             public QueryExecutor(
                 QueryContext queryContext,
                 Expression expression,
@@ -525,7 +521,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         typeof(List<>).MakeGenericType(targetType.GenericTypeArguments));
 
                     return Activator.CreateInstance(
-                        CollectionTypeFactory.TryFindTypeToInstantiate(targetType.GenericTypeArguments.Single(), targetType),
+                        new CollectionTypeFactory().TryFindTypeToInstantiate(targetType.GenericTypeArguments.Single(), targetType),
                         list);
                 }
 
