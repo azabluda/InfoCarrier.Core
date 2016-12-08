@@ -2,6 +2,7 @@
 {
     using System;
     using Common;
+    using Common.Properties;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Logging;
 
@@ -60,7 +61,7 @@
         {
             if (this.finished)
             {
-                throw new InvalidOperationException("TransactionAlreadyFinished");
+                throw new InvalidOperationException(Resources.NoActiveTransaction);
             }
         }
 

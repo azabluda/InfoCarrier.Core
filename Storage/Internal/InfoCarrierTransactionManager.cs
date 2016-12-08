@@ -7,6 +7,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Common.Properties;
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Storage;
@@ -46,7 +47,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction == null)
             {
-                throw new InvalidOperationException("RelationalStrings.NoActiveTransaction");
+                throw new InvalidOperationException(Resources.NoActiveTransaction);
             }
 
             this.CurrentTransaction.Commit();
@@ -56,7 +57,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction == null)
             {
-                throw new InvalidOperationException("RelationalStrings.NoActiveTransaction");
+                throw new InvalidOperationException(Resources.NoActiveTransaction);
             }
 
             this.CurrentTransaction.Rollback();
@@ -66,7 +67,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction != null)
             {
-                throw new InvalidOperationException("RelationalStrings.TransactionAlreadyStarted");
+                throw new InvalidOperationException(Resources.TransactionAlreadyStarted);
             }
         }
 
