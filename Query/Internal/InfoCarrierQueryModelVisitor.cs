@@ -431,7 +431,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private ServiceMessage CreateQueryDataRequest()
             {
                 IInfoCarrierLogger logger = this.serverContext.GetLogger(this.serverContext);
-                logger.Debug("Execute query on the server");
+                logger.Debug(@"Execute query on the server");
                 logger.Debug(this.rlinq);
 
                 using (var request = DisposableGuard.Create(new ServiceMessage(this.serverContext.SessionId, this.serverContext.ServerPublicKey)))
@@ -586,7 +586,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     toType = inclProp.PropertyType;
-                    arg = Expression.Parameter(prevType, "x");
+                    arg = Expression.Parameter(prevType, @"x");
 
                     methodCallExpression = Expression.Call(
                         miThenInclude.GetGenericMethodDefinition().MakeGenericMethod(entityType, prevType, toType),

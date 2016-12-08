@@ -35,14 +35,14 @@
             return Expression.New(
                 ctor,
                 new[] { outerExpression, innerExpression },
-                transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer"),
-                transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner"));
+                transparentIdentifierType.GetTypeInfo().GetDeclaredProperty(@"Outer"),
+                transparentIdentifierType.GetTypeInfo().GetDeclaredProperty(@"Inner"));
         }
 
         private static Expression AccessOuterTransparentField(
             Type transparentIdentifierType, Expression targetExpression)
         {
-            PropertyInfo propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Outer");
+            PropertyInfo propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty(@"Outer");
 
             return Expression.Property(targetExpression, propertyInfo);
         }
@@ -50,7 +50,7 @@
         private static Expression AccessInnerTransparentField(
             Type transparentIdentifierType, Expression targetExpression)
         {
-            PropertyInfo propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty("Inner");
+            PropertyInfo propertyInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredProperty(@"Inner");
 
             return Expression.Property(targetExpression, propertyInfo);
         }
@@ -59,7 +59,7 @@
             IQuerySource fromClause, QueryModel queryModel, int index, Type transparentIdentifierType)
         {
             this.CurrentParameter
-                = Expression.Parameter(transparentIdentifierType, $"t{this.transparentParameterCounter++}");
+                = Expression.Parameter(transparentIdentifierType, $@"t{this.transparentParameterCounter++}");
 
             Expression outerAccessExpression
                 = AccessOuterTransparentField(transparentIdentifierType, this.CurrentParameter);
