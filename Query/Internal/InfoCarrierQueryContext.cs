@@ -11,7 +11,7 @@
         public InfoCarrierQueryContext(
             Func<IQueryBuffer> createQueryBuffer,
             ServerContext serverContext,
-            IStateManager stateManager,
+            LazyRef<IStateManager> stateManager,
             IConcurrencyDetector concurrencyDetector)
             : base(
                 createQueryBuffer,

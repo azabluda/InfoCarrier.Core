@@ -449,7 +449,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
                 {
-                    IEntityType entityType = this.queryContext.StateManager.Context.Model.FindEntityType(targetType);
+                    IEntityType entityType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(targetType);
                     if (entityType == null)
                     {
                         continue;
@@ -613,7 +613,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
             }
 
-            public override void Rewrite(QueryModel queryModel)
+            public override void Rewrite(QueryModel queryModel, QueryModel parentQueryModel)
             {
             }
         }

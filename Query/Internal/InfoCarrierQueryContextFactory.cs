@@ -2,7 +2,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System.Linq;
     using Infrastructure.Internal;
-    using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -12,11 +11,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private readonly ServerContext serverContext;
 
         public InfoCarrierQueryContextFactory(
-            IStateManager stateManager,
+            ICurrentDbContext currentContext,
             IConcurrencyDetector concurrencyDetector,
-            IChangeDetector changeDetector,
             IDbContextOptions contextOptions)
-            : base(stateManager, concurrencyDetector, changeDetector)
+            : base(currentContext, concurrencyDetector)
         {
             this.serverContext = contextOptions.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
         }
