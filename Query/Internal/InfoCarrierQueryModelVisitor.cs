@@ -44,9 +44,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IExpressionPrinter expressionPrinter,
             QueryCompilationContext queryCompilationContext)
             : base(
-                queryOptimizer,
-                new SuppressNavigationRewritingFactory(), // Suppress navigation rewriting
-                subQueryMemberPushDownExpressionVisitor,
+                queryOptimizer, // not used, see OptimizeQueryModel
+                navigationRewritingExpressionVisitorFactory, // not used, see OptimizeQueryModel
+                subQueryMemberPushDownExpressionVisitor, // not used, see OptimizeQueryModel
                 querySourceTracingExpressionVisitorFactory,
                 entityResultFindingExpressionVisitorFactory,
                 taskBlockingExpressionVisitor,
@@ -79,6 +79,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.ExpressionIsAsyncEnumerable
                 ? (ILinqOperatorProvider)new AsyncLinqOperatorProvider()
                 : this.InfoCarrierLinqOperatorProvider;
+
+        protected override void OptimizeQueryModel(QueryModel queryModel)
+        {
+            // Suppress any optimization. We want to transparently transfer the query
+            // to the application server as close to the original as it is possible.
+        }
 
         public override Func<QueryContext, IAsyncEnumerable<TResult>> CreateAsyncQueryExecutor<TResult>(QueryModel queryModel)
         {
@@ -595,26 +601,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 return methodCallExpression;
-            }
-        }
-
-        private class SuppressNavigationRewritingFactory : INavigationRewritingExpressionVisitorFactory
-        {
-            public NavigationRewritingExpressionVisitor Create(EntityQueryModelVisitor queryModelVisitor)
-            {
-                return new SuppressNavigationRewriting(queryModelVisitor);
-            }
-        }
-
-        private class SuppressNavigationRewriting : NavigationRewritingExpressionVisitor
-        {
-            public SuppressNavigationRewriting(EntityQueryModelVisitor queryModelVisitor)
-                : base(queryModelVisitor)
-            {
-            }
-
-            public override void Rewrite(QueryModel queryModel, QueryModel parentQueryModel)
-            {
             }
         }
 
