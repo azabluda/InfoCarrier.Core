@@ -7,6 +7,7 @@
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+    using Remote.Linq;
     using Utils;
 
     internal class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
@@ -29,16 +30,21 @@
                         .MakeGenericMethod(paramType)
                         .ToDelegate<Func<MethodCallExpression, object>>(this)
                         .Invoke(node);
-                return Expression.Constant(paramValue, paramType);
+
+                return Expression.Property(
+                    Expression.Constant(paramValue),
+                    paramValue.GetType(),
+                    nameof(VariableQueryArgument<object>.Value));
             }
 
             return base.VisitMethodCall(node);
         }
 
         private object GetParameterValue<T>(MethodCallExpression node) =>
-            Expression
-                .Lambda<Func<QueryContext, T>>(node, EntityQueryModelVisitor.QueryContextParameter)
-                .Compile()
-                .Invoke(this.queryContext);
+            new VariableQueryArgument<T>(
+                Expression
+                    .Lambda<Func<QueryContext, T>>(node, EntityQueryModelVisitor.QueryContextParameter)
+                    .Compile()
+                    .Invoke(this.queryContext));
     }
 }
