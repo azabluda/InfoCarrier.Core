@@ -5,6 +5,8 @@ namespace InfoCarrier.Core.Client
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+    using Query.ExpressionVisitors.Internal;
 
     public static class InfoCarrierDbContextOptionsExtensions
     {
@@ -33,7 +35,8 @@ namespace InfoCarrier.Core.Client
 
             infoCarrierOptionsAction?.Invoke(new InfoCarrierDbContextOptionsBuilder(optionsBuilder));
 
-            return optionsBuilder;
+            return optionsBuilder
+                .ReplaceService<IMemberAccessBindingExpressionVisitorFactory, InfoCarrierMemberAccessBindingExpressionVisitorFactory>();
         }
     }
 }
