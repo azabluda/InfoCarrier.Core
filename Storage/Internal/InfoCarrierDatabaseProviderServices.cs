@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
+    using Query;
     using Query.ExpressionVisitors.Internal;
     using Query.Internal;
     using ValueGeneration.Internal;
@@ -30,6 +31,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public override IDatabaseCreator Creator => this.GetService<InfoCarrierDatabaseCreator>();
 
         public override IValueGeneratorSelector ValueGeneratorSelector => this.GetService<InfoCarrierValueGeneratorSelector>();
+
+        public override IResultOperatorHandler ResultOperatorHandler => this.GetService<InfoCarrierResultOperatorHandler>();
 
         public override IModelSource ModelSource => this.GetService<InfoCarrierModelSource>();
 
