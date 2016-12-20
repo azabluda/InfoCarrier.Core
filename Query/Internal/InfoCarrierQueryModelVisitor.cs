@@ -455,7 +455,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
                 {
-                    IEntityType entityType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(targetType);
+                    object entityTypeName;
+                    if (!dobj.TryGet(Serializer.EntityTypeNameTag, out entityTypeName))
+                    {
+                        continue;
+                    }
+
+                    IEntityType entityType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(entityTypeName.ToString());
                     if (entityType == null)
                     {
                         continue;
@@ -489,7 +495,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 valueBuffer,
                                 vr =>
                                 {
-                                    object newEntity = Activator.CreateInstance(targetType);
+                                    object newEntity = Activator.CreateInstance(entityType.ClrType);
                                     this.map.Add(dobj, newEntity);
 
                                     // Set regular (non-shadow) properties
