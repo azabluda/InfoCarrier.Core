@@ -145,11 +145,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     ? SymbolExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, false))
                     : SymbolExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, false));
 
+            // Prevent misinterpretation of single element T[] as collection of T
+            Type resultType = this.Expression.Type.IsArray
+                ? this.Expression.Type
+                : Aqua.TypeSystem.TypeHelper.GetElementType(this.Expression.Type);
+
             this.Expression
                 = Expression.Call(
                     execQueryMethod
                         .GetGenericMethodDefinition()
-                        .MakeGenericMethod(Aqua.TypeSystem.TypeHelper.GetElementType(this.Expression.Type)),
+                        .MakeGenericMethod(resultType),
                     QueryContextParameter,
                     Expression.Constant(this.Expression),
                     Expression.Constant(this.QueryCompilationContext.IsTrackingQuery));
@@ -394,9 +399,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
             public IEnumerable<TResult> ExecuteQuery()
             {
                 IEnumerable<DynamicObject> dataRecords = this.QueryData();
-                return dataRecords == null
-                    ? Enumerable.Empty<TResult>()
-                    : this.Map<TResult>(dataRecords);
+                if (dataRecords == null)
+                {
+                    return Enumerable.Empty<TResult>();
+                }
+
+                // Remote.Linq misinterprets single-element IEnumerable<object[]>
+                // as IEnumerable<object> so we need to compensate this effect.
+                if (typeof(TResult) == typeof(object).MakeArrayType())
+                {
+                    return this.Map<object>(dataRecords).ToArray().Yield().Cast<TResult>();
+                }
+
+                return this.Map<TResult>(dataRecords);
             }
 
             public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
@@ -455,6 +470,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
                 {
+                    // TODO: remove after https://github.com/6bee/aqua-core/issues/4 is fixed
+                    object clrTypeName;
+                    if (dobj.TryGet(Serializer.ClrTypeNameTag, out clrTypeName))
+                    {
+                        dobj.Type = new Aqua.TypeSystem.TypeInfo(Type.GetType(clrTypeName.ToString()));
+                        dobj.Remove(Serializer.ClrTypeNameTag);
+                    }
+
                     object entityTypeName;
                     if (!dobj.TryGet(Serializer.EntityTypeNameTag, out entityTypeName))
                     {
@@ -627,9 +650,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 IDynamicObjectMapper mapper)
             {
                 IEnumerable<DynamicObject> dataRecords = await asyncResult;
-                return dataRecords == null
-                    ? default(T).Yield()
-                    : mapper.Map<T>(dataRecords);
+                if (dataRecords == null)
+                {
+                    return default(T).Yield();
+                }
+
+                // Remote.Linq misinterprets single-element IEnumerable<object[]>
+                // as IEnumerable<object> so we need to compensate this effect.
+                if (typeof(T) == typeof(object).MakeArrayType())
+                {
+                    return mapper.Map<object>(dataRecords).ToArray().Yield().Cast<T>();
+                }
+
+                return mapper.Map<T>(dataRecords);
             }
 
             public IAsyncEnumerator<T> GetEnumerator() => this.enumeratorFactory();
