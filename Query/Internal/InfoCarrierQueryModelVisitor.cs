@@ -470,14 +470,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
                 {
-                    // TODO: remove after https://github.com/6bee/aqua-core/issues/4 is fixed
-                    object clrTypeName;
-                    if (dobj.TryGet(Serializer.ClrTypeNameTag, out clrTypeName))
-                    {
-                        dobj.Type = new Aqua.TypeSystem.TypeInfo(Type.GetType(clrTypeName.ToString()));
-                        dobj.Remove(Serializer.ClrTypeNameTag);
-                    }
-
                     object entityTypeName;
                     if (!dobj.TryGet(Serializer.EntityTypeNameTag, out entityTypeName))
                     {
