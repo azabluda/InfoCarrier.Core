@@ -8,7 +8,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Threading;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
-    using Common;
     using ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Metadata;
@@ -23,7 +22,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remote.Linq.ExpressionVisitors;
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
-    using Utils;
 
     public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
@@ -142,8 +140,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             MethodInfo execQueryMethod =
                 ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
-                    ? SymbolExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, false))
-                    : SymbolExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, false));
+                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, false))
+                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, false));
 
             // Prevent misinterpretation of single element T[] as collection of T
             Type resultType = this.Expression.Type.IsArray
@@ -373,7 +371,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private readonly QueryContext queryContext;
             private readonly bool queryStateManager;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
-            private readonly ServerContext serverContext;
+            private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
 
             public QueryExecutor(
@@ -384,7 +382,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 this.queryContext = queryContext;
                 this.queryStateManager = queryStateManager;
-                this.serverContext = ((InfoCarrierQueryContext)queryContext).ServerContext;
+                this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
                 // Substitute query parameters
                 expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
@@ -398,7 +396,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public IEnumerable<TResult> ExecuteQuery()
             {
-                IEnumerable<DynamicObject> dataRecords = this.QueryData();
+                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq);
                 if (dataRecords == null)
                 {
                     return Enumerable.Empty<TResult>();
@@ -408,7 +406,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 // as IEnumerable<object> so we need to compensate this effect.
                 if (typeof(TResult) == typeof(object).MakeArrayType())
                 {
-                    return this.Map<object>(dataRecords).ToArray().Yield().Cast<TResult>();
+                    return Enumerable.Repeat(this.Map<object>(dataRecords).ToArray(), 1).Cast<TResult>();
                 }
 
                 return this.Map<TResult>(dataRecords);
@@ -416,119 +414,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
             {
-                return new AsyncEnumerableAdapter<TResult>(this.QueryDataAsync(), this);
-            }
-
-            private IEnumerable<DynamicObject> QueryData()
-            {
-                using (ServiceMessage xmlMsg = this.CreateQueryDataRequest())
-                {
-                    using (ServiceMessage cresp = this.serverContext.ServiceDispatcher.QueryData(xmlMsg))
-                    {
-                        return this.ParseQueryResult(cresp);
-                    }
-                }
-            }
-
-            private async Task<IEnumerable<DynamicObject>> QueryDataAsync()
-            {
-                using (ServiceMessage xmlMsg = this.CreateQueryDataRequest())
-                {
-                    using (ServiceMessage cresp = await this.serverContext.ServiceDispatcher.QueryDataAsync(xmlMsg))
-                    {
-                        return this.ParseQueryResult(cresp);
-                    }
-                }
-            }
-
-            private IEnumerable<DynamicObject> ParseQueryResult(ServiceMessage queryResultMessage)
-            {
-                using (ServiceMessage.SecureBody bodyReader = queryResultMessage.CreateBodyReader(this.serverContext.ClientPrivateKey))
-                {
-                    return Serializer.LoadFromStream<IEnumerable<DynamicObject>>(bodyReader.Stream);
-                }
-            }
-
-            private ServiceMessage CreateQueryDataRequest()
-            {
-                IInfoCarrierLogger logger = this.serverContext.GetLogger(this.serverContext);
-                logger.Debug(@"Execute query on the server");
-                logger.Debug(this.rlinq);
-
-                using (var request = DisposableGuard.Create(new ServiceMessage(this.serverContext.SessionId, this.serverContext.ServerPublicKey)))
-                {
-                    using (ServiceMessage.SecureBody bodyWriter = request.Value.CreateBodyWriter(this.serverContext.ServerPublicKey))
-                    {
-                        RemoteLinqHelper.SaveToStream(bodyWriter.Stream, this.rlinq, this.serverContext.ModuleManager);
-                    }
-
-                    return request.Release();
-                }
+                return new AsyncEnumerableAdapter<TResult>(this.infoCarrierBackend.QueryDataAsync(this.rlinq), this);
             }
 
             protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
             {
-                foreach (DynamicObject dobj in obj.YieldAs<DynamicObject>())
+                object entity;
+                if (this.TryMapEntity(obj, out entity))
                 {
-                    object entityTypeName;
-                    if (!dobj.TryGet(Serializer.EntityTypeNameTag, out entityTypeName))
-                    {
-                        continue;
-                    }
-
-                    IEntityType entityType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(entityTypeName.ToString());
-                    if (entityType == null)
-                    {
-                        continue;
-                    }
-
-                    object entity;
-                    if (this.map.TryGetValue(dobj, out entity))
-                    {
-                        return entity;
-                    }
-
-                    IKey key = entityType.FindPrimaryKey();
-
-                    // TRICKY: We need ValueBuffer containing only key values (for entity identity lookup)
-                    // and shadow property values for InternalMixedEntityEntry.
-                    // We will set other properties with our own algorithm.
-                    var keyAndShadowProps = entityType.GetProperties().Where(p => p.IsKey() || p.IsShadowProperty).ToList();
-                    var nulls = Enumerable.Repeat<object>(null, 1 + keyAndShadowProps.Select(p => p.GetIndex()).DefaultIfEmpty(-1).Max());
-                    var valueBuffer = new ValueBuffer(nulls.ToList());
-                    foreach (IProperty p in keyAndShadowProps)
-                    {
-                        valueBuffer[p.GetIndex()] = this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType);
-                    }
-
-                    // Get entity instance from EFC's identity map, or create a new one
-                    return this.queryContext
-                        .QueryBuffer
-                        .GetEntity(
-                            key,
-                            new EntityLoadInfo(
-                                valueBuffer,
-                                vr =>
-                                {
-                                    object newEntity = Activator.CreateInstance(entityType.ClrType);
-                                    this.map.Add(dobj, newEntity);
-
-                                    // Set regular (non-shadow) properties
-                                    var targetProperties = newEntity.GetType().GetProperties().Where(p => p.CanWrite);
-                                    foreach (PropertyInfo property in targetProperties)
-                                    {
-                                        object value;
-                                        if (dobj.TryGet(property.Name, out value))
-                                        {
-                                            value = this.MapFromDynamicObjectGraph(value, property.PropertyType);
-                                            property.SetValue(newEntity, value);
-                                        }
-                                    }
-
-                                    return newEntity;
-                                }),
-                            this.queryStateManager,
-                            throwOnNullKey: false);
+                    return entity;
                 }
 
                 if (obj != null &&
@@ -546,6 +440,84 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 return base.MapFromDynamicObjectGraph(obj, targetType);
             }
+
+            private bool TryMapEntity(object obj, out object entity)
+            {
+                var dobj = obj as DynamicObject;
+                if (dobj == null)
+                {
+                    entity = null;
+                    return false;
+                }
+
+                object entityTypeName;
+                if (!dobj.TryGet(Server.QueryDataHelper.EntityTypeNameTag, out entityTypeName))
+                {
+                    entity = null;
+                    return false;
+                }
+
+                if (!(entityTypeName is string))
+                {
+                    entity = null;
+                    return false;
+                }
+
+                IEntityType entityType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(entityTypeName.ToString());
+                if (entityType == null)
+                {
+                    entity = null;
+                    return false;
+                }
+
+                if (this.map.TryGetValue(dobj, out entity))
+                {
+                    return true;
+                }
+
+                IKey key = entityType.FindPrimaryKey();
+
+                // TRICKY: We need ValueBuffer containing only key values (for entity identity lookup)
+                // and shadow property values for InternalMixedEntityEntry.
+                // We will set other properties with our own algorithm.
+                var keyAndShadowProps = entityType.GetProperties().Where(p => p.IsKey() || p.IsShadowProperty).ToList();
+                var nulls = Enumerable.Repeat<object>(null, 1 + keyAndShadowProps.Select(p => p.GetIndex()).DefaultIfEmpty(-1).Max());
+                var valueBuffer = new ValueBuffer(nulls.ToList());
+                foreach (IProperty p in keyAndShadowProps)
+                {
+                    valueBuffer[p.GetIndex()] = this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType);
+                }
+
+                // Get entity instance from EFC's identity map, or create a new one
+                entity = this.queryContext
+                    .QueryBuffer
+                    .GetEntity(
+                        key,
+                        new EntityLoadInfo(
+                            valueBuffer,
+                            vr =>
+                            {
+                                object newEntity = Activator.CreateInstance(entityType.ClrType);
+                                this.map.Add(dobj, newEntity);
+
+                                // Set regular (non-shadow) properties
+                                var targetProperties = newEntity.GetType().GetProperties().Where(p => p.CanWrite);
+                                foreach (PropertyInfo property in targetProperties)
+                                {
+                                    object value;
+                                    if (dobj.TryGet(property.Name, out value))
+                                    {
+                                        value = this.MapFromDynamicObjectGraph(value, property.PropertyType);
+                                        property.SetValue(newEntity, value);
+                                    }
+                                }
+
+                                return newEntity;
+                            }),
+                        this.queryStateManager,
+                        throwOnNullKey: false);
+                return true;
+            }
         }
 
         private class InfoCarrierIncludeExpressionVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
@@ -559,9 +531,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
-                if (node.Value
-                        .YieldAs<InfoCarrierEntityQueryableExpressionVisitor.RemoteQueryableStub>()
-                        .Any(dummyQueryable => dummyQueryable.QuerySource == this.includeResultOperator.QuerySource))
+                var stub = node.Value as InfoCarrierEntityQueryableExpressionVisitor.RemoteQueryableStub;
+                if (stub?.QuerySource == this.includeResultOperator.QuerySource)
                 {
                     return this.ApplyTopLevelInclude(node);
                 }
@@ -577,7 +548,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 var arg = Expression.Parameter(entityType, this.includeResultOperator.QuerySource.ItemName);
 
                 var methodCallExpression = Expression.Call(
-                    SymbolExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
+                    MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
                         .GetGenericMethodDefinition()
                         .MakeGenericMethod(entityType, toType),
                     constantExpression,
@@ -603,13 +574,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     {
                         prevType = collElementType;
                         miThenInclude =
-                            SymbolExtensions.GetMethodInfo(() => collArg.ThenInclude<object, object, object>(null));
+                            MethodInfoExtensions.GetMethodInfo(() => collArg.ThenInclude<object, object, object>(null));
                     }
                     else
                     {
                         prevType = toType;
                         miThenInclude =
-                            SymbolExtensions.GetMethodInfo(() => refArg.ThenInclude<object, object, object>(null));
+                            MethodInfoExtensions.GetMethodInfo(() => refArg.ThenInclude<object, object, object>(null));
                     }
 
                     toType = inclProp.PropertyType;
@@ -644,14 +615,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 IEnumerable<DynamicObject> dataRecords = await asyncResult;
                 if (dataRecords == null)
                 {
-                    return default(T).Yield();
+                    return Enumerable.Repeat(default(T), 1);
                 }
 
                 // Remote.Linq misinterprets single-element IEnumerable<object[]>
                 // as IEnumerable<object> so we need to compensate this effect.
                 if (typeof(T) == typeof(object).MakeArrayType())
                 {
-                    return mapper.Map<object>(dataRecords).ToArray().Yield().Cast<T>();
+                    return Enumerable.Repeat(mapper.Map<object>(dataRecords).ToArray(), 1).Cast<T>();
                 }
 
                 return mapper.Map<T>(dataRecords);

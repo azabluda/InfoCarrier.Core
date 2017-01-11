@@ -6,7 +6,6 @@
     using System.Reflection;
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
-    using Utils;
 
     // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L1027
     public partial class InfoCarrierQueryModelVisitor
@@ -15,7 +14,7 @@
 
         private static Type GetTransparentIdentifierType(Type outer, Type inner)
         {
-            return SymbolExtensions.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
+            return MethodInfoExtensions.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
                 .GetGenericMethodDefinition()
                 .MakeGenericMethod(outer, inner)
                 .ToDelegate<Func<Type>>()

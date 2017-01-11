@@ -7,9 +7,9 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using Common.Properties;
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Logging;
 
@@ -20,10 +20,10 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             ILogger<InfoCarrierTransactionManager> logger)
         {
             this.Logger = logger;
-            this.ServerContext = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
+            this.InfoCarrierBackend = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
         }
 
-        internal ServerContext ServerContext { get; }
+        internal IInfoCarrierBackend InfoCarrierBackend { get; }
 
         internal ILogger<InfoCarrierTransactionManager> Logger { get; }
 
@@ -32,14 +32,14 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public virtual IDbContextTransaction BeginTransaction()
         {
             this.CheckNoTransaction();
-            this.ServerContext.GetServiceInterface<Common.ITransactionManager>().BeginTransaction();
+            this.InfoCarrierBackend.BeginTransaction();
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 
         public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             this.CheckNoTransaction();
-            await this.ServerContext.GetServiceInterface<Common.ITransactionManager>().BeginTransactionAsync();
+            await this.InfoCarrierBackend.BeginTransactionAsync();
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 
@@ -47,7 +47,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction == null)
             {
-                throw new InvalidOperationException(Resources.NoActiveTransaction);
+                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
             }
 
             this.CurrentTransaction.Commit();
@@ -57,7 +57,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction == null)
             {
-                throw new InvalidOperationException(Resources.NoActiveTransaction);
+                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
             }
 
             this.CurrentTransaction.Rollback();
@@ -67,7 +67,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction != null)
             {
-                throw new InvalidOperationException(Resources.TransactionAlreadyStarted);
+                throw new InvalidOperationException(RelationalStrings.TransactionAlreadyStarted);
             }
         }
 

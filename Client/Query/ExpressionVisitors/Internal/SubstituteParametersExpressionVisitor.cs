@@ -8,7 +8,6 @@
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Remote.Linq;
-    using Utils;
 
     internal class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
     {
@@ -21,11 +20,11 @@
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (MethodInfoExtensions.MethodIsClosedFormOf(node.Method, DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
+            if (node.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
             {
                 Type paramType = node.Method.GetGenericArguments().Single();
                 object paramValue =
-                    SymbolExtensions.GetMethodInfo(() => this.GetParameterValue<object>(node))
+                    InfoCarrier.Core.MethodInfoExtensions.GetMethodInfo(() => this.GetParameterValue<object>(node))
                         .GetGenericMethodDefinition()
                         .MakeGenericMethod(paramType)
                         .ToDelegate<Func<MethodCallExpression, object>>(this)

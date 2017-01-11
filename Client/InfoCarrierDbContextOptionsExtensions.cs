@@ -12,15 +12,15 @@ namespace InfoCarrier.Core.Client
     {
         public static DbContextOptionsBuilder<TContext> UseInfoCarrierBackend<TContext>(
             this DbContextOptionsBuilder<TContext> optionsBuilder,
-            ServerContext serverContext,
+            IInfoCarrierBackend infoCarrierBackend,
             Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
             where TContext : DbContext
             => (DbContextOptionsBuilder<TContext>)UseInfoCarrierBackend(
-                (DbContextOptionsBuilder)optionsBuilder, serverContext, infoCarrierOptionsAction);
+                (DbContextOptionsBuilder)optionsBuilder, infoCarrierBackend, infoCarrierOptionsAction);
 
         public static DbContextOptionsBuilder UseInfoCarrierBackend(
             this DbContextOptionsBuilder optionsBuilder,
-            ServerContext serverContext,
+            IInfoCarrierBackend infoCarrierBackend,
             Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
         {
             var extension = optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>();
@@ -29,7 +29,7 @@ namespace InfoCarrier.Core.Client
                 ? new InfoCarrierOptionsExtension(extension)
                 : new InfoCarrierOptionsExtension();
 
-            extension.ServerContext = serverContext;
+            extension.InfoCarrierBackend = infoCarrierBackend;
 
             ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
 

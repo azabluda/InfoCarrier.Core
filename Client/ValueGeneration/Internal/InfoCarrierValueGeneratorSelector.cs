@@ -4,7 +4,6 @@
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.EntityFrameworkCore.ValueGeneration.Internal;
-    using Utils;
 
     public class InfoCarrierValueGeneratorSelector : ValueGeneratorSelector
     {

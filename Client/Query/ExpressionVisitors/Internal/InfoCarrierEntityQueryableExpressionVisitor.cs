@@ -9,7 +9,6 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Remote.Linq;
     using Remotion.Linq.Clauses;
-    using Utils;
 
     public class InfoCarrierEntityQueryableExpressionVisitor : EntityQueryableExpressionVisitor
     {
@@ -25,7 +24,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitEntityQueryable(Type elementType)
         {
-            IQueryable stub = SymbolExtensions.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
+            IQueryable stub = MethodInfoExtensions.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
                 .GetGenericMethodDefinition()
                 .MakeGenericMethod(elementType)
                 .ToDelegate<Func<IQuerySource, IQueryable>>()

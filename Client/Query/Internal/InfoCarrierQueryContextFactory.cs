@@ -8,7 +8,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
     public class InfoCarrierQueryContextFactory : QueryContextFactory
     {
-        private readonly ServerContext serverContext;
+        private readonly IInfoCarrierBackend infoCarrierBackend;
 
         public InfoCarrierQueryContextFactory(
             ICurrentDbContext currentContext,
@@ -16,10 +16,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IDbContextOptions contextOptions)
             : base(currentContext, concurrencyDetector)
         {
-            this.serverContext = contextOptions.Extensions.OfType<InfoCarrierOptionsExtension>().First().ServerContext;
+            this.infoCarrierBackend = contextOptions.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
         }
 
         public override QueryContext Create()
-            => new InfoCarrierQueryContext(this.CreateQueryBuffer, this.serverContext, this.StateManager, this.ConcurrencyDetector);
+            => new InfoCarrierQueryContext(this.CreateQueryBuffer, this.infoCarrierBackend, this.StateManager, this.ConcurrencyDetector);
     }
 }

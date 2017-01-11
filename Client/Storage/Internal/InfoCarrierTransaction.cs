@@ -1,8 +1,7 @@
 ﻿namespace InfoCarrier.Core.Client.Storage.Internal
 {
     using System;
-    using Common;
-    using Common.Properties;
+    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.Logging;
 
@@ -16,9 +15,6 @@
             this.transactionManager = transactionManager;
         }
 
-        private ITransactionManager TransactionManager =>
-            this.transactionManager.ServerContext.GetServiceInterface<ITransactionManager>();
-
         private ILogger<InfoCarrierTransactionManager> Logger => this.transactionManager.Logger;
 
         public void Commit()
@@ -27,7 +23,7 @@
 
             try
             {
-                this.TransactionManager.CommitTransaction();
+                this.transactionManager.InfoCarrierBackend.CommitTransaction();
             }
             finally
             {
@@ -41,7 +37,7 @@
 
             try
             {
-                this.TransactionManager.RollbackTransaction();
+                this.transactionManager.InfoCarrierBackend.RollbackTransaction();
             }
             finally
             {
@@ -61,7 +57,7 @@
         {
             if (this.finished)
             {
-                throw new InvalidOperationException(Resources.NoActiveTransaction);
+                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
             }
         }
 

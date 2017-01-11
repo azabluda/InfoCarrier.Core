@@ -10,7 +10,7 @@
     {
         public InfoCarrierQueryContext(
             Func<IQueryBuffer> createQueryBuffer,
-            ServerContext serverContext,
+            IInfoCarrierBackend infoCarrierBackend,
             LazyRef<IStateManager> stateManager,
             IConcurrencyDetector concurrencyDetector)
             : base(
@@ -18,9 +18,9 @@
                 stateManager,
                 concurrencyDetector)
         {
-            this.ServerContext = serverContext;
+            this.InfoCarrierBackend = infoCarrierBackend;
         }
 
-        public ServerContext ServerContext { get; }
+        public IInfoCarrierBackend InfoCarrierBackend { get; }
     }
 }

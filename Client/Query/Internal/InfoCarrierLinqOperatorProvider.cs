@@ -4,7 +4,6 @@
     using System.Linq.Expressions;
     using System.Reflection;
     using Microsoft.EntityFrameworkCore.Query.Internal;
-    using Utils;
 
     internal abstract class InfoCarrierLinqOperatorProvider : LinqOperatorProvider
     {
@@ -14,7 +13,7 @@
 
         protected static MethodInfo GetMethod(Expression<Action> expression)
         {
-            MethodInfo mi = SymbolExtensions.GetMethodInfo(expression);
+            MethodInfo mi = MethodInfoExtensions.GetMethodInfo(expression);
             return mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi;
         }
     }
