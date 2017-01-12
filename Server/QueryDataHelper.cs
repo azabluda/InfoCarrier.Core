@@ -106,6 +106,17 @@
 
             protected override DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation)
             {
+                if (obj != null && obj.GetType().IsArray)
+                {
+                    var list = ((System.Collections.IEnumerable)obj)
+                        .Cast<object>()
+                        .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
+                        .ToArray();
+                    DynamicObject darr = new DynamicObject(obj.GetType());
+                    darr.Add(string.Empty, list.Any() ? list : null);
+                    return darr;
+                }
+
                 DynamicObject dto = base.MapToDynamicObjectGraph(obj, setTypeInformation);
 
                 if (obj == null || dto == null)

@@ -396,13 +396,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return Enumerable.Empty<TResult>();
                 }
 
-                // Remote.Linq misinterprets single-element IEnumerable<object[]>
-                // as IEnumerable<object> so we need to compensate this effect.
-                if (typeof(TResult) == typeof(object).MakeArrayType())
-                {
-                    return Enumerable.Repeat(this.Map<object>(dataRecords).ToArray(), 1).Cast<TResult>();
-                }
-
                 return this.Map<TResult>(dataRecords);
             }
 
@@ -419,6 +412,26 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return entity;
                 }
 
+                if (targetType.IsArray)
+                {
+                    var dobj = obj as DynamicObject;
+                    if (dobj != null
+                        && dobj.PropertyCount == 1
+                        && string.IsNullOrEmpty(dobj.PropertyNames.Single()))
+                    {
+                        var darr = dobj.Values.Single() as DynamicObject[];
+                        if (darr != null)
+                        {
+                            var items = darr.Select(x => x != null ? this.MapFromDynamicObjectGraph(x, x.Type.Type) : null);
+                            return MethodInfoExtensions.GetMethodInfo(() => CastToArray<object>(null))
+                                .GetGenericMethodDefinition()
+                                .MakeGenericMethod(targetType.GetElementType())
+                                .ToDelegate<Func<IEnumerable<object>, object>>()
+                                .Invoke(items);
+                        }
+                    }
+                }
+
                 if (obj != null &&
                     targetType.IsGenericType &&
                     targetType.GetGenericTypeDefinition() == typeof(ICollection<>))
@@ -433,6 +446,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 return base.MapFromDynamicObjectGraph(obj, targetType);
+            }
+
+            private static object CastToArray<T>(IEnumerable<object> items)
+            {
+                return items.Cast<T>().ToArray();
             }
 
             private bool TryMapEntity(object obj, out object entity)
@@ -610,13 +628,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 if (dataRecords == null)
                 {
                     return Enumerable.Repeat(default(T), 1);
-                }
-
-                // Remote.Linq misinterprets single-element IEnumerable<object[]>
-                // as IEnumerable<object> so we need to compensate this effect.
-                if (typeof(T) == typeof(object).MakeArrayType())
-                {
-                    return Enumerable.Repeat(mapper.Map<object>(dataRecords).ToArray(), 1).Cast<T>();
                 }
 
                 return mapper.Map<T>(dataRecords);
