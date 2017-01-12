@@ -146,7 +146,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // Prevent misinterpretation of single element T[] as collection of T
             Type resultType = this.Expression.Type.IsArray
                 ? this.Expression.Type
-                : Aqua.TypeSystem.TypeHelper.GetElementType(this.Expression.Type);
+                : Server.QueryDataHelper.GetSequenceType(this.Expression.Type, this.Expression.Type);
 
             this.Expression
                 = Expression.Call(
@@ -173,7 +173,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             var innerItemParameter
                 = Expression.Parameter(
-                    GetSequenceType(fromExpression.Type), fromClause.ItemName);
+                    fromExpression.Type.GetSequenceType(), fromClause.ItemName);
 
             var transparentIdentifierType = GetTransparentIdentifierType(
                 this.CurrentParameter.Type,
@@ -239,7 +239,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             var innerItemParameter
                 = Expression.Parameter(
-                    GetSequenceType(innerSequenceExpression.Type), joinClause.ItemName);
+                    innerSequenceExpression.Type.GetSequenceType(), joinClause.ItemName);
 
             if (!this.QueryCompilationContext.QuerySourceMapping.ContainsMapping(joinClause))
             {
@@ -291,7 +291,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             var innerItemParameter
                 = Expression.Parameter(
-                    GetSequenceType(innerSequenceExpression.Type),
+                    innerSequenceExpression.Type.GetSequenceType(),
                     groupJoinClause.JoinClause.ItemName);
 
             if (!this.QueryCompilationContext.QuerySourceMapping.ContainsMapping(groupJoinClause.JoinClause))
@@ -346,12 +346,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             bool querySourceRequiresTracking)
         {
             // Everything is already in-place so we just stub this method with empty body
-        }
-
-        private static Type GetSequenceType(Type type)
-        {
-            Type result = Aqua.TypeSystem.TypeHelper.GetElementType(type);
-            return result == type ? null : result;
         }
 
         private static bool ImplementsGenericInterface(Type type, Type interfaceType)
@@ -563,7 +557,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 foreach (PropertyInfo inclProp in this.includeResultOperator.ChainedNavigationProperties)
                 {
-                    Type collElementType = GetSequenceType(toType);
+                    Type collElementType = Server.QueryDataHelper.GetSequenceType(toType, null);
 
                     IIncludableQueryable<object, object> refArg = null;
                     IIncludableQueryable<object, ICollection<object>> collArg = null;

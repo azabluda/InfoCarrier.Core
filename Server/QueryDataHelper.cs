@@ -19,6 +19,23 @@
     {
         internal static string EntityTypeNameTag { get; } = "__EntityType";
 
+        internal static Type GetSequenceType(Type type, Type ifNotSequence)
+        {
+            // Despite formally a string is a sequence of chars, we treat it as a scalar type
+            if (type == typeof(string))
+            {
+                return ifNotSequence;
+            }
+
+            // Arrays is another special case
+            if (type.IsArray)
+            {
+                return ifNotSequence;
+            }
+
+            return type.TryGetSequenceType() ?? ifNotSequence;
+        }
+
         public static async Task<IEnumerable<DynamicObject>> QueryDataAsync(DbContext dbContext, Expression rlinq)
         {
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
@@ -37,7 +54,7 @@
                 .ToLinqExpression(typeResolver: null);
 
             IAsyncQueryProvider provider = dbContext.GetService<IAsyncQueryProvider>();
-            Type elementType = Aqua.TypeSystem.TypeHelper.GetElementType(linqExpression.Type);
+            Type elementType = GetSequenceType(linqExpression.Type, linqExpression.Type);
 
             object queryResult = await typeof(QueryDataHelper).GetTypeInfo()
                 .GetDeclaredMethod(nameof(ExecuteExpression))
