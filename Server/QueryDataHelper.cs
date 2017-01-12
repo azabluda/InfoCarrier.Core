@@ -74,13 +74,6 @@
             IAsyncQueryProvider provider,
             System.Linq.Expressions.Expression expression)
         {
-            // Temp workaround: execute queries synchronously, because async execution
-            // is slow due to the known performance issue in EFC
-            // https://github.com/aspnet/EntityFramework/issues/5816
-            return Remote.Linq.Expressions.ExpressionExtensions.Execute(expression)
-                ?? Enumerable.Repeat<object>(null, 1);
-
-#pragma warning disable 162
             var queryResult = new List<T>();
             using (var enumerator = provider.ExecuteAsync<T>(expression).GetEnumerator())
             {
@@ -91,7 +84,6 @@
             }
 
             return queryResult;
-#pragma warning restore 162
         }
 
         private class EntityToDynamicObjectMapper : DynamicObjectMapper
