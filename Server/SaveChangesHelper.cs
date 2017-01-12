@@ -10,13 +10,13 @@
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
 
-    public class SaveChangesHelper
+    public class SaveChangesHelper : IDisposable
     {
         private readonly DbContext dbContext;
 
-        public SaveChangesHelper(DbContext dbContext, SaveChangesRequest request)
+        public SaveChangesHelper(Func<DbContext> dbContextFactory, SaveChangesRequest request)
         {
-            this.dbContext = dbContext;
+            this.dbContext = dbContextFactory();
 
             var entities = new List<object>();
             var dtos = new Dictionary<object, DataTransferObject>();
@@ -24,7 +24,7 @@
             // Materialize entities and add them to dictionary
             foreach (DataTransferObject dto in request.DataTransferObjects)
             {
-                IEntityType entityType = dbContext.Model.FindEntityType(dto.EntityTypeName);
+                IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
                 object entity = Activator.CreateInstance(entityType.ClrType);
 
                 entities.Add(entity);
@@ -34,7 +34,7 @@
             // Add entities to dbContext
             foreach (object entity in entities)
             {
-                dbContext.ChangeTracker.TrackGraph(
+                this.dbContext.ChangeTracker.TrackGraph(
                     entity,
                     node =>
                     {
@@ -85,6 +85,11 @@
         }
 
         public IEnumerable<object> Entities { get; }
+
+        public void Dispose()
+        {
+            this.dbContext.Dispose();
+        }
 
         public SaveChangesResult SaveChanges()
         {
