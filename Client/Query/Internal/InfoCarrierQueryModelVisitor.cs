@@ -464,8 +464,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 IKey key = entityType.FindPrimaryKey();
 
-                // TRICKY: We need ValueBuffer containing only key values (for entity identity lookup)
-                // and shadow property values for InternalMixedEntityEntry.
+                // TRICKY: We need ValueBuffer containing only
+                // - key values for entity identity lookup
+                // - shadow property values for InternalMixedEntityEntry
                 // We will set other properties with our own algorithm.
                 var keyAndShadowProps = entityType.GetProperties().Where(p => p.IsKey() || p.IsShadowProperty).ToList();
                 var nulls = Enumerable.Repeat<object>(null, 1 + keyAndShadowProps.Select(p => p.GetIndex()).DefaultIfEmpty(-1).Max());
