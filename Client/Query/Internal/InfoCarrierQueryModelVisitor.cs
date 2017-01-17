@@ -388,6 +388,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
 
+            private IModel Model => this.queryContext.StateManager.Value.Context.Model;
+
             public IEnumerable<TResult> ExecuteQuery()
             {
                 IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq);
@@ -406,54 +408,68 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
             {
+                Func<object> baseImpl = () => base.MapFromDynamicObjectGraph(obj, targetType);
+
+                // mapping required?
+                if (obj == null || targetType == obj.GetType())
+                {
+                    return baseImpl();
+                }
+
+                // is obj an entity?
                 object entity;
                 if (this.TryMapEntity(obj, out entity))
                 {
                     return entity;
                 }
 
-                if (obj != null &&
-                    targetType.IsGenericType &&
-                    targetType.GetGenericTypeDefinition() == typeof(ICollection<>))
+                // is targetType a collection of entities?
+                Type elementType = Server.QueryDataHelper.GetSequenceType(targetType, null);
+                if (elementType == null
+                    || this.Model.FindEntityType(elementType) == null)
                 {
-                    object list = base.MapFromDynamicObjectGraph(
-                        obj,
-                        typeof(List<>).MakeGenericType(targetType.GenericTypeArguments));
-
-                    return Activator.CreateInstance(
-                        new CollectionTypeFactory().TryFindTypeToInstantiate(targetType.GenericTypeArguments.Single(), targetType),
-                        list);
+                    return baseImpl();
                 }
 
-                return base.MapFromDynamicObjectGraph(obj, targetType);
+                // map to list (supported directly by aqua-core)
+                Type listType = typeof(List<>).MakeGenericType(elementType);
+                object list = base.MapFromDynamicObjectGraph(obj, listType);
+
+                // determine concrete collection type
+                Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(elementType, targetType);
+                if (listType == collType)
+                {
+                    return list; // no further mapping required
+                }
+
+                // materialize concrete collection
+                return Activator.CreateInstance(collType, list);
             }
 
             private bool TryMapEntity(object obj, out object entity)
             {
+                entity = null;
+
                 var dobj = obj as DynamicObject;
                 if (dobj == null)
                 {
-                    entity = null;
                     return false;
                 }
 
                 object entityTypeName;
                 if (!dobj.TryGet(Server.QueryDataHelper.EntityTypeNameTag, out entityTypeName))
                 {
-                    entity = null;
                     return false;
                 }
 
                 if (!(entityTypeName is string))
                 {
-                    entity = null;
                     return false;
                 }
 
-                IEntityType entityType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(entityTypeName.ToString());
+                IEntityType entityType = this.Model.FindEntityType(entityTypeName.ToString());
                 if (entityType == null)
                 {
-                    entity = null;
                     return false;
                 }
 
@@ -467,7 +483,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 // TRICKY: We need ValueBuffer containing only
                 // - key values for entity identity lookup
                 // - shadow property values for InternalMixedEntityEntry
-                // We will set other properties with our own algorithm.
+                // We will set regular properties in materializer.
                 var keyAndShadowProps = entityType.GetProperties().Where(p => p.IsKey() || p.IsShadowProperty).ToList();
                 var nulls = Enumerable.Repeat<object>(null, 1 + keyAndShadowProps.Select(p => p.GetIndex()).DefaultIfEmpty(-1).Max());
                 var valueBuffer = new ValueBuffer(nulls.ToList());
