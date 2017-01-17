@@ -19,10 +19,10 @@
             this.dbContext = dbContextFactory();
 
             var entities = new List<object>();
-            var dtos = new Dictionary<object, DataTransferObject>();
+            var dtos = new Dictionary<object, UpdateEntryDto>();
 
             // Materialize entities and add them to dictionary
-            foreach (DataTransferObject dto in request.DataTransferObjects)
+            foreach (UpdateEntryDto dto in request.DataTransferObjects)
             {
                 IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
                 object entity = Activator.CreateInstance(entityType.ClrType);
@@ -38,7 +38,7 @@
                     entity,
                     node =>
                     {
-                        DataTransferObject dto;
+                        UpdateEntryDto dto;
                         if (!dtos.TryGetValue(node.Entry.Entity, out dto))
                         {
                             node.Entry.State = EntityState.Detached;
@@ -51,7 +51,7 @@
                             .ToList();
 
                         // Set PK values
-                        foreach (DataTransferObject.Property prop in props.Where(x => x.EfProperty.IsPrimaryKey()))
+                        foreach (UpdateEntryDto.Property prop in props.Where(x => x.EfProperty.IsPrimaryKey()))
                         {
                             PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
                             propEntry.CurrentValue = prop.CurrentValue;
@@ -63,7 +63,7 @@
                         node.Entry.State = dto.EntityState;
 
                         // Set non-PK / non temporary (e.g. TPH discriminators) values
-                        foreach (DataTransferObject.Property prop in
+                        foreach (UpdateEntryDto.Property prop in
                             props.Where(x => !x.EfProperty.IsPrimaryKey() && !x.HasTemporaryValue))
                         {
                             PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
@@ -73,7 +73,7 @@
                         }
 
                         // Mark temporary values
-                        foreach (DataTransferObject.Property prop in props.Where(x => x.HasTemporaryValue))
+                        foreach (UpdateEntryDto.Property prop in props.Where(x => x.HasTemporaryValue))
                         {
                             PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
                             propEntry.IsTemporary = true;
@@ -106,7 +106,7 @@
             var result = new SaveChangesResult { CountPersisted = countPersisted };
             result.DataTransferObjects.AddRange(
                 this.Entities.Select(
-                    e => new DataTransferObject(this.dbContext.Entry(e).GetInfrastructure())));
+                    e => new UpdateEntryDto(this.dbContext.Entry(e).GetInfrastructure())));
             return result;
         }
     }

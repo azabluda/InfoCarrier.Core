@@ -149,7 +149,7 @@
     <Compile Include="Client\Query\Internal\InfoCarrierQueryModelVisitor.cs" />
     <Compile Include="Client\Query\Internal\InfoCarrierQueryModelVisitor.TransparentIdentifiers.cs" />
     <Compile Include="Client\Query\Internal\InfoCarrierQueryModelVisitorFactory.cs" />
-    <Compile Include="Common\DataTransferObject.cs" />
+    <Compile Include="Common\UpdateEntryDto.cs" />
     <Compile Include="Server\QueryDataHelper.cs" />
     <Compile Include="Server\SaveChangesHelper.cs" />
     <Compile Include="Common\SaveChangesRequest.cs" />

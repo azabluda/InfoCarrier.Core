@@ -11,13 +11,13 @@
     using Microsoft.EntityFrameworkCore.Update;
 
     [DataContract]
-    public class DataTransferObject
+    public class UpdateEntryDto
     {
-        public DataTransferObject()
+        public UpdateEntryDto()
         {
         }
 
-        public DataTransferObject(IUpdateEntry entry)
+        public UpdateEntryDto(IUpdateEntry entry)
         {
             this.EntityTypeName = entry.EntityType.Name;
             this.EntityState = entry.EntityState;

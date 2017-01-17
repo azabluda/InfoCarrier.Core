@@ -7,6 +7,6 @@
     public class SaveChangesRequest
     {
         [DataMember]
-        public List<DataTransferObject> DataTransferObjects { get; } = new List<DataTransferObject>();
+        public List<UpdateEntryDto> DataTransferObjects { get; } = new List<UpdateEntryDto>();
     }
 }

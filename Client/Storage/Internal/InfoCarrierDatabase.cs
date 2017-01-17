@@ -31,7 +31,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
             var saveChanges = new SaveChangesRequest();
-            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new DataTransferObject(e)));
+            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e)));
             SaveChangesResult result = this.infoCarrierBackend.SaveChanges(saveChanges, i => entries[i]);
             MergeResults(entries, result);
             return result.CountPersisted;
@@ -42,7 +42,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             CancellationToken cancellationToken = default(CancellationToken))
         {
             var saveChanges = new SaveChangesRequest();
-            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new DataTransferObject(e)));
+            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e)));
             SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(saveChanges, i => entries[i]);
             MergeResults(entries, result);
             return result.CountPersisted;
@@ -53,7 +53,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             // Merge the results / update properties modified during SaveChanges on the server-side
             foreach (var merge in entries.Zip(result.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
             {
-                foreach (DataTransferObject.Property prop in
+                foreach (UpdateEntryDto.Property prop in
                     merge.Entry.EntityType.GetProperties().SelectMany(p => merge.Dto.YieldPropery(p)))
                 {
                     // Can not (and need not) merge non-temporary PK values
