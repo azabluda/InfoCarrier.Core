@@ -30,25 +30,21 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
         public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
-            var saveChanges = new SaveChangesRequest();
-            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e)));
-            SaveChangesResult result = this.infoCarrierBackend.SaveChanges(saveChanges, i => entries[i]);
-            MergeResults(entries, result);
-            return result.CountPersisted;
+            var request = new SaveChangesRequest(entries);
+            SaveChangesResult result = this.infoCarrierBackend.SaveChanges(request, i => entries[i]);
+            return MergeResults(entries, result);
         }
 
         public override async Task<int> SaveChangesAsync(
             IReadOnlyList<IUpdateEntry> entries,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            var saveChanges = new SaveChangesRequest();
-            saveChanges.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e)));
-            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(saveChanges, i => entries[i]);
-            MergeResults(entries, result);
-            return result.CountPersisted;
+            var request = new SaveChangesRequest(entries);
+            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(request, i => entries[i]);
+            return MergeResults(entries, result);
         }
 
-        private static void MergeResults(IReadOnlyList<IUpdateEntry> entries, SaveChangesResult result)
+        private static int MergeResults(IReadOnlyList<IUpdateEntry> entries, SaveChangesResult result)
         {
             // Merge the results / update properties modified during SaveChanges on the server-side
             foreach (var merge in entries.Zip(result.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
@@ -65,6 +61,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                     merge.Entry.SetCurrentValue(prop.EfProperty, prop.CurrentValue);
                 }
             }
+
+            return result.CountPersisted;
         }
     }
 }

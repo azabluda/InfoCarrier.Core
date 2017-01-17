@@ -103,11 +103,9 @@
 
         private SaveChangesResult BuildResult(int countPersisted)
         {
-            var result = new SaveChangesResult { CountPersisted = countPersisted };
-            result.DataTransferObjects.AddRange(
-                this.Entities.Select(
-                    e => new UpdateEntryDto(this.dbContext.Entry(e).GetInfrastructure())));
-            return result;
+            return new SaveChangesResult(
+                countPersisted,
+                this.Entities.Select(e => this.dbContext.Entry(e).GetInfrastructure()));
         }
     }
 }
