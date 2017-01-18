@@ -30,8 +30,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
         public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
-            var request = new SaveChangesRequest(entries);
-            SaveChangesResult result = this.infoCarrierBackend.SaveChanges(request, i => entries[i]);
+            SaveChangesResult result = this.infoCarrierBackend.SaveChanges(entries);
             return MergeResults(entries, result);
         }
 
@@ -39,8 +38,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             IReadOnlyList<IUpdateEntry> entries,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            var request = new SaveChangesRequest(entries);
-            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(request, i => entries[i]);
+            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(entries);
             return MergeResults(entries, result);
         }
 

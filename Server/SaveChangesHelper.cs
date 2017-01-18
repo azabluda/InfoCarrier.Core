@@ -9,6 +9,7 @@
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.Update;
 
     public class SaveChangesHelper : IDisposable
     {
@@ -79,11 +80,11 @@
                         }
                     });
 
-                this.Entities = entities;
+                this.Entries = entities.Select(e => this.dbContext.Entry(e).GetInfrastructure());
             }
         }
 
-        public IEnumerable<object> Entities { get; }
+        public IEnumerable<IUpdateEntry> Entries { get; }
 
         public void Dispose()
         {
@@ -92,19 +93,12 @@
 
         public SaveChangesResult SaveChanges()
         {
-            return this.BuildResult(this.dbContext.SaveChanges());
+            return new SaveChangesResult(this.dbContext.SaveChanges(), this.Entries);
         }
 
         public async Task<SaveChangesResult> SaveChangesAsync()
         {
-            return this.BuildResult(await this.dbContext.SaveChangesAsync());
-        }
-
-        private SaveChangesResult BuildResult(int countPersisted)
-        {
-            return new SaveChangesResult(
-                countPersisted,
-                this.Entities.Select(e => this.dbContext.Entry(e).GetInfrastructure()));
+            return new SaveChangesResult(await this.dbContext.SaveChangesAsync(), this.Entries);
         }
     }
 }
