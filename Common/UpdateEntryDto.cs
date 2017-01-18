@@ -1,7 +1,5 @@
 ﻿namespace InfoCarrier.Core.Common
 {
-    using System;
-    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
     using System.Runtime.Serialization;
@@ -40,72 +38,49 @@
         public EntityState EntityState { get; private set; }
 
         [DataMember]
-        internal Dictionary<string, PropertyData> PropertyDatas { get; } = new Dictionary<string, PropertyData>();
+        private Dictionary<string, PropertyData> PropertyDatas { get; } = new Dictionary<string, PropertyData>();
 
-        public IEnumerable<Property> YieldPropery(IProperty efProperty)
+        public IEnumerable<JoinedProperty> YieldProperty(IProperty efProperty)
         {
             PropertyData data;
             if (this.PropertyDatas.TryGetValue(efProperty.Name, out data))
             {
-                yield return new Property(efProperty, data);
+                yield return new JoinedProperty { EfProperty = efProperty, DtoProperty = data };
             }
         }
 
-        public class Property
+        public class JoinedProperty
         {
-            private readonly PropertyData data;
+            public IProperty EfProperty { get; set; }
 
-            internal Property(IProperty efProperty, PropertyData data)
-            {
-                this.EfProperty = efProperty;
-                this.data = data;
-            }
-
-            public IProperty EfProperty { get; }
-
-            public object OriginalValue => Converter.Convert(this.data.OriginalValue, this.EfProperty.ClrType);
-
-            public object CurrentValue => Converter.Convert(this.data.CurrentValue, this.EfProperty.ClrType);
-
-            public bool HasTemporaryValue => this.data.HasTemporaryValue;
-
-            public bool IsModified => this.data.IsModified;
-        }
-
-        private sealed class Converter : DynamicObjectMapper
-        {
-            private static readonly Converter Instance = new Converter();
-
-            private static object PrepareForConversion(object obj)
-            {
-                if (obj == null || obj is string)
-                {
-                    return obj;
-                }
-
-                var coll = obj as IEnumerable;
-                if (coll != null)
-                {
-                    return coll.Cast<object>().Select(PrepareForConversion).ToList();
-                }
-
-                return obj.ToString();
-            }
-
-            public static object Convert(object obj, Type type)
-            {
-                return Instance.MapFromDynamicObjectGraph(PrepareForConversion(obj), type);
-            }
+            public PropertyData DtoProperty { get; set; }
         }
 
         [DataContract]
-        internal class PropertyData
+        public class PropertyData
         {
-            [DataMember]
+            private static readonly DynamicObjectMapper Mapper
+                = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true });
+
+            [IgnoreDataMember]
             public object OriginalValue { get; set; }
 
-            [DataMember]
+            [IgnoreDataMember]
             public object CurrentValue { get; set; }
+
+            [DataMember]
+            private DynamicObject OriginalValueDto
+            {
+                get { return Mapper.MapObject(this.OriginalValue); }
+                set { this.OriginalValue = Mapper.Map(value); }
+            }
+
+            [DataMember]
+            private DynamicObject CurrentValueDto
+            {
+                get { return Mapper.MapObject(this.CurrentValue); }
+                set { this.CurrentValue = Mapper.Map(value); }
+            }
 
             [DataMember]
             public bool IsModified { get; set; }

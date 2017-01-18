@@ -47,15 +47,15 @@
 
                         // Correlate properties of DTO and node.Entry
                         var props = node.Entry.Metadata.GetProperties()
-                            .SelectMany(p => dto.YieldPropery(p))
+                            .SelectMany(p => dto.YieldProperty(p))
                             .ToList();
 
                         // Set PK values
-                        foreach (UpdateEntryDto.Property prop in props.Where(x => x.EfProperty.IsPrimaryKey()))
+                        foreach (var prop in props.Where(x => x.EfProperty.IsPrimaryKey()))
                         {
                             PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
-                            propEntry.CurrentValue = prop.CurrentValue;
-                            propEntry.OriginalValue = prop.OriginalValue;
+                            propEntry.CurrentValue = prop.DtoProperty.CurrentValue;
+                            propEntry.OriginalValue = prop.DtoProperty.OriginalValue;
                         }
 
                         // Set EntityState after PK values (temp or perm) are set.
@@ -63,17 +63,16 @@
                         node.Entry.State = dto.EntityState;
 
                         // Set non-PK / non temporary (e.g. TPH discriminators) values
-                        foreach (UpdateEntryDto.Property prop in
-                            props.Where(x => !x.EfProperty.IsPrimaryKey() && !x.HasTemporaryValue))
+                        foreach (var prop in props.Where(x => !x.EfProperty.IsPrimaryKey() && !x.DtoProperty.HasTemporaryValue))
                         {
                             PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
-                            propEntry.CurrentValue = prop.CurrentValue;
-                            propEntry.OriginalValue = prop.OriginalValue;
-                            propEntry.IsModified = prop.IsModified;
+                            propEntry.CurrentValue = prop.DtoProperty.CurrentValue;
+                            propEntry.OriginalValue = prop.DtoProperty.OriginalValue;
+                            propEntry.IsModified = prop.DtoProperty.IsModified;
                         }
 
                         // Mark temporary values
-                        foreach (UpdateEntryDto.Property prop in props.Where(x => x.HasTemporaryValue))
+                        foreach (var prop in props.Where(x => x.DtoProperty.HasTemporaryValue))
                         {
                             PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
                             propEntry.IsTemporary = true;

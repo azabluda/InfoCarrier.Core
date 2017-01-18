@@ -49,8 +49,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             // Merge the results / update properties modified during SaveChanges on the server-side
             foreach (var merge in entries.Zip(result.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
             {
-                foreach (UpdateEntryDto.Property prop in
-                    merge.Entry.EntityType.GetProperties().SelectMany(p => merge.Dto.YieldPropery(p)))
+                foreach (var prop in
+                    merge.Entry.EntityType.GetProperties().SelectMany(p => merge.Dto.YieldProperty(p)))
                 {
                     // Can not (and need not) merge non-temporary PK values
                     if (prop.EfProperty.IsKey() && !merge.Entry.HasTemporaryValue(prop.EfProperty))
@@ -58,7 +58,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                         continue;
                     }
 
-                    merge.Entry.SetCurrentValue(prop.EfProperty, prop.CurrentValue);
+                    merge.Entry.SetCurrentValue(prop.EfProperty, prop.DtoProperty.CurrentValue);
                 }
             }
 
