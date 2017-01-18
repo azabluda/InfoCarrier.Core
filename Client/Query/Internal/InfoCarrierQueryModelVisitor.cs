@@ -25,6 +25,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
     public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
+        private readonly IEntityMaterializerSource entityMaterializerSource;
+
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
             INavigationRewritingExpressionVisitorFactory navigationRewritingExpressionVisitorFactory,
@@ -58,6 +60,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 expressionPrinter,
                 queryCompilationContext)
         {
+            this.entityMaterializerSource = entityMaterializerSource;
         }
 
         private bool ExpressionIsQueryable =>
@@ -114,19 +117,21 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private static IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>(
             QueryContext queryContext,
+            IEntityMaterializerSource entityMaterializerSource,
             Expression expression,
             bool queryStateManager)
         {
-            return new QueryExecutor<TResult>(queryContext, expression, queryStateManager)
+            return new QueryExecutor<TResult>(queryContext, entityMaterializerSource, expression, queryStateManager)
                 .ExecuteAsyncQuery();
         }
 
         private static IEnumerable<TResult> ExecuteQuery<TResult>(
             QueryContext queryContext,
+            IEntityMaterializerSource entityMaterializerSource,
             Expression expression,
             bool queryStateManager)
         {
-            return new QueryExecutor<TResult>(queryContext, expression, queryStateManager)
+            return new QueryExecutor<TResult>(queryContext, entityMaterializerSource, expression, queryStateManager)
                 .ExecuteQuery();
         }
 
@@ -140,8 +145,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             MethodInfo execQueryMethod =
                 ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
-                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, false))
-                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, false));
+                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, false))
+                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, false));
 
             // Prevent misinterpretation of single element T[] as collection of T
             Type resultType = this.Expression.Type.IsArray
@@ -154,6 +159,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         .GetGenericMethodDefinition()
                         .MakeGenericMethod(resultType),
                     QueryContextParameter,
+                    Expression.Constant(this.entityMaterializerSource),
                     Expression.Constant(this.Expression),
                     Expression.Constant(this.QueryCompilationContext.IsTrackingQuery));
         }
@@ -363,6 +369,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
         {
             private readonly QueryContext queryContext;
+            private readonly IEntityMaterializerSource entityMaterializerSource;
             private readonly bool queryStateManager;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
@@ -370,11 +377,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public QueryExecutor(
                 QueryContext queryContext,
+                IEntityMaterializerSource entityMaterializerSource,
                 Expression expression,
                 bool queryStateManager)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
                 this.queryContext = queryContext;
+                this.entityMaterializerSource = entityMaterializerSource;
                 this.queryStateManager = queryStateManager;
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
@@ -478,41 +487,33 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return true;
                 }
 
-                IKey key = entityType.FindPrimaryKey();
-
-                // TRICKY: We need ValueBuffer containing only
-                // - key values for entity identity lookup
-                // - shadow property values for InternalMixedEntityEntry
-                // We will set regular properties in materializer.
-                var keyAndShadowProps = entityType.GetProperties().Where(p => p.IsKey() || p.IsShadowProperty).ToList();
-                var nulls = Enumerable.Repeat<object>(null, 1 + keyAndShadowProps.Select(p => p.GetIndex()).DefaultIfEmpty(-1).Max());
-                var valueBuffer = new ValueBuffer(nulls.ToList());
-                foreach (IProperty p in keyAndShadowProps)
-                {
-                    valueBuffer[p.GetIndex()] = this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType);
-                }
+                // Map only scalar properties for now, navigations must be set later
+                IList<object> scalarValues = entityType
+                    .GetProperties()
+                    .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
+                    .ToList();
 
                 // Get entity instance from EFC's identity map, or create a new one
+                Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
                 entity = this.queryContext
                     .QueryBuffer
                     .GetEntity(
-                        key,
+                        entityType.FindPrimaryKey(),
                         new EntityLoadInfo(
-                            valueBuffer,
+                            new ValueBuffer(scalarValues),
                             vr =>
                             {
-                                object newEntity = Activator.CreateInstance(entityType.ClrType);
+                                object newEntity = materializer(vr);
                                 this.map.Add(dobj, newEntity);
 
-                                // Set regular (non-shadow) properties
-                                var targetProperties = newEntity.GetType().GetProperties().Where(p => p.CanWrite);
-                                foreach (PropertyInfo property in targetProperties)
+                                // Set navigation properties AFTER adding to map to avoid endless recursion
+                                foreach (INavigation navigation in entityType.GetNavigations())
                                 {
                                     object value;
-                                    if (dobj.TryGet(property.Name, out value))
+                                    if (dobj.TryGet(navigation.Name, out value))
                                     {
-                                        value = this.MapFromDynamicObjectGraph(value, property.PropertyType);
-                                        property.SetValue(newEntity, value);
+                                        value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
+                                        navigation.GetSetter().SetClrValue(newEntity, value);
                                     }
                                 }
 
