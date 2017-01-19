@@ -19,36 +19,25 @@
         {
             this.dbContext = dbContextFactory();
 
+            // Materialize entities
             var entities = new List<object>();
-            var dtos = new Dictionary<object, UpdateEntryDto>();
-
-            // Materialize entities and add them to dictionary
             foreach (UpdateEntryDto dto in request.DataTransferObjects)
             {
                 IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
                 object entity = Activator.CreateInstance(entityType.ClrType);
-
                 entities.Add(entity);
-                dtos[entity] = dto;
             }
 
             // Add entities to dbContext
-            foreach (object entity in entities)
+            foreach (var i in entities.Zip(request.DataTransferObjects, (e, d) => new { Entity = e, Dto = d }))
             {
                 this.dbContext.ChangeTracker.TrackGraph(
-                    entity,
+                    i.Entity,
                     node =>
                     {
-                        UpdateEntryDto dto;
-                        if (!dtos.TryGetValue(node.Entry.Entity, out dto))
-                        {
-                            node.Entry.State = EntityState.Detached;
-                            return;
-                        }
-
                         // Correlate properties of DTO and node.Entry
                         var props = node.Entry.Metadata.GetProperties()
-                            .SelectMany(p => dto.YieldProperty(p))
+                            .SelectMany(p => i.Dto.YieldProperty(p))
                             .ToList();
 
                         // Set PK values
@@ -61,7 +50,7 @@
 
                         // Set EntityState after PK values (temp or perm) are set.
                         // This will add entities to identity map.
-                        node.Entry.State = dto.EntityState;
+                        node.Entry.State = i.Dto.EntityState;
 
                         // Set non-PK / non temporary (e.g. TPH discriminators) values
                         foreach (var prop in props.Where(x => !x.EfProperty.IsPrimaryKey() && !x.DtoProperty.HasTemporaryValue))
