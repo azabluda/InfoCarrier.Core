@@ -19,15 +19,14 @@
         {
             this.EntityTypeName = entry.EntityType.Name;
             this.EntityState = entry.EntityState;
-            this.PropertyDatas = entry.EntityType.GetProperties().ToDictionary(
-                prop => prop.Name,
+            this.PropertyDatas = entry.EntityType.GetProperties().Select(
                 prop => new PropertyData
                 {
                     OriginalValue = entry.GetOriginalValue(prop),
                     CurrentValue = entry.GetCurrentValue(prop),
                     IsModified = entry.IsModified(prop),
                     HasTemporaryValue = entry.HasTemporaryValue(prop),
-                });
+                }).ToList();
         }
 
         [DataMember]
@@ -37,23 +36,19 @@
         public EntityState EntityState { get; private set; }
 
         [DataMember]
-        private Dictionary<string, PropertyData> PropertyDatas { get; } = new Dictionary<string, PropertyData>();
+        private List<PropertyData> PropertyDatas { get; } = new List<PropertyData>();
 
-        internal IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
+        public IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
         {
-            return entry.Metadata.GetProperties().Select(
-                p => new JoinedProperty
-                {
-                    EfProperty = entry.Property(p.Name),
-                    DtoProperty = this.PropertyDatas[p.Name]
-                }).ToList();
+            return entry.Properties.Zip(
+                this.PropertyDatas,
+                (ef, dto) => new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
         }
 
-        public class JoinedProperty
+        public struct JoinedProperty
         {
-            public PropertyEntry EfProperty { get; set; }
-
-            public PropertyData DtoProperty { get; set; }
+            public PropertyEntry EfProperty;
+            public PropertyData DtoProperty;
         }
 
         [DataContract]
