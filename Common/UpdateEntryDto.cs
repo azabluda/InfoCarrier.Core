@@ -5,7 +5,7 @@
     using System.Runtime.Serialization;
     using Aqua.Dynamic;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Update;
 
     [DataContract]
@@ -40,18 +40,19 @@
         [DataMember]
         private Dictionary<string, PropertyData> PropertyDatas { get; } = new Dictionary<string, PropertyData>();
 
-        public IEnumerable<JoinedProperty> YieldProperty(IProperty efProperty)
+        internal IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
         {
-            PropertyData data;
-            if (this.PropertyDatas.TryGetValue(efProperty.Name, out data))
-            {
-                yield return new JoinedProperty { EfProperty = efProperty, DtoProperty = data };
-            }
+            return entry.Metadata.GetProperties().Select(
+                p => new JoinedProperty
+                {
+                    EfProperty = entry.Property(p.Name),
+                    DtoProperty = this.PropertyDatas[p.Name]
+                }).ToList();
         }
 
         public class JoinedProperty
         {
-            public IProperty EfProperty { get; set; }
+            public PropertyEntry EfProperty { get; set; }
 
             public PropertyData DtoProperty { get; set; }
         }

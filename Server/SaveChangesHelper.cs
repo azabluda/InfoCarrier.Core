@@ -6,7 +6,6 @@
     using System.Threading.Tasks;
     using Common;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Update;
@@ -20,7 +19,7 @@
             this.dbContext = dbContextFactory();
 
             // Materialize entities
-            var entities = new List<object>();
+            var entities = new List<object>(request.DataTransferObjects.Count);
             foreach (UpdateEntryDto dto in request.DataTransferObjects)
             {
                 IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
@@ -36,16 +35,13 @@
                     node =>
                     {
                         // Correlate properties of DTO and node.Entry
-                        var props = node.Entry.Metadata.GetProperties()
-                            .SelectMany(p => i.Dto.YieldProperty(p))
-                            .ToList();
+                        var props = i.Dto.JoinScalarProperties(node.Entry);
 
                         // Set PK values
-                        foreach (var prop in props.Where(x => x.EfProperty.IsPrimaryKey()))
+                        foreach (var p in props.Where(x => x.EfProperty.Metadata.IsPrimaryKey()))
                         {
-                            PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
-                            propEntry.CurrentValue = prop.DtoProperty.CurrentValue;
-                            propEntry.OriginalValue = prop.DtoProperty.OriginalValue;
+                            p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                            p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
                         }
 
                         // Set EntityState after PK values (temp or perm) are set.
@@ -53,19 +49,18 @@
                         node.Entry.State = i.Dto.EntityState;
 
                         // Set non-PK / non temporary (e.g. TPH discriminators) values
-                        foreach (var prop in props.Where(x => !x.EfProperty.IsPrimaryKey() && !x.DtoProperty.HasTemporaryValue))
+                        foreach (var p in props.Where(
+                            x => !x.EfProperty.Metadata.IsPrimaryKey() && !x.DtoProperty.HasTemporaryValue))
                         {
-                            PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
-                            propEntry.CurrentValue = prop.DtoProperty.CurrentValue;
-                            propEntry.OriginalValue = prop.DtoProperty.OriginalValue;
-                            propEntry.IsModified = prop.DtoProperty.IsModified;
+                            p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                            p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                            p.EfProperty.IsModified = p.DtoProperty.IsModified;
                         }
 
                         // Mark temporary values
-                        foreach (var prop in props.Where(x => x.DtoProperty.HasTemporaryValue))
+                        foreach (var p in props.Where(x => x.DtoProperty.HasTemporaryValue))
                         {
-                            PropertyEntry propEntry = node.Entry.Property(prop.EfProperty.Name);
-                            propEntry.IsTemporary = true;
+                            p.EfProperty.IsTemporary = true;
                         }
                     });
 
