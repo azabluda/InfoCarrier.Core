@@ -50,7 +50,7 @@
 
                         // Set non-PK / non temporary (e.g. TPH discriminators) values
                         foreach (var p in props.Where(
-                            x => !x.EfProperty.Metadata.IsPrimaryKey() && !x.DtoProperty.HasTemporaryValue))
+                            x => !x.EfProperty.Metadata.IsPrimaryKey() && !x.DtoProperty.IsTemporary))
                         {
                             p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
                             p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
@@ -58,7 +58,7 @@
                         }
 
                         // Mark temporary values
-                        foreach (var p in props.Where(x => x.DtoProperty.HasTemporaryValue))
+                        foreach (var p in props.Where(x => x.DtoProperty.IsTemporary))
                         {
                             p.EfProperty.IsTemporary = true;
                         }

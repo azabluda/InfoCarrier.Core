@@ -19,13 +19,13 @@
         {
             this.EntityTypeName = entry.EntityType.Name;
             this.EntityState = entry.EntityState;
-            this.PropertyDatas = entry.EntityType.GetProperties().Select(
+            this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
                 {
-                    OriginalValue = entry.GetOriginalValue(prop),
-                    CurrentValue = entry.GetCurrentValue(prop),
-                    IsModified = entry.IsModified(prop),
-                    HasTemporaryValue = entry.HasTemporaryValue(prop),
+                    OriginalValue = prop.OriginalValue,
+                    CurrentValue = prop.CurrentValue,
+                    IsModified = prop.IsModified,
+                    IsTemporary = prop.IsTemporary,
                 }).ToList();
         }
 
@@ -81,7 +81,7 @@
             public bool IsModified { get; set; }
 
             [DataMember]
-            public bool HasTemporaryValue { get; set; }
+            public bool IsTemporary { get; set; }
         }
     }
 }
