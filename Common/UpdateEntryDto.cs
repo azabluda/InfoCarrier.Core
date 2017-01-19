@@ -27,7 +27,6 @@
                     CurrentValue = entry.GetCurrentValue(prop),
                     IsModified = entry.IsModified(prop),
                     HasTemporaryValue = entry.HasTemporaryValue(prop),
-                    IsStoreGenerated = entry.IsStoreGenerated(prop),
                 });
         }
 
@@ -88,9 +87,6 @@
 
             [DataMember]
             public bool HasTemporaryValue { get; set; }
-
-            [DataMember]
-            public bool IsStoreGenerated { get; set; }
         }
     }
 }
