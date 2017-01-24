@@ -12,6 +12,7 @@
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
+    using Remote.Linq.DynamicQuery;
     using Remote.Linq.Expressions;
     using Remote.Linq.ExpressionVisitors;
 
@@ -54,6 +55,8 @@
                                 .ToDelegate<Func<IQueryable>>(dbContext)
                                 .Invoke())
                     .ToLinqExpression(typeResolver: null);
+
+                linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(linqExpression);
 
                 IAsyncQueryProvider provider = dbContext.GetService<IAsyncQueryProvider>();
                 Type elementType = GetSequenceType(linqExpression.Type, linqExpression.Type);
@@ -135,6 +138,36 @@
                 dto.Add(EntityTypeNameTag, entry.EntityType.Name);
 
                 return dto;
+            }
+        }
+
+        // Remote.Linq falls into premature evaluation of EntityFrameworkQueryableExtensions.Include(string)
+        // extension method, therefore we had to replace those with QueryFunctions.Include(string) in the tree.
+        // Here we are restoring the EF version back.
+        private class FixIncludeVisitor : ExpressionVisitorBase
+        {
+            private static readonly System.Reflection.MethodInfo QfIncludeMethod =
+                MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null)).GetGenericMethodDefinition();
+
+            private static readonly System.Reflection.MethodInfo EfIncludeMethod =
+                MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null)).GetGenericMethodDefinition();
+
+            internal System.Linq.Expressions.Expression ReplaceRlinqIncludes(System.Linq.Expressions.Expression expression)
+            {
+                return this.Visit(expression);
+            }
+
+            protected override System.Linq.Expressions.Expression VisitMethodCall(System.Linq.Expressions.MethodCallExpression m)
+            {
+                if (m.Method.IsGenericMethod
+                    && m.Method.GetGenericMethodDefinition() == QfIncludeMethod)
+                {
+                    return System.Linq.Expressions.Expression.Call(
+                        EfIncludeMethod.MakeGenericMethod(m.Method.GetGenericArguments()),
+                        m.Arguments.Select(this.Visit));
+                }
+
+                return base.VisitMethodCall(m);
             }
         }
     }

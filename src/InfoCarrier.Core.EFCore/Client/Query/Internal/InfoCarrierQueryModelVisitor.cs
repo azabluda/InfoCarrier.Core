@@ -19,6 +19,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Remote.Linq;
+    using Remote.Linq.DynamicQuery;
     using Remote.Linq.ExpressionVisitors;
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
@@ -545,9 +546,32 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return base.VisitConstant(node);
             }
 
+            private static Expression BindNavigationPropertyPath(ParameterExpression arg, MemberExpression navigationPropertyPath)
+            {
+                if (navigationPropertyPath == null)
+                {
+                    return arg;
+                }
+
+                return Expression.MakeMemberAccess(
+                    BindNavigationPropertyPath(arg, navigationPropertyPath.Expression as MemberExpression),
+                    navigationPropertyPath.Member);
+            }
+
             private Expression ApplyTopLevelInclude(ConstantExpression constantExpression)
             {
                 Type entityType = constantExpression.Type.GetGenericArguments().Single();
+
+                if (!string.IsNullOrEmpty(this.includeResultOperator.StringNavigationPropertyPath))
+                {
+                    return Expression.Call(
+                        MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
+                            .GetGenericMethodDefinition()
+                            .MakeGenericMethod(entityType),
+                        constantExpression,
+                        Expression.Constant(this.includeResultOperator.StringNavigationPropertyPath));
+                }
+
                 Type toType = this.includeResultOperator.NavigationPropertyPath.Type;
 
                 var arg = Expression.Parameter(entityType, this.includeResultOperator.QuerySource.ItemName);
@@ -558,7 +582,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         .MakeGenericMethod(entityType, toType),
                     constantExpression,
                     Expression.Lambda(
-                        Expression.MakeMemberAccess(arg, this.includeResultOperator.NavigationPropertyPath.Member),
+                        BindNavigationPropertyPath(arg, this.includeResultOperator.NavigationPropertyPath),
                         arg));
 
                 if (this.includeResultOperator.ChainedNavigationProperties == null)
