@@ -27,6 +27,8 @@
                 entities.Add(entity);
             }
 
+            var entries = new List<IUpdateEntry>(entities.Count);
+
             // Add entities to dbContext
             foreach (var i in entities.Zip(request.DataTransferObjects, (e, d) => new { Entity = e, Dto = d }))
             {
@@ -62,10 +64,12 @@
                         {
                             p.EfProperty.IsTemporary = true;
                         }
-                    });
 
-                this.Entries = entities.Select(e => this.dbContext.Entry(e).GetInfrastructure());
+                        entries.Add(node.Entry.GetInfrastructure());
+                    });
             }
+
+            this.Entries = entries;
         }
 
         public IEnumerable<IUpdateEntry> Entries { get; }
