@@ -2,6 +2,7 @@ namespace InfoCarrier.Core.Client
 {
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,6 +17,12 @@ namespace InfoCarrier.Core.Client
         public static IServiceCollection AddEntityFrameworkInfoCarrierBackend(this IServiceCollection services)
         {
             services.AddEntityFramework();
+
+            services.Replace(
+                new ServiceDescriptor(
+                    typeof(IMemberAccessBindingExpressionVisitorFactory),
+                    typeof(InfoCarrierMemberAccessBindingExpressionVisitorFactory),
+                    ServiceLifetime.Scoped));
 
             services.TryAddEnumerable(ServiceDescriptor
                 .Singleton<IDatabaseProvider, DatabaseProvider<InfoCarrierDatabaseProviderServices, InfoCarrierOptionsExtension>>());
