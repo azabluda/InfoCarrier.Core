@@ -6,7 +6,6 @@ namespace InfoCarrier.Core.Client
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
-    using Query;
     using Query.ExpressionVisitors.Internal;
     using Query.Internal;
     using Storage.Internal;
@@ -51,7 +50,6 @@ namespace InfoCarrier.Core.Client
                 .AddScoped<InfoCarrierQueryCompilationContextFactory>()
                 .AddScoped<InfoCarrierQueryContextFactory>()
                 .AddScoped<InfoCarrierQueryModelVisitorFactory>()
-                .AddScoped<InfoCarrierEntityQueryableExpressionVisitorFactory>()
-                .AddScoped<InfoCarrierResultOperatorHandler>();
+                .AddScoped<InfoCarrierEntityQueryableExpressionVisitorFactory>();
     }
 }

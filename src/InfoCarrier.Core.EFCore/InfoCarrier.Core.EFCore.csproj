@@ -140,7 +140,6 @@
     <Compile Include="Client\Query\ExpressionVisitors\Internal\InfoCarrierMemberAccessBindingExpressionVisitor.cs" />
     <Compile Include="Client\Query\ExpressionVisitors\Internal\InfoCarrierMemberAccessBindingExpressionVisitorFactory.cs" />
     <Compile Include="Client\Query\ExpressionVisitors\Internal\SubstituteParametersExpressionVisitor.cs" />
-    <Compile Include="Client\Query\InfoCarrierResultOperatorHandler.cs" />
     <Compile Include="Client\Query\Internal\InfoCarrierEnumerableLinqOperatorProvider.cs" />
     <Compile Include="Client\Query\Internal\InfoCarrierLinqOperatorProvider.cs" />
     <Compile Include="Client\Query\Internal\InfoCarrierQueryableLinqOperatorProvider.cs" />
