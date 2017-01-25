@@ -24,6 +24,12 @@ namespace InfoCarrier.Core.Client
                     typeof(InfoCarrierMemberAccessBindingExpressionVisitorFactory),
                     ServiceLifetime.Scoped));
 
+            services.Replace(
+                new ServiceDescriptor(
+                    typeof(INavigationRewritingExpressionVisitorFactory),
+                    typeof(InfoCarrierNavigationRewritingExpressionVisitorFactory),
+                    ServiceLifetime.Scoped));
+
             services.TryAddEnumerable(ServiceDescriptor
                 .Singleton<IDatabaseProvider, DatabaseProvider<InfoCarrierDatabaseProviderServices, InfoCarrierOptionsExtension>>());
 

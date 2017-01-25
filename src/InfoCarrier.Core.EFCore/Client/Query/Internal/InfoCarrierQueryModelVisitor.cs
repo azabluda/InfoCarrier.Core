@@ -45,9 +45,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IExpressionPrinter expressionPrinter,
             QueryCompilationContext queryCompilationContext)
             : base(
-                queryOptimizer, // not used, see OptimizeQueryModel
-                navigationRewritingExpressionVisitorFactory, // not used, see OptimizeQueryModel
-                subQueryMemberPushDownExpressionVisitor, // not used, see OptimizeQueryModel
+                queryOptimizer,
+                navigationRewritingExpressionVisitorFactory,
+                subQueryMemberPushDownExpressionVisitor,
                 querySourceTracingExpressionVisitorFactory,
                 entityResultFindingExpressionVisitorFactory,
                 taskBlockingExpressionVisitor,
@@ -81,12 +81,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.ExpressionIsAsyncEnumerable
                 ? (ILinqOperatorProvider)new AsyncLinqOperatorProvider()
                 : this.InfoCarrierLinqOperatorProvider;
-
-        protected override void OptimizeQueryModel(QueryModel queryModel)
-        {
-            // Suppress any optimization. We want to transparently transfer the query
-            // to the application server as close to the original as it is possible.
-        }
 
         public override Func<QueryContext, IAsyncEnumerable<TResult>> CreateAsyncQueryExecutor<TResult>(QueryModel queryModel)
         {
