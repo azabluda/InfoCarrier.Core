@@ -143,10 +143,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, false))
                     : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, false));
 
-            // Prevent misinterpretation of single element T[] as collection of T
-            Type resultType = this.Expression.Type.IsArray
-                ? this.Expression.Type
-                : Server.QueryDataHelper.GetSequenceType(this.Expression.Type, this.Expression.Type);
+            Type resultType = Server.QueryDataHelper.GetSequenceType(this.Expression.Type, this.Expression.Type);
 
             this.Expression
                 = Expression.Call(
@@ -427,6 +424,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return entity;
                 }
 
+                // is obj a grouping
+                object grouping;
+                if (this.TryMapGrouping(obj, targetType, out grouping))
+                {
+                    return grouping;
+                }
+
                 // is targetType a collection of entities?
                 Type elementType = Server.QueryDataHelper.GetSequenceType(targetType, null);
                 if (elementType == null
@@ -448,6 +452,55 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 // materialize concrete collection
                 return Activator.CreateInstance(collType, list);
+            }
+
+            private bool TryMapGrouping(object obj, Type targetType, out object grouping)
+            {
+                grouping = null;
+
+                var dobj = obj as DynamicObject;
+                if (dobj == null)
+                {
+                    return false;
+                }
+
+                Type type = dobj.Type?.Type ?? targetType;
+
+                if (type == null
+                    || !type.IsGenericType
+                    || type.GetGenericTypeDefinition() != typeof(IGrouping<,>))
+                {
+                    return false;
+                }
+
+                object key;
+                if (!dobj.TryGet("Key", out key))
+                {
+                    return false;
+                }
+
+                object elements;
+                if (!dobj.TryGet("Elements", out elements))
+                {
+                    return false;
+                }
+
+                Type keyType = type.GenericTypeArguments[0];
+                Type elementType = type.GenericTypeArguments[1];
+
+                key = this.MapFromDynamicObjectGraph(key, keyType);
+                elements = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
+
+                grouping = MethodInfoExtensions.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
+                    .GetGenericMethodDefinition()
+                    .MakeGenericMethod(keyType, elementType)
+                    .Invoke(null, new[] { key, elements });
+                return true;
+            }
+
+            private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
+            {
+                return elements.GroupBy(x => key).Single();
             }
 
             private bool TryMapEntity(object obj, out object entity)

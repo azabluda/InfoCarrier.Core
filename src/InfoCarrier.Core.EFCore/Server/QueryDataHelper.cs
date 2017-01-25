@@ -34,6 +34,12 @@
                 return ifNotSequence;
             }
 
+            // Grouping is another special case
+            if (type.IsGrouping())
+            {
+                return ifNotSequence;
+            }
+
             return type.TryGetSequenceType() ?? ifNotSequence;
         }
 
@@ -104,15 +110,30 @@
 
             protected override DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation)
             {
-                if (obj != null && obj.GetType().IsArray)
+                if (obj != null)
                 {
-                    var list = ((System.Collections.IEnumerable)obj)
-                        .Cast<object>()
-                        .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
-                        .ToArray();
-                    DynamicObject darr = new DynamicObject(obj.GetType());
-                    darr.Add(string.Empty, list.Any() ? list : null);
-                    return darr;
+                    // Special mapping of arrays
+                    if (obj.GetType().IsArray)
+                    {
+                        var list = ((System.Collections.IEnumerable)obj)
+                            .Cast<object>()
+                            .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
+                            .ToArray();
+                        DynamicObject darr = new DynamicObject(obj.GetType());
+                        darr.Add(string.Empty, list.Any() ? list : null);
+                        return darr;
+                    }
+
+                    // Special mapping of IGrouping<,>
+                    foreach (var groupingType in obj.GetType().GetGenericTypeImplementations(typeof(IGrouping<,>)))
+                    {
+                        object mappedGrouping =
+                            MethodInfoExtensions.GetMethodInfo(() => this.MapGrouping<object, object>(null, null))
+                                .GetGenericMethodDefinition()
+                                .MakeGenericMethod(groupingType.GenericTypeArguments)
+                                .Invoke(this, new[] { obj, setTypeInformation });
+                        return (DynamicObject)mappedGrouping;
+                    }
                 }
 
                 DynamicObject dto = base.MapToDynamicObjectGraph(obj, setTypeInformation);
@@ -138,6 +159,14 @@
                 dto.Add(EntityTypeNameTag, entry.EntityType.Name);
 
                 return dto;
+            }
+
+            private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
+            {
+                var mappedGrouping = new DynamicObject(typeof(IGrouping<TKey, TElement>));
+                mappedGrouping.Add("Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
+                mappedGrouping.Add("Elements", this.MapCollection(grouping, setTypeInformation).ToList());
+                return mappedGrouping;
             }
         }
 
