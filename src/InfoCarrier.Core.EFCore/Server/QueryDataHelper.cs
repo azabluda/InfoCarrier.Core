@@ -134,6 +134,15 @@
                                 .Invoke(this, new[] { obj, setTypeInformation });
                         return (DynamicObject)mappedGrouping;
                     }
+
+                    // Special mapping of other collections
+                    if (GetSequenceType(obj.GetType(), null) != null)
+                    {
+                        var list = this.MapCollection(obj, setTypeInformation).ToList();
+                        var dynamicObject = new DynamicObject(obj.GetType());
+                        dynamicObject.Add(string.Empty, list.Any() ? list : null);
+                        return dynamicObject;
+                    }
                 }
 
                 DynamicObject dto = base.MapToDynamicObjectGraph(obj, setTypeInformation);
