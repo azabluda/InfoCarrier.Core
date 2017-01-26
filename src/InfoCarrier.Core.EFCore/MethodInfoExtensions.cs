@@ -6,9 +6,15 @@
 
     public static class MethodInfoExtensions
     {
+        public static MethodInfo GetMethodInfo<T>(Expression<Action<T>> expression)
+            => GetMethodInfo(expression.Body);
+
         public static MethodInfo GetMethodInfo(Expression<Action> expression)
+            => GetMethodInfo(expression.Body);
+
+        private static MethodInfo GetMethodInfo(Expression expressionBody)
         {
-            var outermostExpression = expression.Body as MethodCallExpression;
+            var outermostExpression = expressionBody as MethodCallExpression;
             if (outermostExpression != null)
             {
                 return outermostExpression.Method;

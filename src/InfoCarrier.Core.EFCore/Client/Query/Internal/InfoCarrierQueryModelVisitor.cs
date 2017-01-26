@@ -66,11 +66,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private bool ExpressionIsQueryable =>
             this.Expression != null
-            && ImplementsGenericInterface(this.Expression.Type, typeof(IQueryable<>));
+            && this.Expression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Any();
 
         private bool ExpressionIsAsyncEnumerable =>
             this.Expression != null
-            && ImplementsGenericInterface(this.Expression.Type, typeof(IAsyncEnumerable<>));
+            && this.Expression.Type.GetGenericTypeImplementations(typeof(IAsyncEnumerable<>)).Any();
 
         internal virtual InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
             this.ExpressionIsQueryable
@@ -344,18 +344,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             bool querySourceRequiresTracking)
         {
             // Everything is already in-place so we just stub this method with empty body
-        }
-
-        private static bool ImplementsGenericInterface(Type type, Type interfaceType)
-        {
-            if (type.IsInterface
-                && type.IsGenericType
-                && type.GetGenericTypeDefinition() == interfaceType)
-            {
-                return true;
-            }
-
-            return type.GetInterfaces().Any(i => ImplementsGenericInterface(i, interfaceType));
         }
 
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
@@ -639,24 +627,22 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 foreach (PropertyInfo inclProp in this.includeResultOperator.ChainedNavigationProperties)
                 {
-                    Type collElementType = Server.QueryDataHelper.GetSequenceType(toType, null);
-
-                    IIncludableQueryable<object, object> refArg = null;
-                    IIncludableQueryable<object, ICollection<object>> collArg = null;
-
                     MethodInfo miThenInclude;
                     Type prevType;
+                    Type collElementType = toType.TryGetElementType(typeof(IEnumerable<>));
                     if (collElementType != null)
                     {
                         prevType = collElementType;
                         miThenInclude =
-                            MethodInfoExtensions.GetMethodInfo(() => collArg.ThenInclude<object, object, object>(null));
+                            MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
+                                x => x.ThenInclude<object, object, object>(null));
                     }
                     else
                     {
                         prevType = toType;
                         miThenInclude =
-                            MethodInfoExtensions.GetMethodInfo(() => refArg.ThenInclude<object, object, object>(null));
+                            MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, object>>(
+                                x => x.ThenInclude<object, object, object>(null));
                     }
 
                     toType = inclProp.PropertyType;
