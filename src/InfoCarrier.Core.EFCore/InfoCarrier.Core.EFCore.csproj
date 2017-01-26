@@ -131,7 +131,6 @@
     <Compile Include="Client\Infrastructure\InfoCarrierDbContextOptionsBuilder.cs" />
     <Compile Include="Client\Infrastructure\Internal\InfoCarrierModelSource.cs" />
     <Compile Include="Client\Infrastructure\Internal\InfoCarrierOptionsExtension.cs" />
-    <Compile Include="Client\Query\ExpressionVisitors\Internal\InfoCarrierNavigationRewritingExpressionVisitorFactory.cs" />
     <Compile Include="MethodInfoExtensions.cs" />
     <Compile Include="SharedTypeExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
