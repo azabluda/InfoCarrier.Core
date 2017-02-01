@@ -419,10 +419,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return grouping;
                 }
 
-                // is targetType a collection of entities?
+                // is targetType a collection?
                 Type elementType = Server.QueryDataHelper.GetSequenceType(targetType, null);
-                if (elementType == null
-                    || this.Model.FindEntityType(elementType) == null)
+                if (elementType == null)
                 {
                     return baseImpl();
                 }
