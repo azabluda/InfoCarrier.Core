@@ -431,10 +431,26 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 object list = base.MapFromDynamicObjectGraph(obj, listType);
 
                 // determine concrete collection type
-                Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(elementType, targetType);
+                Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(elementType, targetType) ?? targetType;
                 if (listType == collType)
                 {
                     return list; // no further mapping required
+                }
+
+                // materialize IOrderedEnumerable<>
+                if (collType.IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
+                {
+                    return new LinqOperatorProvider().ToOrdered.MakeGenericMethod(collType.GenericTypeArguments)
+                        .Invoke(null, new[] { list });
+                }
+
+                // materialize IQueryable<> / IOrderedQueryable<>
+                if (collType.IsGenericType
+                    && (collType.GetGenericTypeDefinition() == typeof(IQueryable<>)
+                        || collType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)))
+                {
+                    return new LinqOperatorProvider().ToQueryable.MakeGenericMethod(collType.GenericTypeArguments)
+                        .Invoke(null, new[] { list, this.queryContext });
                 }
 
                 // materialize concrete collection
