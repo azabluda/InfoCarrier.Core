@@ -428,7 +428,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 // map to list (supported directly by aqua-core)
                 Type listType = typeof(List<>).MakeGenericType(elementType);
-                object list = base.MapFromDynamicObjectGraph(obj, listType);
+                object list = base.MapFromDynamicObjectGraph(obj, listType) ?? Activator.CreateInstance(listType);
 
                 // determine concrete collection type
                 Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(elementType, targetType) ?? targetType;
