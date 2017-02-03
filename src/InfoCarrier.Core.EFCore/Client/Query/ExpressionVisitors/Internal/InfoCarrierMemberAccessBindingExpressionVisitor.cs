@@ -1,12 +1,10 @@
 ﻿namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 {
+    using System.Collections.ObjectModel;
     using System.Linq.Expressions;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
-    using Microsoft.EntityFrameworkCore.Storage;
     using Remotion.Linq.Clauses;
-    using Remotion.Linq.Clauses.Expressions;
 
     public class InfoCarrierMemberAccessBindingExpressionVisitor : MemberAccessBindingExpressionVisitor
     {
@@ -18,24 +16,21 @@
         {
         }
 
-        protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+        protected override Expression VisitMethodCall(MethodCallExpression expression)
         {
-            if (EntityQueryModelVisitor.IsPropertyMethod(methodCallExpression.Method)
-                && methodCallExpression.Arguments[0] is QuerySourceReferenceExpression)
+            // Basically we just want to call base.base.VisitMethodCall(expression) here
+            // bypassing the MemberAccessBindingExpressionVisitor.VisitMethodCall logic,
+            // but C# doesn't allow it.
+
+            // UGLY: copy-n-paste of https://github.com/re-motion/Relinq/blob/v2.1.1/Core.Net_3_5/Parsing/ExpressionVisitor.cs#L252
+            Expression newObject = this.Visit(expression.Object);
+            ReadOnlyCollection<Expression> newArguments = this.VisitAndConvert(expression.Arguments, nameof(this.VisitMethodCall));
+            if ((newObject != expression.Object) || (newArguments != expression.Arguments))
             {
-                const string callerName = nameof(this.VisitMethodCall);
-                Expression arg0 = this.VisitAndConvert(methodCallExpression.Arguments[0].RemoveConvert(), callerName);
-                Expression arg1 = this.VisitAndConvert(methodCallExpression.Arguments[1], callerName);
-
-                // Compensate for ValueBuffer being a struct, and hence not compatible with Object method
-                arg0 = arg0.Type == typeof(ValueBuffer)
-                    ? Expression.Convert(arg0, typeof(object))
-                    : arg0;
-
-                return Expression.Call(methodCallExpression.Method, arg0, arg1);
+                return Expression.Call(newObject, expression.Method, newArguments);
             }
 
-            return base.VisitMethodCall(methodCallExpression);
+            return expression;
         }
     }
 }
