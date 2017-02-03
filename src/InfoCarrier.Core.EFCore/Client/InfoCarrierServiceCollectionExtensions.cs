@@ -2,6 +2,7 @@ namespace InfoCarrier.Core.Client
 {
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,12 @@ namespace InfoCarrier.Core.Client
                 new ServiceDescriptor(
                     typeof(IMemberAccessBindingExpressionVisitorFactory),
                     typeof(InfoCarrierMemberAccessBindingExpressionVisitorFactory),
+                    ServiceLifetime.Scoped));
+
+            services.Replace(
+                new ServiceDescriptor(
+                    typeof(IProjectionExpressionVisitorFactory),
+                    typeof(InfoCarrierProjectionExpressionVisitorFactory),
                     ServiceLifetime.Scoped));
 
             services.TryAddEnumerable(ServiceDescriptor
