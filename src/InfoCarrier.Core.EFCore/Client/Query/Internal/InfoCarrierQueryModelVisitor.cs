@@ -370,6 +370,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 // Substitute query parameters
                 expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
 
+                // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
+                expression = new ReplaceNullConditionalExpressionVisitor(true).Visit(expression);
+
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 this.rlinq = expression
                     .ToRemoteLinqExpression()

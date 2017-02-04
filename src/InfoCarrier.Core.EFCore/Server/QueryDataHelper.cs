@@ -6,6 +6,7 @@
     using System.Reflection;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
+    using Client.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -63,6 +64,9 @@
                     .ToLinqExpression(typeResolver: null);
 
                 linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(linqExpression);
+
+                // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
+                linqExpression = new ReplaceNullConditionalExpressionVisitor(false).Visit(linqExpression);
 
                 IAsyncQueryProvider provider = dbContext.GetService<IAsyncQueryProvider>();
                 Type elementType = GetSequenceType(linqExpression.Type, linqExpression.Type);
