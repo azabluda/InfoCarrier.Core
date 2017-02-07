@@ -83,6 +83,12 @@
                 .ToDelegate<Func<object>>(this)
                 .Invoke();
 
+            // Partial workaround for IGrouping
+            if (resultType.IsGrouping())
+            {
+                queryResult = new[] { queryResult };
+            }
+
             return this.MapResult(queryResult);
         }
 
