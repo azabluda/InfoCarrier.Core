@@ -14,11 +14,38 @@
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
     using Remote.Linq.DynamicQuery;
-    using Remote.Linq.Expressions;
     using Remote.Linq.ExpressionVisitors;
 
-    public static class QueryDataHelper
+    public sealed class QueryDataHelper : IDisposable
     {
+        private readonly DbContext dbContext;
+        private readonly System.Linq.Expressions.Expression linqExpression;
+
+        public QueryDataHelper(Func<DbContext> dbContextFactory, Remote.Linq.Expressions.Expression rlinq)
+        {
+            this.dbContext = dbContextFactory();
+
+            // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
+            // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
+            // prematurely)
+            this.linqExpression = rlinq
+                .ReplaceNonGenericQueryArgumentsByGenericArguments()
+                .ReplaceResourceDescriptorsByQueryable(
+                    typeResolver: null,
+                    provider: type =>
+                        MethodInfoExtensions.GetMethodInfo(() => this.dbContext.Set<object>())
+                            .GetGenericMethodDefinition()
+                            .MakeGenericMethod(type)
+                            .ToDelegate<Func<IQueryable>>(this.dbContext)
+                            .Invoke())
+                .ToLinqExpression(typeResolver: null);
+
+            this.linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(this.linqExpression);
+
+            // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
+            this.linqExpression = new ReplaceNullConditionalExpressionVisitor(false).Visit(this.linqExpression);
+        }
+
         internal static string EntityTypeNameTag { get; } = "__EntityType";
 
         internal static Type GetSequenceType(Type type, Type ifNotSequence)
@@ -44,54 +71,46 @@
             return type.TryGetSequenceType() ?? ifNotSequence;
         }
 
-        public static async Task<IEnumerable<DynamicObject>> QueryDataAsync(Func<DbContext> dbContextFactory, Expression rlinq)
+        public IEnumerable<DynamicObject> QueryData()
         {
-            using (DbContext dbContext = dbContextFactory())
-            {
-                // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
-                // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
-                // prematurely)
-                var linqExpression = rlinq
-                    .ReplaceNonGenericQueryArgumentsByGenericArguments()
-                    .ReplaceResourceDescriptorsByQueryable(
-                        typeResolver: null,
-                        provider: type =>
-                            MethodInfoExtensions.GetMethodInfo(() => dbContext.Set<object>())
-                                .GetGenericMethodDefinition()
-                                .MakeGenericMethod(type)
-                                .ToDelegate<Func<IQueryable>>(dbContext)
-                                .Invoke())
-                    .ToLinqExpression(typeResolver: null);
+            var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
+            resultType = resultType == null ? this.linqExpression.Type : typeof(IEnumerable<>).MakeGenericType(resultType);
 
-                linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(linqExpression);
+            object queryResult =
+                typeof(QueryDataHelper).GetTypeInfo()
+                .GetDeclaredMethod(nameof(this.ExecuteExpression))
+                .MakeGenericMethod(resultType)
+                .ToDelegate<Func<object>>(this)
+                .Invoke();
 
-                // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
-                linqExpression = new ReplaceNullConditionalExpressionVisitor(false).Visit(linqExpression);
-
-                IAsyncQueryProvider provider = dbContext.GetService<IAsyncQueryProvider>();
-                Type elementType = GetSequenceType(linqExpression.Type, linqExpression.Type);
-
-                object queryResult = await typeof(QueryDataHelper).GetTypeInfo()
-                    .GetDeclaredMethod(nameof(ExecuteExpression))
-                    .MakeGenericMethod(elementType)
-                    .ToDelegate<Func<IAsyncQueryProvider, System.Linq.Expressions.Expression, Task<object>>>()
-                    .Invoke(provider, linqExpression);
-
-                IEnumerable<DynamicObject> result =
-                    Remote.Linq.Expressions.ExpressionExtensions.ConvertResultToDynamicObjects(
-                        queryResult,
-                        new EntityToDynamicObjectMapper(dbContext));
-
-                return result;
-            }
+            return this.MapResult(queryResult);
         }
 
-        private static async Task<object> ExecuteExpression<T>(
-            IAsyncQueryProvider provider,
-            System.Linq.Expressions.Expression expression)
+        public async Task<IEnumerable<DynamicObject>> QueryDataAsync()
         {
+            Type elementType = GetSequenceType(this.linqExpression.Type, this.linqExpression.Type);
+
+            object queryResult = await typeof(QueryDataHelper).GetTypeInfo()
+                .GetDeclaredMethod(nameof(this.ExecuteExpressionAsync))
+                .MakeGenericMethod(elementType)
+                .ToDelegate<Func<Task<object>>>(this)
+                .Invoke();
+
+            return this.MapResult(queryResult);
+        }
+
+        private object ExecuteExpression<T>()
+        {
+            IQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
+            return provider.Execute<T>(this.linqExpression);
+        }
+
+        private async Task<object> ExecuteExpressionAsync<T>()
+        {
+            IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
+
             var queryResult = new List<T>();
-            using (var enumerator = provider.ExecuteAsync<T>(expression).GetEnumerator())
+            using (var enumerator = provider.ExecuteAsync<T>(this.linqExpression).GetEnumerator())
             {
                 while (await enumerator.MoveNext())
                 {
@@ -100,6 +119,21 @@
             }
 
             return queryResult;
+        }
+
+        private IEnumerable<DynamicObject> MapResult(object queryResult)
+        {
+            IEnumerable<DynamicObject> result =
+                Remote.Linq.Expressions.ExpressionExtensions.ConvertResultToDynamicObjects(
+                    queryResult,
+                    new EntityToDynamicObjectMapper(this.dbContext));
+
+            return result;
+        }
+
+        public void Dispose()
+        {
+            this.dbContext.Dispose();
         }
 
         private class EntityToDynamicObjectMapper : DynamicObjectMapper

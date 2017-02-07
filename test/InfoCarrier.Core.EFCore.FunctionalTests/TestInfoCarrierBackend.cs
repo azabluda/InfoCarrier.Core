@@ -37,12 +37,18 @@
 
         public IEnumerable<DynamicObject> QueryData(Expression rlinq)
         {
-            return Task.Run(() => QueryDataHelper.QueryDataAsync(this.dbContextFactory, rlinq)).Result;
+            using (var helper = new QueryDataHelper(this.dbContextFactory, rlinq))
+            {
+                return helper.QueryData();
+            }
         }
 
-        public Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq)
+        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq)
         {
-            return QueryDataHelper.QueryDataAsync(this.dbContextFactory, rlinq);
+            using (var helper = new QueryDataHelper(this.dbContextFactory, rlinq))
+            {
+                return await helper.QueryDataAsync();
+            }
         }
 
         public void RollbackTransaction()
