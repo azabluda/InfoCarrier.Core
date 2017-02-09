@@ -166,6 +166,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
             // otherwise Remote.Linq's serializaion would fail.
             // Additionally we determine and use 'firstParamDelegateType' in ExpressionIsQueryable case.
+            // Also CallCreateTransparentIdentifierLambda ensures uniqueness of TransparentIdentifier lambda parameters.
             var fromExpression
                 = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
 
@@ -195,9 +196,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     miSelectMany,
                     this.Expression,
                     Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter),
-                    Expression.Lambda(
-                        CallCreateTransparentIdentifier(
-                            transparentIdentifierType, this.CurrentParameter, innerItemParameter),
+                    CallCreateTransparentIdentifierLambda(
+                        transparentIdentifierType,
                         this.CurrentParameter,
                         innerItemParameter));
 
@@ -229,6 +229,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L765
             // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
             // otherwise Remote.Linq's serializaion would fail.
+            // Also CallCreateTransparentIdentifierLambda ensures uniqueness of TransparentIdentifier lambda parameters.
             var outerKeySelectorExpression
                 = this.ReplaceClauseReferences(joinClause.OuterKeySelector, joinClause);
 
@@ -264,11 +265,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     innerSequenceExpression,
                     Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
                     Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
-                    Expression.Lambda(
-                        CallCreateTransparentIdentifier(
-                            transparentIdentifierType,
-                            this.CurrentParameter,
-                            innerItemParameter),
+                    CallCreateTransparentIdentifierLambda(
+                        transparentIdentifierType,
                         this.CurrentParameter,
                         innerItemParameter));
 
@@ -281,6 +279,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L838
             // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
             // otherwise Remote.Linq's serializaion would fail.
+            // Also CallCreateTransparentIdentifierLambda ensures uniqueness of TransparentIdentifier lambda parameters.
             var outerKeySelectorExpression
                 = this.ReplaceClauseReferences(groupJoinClause.JoinClause.OuterKeySelector, groupJoinClause);
 
@@ -326,15 +325,31 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     innerSequenceExpression,
                     Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
                     Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
-                    Expression.Lambda(
-                        CallCreateTransparentIdentifier(
-                            transparentIdentifierType,
-                            this.CurrentParameter,
-                            innerItemsParameter),
+                    CallCreateTransparentIdentifierLambda(
+                        transparentIdentifierType,
                         this.CurrentParameter,
                         innerItemsParameter));
 
             this.IntroduceTransparentScope(groupJoinClause, queryModel, index, transparentIdentifierType);
+        }
+
+        private static LambdaExpression CallCreateTransparentIdentifierLambda(
+            Type transparentIdentifierType,
+            ParameterExpression outerParameter,
+            ParameterExpression innerParameter)
+        {
+            var uniqueInnerParameter =
+                innerParameter.Name == outerParameter.Name
+                    ? Expression.Parameter(innerParameter.Type, innerParameter.Name + @"_")
+                    : innerParameter;
+
+            return Expression.Lambda(
+                CallCreateTransparentIdentifier(
+                    transparentIdentifierType,
+                    outerParameter,
+                    uniqueInnerParameter),
+                outerParameter,
+                uniqueInnerParameter);
         }
 
         protected override void IncludeNavigations(
