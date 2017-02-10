@@ -15,10 +15,12 @@
     internal class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
     {
         private readonly QueryContext queryContext;
+        private readonly IModel model;
 
-        public SubstituteParametersExpressionVisitor(QueryContext queryContext)
+        public SubstituteParametersExpressionVisitor(QueryContext queryContext, IModel model)
         {
             this.queryContext = queryContext;
+            this.model = model;
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -85,7 +87,7 @@
                 return null;
             }
 
-            IEntityType efType = this.queryContext.StateManager.Value.Context.Model.FindEntityType(entity.GetType());
+            IEntityType efType = this.model.FindEntityType(entity.GetType());
             IProperty efProperty = efType?.FindProperty(propertyName);
             if (efProperty == null)
             {

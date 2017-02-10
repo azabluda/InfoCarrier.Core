@@ -112,21 +112,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private static IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>(
             QueryContext queryContext,
+            QueryCompilationContext queryCompilationContext,
             IEntityMaterializerSource entityMaterializerSource,
-            Expression expression,
-            bool queryStateManager)
+            Expression expression)
         {
-            return new QueryExecutor<TResult>(queryContext, entityMaterializerSource, expression, queryStateManager)
+            return new QueryExecutor<TResult>(
+                queryContext, queryCompilationContext, entityMaterializerSource, expression)
                 .ExecuteAsyncQuery();
         }
 
         private static IEnumerable<TResult> ExecuteQuery<TResult>(
             QueryContext queryContext,
+            QueryCompilationContext queryCompilationContext,
             IEntityMaterializerSource entityMaterializerSource,
-            Expression expression,
-            bool queryStateManager)
+            Expression expression)
         {
-            return new QueryExecutor<TResult>(queryContext, entityMaterializerSource, expression, queryStateManager)
+            return new QueryExecutor<TResult>(
+                queryContext, queryCompilationContext, entityMaterializerSource, expression)
                 .ExecuteQuery();
         }
 
@@ -140,8 +142,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             MethodInfo execQueryMethod =
                 ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
-                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, false))
-                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, false));
+                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
+                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null));
 
             Type resultType = Server.QueryDataHelper.GetSequenceType(this.Expression.Type, this.Expression.Type);
 
@@ -151,9 +153,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         .GetGenericMethodDefinition()
                         .MakeGenericMethod(resultType),
                     QueryContextParameter,
+                    Expression.Constant(this.QueryCompilationContext),
                     Expression.Constant(this.entityMaterializerSource),
-                    Expression.Constant(this.Expression),
-                    Expression.Constant(this.QueryCompilationContext.IsTrackingQuery));
+                    Expression.Constant(this.Expression));
         }
 
         public override void VisitAdditionalFromClause(
@@ -364,29 +366,31 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
         {
             private readonly QueryContext queryContext;
+            private readonly QueryCompilationContext queryCompilationContext;
             private readonly IEntityMaterializerSource entityMaterializerSource;
-            private readonly bool queryStateManager;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
 
             public QueryExecutor(
                 QueryContext queryContext,
+                QueryCompilationContext queryCompilationContext,
                 IEntityMaterializerSource entityMaterializerSource,
-                Expression expression,
-                bool queryStateManager)
+                Expression expression)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
                 this.queryContext = queryContext;
+                this.queryCompilationContext = queryCompilationContext;
                 this.entityMaterializerSource = entityMaterializerSource;
-                this.queryStateManager = queryStateManager;
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
                 // Substitute query parameters
-                expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
+                expression = new SubstituteParametersExpressionVisitor(queryContext, this.queryCompilationContext.Model)
+                    .Visit(expression);
 
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
-                expression = new ReplaceNullConditionalExpressionVisitor(true).Visit(expression);
+                expression = new ReplaceNullConditionalExpressionVisitor(true)
+                    .Visit(expression);
 
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 this.rlinq = expression
@@ -394,8 +398,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .ReplaceQueryableByResourceDescriptors()
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
-
-            private IModel Model => this.queryContext.StateManager.Value.Context.Model;
 
             public IEnumerable<TResult> ExecuteQuery()
             {
@@ -545,7 +547,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return false;
                 }
 
-                IEntityType entityType = this.Model.FindEntityType(entityTypeName.ToString());
+                IEntityType entityType = this.queryCompilationContext.Model.FindEntityType(entityTypeName.ToString());
                 if (entityType == null)
                 {
                     return false;
@@ -576,7 +578,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 this.map.Add(dobj, newEntity);
                                 return newEntity;
                             }),
-                        this.queryStateManager,
+                        queryStateManager: this.queryCompilationContext.IsTrackingQuery,
                         throwOnNullKey: false);
 
                 // Set navigation properties AFTER adding to map to avoid endless recursion
