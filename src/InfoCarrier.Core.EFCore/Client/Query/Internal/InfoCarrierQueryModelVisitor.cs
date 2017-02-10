@@ -402,7 +402,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq);
                 if (dataRecords == null)
                 {
-                    return Enumerable.Empty<TResult>();
+                    return Enumerable.Repeat(default(TResult), 1);
                 }
 
                 return this.Map<TResult>(dataRecords);
