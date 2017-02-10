@@ -574,22 +574,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             {
                                 object newEntity = materializer(vr);
                                 this.map.Add(dobj, newEntity);
-
-                                // Set navigation properties AFTER adding to map to avoid endless recursion
-                                foreach (INavigation navigation in entityType.GetNavigations())
-                                {
-                                    object value;
-                                    if (dobj.TryGet(navigation.Name, out value))
-                                    {
-                                        value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
-                                        navigation.GetSetter().SetClrValue(newEntity, value);
-                                    }
-                                }
-
                                 return newEntity;
                             }),
                         this.queryStateManager,
                         throwOnNullKey: false);
+
+                // Set navigation properties AFTER adding to map to avoid endless recursion
+                foreach (INavigation navigation in entityType.GetNavigations())
+                {
+                    // TODO: shall we skip already loaded navigations if the entity is already tracked?
+                    object value;
+                    if (dobj.TryGet(navigation.Name, out value))
+                    {
+                        value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
+                        navigation.GetSetter().SetClrValue(entity, value);
+                    }
+                }
+
                 return true;
             }
         }
