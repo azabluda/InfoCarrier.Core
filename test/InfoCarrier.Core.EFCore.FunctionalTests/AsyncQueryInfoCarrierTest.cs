@@ -16,5 +16,11 @@
         {
             return base.SelectMany_mixed();
         }
+
+        [Fact(Skip = "https://github.com/6bee/aqua-core/issues/6#issuecomment-281114757")]
+        public override Task Take_with_single_select_many()
+        {
+            return base.Take_with_single_select_many();
+        }
     }
 }

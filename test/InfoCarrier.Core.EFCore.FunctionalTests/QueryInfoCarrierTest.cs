@@ -57,5 +57,11 @@
         {
             base.Where_subquery_expression_same_parametername();
         }
+
+        [Fact(Skip = "https://github.com/6bee/aqua-core/issues/6#issuecomment-281114757")]
+        public override void Take_with_single_select_many()
+        {
+            base.Take_with_single_select_many();
+        }
     }
 }
