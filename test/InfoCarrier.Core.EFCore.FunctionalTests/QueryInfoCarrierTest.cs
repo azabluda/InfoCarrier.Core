@@ -28,12 +28,6 @@
             base.Where_comparison_to_nullable_bool();
         }
 
-        [Fact(Skip = "https://github.com/6bee/aqua-core/issues/7")]
-        public override void GroupBy_with_orderby_and_anonymous_projection()
-        {
-            base.GroupBy_with_orderby_and_anonymous_projection();
-        }
-
         [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311")]
         public override void GroupJoin_DefaultIfEmpty3()
         {

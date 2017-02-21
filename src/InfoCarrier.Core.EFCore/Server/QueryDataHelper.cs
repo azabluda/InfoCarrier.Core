@@ -1,6 +1,7 @@
 ﻿namespace InfoCarrier.Core.Server
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
@@ -153,6 +154,10 @@
             {
                 this.stateManager = dbContext.GetInfrastructure().GetRequiredService<IStateManager>();
             }
+
+            protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>
+                collection.GetType().GetGenericTypeImplementations(typeof(IGrouping<,>)).Any()
+                || base.ShouldMapToDynamicObject(collection);
 
             protected override DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation)
             {
