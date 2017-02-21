@@ -4,6 +4,7 @@
     using System.Linq;
     using System.Runtime.Serialization;
     using Aqua.Dynamic;
+    using Aqua.TypeSystem;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Update;
@@ -54,8 +55,9 @@
         [DataContract]
         public class PropertyData
         {
-            private static readonly DynamicObjectMapper Mapper
-                = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true });
+            // TODO: may this affect the performance?
+            private static DynamicObjectMapper Mapper
+                => new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, new TypeResolver());
 
             [IgnoreDataMember]
             public object OriginalValue { get; set; }

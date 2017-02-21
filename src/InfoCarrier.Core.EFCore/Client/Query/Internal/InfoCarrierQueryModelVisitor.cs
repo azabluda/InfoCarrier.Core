@@ -371,13 +371,22 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
+            private readonly Aqua.TypeSystem.ITypeResolver typeResolver;
+
+            private QueryExecutor(
+                DynamicObjectMapperSettings settings,
+                Aqua.TypeSystem.ITypeResolver typeResolver)
+                : base(settings, typeResolver)
+            {
+                this.typeResolver = typeResolver;
+            }
 
             public QueryExecutor(
                 QueryContext queryContext,
                 QueryCompilationContext queryCompilationContext,
                 IEntityMaterializerSource entityMaterializerSource,
                 Expression expression)
-                : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
+                : this(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, new Aqua.TypeSystem.TypeResolver())
             {
                 this.queryContext = queryContext;
                 this.queryCompilationContext = queryCompilationContext;
@@ -395,7 +404,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 this.rlinq = expression
                     .ToRemoteLinqExpression()
-                    .ReplaceQueryableByResourceDescriptors()
+                    .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
 

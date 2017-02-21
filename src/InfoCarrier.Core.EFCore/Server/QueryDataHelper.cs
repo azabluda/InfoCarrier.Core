@@ -6,6 +6,7 @@
     using System.Reflection;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
+    using Aqua.TypeSystem;
     using Client.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
@@ -20,6 +21,7 @@
     {
         private readonly DbContext dbContext;
         private readonly System.Linq.Expressions.Expression linqExpression;
+        private readonly ITypeResolver typeResolver = new TypeResolver();
 
         public QueryDataHelper(Func<DbContext> dbContextFactory, Remote.Linq.Expressions.Expression rlinq)
         {
@@ -31,14 +33,14 @@
             this.linqExpression = rlinq
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
-                    typeResolver: null,
+                    this.typeResolver,
                     provider: type =>
                         MethodInfoExtensions.GetMethodInfo(() => this.dbContext.Set<object>())
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(type)
                             .ToDelegate<Func<IQueryable>>(this.dbContext)
                             .Invoke())
-                .ToLinqExpression(typeResolver: null);
+                .ToLinqExpression(this.typeResolver);
 
             this.linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(this.linqExpression);
 
@@ -132,7 +134,7 @@
             IEnumerable<DynamicObject> result =
                 Remote.Linq.Expressions.ExpressionExtensions.ConvertResultToDynamicObjects(
                     queryResult,
-                    new EntityToDynamicObjectMapper(this.dbContext));
+                    new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver));
 
             return result;
         }
@@ -146,8 +148,8 @@
         {
             private readonly IStateManager stateManager;
 
-            public EntityToDynamicObjectMapper(DbContext dbContext)
-                : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
+            public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver)
+                : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
             {
                 this.stateManager = dbContext.GetInfrastructure().GetRequiredService<IStateManager>();
             }
