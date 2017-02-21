@@ -15,11 +15,5 @@
         {
             base.Select_Where_Navigation_Included();
         }
-
-        [Fact(Skip = "https://github.com/6bee/Remote.Linq/issues/5")]
-        public override void Select_Where_Navigation_Contains()
-        {
-            base.Select_Where_Navigation_Contains();
-        }
     }
 }

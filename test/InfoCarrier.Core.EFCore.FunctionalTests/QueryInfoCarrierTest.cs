@@ -22,12 +22,6 @@
             base.SelectMany_mixed();
         }
 
-        [Fact(Skip = "https://github.com/6bee/Remote.Linq/issues/5")]
-        public override void Where_comparison_to_nullable_bool()
-        {
-            base.Where_comparison_to_nullable_bool();
-        }
-
         [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311")]
         public override void GroupJoin_DefaultIfEmpty3()
         {
@@ -44,12 +38,6 @@
         public override void OfType_Select_OfType_Select()
         {
             base.OfType_Select_OfType_Select();
-        }
-
-        [Fact(Skip = "https://github.com/6bee/Remote.Linq/issues/6")]
-        public override void Where_Is_on_same_type()
-        {
-            base.Where_Is_on_same_type();
         }
 
         [Fact(Skip = "https://github.com/6bee/Remote.Linq/issues/7")]
