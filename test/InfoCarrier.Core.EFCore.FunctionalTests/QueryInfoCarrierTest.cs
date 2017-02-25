@@ -16,12 +16,6 @@
             base.OrderBy_correlated_subquery_lol2();
         }
 
-        [Fact(Skip = "https://github.com/6bee/Remote.Linq/issues/4")]
-        public override void SelectMany_mixed()
-        {
-            base.SelectMany_mixed();
-        }
-
         [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311")]
         public override void GroupJoin_DefaultIfEmpty3()
         {
