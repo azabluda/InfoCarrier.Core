@@ -34,8 +34,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="aqua-core, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\aqua-core.4.0.0-alpha-039\lib\net451\aqua-core.dll</HintPath>
+    <Reference Include="Aqua, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\aqua-core.4.0.0-alpha-040\lib\net451\Aqua.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.EntityFrameworkCore, Version=1.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
