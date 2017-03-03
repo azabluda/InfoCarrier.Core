@@ -33,11 +33,5 @@
         {
             base.OfType_Select_OfType_Select();
         }
-
-        [Fact(Skip = "https://github.com/6bee/Remote.Linq/issues/7")]
-        public override void Where_subquery_expression_same_parametername()
-        {
-            base.Where_subquery_expression_same_parametername();
-        }
     }
 }
