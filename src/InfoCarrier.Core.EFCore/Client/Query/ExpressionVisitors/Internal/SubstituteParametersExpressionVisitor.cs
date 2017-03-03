@@ -10,7 +10,7 @@
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
-    using Remote.Linq;
+    using Remote.Linq.DynamicQuery;
 
     internal class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
     {
