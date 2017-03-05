@@ -150,8 +150,10 @@
     <Compile Include="AsNoTrackingInfoCarrierTest.cs" />
     <Compile Include="AsTrackingInfoCarrierTest.cs" />
     <Compile Include="ChangeTrackingInfoCarrierTest.cs" />
+    <Compile Include="GraphUpdatesInfoCarrierTest.cs" />
     <Compile Include="IncludeAsyncInfoCarrierTest.cs" />
     <Compile Include="IncludeInfoCarrierTest.cs" />
+    <Compile Include="InMemoryTestStore.cs" />
     <Compile Include="NorthwindQueryInfoCarrierFixture.cs" />
     <Compile Include="AsyncQueryInfoCarrierTest.cs" />
     <Compile Include="AsyncQueryNavigationsInfoCarrierTest.cs" />
