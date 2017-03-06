@@ -153,6 +153,8 @@
     <Compile Include="GraphUpdatesInfoCarrierTest.cs" />
     <Compile Include="IncludeAsyncInfoCarrierTest.cs" />
     <Compile Include="IncludeInfoCarrierTest.cs" />
+    <Compile Include="InheritanceInfoCarrierFixture.cs" />
+    <Compile Include="InheritanceInfoCarrierTest.cs" />
     <Compile Include="InMemoryTestStore.cs" />
     <Compile Include="NorthwindQueryInfoCarrierFixture.cs" />
     <Compile Include="AsyncQueryInfoCarrierTest.cs" />
