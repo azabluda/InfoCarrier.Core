@@ -39,8 +39,8 @@
                         // Correlate properties of DTO and node.Entry
                         var props = i.Dto.JoinScalarProperties(node.Entry);
 
-                        // Set PK values
-                        foreach (var p in props.Where(x => x.EfProperty.Metadata.IsPrimaryKey()))
+                        // Set Key values
+                        foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
                         {
                             p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
                             p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
@@ -50,9 +50,9 @@
                         // This will add entities to identity map.
                         node.Entry.State = i.Dto.EntityState;
 
-                        // Set non-PK / non temporary (e.g. TPH discriminators) values
+                        // Set non key / non temporary (e.g. TPH discriminators) values
                         foreach (var p in props.Where(
-                            x => !x.EfProperty.Metadata.IsPrimaryKey() && !x.DtoProperty.IsTemporary))
+                            x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
                         {
                             p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
                             p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;

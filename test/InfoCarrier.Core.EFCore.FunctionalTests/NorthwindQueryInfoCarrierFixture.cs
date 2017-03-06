@@ -20,7 +20,7 @@
             this.OnModelCreating(modelBuilder);
             optionsBuilder.UseModel(modelBuilder.Model);
             var backendDbContextOptions = optionsBuilder.Options;
-            this.infoCarrierBackend = new TestInfoCarrierBackend(() => new NorthwindContext(backendDbContextOptions));
+            this.infoCarrierBackend = new TestInfoCarrierBackend(() => new NorthwindContext(backendDbContextOptions), true);
 
             this.options = this.BuildOptions();
 

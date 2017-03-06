@@ -209,7 +209,7 @@
 
             public override DbContext CreateContext(InMemoryTestStore testStore)
                 => new GraphUpdatesContext(new DbContextOptionsBuilder()
-                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(this.inMemoryDbContextFactory))
+                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(this.inMemoryDbContextFactory, true))
                     .UseInternalServiceProvider(
                         new ServiceCollection()
                             .AddEntityFrameworkInfoCarrierBackend()

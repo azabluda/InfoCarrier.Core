@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Client;
@@ -14,10 +15,12 @@
     public class TestInfoCarrierBackend : IInfoCarrierBackend
     {
         private readonly Func<DbContext> dbContextFactory;
+        private readonly bool isInMemoryDatabase;
 
-        public TestInfoCarrierBackend(Func<DbContext> dbContextFactory)
+        public TestInfoCarrierBackend(Func<DbContext> dbContextFactory, bool isInMemoryDatabase)
         {
             this.dbContextFactory = dbContextFactory;
+            this.isInMemoryDatabase = isInMemoryDatabase;
         }
 
         public void BeginTransaction()
@@ -58,7 +61,7 @@
 
         public SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
-            using (var helper = new SaveChangesHelper(this.dbContextFactory, new SaveChangesRequest(entries)))
+            using (SaveChangesHelper helper = this.CreateSaveChangesHelper(entries))
             {
                 return helper.SaveChanges();
             }
@@ -66,10 +69,29 @@
 
         public Task<SaveChangesResult> SaveChangesAsync(IReadOnlyList<IUpdateEntry> entries)
         {
-            using (var helper = new SaveChangesHelper(this.dbContextFactory, new SaveChangesRequest(entries)))
+            using (SaveChangesHelper helper = this.CreateSaveChangesHelper(entries))
             {
                 return helper.SaveChangesAsync();
             }
+        }
+
+        private SaveChangesHelper CreateSaveChangesHelper(IEnumerable<IUpdateEntry> entries)
+        {
+            var helper = new SaveChangesHelper(this.dbContextFactory, new SaveChangesRequest(entries));
+
+            if (this.isInMemoryDatabase)
+            {
+                // Temporary values for Key properties generated on the client side should
+                // be treated a permanent if the backend database is InMemory
+                var tempKeyProps =
+                    helper.Entries.SelectMany(e =>
+                        e.ToEntityEntry().Properties
+                            .Where(p => p.IsTemporary && p.Metadata.IsKey())).ToList();
+
+                tempKeyProps.ForEach(p => p.IsTemporary = false);
+            }
+
+            return helper;
         }
     }
 }
