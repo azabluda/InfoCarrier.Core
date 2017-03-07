@@ -153,16 +153,16 @@
     <Compile Include="GraphUpdatesInfoCarrierTest.cs" />
     <Compile Include="IncludeAsyncInfoCarrierTest.cs" />
     <Compile Include="IncludeInfoCarrierTest.cs" />
+    <Compile Include="InfoCarrierInMemoryTestHelper.cs" />
+    <Compile Include="InfoCarrierInMemoryTestHelper{TDbContext}.cs" />
     <Compile Include="InheritanceInfoCarrierFixture.cs" />
     <Compile Include="InheritanceInfoCarrierTest.cs" />
-    <Compile Include="InMemoryTestStore.cs" />
     <Compile Include="NorthwindQueryInfoCarrierFixture.cs" />
     <Compile Include="AsyncQueryInfoCarrierTest.cs" />
     <Compile Include="AsyncQueryNavigationsInfoCarrierTest.cs" />
     <Compile Include="QueryInfoCarrierTest.cs" />
     <Compile Include="QueryNavigationsInfoCarrierTest.cs" />
     <Compile Include="TestInfoCarrierBackend.cs" />
-    <Compile Include="TestInfoCarrierModelSource.cs" />
   </ItemGroup>
   <ItemGroup>
     <Analyzer Include="..\..\packages\StyleCop.Analyzers.1.0.0\analyzers\dotnet\cs\Newtonsoft.Json.dll" />

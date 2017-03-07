@@ -1,16 +1,12 @@
 ﻿namespace InfoCarrier.Core.EFCore.FunctionalTests
 {
-    using System;
-    using Client;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestUtilities.Xunit;
-    using Microsoft.Extensions.DependencyInjection;
 
     public class GraphUpdatesInfoCarrierTest
-        : GraphUpdatesTestBase<InMemoryTestStore, GraphUpdatesInfoCarrierTest.GraphUpdatesInfoCarrierFixture>
+        : GraphUpdatesTestBase<TestStore, GraphUpdatesInfoCarrierTest.GraphUpdatesInfoCarrierFixture>
     {
         public GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierFixture fixture)
             : base(fixture)
@@ -181,40 +177,21 @@
 
         public class GraphUpdatesInfoCarrierFixture : GraphUpdatesFixtureBase
         {
-            private static readonly string StoreName = nameof(GraphUpdatesInfoCarrierTest);
-            private readonly Func<DbContext> inMemoryDbContextFactory;
+            private readonly InfoCarrierInMemoryTestHelper<GraphUpdatesContext> helper;
 
             public GraphUpdatesInfoCarrierFixture()
             {
-                var optionsBuilder = new DbContextOptionsBuilder();
-                optionsBuilder.UseInMemoryDatabase(StoreName);
-                var modelBuilder = new ModelBuilder(new CoreConventionSetBuilder().CreateConventionSet());
-                this.OnModelCreating(modelBuilder);
-                optionsBuilder.UseModel(modelBuilder.Model);
-                optionsBuilder.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-                this.inMemoryDbContextFactory = () => new GraphUpdatesContext(optionsBuilder.Options);
+                this.helper = InfoCarrierInMemoryTestHelper.Create(
+                    this.OnModelCreating,
+                    (opt, _) => new GraphUpdatesContext(opt),
+                    w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             }
 
-            protected override void OnModelCreating(ModelBuilder modelBuilder)
-            {
-                base.OnModelCreating(modelBuilder);
-                modelBuilder.Entity<BadOrder>();
-            }
+            public override TestStore CreateTestStore()
+                => this.helper.CreateTestStore(this.Seed);
 
-            public override InMemoryTestStore CreateTestStore()
-                => new InMemoryTestStore(
-                    StoreName,
-                    this.inMemoryDbContextFactory,
-                    this.Seed);
-
-            public override DbContext CreateContext(InMemoryTestStore testStore)
-                => new GraphUpdatesContext(new DbContextOptionsBuilder()
-                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(this.inMemoryDbContextFactory, true))
-                    .UseInternalServiceProvider(
-                        new ServiceCollection()
-                            .AddEntityFrameworkInfoCarrierBackend()
-                            .AddSingleton(TestInfoCarrierModelSource.GetFactory(this.OnModelCreating))
-                            .BuildServiceProvider()).Options);
+            public override DbContext CreateContext(TestStore testStore)
+                => this.helper.CreateInfoCarrierContext();
         }
     }
 }
