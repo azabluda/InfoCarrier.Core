@@ -23,9 +23,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remote.Linq.ExpressionVisitors;
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
+    using Remotion.Linq.Clauses.Expressions;
 
     public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
+        private static readonly TypeInfo SubqueryInjectorClass =
+            typeof(NavigationRewritingExpressionVisitor).GetTypeInfo()
+                .GetDeclaredNestedType("NavigationRewritingQueryModelVisitor")
+                .GetDeclaredNestedType("SubqueryInjector");
+
         private readonly IEntityMaterializerSource entityMaterializerSource;
 
         public InfoCarrierQueryModelVisitor(
@@ -361,6 +367,47 @@ namespace InfoCarrier.Core.Client.Query.Internal
             bool querySourceRequiresTracking)
         {
             // Everything is already in-place so we just stub this method with empty body
+        }
+
+        public override TResult BindNavigationPathPropertyExpression<TResult>(
+            Expression propertyExpression,
+            Func<IEnumerable<IPropertyBase>, IQuerySource, TResult> propertyBinder)
+        {
+            // UGLY: this is the hackiest thing I ever did! It will break if EF.Core team changes their implementation
+            // https://github.com/aspnet/EntityFramework/blob/rel/1.1.0/src/Microsoft.EntityFrameworkCore/Query/ExpressionVisitors/Internal/NavigationRewritingExpressionVisitor.cs#L1233
+            //
+            // We check if the propertyBinder (local functor) comes from the private class
+            // NavigationRewritingExpressionVisitor.NavigationRewritingQueryModelVisitor.SubqueryInjector
+            // and override the logic a bit.
+            if (propertyBinder.Target.GetType().DeclaringType == SubqueryInjectorClass)
+            {
+                propertyBinder = (properties, querySource) =>
+                {
+                    var navigations = properties.OfType<INavigation>().ToList();
+                    var collectionNavigation = navigations.SingleOrDefault(n => n.IsCollection());
+                    if (collectionNavigation == null)
+                    {
+                        return default(TResult);
+                    }
+
+                    // Expand collection property access into subquery (same as in EF.Core)
+                    var targetType = collectionNavigation.GetTargetType().ClrType;
+                    var mainFromClause = new MainFromClause(targetType.Name.Substring(0, 1).ToLowerInvariant(), targetType, propertyExpression);
+                    var selector = new QuerySourceReferenceExpression(mainFromClause);
+                    var subqueryModel = new QueryModel(mainFromClause, new SelectClause(selector));
+                    var subqueryExpression = new SubQueryExpression(subqueryModel);
+
+                    // Convert subquery back to ICollection (in this case to List)
+                    // instead of wrapping into MaterializeCollectionNavigation method call.
+                    return (TResult)(object)Expression.Call(
+                        MethodInfoExtensions.GetMethodInfo(() => Enumerable.ToList<object>(null))
+                            .GetGenericMethodDefinition()
+                            .MakeGenericMethod(subqueryExpression.Type.GenericTypeArguments),
+                        subqueryExpression);
+                };
+            }
+
+            return base.BindNavigationPathPropertyExpression(propertyExpression, propertyBinder);
         }
 
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
