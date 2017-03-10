@@ -35,7 +35,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Aqua, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\aqua-core.4.0.0-alpha-044\lib\net451\Aqua.dll</HintPath>
+      <HintPath>..\..\packages\aqua-core.4.0.0-alpha-045\lib\net451\Aqua.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.EntityFrameworkCore, Version=1.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
@@ -79,7 +79,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Remote.Linq, Version=5.4.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Remote.Linq.5.4.0-alpha-020\lib\net451\Remote.Linq.dll</HintPath>
+      <HintPath>..\..\packages\Remote.Linq.5.4.0-alpha-021\lib\net451\Remote.Linq.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Remotion.Linq, Version=2.1.0.0, Culture=neutral, PublicKeyToken=fee00910d6e5f53b, processorArchitecture=MSIL">
