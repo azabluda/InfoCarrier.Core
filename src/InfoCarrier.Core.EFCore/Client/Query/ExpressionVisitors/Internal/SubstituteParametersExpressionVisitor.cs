@@ -44,7 +44,7 @@
                 return Expression.Property(
                     Expression.Constant(paramValue),
                     paramValue.GetType(),
-                    nameof(VariableQueryArgument<object>.Value));
+                    nameof(ValueWrapper<object>.Value));
             }
 
             return base.VisitMethodCall(node);
@@ -103,7 +103,7 @@
             Expression result = Expression.Property(
                 Expression.Constant(paramValue),
                 paramValue.GetType(),
-                nameof(VariableQueryArgument<object>.Value));
+                nameof(ValueWrapper<object>.Value));
 
             if (result.Type != node.Type)
             {
@@ -119,6 +119,11 @@
                 .Compile()
                 .Invoke(this.queryContext));
 
-        private static object Wrap<T>(T value) => new VariableQueryArgument<T>(value);
+        private static object Wrap<T>(T value) => new ValueWrapper<T> { Value = value };
+
+        private struct ValueWrapper<T>
+        {
+            public T Value { get; set; }
+        }
     }
 }
