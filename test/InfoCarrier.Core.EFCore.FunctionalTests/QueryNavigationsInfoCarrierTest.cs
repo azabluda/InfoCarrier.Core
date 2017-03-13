@@ -15,5 +15,11 @@
         {
             base.Select_Where_Navigation_Included();
         }
+
+        [Fact(Skip = "Client-side evaluation not fully supported")]
+        public override void Where_subquery_on_navigation_client_eval()
+        {
+            base.Where_subquery_on_navigation_client_eval();
+        }
     }
 }

@@ -33,5 +33,11 @@
         {
             base.OfType_Select_OfType_Select();
         }
+
+        [Fact(Skip = "Client-side evaluation not fully supported")]
+        public override void Client_Join_select_many()
+        {
+            base.Client_Join_select_many();
+        }
     }
 }
