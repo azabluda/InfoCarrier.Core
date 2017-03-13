@@ -6,7 +6,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="1.1.0" />
     <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.4.0-alpha-021" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.0.0" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core.EFCore\InfoCarrier.Core.EFCore.csproj" />
