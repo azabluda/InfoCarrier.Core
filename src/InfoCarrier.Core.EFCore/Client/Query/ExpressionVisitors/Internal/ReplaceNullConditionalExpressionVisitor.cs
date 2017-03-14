@@ -23,8 +23,7 @@
         {
             if (this.toMethodCall)
             {
-                var nullConditionalExpression = node as NullConditionalExpression;
-                if (nullConditionalExpression != null)
+                if (node is NullConditionalExpression nullConditionalExpression)
                 {
                     return Expression.Call(
                         null,

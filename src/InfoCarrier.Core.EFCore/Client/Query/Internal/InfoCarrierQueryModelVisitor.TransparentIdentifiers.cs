@@ -67,9 +67,7 @@
 
             for (var i = 0; i < index; i++)
             {
-                var querySource = queryModel.BodyClauses[i] as IQuerySource;
-
-                if (querySource != null)
+                if (queryModel.BodyClauses[i] is IQuerySource querySource)
                 {
                     this.RescopeTransparentAccess(querySource, outerAccessExpression);
                 }

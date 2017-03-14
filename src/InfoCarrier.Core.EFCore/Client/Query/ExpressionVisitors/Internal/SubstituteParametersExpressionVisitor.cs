@@ -10,7 +10,6 @@
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
-    using Remote.Linq.DynamicQuery;
 
     internal class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
     {
@@ -64,22 +63,24 @@
                 return null;
             }
 
-            object entity = null;
-
-            var maybeConstant = node.Arguments[0] as ConstantExpression;
-            if (maybeConstant != null)
+            object entity = GetEntity();
+            object GetEntity()
             {
-                entity = maybeConstant.Value;
-            }
+                switch (node.Arguments[0])
+                {
+                    case ConstantExpression maybeConstant:
+                        return maybeConstant.Value;
 
-            var maybeMethodCall = node.Arguments[0] as MethodCallExpression;
-            if (maybeMethodCall != null
-                && maybeMethodCall.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
-            {
-                entity =
-                    Expression.Lambda<Func<QueryContext, object>>(maybeMethodCall, EntityQueryModelVisitor.QueryContextParameter)
-                        .Compile()
-                        .Invoke(this.queryContext);
+                    case MethodCallExpression maybeMethodCall
+                        when maybeMethodCall.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo):
+                        return
+                            Expression.Lambda<Func<QueryContext, object>>(maybeMethodCall, EntityQueryModelVisitor.QueryContextParameter)
+                                .Compile()
+                                .Invoke(this.queryContext);
+
+                    default:
+                        return null;
+                }
             }
 
             if (entity == null)

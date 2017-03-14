@@ -482,15 +482,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 // is obj an entity?
-                object entity;
-                if (this.TryMapEntity(obj, out entity))
+                if (this.TryMapEntity(obj, out object entity))
                 {
                     return entity;
                 }
 
                 // is obj a grouping
-                object grouping;
-                if (this.TryMapGrouping(obj, targetType, out grouping))
+                if (this.TryMapGrouping(obj, targetType, out object grouping))
                 {
                     return grouping;
                 }
@@ -552,14 +550,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return false;
                 }
 
-                object key;
-                if (!dobj.TryGet("Key", out key))
+                if (!dobj.TryGet("Key", out object key))
                 {
                     return false;
                 }
 
-                object elements;
-                if (!dobj.TryGet("Elements", out elements))
+                if (!dobj.TryGet("Elements", out object elements))
                 {
                     return false;
                 }
@@ -592,8 +588,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return false;
                 }
 
-                object entityTypeName;
-                if (!dobj.TryGet(Server.QueryDataHelper.EntityTypeNameTag, out entityTypeName))
+                if (!dobj.TryGet(Server.QueryDataHelper.EntityTypeNameTag, out object entityTypeName))
                 {
                     return false;
                 }
@@ -641,8 +636,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 foreach (INavigation navigation in entityType.GetNavigations())
                 {
                     // TODO: shall we skip already loaded navigations if the entity is already tracked?
-                    object value;
-                    if (dobj.TryGet(navigation.Name, out value))
+                    if (dobj.TryGet(navigation.Name, out object value))
                     {
                         value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
                         navigation.GetSetter().SetClrValue(entity, value);
