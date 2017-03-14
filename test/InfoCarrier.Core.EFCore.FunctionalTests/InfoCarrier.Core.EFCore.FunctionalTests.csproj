@@ -4,6 +4,7 @@
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="aqua-core-newtonsoft-json" Version="4.0.0-alpha-048" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="1.1.0" />
     <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.4.0-alpha-021" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">

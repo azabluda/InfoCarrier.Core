@@ -10,6 +10,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="aqua-core" Version="4.0.0-alpha-048" />
     <PackageReference Include="GitVersionTask" Version="4.0.0-beta0011">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
