@@ -3,6 +3,8 @@
     using System;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Storage.Internal;
 
     public class InfoCarrierInMemoryTestHelper<TDbContext> : InfoCarrierInMemoryTestHelper
         where TDbContext : DbContext
@@ -16,6 +18,16 @@
             : base(onModelCreating, warningsConfigurationBuilderAction ?? (_ => { }))
         {
             this.createDbContext = createDbContext;
+        }
+
+        public TestStore CreateTestStore(Action<TDbContext> seedDatabase)
+        {
+            using (var context = this.CreateInMemoryContext())
+            {
+                seedDatabase(context);
+                var storeSource = context.GetService<IInMemoryStoreSource>();
+                return new GenericTestStore(() => storeSource.GetGlobalStore().Clear());
+            }
         }
 
         protected override DbContext CreateInMemoryContextInternal(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)

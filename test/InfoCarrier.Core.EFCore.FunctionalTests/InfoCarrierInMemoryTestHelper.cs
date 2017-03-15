@@ -10,7 +10,6 @@
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Storage.Internal;
     using Microsoft.Extensions.DependencyInjection;
 
     public abstract class InfoCarrierInMemoryTestHelper
@@ -57,19 +56,6 @@
                 warningsConfigurationBuilderAction);
         }
 
-        public TestStore CreateTestStore(Action<DbContext> seedDatabase)
-        {
-            using (var context = this.CreateInMemoryContextInternal())
-            {
-                seedDatabase(context);
-                var storeSource = context.GetService<IInMemoryStoreSource>();
-                return new InMemoryTestStore
-                {
-                    DeleteDatabase = () => storeSource.GetGlobalStore().Clear()
-                };
-            }
-        }
-
         public DbContextOptions BuildInfoCarrierOptions(IServiceCollection additionalServices = null)
             => this.buildInfoCarrierOptions(additionalServices);
 
@@ -80,17 +66,6 @@
             Func<TestModelSourceParams, TModelSource> creator)
             where TModelSource : ModelSource
             => provider => creator(new TestModelSourceParams(provider, onModelCreating));
-
-        private class InMemoryTestStore : TestStore
-        {
-            internal Action DeleteDatabase { private get; set; }
-
-            public override void Dispose()
-            {
-                this.DeleteDatabase?.Invoke();
-                base.Dispose();
-            }
-        }
 
         private class TestModelSourceParams
         {
