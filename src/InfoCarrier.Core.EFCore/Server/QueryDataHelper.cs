@@ -166,12 +166,12 @@
                     // Special mapping of arrays
                     if (obj.GetType().IsArray)
                     {
-                        var list = ((System.Collections.IEnumerable)obj)
+                        var array = ((System.Collections.IEnumerable)obj)
                             .Cast<object>()
                             .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
                             .ToArray();
-                        DynamicObject darr = new DynamicObject(obj.GetType());
-                        darr.Add(string.Empty, list.Any() ? list : null);
+                        DynamicObject darr = new DynamicObject();
+                        darr.Add(string.Empty, array);
                         return darr;
                     }
 
@@ -184,15 +184,6 @@
                                 .MakeGenericMethod(groupingType.GenericTypeArguments)
                                 .Invoke(this, new[] { obj, setTypeInformation });
                         return (DynamicObject)mappedGrouping;
-                    }
-
-                    // Special mapping of other collections
-                    if (GetSequenceType(obj.GetType(), null) != null)
-                    {
-                        var list = this.MapCollection(obj, setTypeInformation).ToList();
-                        var dynamicObject = new DynamicObject(obj.GetType());
-                        dynamicObject.Add(string.Empty, list.Any() ? list : null);
-                        return dynamicObject;
                     }
                 }
 

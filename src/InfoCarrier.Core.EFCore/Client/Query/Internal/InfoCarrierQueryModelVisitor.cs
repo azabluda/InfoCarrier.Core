@@ -487,6 +487,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return entity;
                 }
 
+                // is obj an array
+                if (this.TryMapArray(obj, targetType, out object array))
+                {
+                    return array;
+                }
+
                 // is obj a grouping
                 if (this.TryMapGrouping(obj, targetType, out object grouping))
                 {
@@ -529,6 +535,35 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 // materialize concrete collection
                 return Activator.CreateInstance(collType, list);
+            }
+
+            private bool TryMapArray(object obj, Type targetType, out object array)
+            {
+                array = null;
+
+                if (!targetType.IsArray)
+                {
+                    return false;
+                }
+
+                if (obj is DynamicObject dobj)
+                {
+                    if (dobj.Type != null)
+                    {
+                        // Our custom mapping of arrays doesn't contain Type
+                        return false;
+                    }
+
+                    if (!dobj.TryGet(string.Empty, out object elements))
+                    {
+                        return false;
+                    }
+
+                    array = this.MapFromDynamicObjectGraph(elements, targetType);
+                    return true;
+                }
+
+                return false;
             }
 
             private bool TryMapGrouping(object obj, Type targetType, out object grouping)
