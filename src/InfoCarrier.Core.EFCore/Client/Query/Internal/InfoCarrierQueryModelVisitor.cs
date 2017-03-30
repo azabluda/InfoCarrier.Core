@@ -651,21 +651,17 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .ToList();
 
                 // Get entity instance from EFC's identity map, or create a new one
-                Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
                 entity = this.queryContext
                     .QueryBuffer
                     .GetEntity(
                         entityType.FindPrimaryKey(),
                         new EntityLoadInfo(
                             new ValueBuffer(scalarValues),
-                            vr =>
-                            {
-                                object newEntity = materializer(vr);
-                                this.map.Add(dobj, newEntity);
-                                return newEntity;
-                            }),
+                            this.entityMaterializerSource.GetMaterializer(entityType)),
                         queryStateManager: this.queryCompilationContext.IsTrackingQuery,
                         throwOnNullKey: false);
+
+                this.map.Add(dobj, entity);
 
                 // Set navigation properties AFTER adding to map to avoid endless recursion
                 foreach (INavigation navigation in entityType.GetNavigations())
