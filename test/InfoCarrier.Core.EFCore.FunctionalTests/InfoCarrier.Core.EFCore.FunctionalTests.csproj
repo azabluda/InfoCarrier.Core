@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="1.1.0" />
-    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.4.0-alpha-022" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.4.0-alpha-024" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
