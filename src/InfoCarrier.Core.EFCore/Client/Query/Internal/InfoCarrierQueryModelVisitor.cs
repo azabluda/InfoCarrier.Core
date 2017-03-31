@@ -667,7 +667,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 foreach (INavigation navigation in entityType.GetNavigations())
                 {
                     // TODO: shall we skip already loaded navigations if the entity is already tracked?
-                    if (dobj.TryGet(navigation.Name, out object value))
+                    if (dobj.TryGet(navigation.Name, out object value) && value != null)
                     {
                         value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
                         navigation.GetSetter().SetClrValue(entity, value);
