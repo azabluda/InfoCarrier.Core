@@ -1,6 +1,7 @@
 namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
     using System.Linq.Expressions;
@@ -670,7 +671,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     if (dobj.TryGet(navigation.Name, out object value) && value != null)
                     {
                         value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
-                        navigation.GetSetter().SetClrValue(entity, value);
+                        if (navigation.IsCollection())
+                        {
+                            // TODO: clear or skip collection if it already contains something?
+                            navigation.GetCollectionAccessor().AddRange(entity, ((IEnumerable)value).Cast<object>());
+                        }
+                        else
+                        {
+                            navigation.GetSetter().SetClrValue(entity, value);
+                        }
                     }
                 }
 
