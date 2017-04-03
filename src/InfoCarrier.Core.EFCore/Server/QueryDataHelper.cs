@@ -10,6 +10,7 @@
     using Aqua.TypeSystem;
     using Client.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query.Internal;
@@ -156,6 +157,8 @@
         private class EntityToDynamicObjectMapper : DynamicObjectMapper
         {
             private readonly IStateManager stateManager;
+            private readonly Dictionary<object, DynamicObject> cachedEntities =
+                new Dictionary<object, DynamicObject>();
 
             public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
@@ -169,55 +172,60 @@
 
             protected override DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation)
             {
-                if (obj != null)
+                if (obj == null)
                 {
-                    // Special mapping of arrays
-                    if (obj.GetType().IsArray)
-                    {
-                        var array = ((System.Collections.IEnumerable)obj)
-                            .Cast<object>()
-                            .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
-                            .ToArray();
-                        DynamicObject darr = new DynamicObject();
-                        darr.Add(string.Empty, array);
-                        return darr;
-                    }
-
-                    // Special mapping of IGrouping<,>
-                    foreach (var groupingType in obj.GetType().GetGenericTypeImplementations(typeof(IGrouping<,>)))
-                    {
-                        object mappedGrouping =
-                            MethodInfoExtensions.GetMethodInfo(() => this.MapGrouping<object, object>(null, null))
-                                .GetGenericMethodDefinition()
-                                .MakeGenericMethod(groupingType.GenericTypeArguments)
-                                .Invoke(this, new[] { obj, setTypeInformation });
-                        return (DynamicObject)mappedGrouping;
-                    }
+                    return null;
                 }
 
-                DynamicObject dto = base.MapToDynamicObjectGraph(obj, setTypeInformation);
+                Type objType = obj.GetType();
 
-                if (obj == null || dto == null)
+                // Special mapping of arrays
+                if (objType.IsArray)
                 {
+                    var array = ((IEnumerable)obj)
+                        .Cast<object>()
+                        .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
+                        .ToArray();
+                    var dto = new DynamicObject();
+                    dto.Add(string.Empty, array);
                     return dto;
                 }
 
-                InternalEntityEntry entry = this.stateManager.TryGetEntry(obj);
-                if (entry == null)
+                // Special mapping of IGrouping<,>
+                foreach (var groupingType in objType.GetGenericTypeImplementations(typeof(IGrouping<,>)))
                 {
+                    object mappedGrouping =
+                        MethodInfoExtensions.GetMethodInfo(() => this.MapGrouping<object, object>(null, null))
+                            .GetGenericMethodDefinition()
+                            .MakeGenericMethod(groupingType.GenericTypeArguments)
+                            .Invoke(this, new[] { obj, setTypeInformation });
+                    return (DynamicObject)mappedGrouping;
+                }
+
+                // Special mapping of entities
+                if (this.stateManager.Context.Model.FindEntityType(objType) != null)
+                {
+                    if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
+                    {
+                        return dto;
+                    }
+
+                    this.cachedEntities.Add(obj, dto = new DynamicObject(objType));
+
+                    InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj);
+                    dto.Add(EntityTypeNameTag, entry.EntityType.Name);
+
+                    foreach (MemberEntry prop in entry.ToEntityEntry().Members)
+                    {
+                        dto.Add(
+                            prop.Metadata.Name,
+                            this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation));
+                    }
+
                     return dto;
                 }
 
-                foreach (var shadowProp in entry.EntityType.GetProperties().Where(p => p.IsShadowProperty))
-                {
-                    dto.Add(
-                        shadowProp.Name,
-                        this.MapToDynamicObjectGraph(entry[shadowProp], setTypeInformation));
-                }
-
-                dto.Add(EntityTypeNameTag, entry.EntityType.Name);
-
-                return dto;
+                return base.MapToDynamicObjectGraph(obj, setTypeInformation);
             }
 
             private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
