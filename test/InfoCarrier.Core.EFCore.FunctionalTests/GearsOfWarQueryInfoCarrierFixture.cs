@@ -16,7 +16,7 @@
         }
 
         public override TestStore CreateTestStore()
-            => this.helper.CreateTestStore(GearsOfWarModelInitializer.Seed);
+            => this.helper.CreateTestStore(GearsOfWarModelInitializer.Seed, true);
 
         public override GearsOfWarContext CreateContext(TestStore testStore)
         {

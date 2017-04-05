@@ -20,13 +20,20 @@
             this.createDbContext = createDbContext;
         }
 
-        public TestStore CreateTestStore(Action<TDbContext> seedDatabase)
+        public TestStore CreateTestStore(Action<TDbContext> seedDatabase, bool fullResetInMemoryStore = false)
         {
             using (var context = this.CreateInMemoryContext())
             {
                 seedDatabase(context);
                 var storeSource = context.GetService<IInMemoryStoreSource>();
-                return new GenericTestStore(() => storeSource.GetGlobalStore().Clear());
+                return new GenericTestStore(() =>
+                {
+                    storeSource.GetGlobalStore().Clear();
+                    if (fullResetInMemoryStore)
+                    {
+                        this.ResetInMemoryOptions();
+                    }
+                });
             }
         }
 

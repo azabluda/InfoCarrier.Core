@@ -14,13 +14,14 @@
 
     public abstract class InfoCarrierInMemoryTestHelper
     {
+        private readonly Func<DbContextOptions> buildInMemoryOptions;
         private readonly Func<IServiceCollection, DbContextOptions> buildInfoCarrierOptions;
 
         protected InfoCarrierInMemoryTestHelper(
             Action<ModelBuilder> onModelCreating,
             Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction)
         {
-            this.InMemoryOptions =
+            this.buildInMemoryOptions = () =>
                 new DbContextOptionsBuilder()
                     .UseInMemoryDatabase()
                     .UseInternalServiceProvider(
@@ -30,6 +31,8 @@
                             .BuildServiceProvider())
                     .ConfigureWarnings(warningsConfigurationBuilderAction)
                     .Options;
+
+            this.ResetInMemoryOptions();
 
             this.buildInfoCarrierOptions = additionalServices =>
                 new DbContextOptionsBuilder()
@@ -42,7 +45,12 @@
                     .Options;
         }
 
-        protected DbContextOptions InMemoryOptions { get; }
+        protected DbContextOptions InMemoryOptions { get; private set; }
+
+        protected void ResetInMemoryOptions()
+        {
+            this.InMemoryOptions = this.buildInMemoryOptions();
+        }
 
         public static InfoCarrierInMemoryTestHelper<TDbContext> Create<TDbContext>(
             Action<ModelBuilder> onModelCreating,
