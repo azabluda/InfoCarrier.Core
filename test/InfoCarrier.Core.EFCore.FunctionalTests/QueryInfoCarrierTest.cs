@@ -10,7 +10,7 @@
         {
         }
 
-        [Fact(Skip="Too slow")]
+        [Fact(Skip = "Too slow")]
         public override void OrderBy_correlated_subquery_lol2()
         {
             base.OrderBy_correlated_subquery_lol2();

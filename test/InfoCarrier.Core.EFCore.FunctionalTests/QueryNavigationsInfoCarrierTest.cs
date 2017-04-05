@@ -10,7 +10,7 @@
         {
         }
 
-        [Fact(Skip= "https://github.com/aspnet/EntityFramework/issues/7559")]
+        [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/7559")]
         public override void Select_Where_Navigation_Included()
         {
             base.Select_Where_Navigation_Included();
