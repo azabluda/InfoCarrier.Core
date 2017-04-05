@@ -25,6 +25,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
     using Remotion.Linq.Clauses.Expressions;
+    using MIE = Microsoft.EntityFrameworkCore.Extensions.Internal.MethodInfoExtensions;
 
     public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
@@ -139,20 +140,25 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 .ExecuteQuery();
         }
 
-        protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
+        protected override void TrackEntitiesInResults<TResult>(QueryModel queryModel)
         {
-            // Add .Include to the expression before its execution
-            foreach (var incl in this.QueryCompilationContext.QueryAnnotations.OfType<IncludeResultOperator>())
+            // Unwrap expression (revert SingleResultToSequence)
+            Expression linqExpression = this.Expression;
+            if (linqExpression is MethodCallExpression call)
             {
-                this.Expression = new InfoCarrierIncludeExpressionVisitor(incl).Visit(this.Expression);
+                if (MIE.MethodIsClosedFormOf(call.Method, this.LinqOperatorProvider.ToSequence))
+                {
+                    linqExpression = call.Arguments.Single();
+                }
             }
 
+            // Replace ToSequence with ExecuteQuery
             MethodInfo execQueryMethod =
                 ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
                     ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
                     : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null));
 
-            Type resultType = Server.QueryDataHelper.GetSequenceType(this.Expression.Type, this.Expression.Type);
+            Type resultType = Server.QueryDataHelper.GetSequenceType(linqExpression.Type, linqExpression.Type);
 
             this.Expression
                 = Expression.Call(
@@ -162,7 +168,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     QueryContextParameter,
                     Expression.Constant(this.QueryCompilationContext),
                     Expression.Constant(this.entityMaterializerSource),
-                    Expression.Constant(this.Expression));
+                    Expression.Constant(linqExpression));
+
+            // Track results
+            base.TrackEntitiesInResults<TResult>(queryModel);
         }
 
         public override void VisitAdditionalFromClause(
@@ -367,7 +376,24 @@ namespace InfoCarrier.Core.Client.Query.Internal
             Expression accessorExpression,
             bool querySourceRequiresTracking)
         {
-            // Everything is already in-place so we just stub this method with empty body
+            bool canUseStringIncludeOnSource
+                = this.QueryCompilationContext.QueryAnnotations
+                    .OfType<IncludeResultOperator>()
+                    .Where(o => o.QuerySource == includeSpecification.QuerySource)
+                    .Any(o => !string.IsNullOrEmpty(o.StringNavigationPropertyPath));
+
+            // TODO: do some testing against real database.
+            // InfoCarrierIncludeExpressionVisitor may append the same .Include
+            // multiple times (to QueryableStub and to Select) in some situations.
+            // Need to know if it leads to bad SQL.
+            var includeExpressionVisitor
+                = new InfoCarrierIncludeExpressionVisitor(
+                    this.LinqOperatorProvider,
+                    includeSpecification,
+                    accessorExpression,
+                    canUseStringIncludeOnSource);
+
+            this.Expression = includeExpressionVisitor.Visit(this.Expression);
         }
 
         public override TResult BindNavigationPathPropertyExpression<TResult>(
@@ -689,17 +715,62 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private class InfoCarrierIncludeExpressionVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
         {
-            private readonly IncludeResultOperator includeResultOperator;
+            private readonly IncludeSpecification includeSpecification;
+            private readonly ILinqOperatorProvider linqOperatorProvider;
+            private readonly Expression accessorExpression;
+            private readonly bool useString;
 
-            public InfoCarrierIncludeExpressionVisitor(IncludeResultOperator includeResultOperator)
+            private static readonly MethodInfo OfTypeMethodInfo
+                = typeof(Enumerable).GetTypeInfo()
+                    .GetDeclaredMethod(nameof(Enumerable.OfType));
+
+            public InfoCarrierIncludeExpressionVisitor(
+                ILinqOperatorProvider linqOperatorProvider,
+                IncludeSpecification includeSpecification,
+                Expression accessorExpression,
+                bool useString)
             {
-                this.includeResultOperator = includeResultOperator;
+                this.linqOperatorProvider = linqOperatorProvider;
+                this.includeSpecification = includeSpecification;
+                this.accessorExpression = accessorExpression;
+                this.useString = useString;
+            }
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                Expression result = base.VisitMethodCall(node);
+
+                if (this.IsMatchingSelect(node))
+                {
+                    result = this.ApplyTopLevelInclude(result);
+                }
+
+                return result;
+            }
+
+            private bool IsMatchingSelect(MethodCallExpression node)
+            {
+                if (!MIE.MethodIsClosedFormOf(node.Method, this.linqOperatorProvider.Select))
+                {
+                    return false;
+                }
+
+                var unary = node.Arguments[1] as UnaryExpression;
+                if (unary == null
+                    || unary.NodeType != ExpressionType.Quote
+                    || unary.Operand.NodeType != ExpressionType.Lambda)
+                {
+                    return false;
+                }
+
+                var lambda = unary.Operand as LambdaExpression;
+                return lambda != null && lambda.Body == this.accessorExpression;
             }
 
             protected override Expression VisitConstant(ConstantExpression node)
             {
                 var stub = node.Value as InfoCarrierEntityQueryableExpressionVisitor.RemoteQueryableStub;
-                if (stub?.QuerySource == this.includeResultOperator.QuerySource)
+                if (stub?.QuerySource == this.includeSpecification.QuerySource)
                 {
                     return this.ApplyTopLevelInclude(node);
                 }
@@ -707,80 +778,59 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return base.VisitConstant(node);
             }
 
-            private static Expression BindNavigationPropertyPath(ParameterExpression arg, MemberExpression navigationPropertyPath)
+            private Expression ApplyTopLevelInclude(Expression node)
             {
-                if (navigationPropertyPath == null)
+                using (IEnumerator<INavigation> iNav = this.includeSpecification.NavigationPath.GetEnumerator())
                 {
-                    return arg;
-                }
+                    if (!iNav.MoveNext())
+                    {
+                        return node;
+                    }
 
-                return Expression.MakeMemberAccess(
-                    BindNavigationPropertyPath(arg, navigationPropertyPath.Expression as MemberExpression),
-                    navigationPropertyPath.Member);
-            }
+                    Type entityType = node.Type.GetGenericArguments().Single();
 
-            private Expression ApplyTopLevelInclude(ConstantExpression constantExpression)
-            {
-                Type entityType = constantExpression.Type.GetGenericArguments().Single();
+                    if (this.useString)
+                    {
+                        return Expression.Call(
+                            MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
+                                .GetGenericMethodDefinition()
+                                .MakeGenericMethod(entityType),
+                            node,
+                            Expression.Constant(string.Join(".", this.includeSpecification.NavigationPath.Select(n => n.Name))));
+                    }
 
-                if (!string.IsNullOrEmpty(this.includeResultOperator.StringNavigationPropertyPath))
-                {
-                    return Expression.Call(
-                        MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
+                    Expression BuildMemberAccessLambda(INavigation navigation, Type paramType, string paramName)
+                    {
+                        var arg = Expression.Parameter(paramType, paramName);
+                        return Expression.Lambda(Expression.MakeMemberAccess(arg, navigation.GetMemberInfo(false, false)), arg);
+                    }
+
+                    MethodCallExpression result = Expression.Call(
+                        MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
                             .GetGenericMethodDefinition()
-                            .MakeGenericMethod(entityType),
-                        constantExpression,
-                        Expression.Constant(this.includeResultOperator.StringNavigationPropertyPath));
-                }
+                            .MakeGenericMethod(entityType, iNav.Current.ClrType),
+                        node,
+                        BuildMemberAccessLambda(iNav.Current, entityType, this.includeSpecification.QuerySource.ItemName));
 
-                Type toType = this.includeResultOperator.NavigationPropertyPath.Type;
-
-                var arg = Expression.Parameter(entityType, this.includeResultOperator.QuerySource.ItemName);
-
-                var methodCallExpression = Expression.Call(
-                    MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
-                        .GetGenericMethodDefinition()
-                        .MakeGenericMethod(entityType, toType),
-                    constantExpression,
-                    Expression.Lambda(
-                        BindNavigationPropertyPath(arg, this.includeResultOperator.NavigationPropertyPath),
-                        arg));
-
-                if (this.includeResultOperator.ChainedNavigationProperties == null)
-                {
-                    return methodCallExpression;
-                }
-
-                foreach (PropertyInfo inclProp in this.includeResultOperator.ChainedNavigationProperties)
-                {
-                    MethodInfo miThenInclude;
-                    Type prevType;
-                    Type collElementType = toType.TryGetElementType(typeof(IEnumerable<>));
-                    if (collElementType != null)
+                    for (INavigation prev = iNav.Current; iNav.MoveNext(); prev = iNav.Current)
                     {
-                        prevType = collElementType;
-                        miThenInclude =
-                            MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
-                                x => x.ThenInclude<object, object, object>(null));
-                    }
-                    else
-                    {
-                        prevType = toType;
-                        miThenInclude =
-                            MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, object>>(
-                                x => x.ThenInclude<object, object, object>(null));
+                        MethodInfo miThenInclude =
+                            prev.IsCollection()
+                                ? MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
+                                    x => x.ThenInclude<object, object, object>(null))
+                                : MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, object>>(
+                                    x => x.ThenInclude<object, object, object>(null));
+
+                        Type prevType = prev.GetTargetType().ClrType;
+
+                        result = Expression.Call(
+                            miThenInclude.GetGenericMethodDefinition().MakeGenericMethod(entityType, prevType, iNav.Current.ClrType),
+                            result,
+                            BuildMemberAccessLambda(iNav.Current, prevType, @"x"));
                     }
 
-                    toType = inclProp.PropertyType;
-                    arg = Expression.Parameter(prevType, @"x");
-
-                    methodCallExpression = Expression.Call(
-                        miThenInclude.GetGenericMethodDefinition().MakeGenericMethod(entityType, prevType, toType),
-                        methodCallExpression,
-                        Expression.Lambda(Expression.Property(arg, inclProp), arg));
+                    return result;
                 }
-
-                return methodCallExpression;
             }
         }
 
