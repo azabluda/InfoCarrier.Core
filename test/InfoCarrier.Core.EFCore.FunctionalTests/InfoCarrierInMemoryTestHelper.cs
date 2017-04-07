@@ -16,31 +16,44 @@
     {
         private readonly Func<DbContextOptions> buildInMemoryOptions;
         private readonly Func<IServiceCollection, DbContextOptions> buildInfoCarrierOptions;
+        private readonly Action<IServiceCollection> configureInfoCarrierServices;
 
         protected InfoCarrierInMemoryTestHelper(
             Action<ModelBuilder> onModelCreating,
             Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction)
         {
             this.buildInMemoryOptions = () =>
-                new DbContextOptionsBuilder()
+            {
+                var serviceCollection = new ServiceCollection().AddEntityFrameworkInMemoryDatabase();
+
+                if (onModelCreating != null)
+                {
+                    serviceCollection.AddSingleton(GetModelSourceFactory<InMemoryModelSource>(onModelCreating, p => new TestInMemoryModelSource(p)));
+                }
+
+                return new DbContextOptionsBuilder()
                     .UseInMemoryDatabase()
-                    .UseInternalServiceProvider(
-                        new ServiceCollection()
-                            .AddEntityFrameworkInMemoryDatabase()
-                            .AddSingleton(GetModelSourceFactory<InMemoryModelSource>(onModelCreating, p => new TestInMemoryModelSource(p)))
-                            .BuildServiceProvider())
+                    .UseInternalServiceProvider(serviceCollection.BuildServiceProvider())
                     .ConfigureWarnings(warningsConfigurationBuilderAction)
                     .Options;
+            };
 
             this.ResetInMemoryOptions();
+
+            this.configureInfoCarrierServices = services =>
+            {
+                services.AddEntityFrameworkInfoCarrierBackend();
+                if (onModelCreating != null)
+                {
+                    services.AddSingleton(GetModelSourceFactory<InfoCarrierModelSource>(onModelCreating, p => new TestInfoCarrierModelSource(p)));
+                }
+            };
 
             this.buildInfoCarrierOptions = additionalServices =>
                 new DbContextOptionsBuilder()
                     .UseInfoCarrierBackend(new TestInfoCarrierBackend(() => this.CreateInMemoryContextInternal(), true))
                     .UseInternalServiceProvider(
-                        (additionalServices ?? new ServiceCollection())
-                            .AddEntityFrameworkInfoCarrierBackend()
-                            .AddSingleton(GetModelSourceFactory<InfoCarrierModelSource>(onModelCreating, p => new TestInfoCarrierModelSource(p)))
+                        this.ConfigureInfoCarrierServices(additionalServices ?? new ServiceCollection())
                             .BuildServiceProvider())
                     .Options;
         }
@@ -50,6 +63,12 @@
         protected void ResetInMemoryOptions()
         {
             this.InMemoryOptions = this.buildInMemoryOptions();
+        }
+
+        public IServiceCollection ConfigureInfoCarrierServices(IServiceCollection services)
+        {
+            this.configureInfoCarrierServices(services);
+            return services;
         }
 
         public static InfoCarrierInMemoryTestHelper<TDbContext> Create<TDbContext>(
