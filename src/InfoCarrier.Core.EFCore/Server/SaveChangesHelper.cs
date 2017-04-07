@@ -8,6 +8,7 @@
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Update;
 
     public class SaveChangesHelper : IDisposable
@@ -43,7 +44,10 @@
                         foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
                         {
                             p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
-                            p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                            if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
+                            {
+                                p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                            }
                         }
 
                         // Set EntityState after PK values (temp or perm) are set.
@@ -55,7 +59,10 @@
                             x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
                         {
                             p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
-                            p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                            if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
+                            {
+                                p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                            }
                             p.EfProperty.IsModified = p.DtoProperty.IsModified;
                         }
 

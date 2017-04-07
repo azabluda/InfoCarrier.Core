@@ -6,6 +6,7 @@
     using Aqua.Dynamic;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
+    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Update;
 
     [DataContract]
@@ -22,7 +23,7 @@
             this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
                 {
-                    OriginalValue = prop.OriginalValue,
+                    OriginalValue = prop.Metadata.GetOriginalValueIndex() >= 0 ? prop.OriginalValue : null,
                     CurrentValue = prop.CurrentValue,
                     IsModified = prop.IsModified,
                     IsTemporary = prop.IsTemporary,
