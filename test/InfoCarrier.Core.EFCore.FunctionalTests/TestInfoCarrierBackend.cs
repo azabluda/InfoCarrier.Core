@@ -2,9 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.IO;
     using System.Linq;
-    using System.Runtime.Serialization;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Client;
@@ -18,7 +16,6 @@
 
     public class TestInfoCarrierBackend : IInfoCarrierBackend
     {
-        private readonly Lazy<DataContractSerializer> dataContractSerializer;
         private readonly Func<DbContext> dbContextFactory;
         private readonly bool isInMemoryDatabase;
 
@@ -26,16 +23,6 @@
         {
             this.dbContextFactory = dbContextFactory;
             this.isInMemoryDatabase = isInMemoryDatabase;
-            this.dataContractSerializer = new Lazy<DataContractSerializer>(() =>
-                new DataContractSerializer(typeof(Expression), this.GetKnownEntityTypes()));
-        }
-
-        private IEnumerable<Type> GetKnownEntityTypes()
-        {
-            using (DbContext context = this.dbContextFactory())
-            {
-                return context.Model.GetEntityTypes().Select(et => et.ClrType);
-            }
         }
 
         public void BeginTransaction()
@@ -55,7 +42,7 @@
 
         public IEnumerable<DynamicObject> QueryData(Expression rlinq)
         {
-            using (var helper = new QueryDataHelper(this.dbContextFactory, this.SimulateNetworkTransferDataContract(rlinq)))
+            using (var helper = new QueryDataHelper(this.dbContextFactory, SimulateNetworkTransferJson(rlinq)))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
@@ -63,7 +50,7 @@
 
         public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq)
         {
-            using (var helper = new QueryDataHelper(this.dbContextFactory, this.SimulateNetworkTransferDataContract(rlinq)))
+            using (var helper = new QueryDataHelper(this.dbContextFactory, SimulateNetworkTransferJson(rlinq)))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync());
             }
@@ -120,21 +107,6 @@
             var serializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
             var json = JsonConvert.SerializeObject(value, serializerSettings);
             return (T)JsonConvert.DeserializeObject(json, value.GetType(), serializerSettings);
-        }
-
-        private Expression SimulateNetworkTransferDataContract(Expression value)
-        {
-            if (value == null)
-            {
-                return default(Expression);
-            }
-
-            using (var ms = new MemoryStream())
-            {
-                this.dataContractSerializer.Value.WriteObject(ms, value);
-                ms.Seek(0, SeekOrigin.Begin);
-                return (Expression)this.dataContractSerializer.Value.ReadObject(ms);
-            }
         }
     }
 }
