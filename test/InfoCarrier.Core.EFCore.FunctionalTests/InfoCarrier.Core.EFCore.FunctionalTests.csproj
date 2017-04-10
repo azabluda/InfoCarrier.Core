@@ -5,7 +5,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="FunkyDataQueryInfoCarrierTest.cs" />
+    <Compile Remove="OptimisticConcurrencyInfoCarrierTest.cs" />
     <None Include="FunkyDataQueryInfoCarrierTest.cs" />
+    <None Include="OptimisticConcurrencyInfoCarrierTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="1.1.0" />
