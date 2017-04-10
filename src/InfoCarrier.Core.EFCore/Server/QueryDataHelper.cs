@@ -87,18 +87,20 @@
                 .ToDelegate<Func<object>>(this)
                 .Invoke();
 
-            // TRICKY: sometimes EF returns enumerable result as ExceptionInterceptor<T> which
-            // isn't fully ready for mapping to DynamicObjects (some complex self-referencing navigation
-            // properties may not have received their values yet). We have to force materialization.
-            if (queryResult is IEnumerable enumerable && GetSequenceType(resultType, null) != null)
+            if (queryResult is IEnumerable enumerable)
             {
-                queryResult = enumerable.Cast<object>().ToList();
-            }
-
-            // Partial workaround for IGrouping
-            if (resultType.IsGrouping())
-            {
-                queryResult = new[] { queryResult };
+                if (GetSequenceType(resultType, null) != null)
+                {
+                    // TRICKY: sometimes EF returns enumerable result as ExceptionInterceptor<T> which
+                    // isn't fully ready for mapping to DynamicObjects (some complex self-referencing navigation
+                    // properties may not have received their values yet). We have to force materialization.
+                    queryResult = enumerable.Cast<object>().ToList();
+                }
+                else
+                {
+                    // Little trick for a single result item of type IGrouping/array/string
+                    queryResult = new[] { queryResult };
+                }
             }
 
             return this.MapResult(queryResult);
