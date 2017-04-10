@@ -10,12 +10,6 @@
         {
         }
 
-        [Fact(Skip = "Too slow")]
-        public override void OrderBy_correlated_subquery_lol2()
-        {
-            base.OrderBy_correlated_subquery_lol2();
-        }
-
         [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311")]
         public override void GroupJoin_DefaultIfEmpty3()
         {
