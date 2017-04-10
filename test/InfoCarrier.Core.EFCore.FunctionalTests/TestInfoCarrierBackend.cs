@@ -27,17 +27,26 @@
 
         public void BeginTransaction()
         {
-            this.dbContextFactory().Database.BeginTransaction();
+            using (var context = this.dbContextFactory())
+            {
+                context.Database.BeginTransaction();
+            }
         }
 
-        public Task BeginTransactionAsync()
+        public async Task BeginTransactionAsync()
         {
-            return this.dbContextFactory().Database.BeginTransactionAsync();
+            using (var context = this.dbContextFactory())
+            {
+                await context.Database.BeginTransactionAsync();
+            }
         }
 
         public void CommitTransaction()
         {
-            this.dbContextFactory().Database.CommitTransaction();
+            using (var context = this.dbContextFactory())
+            {
+                context.Database.CommitTransaction();
+            }
         }
 
         public IEnumerable<DynamicObject> QueryData(Expression rlinq)
@@ -58,7 +67,10 @@
 
         public void RollbackTransaction()
         {
-            this.dbContextFactory().Database.RollbackTransaction();
+            using (var context = this.dbContextFactory())
+            {
+                context.Database.RollbackTransaction();
+            }
         }
 
         public SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)
