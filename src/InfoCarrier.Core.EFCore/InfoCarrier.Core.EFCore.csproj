@@ -7,12 +7,17 @@
     <Authors>Alexander Zabluda</Authors>
     <Product>InfoCarrier</Product>
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
+    <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
   </PropertyGroup>
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="&quot;$(ProjectDir)..\..\tools\GitVersion.CommandLine.3.6.5\tools\GitVersion.exe&quot; /updateassemblyinfo &quot;$(ProjectDir)obj\GitVersionTaskAssemblyInfo.g.cs&quot; /ensureassemblyinfo" />
+  </Target>  
   <ItemGroup>
-    <PackageReference Include="GitVersionTask" Version="4.0.0-beta0011">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="1.1.0" />
     <PackageReference Include="Remote.Linq" Version="5.4.0-alpha-027" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">
