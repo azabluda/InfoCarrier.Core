@@ -3,7 +3,7 @@
     <TargetFramework>net451</TargetFramework>
     <Copyright>Copyright ©  2017</Copyright>
     <Version>$(NuGetVersion)</Version>
-    <Description />
+    <Description>EntityFrameworkCore provider for multitier applications</Description>
     <Company>on/off it-solutions-gmbh</Company>
     <Authors>Alexander Zabluda</Authors>
     <Product>InfoCarrier</Product>
