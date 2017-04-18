@@ -58,6 +58,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 this.ResultOperatorHandler,
                 this.EntityMaterializerSource,
                 this.ExpressionPrinter,
-                queryCompilationContext);
+                queryCompilationContext,
+                parentEntityQueryModelVisitor is null);
     }
 }

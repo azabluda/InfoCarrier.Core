@@ -35,6 +35,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 .GetDeclaredNestedType("SubqueryInjector");
 
         private readonly IEntityMaterializerSource entityMaterializerSource;
+        private readonly bool isRoot;
 
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
@@ -51,7 +52,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IResultOperatorHandler resultOperatorHandler,
             IEntityMaterializerSource entityMaterializerSource,
             IExpressionPrinter expressionPrinter,
-            QueryCompilationContext queryCompilationContext)
+            QueryCompilationContext queryCompilationContext,
+            bool isRoot)
             : base(
                 queryOptimizer,
                 navigationRewritingExpressionVisitorFactory,
@@ -70,6 +72,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 queryCompilationContext)
         {
             this.entityMaterializerSource = entityMaterializerSource;
+            this.isRoot = isRoot;
         }
 
         private bool ExpressionIsQueryable =>
@@ -90,32 +93,33 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 ? (ILinqOperatorProvider)new AsyncLinqOperatorProvider()
                 : this.InfoCarrierLinqOperatorProvider;
 
-        public override Func<QueryContext, IAsyncEnumerable<TResult>> CreateAsyncQueryExecutor<TResult>(QueryModel queryModel)
+        public override void VisitQueryModel(QueryModel queryModel)
         {
-            // UGLY: pretty much copy-and-paste of the base implementation except for:
-            // + Call SingleResultToSequence without 2nd argument
-            // - Unable to "copy-and-paste" original logging
-            using (this.QueryCompilationContext.Logger.BeginScope(this))
+            base.VisitQueryModel(queryModel);
+
+            // CreateAsyncQueryExecutor requires the expression type to be generic
+            // which is not the case since we are building synchronous LINQ expressions
+            // even for async queries.
+            // UGLY: apply ToSequence wrapper to the expression
+            if (this.isRoot && ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async)
             {
-                this.ExtractQueryAnnotations(queryModel);
-
-                this.OptimizeQueryModel(queryModel);
-
-                this.QueryCompilationContext.FindQuerySourcesRequiringMaterialization(this, queryModel);
-                this.QueryCompilationContext.DetermineQueryBufferRequirement(queryModel);
-
-                this.VisitQueryModel(queryModel);
-
-                this.SingleResultToSequence(queryModel);
-
-                this.IncludeNavigations(queryModel);
-
-                this.TrackEntitiesInResults<TResult>(queryModel);
-
-                this.InterceptExceptions();
-
-                return this.CreateExecutorLambda<IAsyncEnumerable<TResult>>();
+                this.Expression
+                    = Expression.Call(
+                        this.LinqOperatorProvider.ToSequence.MakeGenericMethod(this.Expression.Type),
+                        this.Expression);
             }
+        }
+
+        protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
+        {
+            // UGLY: unapply ToSequence wrapper temporarily added in VisitQueryModel
+            if (this.Expression is MethodCallExpression mc
+                && MIE.MethodIsClosedFormOf(mc.Method, this.LinqOperatorProvider.ToSequence))
+            {
+                this.Expression = mc.Arguments.Single();
+            }
+
+            base.SingleResultToSequence(queryModel, type);
         }
 
         private static IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>(
