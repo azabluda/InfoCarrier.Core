@@ -11,11 +11,11 @@
 
         public NorthwindQueryInfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 this.OnModelCreating,
                 (opt, queryTrackingBehavior) => new NorthwindContext(opt, queryTrackingBehavior));
 
-            using (var context = this.helper.CreateInMemoryContext())
+            using (var context = this.helper.CreateBackendContext())
             {
                 NorthwindData.Seed(context);
             }

@@ -11,7 +11,7 @@ namespace InfoCarrier.Core.EFCore.FunctionalTests
 
         public UpdatesInfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 null,
                 (opt, _) => new UpdatesContext(opt),
                 w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));

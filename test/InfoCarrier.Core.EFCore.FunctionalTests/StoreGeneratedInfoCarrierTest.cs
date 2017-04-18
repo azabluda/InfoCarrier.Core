@@ -169,7 +169,7 @@
 
             public StoreGeneratedInfoCarrierFixture()
             {
-                this.helper = InfoCarrierInMemoryTestHelper.Create(
+                this.helper = InfoCarrierTestHelper.CreateInMemory(
                     this.OnModelCreating,
                     (opt, _) => new StoreGeneratedContext(opt),
                     w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));

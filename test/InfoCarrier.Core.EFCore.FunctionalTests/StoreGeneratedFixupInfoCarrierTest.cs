@@ -20,7 +20,7 @@
 
             public StoreGeneratedFixupInfoCarrierFixture()
             {
-                this.helper = InfoCarrierInMemoryTestHelper.Create(
+                this.helper = InfoCarrierTestHelper.CreateInMemory(
                     this.OnModelCreating,
                     (opt, _) => new StoreGeneratedFixupContext(opt),
                     w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));

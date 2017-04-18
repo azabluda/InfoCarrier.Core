@@ -9,11 +9,11 @@ namespace InfoCarrier.Core.EFCore.FunctionalTests
 
         public OneToOneQueryInfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 this.OnModelCreating,
                 (opt, _) => new DbContext(opt));
 
-            using (var context = this.helper.CreateInMemoryContext())
+            using (var context = this.helper.CreateBackendContext())
             {
                 AddTestData(context);
             }

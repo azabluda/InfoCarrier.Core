@@ -12,7 +12,7 @@
 
         public BuiltInDataTypesInfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 this.OnModelCreating,
                 (opt, _) => new DbContext(opt));
         }
@@ -28,7 +28,7 @@
 
         public override void Dispose()
         {
-            using (var context = this.helper.CreateInMemoryContext())
+            using (var context = this.helper.CreateBackendContext())
             {
                 var storeSource = context.GetService<IInMemoryStoreSource>();
                 storeSource.GetGlobalStore().Clear();

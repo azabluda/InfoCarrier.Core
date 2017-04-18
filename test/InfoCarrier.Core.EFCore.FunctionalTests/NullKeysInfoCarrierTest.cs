@@ -16,7 +16,7 @@ namespace InfoCarrier.Core.EFCore.FunctionalTests
 
             public NullKeysInfoCarrierFixture()
             {
-                this.helper = InfoCarrierInMemoryTestHelper.Create(
+                this.helper = InfoCarrierTestHelper.CreateInMemory(
                     this.OnModelCreating,
                     (opt, _) => new DbContext(opt));
 

@@ -17,7 +17,7 @@
 
             public PropertyValuesInfoCarrierFixture()
             {
-                this.helper = InfoCarrierInMemoryTestHelper.Create(
+                this.helper = InfoCarrierTestHelper.CreateInMemory(
                     this.OnModelCreating,
                     (opt, _) => new AdvancedPatternsMasterContext(opt));
             }

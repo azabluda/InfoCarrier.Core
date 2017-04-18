@@ -9,7 +9,7 @@
 
         public F1InfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 this.OnModelCreating,
                 (opt, _) => new F1Context(opt));
         }

@@ -12,7 +12,7 @@
 
         public DataAnnotationInfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 this.OnModelCreating,
                 (opt, _) => new DataAnnotationContext(opt),
                 w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));

@@ -9,11 +9,11 @@
 
         public InheritanceInfoCarrierFixture()
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(
+            this.helper = InfoCarrierTestHelper.CreateInMemory(
                 this.OnModelCreating,
                 (opt, _) => new InheritanceContext(opt));
 
-            using (var context = this.helper.CreateInMemoryContext())
+            using (var context = this.helper.CreateBackendContext())
             {
                 this.SeedData(context);
             }

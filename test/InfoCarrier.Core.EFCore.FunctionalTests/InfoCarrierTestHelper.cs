@@ -5,41 +5,20 @@
     using Client.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.Extensions.DependencyInjection;
 
-    public abstract class InfoCarrierInMemoryTestHelper
+    public abstract class InfoCarrierTestHelper : IInfoCarrierTestHelper
     {
-        private readonly Func<DbContextOptions> buildInMemoryOptions;
         private readonly Func<IServiceCollection, DbContextOptions> buildInfoCarrierOptions;
         private readonly Action<IServiceCollection> configureInfoCarrierServices;
 
-        protected InfoCarrierInMemoryTestHelper(
-            Action<ModelBuilder> onModelCreating,
-            Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction)
+        protected InfoCarrierTestHelper(
+            Action<ModelBuilder> onModelCreating)
         {
-            this.buildInMemoryOptions = () =>
-            {
-                var serviceCollection = new ServiceCollection().AddEntityFrameworkInMemoryDatabase();
-
-                if (onModelCreating != null)
-                {
-                    serviceCollection.AddSingleton(GetModelSourceFactory<InMemoryModelSource>(onModelCreating, p => new TestInMemoryModelSource(p)));
-                }
-
-                return new DbContextOptionsBuilder()
-                    .UseInMemoryDatabase()
-                    .UseInternalServiceProvider(serviceCollection.BuildServiceProvider())
-                    .ConfigureWarnings(warningsConfigurationBuilderAction)
-                    .Options;
-            };
-
-            this.ResetInMemoryOptions();
-
             this.configureInfoCarrierServices = services =>
             {
                 services.AddEntityFrameworkInfoCarrierBackend();
@@ -51,19 +30,14 @@
 
             this.buildInfoCarrierOptions = additionalServices =>
                 new DbContextOptionsBuilder()
-                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(() => this.CreateInMemoryContextInternal(), true))
+                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(() => this.CreateBackendContextInternal(), this.IsInMemoryDatabase))
                     .UseInternalServiceProvider(
                         this.ConfigureInfoCarrierServices(additionalServices ?? new ServiceCollection())
                             .BuildServiceProvider())
                     .Options;
         }
 
-        protected DbContextOptions InMemoryOptions { get; private set; }
-
-        protected void ResetInMemoryOptions()
-        {
-            this.InMemoryOptions = this.buildInMemoryOptions();
-        }
+        protected virtual bool IsInMemoryDatabase => false;
 
         public IServiceCollection ConfigureInfoCarrierServices(IServiceCollection services)
         {
@@ -71,7 +45,7 @@
             return services;
         }
 
-        public static InfoCarrierInMemoryTestHelper<TDbContext> Create<TDbContext>(
+        public static InfoCarrierInMemoryTestHelper<TDbContext> CreateInMemory<TDbContext>(
             Action<ModelBuilder> onModelCreating,
             Func<DbContextOptions, QueryTrackingBehavior, TDbContext> createDbContext,
             Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction = null)
@@ -86,15 +60,15 @@
         public DbContextOptions BuildInfoCarrierOptions(IServiceCollection additionalServices = null)
             => this.buildInfoCarrierOptions(additionalServices);
 
-        protected abstract DbContext CreateInMemoryContextInternal(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll);
+        protected abstract DbContext CreateBackendContextInternal(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll);
 
-        private static Func<IServiceProvider, TModelSource> GetModelSourceFactory<TModelSource>(
+        protected static Func<IServiceProvider, TModelSource> GetModelSourceFactory<TModelSource>(
             Action<ModelBuilder> onModelCreating,
             Func<TestModelSourceParams, TModelSource> creator)
             where TModelSource : ModelSource
             => provider => creator(new TestModelSourceParams(provider, onModelCreating));
 
-        private class TestModelSourceParams
+        protected class TestModelSourceParams
         {
             public TestModelSourceParams(IServiceProvider provider, Action<ModelBuilder> onModelCreating)
             {
@@ -123,20 +97,6 @@
             public IModelCacheKeyFactory ModelCacheKeyFactory { get; }
 
             public Func<DbContext, IConventionSetBuilder, IModelValidator, IModel> GetModel { get; }
-        }
-
-        private class TestInMemoryModelSource : InMemoryModelSource
-        {
-            private readonly TestModelSourceParams testModelSourceParams;
-
-            public TestInMemoryModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
-            {
-                this.testModelSourceParams = p;
-            }
-
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
         }
 
         private class TestInfoCarrierModelSource : InfoCarrierModelSource

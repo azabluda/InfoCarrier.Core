@@ -181,7 +181,7 @@
 
             public GraphUpdatesInfoCarrierFixture()
             {
-                this.helper = InfoCarrierInMemoryTestHelper.Create(
+                this.helper = InfoCarrierTestHelper.CreateInMemory(
                     this.OnModelCreating,
                     (opt, _) => new GraphUpdatesContext(opt),
                     w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));

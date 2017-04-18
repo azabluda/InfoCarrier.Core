@@ -12,7 +12,7 @@
 
     public class MonsterFixupInfoCarrierTest : MonsterFixupTestBase
     {
-        private InfoCarrierInMemoryTestHelper helper;
+        private IInfoCarrierTestHelper helper;
 
         public MonsterFixupInfoCarrierTest(ITestOutputHelper testOutputHelper)
         {
@@ -85,7 +85,7 @@
         private void ConfigureContext<TDbContext>(Func<DbContextOptions, TDbContext> createDbContext)
             where TDbContext : MonsterContext
         {
-            this.helper = InfoCarrierInMemoryTestHelper.Create(null, (opt, _) => createDbContext(opt));
+            this.helper = InfoCarrierTestHelper.CreateInMemory(null, (opt, _) => createDbContext(opt));
         }
 
         private void ConfigureSnapshotMonsterContext()
