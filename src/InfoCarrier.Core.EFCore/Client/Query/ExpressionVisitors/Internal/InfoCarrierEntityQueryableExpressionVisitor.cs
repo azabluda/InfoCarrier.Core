@@ -44,13 +44,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
             public abstract Type ElementType { get; }
 
-            protected static dynamic NotImplemented
-            {
-                get
-                {
-                    throw new NotImplementedException();
-                }
-            }
+            protected static dynamic NotImplemented => throw new NotImplementedException();
 
             public Expression Expression => NotImplemented;
 

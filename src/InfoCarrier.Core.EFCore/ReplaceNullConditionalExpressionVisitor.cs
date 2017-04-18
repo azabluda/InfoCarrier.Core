@@ -1,4 +1,4 @@
-﻿namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
+﻿namespace InfoCarrier.Core
 {
     using System;
     using System.Linq.Expressions;
@@ -6,7 +6,7 @@
     using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
 
-    public class ReplaceNullConditionalExpressionVisitor : ExpressionVisitorBase
+    internal class ReplaceNullConditionalExpressionVisitor : ExpressionVisitorBase
     {
         private readonly bool toMethodCall;
 
