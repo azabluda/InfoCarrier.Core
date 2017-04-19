@@ -15,5 +15,11 @@
         {
             base.Optional_navigation_projected_into_DTO();
         }
+
+        [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/7559")]
+        public override void Key_equality_using_property_method_nested()
+        {
+            base.Key_equality_using_property_method_nested();
+        }
     }
 }
