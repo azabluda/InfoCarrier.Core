@@ -23,6 +23,7 @@
             this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
                 {
+                    Name = prop.Metadata.Name,
                     OriginalValue = prop.Metadata.GetOriginalValueIndex() >= 0 ? prop.OriginalValue : null,
                     CurrentValue = prop.CurrentValue,
                     IsModified = prop.IsModified,
@@ -41,9 +42,11 @@
 
         public IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
         {
-            return entry.Properties.Zip(
-                this.PropertyDatas,
-                (ef, dto) => new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
+            return (
+                from ef in entry.Properties
+                join dto in this.PropertyDatas
+                on ef.Metadata.Name equals dto.Name
+                select new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
         }
 
         public struct JoinedProperty
@@ -57,6 +60,9 @@
         {
             private static readonly DynamicObjectMapper Mapper
                 = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true });
+
+            [DataMember]
+            public string Name { get; set; }
 
             [IgnoreDataMember]
             public object OriginalValue { get; set; }
