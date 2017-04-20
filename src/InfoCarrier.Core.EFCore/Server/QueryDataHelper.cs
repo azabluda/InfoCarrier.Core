@@ -188,7 +188,8 @@
                         .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
                         .ToArray();
                     var dto = new DynamicObject();
-                    dto.Add(string.Empty, array);
+                    dto.Add("ArrayType", new Aqua.TypeSystem.TypeInfo(objType, includePropertyInfos: false));
+                    dto.Add("Elements", array);
                     return dto;
                 }
 

@@ -573,11 +573,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 array = null;
 
-                if (!targetType.IsArray)
-                {
-                    return false;
-                }
-
                 if (obj is DynamicObject dobj)
                 {
                     if (dobj.Type != null)
@@ -586,13 +581,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return false;
                     }
 
-                    if (!dobj.TryGet(string.Empty, out object elements))
+                    if (!dobj.TryGet("Elements", out object elements))
                     {
                         return false;
                     }
 
-                    array = this.MapFromDynamicObjectGraph(elements, targetType);
-                    return true;
+                    if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
+                    {
+                        return false;
+                    }
+
+                    if (targetType.IsArray)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, targetType);
+                        return true;
+                    }
+
+                    if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, typeInfo.Type);
+                        return true;
+                    }
                 }
 
                 return false;
