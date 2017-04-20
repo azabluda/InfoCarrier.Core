@@ -12,7 +12,7 @@
 
     public class MonsterFixupInfoCarrierTest : MonsterFixupTestBase
     {
-        private IInfoCarrierTestHelper helper;
+        private IInfoCarrierTestHelper<TestStore> helper;
 
         public MonsterFixupInfoCarrierTest(ITestOutputHelper testOutputHelper)
         {
@@ -122,7 +122,7 @@
 
         protected override DbContextOptions CreateOptions(string databaseName)
         {
-            return this.helper.BuildInfoCarrierOptions();
+            return this.helper.BuildInfoCarrierOptions(null);
         }
 
         protected override IServiceProvider CreateServiceProvider(bool throwingStateManager = false)

@@ -11,7 +11,7 @@
     using Microsoft.EntityFrameworkCore.Storage.Internal;
     using Microsoft.Extensions.DependencyInjection;
 
-    public class InfoCarrierInMemoryTestHelper<TDbContext> : InfoCarrierTestHelper
+    public class InfoCarrierInMemoryTestHelper<TDbContext> : InfoCarrierTestHelper<TestStore>
         where TDbContext : DbContext
     {
         private readonly Func<DbContextOptions> buildInMemoryOptions;
@@ -70,14 +70,16 @@
             }
         }
 
-        protected override DbContext CreateBackendContextInternal(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)
+        protected override DbContext CreateBackendContextInternal(
+            TestStore testStore,
+            QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)
             => this.CreateBackendContext(queryTrackingBehavior);
 
         public TDbContext CreateBackendContext(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)
             => this.createDbContext(this.InMemoryOptions, queryTrackingBehavior);
 
         public TDbContext CreateInfoCarrierContext(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)
-            => this.createDbContext(this.BuildInfoCarrierOptions(), queryTrackingBehavior);
+            => this.createDbContext(this.BuildInfoCarrierOptions(null), queryTrackingBehavior);
 
         private class TestInMemoryModelSource : InMemoryModelSource
         {

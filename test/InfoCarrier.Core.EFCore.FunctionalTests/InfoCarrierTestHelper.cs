@@ -11,9 +11,37 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.Extensions.DependencyInjection;
 
-    public abstract class InfoCarrierTestHelper : IInfoCarrierTestHelper
+    public static class InfoCarrierTestHelper
     {
-        private readonly Func<IServiceCollection, DbContextOptions> buildInfoCarrierOptions;
+        public static InfoCarrierInMemoryTestHelper<TDbContext> CreateInMemory<TDbContext>(
+            Action<ModelBuilder> onModelCreating,
+            Func<DbContextOptions, QueryTrackingBehavior, TDbContext> createDbContext,
+            Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction = null)
+            where TDbContext : DbContext
+        {
+            return new InfoCarrierInMemoryTestHelper<TDbContext>(
+                onModelCreating,
+                createDbContext,
+                warningsConfigurationBuilderAction);
+        }
+
+        public static InfoCarrierSqlServerTestHelper<TDbContext> CreateSqlServer<TDbContext>(
+            string databaseName,
+            Action<ModelBuilder> onModelCreating,
+            Func<DbContextOptions, QueryTrackingBehavior, TDbContext> createDbContext)
+            where TDbContext : DbContext
+        {
+            return new InfoCarrierSqlServerTestHelper<TDbContext>(
+                databaseName,
+                onModelCreating,
+                createDbContext);
+        }
+    }
+
+    public abstract class InfoCarrierTestHelper<TTestStore> : IInfoCarrierTestHelper<TTestStore>
+        where TTestStore : TestStore
+    {
+        private readonly Func<TTestStore, IServiceCollection, DbContextOptions> buildInfoCarrierOptions;
         private readonly Action<IServiceCollection> configureInfoCarrierServices;
 
         protected InfoCarrierTestHelper(
@@ -28,9 +56,9 @@
                 }
             };
 
-            this.buildInfoCarrierOptions = additionalServices =>
+            this.buildInfoCarrierOptions = (testStore, additionalServices) =>
                 new DbContextOptionsBuilder()
-                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(() => this.CreateBackendContextInternal(), this.IsInMemoryDatabase))
+                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(() => this.CreateBackendContextInternal(testStore), this.IsInMemoryDatabase, (testStore as RelationalTestStore)?.Connection))
                     .UseInternalServiceProvider(
                         this.ConfigureInfoCarrierServices(additionalServices ?? new ServiceCollection())
                             .BuildServiceProvider())
@@ -45,22 +73,14 @@
             return services;
         }
 
-        public static InfoCarrierInMemoryTestHelper<TDbContext> CreateInMemory<TDbContext>(
-            Action<ModelBuilder> onModelCreating,
-            Func<DbContextOptions, QueryTrackingBehavior, TDbContext> createDbContext,
-            Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction = null)
-            where TDbContext : DbContext
-        {
-            return new InfoCarrierInMemoryTestHelper<TDbContext>(
-                onModelCreating,
-                createDbContext,
-                warningsConfigurationBuilderAction);
-        }
+        public DbContextOptions BuildInfoCarrierOptions(
+            TTestStore testStore,
+            IServiceCollection additionalServices = null)
+            => this.buildInfoCarrierOptions(testStore, additionalServices);
 
-        public DbContextOptions BuildInfoCarrierOptions(IServiceCollection additionalServices = null)
-            => this.buildInfoCarrierOptions(additionalServices);
-
-        protected abstract DbContext CreateBackendContextInternal(QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll);
+        protected abstract DbContext CreateBackendContextInternal(
+            TTestStore testStore,
+            QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll);
 
         protected static Func<IServiceProvider, TModelSource> GetModelSourceFactory<TModelSource>(
             Action<ModelBuilder> onModelCreating,

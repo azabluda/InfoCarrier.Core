@@ -1,32 +1,40 @@
 ﻿namespace InfoCarrier.Core.EFCore.FunctionalTests.SqlServer
 {
+    using System;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.FunkyDataModel;
 
     public class FunkyDataQueryInfoCarrierTest
-        : FunkyDataQueryTestBase<TestStore, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
+        : FunkyDataQueryTestBase<SqlServerTestStore, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
     {
         public FunkyDataQueryInfoCarrierTest(FunkyDataQueryInfoCarrierFixture fixture)
             : base(fixture)
         {
         }
 
-        public class FunkyDataQueryInfoCarrierFixture : FunkyDataQueryFixtureBase<TestStore>
+        public class FunkyDataQueryInfoCarrierFixture : FunkyDataQueryFixtureBase<SqlServerTestStore>,
+            IDisposable
         {
-            private readonly InfoCarrierInMemoryTestHelper<FunkyDataContext> helper;
+            private readonly InfoCarrierSqlServerTestHelper<FunkyDataContext> helper;
 
             public FunkyDataQueryInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InfoCarrierTestHelper.CreateSqlServer(
+                    "FunkyDataQueryTest",
                     this.OnModelCreating,
                     (opt, _) => new FunkyDataContext(opt));
             }
 
-            public override TestStore CreateTestStore()
+            public override SqlServerTestStore CreateTestStore()
                 => this.helper.CreateTestStore(FunkyDataModelInitializer.Seed);
 
-            public override FunkyDataContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override FunkyDataContext CreateContext(SqlServerTestStore testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
+
+            public void Dispose()
+            {
+                this.helper.Dispose();
+            }
         }
     }
 }

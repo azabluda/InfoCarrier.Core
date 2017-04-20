@@ -22,7 +22,7 @@
         }
 
         public override DbContextOptions BuildOptions(IServiceCollection additionalServices = null)
-            => this.helper.BuildInfoCarrierOptions(additionalServices);
+            => this.helper.BuildInfoCarrierOptions(null, additionalServices);
 
         public override NorthwindContext CreateContext(
             QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)

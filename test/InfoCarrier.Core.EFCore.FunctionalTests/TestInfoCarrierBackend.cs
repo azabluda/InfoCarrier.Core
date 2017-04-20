@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Data.Common;
     using System.Linq;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
@@ -18,35 +19,58 @@
     {
         private readonly Func<DbContext> dbContextFactory;
         private readonly bool isInMemoryDatabase;
+        private readonly DbConnection dbConnection;
+        private DbTransaction transaction;
 
-        public TestInfoCarrierBackend(Func<DbContext> dbContextFactory, bool isInMemoryDatabase)
+        public TestInfoCarrierBackend(Func<DbContext> dbContextFactory, bool isInMemoryDatabase, DbConnection dbConnection)
         {
-            this.dbContextFactory = dbContextFactory;
+            this.dbContextFactory = () =>
+            {
+                DbContext context = dbContextFactory();
+                if (this.dbConnection != null)
+                {
+                    context.Database.UseTransaction(this.transaction);
+                }
+
+                return context;
+            };
+
             this.isInMemoryDatabase = isInMemoryDatabase;
+            this.dbConnection = dbConnection;
         }
 
         public void BeginTransaction()
         {
-            using (var context = this.dbContextFactory())
+            if (this.dbConnection == null)
             {
-                context.Database.BeginTransaction();
+                return;
             }
+
+            this.dbConnection.Open();
+            this.transaction = this.dbConnection.BeginTransaction();
         }
 
         public async Task BeginTransactionAsync()
         {
-            using (var context = this.dbContextFactory())
+            if (this.dbConnection == null)
             {
-                await context.Database.BeginTransactionAsync();
+                return;
             }
+
+            await this.dbConnection.OpenAsync();
+            this.transaction = this.dbConnection.BeginTransaction();
         }
 
         public void CommitTransaction()
         {
-            using (var context = this.dbContextFactory())
+            if (this.dbConnection == null)
             {
-                context.Database.CommitTransaction();
+                return;
             }
+
+            this.transaction.Commit();
+            this.transaction = null;
+            this.dbConnection.Close();
         }
 
         public IEnumerable<DynamicObject> QueryData(Expression rlinq)
@@ -67,10 +91,14 @@
 
         public void RollbackTransaction()
         {
-            using (var context = this.dbContextFactory())
+            if (this.dbConnection == null)
             {
-                context.Database.RollbackTransaction();
+                return;
             }
+
+            this.transaction.Rollback();
+            this.transaction = null;
+            this.dbConnection.Close();
         }
 
         public SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)

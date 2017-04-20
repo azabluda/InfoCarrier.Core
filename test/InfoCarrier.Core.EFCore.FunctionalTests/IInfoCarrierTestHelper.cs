@@ -1,12 +1,16 @@
 ﻿namespace InfoCarrier.Core.EFCore.FunctionalTests
 {
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.Extensions.DependencyInjection;
 
-    public interface IInfoCarrierTestHelper
+    public interface IInfoCarrierTestHelper<TTestStore>
+        where TTestStore : TestStore
     {
         IServiceCollection ConfigureInfoCarrierServices(IServiceCollection services);
 
-        DbContextOptions BuildInfoCarrierOptions(IServiceCollection additionalServices = null);
+        DbContextOptions BuildInfoCarrierOptions(
+            TTestStore testStore,
+            IServiceCollection additionalServices = null);
     }
 }
