@@ -9,6 +9,7 @@
     using Client;
     using Common;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Update;
     using Newtonsoft.Json;
     using Remote.Linq;
@@ -105,7 +106,15 @@
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(entries))
             {
-                return SimulateNetworkTransferJson(helper.SaveChanges());
+                try
+                {
+                    return SimulateNetworkTransferJson(helper.SaveChanges());
+                }
+                catch (DbUpdateException e)
+                {
+                    SimulateNetworkTransferException(e, helper, entries);
+                    throw;
+                }
             }
         }
 
@@ -113,7 +122,15 @@
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(entries))
             {
-                return SimulateNetworkTransferJson(await helper.SaveChangesAsync());
+                try
+                {
+                    return SimulateNetworkTransferJson(await helper.SaveChangesAsync());
+                }
+                catch (DbUpdateException e)
+                {
+                    SimulateNetworkTransferException(e, helper, entries);
+                    throw;
+                }
             }
         }
 
@@ -147,6 +164,29 @@
             var serializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
             var json = JsonConvert.SerializeObject(value, serializerSettings);
             return (T)JsonConvert.DeserializeObject(json, value.GetType(), serializerSettings);
+        }
+
+        private static void SimulateNetworkTransferException(
+            DbUpdateException dbUpdateException,
+            SaveChangesHelper helper,
+            IReadOnlyList<IUpdateEntry> entries)
+        {
+            var map = helper.Entries
+                .Select((e, i) => new { Index = i, Entry = e })
+                .ToDictionary(x => x.Entry, x => x.Index);
+
+            var entityIndexes = dbUpdateException.Entries.Select(re => map[re.GetInfrastructure()]).ToArray();
+
+            IReadOnlyList<IUpdateEntry> failedEntries = entityIndexes.Select(x => entries[x]).ToList();
+
+            if (dbUpdateException is DbUpdateConcurrencyException)
+            {
+                throw new DbUpdateConcurrencyException(dbUpdateException.Message, failedEntries);
+            }
+
+            throw failedEntries.Any()
+                ? new DbUpdateException(dbUpdateException.Message, dbUpdateException.InnerException, failedEntries)
+                : new DbUpdateException(dbUpdateException.Message, dbUpdateException.InnerException);
         }
     }
 }
