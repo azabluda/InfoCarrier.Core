@@ -3,7 +3,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Xunit;
 
-    public class GearsOfWarQueryInfoCarrierTest : GearsOfWarQueryTestBase<TestStore, GearsOfWarQueryInfoCarrierFixture>
+    public class GearsOfWarQueryInfoCarrierTest : GearsOfWarQueryTestBase<TestStoreBase, GearsOfWarQueryInfoCarrierFixture>
     {
         public GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fixture)
             : base(fixture)

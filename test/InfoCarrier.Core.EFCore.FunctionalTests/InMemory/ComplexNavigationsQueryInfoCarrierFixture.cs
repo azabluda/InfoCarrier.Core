@@ -3,21 +3,22 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ComplexNavigationsModel;
 
-    public class ComplexNavigationsQueryInfoCarrierFixture : ComplexNavigationsQueryFixtureBase<TestStore>
+    public class ComplexNavigationsQueryInfoCarrierFixture : ComplexNavigationsQueryFixtureBase<TestStoreBase>
     {
-        private readonly InfoCarrierInMemoryTestHelper<ComplexNavigationsContext> helper;
+        private readonly InfoCarrierTestHelper<ComplexNavigationsContext> helper;
 
         public ComplexNavigationsQueryInfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<ComplexNavigationsContext>.CreateHelper(
                 this.OnModelCreating,
-                (opt, _) => new ComplexNavigationsContext(opt));
+                opt => new ComplexNavigationsContext(opt),
+                ComplexNavigationsModelInitializer.Seed);
         }
 
-        public override TestStore CreateTestStore()
-            => this.helper.CreateTestStore(ComplexNavigationsModelInitializer.Seed);
+        public override TestStoreBase CreateTestStore()
+            => this.helper.CreateTestStore();
 
-        public override ComplexNavigationsContext CreateContext(TestStore testStore)
-            => this.helper.CreateInfoCarrierContext();
+        public override ComplexNavigationsContext CreateContext(TestStoreBase testStore)
+            => this.helper.CreateInfoCarrierContext(testStore);
     }
 }

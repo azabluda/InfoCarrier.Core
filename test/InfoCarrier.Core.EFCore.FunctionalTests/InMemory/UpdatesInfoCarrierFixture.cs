@@ -5,22 +5,24 @@ namespace InfoCarrier.Core.EFCore.FunctionalTests.InMemory
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.UpdatesModel;
 
-    public class UpdatesInfoCarrierFixture : UpdatesFixtureBase<TestStore>
+    public class UpdatesInfoCarrierFixture : UpdatesFixtureBase<TestStoreBase>
     {
-        private readonly InfoCarrierInMemoryTestHelper<UpdatesContext> helper;
+        private readonly InfoCarrierTestHelper<UpdatesContext> helper;
 
         public UpdatesInfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<UpdatesContext>.CreateHelper(
                 null,
-                (opt, _) => new UpdatesContext(opt),
+                opt => new UpdatesContext(opt),
+                UpdatesModelInitializer.Seed,
+                false,
                 w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
         }
 
-        public override TestStore CreateTestStore()
-            => this.helper.CreateTestStore(UpdatesModelInitializer.Seed);
+        public override TestStoreBase CreateTestStore()
+            => this.helper.CreateTestStore();
 
-        public override UpdatesContext CreateContext(TestStore testStore)
-            => this.helper.CreateInfoCarrierContext();
+        public override UpdatesContext CreateContext(TestStoreBase testStore)
+            => this.helper.CreateInfoCarrierContext(testStore);
     }
 }

@@ -5,29 +5,31 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ConcurrencyModel;
 
     public class OptimisticConcurrencyInfoCarrierTest
-        : OptimisticConcurrencyTestBase<SqlServerTestStore, OptimisticConcurrencyInfoCarrierTest.OptimisticConcurrencyInfoCarrierFixture>
+        : OptimisticConcurrencyTestBase<TestStoreBase, OptimisticConcurrencyInfoCarrierTest.OptimisticConcurrencyInfoCarrierFixture>
     {
         public OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarrierFixture fixture)
             : base(fixture)
         {
         }
 
-        public class OptimisticConcurrencyInfoCarrierFixture : F1RelationalFixture<SqlServerTestStore>
+        public class OptimisticConcurrencyInfoCarrierFixture : F1RelationalFixture<TestStoreBase>
         {
-            private readonly InfoCarrierSqlServerTestHelper<F1Context> helper;
+            private readonly InfoCarrierTestHelper<F1Context> helper;
 
             public OptimisticConcurrencyInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateSqlServer(
-                    "OptimisticConcurrencyTest",
+                this.helper = SqlServerTestStore<F1Context>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new F1Context(opt));
+                    opt => new F1Context(opt),
+                    ConcurrencyModelInitializer.Seed,
+                    true,
+                    "OptimisticConcurrencyTest");
             }
 
-            public override SqlServerTestStore CreateTestStore()
-                => this.helper.CreateTestStore(ConcurrencyModelInitializer.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override F1Context CreateContext(SqlServerTestStore testStore)
+            public override F1Context CreateContext(TestStoreBase testStore)
                 => this.helper.CreateInfoCarrierContext(testStore);
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)

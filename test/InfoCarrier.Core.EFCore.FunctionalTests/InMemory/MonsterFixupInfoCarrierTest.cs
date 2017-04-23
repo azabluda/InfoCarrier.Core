@@ -10,9 +10,10 @@
     using Microsoft.Extensions.DependencyInjection;
     using Xunit.Abstractions;
 
-    public class MonsterFixupInfoCarrierTest : MonsterFixupTestBase
+    public class MonsterFixupInfoCarrierTest : MonsterFixupTestBase, IDisposable
     {
-        private IInfoCarrierTestHelper<TestStore> helper;
+        private InfoCarrierTestHelper helper;
+        private TestStoreBase testStore;
 
         public MonsterFixupInfoCarrierTest(ITestOutputHelper testOutputHelper)
         {
@@ -85,7 +86,12 @@
         private void ConfigureContext<TDbContext>(Func<DbContextOptions, TDbContext> createDbContext)
             where TDbContext : MonsterContext
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(null, (opt, _) => createDbContext(opt));
+            this.helper = InMemoryTestStore<TDbContext>.CreateHelper(
+                null,
+                createDbContext,
+                _ => { });
+
+            this.testStore = this.helper.CreateTestStore();
         }
 
         private void ConfigureSnapshotMonsterContext()
@@ -122,7 +128,7 @@
 
         protected override DbContextOptions CreateOptions(string databaseName)
         {
-            return this.helper.BuildInfoCarrierOptions(null);
+            return this.helper.BuildInfoCarrierOptions(this.testStore.InfoCarrierBackend);
         }
 
         protected override IServiceProvider CreateServiceProvider(bool throwingStateManager = false)
@@ -144,6 +150,11 @@
             builder.Entity<TMessage>().Property(e => e.MessageId).ValueGeneratedOnAdd();
             builder.Entity<TProductPhoto>().Property(e => e.PhotoId).ValueGeneratedOnAdd();
             builder.Entity<TProductReview>().Property(e => e.ReviewId).ValueGeneratedOnAdd();
+        }
+
+        public void Dispose()
+        {
+            this.testStore?.Dispose();
         }
     }
 }

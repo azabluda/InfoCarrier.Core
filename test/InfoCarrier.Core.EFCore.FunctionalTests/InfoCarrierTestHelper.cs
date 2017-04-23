@@ -2,135 +2,57 @@
 {
     using System;
     using Client;
-    using Client.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.Extensions.DependencyInjection;
 
-    public static class InfoCarrierTestHelper
+    public abstract class InfoCarrierTestHelper : IDisposable
     {
-        public static InfoCarrierInMemoryTestHelper<TDbContext> CreateInMemory<TDbContext>(
-            Action<ModelBuilder> onModelCreating,
-            Func<DbContextOptions, QueryTrackingBehavior, TDbContext> createDbContext,
-            Action<WarningsConfigurationBuilder> warningsConfigurationBuilderAction = null)
-            where TDbContext : DbContext
-        {
-            return new InfoCarrierInMemoryTestHelper<TDbContext>(
-                onModelCreating,
-                createDbContext,
-                warningsConfigurationBuilderAction);
-        }
-
-        public static InfoCarrierSqlServerTestHelper<TDbContext> CreateSqlServer<TDbContext>(
-            string databaseName,
-            Action<ModelBuilder> onModelCreating,
-            Func<DbContextOptions, QueryTrackingBehavior, TDbContext> createDbContext)
-            where TDbContext : DbContext
-        {
-            return new InfoCarrierSqlServerTestHelper<TDbContext>(
-                databaseName,
-                onModelCreating,
-                createDbContext);
-        }
-    }
-
-    public abstract class InfoCarrierTestHelper<TTestStore> : IInfoCarrierTestHelper<TTestStore>
-        where TTestStore : TestStore
-    {
-        private readonly Func<TTestStore, IServiceCollection, DbContextOptions> buildInfoCarrierOptions;
-        private readonly Action<IServiceCollection> configureInfoCarrierServices;
+        private readonly Action<IServiceCollection> configureInfoCarrierService;
+        private readonly Func<TestStoreImplBase> createTestStore;
+        private readonly Lazy<TestStoreImplBase> sharedStoreLazy;
 
         protected InfoCarrierTestHelper(
-            Action<ModelBuilder> onModelCreating)
+            Action<IServiceCollection> configureInfoCarrierService,
+            Func<TestStoreImplBase> createTestStore,
+            bool useSharedStore)
         {
-            this.configureInfoCarrierServices = services =>
+            this.configureInfoCarrierService = configureInfoCarrierService;
+            this.createTestStore = createTestStore;
+
+            if (useSharedStore)
             {
-                services.AddEntityFrameworkInfoCarrierBackend();
-                if (onModelCreating != null)
-                {
-                    services.AddSingleton(GetModelSourceFactory<InfoCarrierModelSource>(onModelCreating, p => new TestInfoCarrierModelSource(p)));
-                }
-            };
-
-            this.buildInfoCarrierOptions = (testStore, additionalServices) =>
-                new DbContextOptionsBuilder()
-                    .UseInfoCarrierBackend(new TestInfoCarrierBackend(() => this.CreateBackendContextInternal(testStore), this.IsInMemoryDatabase, (testStore as RelationalTestStore)?.Connection))
-                    .UseInternalServiceProvider(
-                        this.ConfigureInfoCarrierServices(additionalServices ?? new ServiceCollection())
-                            .BuildServiceProvider())
-                    .Options;
-        }
-
-        protected virtual bool IsInMemoryDatabase => false;
-
-        public IServiceCollection ConfigureInfoCarrierServices(IServiceCollection services)
-        {
-            this.configureInfoCarrierServices(services);
-            return services;
-        }
-
-        public DbContextOptions BuildInfoCarrierOptions(
-            TTestStore testStore,
-            IServiceCollection additionalServices = null)
-            => this.buildInfoCarrierOptions(testStore, additionalServices);
-
-        protected abstract DbContext CreateBackendContextInternal(
-            TTestStore testStore,
-            QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll);
-
-        protected static Func<IServiceProvider, TModelSource> GetModelSourceFactory<TModelSource>(
-            Action<ModelBuilder> onModelCreating,
-            Func<TestModelSourceParams, TModelSource> creator)
-            where TModelSource : ModelSource
-            => provider => creator(new TestModelSourceParams(provider, onModelCreating));
-
-        protected class TestModelSourceParams
-        {
-            public TestModelSourceParams(IServiceProvider provider, Action<ModelBuilder> onModelCreating)
-            {
-                this.SetFinder = provider.GetRequiredService<IDbSetFinder>();
-                this.CoreConventionSetBuilder = provider.GetRequiredService<ICoreConventionSetBuilder>();
-                this.ModelCustomizer = new ModelCustomizer();
-                this.ModelCacheKeyFactory = new ModelCacheKeyFactory();
-
-                var testModelSource = new TestModelSource(
-                    onModelCreating,
-                    this.SetFinder,
-                    this.CoreConventionSetBuilder,
-                    new ModelCustomizer(),
-                    new ModelCacheKeyFactory());
-
-                this.GetModel = (context, conventionSetBuilder, modelValidator)
-                    => testModelSource.GetModel(context, conventionSetBuilder, modelValidator);
+                this.sharedStoreLazy = new Lazy<TestStoreImplBase>(this.createTestStore);
             }
-
-            public IDbSetFinder SetFinder { get; }
-
-            public ICoreConventionSetBuilder CoreConventionSetBuilder { get; }
-
-            public IModelCustomizer ModelCustomizer { get; }
-
-            public IModelCacheKeyFactory ModelCacheKeyFactory { get; }
-
-            public Func<DbContext, IConventionSetBuilder, IModelValidator, IModel> GetModel { get; }
         }
 
-        private class TestInfoCarrierModelSource : InfoCarrierModelSource
+        public DbContextOptions BuildInfoCarrierOptions(IInfoCarrierBackend infoCarrierBackend, IServiceCollection additionalServices = null)
         {
-            private readonly TestModelSourceParams testModelSourceParams;
+            IServiceCollection services = additionalServices ?? new ServiceCollection();
+            this.ConfigureInfoCarrierServices(services);
+            return new DbContextOptionsBuilder()
+                .UseInfoCarrierBackend(infoCarrierBackend)
+                .UseInternalServiceProvider(services.BuildServiceProvider())
+                .Options;
+        }
 
-            public TestInfoCarrierModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
+        public IServiceCollection ConfigureInfoCarrierServices(IServiceCollection serviceCollection)
+        {
+            serviceCollection.AddEntityFrameworkInfoCarrierBackend();
+            this.configureInfoCarrierService(serviceCollection);
+            return serviceCollection;
+        }
+
+        public TestStoreBase CreateTestStore()
+            => this.sharedStoreLazy == null
+                ? this.createTestStore()
+                : this.sharedStoreLazy.Value.FromShared();
+
+        public void Dispose()
+        {
+            if (this.sharedStoreLazy?.IsValueCreated == true)
             {
-                this.testModelSourceParams = p;
+                this.sharedStoreLazy.Value.Dispose();
             }
-
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
         }
     }
 }

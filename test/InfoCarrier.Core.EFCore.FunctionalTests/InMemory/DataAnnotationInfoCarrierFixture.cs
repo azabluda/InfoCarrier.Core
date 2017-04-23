@@ -6,25 +6,27 @@
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
-    public class DataAnnotationInfoCarrierFixture : DataAnnotationFixtureBase<TestStore>
+    public class DataAnnotationInfoCarrierFixture : DataAnnotationFixtureBase<TestStoreBase>
     {
-        private readonly InfoCarrierInMemoryTestHelper<DataAnnotationContext> helper;
+        private readonly InfoCarrierTestHelper<DataAnnotationContext> helper;
 
         public DataAnnotationInfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<DataAnnotationContext>.CreateHelper(
                 this.OnModelCreating,
-                (opt, _) => new DataAnnotationContext(opt),
+                opt => new DataAnnotationContext(opt),
+                DataAnnotationModelInitializer.Seed,
+                true,
                 w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
         }
 
         public override ModelValidator ThrowingValidator => new ThrowingModelValidator();
 
-        public override TestStore CreateTestStore()
-            => this.helper.CreateTestStore(DataAnnotationModelInitializer.Seed);
+        public override TestStoreBase CreateTestStore()
+            => this.helper.CreateTestStore();
 
-        public override DataAnnotationContext CreateContext(TestStore testStore)
-            => this.helper.CreateInfoCarrierContext();
+        public override DataAnnotationContext CreateContext(TestStoreBase testStore)
+            => this.helper.CreateInfoCarrierContext(testStore);
 
         private class ThrowingModelValidator : ModelValidator
         {

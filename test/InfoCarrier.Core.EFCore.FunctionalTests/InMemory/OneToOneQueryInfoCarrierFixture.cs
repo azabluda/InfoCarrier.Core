@@ -1,25 +1,30 @@
 namespace InfoCarrier.Core.EFCore.FunctionalTests.InMemory
 {
+    using System;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
-    public class OneToOneQueryInfoCarrierFixture : OneToOneQueryFixtureBase
+    public class OneToOneQueryInfoCarrierFixture : OneToOneQueryFixtureBase, IDisposable
     {
-        private readonly InfoCarrierInMemoryTestHelper<DbContext> helper;
+        private readonly InfoCarrierTestHelper<DbContext> helper;
+        private readonly TestStoreBase testStore;
 
         public OneToOneQueryInfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<DbContext>.CreateHelper(
                 this.OnModelCreating,
-                (opt, _) => new DbContext(opt));
+                opt => new DbContext(opt),
+                AddTestData);
 
-            using (var context = this.helper.CreateBackendContext())
-            {
-                AddTestData(context);
-            }
+            this.testStore = this.helper.CreateTestStore();
         }
 
         public DbContext CreateContext()
-            => this.helper.CreateInfoCarrierContext();
+            => this.helper.CreateInfoCarrierContext(this.testStore);
+
+        public void Dispose()
+        {
+            this.testStore.Dispose();
+        }
     }
 }

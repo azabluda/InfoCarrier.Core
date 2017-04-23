@@ -6,7 +6,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestUtilities.Xunit;
 
     public class GraphUpdatesInfoCarrierTest
-        : GraphUpdatesTestBase<TestStore, GraphUpdatesInfoCarrierTest.GraphUpdatesInfoCarrierFixture>
+        : GraphUpdatesTestBase<TestStoreBase, GraphUpdatesInfoCarrierTest.GraphUpdatesInfoCarrierFixture>
     {
         public GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierFixture fixture)
             : base(fixture)
@@ -177,21 +177,23 @@
 
         public class GraphUpdatesInfoCarrierFixture : GraphUpdatesFixtureBase
         {
-            private readonly InfoCarrierInMemoryTestHelper<GraphUpdatesContext> helper;
+            private readonly InfoCarrierTestHelper<GraphUpdatesContext> helper;
 
             public GraphUpdatesInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<GraphUpdatesContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new GraphUpdatesContext(opt),
+                    opt => new GraphUpdatesContext(opt),
+                    this.Seed,
+                    false,
                     w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             }
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(this.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override DbContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override DbContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
         }
     }
 }

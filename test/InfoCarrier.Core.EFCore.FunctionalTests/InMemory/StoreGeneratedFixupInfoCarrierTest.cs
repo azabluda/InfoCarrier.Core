@@ -5,7 +5,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class StoreGeneratedFixupInfoCarrierTest
-        : StoreGeneratedFixupTestBase<TestStore, StoreGeneratedFixupInfoCarrierTest.StoreGeneratedFixupInfoCarrierFixture>
+        : StoreGeneratedFixupTestBase<TestStoreBase, StoreGeneratedFixupInfoCarrierTest.StoreGeneratedFixupInfoCarrierFixture>
     {
         public StoreGeneratedFixupInfoCarrierTest(StoreGeneratedFixupInfoCarrierFixture fixture)
             : base(fixture)
@@ -16,21 +16,23 @@
 
         public class StoreGeneratedFixupInfoCarrierFixture : StoreGeneratedFixupFixtureBase
         {
-            private readonly InfoCarrierInMemoryTestHelper<StoreGeneratedFixupContext> helper;
+            private readonly InfoCarrierTestHelper<StoreGeneratedFixupContext> helper;
 
             public StoreGeneratedFixupInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<StoreGeneratedFixupContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new StoreGeneratedFixupContext(opt),
+                    opt => new StoreGeneratedFixupContext(opt),
+                    this.Seed,
+                    false,
                     w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             }
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(this.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override DbContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override DbContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
             {

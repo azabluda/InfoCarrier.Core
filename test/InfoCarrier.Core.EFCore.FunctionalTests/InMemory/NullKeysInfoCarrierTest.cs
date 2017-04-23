@@ -1,5 +1,6 @@
 namespace InfoCarrier.Core.EFCore.FunctionalTests.InMemory
 {
+    using System;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
@@ -10,21 +11,28 @@ namespace InfoCarrier.Core.EFCore.FunctionalTests.InMemory
         {
         }
 
-        public class NullKeysInfoCarrierFixture : NullKeysFixtureBase
+        public class NullKeysInfoCarrierFixture : NullKeysFixtureBase, IDisposable
         {
-            private readonly InfoCarrierInMemoryTestHelper<DbContext> helper;
+            private readonly InfoCarrierTestHelper<DbContext> helper;
+            private readonly TestStoreBase testStore;
 
             public NullKeysInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<DbContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new DbContext(opt));
+                    opt => new DbContext(opt),
+                    _ => this.EnsureCreated());
 
-                this.EnsureCreated();
+                this.testStore = this.helper.CreateTestStore();
             }
 
             public override DbContext CreateContext()
-                => this.helper.CreateInfoCarrierContext();
+                => this.helper.CreateInfoCarrierContext(this.testStore);
+
+            public void Dispose()
+            {
+                this.testStore.Dispose();
+            }
         }
     }
 }

@@ -4,7 +4,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class LoadInfoCarrierTest
-        : LoadTestBase<TestStore, LoadInfoCarrierTest.LoadInfoCarrierFixture>
+        : LoadTestBase<TestStoreBase, LoadInfoCarrierTest.LoadInfoCarrierFixture>
     {
         public LoadInfoCarrierTest(LoadInfoCarrierFixture fixture)
             : base(fixture)
@@ -13,20 +13,21 @@
 
         public class LoadInfoCarrierFixture : LoadFixtureBase
         {
-            private readonly InfoCarrierInMemoryTestHelper<LoadContext> helper;
+            private readonly InfoCarrierTestHelper<LoadContext> helper;
 
             public LoadInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<LoadContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new LoadContext(opt));
+                    opt => new LoadContext(opt),
+                    this.Seed);
             }
 
-            public override DbContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override DbContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(this.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
         }
     }
 }

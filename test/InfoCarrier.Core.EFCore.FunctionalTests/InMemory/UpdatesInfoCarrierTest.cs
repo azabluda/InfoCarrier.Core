@@ -3,7 +3,7 @@
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
-    public class UpdatesInfoCarrierTest : UpdatesTestBase<UpdatesInfoCarrierFixture, TestStore>
+    public class UpdatesInfoCarrierTest : UpdatesTestBase<UpdatesInfoCarrierFixture, TestStoreBase>
     {
         public UpdatesInfoCarrierTest(UpdatesInfoCarrierFixture fixture)
             : base(fixture)

@@ -4,29 +4,30 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.InheritanceRelationships;
 
     public class InheritanceRelationshipsQueryInfoCarrierTest
-        : InheritanceRelationshipsQueryTestBase<TestStore, InheritanceRelationshipsQueryInfoCarrierTest.InheritanceRelationshipsQueryInfoCarrierFixture>
+        : InheritanceRelationshipsQueryTestBase<TestStoreBase, InheritanceRelationshipsQueryInfoCarrierTest.InheritanceRelationshipsQueryInfoCarrierFixture>
     {
         public InheritanceRelationshipsQueryInfoCarrierTest(InheritanceRelationshipsQueryInfoCarrierFixture fixture)
             : base(fixture)
         {
         }
 
-        public class InheritanceRelationshipsQueryInfoCarrierFixture : InheritanceRelationshipsQueryFixtureBase<TestStore>
+        public class InheritanceRelationshipsQueryInfoCarrierFixture : InheritanceRelationshipsQueryFixtureBase<TestStoreBase>
         {
-            private readonly InfoCarrierInMemoryTestHelper<InheritanceRelationshipsContext> helper;
+            private readonly InfoCarrierTestHelper<InheritanceRelationshipsContext> helper;
 
             public InheritanceRelationshipsQueryInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<InheritanceRelationshipsContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new InheritanceRelationshipsContext(opt));
+                    opt => new InheritanceRelationshipsContext(opt),
+                    InheritanceRelationshipsModelInitializer.Seed);
             }
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(InheritanceRelationshipsModelInitializer.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override InheritanceRelationshipsContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override InheritanceRelationshipsContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
         }
     }
 }

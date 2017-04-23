@@ -3,7 +3,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Xunit;
 
-    public class ComplexNavigationsQueryInfoCarrierTest : ComplexNavigationsQueryTestBase<TestStore, ComplexNavigationsQueryInfoCarrierFixture>
+    public class ComplexNavigationsQueryInfoCarrierTest : ComplexNavigationsQueryTestBase<TestStoreBase, ComplexNavigationsQueryInfoCarrierFixture>
     {
         public ComplexNavigationsQueryInfoCarrierTest(ComplexNavigationsQueryInfoCarrierFixture fixture)
             : base(fixture)

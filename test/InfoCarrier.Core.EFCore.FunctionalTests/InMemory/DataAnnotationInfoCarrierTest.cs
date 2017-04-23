@@ -4,7 +4,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Xunit;
 
-    public class DataAnnotationInfoCarrierTest : DataAnnotationTestBase<TestStore, DataAnnotationInfoCarrierFixture>
+    public class DataAnnotationInfoCarrierTest : DataAnnotationTestBase<TestStoreBase, DataAnnotationInfoCarrierFixture>
     {
         public DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierFixture fixture)
             : base(fixture)

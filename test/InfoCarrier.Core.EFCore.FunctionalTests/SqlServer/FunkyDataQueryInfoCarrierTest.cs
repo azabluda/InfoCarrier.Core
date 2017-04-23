@@ -1,40 +1,35 @@
 ﻿namespace InfoCarrier.Core.EFCore.FunctionalTests.SqlServer
 {
-    using System;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.FunkyDataModel;
 
     public class FunkyDataQueryInfoCarrierTest
-        : FunkyDataQueryTestBase<SqlServerTestStore, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
+        : FunkyDataQueryTestBase<TestStoreBase, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
     {
         public FunkyDataQueryInfoCarrierTest(FunkyDataQueryInfoCarrierFixture fixture)
             : base(fixture)
         {
         }
 
-        public class FunkyDataQueryInfoCarrierFixture : FunkyDataQueryFixtureBase<SqlServerTestStore>,
-            IDisposable
+        public class FunkyDataQueryInfoCarrierFixture : FunkyDataQueryFixtureBase<TestStoreBase>
         {
-            private readonly InfoCarrierSqlServerTestHelper<FunkyDataContext> helper;
+            private readonly InfoCarrierTestHelper<FunkyDataContext> helper;
 
             public FunkyDataQueryInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateSqlServer(
-                    "FunkyDataQueryTest",
+                this.helper = SqlServerTestStore<FunkyDataContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new FunkyDataContext(opt));
+                    opt => new FunkyDataContext(opt),
+                    FunkyDataModelInitializer.Seed,
+                    true,
+                    "FunkyDataQueryTest");
             }
 
-            public override SqlServerTestStore CreateTestStore()
-                => this.helper.CreateTestStore(FunkyDataModelInitializer.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override FunkyDataContext CreateContext(SqlServerTestStore testStore)
+            public override FunkyDataContext CreateContext(TestStoreBase testStore)
                 => this.helper.CreateInfoCarrierContext(testStore);
-
-            public void Dispose()
-            {
-                this.helper.Dispose();
-            }
         }
     }
 }

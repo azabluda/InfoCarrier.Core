@@ -4,7 +4,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class PropertyValuesInfoCarrierTest
-        : PropertyValuesTestBase<TestStore, PropertyValuesInfoCarrierTest.PropertyValuesInfoCarrierFixture>
+        : PropertyValuesTestBase<TestStoreBase, PropertyValuesInfoCarrierTest.PropertyValuesInfoCarrierFixture>
     {
         public PropertyValuesInfoCarrierTest(PropertyValuesInfoCarrierFixture fixture)
             : base(fixture)
@@ -13,20 +13,21 @@
 
         public class PropertyValuesInfoCarrierFixture : PropertyValuesFixtureBase
         {
-            private readonly InfoCarrierInMemoryTestHelper<AdvancedPatternsMasterContext> helper;
+            private readonly InfoCarrierTestHelper<AdvancedPatternsMasterContext> helper;
 
             public PropertyValuesInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<AdvancedPatternsMasterContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new AdvancedPatternsMasterContext(opt));
+                    opt => new AdvancedPatternsMasterContext(opt),
+                    this.Seed);
             }
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(this.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override DbContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override DbContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
         }
     }
 }

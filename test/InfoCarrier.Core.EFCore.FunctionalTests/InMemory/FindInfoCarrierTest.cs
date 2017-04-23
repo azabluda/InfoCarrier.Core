@@ -5,7 +5,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public abstract class FindInfoCarrierTest
-        : FindTestBase<TestStore, FindInfoCarrierTest.FindInfoCarrierFixture>
+        : FindTestBase<TestStoreBase, FindInfoCarrierTest.FindInfoCarrierFixture>
     {
         protected FindInfoCarrierTest(FindInfoCarrierFixture fixture)
             : base(fixture)
@@ -56,20 +56,21 @@
 
         public class FindInfoCarrierFixture : FindFixtureBase
         {
-            private readonly InfoCarrierInMemoryTestHelper<FindContext> helper;
+            private readonly InfoCarrierTestHelper<FindContext> helper;
 
             public FindInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<FindContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new FindContext(opt));
+                    opt => new FindContext(opt),
+                    this.Seed);
             }
 
-            public override DbContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override DbContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(this.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
         }
     }
 }

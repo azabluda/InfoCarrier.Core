@@ -4,7 +4,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class StoreGeneratedInfoCarrierTest
-        : StoreGeneratedTestBase<SqlServerTestStore, StoreGeneratedInfoCarrierTest.StoreGeneratedInfoCarrierFixture>
+        : StoreGeneratedTestBase<TestStoreBase, StoreGeneratedInfoCarrierTest.StoreGeneratedInfoCarrierFixture>
     {
         public StoreGeneratedInfoCarrierTest(StoreGeneratedInfoCarrierFixture fixture)
             : base(fixture)
@@ -13,20 +13,22 @@
 
         public class StoreGeneratedInfoCarrierFixture : StoreGeneratedFixtureBase
         {
-            private readonly InfoCarrierSqlServerTestHelper<StoreGeneratedContext> helper;
+            private readonly InfoCarrierTestHelper<StoreGeneratedContext> helper;
 
             public StoreGeneratedInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateSqlServer(
-                    "StoreGeneratedTest",
+                this.helper = SqlServerTestStore<StoreGeneratedContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new StoreGeneratedContext(opt));
+                    opt => new StoreGeneratedContext(opt),
+                    _ => { },
+                    true,
+                    "StoreGeneratedTest");
             }
 
-            public override SqlServerTestStore CreateTestStore()
-                => this.helper.CreateTestStore(_ => { });
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
 
-            public override DbContext CreateContext(SqlServerTestStore testStore)
+            public override DbContext CreateContext(TestStoreBase testStore)
                 => this.helper.CreateInfoCarrierContext(testStore);
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)

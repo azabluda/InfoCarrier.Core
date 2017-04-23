@@ -4,23 +4,24 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.GearsOfWarModel;
 
-    public class GearsOfWarQueryInfoCarrierFixture : GearsOfWarQueryFixtureBase<TestStore>
+    public class GearsOfWarQueryInfoCarrierFixture : GearsOfWarQueryFixtureBase<TestStoreBase>
     {
-        private readonly InfoCarrierInMemoryTestHelper<GearsOfWarContext> helper;
+        private readonly InfoCarrierTestHelper<GearsOfWarContext> helper;
 
         public GearsOfWarQueryInfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<GearsOfWarContext>.CreateHelper(
                 this.OnModelCreating,
-                (opt, _) => new GearsOfWarContext(opt));
+                opt => new GearsOfWarContext(opt),
+                GearsOfWarModelInitializer.Seed);
         }
 
-        public override TestStore CreateTestStore()
-            => this.helper.CreateTestStore(GearsOfWarModelInitializer.Seed, true);
+        public override TestStoreBase CreateTestStore()
+            => this.helper.CreateTestStore();
 
-        public override GearsOfWarContext CreateContext(TestStore testStore)
+        public override GearsOfWarContext CreateContext(TestStoreBase testStore)
         {
-            var context = this.helper.CreateInfoCarrierContext();
+            var context = this.helper.CreateInfoCarrierContext(testStore);
 
             context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 

@@ -2,19 +2,21 @@
 {
     using System;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Storage.Internal;
 
     public class BuiltInDataTypesInfoCarrierFixture : BuiltInDataTypesFixtureBase
     {
-        private readonly InfoCarrierInMemoryTestHelper<DbContext> helper;
+        private readonly InfoCarrierTestHelper<DbContext> helper;
+        private readonly TestStoreBase testStore;
 
         public BuiltInDataTypesInfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<DbContext>.CreateHelper(
                 this.OnModelCreating,
-                (opt, _) => new DbContext(opt));
+                opt => new DbContext(opt),
+                _ => { });
+
+            this.testStore = this.helper.CreateTestStore();
         }
 
         public override bool SupportsBinaryKeys
@@ -24,15 +26,11 @@
             => default(DateTime);
 
         public override DbContext CreateContext()
-            => this.helper.CreateInfoCarrierContext();
+            => this.helper.CreateInfoCarrierContext(this.testStore);
 
         public override void Dispose()
         {
-            using (var context = this.helper.CreateBackendContext())
-            {
-                var storeSource = context.GetService<IInMemoryStoreSource>();
-                storeSource.GetGlobalStore().Clear();
-            }
+            this.testStore.Dispose();
         }
     }
 }

@@ -5,7 +5,7 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class FieldMappingInfoCarrierTest
-        : FieldMappingTestBase<TestStore, FieldMappingInfoCarrierTest.FieldMappingInfoCarrierFixture>
+        : FieldMappingTestBase<TestStoreBase, FieldMappingInfoCarrierTest.FieldMappingInfoCarrierFixture>
     {
         public FieldMappingInfoCarrierTest(FieldMappingInfoCarrierFixture fixture)
             : base(fixture)
@@ -14,21 +14,23 @@
 
         public class FieldMappingInfoCarrierFixture : FieldMappingFixtureBase
         {
-            private readonly InfoCarrierInMemoryTestHelper<FieldMappingContext> helper;
+            private readonly InfoCarrierTestHelper<FieldMappingContext> helper;
 
             public FieldMappingInfoCarrierFixture()
             {
-                this.helper = InfoCarrierTestHelper.CreateInMemory(
+                this.helper = InMemoryTestStore<FieldMappingContext>.CreateHelper(
                     this.OnModelCreating,
-                    (opt, _) => new FieldMappingContext(opt),
+                    opt => new FieldMappingContext(opt),
+                    this.Seed,
+                    false,
                     w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             }
 
-            public override DbContext CreateContext(TestStore testStore)
-                => this.helper.CreateInfoCarrierContext();
+            public override DbContext CreateContext(TestStoreBase testStore)
+                => this.helper.CreateInfoCarrierContext(testStore);
 
-            public override TestStore CreateTestStore()
-                => this.helper.CreateTestStore(this.Seed);
+            public override TestStoreBase CreateTestStore()
+                => this.helper.CreateTestStore();
         }
     }
 }

@@ -3,21 +3,22 @@
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ConcurrencyModel;
 
-    public class F1InfoCarrierFixture : F1FixtureBase<TestStore>
+    public class F1InfoCarrierFixture : F1FixtureBase<TestStoreBase>
     {
-        private readonly InfoCarrierInMemoryTestHelper<F1Context> helper;
+        private readonly InfoCarrierTestHelper<F1Context> helper;
 
         public F1InfoCarrierFixture()
         {
-            this.helper = InfoCarrierTestHelper.CreateInMemory(
+            this.helper = InMemoryTestStore<F1Context>.CreateHelper(
                 this.OnModelCreating,
-                (opt, _) => new F1Context(opt));
+                opt => new F1Context(opt),
+                ConcurrencyModelInitializer.Seed);
         }
 
-        public override F1Context CreateContext(TestStore testStore)
-            => this.helper.CreateInfoCarrierContext();
+        public override F1Context CreateContext(TestStoreBase testStore)
+            => this.helper.CreateInfoCarrierContext(testStore);
 
-        public override TestStore CreateTestStore()
-            => this.helper.CreateTestStore(ConcurrencyModelInitializer.Seed);
+        public override TestStoreBase CreateTestStore()
+            => this.helper.CreateTestStore();
     }
 }
