@@ -6,6 +6,7 @@
     using Aqua.Dynamic;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
+    using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Update;
 
@@ -47,6 +48,14 @@
                 join dto in this.PropertyDatas
                 on ef.Metadata.Name equals dto.Name
                 select new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
+        }
+
+        public IList<object> GetCurrentValues(IEntityType entityType)
+        {
+            return entityType
+                .GetProperties()
+                .Select(p => this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValue)
+                .ToList();
         }
 
         public struct JoinedProperty

@@ -9,6 +9,7 @@
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
+    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
 
     public class SaveChangesHelper : IDisposable
@@ -20,11 +21,13 @@
             this.dbContext = dbContextFactory();
 
             // Materialize entities
+            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
             var entities = new List<object>(request.DataTransferObjects.Count);
             foreach (UpdateEntryDto dto in request.DataTransferObjects)
             {
                 IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
-                object entity = Activator.CreateInstance(entityType.ClrType);
+                var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
+                object entity = entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
                 entities.Add(entity);
             }
 
