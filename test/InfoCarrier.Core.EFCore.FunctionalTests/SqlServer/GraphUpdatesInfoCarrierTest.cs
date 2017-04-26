@@ -22,7 +22,7 @@
                     opt => new GraphUpdatesContext(opt),
                     this.Seed,
                     true,
-                    "GraphIdentityUpdatesTest");
+                    "GraphSequenceUpdatesTest");
             }
 
             public override TestStoreBase CreateTestStore()
@@ -33,7 +33,7 @@
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
-                modelBuilder.ForSqlServerUseIdentityColumns(); // ensure model uses identity
+                modelBuilder.ForSqlServerUseSequenceHiLo(); // ensure model uses sequences
 
                 base.OnModelCreating(modelBuilder);
             }
