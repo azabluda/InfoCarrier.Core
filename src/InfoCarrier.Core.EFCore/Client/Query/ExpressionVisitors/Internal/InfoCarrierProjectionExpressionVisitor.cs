@@ -4,6 +4,7 @@
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Common;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Query.Internal;
@@ -36,7 +37,7 @@
                     InfoCarrierQueryableLinqOperatorProvider.Instance.OrderBy
                         .MakeGenericMethod(elementType, typeof(object)),
                     subExpression,
-                    MethodInfoExtensions.GetMethodInfo(() => GetDummyOrderBy<object>())
+                    Utils.GetMethodInfo(() => GetDummyOrderBy<object>())
                         .GetGenericMethodDefinition()
                         .MakeGenericMethod(elementType)
                         .ToDelegate<Func<Expression>>()

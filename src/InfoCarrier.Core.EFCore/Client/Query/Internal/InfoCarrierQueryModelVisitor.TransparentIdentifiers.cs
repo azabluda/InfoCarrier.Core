@@ -4,6 +4,7 @@
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Common;
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
 
@@ -14,7 +15,7 @@
 
         private static Type GetTransparentIdentifierType(Type outer, Type inner)
         {
-            return MethodInfoExtensions.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
+            return Utils.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
                 .GetGenericMethodDefinition()
                 .MakeGenericMethod(outer, inner)
                 .ToDelegate<Func<Type>>()

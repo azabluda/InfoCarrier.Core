@@ -9,8 +9,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Threading;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
+    using Common;
     using ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -26,7 +28,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remotion.Linq.Clauses;
     using Remotion.Linq.Clauses.Expressions;
     using ExpressionVisitorBase = Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase;
-    using MIE = Microsoft.EntityFrameworkCore.Extensions.Internal.MethodInfoExtensions;
 
     public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
@@ -84,7 +85,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.Expression != null
             && this.Expression.Type.GetGenericTypeImplementations(typeof(IAsyncEnumerable<>)).Any();
 
-        internal virtual InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
+        private InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
             this.ExpressionIsQueryable
                 ? InfoCarrierQueryableLinqOperatorProvider.Instance
                 : InfoCarrierEnumerableLinqOperatorProvider.Instance;
@@ -101,7 +102,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // CreateAsyncQueryExecutor requires the expression type to be generic
             // which is not the case since we are building synchronous LINQ expressions
             // even for async queries.
-            // UGLY: apply ToSequence wrapper to the expression
+            // UGLY: apply dummy ToSequence wrapper to the expression
             if (this.isRoot && ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async)
             {
                 this.Expression
@@ -113,9 +114,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
         {
-            // UGLY: unapply ToSequence wrapper temporarily added in VisitQueryModel
+            // UGLY: unapply dummy ToSequence wrapper temporarily added in VisitQueryModel
             if (this.Expression is MethodCallExpression mc
-                && MIE.MethodIsClosedFormOf(mc.Method, this.LinqOperatorProvider.ToSequence))
+                && mc.Method.MethodIsClosedFormOf(this.LinqOperatorProvider.ToSequence))
             {
                 this.Expression = mc.Arguments.Single();
             }
@@ -151,7 +152,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             Expression linqExpression = this.Expression;
             if (linqExpression is MethodCallExpression call)
             {
-                if (MIE.MethodIsClosedFormOf(call.Method, this.LinqOperatorProvider.ToSequence))
+                if (call.Method.MethodIsClosedFormOf(this.LinqOperatorProvider.ToSequence))
                 {
                     linqExpression = call.Arguments.Single();
                 }
@@ -160,10 +161,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // Replace ToSequence with ExecuteQuery
             MethodInfo execQueryMethod =
                 ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
-                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
-                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null));
+                    ? Utils.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
+                    : Utils.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null));
 
-            Type resultType = Server.QueryDataHelper.GetSequenceType(linqExpression.Type, linqExpression.Type);
+            Type resultType = Utils.TryGetQueryResultSequenceType(linqExpression.Type) ?? linqExpression.Type;
 
             this.Expression
                 = Expression.Call(
@@ -432,7 +433,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     // Convert subquery back to ICollection (in this case to List)
                     // instead of wrapping into MaterializeCollectionNavigation method call.
                     return (TResult)(object)Expression.Call(
-                        MethodInfoExtensions.GetMethodInfo(() => Enumerable.ToList<object>(null))
+                        Utils.GetMethodInfo(() => Enumerable.ToList<object>(null))
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(subqueryExpression.Type.GenericTypeArguments),
                         subqueryExpression);
@@ -477,8 +478,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .Visit(expression);
 
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
-                expression = new ReplaceNullConditionalExpressionVisitor(true)
-                    .Visit(expression);
+                expression = Utils.ReplaceNullConditional(expression, true);
 
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 this.rlinq = expression
@@ -532,7 +532,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 // is targetType a collection?
-                Type elementType = Server.QueryDataHelper.GetSequenceType(targetType, null);
+                Type elementType = Utils.TryGetQueryResultSequenceType(targetType);
                 if (elementType == null)
                 {
                     return baseImpl();
@@ -642,7 +642,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 key = this.MapFromDynamicObjectGraph(key, keyType);
                 elements = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
 
-                grouping = MethodInfoExtensions.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
+                grouping = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition()
                     .MakeGenericMethod(keyType, elementType)
                     .Invoke(null, new[] { key, elements });
@@ -745,11 +745,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return maybeInlineEntityProperty;
                     }
 
-                    if (MIE.MethodIsClosedFormOf(node.Method, DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
+                    if (node.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
                     {
                         Type paramType = node.Method.GetGenericArguments().Single();
                         object paramValue =
-                            InfoCarrier.Core.MethodInfoExtensions.GetMethodInfo(() => this.GetParameterValue<object>(node))
+                            Utils.GetMethodInfo(() => this.GetParameterValue<object>(node))
                                 .GetGenericMethodDefinition()
                                 .MakeGenericMethod(paramType)
                                 .ToDelegate<Func<MethodCallExpression, object>>(this)
@@ -787,7 +787,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                                 return maybeConstant.Value;
 
                             case MethodCallExpression maybeMethodCall
-                            when MIE.MethodIsClosedFormOf(maybeMethodCall.Method, DefaultQueryExpressionVisitor.GetParameterValueMethodInfo):
+                            when maybeMethodCall.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo):
                                 return
                                     Expression.Lambda<Func<QueryContext, object>>(maybeMethodCall, EntityQueryModelVisitor.QueryContextParameter)
                                         .Compile()
@@ -811,7 +811,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     object paramValue =
-                        InfoCarrier.Core.MethodInfoExtensions.GetMethodInfo(() => Wrap<object>(null))
+                        Utils.GetMethodInfo(() => Wrap<object>(null))
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(efProperty.ClrType)
                             .Invoke(null, new object[] { efProperty.GetGetter().GetClrValue(entity) });
@@ -851,10 +851,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private readonly Expression accessorExpression;
             private readonly bool useString;
 
-            private static readonly MethodInfo OfTypeMethodInfo
-                = typeof(Enumerable).GetTypeInfo()
-                    .GetDeclaredMethod(nameof(Enumerable.OfType));
-
             public IncludeExpressionVisitor(
                 ILinqOperatorProvider linqOperatorProvider,
                 IncludeSpecification includeSpecification,
@@ -881,7 +877,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private bool IsMatchingSelect(MethodCallExpression node)
             {
-                if (!MIE.MethodIsClosedFormOf(node.Method, this.linqOperatorProvider.Select))
+                if (!node.Method.MethodIsClosedFormOf(this.linqOperatorProvider.Select))
                 {
                     return false;
                 }
@@ -923,7 +919,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     if (this.useString)
                     {
                         return Expression.Call(
-                            MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
+                            Utils.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
                                 .GetGenericMethodDefinition()
                                 .MakeGenericMethod(entityType),
                             node,
@@ -937,7 +933,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     MethodCallExpression result = Expression.Call(
-                        MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
+                        Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(entityType, iNav.Current.ClrType),
                         node,
@@ -947,9 +943,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     {
                         MethodInfo miThenInclude =
                             prev.IsCollection()
-                                ? MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
+                                ? Utils.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
                                     x => x.ThenInclude<object, object, object>(null))
-                                : MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, object>>(
+                                : Utils.GetMethodInfo<IIncludableQueryable<object, object>>(
                                     x => x.ThenInclude<object, object, object>(null));
 
                         Type prevType = prev.GetTargetType().ClrType;

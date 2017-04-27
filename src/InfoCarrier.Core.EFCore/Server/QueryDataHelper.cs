@@ -8,6 +8,7 @@
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
+    using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
@@ -36,7 +37,7 @@
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
                     provider: type =>
-                        MethodInfoExtensions.GetMethodInfo(() => this.dbContext.Set<object>())
+                        Utils.GetMethodInfo(() => this.dbContext.Set<object>())
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(type)
                             .ToDelegate<Func<IQueryable>>(this.dbContext)
@@ -46,33 +47,10 @@
             this.linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(this.linqExpression);
 
             // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
-            this.linqExpression = new ReplaceNullConditionalExpressionVisitor(false).Visit(this.linqExpression);
+            this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
         internal static string EntityTypeNameTag { get; } = "__EntityType";
-
-        internal static Type GetSequenceType(Type type, Type ifNotSequence)
-        {
-            // Despite formally a string is a sequence of chars, we treat it as a scalar type
-            if (type == typeof(string))
-            {
-                return ifNotSequence;
-            }
-
-            // Arrays is another special case
-            if (type.IsArray)
-            {
-                return ifNotSequence;
-            }
-
-            // Grouping is another special case
-            if (type.IsGrouping())
-            {
-                return ifNotSequence;
-            }
-
-            return type.TryGetSequenceType() ?? ifNotSequence;
-        }
 
         public IEnumerable<DynamicObject> QueryData()
         {
@@ -88,7 +66,7 @@
 
             if (queryResult is IEnumerable enumerable)
             {
-                if (GetSequenceType(resultType, null) != null)
+                if (Utils.TryGetQueryResultSequenceType(resultType) != null)
                 {
                     // TRICKY: sometimes EF returns enumerable result as ExceptionInterceptor<T> which
                     // isn't fully ready for mapping to DynamicObjects (some complex self-referencing navigation
@@ -107,7 +85,7 @@
 
         public async Task<IEnumerable<DynamicObject>> QueryDataAsync()
         {
-            Type elementType = GetSequenceType(this.linqExpression.Type, this.linqExpression.Type);
+            Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
 
             object queryResult = await typeof(QueryDataHelper).GetTypeInfo()
                 .GetDeclaredMethod(nameof(this.ExecuteExpressionAsync))
@@ -197,7 +175,7 @@
                 foreach (var groupingType in objType.GetGenericTypeImplementations(typeof(IGrouping<,>)))
                 {
                     object mappedGrouping =
-                        MethodInfoExtensions.GetMethodInfo(() => this.MapGrouping<object, object>(null, null))
+                        Utils.GetMethodInfo(() => this.MapGrouping<object, object>(null, null))
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(groupingType.GenericTypeArguments)
                             .Invoke(this, new[] { obj, setTypeInformation });
@@ -245,10 +223,10 @@
         private class FixIncludeVisitor : ExpressionVisitorBase
         {
             private static readonly System.Reflection.MethodInfo QfIncludeMethod =
-                MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null)).GetGenericMethodDefinition();
+                Utils.GetMethodInfo(() => QueryFunctions.Include<object>(null, null)).GetGenericMethodDefinition();
 
             private static readonly System.Reflection.MethodInfo EfIncludeMethod =
-                MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null)).GetGenericMethodDefinition();
+                Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null)).GetGenericMethodDefinition();
 
             internal System.Linq.Expressions.Expression ReplaceRlinqIncludes(System.Linq.Expressions.Expression expression)
             {

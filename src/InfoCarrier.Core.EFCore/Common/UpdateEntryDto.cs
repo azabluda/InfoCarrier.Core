@@ -82,15 +82,15 @@
             [DataMember]
             private DynamicObject OriginalValueDto
             {
-                get { return Mapper.MapObject(this.OriginalValue); }
-                set { this.OriginalValue = Mapper.Map(value); }
+                get => Mapper.MapObject(this.OriginalValue);
+                set => this.OriginalValue = Mapper.Map(value);
             }
 
             [DataMember]
             private DynamicObject CurrentValueDto
             {
-                get { return Mapper.MapObject(this.CurrentValue); }
-                set { this.CurrentValue = Mapper.Map(value); }
+                get => Mapper.MapObject(this.CurrentValue);
+                set => this.CurrentValue = Mapper.Map(value);
             }
 
             [DataMember]
