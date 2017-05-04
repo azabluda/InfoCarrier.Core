@@ -11,9 +11,10 @@
     <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <RootNamespace>InfoCarrier.Core</RootNamespace>
   </PropertyGroup>
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="&quot;$(ProjectDir)..\..\tools\GitVersion.CommandLine.3.6.5\tools\GitVersion.exe&quot; /updateassemblyinfo &quot;$(ProjectDir)obj\GitVersionTaskAssemblyInfo.g.cs&quot; /ensureassemblyinfo" />
+    <Exec Command="&quot;$(ProjectDir)..\..\tools\GitVersion.CommandLine\tools\GitVersion.exe&quot; /updateassemblyinfo &quot;$(ProjectDir)obj\GitVersionTaskAssemblyInfo.g.cs&quot; /ensureassemblyinfo" />
   </Target>  
   <ItemGroup>
     <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />

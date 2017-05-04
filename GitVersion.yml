@@ -1,5 +1,5 @@
-next-version: 0.2.0
-mode: ContinuousDeployment
-branches: {}
-ignore:
-  sha: []
+next-version: 1.0.0-dev
+
+branches:
+  develop:
+    tracks-release-branches: false

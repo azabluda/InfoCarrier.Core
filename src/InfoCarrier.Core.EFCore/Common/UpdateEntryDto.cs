@@ -6,6 +6,7 @@
     using Aqua.Dynamic;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
+    using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Update;
 
@@ -23,6 +24,7 @@
             this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
                 {
+                    Name = prop.Metadata.Name,
                     OriginalValue = prop.Metadata.GetOriginalValueIndex() >= 0 ? prop.OriginalValue : null,
                     CurrentValue = prop.CurrentValue,
                     IsModified = prop.IsModified,
@@ -41,9 +43,19 @@
 
         public IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
         {
-            return entry.Properties.Zip(
-                this.PropertyDatas,
-                (ef, dto) => new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
+            return (
+                from ef in entry.Properties
+                join dto in this.PropertyDatas
+                on ef.Metadata.Name equals dto.Name
+                select new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
+        }
+
+        public IList<object> GetCurrentValues(IEntityType entityType)
+        {
+            return entityType
+                .GetProperties()
+                .Select(p => this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValue)
+                .ToList();
         }
 
         public struct JoinedProperty
@@ -58,6 +70,9 @@
             private static readonly DynamicObjectMapper Mapper
                 = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true });
 
+            [DataMember]
+            public string Name { get; set; }
+
             [IgnoreDataMember]
             public object OriginalValue { get; set; }
 
@@ -67,15 +82,15 @@
             [DataMember]
             private DynamicObject OriginalValueDto
             {
-                get { return Mapper.MapObject(this.OriginalValue); }
-                set { this.OriginalValue = Mapper.Map(value); }
+                get => Mapper.MapObject(this.OriginalValue);
+                set => this.OriginalValue = Mapper.Map(value);
             }
 
             [DataMember]
             private DynamicObject CurrentValueDto
             {
-                get { return Mapper.MapObject(this.CurrentValue); }
-                set { this.CurrentValue = Mapper.Map(value); }
+                get => Mapper.MapObject(this.CurrentValue);
+                set => this.CurrentValue = Mapper.Map(value);
             }
 
             [DataMember]

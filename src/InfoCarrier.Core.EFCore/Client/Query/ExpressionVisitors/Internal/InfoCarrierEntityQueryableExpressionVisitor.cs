@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     using System.Collections.Generic;
     using System.Linq;
     using System.Linq.Expressions;
+    using Common;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Remote.Linq;
@@ -24,7 +25,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitEntityQueryable(Type elementType)
         {
-            IQueryable stub = MethodInfoExtensions.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
+            IQueryable stub = Utils.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
                 .GetGenericMethodDefinition()
                 .MakeGenericMethod(elementType)
                 .ToDelegate<Func<IQuerySource, IQueryable>>()
@@ -44,13 +45,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
             public abstract Type ElementType { get; }
 
-            protected static dynamic NotImplemented
-            {
-                get
-                {
-                    throw new NotImplementedException();
-                }
-            }
+            protected static dynamic NotImplemented => throw new NotImplementedException();
 
             public Expression Expression => NotImplemented;
 

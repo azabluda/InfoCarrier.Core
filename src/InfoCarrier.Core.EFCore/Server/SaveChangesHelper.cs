@@ -6,10 +6,13 @@
     using System.Threading.Tasks;
     using Common;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
+    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
+    using Microsoft.EntityFrameworkCore.ValueGeneration;
 
     public class SaveChangesHelper : IDisposable
     {
@@ -20,11 +23,13 @@
             this.dbContext = dbContextFactory();
 
             // Materialize entities
+            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
             var entities = new List<object>(request.DataTransferObjects.Count);
             foreach (UpdateEntryDto dto in request.DataTransferObjects)
             {
                 IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
-                object entity = Activator.CreateInstance(entityType.ClrType);
+                var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
+                object entity = entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
                 entities.Add(entity);
             }
 
@@ -74,6 +79,25 @@
 
                         entries.Add(node.Entry.GetInfrastructure());
                     });
+            }
+
+            // Replace temporary PKs coming from client with generated values (e.g. HiLoSequence)
+            var valueGeneratorSelector = this.dbContext.GetService<IValueGeneratorSelector>();
+            foreach (EntityEntry entry in entries.Select(e => e.ToEntityEntry()))
+            {
+                foreach (PropertyEntry tempPk in
+                    entry.Properties.Where(p =>
+                        p.IsTemporary
+                        && p.Metadata.IsKey()
+                        && p.Metadata.RequiresValueGenerator).ToList())
+                {
+                    ValueGenerator valueGenerator = valueGeneratorSelector.Select(tempPk.Metadata, entry.Metadata);
+                    if (!valueGenerator.GeneratesTemporaryValues)
+                    {
+                        tempPk.CurrentValue = valueGenerator.Next(entry);
+                        tempPk.IsTemporary = false;
+                    }
+                }
             }
 
             this.Entries = entries;

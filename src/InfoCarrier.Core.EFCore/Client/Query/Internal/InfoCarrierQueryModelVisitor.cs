@@ -9,8 +9,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Threading;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
+    using Common;
     using ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -25,7 +27,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remotion.Linq;
     using Remotion.Linq.Clauses;
     using Remotion.Linq.Clauses.Expressions;
-    using MIE = Microsoft.EntityFrameworkCore.Extensions.Internal.MethodInfoExtensions;
+    using ExpressionVisitorBase = Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase;
 
     public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
     {
@@ -35,6 +37,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 .GetDeclaredNestedType("SubqueryInjector");
 
         private readonly IEntityMaterializerSource entityMaterializerSource;
+        private readonly bool isRoot;
 
         public InfoCarrierQueryModelVisitor(
             IQueryOptimizer queryOptimizer,
@@ -51,7 +54,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IResultOperatorHandler resultOperatorHandler,
             IEntityMaterializerSource entityMaterializerSource,
             IExpressionPrinter expressionPrinter,
-            QueryCompilationContext queryCompilationContext)
+            QueryCompilationContext queryCompilationContext,
+            bool isRoot)
             : base(
                 queryOptimizer,
                 navigationRewritingExpressionVisitorFactory,
@@ -70,6 +74,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 queryCompilationContext)
         {
             this.entityMaterializerSource = entityMaterializerSource;
+            this.isRoot = isRoot;
         }
 
         private bool ExpressionIsQueryable =>
@@ -80,7 +85,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.Expression != null
             && this.Expression.Type.GetGenericTypeImplementations(typeof(IAsyncEnumerable<>)).Any();
 
-        internal virtual InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
+        private InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
             this.ExpressionIsQueryable
                 ? InfoCarrierQueryableLinqOperatorProvider.Instance
                 : InfoCarrierEnumerableLinqOperatorProvider.Instance;
@@ -90,32 +95,33 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 ? (ILinqOperatorProvider)new AsyncLinqOperatorProvider()
                 : this.InfoCarrierLinqOperatorProvider;
 
-        public override Func<QueryContext, IAsyncEnumerable<TResult>> CreateAsyncQueryExecutor<TResult>(QueryModel queryModel)
+        public override void VisitQueryModel(QueryModel queryModel)
         {
-            // UGLY: pretty much copy-and-paste of the base implementation except for:
-            // + Call SingleResultToSequence without 2nd argument
-            // - Unable to "copy-and-paste" original logging
-            using (this.QueryCompilationContext.Logger.BeginScope(this))
+            base.VisitQueryModel(queryModel);
+
+            // CreateAsyncQueryExecutor requires the expression type to be generic
+            // which is not the case since we are building synchronous LINQ expressions
+            // even for async queries.
+            // UGLY: apply dummy ToSequence wrapper to the expression
+            if (this.isRoot && ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async)
             {
-                this.ExtractQueryAnnotations(queryModel);
-
-                this.OptimizeQueryModel(queryModel);
-
-                this.QueryCompilationContext.FindQuerySourcesRequiringMaterialization(this, queryModel);
-                this.QueryCompilationContext.DetermineQueryBufferRequirement(queryModel);
-
-                this.VisitQueryModel(queryModel);
-
-                this.SingleResultToSequence(queryModel);
-
-                this.IncludeNavigations(queryModel);
-
-                this.TrackEntitiesInResults<TResult>(queryModel);
-
-                this.InterceptExceptions();
-
-                return this.CreateExecutorLambda<IAsyncEnumerable<TResult>>();
+                this.Expression
+                    = Expression.Call(
+                        this.LinqOperatorProvider.ToSequence.MakeGenericMethod(this.Expression.Type),
+                        this.Expression);
             }
+        }
+
+        protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
+        {
+            // UGLY: unapply dummy ToSequence wrapper temporarily added in VisitQueryModel
+            if (this.Expression is MethodCallExpression mc
+                && mc.Method.MethodIsClosedFormOf(this.LinqOperatorProvider.ToSequence))
+            {
+                this.Expression = mc.Arguments.Single();
+            }
+
+            base.SingleResultToSequence(queryModel, type);
         }
 
         private static IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>(
@@ -146,7 +152,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             Expression linqExpression = this.Expression;
             if (linqExpression is MethodCallExpression call)
             {
-                if (MIE.MethodIsClosedFormOf(call.Method, this.LinqOperatorProvider.ToSequence))
+                if (call.Method.MethodIsClosedFormOf(this.LinqOperatorProvider.ToSequence))
                 {
                     linqExpression = call.Arguments.Single();
                 }
@@ -155,10 +161,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // Replace ToSequence with ExecuteQuery
             MethodInfo execQueryMethod =
                 ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
-                    ? MethodInfoExtensions.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
-                    : MethodInfoExtensions.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null));
+                    ? Utils.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
+                    : Utils.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null));
 
-            Type resultType = Server.QueryDataHelper.GetSequenceType(linqExpression.Type, linqExpression.Type);
+            Type resultType = Utils.TryGetQueryResultSequenceType(linqExpression.Type) ?? linqExpression.Type;
 
             this.Expression
                 = Expression.Call(
@@ -383,11 +389,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .Any(o => !string.IsNullOrEmpty(o.StringNavigationPropertyPath));
 
             // TODO: do some testing against real database.
-            // InfoCarrierIncludeExpressionVisitor may append the same .Include
+            // IncludeExpressionVisitor may append the same .Include
             // multiple times (to QueryableStub and to Select) in some situations.
             // Need to know if it leads to bad SQL.
             var includeExpressionVisitor
-                = new InfoCarrierIncludeExpressionVisitor(
+                = new IncludeExpressionVisitor(
                     this.LinqOperatorProvider,
                     includeSpecification,
                     accessorExpression,
@@ -427,7 +433,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     // Convert subquery back to ICollection (in this case to List)
                     // instead of wrapping into MaterializeCollectionNavigation method call.
                     return (TResult)(object)Expression.Call(
-                        MethodInfoExtensions.GetMethodInfo(() => Enumerable.ToList<object>(null))
+                        Utils.GetMethodInfo(() => Enumerable.ToList<object>(null))
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(subqueryExpression.Type.GenericTypeArguments),
                         subqueryExpression);
@@ -472,8 +478,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .Visit(expression);
 
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
-                expression = new ReplaceNullConditionalExpressionVisitor(true)
-                    .Visit(expression);
+                expression = Utils.ReplaceNullConditional(expression, true);
 
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 this.rlinq = expression
@@ -527,7 +532,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 // is targetType a collection?
-                Type elementType = Server.QueryDataHelper.GetSequenceType(targetType, null);
+                Type elementType = Utils.TryGetQueryResultSequenceType(targetType);
                 if (elementType == null)
                 {
                     return baseImpl();
@@ -568,11 +573,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 array = null;
 
-                if (!targetType.IsArray)
-                {
-                    return false;
-                }
-
                 if (obj is DynamicObject dobj)
                 {
                     if (dobj.Type != null)
@@ -581,13 +581,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return false;
                     }
 
-                    if (!dobj.TryGet(string.Empty, out object elements))
+                    if (!dobj.TryGet("Elements", out object elements))
                     {
                         return false;
                     }
 
-                    array = this.MapFromDynamicObjectGraph(elements, targetType);
-                    return true;
+                    if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
+                    {
+                        return false;
+                    }
+
+                    if (targetType.IsArray)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, targetType);
+                        return true;
+                    }
+
+                    if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, typeInfo.Type);
+                        return true;
+                    }
                 }
 
                 return false;
@@ -628,7 +642,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 key = this.MapFromDynamicObjectGraph(key, keyType);
                 elements = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
 
-                grouping = MethodInfoExtensions.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
+                grouping = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition()
                     .MakeGenericMethod(keyType, elementType)
                     .Invoke(null, new[] { key, elements });
@@ -711,20 +725,133 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 return true;
             }
+
+            private class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
+            {
+                private readonly QueryContext queryContext;
+                private readonly IModel model;
+
+                public SubstituteParametersExpressionVisitor(QueryContext queryContext, IModel model)
+                {
+                    this.queryContext = queryContext;
+                    this.model = model;
+                }
+
+                protected override Expression VisitMethodCall(MethodCallExpression node)
+                {
+                    Expression maybeInlineEntityProperty = this.TryVisitInlineEntityProperty(node);
+                    if (maybeInlineEntityProperty != null)
+                    {
+                        return maybeInlineEntityProperty;
+                    }
+
+                    if (node.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
+                    {
+                        Type paramType = node.Method.GetGenericArguments().Single();
+                        object paramValue =
+                            Utils.GetMethodInfo(() => this.GetParameterValue<object>(node))
+                                .GetGenericMethodDefinition()
+                                .MakeGenericMethod(paramType)
+                                .ToDelegate<Func<MethodCallExpression, object>>(this)
+                                .Invoke(node);
+
+                        return Expression.Property(
+                            Expression.Constant(paramValue),
+                            paramValue.GetType(),
+                            nameof(ValueWrapper<object>.Value));
+                    }
+
+                    return base.VisitMethodCall(node);
+                }
+
+                private Expression TryVisitInlineEntityProperty(MethodCallExpression node)
+                {
+                    if (!EntityQueryModelVisitor.IsPropertyMethod(node.Method))
+                    {
+                        return null;
+                    }
+
+                    var propertyNameExpression = node.Arguments[1] as ConstantExpression;
+                    string propertyName = propertyNameExpression?.Value as string;
+                    if (propertyName == null)
+                    {
+                        return null;
+                    }
+
+                    object entity = GetEntity();
+                    object GetEntity()
+                    {
+                        switch (node.Arguments[0])
+                        {
+                            case ConstantExpression maybeConstant:
+                                return maybeConstant.Value;
+
+                            case MethodCallExpression maybeMethodCall
+                            when maybeMethodCall.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo):
+                                return
+                                    Expression.Lambda<Func<QueryContext, object>>(maybeMethodCall, EntityQueryModelVisitor.QueryContextParameter)
+                                        .Compile()
+                                        .Invoke(this.queryContext);
+
+                            default:
+                                return null;
+                        }
+                    }
+
+                    if (entity == null)
+                    {
+                        return null;
+                    }
+
+                    IEntityType efType = this.model.FindEntityType(entity.GetType());
+                    IProperty efProperty = efType?.FindProperty(propertyName);
+                    if (efProperty == null)
+                    {
+                        return null;
+                    }
+
+                    object paramValue =
+                        Utils.GetMethodInfo(() => Wrap<object>(null))
+                            .GetGenericMethodDefinition()
+                            .MakeGenericMethod(efProperty.ClrType)
+                            .Invoke(null, new object[] { efProperty.GetGetter().GetClrValue(entity) });
+
+                    Expression result = Expression.Property(
+                        Expression.Constant(paramValue),
+                        paramValue.GetType(),
+                        nameof(ValueWrapper<object>.Value));
+
+                    if (result.Type != node.Type)
+                    {
+                        result = Expression.Convert(result, node.Type);
+                    }
+
+                    return result;
+                }
+
+                private object GetParameterValue<T>(MethodCallExpression node) => Wrap(
+                    Expression
+                        .Lambda<Func<QueryContext, T>>(node, EntityQueryModelVisitor.QueryContextParameter)
+                        .Compile()
+                        .Invoke(this.queryContext));
+
+                private static object Wrap<T>(T value) => new ValueWrapper<T> { Value = value };
+
+                private struct ValueWrapper<T>
+                {
+                    public T Value { get; set; }
+                }
+            }
         }
 
-        private class InfoCarrierIncludeExpressionVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
+        private class IncludeExpressionVisitor : ExpressionVisitorBase
         {
             private readonly IncludeSpecification includeSpecification;
             private readonly ILinqOperatorProvider linqOperatorProvider;
             private readonly Expression accessorExpression;
             private readonly bool useString;
 
-            private static readonly MethodInfo OfTypeMethodInfo
-                = typeof(Enumerable).GetTypeInfo()
-                    .GetDeclaredMethod(nameof(Enumerable.OfType));
-
-            public InfoCarrierIncludeExpressionVisitor(
+            public IncludeExpressionVisitor(
                 ILinqOperatorProvider linqOperatorProvider,
                 IncludeSpecification includeSpecification,
                 Expression accessorExpression,
@@ -750,7 +877,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private bool IsMatchingSelect(MethodCallExpression node)
             {
-                if (!MIE.MethodIsClosedFormOf(node.Method, this.linqOperatorProvider.Select))
+                if (!node.Method.MethodIsClosedFormOf(this.linqOperatorProvider.Select))
                 {
                     return false;
                 }
@@ -792,7 +919,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     if (this.useString)
                     {
                         return Expression.Call(
-                            MethodInfoExtensions.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
+                            Utils.GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
                                 .GetGenericMethodDefinition()
                                 .MakeGenericMethod(entityType),
                             node,
@@ -806,7 +933,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     MethodCallExpression result = Expression.Call(
-                        MethodInfoExtensions.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
+                        Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
                             .GetGenericMethodDefinition()
                             .MakeGenericMethod(entityType, iNav.Current.ClrType),
                         node,
@@ -816,9 +943,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     {
                         MethodInfo miThenInclude =
                             prev.IsCollection()
-                                ? MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
+                                ? Utils.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
                                     x => x.ThenInclude<object, object, object>(null))
-                                : MethodInfoExtensions.GetMethodInfo<IIncludableQueryable<object, object>>(
+                                : Utils.GetMethodInfo<IIncludableQueryable<object, object>>(
                                     x => x.ThenInclude<object, object, object>(null));
 
                         Type prevType = prev.GetTargetType().ClrType;

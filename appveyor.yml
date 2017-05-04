@@ -1,0 +1,20 @@
+image: Visual Studio 2017
+
+branches:
+  only:
+  - develop
+
+before_build:
+  - dotnet --info
+  - dotnet restore
+
+build_script:
+  - for /f "delims=" %%i in ('tools\GitVersion.CommandLine\tools\GitVersion.exe /showvariable NuGetVersion') do set NuGetVersion=%%i
+  - dotnet build test\InfoCarrier.Core.EFCore.FunctionalTests\InfoCarrier.Core.EFCore.FunctionalTests.csproj
+  - dotnet pack src\InfoCarrier.Core.EFCore\InfoCarrier.Core.EFCore.csproj --output "..\..\artifacts" --configuration Debug --include-symbols
+
+test_script:
+  echo DISABLE!!! dotnet test test\InfoCarrier.Core.EFCore.FunctionalTests\InfoCarrier.Core.EFCore.FunctionalTests.csproj
+
+artifacts:
+  path: artifacts

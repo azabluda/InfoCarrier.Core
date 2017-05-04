@@ -3,6 +3,7 @@
     using System;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Common;
     using Microsoft.EntityFrameworkCore.Query.Internal;
 
     internal abstract class InfoCarrierLinqOperatorProvider : LinqOperatorProvider
@@ -13,7 +14,7 @@
 
         protected static MethodInfo GetMethod(Expression<Action> expression)
         {
-            MethodInfo mi = MethodInfoExtensions.GetMethodInfo(expression);
+            MethodInfo mi = Utils.GetMethodInfo(expression);
             return mi.IsGenericMethod ? mi.GetGenericMethodDefinition() : mi;
         }
     }
