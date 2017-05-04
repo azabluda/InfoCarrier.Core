@@ -1,9 +1,8 @@
 # InfoCarrier.Core
 
-> :point_up: This library is currently in pre-release phase and the repo is mainly intended for reviewers rather than for end-users. We don't provide a NuGet feed yet.
-
 | branch | package | AppVeyor |
 | --- | --- | --- |
+| `master` | [![NuGet Badge](https://buildstats.info/nuget/InfoCarrier.Core?includePreReleases=true)](http://www.nuget.org/packages/InfoCarrier.Core) | - |
 | `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) |
 
 
