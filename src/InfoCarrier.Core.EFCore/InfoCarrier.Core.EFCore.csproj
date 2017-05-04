@@ -1,12 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net451</TargetFramework>
-    <Copyright>Copyright ©  2017</Copyright>
-    <Version>$(NuGetVersion)</Version>
+    <Summary>EntityFrameworkCore provider for multitier applications</Summary>
     <Description>EntityFrameworkCore provider for multitier applications</Description>
+    <TargetFramework>net451</TargetFramework>
+    <Version>$(NuGetVersion)</Version>
     <Company>on/off it-solutions-gmbh</Company>
     <Authors>Alexander Zabluda</Authors>
     <Product>InfoCarrier</Product>
+    <PackageId>InfoCarrier.Core</PackageId>
+    <Title>InfoCarrier.Core</Title>
+    <PackageTags>EF;ORM;multi-tier;n-tier</PackageTags>
+    <PackageProjectUrl>https://github.com/azabluda/InfoCarrier.Core</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicenseUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
     <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
