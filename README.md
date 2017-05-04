@@ -2,6 +2,12 @@
 
 > :point_up: This library is currently in pre-release phase and the repo is mainly intended for reviewers rather than for end-users. We don't provide a NuGet feed yet.
 
+| branch | package | AppVeyor |
+| --- | --- | --- |
+| `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) |
+
+
+
 ### Description:
 InfoCarrier.Core is a framework developed by [on/off it-solutions gmbh](http://www.onoff-it-solutions.info) for building multitier applications in .NET. This repository contains the key data access component of the framework which essentially is a non-relational provider for [Entity Framework Core](https://github.com/aspnet/EntityFramework) which can be deployed on the client-side of your 3-tier application allowing you to use the full power of EF.Core right in your client application (e.g. WPF, WinForms, etc). The main idea is that instead of querying the relational database the commands are translated into requests to your application server where they are executed against the real database.
 
