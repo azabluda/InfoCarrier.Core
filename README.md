@@ -2,7 +2,7 @@
 
 | branch | package | AppVeyor |
 | --- | --- | --- |
-| `master` | [![NuGet Badge](https://buildstats.info/nuget/InfoCarrier.Core?includePreReleases=true)](http://www.nuget.org/packages/InfoCarrier.Core) | - |
+| `master` | [![NuGet](https://img.shields.io/nuget/v/InfoCarrier.Core.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/InfoCarrier.Core/) | - |
 | `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) |
 
 
