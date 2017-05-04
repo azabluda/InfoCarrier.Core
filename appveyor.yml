@@ -1,9 +1,5 @@
 image: Visual Studio 2017
 
-branches:
-  only:
-  - develop
-
 before_build:
   - dotnet --info
   - dotnet restore
