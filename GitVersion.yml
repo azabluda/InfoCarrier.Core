@@ -1,0 +1,5 @@
+next-version: 1.0.0-dev
+
+branches:
+  develop:
+    tracks-release-branches: false
