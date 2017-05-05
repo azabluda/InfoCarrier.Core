@@ -412,7 +412,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // We check if the propertyBinder (local functor) comes from the private class
             // NavigationRewritingExpressionVisitor.NavigationRewritingQueryModelVisitor.SubqueryInjector
             // and override the logic a bit.
-            if (propertyBinder.Target.GetType().DeclaringType == SubqueryInjectorClass)
+            if (propertyBinder.Target.GetType().DeclaringType.GetTypeInfo() == SubqueryInjectorClass)
             {
                 propertyBinder = (properties, querySource) =>
                 {
@@ -550,14 +550,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 // materialize IOrderedEnumerable<>
-                if (collType.IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
+                if (collType.GetTypeInfo().IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
                 {
                     return new LinqOperatorProvider().ToOrdered.MakeGenericMethod(collType.GenericTypeArguments)
                         .Invoke(null, new[] { list });
                 }
 
                 // materialize IQueryable<> / IOrderedQueryable<>
-                if (collType.IsGenericType
+                if (collType.GetTypeInfo().IsGenericType
                     && (collType.GetGenericTypeDefinition() == typeof(IQueryable<>)
                         || collType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)))
                 {
@@ -620,7 +620,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 Type type = dobj.Type?.Type ?? targetType;
 
                 if (type == null
-                    || !type.IsGenericType
+                    || !type.GetTypeInfo().IsGenericType
                     || type.GetGenericTypeDefinition() != typeof(IGrouping<,>))
                 {
                     return false;

@@ -27,12 +27,12 @@
 
         public static TDelegate ToDelegate<TDelegate>(this MethodInfo methodInfo)
         {
-            return (TDelegate)(object)Delegate.CreateDelegate(typeof(TDelegate), methodInfo);
+            return (TDelegate)(object)methodInfo.CreateDelegate(typeof(TDelegate));
         }
 
         public static TDelegate ToDelegate<TDelegate>(this MethodInfo methodInfo, object firstArgument)
         {
-            return (TDelegate)(object)Delegate.CreateDelegate(typeof(TDelegate), firstArgument, methodInfo);
+            return (TDelegate)(object)methodInfo.CreateDelegate(typeof(TDelegate), firstArgument);
         }
 
         internal static Type TryGetQueryResultSequenceType(Type type)

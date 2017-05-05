@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net451</TargetFramework>
+    <TargetFrameworks>net451;netcoreapp1.0</TargetFrameworks>
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
