@@ -2,5 +2,5 @@ for /f "delims=" %%i in ('tools\GitVersion.CommandLine\tools\GitVersion.exe /sho
 
 clean ^
   && dotnet restore ^
-  && echo DISABLE!!! dotnet test test\InfoCarrier.Core.EFCore.FunctionalTests\InfoCarrier.Core.EFCore.FunctionalTests.csproj ^
-  && dotnet pack src\InfoCarrier.Core.EFCore\InfoCarrier.Core.EFCore.csproj --output "..\..\artifacts" --configuration Debug --include-symbols
+  && echo DISABLE!!! dotnet test test\InfoCarrier.Core.FunctionalTests\InfoCarrier.Core.FunctionalTests.csproj ^
+  && dotnet pack src\InfoCarrier.Core\InfoCarrier.Core.csproj --output "..\..\artifacts" --configuration Debug --include-symbols
