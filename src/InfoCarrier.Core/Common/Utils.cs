@@ -3,11 +3,25 @@
     using System;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
+    using Remote.Linq.DynamicQuery;
 
     public static class Utils
     {
+        internal static MethodInfo QfIncludeMethod { get; } =
+            GetMethodInfo(() => QueryFunctions.Include<object>(null, null))
+                .GetGenericMethodDefinition();
+
+        internal static MethodInfo EfIncludeMethod { get; } =
+            GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null))
+                .GetGenericMethodDefinition();
+
+        internal static MethodInfo EfIncludeMethod2 { get; } =
+            GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
+                .GetGenericMethodDefinition();
+
         public static MethodInfo GetMethodInfo<T>(Expression<Action<T>> expression)
             => GetMethodInfo(expression.Body);
 

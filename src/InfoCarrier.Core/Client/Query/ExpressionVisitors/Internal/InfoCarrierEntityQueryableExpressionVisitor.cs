@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     using System.Collections.Generic;
     using System.Linq;
     using System.Linq.Expressions;
+    using System.Reflection;
     using Common;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
@@ -13,6 +14,10 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
     public class InfoCarrierEntityQueryableExpressionVisitor : EntityQueryableExpressionVisitor
     {
+        private static readonly MethodInfo RemoteQueryableStubCreateMethod
+            = Utils.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
+                .GetGenericMethodDefinition();
+
         private readonly IQuerySource querySource;
 
         public InfoCarrierEntityQueryableExpressionVisitor(
@@ -25,8 +30,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitEntityQueryable(Type elementType)
         {
-            IQueryable stub = Utils.GetMethodInfo(() => RemoteQueryableStub.Create<object>(null))
-                .GetGenericMethodDefinition()
+            IQueryable stub = RemoteQueryableStubCreateMethod
                 .MakeGenericMethod(elementType)
                 .ToDelegate<Func<IQuerySource, IQueryable>>()
                 .Invoke(this.querySource);

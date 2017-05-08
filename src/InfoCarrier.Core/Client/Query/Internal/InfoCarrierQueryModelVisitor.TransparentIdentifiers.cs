@@ -11,12 +11,15 @@
     // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L1027
     public partial class InfoCarrierQueryModelVisitor
     {
+        private static readonly MethodInfo GetTransparentIdentifierTypeMethod
+            = Utils.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
+                .GetGenericMethodDefinition();
+
         private int transparentParameterCounter;
 
         private static Type GetTransparentIdentifierType(Type outer, Type inner)
         {
-            return Utils.GetMethodInfo(() => GetTransparentIdentifierType<object, object>())
-                .GetGenericMethodDefinition()
+            return GetTransparentIdentifierTypeMethod
                 .MakeGenericMethod(outer, inner)
                 .ToDelegate<Func<Type>>()
                 .Invoke();

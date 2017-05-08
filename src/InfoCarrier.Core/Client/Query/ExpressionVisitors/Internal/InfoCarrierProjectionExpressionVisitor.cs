@@ -12,6 +12,9 @@
 
     public class InfoCarrierProjectionExpressionVisitor : DefaultQueryExpressionVisitor
     {
+        private static readonly MethodInfo GetDummyOrderByMethod
+            = Utils.GetMethodInfo(() => GetDummyOrderBy<object>()).GetGenericMethodDefinition();
+
         public InfoCarrierProjectionExpressionVisitor(
             EntityQueryModelVisitor entityQueryModelVisitor)
             : base(entityQueryModelVisitor)
@@ -37,8 +40,7 @@
                     InfoCarrierQueryableLinqOperatorProvider.Instance.OrderBy
                         .MakeGenericMethod(elementType, typeof(object)),
                     subExpression,
-                    Utils.GetMethodInfo(() => GetDummyOrderBy<object>())
-                        .GetGenericMethodDefinition()
+                    GetDummyOrderByMethod
                         .MakeGenericMethod(elementType)
                         .ToDelegate<Func<Expression>>()
                         .Invoke());

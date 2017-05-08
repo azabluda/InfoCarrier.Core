@@ -16,11 +16,20 @@
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
-    using Remote.Linq.DynamicQuery;
     using Remote.Linq.ExpressionVisitors;
+    using MethodInfo = System.Reflection.MethodInfo;
 
     public sealed class QueryDataHelper : IDisposable
     {
+        private static readonly MethodInfo ExecuteExpressionMethod
+            = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpression));
+
+        private static readonly MethodInfo ExecuteExpressionAsyncMethod
+            = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpressionAsync));
+
+        private static readonly MethodInfo DbContextSetMethod
+            = Utils.GetMethodInfo<DbContext>(c => c.Set<object>()).GetGenericMethodDefinition();
+
         private readonly DbContext dbContext;
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
@@ -37,8 +46,7 @@
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
                     provider: type =>
-                        Utils.GetMethodInfo(() => this.dbContext.Set<object>())
-                            .GetGenericMethodDefinition()
+                        DbContextSetMethod
                             .MakeGenericMethod(type)
                             .ToDelegate<Func<IQueryable>>(this.dbContext)
                             .Invoke())
@@ -57,9 +65,7 @@
             var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
             resultType = resultType == null ? this.linqExpression.Type : typeof(IEnumerable<>).MakeGenericType(resultType);
 
-            object queryResult =
-                typeof(QueryDataHelper).GetTypeInfo()
-                .GetDeclaredMethod(nameof(this.ExecuteExpression))
+            object queryResult = ExecuteExpressionMethod
                 .MakeGenericMethod(resultType)
                 .ToDelegate<Func<object>>(this)
                 .Invoke();
@@ -87,8 +93,7 @@
         {
             Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
 
-            object queryResult = await typeof(QueryDataHelper).GetTypeInfo()
-                .GetDeclaredMethod(nameof(this.ExecuteExpressionAsync))
+            object queryResult = await ExecuteExpressionAsyncMethod
                 .MakeGenericMethod(elementType)
                 .ToDelegate<Func<Task<object>>>(this)
                 .Invoke();
@@ -135,6 +140,10 @@
 
         private class EntityToDynamicObjectMapper : DynamicObjectMapper
         {
+            private static readonly MethodInfo MapGroupingMethod
+                = Utils.GetMethodInfo<EntityToDynamicObjectMapper>(x => x.MapGrouping<object, object>(null, null))
+                    .GetGenericMethodDefinition();
+
             private readonly IStateManager stateManager;
             private readonly Dictionary<object, DynamicObject> cachedEntities =
                 new Dictionary<object, DynamicObject>();
@@ -175,8 +184,7 @@
                 foreach (var groupingType in objType.GetGenericTypeImplementations(typeof(IGrouping<,>)))
                 {
                     object mappedGrouping =
-                        Utils.GetMethodInfo(() => this.MapGrouping<object, object>(null, null))
-                            .GetGenericMethodDefinition()
+                        MapGroupingMethod
                             .MakeGenericMethod(groupingType.GenericTypeArguments)
                             .Invoke(this, new[] { obj, setTypeInformation });
                     return (DynamicObject)mappedGrouping;
@@ -222,12 +230,6 @@
         // Here we are restoring the EF version back.
         private class FixIncludeVisitor : ExpressionVisitorBase
         {
-            private static readonly System.Reflection.MethodInfo QfIncludeMethod =
-                Utils.GetMethodInfo(() => QueryFunctions.Include<object>(null, null)).GetGenericMethodDefinition();
-
-            private static readonly System.Reflection.MethodInfo EfIncludeMethod =
-                Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null)).GetGenericMethodDefinition();
-
             internal System.Linq.Expressions.Expression ReplaceRlinqIncludes(System.Linq.Expressions.Expression expression)
             {
                 return this.Visit(expression);
@@ -236,10 +238,10 @@
             protected override System.Linq.Expressions.Expression VisitMethodCall(System.Linq.Expressions.MethodCallExpression m)
             {
                 if (m.Method.IsGenericMethod
-                    && m.Method.GetGenericMethodDefinition() == QfIncludeMethod)
+                    && m.Method.GetGenericMethodDefinition().Equals(Utils.QfIncludeMethod))
                 {
                     return System.Linq.Expressions.Expression.Call(
-                        EfIncludeMethod.MakeGenericMethod(m.Method.GetGenericArguments()),
+                        Utils.EfIncludeMethod.MakeGenericMethod(m.Method.GetGenericArguments()),
                         m.Arguments.Select(this.Visit));
                 }
 
