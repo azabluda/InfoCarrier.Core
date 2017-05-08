@@ -35,14 +35,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 .GetDeclaredNestedType("NavigationRewritingQueryModelVisitor")
                 .GetDeclaredNestedType("SubqueryInjector");
 
-        private static readonly MethodInfo CollectionThenIncludeMethod
-            = Utils.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
-                x => x.ThenInclude<object, object, object>(null)).GetGenericMethodDefinition();
-
-        private static readonly MethodInfo ThenIncludeMethod
-            = Utils.GetMethodInfo<IIncludableQueryable<object, object>>(
-                x => x.ThenInclude<object, object, object>(null)).GetGenericMethodDefinition();
-
         private static readonly MethodInfo ExecuteAsyncQueryMethod
             = Utils.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
                 .GetGenericMethodDefinition();
@@ -870,6 +862,22 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
         private class IncludeExpressionVisitor : ExpressionVisitorBase
         {
+            private static readonly MethodInfo IncludeMethodString =
+                Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null))
+                    .GetGenericMethodDefinition();
+
+            private static readonly MethodInfo IncludeMethodExpression =
+                Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
+                    .GetGenericMethodDefinition();
+
+            private static readonly MethodInfo CollectionThenIncludeMethod
+                = Utils.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
+                    x => x.ThenInclude<object, object, object>(null)).GetGenericMethodDefinition();
+
+            private static readonly MethodInfo ThenIncludeMethod
+                = Utils.GetMethodInfo<IIncludableQueryable<object, object>>(
+                    x => x.ThenInclude<object, object, object>(null)).GetGenericMethodDefinition();
+
             private readonly IncludeSpecification includeSpecification;
             private readonly ILinqOperatorProvider linqOperatorProvider;
             private readonly Expression accessorExpression;
@@ -943,7 +951,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     if (this.useString)
                     {
                         return Expression.Call(
-                            Utils.QfIncludeMethod.MakeGenericMethod(entityType),
+                            IncludeMethodString.MakeGenericMethod(entityType),
                             node,
                             Expression.Constant(string.Join(".", this.includeSpecification.NavigationPath.Select(n => n.Name))));
                     }
@@ -955,7 +963,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     MethodCallExpression result = Expression.Call(
-                        Utils.EfIncludeMethod2.MakeGenericMethod(entityType, iNav.Current.ClrType),
+                        IncludeMethodExpression.MakeGenericMethod(entityType, iNav.Current.ClrType),
                         node,
                         BuildMemberAccessLambda(iNav.Current, entityType, this.includeSpecification.QuerySource.ItemName));
 

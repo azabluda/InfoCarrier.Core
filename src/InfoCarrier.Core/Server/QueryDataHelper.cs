@@ -52,8 +52,6 @@
                             .Invoke())
                 .ToLinqExpression(this.typeResolver);
 
-            this.linqExpression = new FixIncludeVisitor().ReplaceRlinqIncludes(this.linqExpression);
-
             // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
             this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
@@ -222,30 +220,6 @@
                 mappedGrouping.Add("Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
                 mappedGrouping.Add("Elements", this.MapCollection(grouping, setTypeInformation).ToList());
                 return mappedGrouping;
-            }
-        }
-
-        // Remote.Linq falls into premature evaluation of EntityFrameworkQueryableExtensions.Include(string)
-        // extension method, therefore we had to replace those with QueryFunctions.Include(string) in the tree.
-        // Here we are restoring the EF version back.
-        private class FixIncludeVisitor : ExpressionVisitorBase
-        {
-            internal System.Linq.Expressions.Expression ReplaceRlinqIncludes(System.Linq.Expressions.Expression expression)
-            {
-                return this.Visit(expression);
-            }
-
-            protected override System.Linq.Expressions.Expression VisitMethodCall(System.Linq.Expressions.MethodCallExpression m)
-            {
-                if (m.Method.IsGenericMethod
-                    && m.Method.GetGenericMethodDefinition().Equals(Utils.QfIncludeMethod))
-                {
-                    return System.Linq.Expressions.Expression.Call(
-                        Utils.EfIncludeMethod.MakeGenericMethod(m.Method.GetGenericArguments()),
-                        m.Arguments.Select(this.Visit));
-                }
-
-                return base.VisitMethodCall(m);
             }
         }
     }
