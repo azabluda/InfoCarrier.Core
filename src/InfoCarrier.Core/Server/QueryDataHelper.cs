@@ -56,8 +56,6 @@
             this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
-        internal static string EntityTypeNameTag { get; } = "__EntityType";
-
         public IEnumerable<DynamicObject> QueryData()
         {
             var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
@@ -199,7 +197,7 @@
                     this.cachedEntities.Add(obj, dto = new DynamicObject(objType));
 
                     InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj);
-                    dto.Add(EntityTypeNameTag, entry.EntityType.Name);
+                    dto.Add(@"__EntityType", entry.EntityType.Name);
 
                     foreach (MemberEntry prop in entry.ToEntityEntry().Members)
                     {

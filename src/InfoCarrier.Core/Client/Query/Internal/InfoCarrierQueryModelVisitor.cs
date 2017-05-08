@@ -675,7 +675,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return false;
                 }
 
-                if (!dobj.TryGet(Server.QueryDataHelper.EntityTypeNameTag, out object entityTypeName))
+                if (!dobj.TryGet(@"__EntityType", out object entityTypeName))
                 {
                     return false;
                 }
