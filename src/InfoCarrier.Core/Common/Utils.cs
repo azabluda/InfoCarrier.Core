@@ -3,6 +3,7 @@
     using System;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
 
@@ -102,8 +103,7 @@
             {
                 if (!this.toStub)
                 {
-                    if (node.Method.IsGenericMethod
-                        && node.Method.GetGenericMethodDefinition() == NullConditionalExpressionStubMethod)
+                    if (node.Method.MethodIsClosedFormOf(NullConditionalExpressionStubMethod))
                     {
                         return new NullConditionalExpression(
                             this.Visit(node.Arguments[0]),
