@@ -25,6 +25,7 @@
     <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="aqua-core" Version="4.0.0-alpha-058" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="1.1.0" />
     <PackageReference Include="Remote.Linq" Version="5.4.0-alpha-027" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">
