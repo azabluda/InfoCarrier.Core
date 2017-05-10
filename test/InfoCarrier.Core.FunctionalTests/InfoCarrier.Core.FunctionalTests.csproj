@@ -4,7 +4,7 @@
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="aqua-core" Version="4.0.0-alpha-058" />
+    <PackageReference Include="aqua-core" Version="4.0.0-alpha-059" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="1.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="1.1.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
