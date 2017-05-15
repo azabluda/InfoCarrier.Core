@@ -216,7 +216,10 @@
             {
                 var mappedGrouping = new DynamicObject(typeof(IGrouping<TKey, TElement>));
                 mappedGrouping.Add("Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
-                mappedGrouping.Add("Elements", this.MapCollection(grouping, setTypeInformation).ToList());
+                mappedGrouping.Add("Elements",
+                    new DynamicObject(
+                        this.MapCollection(grouping, setTypeInformation).ToList(),
+                        this));
                 return mappedGrouping;
             }
         }
