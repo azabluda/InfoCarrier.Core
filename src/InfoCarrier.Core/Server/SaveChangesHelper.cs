@@ -89,7 +89,7 @@
                     entry.Properties.Where(p =>
                         p.IsTemporary
                         && p.Metadata.IsKey()
-                        && p.Metadata.RequiresValueGenerator).ToList())
+                        && p.Metadata.RequiresValueGenerator()).ToList())
                 {
                     ValueGenerator valueGenerator = valueGeneratorSelector.Select(tempPk.Metadata, entry.Metadata);
                     if (!valueGenerator.GeneratesTemporaryValues)

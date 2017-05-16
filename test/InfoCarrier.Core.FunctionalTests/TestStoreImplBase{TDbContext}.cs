@@ -1,7 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
-    using Client.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
 
     public abstract class TestStoreImplBase<TDbContext> : TestStoreImplBase
@@ -51,7 +50,7 @@
             bool useSharedStore)
         {
             return new InfoCarrierTestHelper<TDbContext>(
-                MakeStoreServiceConfigurator<InfoCarrierModelSource>(onModelCreating, p => new TestInfoCarrierModelSource(p)),
+                MakeStoreServiceConfigurator(onModelCreating),
                 createTestStore,
                 useSharedStore);
         }

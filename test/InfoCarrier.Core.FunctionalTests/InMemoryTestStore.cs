@@ -5,10 +5,6 @@
     using System.Linq;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
-    using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.EntityFrameworkCore.Storage.Internal;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +24,7 @@
             configureStoreService(serviceCollection);
 
             this.DbContextOptions = new DbContextOptionsBuilder()
-                .UseInMemoryDatabase()
+                .UseInMemoryDatabase(nameof(TDbContext))
                 .ConfigureWarnings(configureWarnings ?? (_ => { }))
                 .UseInternalServiceProvider(serviceCollection.BuildServiceProvider())
                 .Options;
@@ -60,8 +56,8 @@
             this.DbContextOptions
                 .GetExtension<CoreOptionsExtension>()
                 .InternalServiceProvider
-                .GetRequiredService<IInMemoryStoreSource>()
-                .GetGlobalStore()
+                .GetRequiredService<IInMemoryStoreCache>()
+                .GetStore(nameof(TDbContext))
                 .Clear();
 
             base.Dispose();
@@ -78,24 +74,10 @@
                 onModelCreating,
                 () => new InMemoryTestStore<TDbContext>(
                     createContext,
-                    MakeStoreServiceConfigurator<InMemoryModelSource>(onModelCreating, p => new TestInMemoryModelSource(p)),
+                    MakeStoreServiceConfigurator(onModelCreating),
                     initializeDatabase,
                     configureWarnings),
                 useSharedStore);
-        }
-
-        private class TestInMemoryModelSource : InMemoryModelSource
-        {
-            private readonly TestModelSourceParams testModelSourceParams;
-
-            public TestInMemoryModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
-            {
-                this.testModelSourceParams = p;
-            }
-
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
         }
     }
 }

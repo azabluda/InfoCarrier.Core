@@ -10,16 +10,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Common;
-    using ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
-    using Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
@@ -55,40 +52,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private readonly bool isRoot;
 
         public InfoCarrierQueryModelVisitor(
-            IQueryOptimizer queryOptimizer,
-            INavigationRewritingExpressionVisitorFactory navigationRewritingExpressionVisitorFactory,
-            ISubQueryMemberPushDownExpressionVisitor subQueryMemberPushDownExpressionVisitor,
-            IQuerySourceTracingExpressionVisitorFactory querySourceTracingExpressionVisitorFactory,
-            IEntityResultFindingExpressionVisitorFactory entityResultFindingExpressionVisitorFactory,
-            ITaskBlockingExpressionVisitor taskBlockingExpressionVisitor,
-            IMemberAccessBindingExpressionVisitorFactory memberAccessBindingExpressionVisitorFactory,
-            IOrderingExpressionVisitorFactory orderingExpressionVisitorFactory,
-            IProjectionExpressionVisitorFactory projectionExpressionVisitorFactory,
-            IEntityQueryableExpressionVisitorFactory entityQueryableExpressionVisitorFactory,
-            IQueryAnnotationExtractor queryAnnotationExtractor,
-            IResultOperatorHandler resultOperatorHandler,
-            IEntityMaterializerSource entityMaterializerSource,
-            IExpressionPrinter expressionPrinter,
+            EntityQueryModelVisitorDependencies dependencies,
             QueryCompilationContext queryCompilationContext,
             bool isRoot)
-            : base(
-                queryOptimizer,
-                navigationRewritingExpressionVisitorFactory,
-                subQueryMemberPushDownExpressionVisitor,
-                querySourceTracingExpressionVisitorFactory,
-                entityResultFindingExpressionVisitorFactory,
-                taskBlockingExpressionVisitor,
-                memberAccessBindingExpressionVisitorFactory,
-                orderingExpressionVisitorFactory,
-                projectionExpressionVisitorFactory,
-                entityQueryableExpressionVisitorFactory,
-                queryAnnotationExtractor,
-                resultOperatorHandler,
-                entityMaterializerSource,
-                expressionPrinter,
-                queryCompilationContext)
+            : base(dependencies, queryCompilationContext)
         {
-            this.entityMaterializerSource = entityMaterializerSource;
+            this.entityMaterializerSource = dependencies.EntityMaterializerSource;
             this.isRoot = isRoot;
         }
 
@@ -234,7 +203,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     this.Expression,
                     Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter),
                     Expression.Lambda(
-                        CallCreateTransparentIdentifier(
+                        this.CallCreateTransparentIdentifier(
                             transparentIdentifierType, this.CurrentParameter, innerItemParameter),
                         this.CurrentParameter,
                         innerItemParameter));
@@ -303,7 +272,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
                     Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
                     Expression.Lambda(
-                        CallCreateTransparentIdentifier(
+                        this.CallCreateTransparentIdentifier(
                             transparentIdentifierType,
                             this.CurrentParameter,
                             innerItemParameter),
@@ -365,7 +334,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
                     Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
                     Expression.Lambda(
-                        CallCreateTransparentIdentifier(
+                        this.CallCreateTransparentIdentifier(
                             transparentIdentifierType,
                             this.CurrentParameter,
                             innerItemsParameter),
@@ -375,35 +344,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.IntroduceTransparentScope(groupJoinClause, queryModel, index, transparentIdentifierType);
         }
 
-        protected override void IncludeNavigations(
-            IncludeSpecification includeSpecification,
-            Type resultType,
-            Expression accessorExpression,
-            bool querySourceRequiresTracking)
-        {
-            bool canUseStringIncludeOnSource
-                = this.QueryCompilationContext.QueryAnnotations
-                    .OfType<IncludeResultOperator>()
-                    .Where(o => o.QuerySource == includeSpecification.QuerySource)
-                    .Any(o => !string.IsNullOrEmpty(o.StringNavigationPropertyPath));
-
-            // TODO: do some testing against real database.
-            // IncludeExpressionVisitor may append the same .Include
-            // multiple times (to QueryableStub and to Select) in some situations.
-            // Need to know if it leads to bad SQL.
-            var includeExpressionVisitor
-                = new IncludeExpressionVisitor(
-                    this.LinqOperatorProvider,
-                    includeSpecification,
-                    accessorExpression,
-                    canUseStringIncludeOnSource);
-
-            this.Expression = includeExpressionVisitor.Visit(this.Expression);
-        }
-
         public override TResult BindNavigationPathPropertyExpression<TResult>(
             Expression propertyExpression,
-            Func<IEnumerable<IPropertyBase>, IQuerySource, TResult> propertyBinder)
+            Func<IReadOnlyList<IPropertyBase>, IQuerySource, TResult> propertyBinder)
         {
             // UGLY: this is the hackiest thing I ever did! It will break if EF.Core team changes their implementation
             // https://github.com/aspnet/EntityFramework/blob/rel/1.1.0/src/Microsoft.EntityFrameworkCore/Query/ExpressionVisitors/Internal/NavigationRewritingExpressionVisitor.cs#L1233
@@ -682,10 +625,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
 
                 // Map only scalar properties for now, navigations must be set later
-                IList<object> scalarValues = entityType
+                object[] scalarValues = entityType
                     .GetProperties()
                     .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
-                    .ToList();
+                    .ToArray();
 
                 // Get entity instance from EFC's identity map, or create a new one
                 entity = this.queryContext
@@ -769,7 +712,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private Expression TryVisitInlineEntityProperty(MethodCallExpression node)
             {
-                if (!EntityQueryModelVisitor.IsPropertyMethod(node.Method))
+                if (!node.Method.IsEFPropertyMethod())
                 {
                     return null;
                 }
@@ -842,128 +785,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private struct ValueWrapper<T>
             {
                 public T Value { get; set; }
-            }
-        }
-
-        private class IncludeExpressionVisitor : ExpressionVisitorBase
-        {
-            private static readonly MethodInfo IncludeMethodString =
-                Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object>(null, null))
-                    .GetGenericMethodDefinition();
-
-            private static readonly MethodInfo IncludeMethodExpression =
-                Utils.GetMethodInfo(() => EntityFrameworkQueryableExtensions.Include<object, object>(null, null))
-                    .GetGenericMethodDefinition();
-
-            private static readonly MethodInfo CollectionThenIncludeMethod
-                = Utils.GetMethodInfo<IIncludableQueryable<object, IEnumerable<object>>>(
-                    x => x.ThenInclude<object, object, object>(null)).GetGenericMethodDefinition();
-
-            private static readonly MethodInfo ThenIncludeMethod
-                = Utils.GetMethodInfo<IIncludableQueryable<object, object>>(
-                    x => x.ThenInclude<object, object, object>(null)).GetGenericMethodDefinition();
-
-            private readonly IncludeSpecification includeSpecification;
-            private readonly ILinqOperatorProvider linqOperatorProvider;
-            private readonly Expression accessorExpression;
-            private readonly bool useString;
-
-            public IncludeExpressionVisitor(
-                ILinqOperatorProvider linqOperatorProvider,
-                IncludeSpecification includeSpecification,
-                Expression accessorExpression,
-                bool useString)
-            {
-                this.linqOperatorProvider = linqOperatorProvider;
-                this.includeSpecification = includeSpecification;
-                this.accessorExpression = accessorExpression;
-                this.useString = useString;
-            }
-
-            protected override Expression VisitMethodCall(MethodCallExpression node)
-            {
-                Expression result = base.VisitMethodCall(node);
-
-                if (this.IsMatchingSelect(node))
-                {
-                    result = this.ApplyTopLevelInclude(result);
-                }
-
-                return result;
-            }
-
-            private bool IsMatchingSelect(MethodCallExpression node)
-            {
-                if (!node.Method.MethodIsClosedFormOf(this.linqOperatorProvider.Select))
-                {
-                    return false;
-                }
-
-                var unary = node.Arguments[1] as UnaryExpression;
-                if (unary == null
-                    || unary.NodeType != ExpressionType.Quote
-                    || unary.Operand.NodeType != ExpressionType.Lambda)
-                {
-                    return false;
-                }
-
-                var lambda = unary.Operand as LambdaExpression;
-                return lambda != null && lambda.Body == this.accessorExpression;
-            }
-
-            protected override Expression VisitConstant(ConstantExpression node)
-            {
-                var stub = node.Value as InfoCarrierEntityQueryableExpressionVisitor.RemoteQueryableStub;
-                if (stub?.QuerySource == this.includeSpecification.QuerySource)
-                {
-                    return this.ApplyTopLevelInclude(node);
-                }
-
-                return base.VisitConstant(node);
-            }
-
-            private Expression ApplyTopLevelInclude(Expression node)
-            {
-                using (IEnumerator<INavigation> iNav = this.includeSpecification.NavigationPath.GetEnumerator())
-                {
-                    if (!iNav.MoveNext())
-                    {
-                        return node;
-                    }
-
-                    Type entityType = node.Type.GetGenericArguments().Single();
-
-                    if (this.useString)
-                    {
-                        return Expression.Call(
-                            IncludeMethodString.MakeGenericMethod(entityType),
-                            node,
-                            Expression.Constant(string.Join(".", this.includeSpecification.NavigationPath.Select(n => n.Name))));
-                    }
-
-                    Expression BuildMemberAccessLambda(INavigation navigation, Type paramType, string paramName)
-                    {
-                        var arg = Expression.Parameter(paramType, paramName);
-                        return Expression.Lambda(Expression.MakeMemberAccess(arg, navigation.GetMemberInfo(false, false)), arg);
-                    }
-
-                    MethodCallExpression result = Expression.Call(
-                        IncludeMethodExpression.MakeGenericMethod(entityType, iNav.Current.ClrType),
-                        node,
-                        BuildMemberAccessLambda(iNav.Current, entityType, this.includeSpecification.QuerySource.ItemName));
-
-                    for (INavigation prev = iNav.Current; iNav.MoveNext(); prev = iNav.Current)
-                    {
-                        MethodInfo miThenInclude = prev.IsCollection() ? CollectionThenIncludeMethod : ThenIncludeMethod;
-                        Type prevType = prev.GetTargetType().ClrType;
-                        result = Expression.Call(
-                            miThenInclude.MakeGenericMethod(entityType, prevType, iNav.Current.ClrType),
-                            result,
-                            BuildMemberAccessLambda(iNav.Current, prevType, @"x"));
-                    }
-
-                    return result;
-                }
             }
         }
 

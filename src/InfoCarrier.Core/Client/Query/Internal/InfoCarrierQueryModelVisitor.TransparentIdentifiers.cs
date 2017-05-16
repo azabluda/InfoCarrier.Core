@@ -1,6 +1,7 @@
 ﻿namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
+    using System.Globalization;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
@@ -31,7 +32,7 @@
             return transparentIdentifier.GetType();
         }
 
-        private static Expression CallCreateTransparentIdentifier(
+        protected override Expression CallCreateTransparentIdentifier(
             Type transparentIdentifierType, Expression outerExpression, Expression innerExpression)
         {
             ConstructorInfo ctor = transparentIdentifierType.GetTypeInfo().DeclaredConstructors.Single();
@@ -58,26 +59,39 @@
             return Expression.Property(targetExpression, propertyInfo);
         }
 
-        private void IntroduceTransparentScope(
-            IQuerySource fromClause, QueryModel queryModel, int index, Type transparentIdentifierType)
+        protected override void IntroduceTransparentScope(
+            IQuerySource querySource, QueryModel queryModel, int index, Type transparentIdentifierType)
         {
             this.CurrentParameter
-                = Expression.Parameter(transparentIdentifierType, $@"t{this.transparentParameterCounter++}");
+                = Expression.Parameter(
+                    transparentIdentifierType,
+                    string.Format(CultureInfo.InvariantCulture, "t{0}", this.transparentParameterCounter++));
 
-            Expression outerAccessExpression
+            var outerAccessExpression
                 = AccessOuterTransparentField(transparentIdentifierType, this.CurrentParameter);
 
             this.RescopeTransparentAccess(queryModel.MainFromClause, outerAccessExpression);
 
             for (var i = 0; i < index; i++)
             {
-                if (queryModel.BodyClauses[i] is IQuerySource querySource)
+                var bodyClause = queryModel.BodyClauses[i] as IQuerySource;
+
+                if (bodyClause != null)
                 {
-                    this.RescopeTransparentAccess(querySource, outerAccessExpression);
+                    this.RescopeTransparentAccess(bodyClause, outerAccessExpression);
+
+                    var groupJoinClause = bodyClause as GroupJoinClause;
+
+                    if (groupJoinClause != null
+                        && this.QueryCompilationContext.QuerySourceMapping
+                            .ContainsMapping(groupJoinClause.JoinClause))
+                    {
+                        this.RescopeTransparentAccess(groupJoinClause.JoinClause, outerAccessExpression);
+                    }
                 }
             }
 
-            this.AddOrUpdateMapping(fromClause, AccessInnerTransparentField(transparentIdentifierType, this.CurrentParameter));
+            this.QueryCompilationContext.AddOrUpdateMapping(querySource, AccessInnerTransparentField(transparentIdentifierType, this.CurrentParameter));
         }
 
         private void RescopeTransparentAccess(IQuerySource querySource, Expression targetExpression)
@@ -99,9 +113,20 @@
                 return targetExpression;
             }
 
-            return Expression.MakeMemberAccess(
-                ShiftMemberAccess(targetExpression, memberExpression.Expression),
-                memberExpression.Member);
+            try
+            {
+                return Expression.MakeMemberAccess(
+                    ShiftMemberAccess(targetExpression, memberExpression.Expression),
+                    memberExpression.Member);
+            }
+            catch (ArgumentException)
+            {
+                // Member is not defined on the new target expression.
+                // This is due to stale QuerySourceMappings, which we can't
+                // remove due to there not being an API on QuerySourceMapping.
+            }
+
+            return currentExpression;
         }
     }
 }

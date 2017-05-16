@@ -113,24 +113,10 @@
                 onModelCreating,
                 () => new SqlServerTestStore<TDbContext>(
                     createContext,
-                    MakeStoreServiceConfigurator<SqlServerModelSource>(onModelCreating, p => new TestSqlServerModelSource(p)),
+                    MakeStoreServiceConfigurator(onModelCreating),
                     initializeDatabase,
                     databaseName),
                 useSharedStore);
-        }
-
-        private class TestSqlServerModelSource : SqlServerModelSource
-        {
-            private readonly TestModelSourceParams testModelSourceParams;
-
-            public TestSqlServerModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
-            {
-                this.testModelSourceParams = p;
-            }
-
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
         }
     }
 }

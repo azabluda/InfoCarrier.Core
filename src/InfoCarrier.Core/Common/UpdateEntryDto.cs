@@ -50,12 +50,12 @@
                 select new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
         }
 
-        public IList<object> GetCurrentValues(IEntityType entityType)
+        public object[] GetCurrentValues(IEntityType entityType)
         {
             return entityType
                 .GetProperties()
                 .Select(p => this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValue)
-                .ToList();
+                .ToArray();
         }
 
         public struct JoinedProperty

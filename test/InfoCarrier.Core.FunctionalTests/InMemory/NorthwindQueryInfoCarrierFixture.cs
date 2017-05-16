@@ -24,14 +24,6 @@
         public override DbContextOptions BuildOptions(IServiceCollection additionalServices = null)
             => this.helper.BuildInfoCarrierOptions(this.testStore.InfoCarrierBackend, additionalServices);
 
-        public override NorthwindContext CreateContext(
-            QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)
-        {
-            NorthwindContext context = this.helper.CreateInfoCarrierContext(this.testStore);
-            context.ChangeTracker.QueryTrackingBehavior = queryTrackingBehavior;
-            return context;
-        }
-
         public void Dispose()
         {
             this.testStore.Dispose();

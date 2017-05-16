@@ -8,23 +8,18 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
-    using Microsoft.Extensions.Logging;
 
     public class InfoCarrierDatabase : Database, IInfoCarrierDatabase
     {
         private readonly IInfoCarrierBackend infoCarrierBackend;
-        private readonly ILogger<InfoCarrierDatabase> logger;
 
         public InfoCarrierDatabase(
-            IQueryCompilationContextFactory queryCompilationContextFactory,
-            IDbContextOptions options,
-            ILogger<InfoCarrierDatabase> logger)
-            : base(queryCompilationContextFactory)
+            DatabaseDependencies dependencies,
+            IDbContextOptions options)
+            : base(dependencies)
         {
-            this.logger = logger;
             this.infoCarrierBackend = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
         }
 

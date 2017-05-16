@@ -1,6 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.Inheritance;
 
@@ -19,8 +20,8 @@
             this.testStore = this.helper.CreateTestStore();
         }
 
-        public override InheritanceContext CreateContext()
-            => this.helper.CreateInfoCarrierContext(this.testStore);
+        public override DbContextOptions BuildOptions()
+            => this.helper.BuildInfoCarrierOptions(this.testStore.InfoCarrierBackend);
 
         public void Dispose()
         {

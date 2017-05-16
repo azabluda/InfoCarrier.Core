@@ -2,11 +2,12 @@ namespace InfoCarrier.Core.Client
 {
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
+    using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.DependencyInjection.Extensions;
     using Query.ExpressionVisitors.Internal;
     using Query.Internal;
     using Storage.Internal;
@@ -14,43 +15,27 @@ namespace InfoCarrier.Core.Client
 
     public static class InfoCarrierServiceCollectionExtensions
     {
-        public static IServiceCollection AddEntityFrameworkInfoCarrierBackend(this IServiceCollection services)
+        public static IServiceCollection AddEntityFrameworkInfoCarrierBackend(this IServiceCollection serviceCollection)
         {
-            services.AddEntityFramework();
+            var builder = new EntityFrameworkServicesBuilder(serviceCollection)
+                .TryAdd<IDatabaseProvider, DatabaseProvider<InfoCarrierOptionsExtension>>()
+                .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
+                .TryAdd<IDatabase>(p => p.GetService<IInfoCarrierDatabase>())
+                .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
+                .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
+                .TryAdd<IQueryContextFactory, InfoCarrierQueryContextFactory>()
+                .TryAdd<IQueryCompilationContextFactory, InfoCarrierQueryCompilationContextFactory>()
+                .TryAdd<IEntityQueryModelVisitorFactory, InfoCarrierQueryModelVisitorFactory>()
+                .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
+                .TryAdd<IMemberAccessBindingExpressionVisitorFactory, InfoCarrierMemberAccessBindingExpressionVisitorFactory>()
+                .TryAdd<IProjectionExpressionVisitorFactory, InfoCarrierProjectionExpressionVisitorFactory>()
+                .TryAddProviderSpecificServices(b => b
+                    .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
+                    .TryAddScoped<IMaterializerFactory, MaterializerFactory>());
 
-            services.Replace(
-                new ServiceDescriptor(
-                    typeof(IMemberAccessBindingExpressionVisitorFactory),
-                    typeof(InfoCarrierMemberAccessBindingExpressionVisitorFactory),
-                    ServiceLifetime.Scoped));
+            builder.TryAddCoreServices();
 
-            services.Replace(
-                new ServiceDescriptor(
-                    typeof(IProjectionExpressionVisitorFactory),
-                    typeof(InfoCarrierProjectionExpressionVisitorFactory),
-                    ServiceLifetime.Scoped));
-
-            services.TryAddEnumerable(ServiceDescriptor
-                .Singleton<IDatabaseProvider, DatabaseProvider<InfoCarrierDatabaseProviderServices, InfoCarrierOptionsExtension>>());
-
-            services.TryAdd(new ServiceCollection()
-                .AddSingleton<InfoCarrierValueGeneratorCache>()
-                .AddSingleton<InfoCarrierModelSource>()
-                .AddScoped<InfoCarrierValueGeneratorSelector>()
-                .AddScoped<InfoCarrierDatabaseProviderServices>()
-                .AddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
-                .AddScoped<InfoCarrierTransactionManager>()
-                .AddScoped<InfoCarrierDatabaseCreator>()
-                .AddQuery());
-
-            return services;
+            return serviceCollection;
         }
-
-        private static IServiceCollection AddQuery(this IServiceCollection serviceCollection)
-            => serviceCollection
-                .AddScoped<InfoCarrierQueryCompilationContextFactory>()
-                .AddScoped<InfoCarrierQueryContextFactory>()
-                .AddScoped<InfoCarrierQueryModelVisitorFactory>()
-                .AddScoped<InfoCarrierEntityQueryableExpressionVisitorFactory>();
     }
 }

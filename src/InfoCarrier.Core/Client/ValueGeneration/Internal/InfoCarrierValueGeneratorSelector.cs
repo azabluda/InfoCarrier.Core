@@ -10,8 +10,8 @@
         private readonly TemporaryNumberValueGeneratorFactory numberFactory
             = new TemporaryNumberValueGeneratorFactory();
 
-        public InfoCarrierValueGeneratorSelector(IValueGeneratorCache cache)
-            : base(cache)
+        public InfoCarrierValueGeneratorSelector(ValueGeneratorSelectorDependencies dependencies)
+            : base(dependencies)
         {
         }
 

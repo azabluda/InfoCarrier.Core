@@ -142,62 +142,15 @@
                 : new DbUpdateException(dbUpdateException.Message, dbUpdateException.InnerException);
         }
 
-        protected static Action<IServiceCollection> MakeStoreServiceConfigurator<TModelSource>(
-            Action<ModelBuilder> onModelCreating,
-            Func<TestModelSourceParams, TModelSource> creator)
-            where TModelSource : ModelSource
+        protected static Action<IServiceCollection> MakeStoreServiceConfigurator(
+            Action<ModelBuilder> onModelCreating)
         {
             if (onModelCreating == null)
             {
                 return _ => { };
             }
 
-            return services => services.AddSingleton(provider => creator(new TestModelSourceParams(provider, onModelCreating)));
-        }
-
-        protected class TestModelSourceParams
-        {
-            public TestModelSourceParams(IServiceProvider provider, Action<ModelBuilder> onModelCreating)
-            {
-                this.SetFinder = provider.GetRequiredService<IDbSetFinder>();
-                this.CoreConventionSetBuilder = provider.GetRequiredService<ICoreConventionSetBuilder>();
-                this.ModelCustomizer = new ModelCustomizer();
-                this.ModelCacheKeyFactory = new ModelCacheKeyFactory();
-
-                var testModelSource = new TestModelSource(
-                    onModelCreating,
-                    this.SetFinder,
-                    this.CoreConventionSetBuilder,
-                    new ModelCustomizer(),
-                    new ModelCacheKeyFactory());
-
-                this.GetModel = (context, conventionSetBuilder, modelValidator)
-                    => testModelSource.GetModel(context, conventionSetBuilder, modelValidator);
-            }
-
-            public IDbSetFinder SetFinder { get; }
-
-            public ICoreConventionSetBuilder CoreConventionSetBuilder { get; }
-
-            public IModelCustomizer ModelCustomizer { get; }
-
-            public IModelCacheKeyFactory ModelCacheKeyFactory { get; }
-
-            public Func<DbContext, IConventionSetBuilder, IModelValidator, IModel> GetModel { get; }
-        }
-
-        protected class TestInfoCarrierModelSource : InfoCarrierModelSource
-        {
-            private readonly TestModelSourceParams testModelSourceParams;
-
-            public TestInfoCarrierModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
-            {
-                this.testModelSourceParams = p;
-            }
-
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
+            return services => services.AddSingleton(TestModelSource.GetFactory(onModelCreating));
         }
     }
 }

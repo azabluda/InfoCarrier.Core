@@ -147,7 +147,7 @@
             public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
             {
-                this.stateManager = dbContext.GetInfrastructure().GetRequiredService<IStateManager>();
+                this.stateManager = dbContext.GetInfrastructure<IServiceProvider>().GetRequiredService<IStateManager>();
             }
 
             protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>

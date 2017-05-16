@@ -11,21 +11,16 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
-    using Microsoft.Extensions.Logging;
 
     public class InfoCarrierTransactionManager : IDbContextTransactionManager
     {
         public InfoCarrierTransactionManager(
-            IDbContextOptions options,
-            ILogger<InfoCarrierTransactionManager> logger)
+            IDbContextOptions options)
         {
-            this.Logger = logger;
             this.InfoCarrierBackend = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
         }
 
         internal IInfoCarrierBackend InfoCarrierBackend { get; }
-
-        internal ILogger<InfoCarrierTransactionManager> Logger { get; }
 
         public virtual IDbContextTransaction CurrentTransaction { get; protected set; }
 
@@ -75,6 +70,11 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             this.CurrentTransaction?.Dispose();
             this.CurrentTransaction = null;
+        }
+
+        public void Reset()
+        {
+            throw new NotImplementedException();
         }
     }
 }
