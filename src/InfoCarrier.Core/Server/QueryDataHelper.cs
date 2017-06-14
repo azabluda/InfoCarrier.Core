@@ -204,6 +204,12 @@
                         dto.Add(@"__EntityIsTracked", true);
                     }
 
+                    dto.Add(
+                        @"__EntityLoadedNavigations",
+                        entry.EntityType.GetNavigations()
+                            .Where(n => entry.IsLoaded(n))
+                            .Select(n => n.Name).ToList());
+
                     foreach (MemberEntry prop in entry.ToEntityEntry().Members)
                     {
                         dto.Add(

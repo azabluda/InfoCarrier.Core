@@ -12,6 +12,7 @@
     using Aqua.Dynamic;
     using Common;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
@@ -125,7 +126,7 @@
             private readonly QueryContext queryContext;
             private readonly IEntityMaterializerSource entityMaterializerSource;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
-            private readonly List<object> trackedEntities = new List<object>();
+            private readonly List<Action<IStateManager>> trackEntityActions = new List<Action<IStateManager>>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
             private readonly Aqua.TypeSystem.ITypeResolver typeResolver;
@@ -184,11 +185,9 @@
 
                 var result = this.Map<TResult>(dataRecords);
 
-                foreach (var entry in this.trackedEntities
-                    .Select(o => this.queryContext.StateManager.GetOrCreateEntry(o))
-                    .Where(e => e.EntityState == EntityState.Detached))
+                foreach (var action in this.trackEntityActions)
                 {
-                    entry.ToEntityEntry().State = EntityState.Unchanged;
+                    action(this.queryContext.StateManager);
                 }
 
                 return result;
@@ -388,10 +387,44 @@
                         throwOnNullKey: false);
 
                 this.map.Add(dobj, entity);
+                object entityNoRef = entity;
 
                 if (dobj.PropertyNames.Contains(@"__EntityIsTracked"))
                 {
-                    this.trackedEntities.Add(entity);
+                    this.trackEntityActions.Add(stateManager =>
+                    {
+                        var entry = stateManager.GetOrCreateEntry(entityNoRef);
+                        if (entry.EntityState == EntityState.Detached)
+                        {
+                            entry.ToEntityEntry().State = EntityState.Unchanged;
+                        }
+                    });
+                }
+
+                if (dobj.TryGet(@"__EntityLoadedNavigations", out object ln))
+                {
+                    var loadedNavigations = new HashSet<string>(
+                        ln as IEnumerable<string> ?? Enumerable.Empty<string>());
+
+                    this.trackEntityActions.Add(stateManager =>
+                    {
+                        var entry = stateManager.TryGetEntry(entityNoRef);
+                        if (entry == null)
+                        {
+                            return;
+                        }
+
+                        foreach (INavigation nav in entry.EntityType.GetNavigations())
+                        {
+                            bool loaded = loadedNavigations.Contains(nav.Name);
+                            if (!loaded && !nav.IsCollection() && nav.GetGetter().GetClrValue(entityNoRef) != null)
+                            {
+                                continue;
+                            }
+
+                            entry.SetIsLoaded(nav, loaded);
+                        }
+                    });
                 }
 
                 // Set navigation properties AFTER adding to map to avoid endless recursion
