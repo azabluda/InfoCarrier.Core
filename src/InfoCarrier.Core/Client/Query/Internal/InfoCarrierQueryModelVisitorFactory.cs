@@ -13,7 +13,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 QueryCompilationContext queryCompilationContext, EntityQueryModelVisitor parentEntityQueryModelVisitor)
             => new InfoCarrierQueryModelVisitor(
                 this.Dependencies,
-                queryCompilationContext,
-                parentEntityQueryModelVisitor is null);
+                queryCompilationContext);
+
+        private class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
+        {
+            public InfoCarrierQueryModelVisitor(
+                EntityQueryModelVisitorDependencies dependencies,
+                QueryCompilationContext queryCompilationContext)
+                : base(dependencies, queryCompilationContext)
+            {
+            }
+        }
     }
 }

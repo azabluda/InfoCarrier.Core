@@ -1,4 +1,4 @@
-namespace InfoCarrier.Core.Client.Query.Internal
+﻿namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
     using System.Collections;
@@ -6,12 +6,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using System.Runtime.ExceptionServices;
     using System.Threading;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Common;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Extensions.Internal;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -20,368 +22,98 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Storage;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
-    using Remotion.Linq;
-    using Remotion.Linq.Clauses;
-    using Remotion.Linq.Clauses.Expressions;
-    using ExpressionVisitorBase = Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase;
+    using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
 
-    public partial class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
+    public class InfoCarrierQueryCompiler : IQueryCompiler
     {
-        private static readonly TypeInfo SubqueryInjectorClass =
-            typeof(NavigationRewritingExpressionVisitor).GetTypeInfo()
-                .GetDeclaredNestedType("NavigationRewritingQueryModelVisitor")
-                .GetDeclaredNestedType("SubqueryInjector");
-
-        private static readonly MethodInfo ExecuteAsyncQueryMethod
-            = Utils.GetMethodInfo(() => ExecuteAsyncQuery<object>(null, null, null, null))
-                .GetGenericMethodDefinition();
-
-        private static readonly MethodInfo ExecuteQueryMethod
-            = Utils.GetMethodInfo(() => ExecuteQuery<object>(null, null, null, null))
-                .GetGenericMethodDefinition();
-
         private static readonly MethodInfo MakeGenericGroupingMethod
             = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                 .GetGenericMethodDefinition();
 
-        private static readonly MethodInfo ToListMethod
-            = Utils.GetMethodInfo(() => Enumerable.ToList<object>(null))
-                .GetGenericMethodDefinition();
+        private static readonly MethodInfo ExecuteQueryMethod
+            = typeof(InfoCarrierQueryCompiler).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteQuery));
 
-        private readonly IEntityMaterializerSource entityMaterializerSource;
-        private readonly bool isRoot;
+        private static readonly IEvaluatableExpressionFilter EvaluatableExpressionFilter
+            = new EvaluatableExpressionFilter();
 
-        public InfoCarrierQueryModelVisitor(
-            EntityQueryModelVisitorDependencies dependencies,
-            QueryCompilationContext queryCompilationContext,
-            bool isRoot)
-            : base(dependencies, queryCompilationContext)
+        private readonly IQueryContextFactory queryContextFactory;
+        private readonly IInterceptingLogger<LoggerCategory.Query> logger;
+
+        public InfoCarrierQueryCompiler(
+            IQueryContextFactory queryContextFactory,
+            IInterceptingLogger<LoggerCategory.Query> logger)
         {
-            this.entityMaterializerSource = dependencies.EntityMaterializerSource;
-            this.isRoot = isRoot;
+            this.queryContextFactory = queryContextFactory;
+            this.logger = logger;
         }
 
-        private bool ExpressionIsQueryable =>
-            this.Expression != null
-            && this.Expression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Any();
+        public Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query)
+            => queryContext => this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteAsyncQuery();
 
-        private bool ExpressionIsAsyncEnumerable =>
-            this.Expression != null
-            && this.Expression.Type.GetGenericTypeImplementations(typeof(IAsyncEnumerable<>)).Any();
-
-        private InfoCarrierLinqOperatorProvider InfoCarrierLinqOperatorProvider =>
-            this.ExpressionIsQueryable
-                ? InfoCarrierQueryableLinqOperatorProvider.Instance
-                : InfoCarrierEnumerableLinqOperatorProvider.Instance;
-
-        public override ILinqOperatorProvider LinqOperatorProvider =>
-            this.ExpressionIsAsyncEnumerable
-                ? (ILinqOperatorProvider)new AsyncLinqOperatorProvider()
-                : this.InfoCarrierLinqOperatorProvider;
-
-        public override void VisitQueryModel(QueryModel queryModel)
+        public Func<QueryContext, Task<TResult>> CreateCompiledAsyncTaskQuery<TResult>(Expression query)
         {
-            base.VisitQueryModel(queryModel);
-
-            // CreateAsyncQueryExecutor requires the expression type to be generic
-            // which is not the case since we are building synchronous LINQ expressions
-            // even for async queries.
-            // UGLY: apply dummy ToSequence wrapper to the expression
-            if (this.isRoot && ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async)
+            var exec = this.CreateCompiledAsyncEnumerableQuery<TResult>(query);
+            return async queryContext =>
             {
-                this.Expression
-                    = Expression.Call(
-                        this.LinqOperatorProvider.ToSequence.MakeGenericMethod(this.Expression.Type),
-                        this.Expression);
-            }
-        }
-
-        protected override void SingleResultToSequence(QueryModel queryModel, Type type = null)
-        {
-            // UGLY: unapply dummy ToSequence wrapper temporarily added in VisitQueryModel
-            if (this.Expression is MethodCallExpression mc
-                && mc.Method.MethodIsClosedFormOf(this.LinqOperatorProvider.ToSequence))
-            {
-                this.Expression = mc.Arguments.Single();
-            }
-
-            base.SingleResultToSequence(queryModel, type);
-        }
-
-        private static IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>(
-            QueryContext queryContext,
-            QueryCompilationContext queryCompilationContext,
-            IEntityMaterializerSource entityMaterializerSource,
-            Expression expression)
-        {
-            return new QueryExecutor<TResult>(
-                queryContext, queryCompilationContext, entityMaterializerSource, expression)
-                .ExecuteAsyncQuery();
-        }
-
-        private static IEnumerable<TResult> ExecuteQuery<TResult>(
-            QueryContext queryContext,
-            QueryCompilationContext queryCompilationContext,
-            IEntityMaterializerSource entityMaterializerSource,
-            Expression expression)
-        {
-            return new QueryExecutor<TResult>(
-                queryContext, queryCompilationContext, entityMaterializerSource, expression)
-                .ExecuteQuery();
-        }
-
-        protected override void TrackEntitiesInResults<TResult>(QueryModel queryModel)
-        {
-            // Unwrap expression (revert SingleResultToSequence)
-            Expression linqExpression = this.Expression;
-            if (linqExpression is MethodCallExpression call)
-            {
-                if (call.Method.MethodIsClosedFormOf(this.LinqOperatorProvider.ToSequence))
+                var asyncEnumerable = exec(queryContext);
+                using (var asyncEnumerator = asyncEnumerable.GetEnumerator())
                 {
-                    linqExpression = call.Arguments.Single();
+                    await asyncEnumerator.MoveNext(queryContext.CancellationToken);
+                    return asyncEnumerator.Current;
                 }
-            }
-
-            // Replace ToSequence with ExecuteQuery
-            MethodInfo execQueryMethod =
-                ((InfoCarrierQueryCompilationContext)this.QueryCompilationContext).Async
-                    ? ExecuteAsyncQueryMethod
-                    : ExecuteQueryMethod;
-
-            Type resultType = Utils.TryGetQueryResultSequenceType(linqExpression.Type) ?? linqExpression.Type;
-
-            this.Expression
-                = Expression.Call(
-                    execQueryMethod
-                        .MakeGenericMethod(resultType),
-                    QueryContextParameter,
-                    Expression.Constant(this.QueryCompilationContext),
-                    Expression.Constant(this.entityMaterializerSource),
-                    Expression.Constant(linqExpression));
-
-            // Track results
-            base.TrackEntitiesInResults<TResult>(queryModel);
+            };
         }
 
-        public override void VisitAdditionalFromClause(
-            AdditionalFromClause fromClause,
-            QueryModel queryModel,
-            int index)
+        public Func<QueryContext, TResult> CreateCompiledQuery<TResult>(Expression query)
         {
-            // UGLY: this method is a shameless copy-and-paste of
-            // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L709
-            // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
-            // otherwise Remote.Linq's serializaion would fail.
-            // Additionally we determine and use 'firstParamDelegateType' in ExpressionIsQueryable case.
-            var fromExpression
-                = this.CompileAdditionalFromClauseExpression(fromClause, queryModel);
-
-            var innerItemParameter
-                = Expression.Parameter(
-                    fromExpression.Type.GetSequenceType(), fromClause.ItemName);
-
-            var transparentIdentifierType = GetTransparentIdentifierType(
-                this.CurrentParameter.Type,
-                innerItemParameter.Type);
-
-            MethodInfo miSelectMany
-                = this.LinqOperatorProvider.SelectMany
-                    .MakeGenericMethod(
-                        this.CurrentParameter.Type,
-                        innerItemParameter.Type,
-                        transparentIdentifierType);
-
-            Type firstParamDelegateType = miSelectMany.GetParameters()[1].ParameterType;
-            if (this.ExpressionIsQueryable)
+            Type sequenceType = Utils.TryGetQueryResultSequenceType(typeof(TResult));
+            if (sequenceType == null)
             {
-                firstParamDelegateType = firstParamDelegateType.GenericTypeArguments[0];
-            }
-
-            this.Expression
-                = Expression.Call(
-                    miSelectMany,
-                    this.Expression,
-                    Expression.Lambda(firstParamDelegateType, fromExpression, this.CurrentParameter),
-                    Expression.Lambda(
-                        this.CallCreateTransparentIdentifier(
-                            transparentIdentifierType, this.CurrentParameter, innerItemParameter),
-                        this.CurrentParameter,
-                        innerItemParameter));
-
-            this.IntroduceTransparentScope(fromClause, queryModel, index, transparentIdentifierType);
-        }
-
-        public override void VisitOrdering(Ordering ordering, QueryModel queryModel, OrderByClause orderByClause, int index)
-        {
-            Expression expression = this.ReplaceClauseReferences(ordering.Expression);
-
-            MethodInfo miOrdering = index == 0
-                ? (ordering.OrderingDirection == OrderingDirection.Asc
-                    ? this.InfoCarrierLinqOperatorProvider.OrderBy
-                    : this.InfoCarrierLinqOperatorProvider.OrderByDescending)
-                : (ordering.OrderingDirection == OrderingDirection.Asc
-                    ? this.InfoCarrierLinqOperatorProvider.ThenBy
-                    : this.InfoCarrierLinqOperatorProvider.ThenByDescending);
-
-            this.Expression
-                = Expression.Call(
-                    miOrdering.MakeGenericMethod(this.CurrentParameter.Type, expression.Type),
-                    this.Expression,
-                    Expression.Lambda(expression, this.CurrentParameter));
-        }
-
-        public override void VisitJoinClause(JoinClause joinClause, QueryModel queryModel, int index)
-        {
-            // UGLY: this method is a shameless copy-and-paste of
-            // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L765
-            // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
-            // otherwise Remote.Linq's serializaion would fail.
-            var outerKeySelectorExpression
-                = this.ReplaceClauseReferences(joinClause.OuterKeySelector, joinClause);
-
-            var innerSequenceExpression
-                = this.CompileJoinClauseInnerSequenceExpression(joinClause, queryModel);
-
-            var innerItemParameter
-                = Expression.Parameter(
-                    innerSequenceExpression.Type.GetSequenceType(), joinClause.ItemName);
-
-            if (!this.QueryCompilationContext.QuerySourceMapping.ContainsMapping(joinClause))
-            {
-                this.QueryCompilationContext.QuerySourceMapping
-                    .AddMapping(joinClause, innerItemParameter);
-            }
-
-            var innerKeySelectorExpression
-                = this.ReplaceClauseReferences(joinClause.InnerKeySelector, joinClause);
-
-            var transparentIdentifierType = GetTransparentIdentifierType(
-                this.CurrentParameter.Type,
-                innerItemParameter.Type);
-
-            this.Expression
-                = Expression.Call(
-                    this.LinqOperatorProvider.Join
-                        .MakeGenericMethod(
-                            this.CurrentParameter.Type,
-                            innerItemParameter.Type,
-                            outerKeySelectorExpression.Type,
-                            transparentIdentifierType),
-                    this.Expression,
-                    innerSequenceExpression,
-                    Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
-                    Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
-                    Expression.Lambda(
-                        this.CallCreateTransparentIdentifier(
-                            transparentIdentifierType,
-                            this.CurrentParameter,
-                            innerItemParameter),
-                        this.CurrentParameter,
-                        innerItemParameter));
-
-            this.IntroduceTransparentScope(joinClause, queryModel, index, transparentIdentifierType);
-        }
-
-        public override void VisitGroupJoinClause(GroupJoinClause groupJoinClause, QueryModel queryModel, int index)
-        {
-            // UGLY: this method is a shameless copy-and-paste of
-            // https://github.com/aspnet/EntityFramework/blob/1.0.0/src/Microsoft.EntityFrameworkCore/Query/EntityQueryModelVisitor.cs#L838
-            // We need to replace EFC's TransparentIdentifiers with regular anonymous types,
-            // otherwise Remote.Linq's serializaion would fail.
-            var outerKeySelectorExpression
-                = this.ReplaceClauseReferences(groupJoinClause.JoinClause.OuterKeySelector, groupJoinClause);
-
-            var innerSequenceExpression
-                = this.CompileGroupJoinInnerSequenceExpression(groupJoinClause, queryModel);
-
-            var innerItemParameter
-                = Expression.Parameter(
-                    innerSequenceExpression.Type.GetSequenceType(),
-                    groupJoinClause.JoinClause.ItemName);
-
-            if (!this.QueryCompilationContext.QuerySourceMapping.ContainsMapping(groupJoinClause.JoinClause))
-            {
-                this.QueryCompilationContext.QuerySourceMapping
-                    .AddMapping(groupJoinClause.JoinClause, innerItemParameter);
+                return queryContext => this.ExecuteQuery<TResult>(queryContext, query).First();
             }
             else
             {
-                this.QueryCompilationContext.QuerySourceMapping
-                    .ReplaceMapping(groupJoinClause.JoinClause, innerItemParameter);
-            }
-
-            var innerKeySelectorExpression
-                = this.ReplaceClauseReferences(groupJoinClause.JoinClause.InnerKeySelector, groupJoinClause);
-
-            var innerItemsParameter
-                = Expression.Parameter(
-                    this.LinqOperatorProvider.MakeSequenceType(innerItemParameter.Type),
-                    groupJoinClause.ItemName);
-
-            var transparentIdentifierType
-                = GetTransparentIdentifierType(this.CurrentParameter.Type, innerItemsParameter.Type);
-
-            this.Expression
-                = Expression.Call(
-                    this.LinqOperatorProvider.GroupJoin
-                        .MakeGenericMethod(
-                            this.CurrentParameter.Type,
-                            innerItemParameter.Type,
-                            outerKeySelectorExpression.Type,
-                            transparentIdentifierType),
-                    this.Expression,
-                    innerSequenceExpression,
-                    Expression.Lambda(outerKeySelectorExpression, this.CurrentParameter),
-                    Expression.Lambda(innerKeySelectorExpression, innerItemParameter),
-                    Expression.Lambda(
-                        this.CallCreateTransparentIdentifier(
-                            transparentIdentifierType,
-                            this.CurrentParameter,
-                            innerItemsParameter),
-                        this.CurrentParameter,
-                        innerItemsParameter));
-
-            this.IntroduceTransparentScope(groupJoinClause, queryModel, index, transparentIdentifierType);
-        }
-
-        public override TResult BindNavigationPathPropertyExpression<TResult>(
-            Expression propertyExpression,
-            Func<IReadOnlyList<IPropertyBase>, IQuerySource, TResult> propertyBinder)
-        {
-            // UGLY: this is the hackiest thing I ever did! It will break if EF.Core team changes their implementation
-            // https://github.com/aspnet/EntityFramework/blob/rel/1.1.0/src/Microsoft.EntityFrameworkCore/Query/ExpressionVisitors/Internal/NavigationRewritingExpressionVisitor.cs#L1233
-            //
-            // We check if the propertyBinder (local functor) comes from the private class
-            // NavigationRewritingExpressionVisitor.NavigationRewritingQueryModelVisitor.SubqueryInjector
-            // and override the logic a bit.
-            if (propertyBinder.Target.GetType().DeclaringType.GetTypeInfo() == SubqueryInjectorClass)
-            {
-                propertyBinder = (properties, querySource) =>
+                MethodInfo exec = ExecuteQueryMethod.MakeGenericMethod(sequenceType);
+                return queryContext =>
                 {
-                    var navigations = properties.OfType<INavigation>().ToList();
-                    var collectionNavigation = navigations.SingleOrDefault(n => n.IsCollection());
-                    if (collectionNavigation == null)
+                    try
                     {
-                        return default(TResult);
+                        return (TResult)exec.Invoke(this, new object[] { queryContext, query });
                     }
-
-                    // Expand collection property access into subquery (same as in EF.Core)
-                    var targetType = collectionNavigation.GetTargetType().ClrType;
-                    var mainFromClause = new MainFromClause(targetType.Name.Substring(0, 1).ToLowerInvariant(), targetType, propertyExpression);
-                    var selector = new QuerySourceReferenceExpression(mainFromClause);
-                    var subqueryModel = new QueryModel(mainFromClause, new SelectClause(selector));
-                    var subqueryExpression = new SubQueryExpression(subqueryModel);
-
-                    // Convert subquery back to ICollection (in this case to List)
-                    // instead of wrapping into MaterializeCollectionNavigation method call.
-                    return (TResult)(object)Expression.Call(
-                        ToListMethod.MakeGenericMethod(subqueryExpression.Type.GenericTypeArguments),
-                        subqueryExpression);
+                    catch (TargetInvocationException ex)
+                    {
+                        ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                        throw;
+                    }
                 };
             }
-
-            return base.BindNavigationPathPropertyExpression(propertyExpression, propertyBinder);
         }
+
+        private IEnumerable<TResult> ExecuteQuery<TResult>(QueryContext queryContext, Expression query)
+            => this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteQuery();
+
+        private QueryExecutor<TResult> CreateQueryExecutor<TResult>(QueryContext queryContext, Expression query)
+        {
+            var visitor
+                = new ParameterExtractingExpressionVisitor(
+                    EvaluatableExpressionFilter,
+                    queryContext,
+                    this.logger,
+                    true);
+
+            query = visitor.ExtractParameters(query);
+
+            return new QueryExecutor<TResult>(queryContext, query);
+        }
+
+        public TResult Execute<TResult>(Expression query)
+            => this.CreateCompiledQuery<TResult>(query).Invoke(this.queryContextFactory.Create());
+
+        public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(Expression query)
+            => this.CreateCompiledAsyncEnumerableQuery<TResult>(query).Invoke(this.queryContextFactory.Create());
+
+        public Task<TResult> ExecuteAsync<TResult>(Expression query, CancellationToken cancellationToken)
+            => this.CreateCompiledAsyncTaskQuery<TResult>(query).Invoke(this.queryContextFactory.Create());
 
         private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
         {
@@ -391,9 +123,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
         {
             private readonly QueryContext queryContext;
-            private readonly QueryCompilationContext queryCompilationContext;
             private readonly IEntityMaterializerSource entityMaterializerSource;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
+            private readonly List<object> trackedEntities = new List<object>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
             private readonly Aqua.TypeSystem.ITypeResolver typeResolver;
@@ -408,26 +140,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public QueryExecutor(
                 QueryContext queryContext,
-                QueryCompilationContext queryCompilationContext,
-                IEntityMaterializerSource entityMaterializerSource,
                 Expression expression)
                 : this(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, new Aqua.TypeSystem.TypeResolver())
             {
                 this.queryContext = queryContext;
-                this.queryCompilationContext = queryCompilationContext;
-                this.entityMaterializerSource = entityMaterializerSource;
+                this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
                 // Substitute query parameters
-                expression = new SubstituteParametersExpressionVisitor(queryContext, this.queryCompilationContext.Model)
-                    .Visit(expression);
+                expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
 
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
                 expression = Utils.ReplaceNullConditional(expression, true);
 
+                expression = EntityQueryableStubVisitor.Replace(expression);
+
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
-                this.rlinq = expression
-                    .ToRemoteLinqExpression()
+                this.rlinq = expression.ToRemoteLinqExpression()
                     .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
@@ -435,17 +164,34 @@ namespace InfoCarrier.Core.Client.Query.Internal
             public IEnumerable<TResult> ExecuteQuery()
             {
                 IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq);
+                return this.MapAndTrackResults(dataRecords);
+            }
+
+            public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
+            {
+                async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
+                    => this.MapAndTrackResults(await this.infoCarrierBackend.QueryDataAsync(this.rlinq));
+
+                return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());
+            }
+
+            private IEnumerable<TResult> MapAndTrackResults(IEnumerable<DynamicObject> dataRecords)
+            {
                 if (dataRecords == null)
                 {
                     return Enumerable.Repeat(default(TResult), 1);
                 }
 
-                return this.Map<TResult>(dataRecords);
-            }
+                var result = this.Map<TResult>(dataRecords);
 
-            public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
-            {
-                return new AsyncEnumerableAdapter<TResult>(this.infoCarrierBackend.QueryDataAsync(this.rlinq), this);
+                foreach (var entry in this.trackedEntities
+                    .Select(o => this.queryContext.StateManager.GetOrCreateEntry(o))
+                    .Where(e => e.EntityState == EntityState.Detached))
+                {
+                    entry.ToEntityEntry().State = EntityState.Unchanged;
+                }
+
+                return result;
             }
 
             protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
@@ -613,7 +359,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return false;
                 }
 
-                IEntityType entityType = this.queryCompilationContext.Model.FindEntityType(entityTypeName.ToString());
+                IEntityType entityType = this.queryContext.Context.Model.FindEntityType(entityTypeName.ToString());
                 if (entityType == null)
                 {
                     return false;
@@ -638,10 +384,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         new EntityLoadInfo(
                             new ValueBuffer(scalarValues),
                             this.entityMaterializerSource.GetMaterializer(entityType)),
-                        queryStateManager: this.queryCompilationContext.IsTrackingQuery,
+                        queryStateManager: this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll,
                         throwOnNullKey: false);
 
                 this.map.Add(dobj, entity);
+
+                if (dobj.PropertyNames.Contains(@"__EntityIsTracked"))
+                {
+                    this.trackedEntities.Add(entity);
+                }
 
                 // Set navigation properties AFTER adding to map to avoid endless recursion
                 foreach (INavigation navigation in entityType.GetNavigations())
@@ -666,40 +417,26 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
         }
 
-        private class SubstituteParametersExpressionVisitor : ExpressionVisitorBase
+        private class SubstituteParametersExpressionVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
         {
             private static readonly MethodInfo WrapMethod
                 = Utils.GetMethodInfo(() => Wrap<object>(null)).GetGenericMethodDefinition();
 
-            private static readonly MethodInfo GetParameterValueMethod
-                = Utils.GetMethodInfo<SubstituteParametersExpressionVisitor>(x => x.GetParameterValue<object>(null))
-                    .GetGenericMethodDefinition();
-
             private readonly QueryContext queryContext;
-            private readonly IModel model;
 
-            public SubstituteParametersExpressionVisitor(QueryContext queryContext, IModel model)
+            public SubstituteParametersExpressionVisitor(QueryContext queryContext)
             {
                 this.queryContext = queryContext;
-                this.model = model;
             }
 
-            protected override Expression VisitMethodCall(MethodCallExpression node)
+            protected override Expression VisitParameter(ParameterExpression node)
             {
-                Expression maybeInlineEntityProperty = this.TryVisitInlineEntityProperty(node);
-                if (maybeInlineEntityProperty != null)
+                if (node.Name?.StartsWith(CompiledQueryCache.CompiledQueryParameterPrefix, StringComparison.Ordinal) == true)
                 {
-                    return maybeInlineEntityProperty;
-                }
-
-                if (node.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo))
-                {
-                    Type paramType = node.Method.GetGenericArguments().Single();
                     object paramValue =
-                        GetParameterValueMethod
-                            .MakeGenericMethod(paramType)
-                            .ToDelegate<Func<MethodCallExpression, object>>(this)
-                            .Invoke(node);
+                        WrapMethod
+                            .MakeGenericMethod(node.Type)
+                            .Invoke(null, new[] { this.queryContext.ParameterValues[node.Name] });
 
                     return Expression.Property(
                         Expression.Constant(paramValue),
@@ -707,78 +444,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         nameof(ValueWrapper<object>.Value));
                 }
 
-                return base.VisitMethodCall(node);
+                return base.VisitParameter(node);
             }
-
-            private Expression TryVisitInlineEntityProperty(MethodCallExpression node)
-            {
-                if (!node.Method.IsEFPropertyMethod())
-                {
-                    return null;
-                }
-
-                var propertyNameExpression = node.Arguments[1] as ConstantExpression;
-                string propertyName = propertyNameExpression?.Value as string;
-                if (propertyName == null)
-                {
-                    return null;
-                }
-
-                object entity = GetEntity();
-                object GetEntity()
-                {
-                    switch (node.Arguments[0])
-                    {
-                        case ConstantExpression maybeConstant:
-                            return maybeConstant.Value;
-
-                        case MethodCallExpression maybeMethodCall
-                        when maybeMethodCall.Method.MethodIsClosedFormOf(DefaultQueryExpressionVisitor.GetParameterValueMethodInfo):
-                            return
-                                Expression.Lambda<Func<QueryContext, object>>(maybeMethodCall, EntityQueryModelVisitor.QueryContextParameter)
-                                    .Compile()
-                                    .Invoke(this.queryContext);
-
-                        default:
-                            return null;
-                    }
-                }
-
-                if (entity == null)
-                {
-                    return null;
-                }
-
-                IEntityType efType = this.model.FindEntityType(entity.GetType());
-                IProperty efProperty = efType?.FindProperty(propertyName);
-                if (efProperty == null)
-                {
-                    return null;
-                }
-
-                object paramValue =
-                    WrapMethod
-                        .MakeGenericMethod(efProperty.ClrType)
-                        .Invoke(null, new object[] { efProperty.GetGetter().GetClrValue(entity) });
-
-                Expression result = Expression.Property(
-                    Expression.Constant(paramValue),
-                    paramValue.GetType(),
-                    nameof(ValueWrapper<object>.Value));
-
-                if (result.Type != node.Type)
-                {
-                    result = Expression.Convert(result, node.Type);
-                }
-
-                return result;
-            }
-
-            private object GetParameterValue<T>(MethodCallExpression node) => Wrap(
-                Expression
-                    .Lambda<Func<QueryContext, T>>(node, EntityQueryModelVisitor.QueryContextParameter)
-                    .Compile()
-                    .Invoke(this.queryContext));
 
             private static object Wrap<T>(T value) => new ValueWrapper<T> { Value = value };
 
@@ -792,25 +459,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             private readonly Func<IAsyncEnumerator<T>> enumeratorFactory;
 
-            public AsyncEnumerableAdapter(
-                Task<IEnumerable<DynamicObject>> asyncResult,
-                IDynamicObjectMapper mapper)
+            public AsyncEnumerableAdapter(Task<IEnumerable<T>> asyncResult)
             {
                 this.enumeratorFactory =
-                    () => new AsyncEnumerator(MapResultsAsync(asyncResult, mapper));
-            }
-
-            private static async Task<IEnumerable<T>> MapResultsAsync(
-                Task<IEnumerable<DynamicObject>> asyncResult,
-                IDynamicObjectMapper mapper)
-            {
-                IEnumerable<DynamicObject> dataRecords = await asyncResult;
-                if (dataRecords == null)
-                {
-                    return Enumerable.Repeat(default(T), 1);
-                }
-
-                return mapper.Map<T>(dataRecords);
+                    () => new AsyncEnumerator(asyncResult);
             }
 
             public IAsyncEnumerator<T> GetEnumerator() => this.enumeratorFactory();
@@ -827,8 +479,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 public T Current =>
                     this.enumerator == null
-                    ? default(T)
-                    : this.enumerator.Current;
+                        ? default(T)
+                        : this.enumerator.Current;
 
                 public void Dispose()
                 {
@@ -844,6 +496,56 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     return this.enumerator.MoveNext();
                 }
+            }
+        }
+
+        private class EntityQueryableStubVisitor : ExpressionVisitorBase
+        {
+            private static readonly MethodInfo RemoteQueryableStubCreateMethod
+                = Utils.GetMethodInfo(() => RemoteQueryableStub.Create<object>())
+                    .GetGenericMethodDefinition();
+
+            internal static Expression Replace(Expression expression)
+                => new EntityQueryableStubVisitor().Visit(expression);
+
+            protected override Expression VisitConstant(ConstantExpression constantExpression)
+                => constantExpression.IsEntityQueryable()
+                    ? this.VisitEntityQueryable(((IQueryable)constantExpression.Value).ElementType)
+                    : constantExpression;
+
+            private Expression VisitEntityQueryable(Type elementType)
+            {
+                IQueryable stub = RemoteQueryableStubCreateMethod
+                    .MakeGenericMethod(elementType)
+                    .ToDelegate<Func<IQueryable>>()
+                    .Invoke();
+
+                return Expression.Constant(stub);
+            }
+
+            private abstract class RemoteQueryableStub : IRemoteQueryable
+            {
+                public abstract Type ElementType { get; }
+
+                protected static dynamic NotImplemented => throw new NotImplementedException();
+
+                public Expression Expression => NotImplemented;
+
+                public IQueryProvider Provider => NotImplemented;
+
+                public IEnumerator GetEnumerator() => NotImplemented;
+
+                internal static IQueryable<T> Create<T>()
+                {
+                    return new RemoteQueryableStub<T>();
+                }
+            }
+
+            private class RemoteQueryableStub<T> : RemoteQueryableStub, IQueryable<T>
+            {
+                public override Type ElementType => typeof(T);
+
+                IEnumerator<T> IEnumerable<T>.GetEnumerator() => NotImplemented;
             }
         }
     }

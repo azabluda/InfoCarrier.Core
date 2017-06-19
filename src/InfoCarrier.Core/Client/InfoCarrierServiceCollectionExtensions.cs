@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Client
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+    using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.Extensions.DependencyInjection;
@@ -18,17 +19,15 @@ namespace InfoCarrier.Core.Client
         public static IServiceCollection AddEntityFrameworkInfoCarrierBackend(this IServiceCollection serviceCollection)
         {
             var builder = new EntityFrameworkServicesBuilder(serviceCollection)
+                .TryAdd<IQueryCompiler, InfoCarrierQueryCompiler>()
                 .TryAdd<IDatabaseProvider, DatabaseProvider<InfoCarrierOptionsExtension>>()
                 .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
                 .TryAdd<IDatabase>(p => p.GetService<IInfoCarrierDatabase>())
                 .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
                 .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
                 .TryAdd<IQueryContextFactory, InfoCarrierQueryContextFactory>()
-                .TryAdd<IQueryCompilationContextFactory, InfoCarrierQueryCompilationContextFactory>()
                 .TryAdd<IEntityQueryModelVisitorFactory, InfoCarrierQueryModelVisitorFactory>()
                 .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
-                .TryAdd<IMemberAccessBindingExpressionVisitorFactory, InfoCarrierMemberAccessBindingExpressionVisitorFactory>()
-                .TryAdd<IProjectionExpressionVisitorFactory, InfoCarrierProjectionExpressionVisitorFactory>()
                 .TryAddProviderSpecificServices(b => b
                     .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
                     .TryAddScoped<IMaterializerFactory, MaterializerFactory>());

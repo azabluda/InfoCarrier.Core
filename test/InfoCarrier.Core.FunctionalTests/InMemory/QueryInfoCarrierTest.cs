@@ -11,6 +11,12 @@
         }
 
         [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311")]
+        public override void GroupJoin_customers_orders_count_preserves_ordering()
+        {
+            base.GroupJoin_customers_orders_count_preserves_ordering();
+        }
+
+        [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311")]
         public override void GroupJoin_DefaultIfEmpty3()
         {
             base.GroupJoin_DefaultIfEmpty3();

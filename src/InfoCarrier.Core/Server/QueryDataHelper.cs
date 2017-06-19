@@ -199,6 +199,11 @@
                     InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj);
                     dto.Add(@"__EntityType", entry.EntityType.Name);
 
+                    if (entry.EntityState != EntityState.Detached)
+                    {
+                        dto.Add(@"__EntityIsTracked", true);
+                    }
+
                     foreach (MemberEntry prop in entry.ToEntityEntry().Members)
                     {
                         dto.Add(
