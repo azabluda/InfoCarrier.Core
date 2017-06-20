@@ -7,8 +7,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="1.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="1.1.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
-    <PackageReference Include="Remote.Linq" Version="5.4.0-beta-003" />
-    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.4.0-beta-003" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.4.1" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
