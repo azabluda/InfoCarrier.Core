@@ -157,7 +157,9 @@
                 expression = EntityQueryableStubVisitor.Replace(expression);
 
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
-                this.rlinq = expression.ToRemoteLinqExpression()
+                this.rlinq = expression
+                    .SimplifyIncorporationOfRemoteQueryables()
+                    .ToRemoteLinqExpression()
                     .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
