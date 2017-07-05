@@ -124,7 +124,8 @@
             IEnumerable<DynamicObject> result =
                 Remote.Linq.Expressions.ExpressionExtensions.ConvertResultToDynamicObjects(
                     queryResult,
-                    new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver));
+                    new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver),
+                    t => true);
 
             return result;
         }
