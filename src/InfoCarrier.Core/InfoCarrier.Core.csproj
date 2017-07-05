@@ -25,10 +25,10 @@
     <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="aqua-core" Version="4.1.0-beta-002" />
+    <PackageReference Include="aqua-core" Version="4.1.0-beta-005" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="2.0.0-preview1-final" />
     <PackageReference Update="NETStandard.Library" Version="2.0.0-preview1-25301-01" />
-    <PackageReference Include="Remote.Linq" Version="5.5.0-alpha-003" />
+    <PackageReference Include="Remote.Linq" Version="5.5.0-beta-002" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.0.0">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
