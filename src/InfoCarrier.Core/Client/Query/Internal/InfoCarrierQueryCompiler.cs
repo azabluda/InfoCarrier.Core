@@ -34,6 +34,12 @@
         private static readonly MethodInfo ExecuteQueryMethod
             = typeof(InfoCarrierQueryCompiler).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteQuery));
 
+        private static readonly MethodInfo InterceptExceptionsMethod
+            = new LinqOperatorProvider().InterceptExceptions;
+
+        private static readonly MethodInfo AsyncInterceptExceptionsMethod
+            = new AsyncLinqOperatorProvider().InterceptExceptions;
+
         private static readonly IEvaluatableExpressionFilter EvaluatableExpressionFilter
             = new EvaluatableExpressionFilter();
 
@@ -49,7 +55,13 @@
         }
 
         public Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query)
-            => queryContext => this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteAsyncQuery();
+            => queryContext =>
+            {
+                var result = this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteAsyncQuery();
+
+                return (IAsyncEnumerable<TResult>)AsyncInterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
+                    .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+            };
 
         public Func<QueryContext, Task<TResult>> CreateCompiledAsyncTaskQuery<TResult>(Expression query)
         {
@@ -91,7 +103,12 @@
         }
 
         private IEnumerable<TResult> ExecuteQuery<TResult>(QueryContext queryContext, Expression query)
-            => this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteQuery();
+        {
+            var result = this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteQuery();
+
+            return (IEnumerable<TResult>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
+                    .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+        }
 
         private QueryExecutor<TResult> CreateQueryExecutor<TResult>(QueryContext queryContext, Expression query)
         {
