@@ -36,10 +36,7 @@
         {
         }
 
-        public virtual Task BeginTransactionAsync()
-        {
-            return Task.FromResult(true);
-        }
+        public virtual Task BeginTransactionAsync() => Task.CompletedTask;
 
         public virtual void CommitTransaction()
         {
