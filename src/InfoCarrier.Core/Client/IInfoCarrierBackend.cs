@@ -9,9 +9,9 @@
 
     public interface IInfoCarrierBackend
     {
-        IEnumerable<DynamicObject> QueryData(Expression rlinq);
+        IEnumerable<DynamicObject> QueryData(Expression rlinq, bool trackQueryResults);
 
-        Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq);
+        Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, bool trackQueryResults);
 
         SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries);
 

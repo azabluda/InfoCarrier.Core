@@ -34,9 +34,15 @@
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
 
-        public QueryDataHelper(Func<DbContext> dbContextFactory, Remote.Linq.Expressions.Expression rlinq)
+        public QueryDataHelper(
+            Func<DbContext> dbContextFactory,
+            Remote.Linq.Expressions.Expression rlinq,
+            bool trackQueryResults)
         {
             this.dbContext = dbContextFactory();
+            this.dbContext.ChangeTracker.QueryTrackingBehavior = trackQueryResults
+                ? QueryTrackingBehavior.TrackAll
+                : QueryTrackingBehavior.NoTracking;
 
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed

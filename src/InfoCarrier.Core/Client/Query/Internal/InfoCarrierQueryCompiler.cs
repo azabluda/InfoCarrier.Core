@@ -181,16 +181,19 @@
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
 
+            private bool TrackQueryResults
+                => this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
+
             public IEnumerable<TResult> ExecuteQuery()
             {
-                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq);
+                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq, this.TrackQueryResults);
                 return this.MapAndTrackResults(dataRecords);
             }
 
             public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
             {
                 async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
-                    => this.MapAndTrackResults(await this.infoCarrierBackend.QueryDataAsync(this.rlinq));
+                    => this.MapAndTrackResults(await this.infoCarrierBackend.QueryDataAsync(this.rlinq, this.TrackQueryResults));
 
                 return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());
             }

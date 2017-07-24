@@ -6,13 +6,9 @@
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Client;
-    using Client.Infrastructure.Internal;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
@@ -53,17 +49,17 @@
         {
         }
 
-        public IEnumerable<DynamicObject> QueryData(Expression rlinq)
+        public IEnumerable<DynamicObject> QueryData(Expression rlinq, bool trackQueryResults)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq)))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackQueryResults))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
         }
 
-        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq)
+        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, bool trackQueryResults)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq)))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackQueryResults))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync());
             }
