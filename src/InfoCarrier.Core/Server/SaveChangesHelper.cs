@@ -7,7 +7,9 @@
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
+    using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
@@ -22,12 +24,14 @@
         {
             this.dbContext = dbContextFactory();
 
+            var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
+
             // Materialize entities
             var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
             var entities = new List<object>(request.DataTransferObjects.Count);
             foreach (UpdateEntryDto dto in request.DataTransferObjects)
             {
-                IEntityType entityType = this.dbContext.Model.FindEntityType(dto.EntityTypeName);
+                IEntityType entityType = typeMap[dto.EntityTypeName];
                 var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
                 object entity = entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
                 entities.Add(entity);
@@ -38,47 +42,51 @@
             // Add entities to dbContext
             foreach (var i in entities.Zip(request.DataTransferObjects, (e, d) => new { Entity = e, Dto = d }))
             {
-                this.dbContext.ChangeTracker.TrackGraph(
-                    i.Entity,
-                    node =>
+                InternalEntityEntry internalEntry = this.dbContext.GetInfrastructure<DbContextDependencies>().StateManager.GetOrCreateEntry(i.Entity);
+                entries.Add(internalEntry);
+
+                if (internalEntry.EntityState != EntityState.Detached)
+                {
+                    continue;
+                }
+
+                EntityEntry entry = internalEntry.ToEntityEntry();
+
+                // Correlate properties of DTO and node.Entry
+                var props = i.Dto.JoinScalarProperties(entry);
+
+                // Set Key values
+                foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
+                {
+                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
                     {
-                        // Correlate properties of DTO and node.Entry
-                        var props = i.Dto.JoinScalarProperties(node.Entry);
+                        p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                    }
+                }
 
-                        // Set Key values
-                        foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
-                        {
-                            p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
-                            if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
-                            {
-                                p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
-                            }
-                        }
+                // Set EntityState after PK values (temp or perm) are set.
+                // This will add entities to identity map.
+                entry.State = i.Dto.EntityState;
 
-                        // Set EntityState after PK values (temp or perm) are set.
-                        // This will add entities to identity map.
-                        node.Entry.State = i.Dto.EntityState;
+                // Set non key / non temporary (e.g. TPH discriminators) values
+                foreach (var p in props.Where(
+                    x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
+                {
+                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
+                    {
+                        p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                    }
 
-                        // Set non key / non temporary (e.g. TPH discriminators) values
-                        foreach (var p in props.Where(
-                            x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
-                        {
-                            p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
-                            if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
-                            {
-                                p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
-                            }
-                            p.EfProperty.IsModified = p.DtoProperty.IsModified;
-                        }
+                    p.EfProperty.IsModified = p.DtoProperty.IsModified;
+                }
 
-                        // Mark temporary values
-                        foreach (var p in props.Where(x => x.DtoProperty.IsTemporary))
-                        {
-                            p.EfProperty.IsTemporary = true;
-                        }
-
-                        entries.Add(node.Entry.GetInfrastructure());
-                    });
+                // Mark temporary values
+                foreach (var p in props.Where(x => x.DtoProperty.IsTemporary))
+                {
+                    p.EfProperty.IsTemporary = true;
+                }
             }
 
             // Replace temporary PKs coming from client with generated values (e.g. HiLoSequence)

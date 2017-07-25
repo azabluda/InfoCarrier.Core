@@ -19,7 +19,7 @@
 
         public UpdateEntryDto(IUpdateEntry entry)
         {
-            this.EntityTypeName = entry.EntityType.Name;
+            this.EntityTypeName = entry.EntityType.DisplayName();
             this.EntityState = entry.EntityState;
             this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
