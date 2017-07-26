@@ -2,7 +2,9 @@
 {
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Xunit;
 
+    [Collection("SqlServer")]
     public class GraphUpdatesInfoCarrierTest
         : GraphUpdatesTestBase<TestStoreBase, GraphUpdatesInfoCarrierTest.GraphUpdatesInfoCarrierFixture>
     {

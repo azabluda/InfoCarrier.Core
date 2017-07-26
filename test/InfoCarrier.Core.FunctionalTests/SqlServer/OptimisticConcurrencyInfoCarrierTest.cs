@@ -3,7 +3,9 @@
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ConcurrencyModel;
+    using Xunit;
 
+    [Collection("SqlServer")]
     public class OptimisticConcurrencyInfoCarrierTest
         : OptimisticConcurrencyTestBase<TestStoreBase, OptimisticConcurrencyInfoCarrierTest.OptimisticConcurrencyInfoCarrierFixture>
     {

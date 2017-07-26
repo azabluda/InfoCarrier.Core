@@ -2,7 +2,9 @@
 {
     using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.FunkyDataModel;
+    using Xunit;
 
+    [Collection("SqlServer")]
     public class FunkyDataQueryInfoCarrierTest
         : FunkyDataQueryTestBase<TestStoreBase, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
     {
