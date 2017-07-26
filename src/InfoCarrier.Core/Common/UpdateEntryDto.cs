@@ -30,6 +30,20 @@
                     IsModified = prop.IsModified,
                     IsTemporary = prop.IsTemporary,
                 }).ToList();
+
+            if (entry.EntityType.HasDelegatedIdentity())
+            {
+                var ownership = entry.EntityType.GetForeignKeys().Single(fk => fk.IsOwnership);
+                this.DelegatedIdentityDatas = ownership.Properties.Select(
+                    prop => new PropertyData
+                    {
+                        Name = prop.Name,
+                        OriginalValue = entry.GetOriginalValue(prop),
+                        CurrentValue = entry.GetCurrentValue(prop),
+                        IsModified = entry.IsModified(prop),
+                        IsTemporary = entry.HasTemporaryValue(prop),
+                    }).ToList();
+            }
         }
 
         [DataMember]
@@ -40,6 +54,9 @@
 
         [DataMember]
         private List<PropertyData> PropertyDatas { get; } = new List<PropertyData>();
+
+        [DataMember]
+        private List<PropertyData> DelegatedIdentityDatas { get; } = new List<PropertyData>();
 
         public IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
         {
@@ -56,6 +73,11 @@
                 .GetProperties()
                 .Select(p => this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValue)
                 .ToArray();
+        }
+
+        public object[] GetDelegatedIdentityKeys()
+        {
+            return this.DelegatedIdentityDatas.Select(d => d.CurrentValue).ToArray();
         }
 
         public struct JoinedProperty

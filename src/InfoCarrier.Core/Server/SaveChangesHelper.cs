@@ -25,35 +25,47 @@
             this.dbContext = dbContextFactory();
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
+            IStateManager stateManager = this.dbContext.GetInfrastructure<DbContextDependencies>().StateManager;
 
-            // Materialize entities
+            // Materialize entities and add entries to dbContext
             var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
-            var entities = new List<object>(request.DataTransferObjects.Count);
-            foreach (UpdateEntryDto dto in request.DataTransferObjects)
+            var entries = request.DataTransferObjects.Select(dto =>
             {
                 IEntityType entityType = typeMap[dto.EntityTypeName];
-                var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
-                object entity = entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
-                entities.Add(entity);
-            }
 
-            var entries = new List<IUpdateEntry>(entities.Count);
-
-            // Add entities to dbContext
-            foreach (var i in entities.Zip(request.DataTransferObjects, (e, d) => new { Entity = e, Dto = d }))
-            {
-                InternalEntityEntry internalEntry = this.dbContext.GetInfrastructure<DbContextDependencies>().StateManager.GetOrCreateEntry(i.Entity);
-                entries.Add(internalEntry);
-
-                if (internalEntry.EntityState != EntityState.Detached)
+                object MaterializeEntity()
                 {
-                    continue;
+                    var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
+                    return entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
                 }
 
-                EntityEntry entry = internalEntry.ToEntityEntry();
+                EntityEntry entry;
+                if (entityType.HasDelegatedIdentity())
+                {
+                    // Here we assume that the owner entry is already in the context
+                    InternalEntityEntry ownerEntry = stateManager.TryGetEntry(
+                        entityType.DefiningEntityType.FindPrimaryKey(),
+                        dto.GetDelegatedIdentityKeys());
 
-                // Correlate properties of DTO and node.Entry
-                var props = i.Dto.JoinScalarProperties(entry);
+                    ReferenceEntry referenceEntry = ownerEntry.ToEntityEntry().Reference(entityType.DefiningNavigationName);
+                    if (referenceEntry.CurrentValue == null)
+                    {
+                        referenceEntry.CurrentValue = MaterializeEntity();
+                    }
+                    entry = referenceEntry.TargetEntry;
+                }
+                else
+                {
+                    entry = stateManager.GetOrCreateEntry(MaterializeEntity()).ToEntityEntry();
+                }
+
+                if (entry.State != EntityState.Detached)
+                {
+                    return entry;
+                }
+
+                // Correlate properties of DTO and entry
+                var props = dto.JoinScalarProperties(entry);
 
                 // Set Key values
                 foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
@@ -67,7 +79,7 @@
 
                 // Set EntityState after PK values (temp or perm) are set.
                 // This will add entities to identity map.
-                entry.State = i.Dto.EntityState;
+                entry.State = dto.EntityState;
 
                 // Set non key / non temporary (e.g. TPH discriminators) values
                 foreach (var p in props.Where(
@@ -87,11 +99,13 @@
                 {
                     p.EfProperty.IsTemporary = true;
                 }
-            }
+
+                return entry;
+            }).ToList();
 
             // Replace temporary PKs coming from client with generated values (e.g. HiLoSequence)
             var valueGeneratorSelector = this.dbContext.GetService<IValueGeneratorSelector>();
-            foreach (EntityEntry entry in entries.Select(e => e.ToEntityEntry()))
+            foreach (EntityEntry entry in entries)
             {
                 foreach (PropertyEntry tempPk in
                     entry.Properties.Where(p =>
@@ -108,7 +122,7 @@
                 }
             }
 
-            this.Entries = entries;
+            this.Entries = entries.Select(e => e.GetInfrastructure()).ToList();
         }
 
         public IEnumerable<IUpdateEntry> Entries { get; }
