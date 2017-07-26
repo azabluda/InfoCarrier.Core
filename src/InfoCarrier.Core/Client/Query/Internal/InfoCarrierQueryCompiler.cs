@@ -79,7 +79,11 @@
 
         public Func<QueryContext, TResult> CreateCompiledQuery<TResult>(Expression query)
         {
-            Type sequenceType = Utils.TryGetQueryResultSequenceType(typeof(TResult));
+            Type sequenceType =
+                typeof(TResult) == typeof(IEnumerable)
+                ? typeof(object)
+                : Utils.TryGetQueryResultSequenceType(typeof(TResult));
+
             if (sequenceType == null)
             {
                 return queryContext => this.ExecuteQuery<TResult>(queryContext, query).First();
