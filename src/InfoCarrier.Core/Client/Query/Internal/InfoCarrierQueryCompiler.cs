@@ -211,6 +211,8 @@
 
                 var result = this.Map<TResult>(dataRecords);
 
+                this.queryContext.BeginTrackingQuery();
+
                 foreach (var action in this.trackEntityActions)
                 {
                     action(this.queryContext.StateManager);
@@ -396,10 +398,11 @@
                 }
 
                 // Map only scalar properties for now, navigations must be set later
-                object[] scalarValues = entityType
-                    .GetProperties()
-                    .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
-                    .ToArray();
+                var valueBuffer = new ValueBuffer(
+                    entityType
+                        .GetProperties()
+                        .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
+                        .ToArray());
 
                 // Get entity instance from EFC's identity map, or create a new one
                 entity = this.queryContext
@@ -407,7 +410,7 @@
                     .GetEntity(
                         entityType.FindPrimaryKey(),
                         new EntityLoadInfo(
-                            new ValueBuffer(scalarValues),
+                            valueBuffer,
                             this.entityMaterializerSource.GetMaterializer(entityType)),
                         queryStateManager: this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll,
                         throwOnNullKey: false);
@@ -417,14 +420,8 @@
 
                 if (dobj.PropertyNames.Contains(@"__EntityIsTracked"))
                 {
-                    this.trackEntityActions.Add(stateManager =>
-                    {
-                        var entry = stateManager.GetOrCreateEntry(entityNoRef);
-                        if (entry.EntityState == EntityState.Detached)
-                        {
-                            entry.ToEntityEntry().State = EntityState.Unchanged;
-                        }
-                    });
+                    this.trackEntityActions.Add(
+                        sm => sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null));
                 }
 
                 if (dobj.TryGet(@"__EntityLoadedNavigations", out object ln))
