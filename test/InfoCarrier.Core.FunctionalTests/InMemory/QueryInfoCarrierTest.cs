@@ -22,18 +22,6 @@
             base.GroupJoin_DefaultIfEmpty3();
         }
 
-        [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311#issuecomment-278652479")]
-        public override void OfType_Select()
-        {
-            base.OfType_Select();
-        }
-
-        [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/4311#issuecomment-278652479")]
-        public override void OfType_Select_OfType_Select()
-        {
-            base.OfType_Select_OfType_Select();
-        }
-
         [Fact(Skip = "Client-side evaluation not fully supported")]
         public override void Client_Join_select_many()
         {
