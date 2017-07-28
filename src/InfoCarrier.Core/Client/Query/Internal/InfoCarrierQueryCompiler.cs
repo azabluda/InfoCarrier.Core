@@ -13,6 +13,7 @@
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+    using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
@@ -151,6 +152,7 @@
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
             private readonly Aqua.TypeSystem.ITypeResolver typeResolver;
+            private readonly bool trackQueryResults;
 
             private QueryExecutor(
                 DynamicObjectMapperSettings settings,
@@ -169,6 +171,12 @@
                 this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
+                // Inspect expression for AsTracking/AsNoTracking modifiers
+                var findTrackingModifierVisitor = new FindTrackingModifierVisitor();
+                findTrackingModifierVisitor.Visit(expression);
+                this.trackQueryResults = findTrackingModifierVisitor.IsTracking ??
+                    this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
+
                 // Substitute query parameters
                 expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
 
@@ -185,19 +193,16 @@
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
 
-            private bool TrackQueryResults
-                => this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
-
             public IEnumerable<TResult> ExecuteQuery()
             {
-                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq, this.TrackQueryResults);
+                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq, this.trackQueryResults);
                 return this.MapAndTrackResults(dataRecords);
             }
 
             public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
             {
                 async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
-                    => this.MapAndTrackResults(await this.infoCarrierBackend.QueryDataAsync(this.rlinq, this.TrackQueryResults));
+                    => this.MapAndTrackResults(await this.infoCarrierBackend.QueryDataAsync(this.rlinq, this.trackQueryResults));
 
                 return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());
             }
@@ -412,7 +417,7 @@
                         new EntityLoadInfo(
                             valueBuffer,
                             this.entityMaterializerSource.GetMaterializer(entityType)),
-                        queryStateManager: this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll,
+                        queryStateManager: this.trackQueryResults,
                         throwOnNullKey: false);
 
                 this.map.Add(dobj, entity);
@@ -470,6 +475,33 @@
                 }
 
                 return true;
+            }
+        }
+
+        private class FindTrackingModifierVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
+        {
+            private static readonly MethodInfo AsTrackingMethodInfo
+                = typeof(EntityFrameworkQueryableExtensions)
+                    .GetTypeInfo().GetDeclaredMethod(nameof(EntityFrameworkQueryableExtensions.AsTracking));
+
+            private static readonly MethodInfo AsNoTrackingMethodInfo
+                = typeof(EntityFrameworkQueryableExtensions)
+                    .GetTypeInfo().GetDeclaredMethod(nameof(EntityFrameworkQueryableExtensions.AsNoTracking));
+
+            public bool? IsTracking { get; private set; }
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (node.Method.MethodIsClosedFormOf(AsTrackingMethodInfo))
+                {
+                    this.IsTracking = true;
+                }
+                else if (node.Method.MethodIsClosedFormOf(AsNoTrackingMethodInfo))
+                {
+                    this.IsTracking = false;
+                }
+
+                return base.VisitMethodCall(node);
             }
         }
 
