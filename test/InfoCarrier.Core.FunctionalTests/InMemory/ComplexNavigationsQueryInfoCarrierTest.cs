@@ -15,5 +15,11 @@
         {
             base.Nested_group_join_with_take();
         }
+
+        [Fact(Skip = "Client-side evaluation not fully supported")]
+        public override void Complex_query_with_optional_navigations_and_client_side_evaluation()
+        {
+            base.Complex_query_with_optional_navigations_and_client_side_evaluation();
+        }
     }
 }
