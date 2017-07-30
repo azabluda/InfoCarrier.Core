@@ -42,12 +42,31 @@
                 EntityEntry entry;
                 if (entityType.HasDelegatedIdentity())
                 {
-                    // Here we assume that the owner entry is already in the context
-                    InternalEntityEntry ownerEntry = stateManager.TryGetEntry(
-                        entityType.DefiningEntityType.FindPrimaryKey(),
-                        dto.GetDelegatedIdentityKeys());
+                    object[] keyValues = dto.GetDelegatedIdentityKeys();
 
-                    ReferenceEntry referenceEntry = ownerEntry.ToEntityEntry().Reference(entityType.DefiningNavigationName);
+                    // Here we assume that the owner entry is already present in the context
+                    EntityEntry ownerEntry = stateManager.TryGetEntry(
+                        entityType.DefiningEntityType.FindPrimaryKey(),
+                        keyValues)?.ToEntityEntry();
+
+                    // If not, then we create a dummy instance, set only PK values, and track it as Unchanged
+                    if (ownerEntry == null)
+                    {
+                        var pkProps = entityType.DefiningEntityType.FindPrimaryKey().Properties.ToList();
+                        var ownerValueBuffer = new ValueBuffer(
+                            entityType.DefiningEntityType.GetProperties().Select(p =>
+                            {
+                                int idx = pkProps.IndexOf(p);
+                                return idx < 0
+                                    ? p.ClrType.GetDefaultValue()
+                                    : keyValues[idx];
+                            }).ToArray());
+                        object ownerEntity = entityMaterializerSource.GetMaterializer(entityType.DefiningEntityType).Invoke(ownerValueBuffer);
+                        ownerEntry = stateManager.GetOrCreateEntry(ownerEntity, entityType.DefiningEntityType).ToEntityEntry();
+                        ownerEntry.State = EntityState.Unchanged;
+                    }
+
+                    ReferenceEntry referenceEntry = ownerEntry.Reference(entityType.DefiningNavigationName);
                     if (referenceEntry.CurrentValue == null)
                     {
                         referenceEntry.CurrentValue = MaterializeEntity();
@@ -57,11 +76,6 @@
                 else
                 {
                     entry = stateManager.GetOrCreateEntry(MaterializeEntity()).ToEntityEntry();
-                }
-
-                if (entry.State != EntityState.Detached)
-                {
-                    return entry;
                 }
 
                 // Correlate properties of DTO and entry

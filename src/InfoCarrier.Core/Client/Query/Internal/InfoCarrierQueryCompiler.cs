@@ -146,6 +146,7 @@
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
         {
             private readonly QueryContext queryContext;
+            private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
             private readonly IEntityMaterializerSource entityMaterializerSource;
             private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
             private readonly List<Action<IStateManager>> trackEntityActions = new List<Action<IStateManager>>();
@@ -168,6 +169,7 @@
                 : this(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, new Aqua.TypeSystem.TypeResolver())
             {
                 this.queryContext = queryContext;
+                this.entityTypeMap = this.queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
                 this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
@@ -391,8 +393,7 @@
                     return false;
                 }
 
-                IEntityType entityType = this.queryContext.Context.Model.FindEntityType(entityTypeName.ToString());
-                if (entityType == null)
+                if (!this.entityTypeMap.TryGetValue(entityTypeName.ToString(), out IEntityType entityType))
                 {
                     return false;
                 }
@@ -410,15 +411,18 @@
                         .ToArray());
 
                 // Get entity instance from EFC's identity map, or create a new one
-                entity = this.queryContext
-                    .QueryBuffer
-                    .GetEntity(
-                        entityType.FindPrimaryKey(),
-                        new EntityLoadInfo(
-                            valueBuffer,
-                            this.entityMaterializerSource.GetMaterializer(entityType)),
-                        queryStateManager: this.trackQueryResults,
-                        throwOnNullKey: false);
+                Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
+                entity =
+                    this.queryContext
+                        .QueryBuffer
+                        .GetEntity(
+                            entityType.FindPrimaryKey(),
+                            new EntityLoadInfo(
+                                valueBuffer,
+                                materializer),
+                            queryStateManager: this.trackQueryResults,
+                            throwOnNullKey: false)
+                    ?? materializer.Invoke(valueBuffer);
 
                 this.map.Add(dobj, entity);
                 object entityNoRef = entity;

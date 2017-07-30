@@ -13,6 +13,8 @@
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
@@ -194,40 +196,47 @@
                 }
 
                 // Special mapping of entities
-                if (this.stateManager.Context.Model.FindEntityType(objType) != null)
+                IEntityType entityType = this.stateManager.Context.Model.FindEntityType(objType);
+                if (entityType != null)
                 {
-                    if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
-                    {
-                        return dto;
-                    }
-
-                    this.cachedEntities.Add(obj, dto = new DynamicObject(objType));
-
-                    InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj);
-                    dto.Add(@"__EntityType", entry.EntityType.Name);
-
-                    if (entry.EntityState != EntityState.Detached)
-                    {
-                        dto.Add(@"__EntityIsTracked", true);
-                    }
-
-                    dto.Add(
-                        @"__EntityLoadedNavigations",
-                        entry.EntityType.GetNavigations()
-                            .Where(n => entry.IsLoaded(n))
-                            .Select(n => n.Name).ToList());
-
-                    foreach (MemberEntry prop in entry.ToEntityEntry().Members)
-                    {
-                        dto.Add(
-                            prop.Metadata.Name,
-                            this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation));
-                    }
-
-                    return dto;
+                    return this.MapToDynamicObjectGraph(obj, setTypeInformation, entityType);
                 }
 
                 return base.MapToDynamicObjectGraph(obj, setTypeInformation);
+            }
+
+            private DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation, IEntityType entityType)
+            {
+                if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
+                {
+                    return dto;
+                }
+
+                this.cachedEntities.Add(obj, dto = new DynamicObject(obj.GetType()));
+
+                InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj, entityType);
+                dto.Add(@"__EntityType", entry.EntityType.DisplayName());
+
+                if (entry.EntityState != EntityState.Detached)
+                {
+                    dto.Add(@"__EntityIsTracked", true);
+                }
+
+                dto.Add(
+                    @"__EntityLoadedNavigations",
+                    entry.EntityType.GetNavigations()
+                        .Where(n => entry.IsLoaded(n))
+                        .Select(n => n.Name).ToList());
+
+                foreach (MemberEntry prop in entry.ToEntityEntry().Members)
+                {
+                    DynamicObject value = prop is ReferenceEntry refProp && refProp.TargetEntry != null
+                        ? this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation, refProp.TargetEntry.Metadata)
+                        : this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation);
+                    dto.Add(prop.Metadata.Name, value);
+                }
+
+                return dto;
             }
 
             private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
