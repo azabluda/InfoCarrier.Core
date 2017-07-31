@@ -5,10 +5,6 @@
     using System.Data.SqlClient;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
-    using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.Extensions.DependencyInjection;
 
     public class SqlServerTestStore<TDbContext> : TestStoreImplBase<TDbContext>
@@ -96,7 +92,7 @@
             var builder = new SqlConnectionStringBuilder(@"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30")
             {
                 MultipleActiveResultSets = multipleActiveResultSets,
-                InitialCatalog = name
+                InitialCatalog = name,
             };
 
             return builder.ToString();
