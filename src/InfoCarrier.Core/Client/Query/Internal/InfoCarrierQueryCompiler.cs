@@ -32,8 +32,8 @@
             = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                 .GetGenericMethodDefinition();
 
-        private static readonly MethodInfo ExecuteQueryMethod
-            = typeof(InfoCarrierQueryCompiler).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteQuery));
+        private static readonly MethodInfo CreateCompiledEnumerableQueryMethod
+            = typeof(InfoCarrierQueryCompiler).GetTypeInfo().GetDeclaredMethod(nameof(CreateCompiledEnumerableQuery));
 
         private static readonly MethodInfo InterceptExceptionsMethod
             = new LinqOperatorProvider().InterceptExceptions;
@@ -45,41 +45,63 @@
             = new EvaluatableExpressionFilter();
 
         private readonly IQueryContextFactory queryContextFactory;
+        private readonly ICompiledQueryCache compiledQueryCache;
+        private readonly ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator;
         private readonly IInterceptingLogger<LoggerCategory.Query> logger;
 
         public InfoCarrierQueryCompiler(
             IQueryContextFactory queryContextFactory,
+            ICompiledQueryCache compiledQueryCache,
+            ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator,
             IInterceptingLogger<LoggerCategory.Query> logger)
         {
             this.queryContextFactory = queryContextFactory;
+            this.compiledQueryCache = compiledQueryCache;
+            this.compiledQueryCacheKeyGenerator = compiledQueryCacheKeyGenerator;
             this.logger = logger;
         }
 
         public Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query)
-            => queryContext =>
-            {
-                var result = this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteAsyncQuery();
+            => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, true);
 
+        private Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query, bool extractParams)
+        {
+            if (extractParams)
+            {
+                using (QueryContext qc = this.queryContextFactory.Create())
+                {
+                    query = this.ExtractParameters(query, qc, false);
+                }
+            }
+
+            var inspectedQuery = new InspectedQuery(query);
+            return queryContext =>
+            {
+                IAsyncEnumerable<TResult> result = inspectedQuery.ExecuteAsync<TResult>(queryContext);
                 return (IAsyncEnumerable<TResult>)AsyncInterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
                     .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
             };
+        }
 
         public Func<QueryContext, Task<TResult>> CreateCompiledAsyncTaskQuery<TResult>(Expression query)
         {
-            var exec = this.CreateCompiledAsyncEnumerableQuery<TResult>(query);
-            return async queryContext =>
-            {
-                var asyncEnumerable = exec(queryContext);
-                using (var asyncEnumerator = asyncEnumerable.GetEnumerator())
-                {
-                    await asyncEnumerator.MoveNext(queryContext.CancellationToken);
-                    return asyncEnumerator.Current;
-                }
-            };
+            var compiledAsyncQuery = this.CreateCompiledAsyncEnumerableQuery<TResult>(query);
+            return queryContext => AsyncEnumerableFirst(compiledAsyncQuery(queryContext), queryContext.CancellationToken);
         }
 
         public Func<QueryContext, TResult> CreateCompiledQuery<TResult>(Expression query)
+            => this.CreateCompiledQuery<TResult>(query, true);
+
+        private Func<QueryContext, TResult> CreateCompiledQuery<TResult>(Expression query, bool extractParams)
         {
+            if (extractParams)
+            {
+                using (QueryContext qc = this.queryContextFactory.Create())
+                {
+                    query = this.ExtractParameters(query, qc, false);
+                }
+            }
+
             Type sequenceType =
                 typeof(TResult) == typeof(IEnumerable)
                 ? typeof(object)
@@ -87,60 +109,115 @@
 
             if (sequenceType == null)
             {
-                return queryContext => this.ExecuteQuery<TResult>(queryContext, query).First();
+                return queryContext => this.CreateCompiledEnumerableQuery<TResult>(query)(queryContext).First();
             }
-            else
+
+            try
             {
-                MethodInfo exec = ExecuteQueryMethod.MakeGenericMethod(sequenceType);
-                return queryContext =>
-                {
-                    try
-                    {
-                        return (TResult)exec.Invoke(this, new object[] { queryContext, query });
-                    }
-                    catch (TargetInvocationException ex)
-                    {
-                        ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-                        throw;
-                    }
-                };
+                return (Func<QueryContext, TResult>)CreateCompiledEnumerableQueryMethod.MakeGenericMethod(sequenceType)
+                    .Invoke(this, new object[] { query });
+            }
+            catch (TargetInvocationException ex)
+            {
+                ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                throw;
             }
         }
 
-        private IEnumerable<TResult> ExecuteQuery<TResult>(QueryContext queryContext, Expression query)
+        private Func<QueryContext, IEnumerable<TResult>> CreateCompiledEnumerableQuery<TResult>(Expression query)
         {
-            var result = this.CreateQueryExecutor<TResult>(queryContext, query).ExecuteQuery();
-
-            return (IEnumerable<TResult>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
+            var inspectedQuery = new InspectedQuery(query);
+            return queryContext =>
+            {
+                IEnumerable<TResult> result = inspectedQuery.Execute<TResult>(queryContext);
+                return (IEnumerable<TResult>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
                     .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+            };
         }
 
-        private QueryExecutor<TResult> CreateQueryExecutor<TResult>(QueryContext queryContext, Expression query)
+        private Expression ExtractParameters(
+            Expression query,
+            QueryContext queryContext,
+            bool parameterize)
         {
             var visitor
                 = new ParameterExtractingExpressionVisitor(
                     EvaluatableExpressionFilter,
                     queryContext,
                     this.logger,
-                    true);
+                    parameterize);
 
-            query = visitor.ExtractParameters(query);
+            return visitor.ExtractParameters(query);
+        }
 
-            return new QueryExecutor<TResult>(queryContext, query);
+        private static async Task<TResult> AsyncEnumerableFirst<TResult>(
+            IAsyncEnumerable<TResult> asyncEnumerable,
+            CancellationToken cancellationToken)
+        {
+            using (var asyncEnumerator = asyncEnumerable.GetEnumerator())
+            {
+                await asyncEnumerator.MoveNext(cancellationToken);
+                return asyncEnumerator.Current;
+            }
         }
 
         public TResult Execute<TResult>(Expression query)
-            => this.CreateCompiledQuery<TResult>(query).Invoke(this.queryContextFactory.Create());
+        {
+            QueryContext queryContext = this.queryContextFactory.Create();
+            query = this.ExtractParameters(query, queryContext, true);
+            return this.compiledQueryCache.GetOrAddQuery(
+                this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, false),
+                () => this.CreateCompiledQuery<TResult>(query, false)).Invoke(queryContext);
+        }
 
         public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(Expression query)
-            => this.CreateCompiledAsyncEnumerableQuery<TResult>(query).Invoke(this.queryContextFactory.Create());
+        {
+            QueryContext queryContext = this.queryContextFactory.Create();
+            query = this.ExtractParameters(query, queryContext, true);
+            return this.compiledQueryCache.GetOrAddAsyncQuery(
+                this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, true),
+                () => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, false)).Invoke(queryContext);
+        }
 
         public Task<TResult> ExecuteAsync<TResult>(Expression query, CancellationToken cancellationToken)
-            => this.CreateCompiledAsyncTaskQuery<TResult>(query).Invoke(this.queryContextFactory.Create());
+        {
+            return AsyncEnumerableFirst(this.ExecuteAsync<TResult>(query), cancellationToken);
+        }
 
         private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
         {
             return elements.GroupBy(x => key).Single();
+        }
+
+        private sealed class InspectedQuery
+        {
+            public InspectedQuery(Expression expression)
+            {
+                // Inspect expression for AsTracking/AsNoTracking modifiers
+                var findTrackingModifierVisitor = new FindTrackingModifierVisitor();
+                findTrackingModifierVisitor.Visit(expression);
+                this.IsTrackingQuery = findTrackingModifierVisitor.IsTracking;
+
+                // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
+                expression = Utils.ReplaceNullConditional(expression, true);
+
+                // Replace EntityQueryable with stub
+                expression = EntityQueryableStubVisitor.Replace(expression);
+
+                this.Expression = expression;
+            }
+
+            public bool? IsTrackingQuery { get; }
+
+            public Expression Expression { get; }
+
+            public Aqua.TypeSystem.ITypeResolver TypeResolver { get; } = new Aqua.TypeSystem.TypeResolver();
+
+            public IEnumerable<TResult> Execute<TResult>(QueryContext queryContext)
+                => new QueryExecutor<TResult>(this, queryContext).ExecuteQuery();
+
+            public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(QueryContext queryContext)
+                => new QueryExecutor<TResult>(this, queryContext).ExecuteAsyncQuery();
         }
 
         private sealed class QueryExecutor<TResult> : DynamicObjectMapper
@@ -152,46 +229,28 @@
             private readonly List<Action<IStateManager>> trackEntityActions = new List<Action<IStateManager>>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
-            private readonly Aqua.TypeSystem.ITypeResolver typeResolver;
             private readonly bool trackQueryResults;
 
-            private QueryExecutor(
-                DynamicObjectMapperSettings settings,
-                Aqua.TypeSystem.ITypeResolver typeResolver)
-                : base(settings, typeResolver)
-            {
-                this.typeResolver = typeResolver;
-            }
-
-            public QueryExecutor(
-                QueryContext queryContext,
-                Expression expression)
-                : this(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, new Aqua.TypeSystem.TypeResolver())
+            public QueryExecutor(InspectedQuery inspectedQuery, QueryContext queryContext)
+                : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, inspectedQuery.TypeResolver)
             {
                 this.queryContext = queryContext;
-                this.entityTypeMap = this.queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
+                this.entityTypeMap = queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
                 this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
+                this.trackQueryResults = inspectedQuery.IsTrackingQuery ??
+                    queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
 
-                // Inspect expression for AsTracking/AsNoTracking modifiers
-                var findTrackingModifierVisitor = new FindTrackingModifierVisitor();
-                findTrackingModifierVisitor.Visit(expression);
-                this.trackQueryResults = findTrackingModifierVisitor.IsTracking ??
-                    this.queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
+                Expression expression = inspectedQuery.Expression;
 
                 // Substitute query parameters
                 expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(expression);
-
-                // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
-                expression = Utils.ReplaceNullConditional(expression, true);
-
-                expression = EntityQueryableStubVisitor.Replace(expression);
 
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 this.rlinq = expression
                     .SimplifyIncorporationOfRemoteQueryables()
                     .ToRemoteLinqExpression()
-                    .ReplaceQueryableByResourceDescriptors(this.typeResolver)
+                    .ReplaceQueryableByResourceDescriptors(inspectedQuery.TypeResolver)
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
             }
 
