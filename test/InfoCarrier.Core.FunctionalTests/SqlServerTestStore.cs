@@ -89,7 +89,11 @@
 
         private static string CreateConnectionString(string name, bool multipleActiveResultSets)
         {
-            var builder = new SqlConnectionStringBuilder(@"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30")
+            string connectionString =
+                Environment.GetEnvironmentVariable(@"Test__SqlServer__DefaultConnection")
+                ?? @"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30";
+
+            var builder = new SqlConnectionStringBuilder(connectionString)
             {
                 MultipleActiveResultSets = multipleActiveResultSets,
                 InitialCatalog = name,
