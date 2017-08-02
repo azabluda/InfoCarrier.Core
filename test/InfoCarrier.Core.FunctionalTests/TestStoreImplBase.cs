@@ -46,17 +46,17 @@
         {
         }
 
-        public IEnumerable<DynamicObject> QueryData(Expression rlinq, bool trackQueryResults)
+        public IEnumerable<DynamicObject> QueryData(Expression rlinq, QueryTrackingBehavior trackingBehavior)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackQueryResults))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackingBehavior))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
         }
 
-        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, bool trackQueryResults)
+        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, QueryTrackingBehavior trackingBehavior)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackQueryResults))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackingBehavior))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync());
             }

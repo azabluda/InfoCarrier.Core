@@ -39,12 +39,10 @@
         public QueryDataHelper(
             Func<DbContext> dbContextFactory,
             Remote.Linq.Expressions.Expression rlinq,
-            bool trackQueryResults)
+            QueryTrackingBehavior trackingBehavior)
         {
             this.dbContext = dbContextFactory();
-            this.dbContext.ChangeTracker.QueryTrackingBehavior = trackQueryResults
-                ? QueryTrackingBehavior.TrackAll
-                : QueryTrackingBehavior.NoTracking;
+            this.dbContext.ChangeTracker.QueryTrackingBehavior = trackingBehavior;
 
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed

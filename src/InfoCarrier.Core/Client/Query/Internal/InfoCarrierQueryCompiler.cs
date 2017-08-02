@@ -13,7 +13,6 @@
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-    using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
@@ -193,11 +192,6 @@
         {
             public InspectedQuery(Expression expression)
             {
-                // Inspect expression for AsTracking/AsNoTracking modifiers
-                var findTrackingModifierVisitor = new FindTrackingModifierVisitor();
-                findTrackingModifierVisitor.Visit(expression);
-                this.IsTrackingQuery = findTrackingModifierVisitor.IsTracking;
-
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
                 expression = Utils.ReplaceNullConditional(expression, true);
 
@@ -206,8 +200,6 @@
 
                 this.Expression = expression;
             }
-
-            public bool? IsTrackingQuery { get; }
 
             public Expression Expression { get; }
 
@@ -229,7 +221,6 @@
             private readonly List<Action<IStateManager>> trackEntityActions = new List<Action<IStateManager>>();
             private readonly IInfoCarrierBackend infoCarrierBackend;
             private readonly Remote.Linq.Expressions.Expression rlinq;
-            private readonly bool trackQueryResults;
 
             public QueryExecutor(InspectedQuery inspectedQuery, QueryContext queryContext)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, inspectedQuery.TypeResolver)
@@ -238,8 +229,6 @@
                 this.entityTypeMap = queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
                 this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                 this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
-                this.trackQueryResults = inspectedQuery.IsTrackingQuery ??
-                    queryContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
 
                 Expression expression = inspectedQuery.Expression;
 
@@ -256,14 +245,21 @@
 
             public IEnumerable<TResult> ExecuteQuery()
             {
-                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(this.rlinq, this.trackQueryResults);
+                IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(
+                    this.rlinq,
+                    this.queryContext.Context.ChangeTracker.QueryTrackingBehavior);
                 return this.MapAndTrackResults(dataRecords);
             }
 
             public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
             {
                 async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
-                    => this.MapAndTrackResults(await this.infoCarrierBackend.QueryDataAsync(this.rlinq, this.trackQueryResults));
+                {
+                    IEnumerable<DynamicObject> dataRecords = await this.infoCarrierBackend.QueryDataAsync(
+                        this.rlinq,
+                        this.queryContext.Context.ChangeTracker.QueryTrackingBehavior);
+                    return this.MapAndTrackResults(dataRecords);
+                }
 
                 return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());
             }
@@ -469,6 +465,8 @@
                         .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
                         .ToArray());
 
+                bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityIsTracked");
+
                 // Get entity instance from EFC's identity map, or create a new one
                 Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
                 entity =
@@ -479,14 +477,14 @@
                             new EntityLoadInfo(
                                 valueBuffer,
                                 materializer),
-                            queryStateManager: this.trackQueryResults,
+                            queryStateManager: entityIsTracked,
                             throwOnNullKey: false)
                     ?? materializer.Invoke(valueBuffer);
 
                 this.map.Add(dobj, entity);
                 object entityNoRef = entity;
 
-                if (dobj.PropertyNames.Contains(@"__EntityIsTracked"))
+                if (entityIsTracked)
                 {
                     this.trackEntityActions.Add(
                         sm => sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null));
@@ -538,33 +536,6 @@
                 }
 
                 return true;
-            }
-        }
-
-        private class FindTrackingModifierVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
-        {
-            private static readonly MethodInfo AsTrackingMethodInfo
-                = typeof(EntityFrameworkQueryableExtensions)
-                    .GetTypeInfo().GetDeclaredMethod(nameof(EntityFrameworkQueryableExtensions.AsTracking));
-
-            private static readonly MethodInfo AsNoTrackingMethodInfo
-                = typeof(EntityFrameworkQueryableExtensions)
-                    .GetTypeInfo().GetDeclaredMethod(nameof(EntityFrameworkQueryableExtensions.AsNoTracking));
-
-            public bool? IsTracking { get; private set; }
-
-            protected override Expression VisitMethodCall(MethodCallExpression node)
-            {
-                if (node.Method.MethodIsClosedFormOf(AsTrackingMethodInfo))
-                {
-                    this.IsTracking = true;
-                }
-                else if (node.Method.MethodIsClosedFormOf(AsNoTrackingMethodInfo))
-                {
-                    this.IsTracking = false;
-                }
-
-                return base.VisitMethodCall(node);
             }
         }
 
