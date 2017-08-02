@@ -1,5 +1,10 @@
 image: Visual Studio 2017
 
+environment:
+  Test__SqlServer__DefaultConnection: Server=(local)\SQL2016;Database=master;User ID=sa;Password=Password12!
+
+services: mssql2016
+
 before_build:
   - dotnet --info
   - dotnet restore
