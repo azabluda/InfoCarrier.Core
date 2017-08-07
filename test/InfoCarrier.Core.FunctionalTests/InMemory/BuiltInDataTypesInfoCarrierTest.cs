@@ -41,7 +41,7 @@
                         String3 = shortString,
                         ByteArray5 = shortBinary,
                         String9000 = longString,
-                        ByteArray9000 = longBinary
+                        ByteArray9000 = longBinary,
                     });
 
                 Assert.Equal(1, context.SaveChanges());

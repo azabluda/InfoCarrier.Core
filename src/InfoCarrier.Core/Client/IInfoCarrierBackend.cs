@@ -4,14 +4,15 @@
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Common;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Update;
     using Remote.Linq.Expressions;
 
     public interface IInfoCarrierBackend
     {
-        IEnumerable<DynamicObject> QueryData(Expression rlinq, bool trackQueryResults);
+        IEnumerable<DynamicObject> QueryData(Expression rlinq, QueryTrackingBehavior trackingBehavior);
 
-        Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, bool trackQueryResults);
+        Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, QueryTrackingBehavior trackingBehavior);
 
         SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries);
 

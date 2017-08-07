@@ -1,5 +1,6 @@
 namespace InfoCarrier.Core.Client.Query.Internal
 {
+    using System;
     using Microsoft.EntityFrameworkCore.Query;
 
     public class InfoCarrierQueryModelVisitorFactory : EntityQueryModelVisitorFactory
@@ -10,19 +11,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
         }
 
         public override EntityQueryModelVisitor Create(
-                QueryCompilationContext queryCompilationContext, EntityQueryModelVisitor parentEntityQueryModelVisitor)
-            => new InfoCarrierQueryModelVisitor(
-                this.Dependencies,
-                queryCompilationContext);
-
-        private class InfoCarrierQueryModelVisitor : EntityQueryModelVisitor
-        {
-            public InfoCarrierQueryModelVisitor(
-                EntityQueryModelVisitorDependencies dependencies,
-                QueryCompilationContext queryCompilationContext)
-                : base(dependencies, queryCompilationContext)
-            {
-            }
-        }
+            QueryCompilationContext queryCompilationContext,
+            EntityQueryModelVisitor parentEntityQueryModelVisitor)
+            => throw new InvalidOperationException(@"InfoCarrier.Core is not using EntityQueryModelVisitor");
     }
 }

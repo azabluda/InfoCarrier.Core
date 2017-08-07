@@ -58,13 +58,13 @@
         [DataMember]
         private List<PropertyData> DelegatedIdentityDatas { get; } = new List<PropertyData>();
 
-        public IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
+        public IReadOnlyList<(PropertyEntry EfProperty, PropertyData DtoProperty)> JoinScalarProperties(EntityEntry entry)
         {
             return (
                 from ef in entry.Properties
                 join dto in this.PropertyDatas
                 on ef.Metadata.Name equals dto.Name
-                select new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
+                select (ef, dto)).ToList();
         }
 
         public object[] GetCurrentValues(IEntityType entityType)
@@ -78,12 +78,6 @@
         public object[] GetDelegatedIdentityKeys()
         {
             return this.DelegatedIdentityDatas.Select(d => d.CurrentValue).ToArray();
-        }
-
-        public struct JoinedProperty
-        {
-            public PropertyEntry EfProperty;
-            public PropertyData DtoProperty;
         }
 
         [DataContract]

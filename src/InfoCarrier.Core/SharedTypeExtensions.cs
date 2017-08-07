@@ -245,7 +245,7 @@ namespace System
             { typeof(uint), default(uint) },
             { typeof(ushort), default(ushort) },
             { typeof(ulong), default(ulong) },
-            { typeof(sbyte), default(sbyte) }
+            { typeof(sbyte), default(sbyte) },
         };
 
         public static object GetDefaultValue(this Type type)
