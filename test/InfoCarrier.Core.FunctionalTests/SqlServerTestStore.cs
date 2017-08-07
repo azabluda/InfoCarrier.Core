@@ -25,7 +25,7 @@
                   {
                       if (initializeDatabase != null)
                       {
-                          c.Database.EnsureDeleted();
+                          EnsureDatabaseDeleted(databaseName);
                           c.Database.EnsureCreated();
                           initializeDatabase(c);
                       }
@@ -117,6 +117,26 @@
                     initializeDatabase,
                     databaseName),
                 useSharedStore);
+        }
+
+        private static void EnsureDatabaseDeleted(string databaseName)
+        {
+            using (var master = new SqlConnection(CreateConnectionString("master", false)))
+            {
+                master.Open();
+                using (var cmd = master.CreateCommand())
+                {
+                    cmd.CommandText = $@"
+                        IF EXISTS (SELECT * FROM sys.databases WHERE name = N'{databaseName}')
+                        BEGIN
+                            ALTER DATABASE[{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                            DROP DATABASE[{databaseName}];
+                        END";
+                    cmd.ExecuteNonQuery();
+                }
+
+                SqlConnection.ClearAllPools();
+            }
         }
     }
 }
