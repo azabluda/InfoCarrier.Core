@@ -128,37 +128,40 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
                 {
-                    Func<object> baseImpl = () => base.MapFromDynamicObjectGraph(obj, targetType);
+                    object BaseImpl() => base.MapFromDynamicObjectGraph(obj, targetType);
 
                     // mapping required?
                     if (obj == null || targetType == obj.GetType())
                     {
-                        return baseImpl();
+                        return BaseImpl();
                     }
 
-                    // is obj an entity?
-                    if (this.TryMapEntity(obj, out object entity))
+                    if (obj is DynamicObject dobj)
                     {
-                        return entity;
-                    }
+                        // is obj an entity?
+                        if (this.TryMapEntity(dobj, out object entity))
+                        {
+                            return entity;
+                        }
 
-                    // is obj an array
-                    if (this.TryMapArray(obj, targetType, out object array))
-                    {
-                        return array;
-                    }
+                        // is obj an array
+                        if (this.TryMapArray(dobj, targetType, out object array))
+                        {
+                            return array;
+                        }
 
-                    // is obj a grouping
-                    if (this.TryMapGrouping(obj, targetType, out object grouping))
-                    {
-                        return grouping;
+                        // is obj a grouping
+                        if (this.TryMapGrouping(dobj, targetType, out object grouping))
+                        {
+                            return grouping;
+                        }
                     }
 
                     // is targetType a collection?
                     Type elementType = Utils.TryGetQueryResultSequenceType(targetType);
                     if (elementType == null)
                     {
-                        return baseImpl();
+                        return BaseImpl();
                     }
 
                     // map to list (supported directly by aqua-core)
@@ -192,53 +195,44 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return Activator.CreateInstance(collType, list);
                 }
 
-                private bool TryMapArray(object obj, Type targetType, out object array)
+                private bool TryMapArray(DynamicObject dobj, Type targetType, out object array)
                 {
                     array = null;
 
-                    if (obj is DynamicObject dobj)
+                    if (dobj.Type != null)
                     {
-                        if (dobj.Type != null)
-                        {
-                            // Our custom mapping of arrays doesn't contain Type
-                            return false;
-                        }
+                        // Our custom mapping of arrays doesn't contain Type
+                        return false;
+                    }
 
-                        if (!dobj.TryGet("Elements", out object elements))
-                        {
-                            return false;
-                        }
+                    if (!dobj.TryGet("Elements", out object elements))
+                    {
+                        return false;
+                    }
 
-                        if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
-                        {
-                            return false;
-                        }
+                    if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
+                    {
+                        return false;
+                    }
 
-                        if (targetType.IsArray)
-                        {
-                            array = this.MapFromDynamicObjectGraph(elements, targetType);
-                            return true;
-                        }
+                    if (targetType.IsArray)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, targetType);
+                        return true;
+                    }
 
-                        if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
-                        {
-                            array = this.MapFromDynamicObjectGraph(elements, typeInfo.Type);
-                            return true;
-                        }
+                    if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, typeInfo.Type);
+                        return true;
                     }
 
                     return false;
                 }
 
-                private bool TryMapGrouping(object obj, Type targetType, out object grouping)
+                private bool TryMapGrouping(DynamicObject dobj, Type targetType, out object grouping)
                 {
                     grouping = null;
-
-                    var dobj = obj as DynamicObject;
-                    if (dobj == null)
-                    {
-                        return false;
-                    }
 
                     Type type = dobj.Type?.Type ?? targetType;
 
@@ -271,15 +265,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return true;
                 }
 
-                private bool TryMapEntity(object obj, out object entity)
+                private bool TryMapEntity(DynamicObject dobj, out object entity)
                 {
                     entity = null;
-
-                    var dobj = obj as DynamicObject;
-                    if (dobj == null)
-                    {
-                        return false;
-                    }
 
                     if (!dobj.TryGet(@"__EntityType", out object entityTypeName))
                     {
