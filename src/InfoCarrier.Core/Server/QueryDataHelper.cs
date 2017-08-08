@@ -217,14 +217,13 @@
 
                 if (entry.EntityState != EntityState.Detached)
                 {
-                    dto.Add(@"__EntityIsTracked", true);
+                    dto.Add(
+                        @"__EntityLoadedCollections",
+                        entry.EntityType.GetNavigations()
+                            .Where(n => n.IsCollection())
+                            .Where(n => entry.IsLoaded(n))
+                            .Select(n => n.Name).ToList());
                 }
-
-                dto.Add(
-                    @"__EntityLoadedNavigations",
-                    entry.EntityType.GetNavigations()
-                        .Where(n => entry.IsLoaded(n))
-                        .Select(n => n.Name).ToList());
 
                 foreach (MemberEntry prop in entry.ToEntityEntry().Members)
                 {

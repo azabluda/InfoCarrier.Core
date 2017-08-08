@@ -296,7 +296,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
                             .ToArray());
 
-                    bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityIsTracked");
+                    bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedCollections");
 
                     // Get entity instance from EFC's identity map, or create a new one
                     Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
@@ -317,32 +317,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     if (entityIsTracked)
                     {
-                        this.trackEntityActions.Add(
-                            sm => sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null));
-                    }
+                        var loadedCollections = dobj.Get<List<string>>(@"__EntityLoadedCollections");
 
-                    if (dobj.TryGet(@"__EntityLoadedNavigations", out object ln))
-                    {
-                        var loadedNavigations = new HashSet<string>(
-                            ln as IEnumerable<string> ?? Enumerable.Empty<string>());
-
-                        this.trackEntityActions.Add(stateManager =>
+                        this.trackEntityActions.Add(sm =>
                         {
-                            var entry = stateManager.TryGetEntry(entityNoRef);
-                            if (entry == null)
-                            {
-                                return;
-                            }
+                            InternalEntityEntry entry
+                                = sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null);
 
-                            foreach (INavigation nav in entry.EntityType.GetNavigations())
+                            foreach (INavigation nav in loadedCollections.Select(name => entry.EntityType.FindNavigation(name)))
                             {
-                                bool loaded = loadedNavigations.Contains(nav.Name);
-                                if (!loaded && !nav.IsCollection() && nav.GetGetter().GetClrValue(entityNoRef) != null)
-                                {
-                                    continue;
-                                }
-
-                                entry.SetIsLoaded(nav, loaded);
+                                entry.SetIsLoaded(nav);
                             }
                         });
                     }
