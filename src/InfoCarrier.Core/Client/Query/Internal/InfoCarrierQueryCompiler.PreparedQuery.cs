@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Reflection;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
+    using Aqua.TypeSystem;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
@@ -20,6 +21,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Storage;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
+    using MethodInfo = System.Reflection.MethodInfo;
 
     public partial class InfoCarrierQueryCompiler
     {
@@ -58,6 +60,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private sealed class QueryExecutor<TResult> : DynamicObjectMapper
             {
                 private readonly QueryContext queryContext;
+                private readonly ITypeResolver typeResolver;
                 private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
                 private readonly IEntityMaterializerSource entityMaterializerSource;
                 private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
@@ -69,6 +72,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, preparedQuery.TypeResolver)
                 {
                     this.queryContext = queryContext;
+                    this.typeResolver = preparedQuery.TypeResolver;
                     this.entityTypeMap = queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
                     this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                     this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
@@ -82,7 +86,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     this.rlinq = expression
                         .SimplifyIncorporationOfRemoteQueryables()
                         .ToRemoteLinqExpression()
-                        .ReplaceQueryableByResourceDescriptors(preparedQuery.TypeResolver)
+                        .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                         .ReplaceGenericQueryArgumentsByNonGenericArguments();
                 }
 
@@ -223,7 +227,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
                     {
-                        array = this.MapFromDynamicObjectGraph(elements, typeInfo.Type);
+                        array = this.MapFromDynamicObjectGraph(elements, typeInfo.ResolveType(this.typeResolver));
                         return true;
                     }
 
