@@ -39,7 +39,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 // Replace EntityQueryable with stub
                 expression = EntityQueryableStubVisitor.Replace(expression);
 
-                this.Expression = expression;
+                this.Expression = expression.SimplifyIncorporationOfRemoteQueryables();
             }
 
             private Expression Expression { get; }
@@ -84,7 +84,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                     this.rlinq = expression
-                        .SimplifyIncorporationOfRemoteQueryables()
                         .ToRemoteLinqExpression()
                         .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                         .ReplaceGenericQueryArgumentsByNonGenericArguments();
