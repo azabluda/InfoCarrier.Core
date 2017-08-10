@@ -35,14 +35,14 @@
 
                 object MaterializeEntity()
                 {
-                    var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
+                    var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType, request.Mapper));
                     return entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
                 }
 
                 EntityEntry entry;
                 if (entityType.HasDelegatedIdentity())
                 {
-                    object[] keyValues = dto.GetDelegatedIdentityKeys();
+                    object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper);
 
                     // Here we assume that the owner entry is already present in the context
                     EntityEntry ownerEntry = stateManager.TryGetEntry(
@@ -79,15 +79,15 @@
                 }
 
                 // Correlate properties of DTO and entry
-                var props = dto.JoinScalarProperties(entry);
+                var props = dto.JoinScalarProperties(entry, request.Mapper);
 
                 // Set Key values
                 foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
                 {
-                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    p.EfProperty.CurrentValue = p.CurrentValue;
                     if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
                     {
-                        p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                        p.EfProperty.OriginalValue = p.OriginalValue;
                     }
                 }
 
@@ -99,10 +99,10 @@
                 foreach (var p in props.Where(
                     x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
                 {
-                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    p.EfProperty.CurrentValue = p.CurrentValue;
                     if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
                     {
-                        p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                        p.EfProperty.OriginalValue = p.OriginalValue;
                     }
 
                     p.EfProperty.IsModified = p.DtoProperty.IsModified;
