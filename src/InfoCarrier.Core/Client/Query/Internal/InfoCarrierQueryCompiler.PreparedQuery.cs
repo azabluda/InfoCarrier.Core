@@ -31,8 +31,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition();
 
-            public PreparedQuery(Expression expression)
+            private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
+
+            public PreparedQuery(Expression expression, IReadOnlyDictionary<string, IEntityType> entityTypeMap)
             {
+                this.entityTypeMap = entityTypeMap;
+
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
                 expression = Utils.ReplaceNullConditional(expression, true);
 
@@ -47,10 +51,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private ITypeResolver TypeResolver { get; } = new TypeResolver();
 
             public IEnumerable<TResult> Execute<TResult>(QueryContext queryContext)
-                => new QueryExecutor<TResult>(this, queryContext).ExecuteQuery();
+                => new QueryExecutor<TResult>(this, queryContext, this.entityTypeMap).ExecuteQuery();
 
             public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(QueryContext queryContext)
-                => new QueryExecutor<TResult>(this, queryContext).ExecuteAsyncQuery();
+                => new QueryExecutor<TResult>(this, queryContext, this.entityTypeMap).ExecuteAsyncQuery();
 
             private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
             {
@@ -68,12 +72,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 private readonly IInfoCarrierBackend infoCarrierBackend;
                 private readonly Remote.Linq.Expressions.Expression rlinq;
 
-                public QueryExecutor(PreparedQuery preparedQuery, QueryContext queryContext)
+                public QueryExecutor(
+                    PreparedQuery preparedQuery,
+                    QueryContext queryContext,
+                    IReadOnlyDictionary<string, IEntityType> entityTypeMap)
                     : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, preparedQuery.TypeResolver)
                 {
                     this.queryContext = queryContext;
                     this.typeResolver = preparedQuery.TypeResolver;
-                    this.entityTypeMap = queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
+                    this.entityTypeMap = entityTypeMap;
                     this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                     this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
