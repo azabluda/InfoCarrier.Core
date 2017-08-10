@@ -238,7 +238,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     grouping = null;
 
-                    Type type = dobj.Type?.Type ?? targetType;
+                    Type type = dobj.Type?.ResolveType(this.typeResolver) ?? targetType;
 
                     if (type == null
                         || !type.GetTypeInfo().IsGenericType
