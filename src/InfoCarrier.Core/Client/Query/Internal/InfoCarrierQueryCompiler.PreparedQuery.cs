@@ -44,7 +44,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private Expression Expression { get; }
 
-            private Aqua.TypeSystem.ITypeResolver TypeResolver { get; } = new Aqua.TypeSystem.TypeResolver();
+            private ITypeResolver TypeResolver { get; } = new TypeResolver();
 
             public IEnumerable<TResult> Execute<TResult>(QueryContext queryContext)
                 => new QueryExecutor<TResult>(this, queryContext).ExecuteQuery();
@@ -381,7 +381,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                         return Expression.Property(
                             Expression.Constant(paramValue),
-                            paramValue.GetType(),
                             nameof(ValueWrapper<object>.Value));
                     }
 
