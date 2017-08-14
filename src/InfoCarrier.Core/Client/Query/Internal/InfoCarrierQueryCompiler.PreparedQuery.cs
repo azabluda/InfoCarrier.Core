@@ -98,20 +98,22 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 public IEnumerable<TResult> ExecuteQuery()
                 {
-                    IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(
-                        this.rlinq,
-                        this.queryContext.Context.ChangeTracker.QueryTrackingBehavior);
-                    return this.MapAndTrackResults(dataRecords);
+                    QueryDataResult result = this.infoCarrierBackend.QueryData(
+                        new QueryDataRequest(
+                            this.rlinq,
+                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior));
+                    return this.MapAndTrackResults(result.MappedResults);
                 }
 
                 public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
                 {
                     async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
                     {
-                        IEnumerable<DynamicObject> dataRecords = await this.infoCarrierBackend.QueryDataAsync(
-                            this.rlinq,
-                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior);
-                        return this.MapAndTrackResults(dataRecords);
+                        QueryDataResult result = await this.infoCarrierBackend.QueryDataAsync(
+                            new QueryDataRequest(
+                                this.rlinq,
+                                this.queryContext.Context.ChangeTracker.QueryTrackingBehavior));
+                        return this.MapAndTrackResults(result.MappedResults);
                     }
 
                     return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());

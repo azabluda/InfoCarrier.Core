@@ -38,16 +38,15 @@
 
         public QueryDataHelper(
             Func<DbContext> dbContextFactory,
-            Remote.Linq.Expressions.Expression rlinq,
-            QueryTrackingBehavior trackingBehavior)
+            QueryDataRequest request)
         {
             this.dbContext = dbContextFactory();
-            this.dbContext.ChangeTracker.QueryTrackingBehavior = trackingBehavior;
+            this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
 
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
             // prematurely)
-            this.linqExpression = rlinq
+            this.linqExpression = request.Query
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
@@ -62,7 +61,7 @@
             this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
-        public IEnumerable<DynamicObject> QueryData()
+        public QueryDataResult QueryData()
         {
             var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
             resultType = resultType == null ? this.linqExpression.Type : typeof(IEnumerable<>).MakeGenericType(resultType);
@@ -88,10 +87,10 @@
                 }
             }
 
-            return this.MapResult(queryResult);
+            return new QueryDataResult(this.MapResult(queryResult));
         }
 
-        public async Task<IEnumerable<DynamicObject>> QueryDataAsync()
+        public async Task<QueryDataResult> QueryDataAsync()
         {
             Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
 
@@ -100,7 +99,7 @@
                 .ToDelegate<Func<Task<object>>>(this)
                 .Invoke();
 
-            return this.MapResult(queryResult);
+            return new QueryDataResult(this.MapResult(queryResult));
         }
 
         private object ExecuteExpression<T>()

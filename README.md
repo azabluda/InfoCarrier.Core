@@ -28,7 +28,7 @@ It is important to note that InfoCarrier.Core dictates neither the communication
 ### Credits:
 InfoCarrier.Core is bringing together the following open source projects
 * [Entity Framework Core](https://github.com/aspnet/EntityFramework) by Microsoft.
-* [Remote.Linq](https://github.com/6bee/Remote.Linq) and [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn. You will notice that we are directly using classes `Remote.Linq.Expressions.Expression` and `Aqua.Dynamic.DynamicObject` from these two libraries.
+* [Remote.Linq](https://github.com/6bee/Remote.Linq) and [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn.
 
 ## Sample
 
@@ -60,23 +60,25 @@ public class BloggingContext : DbContext
 
 Implement `IInfoCarrierBackend` interface, e.g. using Windows Communication Foundation
 ```C#
+using IC = InfoCarrier.Core.Common;
+
 public class WcfBackendImpl : IInfoCarrierBackend
 {
     private readonly ChannelFactory<IMyRemoteService> channelFactory
         = new ChannelFactory<IMyRemoteService>(...);
     
-    public IEnumerable<Aqua.Dynamic.DynamicObject> QueryData(Remote.Linq.Expressions.Expression rlinq)
+    public IC.QueryDataResult QueryData(IC.QueryDataRequest request)
     {
         IMyRemoteService channel = this.channelFactory.CreateChannel()
         using ((IDisposable)channel)
         {
-            return channel.ProcessQueryDataRequest(rlinq);
+            return channel.ProcessQueryDataRequest(request);
         }
     }
 
-    public InfoCarrier.Core.Common.SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)
+    public IC.SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)
     {
-        var request = new InfoCarrier.Core.Common.SaveChangesRequest(entries);
+        var request = new IC.SaveChangesRequest(entries);
 
         IMyRemoteService channel = this.channelFactory.CreateChannel()
         using ((IDisposable)channel)
@@ -104,7 +106,7 @@ using (var context = new BloggingContext(optionsBuilder.Options))
         where owner.login == "hi-its-me"
         where post.Title == "my-blog-post"
         select post).Single();
-    
+
     myBlogPost.Date = DateTime.Now;
 
     context.SaveChanges();
@@ -119,9 +121,9 @@ Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend s
 [ServiceContract]
 public interface IMyRemoteService
 {
-    IEnumerable<DynamicObject> ProcessQueryDataRequest(Remote.Linq.Expressions.Expression rlinq);
-    
-    SaveChangesResult ProcessSaveChangesRequest(SaveChangesResult request);
+    QueryDataResult ProcessQueryDataRequest(QueryDataRequest request);
+
+    SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request);
 }
 
 [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
@@ -134,15 +136,15 @@ public class MyRemoteService : IMyRemoteService
         return new BloggingContext(optionsBuilder.Options);
     }
 
-    public IEnumerable<DynamicObject> ProcessQueryDataRequest(Remote.Linq.Expressions.Expression rlinq)
+    public QueryDataResult ProcessQueryDataRequest(QueryDataRequest request)
     {
-        using (var helper = new QueryDataHelper(this.CreateDbContext, rlinq))
+        using (var helper = new QueryDataHelper(this.CreateDbContext, request))
         {
             return helper.QueryData();
         }
     }
-    
-    public SaveChangesResult ProcessSaveChangesRequest(SaveChangesResult request)
+
+    public SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request)
     {
         using (var helper = new SaveChangesHelper(this.CreateDbContext, request))
         {
