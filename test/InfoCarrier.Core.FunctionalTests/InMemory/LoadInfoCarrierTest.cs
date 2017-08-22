@@ -1,7 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class LoadInfoCarrierTest
         : LoadTestBase<TestStoreBase, LoadInfoCarrierTest.LoadInfoCarrierFixture>

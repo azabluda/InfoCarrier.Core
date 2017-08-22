@@ -1,9 +1,8 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.UpdatesModel;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.TestModels.UpdatesModel;
 
     public class UpdatesInfoCarrierFixture : UpdatesFixtureBase<TestStoreBase>
     {

@@ -2,7 +2,6 @@
 {
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public abstract class FindInfoCarrierTest
         : FindTestBase<TestStoreBase, FindInfoCarrierTest.FindInfoCarrierFixture>

@@ -1,7 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Xunit;
 
     [Collection("SqlServer")]

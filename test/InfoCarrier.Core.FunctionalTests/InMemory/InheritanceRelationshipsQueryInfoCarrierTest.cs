@@ -1,7 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.InheritanceRelationships;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.InheritanceRelationships;
 
     public class InheritanceRelationshipsQueryInfoCarrierTest
         : InheritanceRelationshipsQueryTestBase<TestStoreBase, InheritanceRelationshipsQueryInfoCarrierTest.InheritanceRelationshipsQueryInfoCarrierFixture>

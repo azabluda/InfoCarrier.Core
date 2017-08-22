@@ -31,7 +31,7 @@
                     IsTemporary = prop.IsTemporary,
                 }).ToList();
 
-            if (entry.EntityType.HasDelegatedIdentity())
+            if (entry.EntityType.HasDefiningNavigation())
             {
                 var ownership = entry.EntityType.GetForeignKeys().Single(fk => fk.IsOwnership);
                 this.DelegatedIdentityDatas = ownership.Properties.Select(

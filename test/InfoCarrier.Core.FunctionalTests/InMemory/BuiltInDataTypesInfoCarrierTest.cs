@@ -1,7 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System.Linq;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore;
     using Xunit;
 
     public class BuiltInDataTypesInfoCarrierTest : BuiltInDataTypesTestBase<BuiltInDataTypesInfoCarrierFixture>
@@ -14,7 +14,7 @@
         [Fact]
         public virtual void Can_perform_query_with_ansi_strings()
         {
-            this.Can_perform_query_with_ansi_strings(supportsAnsi: false);
+            this.Can_perform_query_with_ansi_strings_test(supportsAnsi: false);
         }
 
         [Fact]

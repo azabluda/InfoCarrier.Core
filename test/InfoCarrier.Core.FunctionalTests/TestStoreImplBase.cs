@@ -8,7 +8,6 @@
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
     using Newtonsoft.Json;
@@ -20,6 +19,8 @@
         protected abstract DbContextOptions DbContextOptions { get; }
 
         public override IInfoCarrierBackend InfoCarrierBackend => this;
+
+        public string LogFragment => this.DbContextOptions.GetExtension<CoreOptionsExtension>().LogFragment;
 
         public override TDbContext CreateContext<TDbContext>(DbContextOptions dbContextOptions)
         {

@@ -14,6 +14,8 @@
             this.transactionManager = transactionManager;
         }
 
+        public Guid TransactionId { get; } = Guid.NewGuid();
+
         public void Commit()
         {
             this.CheckActive();

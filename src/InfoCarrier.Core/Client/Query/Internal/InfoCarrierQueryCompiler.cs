@@ -11,7 +11,8 @@
     using System.Threading.Tasks;
     using Common;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -30,25 +31,25 @@
         private static readonly MethodInfo AsyncInterceptExceptionsMethod
             = new AsyncLinqOperatorProvider().InterceptExceptions;
 
-        private static readonly IEvaluatableExpressionFilter EvaluatableExpressionFilter
-            = new EvaluatableExpressionFilter();
-
         private readonly IQueryContextFactory queryContextFactory;
         private readonly ICompiledQueryCache compiledQueryCache;
         private readonly ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator;
-        private readonly IInterceptingLogger<LoggerCategory.Query> logger;
+        private readonly IDiagnosticsLogger<DbLoggerCategory.Query> logger;
+        private readonly IEvaluatableExpressionFilter evaluatableExpressionFilter;
         private readonly Lazy<IReadOnlyDictionary<string, IEntityType>> entityTypeMap;
 
         public InfoCarrierQueryCompiler(
             IQueryContextFactory queryContextFactory,
             ICompiledQueryCache compiledQueryCache,
             ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator,
-            IInterceptingLogger<LoggerCategory.Query> logger)
+            IDiagnosticsLogger<DbLoggerCategory.Query> logger,
+            IEvaluatableExpressionFilter evaluatableExpressionFilter)
         {
             this.queryContextFactory = queryContextFactory;
             this.compiledQueryCache = compiledQueryCache;
             this.compiledQueryCacheKeyGenerator = compiledQueryCacheKeyGenerator;
             this.logger = logger;
+            this.evaluatableExpressionFilter = evaluatableExpressionFilter;
 
             this.entityTypeMap = new Lazy<IReadOnlyDictionary<string, IEntityType>>(() =>
             {
@@ -109,7 +110,18 @@
 
             if (sequenceType == null)
             {
-                return queryContext => this.CreateCompiledEnumerableQuery<TResult>(query)(queryContext).First();
+                return qc =>
+                {
+                    try
+                    {
+                        return this.CreateCompiledEnumerableQuery<TResult>(query)(qc).First();
+                    }
+                    catch (Exception exception)
+                    {
+                        this.logger.QueryIterationFailed(qc.Context.GetType(), exception);
+                        throw;
+                    }
+                };
             }
 
             try
@@ -142,7 +154,7 @@
         {
             var visitor
                 = new ParameterExtractingExpressionVisitor(
-                    EvaluatableExpressionFilter,
+                    this.evaluatableExpressionFilter,
                     queryContext,
                     this.logger,
                     parameterize);

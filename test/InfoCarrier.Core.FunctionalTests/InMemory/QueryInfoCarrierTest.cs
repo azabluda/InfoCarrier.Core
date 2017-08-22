@@ -2,8 +2,9 @@
 {
     using System;
     using System.Linq;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.Northwind;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Xunit;
 
     public class QueryInfoCarrierTest : QueryTestBase<NorthwindQueryInfoCarrierFixture>

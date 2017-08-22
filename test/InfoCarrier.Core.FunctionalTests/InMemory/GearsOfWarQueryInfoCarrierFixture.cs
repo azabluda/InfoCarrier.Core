@@ -1,8 +1,8 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.GearsOfWarModel;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.GearsOfWarModel;
 
     public class GearsOfWarQueryInfoCarrierFixture : GearsOfWarQueryFixtureBase<TestStoreBase>
     {

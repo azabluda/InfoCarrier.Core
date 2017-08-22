@@ -7,6 +7,8 @@
 
     public interface IInfoCarrierBackend
     {
+        string LogFragment { get; }
+
         QueryDataResult QueryData(QueryDataRequest request);
 
         Task<QueryDataResult> QueryDataAsync(QueryDataRequest request);

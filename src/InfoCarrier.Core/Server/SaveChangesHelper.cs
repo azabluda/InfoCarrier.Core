@@ -9,7 +9,6 @@
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
@@ -25,7 +24,7 @@
             this.dbContext = dbContextFactory();
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-            IStateManager stateManager = this.dbContext.GetInfrastructure<DbContextDependencies>().StateManager;
+            IStateManager stateManager = this.dbContext.GetService<IStateManager>();
 
             // Materialize entities and add entries to dbContext
             var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
@@ -40,7 +39,7 @@
                 }
 
                 EntityEntry entry;
-                if (entityType.HasDelegatedIdentity())
+                if (entityType.HasDefiningNavigation())
                 {
                     object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper);
 
