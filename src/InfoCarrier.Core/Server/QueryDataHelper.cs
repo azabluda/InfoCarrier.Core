@@ -147,6 +147,7 @@
                     .GetGenericMethodDefinition();
 
             private readonly IStateManager stateManager;
+            private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
             private readonly Dictionary<object, DynamicObject> cachedEntities =
                 new Dictionary<object, DynamicObject>();
 
@@ -154,6 +155,10 @@
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
             {
                 this.stateManager = dbContext.GetInfrastructure<IServiceProvider>().GetRequiredService<IStateManager>();
+                this.detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
+                    .Where(et => et.ClrType != null)
+                    .GroupBy(et => et.ClrType)
+                    .ToDictionary(x => x.Key, x => x.First());
             }
 
             protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>
@@ -192,17 +197,21 @@
                     return (DynamicObject)mappedGrouping;
                 }
 
-                // Special mapping of entities
-                IEntityType entityType = this.stateManager.Context.Model.FindEntityType(objType);
-                if (entityType != null)
+                // Check if obj is a tracked or detached entity
+                InternalEntityEntry entry = this.stateManager.TryGetEntry(obj);
+                if (entry == null
+                    && this.detachedEntityTypeMap.TryGetValue(objType, out IEntityType entityType))
                 {
-                    return this.MapToDynamicObjectGraph(obj, setTypeInformation, entityType);
+                    // Create detached entity entry
+                    entry = this.stateManager.GetOrCreateEntry(obj, entityType);
                 }
 
-                return base.MapToDynamicObjectGraph(obj, setTypeInformation);
+                return entry == null
+                    ? base.MapToDynamicObjectGraph(obj, setTypeInformation) // Default mapping
+                    : this.MapToDynamicObjectGraph(obj, setTypeInformation, entry); // Special mapping of entities
             }
 
-            private DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation, IEntityType entityType)
+            private DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation, InternalEntityEntry entry)
             {
                 if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
                 {
@@ -211,7 +220,6 @@
 
                 this.cachedEntities.Add(obj, dto = new DynamicObject(obj.GetType()));
 
-                InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj, entityType);
                 dto.Add(@"__EntityType", entry.EntityType.DisplayName());
 
                 if (entry.EntityState != EntityState.Detached)
@@ -227,7 +235,7 @@
                 foreach (MemberEntry prop in entry.ToEntityEntry().Members)
                 {
                     DynamicObject value = prop is ReferenceEntry refProp && refProp.TargetEntry != null
-                        ? this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation, refProp.TargetEntry.Metadata)
+                        ? this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation, refProp.TargetEntry.GetInfrastructure())
                         : this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation);
                     dto.Add(prop.Metadata.Name, value);
                 }
