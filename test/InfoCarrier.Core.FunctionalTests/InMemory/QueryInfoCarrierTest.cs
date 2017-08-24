@@ -61,5 +61,23 @@
                 }
             }
         }
+
+        [Fact(Skip = "Revisit after https://github.com/aspnet/EntityFrameworkCore/issues/9301")]
+        public override void GroupJoin_outer_projection2()
+        {
+            base.GroupJoin_outer_projection2();
+        }
+
+        [Fact(Skip = "Revisit after https://github.com/aspnet/EntityFrameworkCore/issues/9301")]
+        public override void GroupJoin_outer_projection3()
+        {
+            base.GroupJoin_outer_projection3();
+        }
+
+        [Fact(Skip = "Revisit after https://github.com/aspnet/EntityFrameworkCore/issues/9301")]
+        public override void GroupJoin_outer_projection4()
+        {
+            base.GroupJoin_outer_projection4();
+        }
     }
 }
