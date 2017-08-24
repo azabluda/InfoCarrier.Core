@@ -21,5 +21,11 @@
         {
             base.Complex_query_with_optional_navigations_and_client_side_evaluation();
         }
+
+        [Fact(Skip = "Client-side evaluation not fully supported")]
+        public override void Null_reference_protection_complex_client_eval()
+        {
+            base.Null_reference_protection_complex_client_eval();
+        }
     }
 }
