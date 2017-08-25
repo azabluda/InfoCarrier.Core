@@ -1,9 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using System;
-    using System.Linq;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.Northwind;
+    using Microsoft.EntityFrameworkCore.Query;
     using Xunit;
 
     public class QueryInfoCarrierTest : QueryTestBase<NorthwindQueryInfoCarrierFixture>
@@ -31,34 +28,22 @@
             base.Client_Join_select_many();
         }
 
-        [Fact]
-        public override void Take_with_single_select_many()
+        [Fact(Skip = "Revisit after https://github.com/aspnet/EntityFrameworkCore/issues/9301")]
+        public override void GroupJoin_outer_projection2()
         {
-            // UGLY: this is a complete copy-n-paste of the original test.
-            // Workarounds an unexplainable failure when running the test with netcoreapp1.0.
-            AssertQuery<Customer, Order>((cs, os) =>
-                (from c in cs
-                    from o in os
-                    orderby c.CustomerID, o.OrderID
-                    select new { c, o })
-                .Take(1)
-                .Cast<object>()
-                .Single());
+            base.GroupJoin_outer_projection2();
+        }
 
-            void AssertQuery<TItem1, TItem2>(
-                Func<IQueryable<TItem1>, IQueryable<TItem2>, object> query,
-                bool assertOrder = false)
-                where TItem1 : class
-                where TItem2 : class
-            {
-                using (var context = this.CreateContext())
-                {
-                    TestHelpers.AssertResults(
-                        new[] { query(NorthwindData.Set<TItem1>(), NorthwindData.Set<TItem2>()) },
-                        new[] { query(context.Set<TItem1>(), context.Set<TItem2>()) },
-                        assertOrder);
-                }
-            }
+        [Fact(Skip = "Revisit after https://github.com/aspnet/EntityFrameworkCore/issues/9301")]
+        public override void GroupJoin_outer_projection3()
+        {
+            base.GroupJoin_outer_projection3();
+        }
+
+        [Fact(Skip = "Revisit after https://github.com/aspnet/EntityFrameworkCore/issues/9301")]
+        public override void GroupJoin_outer_projection4()
+        {
+            base.GroupJoin_outer_projection4();
         }
     }
 }

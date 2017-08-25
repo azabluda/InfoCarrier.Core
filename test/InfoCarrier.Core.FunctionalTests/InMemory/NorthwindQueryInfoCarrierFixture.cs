@@ -2,8 +2,8 @@
 {
     using System;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.Northwind;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Microsoft.Extensions.DependencyInjection;
 
     public class NorthwindQueryInfoCarrierFixture : NorthwindQueryFixtureBase, IDisposable

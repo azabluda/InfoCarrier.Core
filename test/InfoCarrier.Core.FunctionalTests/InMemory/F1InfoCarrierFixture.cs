@@ -1,7 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ConcurrencyModel;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
 
     public class F1InfoCarrierFixture : F1FixtureBase<TestStoreBase>
     {

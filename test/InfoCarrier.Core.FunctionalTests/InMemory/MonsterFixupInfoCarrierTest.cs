@@ -4,9 +4,7 @@
     using System.Reflection;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels;
+    using Microsoft.EntityFrameworkCore.TestModels;
     using Microsoft.Extensions.DependencyInjection;
     using Xunit.Abstractions;
 
@@ -155,7 +153,7 @@
             return serviceCollection.BuildServiceProvider();
         }
 
-        public override void OnModelCreating<TMessage, TProductPhoto, TProductReview>(ModelBuilder builder)
+        protected override void OnModelCreating<TMessage, TProductPhoto, TProductReview>(ModelBuilder builder)
         {
             base.OnModelCreating<TMessage, TProductPhoto, TProductReview>(builder);
 

@@ -1,7 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ComplexNavigationsModel;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.ComplexNavigationsModel;
 
     public class ComplexNavigationsOwnedQueryInfoCarrierFixture : ComplexNavigationsOwnedQueryFixtureBase<TestStoreBase>
     {
@@ -12,7 +12,7 @@
             this.helper = InMemoryTestStore<ComplexNavigationsContext>.CreateHelper(
                 this.OnModelCreating,
                 opt => new ComplexNavigationsContext(opt),
-                ComplexNavigationsModelInitializer.Seed);
+                ctx => ComplexNavigationsModelInitializer.Seed(ctx, tableSplitting: true));
         }
 
         public override TestStoreBase CreateTestStore()

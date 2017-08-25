@@ -1,7 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class PropertyValuesInfoCarrierTest
         : PropertyValuesTestBase<TestStoreBase, PropertyValuesInfoCarrierTest.PropertyValuesInfoCarrierFixture>

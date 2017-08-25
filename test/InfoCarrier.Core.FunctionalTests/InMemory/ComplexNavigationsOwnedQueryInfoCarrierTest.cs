@@ -1,6 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Query;
     using Xunit;
 
     public class ComplexNavigationsOwnedQueryInfoCarrierTest : ComplexNavigationsOwnedQueryTestBase<TestStoreBase, ComplexNavigationsOwnedQueryInfoCarrierFixture>
@@ -14,6 +14,12 @@
         public override void Nested_group_join_with_take()
         {
             base.Nested_group_join_with_take();
+        }
+
+        [Fact(Skip = "Client-side evaluation not fully supported")]
+        public override void Null_reference_protection_complex_client_eval()
+        {
+            base.Null_reference_protection_complex_client_eval();
         }
     }
 }

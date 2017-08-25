@@ -9,7 +9,6 @@
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
@@ -25,7 +24,7 @@
             this.dbContext = dbContextFactory();
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-            IStateManager stateManager = this.dbContext.GetInfrastructure<DbContextDependencies>().StateManager;
+            IStateManager stateManager = this.dbContext.GetService<IStateManager>();
 
             // Materialize entities and add entries to dbContext
             var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
@@ -35,14 +34,14 @@
 
                 object MaterializeEntity()
                 {
-                    var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType));
+                    var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType, request.Mapper));
                     return entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
                 }
 
                 EntityEntry entry;
-                if (entityType.HasDelegatedIdentity())
+                if (entityType.HasDefiningNavigation())
                 {
-                    object[] keyValues = dto.GetDelegatedIdentityKeys();
+                    object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper);
 
                     // Here we assume that the owner entry is already present in the context
                     EntityEntry ownerEntry = stateManager.TryGetEntry(
@@ -79,15 +78,15 @@
                 }
 
                 // Correlate properties of DTO and entry
-                var props = dto.JoinScalarProperties(entry);
+                var props = dto.JoinScalarProperties(entry, request.Mapper);
 
                 // Set Key values
                 foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
                 {
-                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    p.EfProperty.CurrentValue = p.CurrentValue;
                     if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
                     {
-                        p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                        p.EfProperty.OriginalValue = p.OriginalValue;
                     }
                 }
 
@@ -99,10 +98,10 @@
                 foreach (var p in props.Where(
                     x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
                 {
-                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    p.EfProperty.CurrentValue = p.CurrentValue;
                     if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
                     {
-                        p.EfProperty.OriginalValue = p.DtoProperty.OriginalValue;
+                        p.EfProperty.OriginalValue = p.OriginalValue;
                     }
 
                     p.EfProperty.IsModified = p.DtoProperty.IsModified;

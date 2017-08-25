@@ -1,6 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Query;
     using Xunit;
 
     public class ComplexNavigationsQueryInfoCarrierTest : ComplexNavigationsQueryTestBase<TestStoreBase, ComplexNavigationsQueryInfoCarrierFixture>
@@ -20,6 +20,12 @@
         public override void Complex_query_with_optional_navigations_and_client_side_evaluation()
         {
             base.Complex_query_with_optional_navigations_and_client_side_evaluation();
+        }
+
+        [Fact(Skip = "Client-side evaluation not fully supported")]
+        public override void Null_reference_protection_complex_client_eval()
+        {
+            base.Null_reference_protection_complex_client_eval();
         }
     }
 }

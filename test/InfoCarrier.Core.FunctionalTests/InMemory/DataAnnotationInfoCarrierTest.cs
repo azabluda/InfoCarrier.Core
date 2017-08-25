@@ -1,7 +1,6 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Xunit;
 
     public class DataAnnotationInfoCarrierTest : DataAnnotationTestBase<TestStoreBase, DataAnnotationInfoCarrierFixture>

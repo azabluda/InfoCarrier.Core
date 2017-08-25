@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Reflection;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
+    using Aqua.TypeSystem;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
@@ -20,6 +21,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Storage;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
+    using MethodInfo = System.Reflection.MethodInfo;
 
     public partial class InfoCarrierQueryCompiler
     {
@@ -29,26 +31,30 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition();
 
-            public PreparedQuery(Expression expression)
+            private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
+
+            public PreparedQuery(Expression expression, IReadOnlyDictionary<string, IEntityType> entityTypeMap)
             {
+                this.entityTypeMap = entityTypeMap;
+
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
                 expression = Utils.ReplaceNullConditional(expression, true);
 
                 // Replace EntityQueryable with stub
                 expression = EntityQueryableStubVisitor.Replace(expression);
 
-                this.Expression = expression;
+                this.Expression = expression.SimplifyIncorporationOfRemoteQueryables();
             }
 
             private Expression Expression { get; }
 
-            private Aqua.TypeSystem.ITypeResolver TypeResolver { get; } = new Aqua.TypeSystem.TypeResolver();
+            private ITypeResolver TypeResolver { get; } = new TypeResolver();
 
             public IEnumerable<TResult> Execute<TResult>(QueryContext queryContext)
-                => new QueryExecutor<TResult>(this, queryContext).ExecuteQuery();
+                => new QueryExecutor<TResult>(this, queryContext, this.entityTypeMap).ExecuteQuery();
 
             public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(QueryContext queryContext)
-                => new QueryExecutor<TResult>(this, queryContext).ExecuteAsyncQuery();
+                => new QueryExecutor<TResult>(this, queryContext, this.entityTypeMap).ExecuteAsyncQuery();
 
             private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
             {
@@ -58,6 +64,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             private sealed class QueryExecutor<TResult> : DynamicObjectMapper
             {
                 private readonly QueryContext queryContext;
+                private readonly ITypeResolver typeResolver;
                 private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
                 private readonly IEntityMaterializerSource entityMaterializerSource;
                 private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
@@ -65,11 +72,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 private readonly IInfoCarrierBackend infoCarrierBackend;
                 private readonly Remote.Linq.Expressions.Expression rlinq;
 
-                public QueryExecutor(PreparedQuery preparedQuery, QueryContext queryContext)
+                public QueryExecutor(
+                    PreparedQuery preparedQuery,
+                    QueryContext queryContext,
+                    IReadOnlyDictionary<string, IEntityType> entityTypeMap)
                     : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, preparedQuery.TypeResolver)
                 {
                     this.queryContext = queryContext;
-                    this.entityTypeMap = queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
+                    this.typeResolver = preparedQuery.TypeResolver;
+                    this.entityTypeMap = entityTypeMap;
                     this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
                     this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
@@ -80,28 +91,29 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                     this.rlinq = expression
-                        .SimplifyIncorporationOfRemoteQueryables()
                         .ToRemoteLinqExpression()
-                        .ReplaceQueryableByResourceDescriptors(preparedQuery.TypeResolver)
+                        .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                         .ReplaceGenericQueryArgumentsByNonGenericArguments();
                 }
 
                 public IEnumerable<TResult> ExecuteQuery()
                 {
-                    IEnumerable<DynamicObject> dataRecords = this.infoCarrierBackend.QueryData(
-                        this.rlinq,
-                        this.queryContext.Context.ChangeTracker.QueryTrackingBehavior);
-                    return this.MapAndTrackResults(dataRecords);
+                    QueryDataResult result = this.infoCarrierBackend.QueryData(
+                        new QueryDataRequest(
+                            this.rlinq,
+                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior));
+                    return this.MapAndTrackResults(result.MappedResults);
                 }
 
                 public IAsyncEnumerable<TResult> ExecuteAsyncQuery()
                 {
                     async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
                     {
-                        IEnumerable<DynamicObject> dataRecords = await this.infoCarrierBackend.QueryDataAsync(
-                            this.rlinq,
-                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior);
-                        return this.MapAndTrackResults(dataRecords);
+                        QueryDataResult result = await this.infoCarrierBackend.QueryDataAsync(
+                            new QueryDataRequest(
+                                this.rlinq,
+                                this.queryContext.Context.ChangeTracker.QueryTrackingBehavior));
+                        return this.MapAndTrackResults(result.MappedResults);
                     }
 
                     return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());
@@ -128,37 +140,40 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
                 {
-                    Func<object> baseImpl = () => base.MapFromDynamicObjectGraph(obj, targetType);
+                    object BaseImpl() => base.MapFromDynamicObjectGraph(obj, targetType);
 
                     // mapping required?
                     if (obj == null || targetType == obj.GetType())
                     {
-                        return baseImpl();
+                        return BaseImpl();
                     }
 
-                    // is obj an entity?
-                    if (this.TryMapEntity(obj, out object entity))
+                    if (obj is DynamicObject dobj)
                     {
-                        return entity;
-                    }
+                        // is obj an entity?
+                        if (this.TryMapEntity(dobj, out object entity))
+                        {
+                            return entity;
+                        }
 
-                    // is obj an array
-                    if (this.TryMapArray(obj, targetType, out object array))
-                    {
-                        return array;
-                    }
+                        // is obj an array
+                        if (this.TryMapArray(dobj, targetType, out object array))
+                        {
+                            return array;
+                        }
 
-                    // is obj a grouping
-                    if (this.TryMapGrouping(obj, targetType, out object grouping))
-                    {
-                        return grouping;
+                        // is obj a grouping
+                        if (this.TryMapGrouping(dobj, targetType, out object grouping))
+                        {
+                            return grouping;
+                        }
                     }
 
                     // is targetType a collection?
                     Type elementType = Utils.TryGetQueryResultSequenceType(targetType);
                     if (elementType == null)
                     {
-                        return baseImpl();
+                        return BaseImpl();
                     }
 
                     // map to list (supported directly by aqua-core)
@@ -192,55 +207,46 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return Activator.CreateInstance(collType, list);
                 }
 
-                private bool TryMapArray(object obj, Type targetType, out object array)
+                private bool TryMapArray(DynamicObject dobj, Type targetType, out object array)
                 {
                     array = null;
 
-                    if (obj is DynamicObject dobj)
+                    if (dobj.Type != null)
                     {
-                        if (dobj.Type != null)
-                        {
-                            // Our custom mapping of arrays doesn't contain Type
-                            return false;
-                        }
+                        // Our custom mapping of arrays doesn't contain Type
+                        return false;
+                    }
 
-                        if (!dobj.TryGet("Elements", out object elements))
-                        {
-                            return false;
-                        }
+                    if (!dobj.TryGet("Elements", out object elements))
+                    {
+                        return false;
+                    }
 
-                        if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
-                        {
-                            return false;
-                        }
+                    if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
+                    {
+                        return false;
+                    }
 
-                        if (targetType.IsArray)
-                        {
-                            array = this.MapFromDynamicObjectGraph(elements, targetType);
-                            return true;
-                        }
+                    if (targetType.IsArray)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, targetType);
+                        return true;
+                    }
 
-                        if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
-                        {
-                            array = this.MapFromDynamicObjectGraph(elements, typeInfo.Type);
-                            return true;
-                        }
+                    if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
+                    {
+                        array = this.MapFromDynamicObjectGraph(elements, typeInfo.ResolveType(this.typeResolver));
+                        return true;
                     }
 
                     return false;
                 }
 
-                private bool TryMapGrouping(object obj, Type targetType, out object grouping)
+                private bool TryMapGrouping(DynamicObject dobj, Type targetType, out object grouping)
                 {
                     grouping = null;
 
-                    var dobj = obj as DynamicObject;
-                    if (dobj == null)
-                    {
-                        return false;
-                    }
-
-                    Type type = dobj.Type?.Type ?? targetType;
+                    Type type = dobj.Type?.ResolveType(this.typeResolver) ?? targetType;
 
                     if (type == null
                         || !type.GetTypeInfo().IsGenericType
@@ -271,15 +277,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return true;
                 }
 
-                private bool TryMapEntity(object obj, out object entity)
+                private bool TryMapEntity(DynamicObject dobj, out object entity)
                 {
                     entity = null;
-
-                    var dobj = obj as DynamicObject;
-                    if (dobj == null)
-                    {
-                        return false;
-                    }
 
                     if (!dobj.TryGet(@"__EntityType", out object entityTypeName))
                     {
@@ -308,7 +308,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
                             .ToArray());
 
-                    bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityIsTracked");
+                    bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedCollections");
 
                     // Get entity instance from EFC's identity map, or create a new one
                     Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
@@ -329,32 +329,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     if (entityIsTracked)
                     {
-                        this.trackEntityActions.Add(
-                            sm => sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null));
-                    }
+                        var loadedCollections = dobj.Get<List<string>>(@"__EntityLoadedCollections");
 
-                    if (dobj.TryGet(@"__EntityLoadedNavigations", out object ln))
-                    {
-                        var loadedNavigations = new HashSet<string>(
-                            ln as IEnumerable<string> ?? Enumerable.Empty<string>());
-
-                        this.trackEntityActions.Add(stateManager =>
+                        this.trackEntityActions.Add(sm =>
                         {
-                            var entry = stateManager.TryGetEntry(entityNoRef);
-                            if (entry == null)
-                            {
-                                return;
-                            }
+                            InternalEntityEntry entry
+                                = sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null);
 
-                            foreach (INavigation nav in entry.EntityType.GetNavigations())
+                            foreach (INavigation nav in loadedCollections.Select(name => entry.EntityType.FindNavigation(name)))
                             {
-                                bool loaded = loadedNavigations.Contains(nav.Name);
-                                if (!loaded && !nav.IsCollection() && nav.GetGetter().GetClrValue(entityNoRef) != null)
-                                {
-                                    continue;
-                                }
-
-                                entry.SetIsLoaded(nav, loaded);
+                                entry.SetIsLoaded(nav);
                             }
                         });
                     }
@@ -405,7 +389,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                         return Expression.Property(
                             Expression.Constant(paramValue),
-                            paramValue.GetType(),
                             nameof(ValueWrapper<object>.Value));
                     }
 

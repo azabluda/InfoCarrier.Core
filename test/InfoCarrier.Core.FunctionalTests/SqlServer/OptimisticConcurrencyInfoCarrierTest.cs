@@ -1,8 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.ConcurrencyModel;
+    using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
     using Xunit;
 
     [Collection("SqlServer")]

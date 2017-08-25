@@ -1,8 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
 
     public class DataAnnotationInfoCarrierFixture : DataAnnotationFixtureBase<TestStoreBase>
     {

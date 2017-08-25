@@ -2,10 +2,10 @@
 {
     using System;
     using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Query;
     using Xunit;
 
-    public class InheritanceInfoCarrierTest : InheritanceTestBase<InheritanceInfoCarrierFixture>
+    public class InheritanceInfoCarrierTest : InheritanceTestBase<TestStoreBase, InheritanceInfoCarrierFixture>
     {
         public InheritanceInfoCarrierTest(InheritanceInfoCarrierFixture fixture)
             : base(fixture)

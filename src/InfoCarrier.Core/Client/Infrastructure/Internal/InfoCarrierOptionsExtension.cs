@@ -16,6 +16,8 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
 
         public IInfoCarrierBackend InfoCarrierBackend { get; set; }
 
+        public string LogFragment => this.InfoCarrierBackend.LogFragment;
+
         public virtual bool ApplyServices(IServiceCollection services)
         {
             services.AddEntityFrameworkInfoCarrierBackend();

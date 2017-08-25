@@ -4,17 +4,14 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
-    using Aqua.Dynamic;
     using Client;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
     using Newtonsoft.Json;
     using Remote.Linq;
-    using Remote.Linq.Expressions;
     using Server;
 
     public abstract class TestStoreImplBase : TestStoreBase, IInfoCarrierBackend
@@ -22,6 +19,8 @@
         protected abstract DbContextOptions DbContextOptions { get; }
 
         public override IInfoCarrierBackend InfoCarrierBackend => this;
+
+        public string LogFragment => this.DbContextOptions.GetExtension<CoreOptionsExtension>().LogFragment;
 
         public override TDbContext CreateContext<TDbContext>(DbContextOptions dbContextOptions)
         {
@@ -46,17 +45,17 @@
         {
         }
 
-        public IEnumerable<DynamicObject> QueryData(Expression rlinq, QueryTrackingBehavior trackingBehavior)
+        public QueryDataResult QueryData(QueryDataRequest request)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackingBehavior))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
         }
 
-        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq, QueryTrackingBehavior trackingBehavior)
+        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq), trackingBehavior))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync());
             }

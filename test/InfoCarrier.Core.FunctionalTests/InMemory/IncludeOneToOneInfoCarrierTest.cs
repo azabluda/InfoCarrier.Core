@@ -1,7 +1,7 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Query;
     using Xunit;
 
     public class IncludeOneToOneInfoCarrierTest : IncludeOneToOneTestBase, IClassFixture<OneToOneQueryInfoCarrierFixture>

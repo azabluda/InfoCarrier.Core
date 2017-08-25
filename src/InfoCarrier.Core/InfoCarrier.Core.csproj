@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Description>EntityFrameworkCore provider for multitier applications</Description>
-    <TargetFrameworks>net46;netstandard1.3</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <Version>$(NuGetVersion)</Version>
     <Company>on/off it-solutions-gmbh</Company>
     <Authors>Alexander Zabluda</Authors>
@@ -25,15 +25,11 @@
     <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="aqua-core" Version="4.1.0-beta-005" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="2.0.0-preview1-final" />
-    <PackageReference Update="NETStandard.Library" Version="2.0.0-preview1-25301-01" />
-    <PackageReference Include="Remote.Linq" Version="5.5.0-beta-003" />
+    <PackageReference Include="aqua-core" Version="4.1.1-beta-001" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="2.0.0" />
+    <PackageReference Include="Remote.Linq" Version="5.5.1-beta-001" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net46' ">
-    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 </Project>

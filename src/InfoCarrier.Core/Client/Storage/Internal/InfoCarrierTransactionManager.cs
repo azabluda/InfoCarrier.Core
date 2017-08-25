@@ -72,7 +72,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             this.CurrentTransaction = null;
         }
 
-        public void Reset()
+        public void ResetState()
         {
             throw new NotImplementedException();
         }

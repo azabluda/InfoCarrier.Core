@@ -11,7 +11,10 @@
     using System.Threading.Tasks;
     using Common;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.Internal;
+    using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
@@ -28,25 +31,36 @@
         private static readonly MethodInfo AsyncInterceptExceptionsMethod
             = new AsyncLinqOperatorProvider().InterceptExceptions;
 
-        private static readonly IEvaluatableExpressionFilter EvaluatableExpressionFilter
-            = new EvaluatableExpressionFilter();
-
         private readonly IQueryContextFactory queryContextFactory;
         private readonly ICompiledQueryCache compiledQueryCache;
         private readonly ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator;
-        private readonly IInterceptingLogger<LoggerCategory.Query> logger;
+        private readonly IDiagnosticsLogger<DbLoggerCategory.Query> logger;
+        private readonly IEvaluatableExpressionFilter evaluatableExpressionFilter;
+        private readonly Lazy<IReadOnlyDictionary<string, IEntityType>> entityTypeMap;
 
         public InfoCarrierQueryCompiler(
             IQueryContextFactory queryContextFactory,
             ICompiledQueryCache compiledQueryCache,
             ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator,
-            IInterceptingLogger<LoggerCategory.Query> logger)
+            IDiagnosticsLogger<DbLoggerCategory.Query> logger,
+            IEvaluatableExpressionFilter evaluatableExpressionFilter)
         {
             this.queryContextFactory = queryContextFactory;
             this.compiledQueryCache = compiledQueryCache;
             this.compiledQueryCacheKeyGenerator = compiledQueryCacheKeyGenerator;
             this.logger = logger;
+            this.evaluatableExpressionFilter = evaluatableExpressionFilter;
+
+            this.entityTypeMap = new Lazy<IReadOnlyDictionary<string, IEntityType>>(() =>
+            {
+                using (QueryContext qc = this.queryContextFactory.Create())
+                {
+                     return qc.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
+                }
+            });
         }
+
+        private IReadOnlyDictionary<string, IEntityType> EntityTypeMap => this.entityTypeMap.Value;
 
         public Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query)
             => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, true);
@@ -61,7 +75,7 @@
                 }
             }
 
-            var preparedQuery = new PreparedQuery(query);
+            var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
             {
                 IAsyncEnumerable<TResult> result = preparedQuery.ExecuteAsync<TResult>(queryContext);
@@ -96,7 +110,18 @@
 
             if (sequenceType == null)
             {
-                return queryContext => this.CreateCompiledEnumerableQuery<TResult>(query)(queryContext).First();
+                return qc =>
+                {
+                    try
+                    {
+                        return this.CreateCompiledEnumerableQuery<TResult>(query)(qc).First();
+                    }
+                    catch (Exception exception)
+                    {
+                        this.logger.QueryIterationFailed(qc.Context.GetType(), exception);
+                        throw;
+                    }
+                };
             }
 
             try
@@ -113,7 +138,7 @@
 
         private Func<QueryContext, IEnumerable<TResult>> CreateCompiledEnumerableQuery<TResult>(Expression query)
         {
-            var preparedQuery = new PreparedQuery(query);
+            var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
             {
                 IEnumerable<TResult> result = preparedQuery.Execute<TResult>(queryContext);
@@ -129,7 +154,7 @@
         {
             var visitor
                 = new ParameterExtractingExpressionVisitor(
-                    EvaluatableExpressionFilter,
+                    this.evaluatableExpressionFilter,
                     queryContext,
                     this.logger,
                     parameterize);
@@ -150,20 +175,24 @@
 
         public TResult Execute<TResult>(Expression query)
         {
-            QueryContext queryContext = this.queryContextFactory.Create();
-            query = this.ExtractParameters(query, queryContext, true);
-            return this.compiledQueryCache.GetOrAddQuery(
-                this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, false),
-                () => this.CreateCompiledQuery<TResult>(query, false)).Invoke(queryContext);
+            using (QueryContext queryContext = this.queryContextFactory.Create())
+            {
+                query = this.ExtractParameters(query, queryContext, true);
+                return this.compiledQueryCache.GetOrAddQuery(
+                    this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, false),
+                    () => this.CreateCompiledQuery<TResult>(query, false)).Invoke(queryContext);
+            }
         }
 
         public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(Expression query)
         {
-            QueryContext queryContext = this.queryContextFactory.Create();
-            query = this.ExtractParameters(query, queryContext, true);
-            return this.compiledQueryCache.GetOrAddAsyncQuery(
-                this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, true),
-                () => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, false)).Invoke(queryContext);
+            using (QueryContext queryContext = this.queryContextFactory.Create())
+            {
+                query = this.ExtractParameters(query, queryContext, true);
+                return this.compiledQueryCache.GetOrAddAsyncQuery(
+                    this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, true),
+                    () => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, false)).Invoke(queryContext);
+            }
         }
 
         public Task<TResult> ExecuteAsync<TResult>(Expression query, CancellationToken cancellationToken)
