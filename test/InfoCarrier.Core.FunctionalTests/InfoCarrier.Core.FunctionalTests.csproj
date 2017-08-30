@@ -9,8 +9,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="2.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
-    <PackageReference Include="Remote.Linq" Version="5.5.1-beta-001" />
-    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.5.1-beta-001" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.5.1" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
