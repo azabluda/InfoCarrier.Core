@@ -2,7 +2,6 @@
 {
     using System;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public class BuiltInDataTypesInfoCarrierFixture : BuiltInDataTypesFixtureBase
     {

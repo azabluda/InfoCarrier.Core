@@ -1,8 +1,10 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.FunkyDataModel;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.FunkyDataModel;
+    using Xunit;
 
+    [Collection("SqlServer")]
     public class FunkyDataQueryInfoCarrierTest
         : FunkyDataQueryTestBase<TestStoreBase, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
     {

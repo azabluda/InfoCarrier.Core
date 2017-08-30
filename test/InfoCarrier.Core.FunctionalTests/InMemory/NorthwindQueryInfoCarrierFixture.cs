@@ -2,8 +2,8 @@
 {
     using System;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.Northwind;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Microsoft.Extensions.DependencyInjection;
 
     public class NorthwindQueryInfoCarrierFixture : NorthwindQueryFixtureBase, IDisposable
@@ -23,14 +23,6 @@
 
         public override DbContextOptions BuildOptions(IServiceCollection additionalServices = null)
             => this.helper.BuildInfoCarrierOptions(this.testStore.InfoCarrierBackend, additionalServices);
-
-        public override NorthwindContext CreateContext(
-            QueryTrackingBehavior queryTrackingBehavior = QueryTrackingBehavior.TrackAll)
-        {
-            NorthwindContext context = this.helper.CreateInfoCarrierContext(this.testStore);
-            context.ChangeTracker.QueryTrackingBehavior = queryTrackingBehavior;
-            return context;
-        }
 
         public void Dispose()
         {

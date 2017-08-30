@@ -3,7 +3,6 @@
     using System;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
-    using Microsoft.Extensions.Logging;
 
     internal sealed class InfoCarrierTransaction : IDbContextTransaction
     {
@@ -15,7 +14,7 @@
             this.transactionManager = transactionManager;
         }
 
-        private ILogger<InfoCarrierTransactionManager> Logger => this.transactionManager.Logger;
+        public Guid TransactionId { get; } = Guid.NewGuid();
 
         public void Commit()
         {

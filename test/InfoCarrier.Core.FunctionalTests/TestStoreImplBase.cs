@@ -4,21 +4,14 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
-    using Aqua.Dynamic;
     using Client;
-    using Client.Infrastructure.Internal;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
     using Newtonsoft.Json;
     using Remote.Linq;
-    using Remote.Linq.Expressions;
     using Server;
 
     public abstract class TestStoreImplBase : TestStoreBase, IInfoCarrierBackend
@@ -26,6 +19,8 @@
         protected abstract DbContextOptions DbContextOptions { get; }
 
         public override IInfoCarrierBackend InfoCarrierBackend => this;
+
+        public string LogFragment => this.DbContextOptions.GetExtension<CoreOptionsExtension>().LogFragment;
 
         public override TDbContext CreateContext<TDbContext>(DbContextOptions dbContextOptions)
         {
@@ -40,10 +35,7 @@
         {
         }
 
-        public virtual Task BeginTransactionAsync()
-        {
-            return Task.FromResult(true);
-        }
+        public virtual Task BeginTransactionAsync() => Task.CompletedTask;
 
         public virtual void CommitTransaction()
         {
@@ -53,17 +45,17 @@
         {
         }
 
-        public IEnumerable<DynamicObject> QueryData(Expression rlinq)
+        public QueryDataResult QueryData(QueryDataRequest request)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq)))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
         }
 
-        public async Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq)
+        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(rlinq)))
+            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync());
             }
@@ -142,62 +134,15 @@
                 : new DbUpdateException(dbUpdateException.Message, dbUpdateException.InnerException);
         }
 
-        protected static Action<IServiceCollection> MakeStoreServiceConfigurator<TModelSource>(
-            Action<ModelBuilder> onModelCreating,
-            Func<TestModelSourceParams, TModelSource> creator)
-            where TModelSource : ModelSource
+        protected static Action<IServiceCollection> MakeStoreServiceConfigurator(
+            Action<ModelBuilder> onModelCreating)
         {
             if (onModelCreating == null)
             {
                 return _ => { };
             }
 
-            return services => services.AddSingleton(provider => creator(new TestModelSourceParams(provider, onModelCreating)));
-        }
-
-        protected class TestModelSourceParams
-        {
-            public TestModelSourceParams(IServiceProvider provider, Action<ModelBuilder> onModelCreating)
-            {
-                this.SetFinder = provider.GetRequiredService<IDbSetFinder>();
-                this.CoreConventionSetBuilder = provider.GetRequiredService<ICoreConventionSetBuilder>();
-                this.ModelCustomizer = new ModelCustomizer();
-                this.ModelCacheKeyFactory = new ModelCacheKeyFactory();
-
-                var testModelSource = new TestModelSource(
-                    onModelCreating,
-                    this.SetFinder,
-                    this.CoreConventionSetBuilder,
-                    new ModelCustomizer(),
-                    new ModelCacheKeyFactory());
-
-                this.GetModel = (context, conventionSetBuilder, modelValidator)
-                    => testModelSource.GetModel(context, conventionSetBuilder, modelValidator);
-            }
-
-            public IDbSetFinder SetFinder { get; }
-
-            public ICoreConventionSetBuilder CoreConventionSetBuilder { get; }
-
-            public IModelCustomizer ModelCustomizer { get; }
-
-            public IModelCacheKeyFactory ModelCacheKeyFactory { get; }
-
-            public Func<DbContext, IConventionSetBuilder, IModelValidator, IModel> GetModel { get; }
-        }
-
-        protected class TestInfoCarrierModelSource : InfoCarrierModelSource
-        {
-            private readonly TestModelSourceParams testModelSourceParams;
-
-            public TestInfoCarrierModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
-            {
-                this.testModelSourceParams = p;
-            }
-
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
+            return services => services.AddSingleton(TestModelSource.GetFactory(onModelCreating));
         }
     }
 }

@@ -14,12 +14,14 @@
     <Rule Id="IDE1005" Action="Warning" />
   </Rules>
   <Rules AnalyzerId="StyleCop.Analyzers" RuleNamespace="StyleCop.Analyzers">
+    <Rule Id="SA0001" Action="None" />
     <Rule Id="SA1117" Action="Warning" />
     <Rule Id="SA1118" Action="Info" />
     <Rule Id="SA1202" Action="Info" />
     <Rule Id="SA1204" Action="Info" />
     <Rule Id="SA1214" Action="Info" />
     <Rule Id="SA1215" Action="Info" />
+    <Rule Id="SA1600" Action="None" />
     <Rule Id="SA1601" Action="None" />
     <Rule Id="SA1602" Action="None" />
     <Rule Id="SA1604" Action="None" />

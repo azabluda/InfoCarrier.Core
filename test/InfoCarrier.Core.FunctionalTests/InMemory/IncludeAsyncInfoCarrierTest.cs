@@ -1,6 +1,6 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Query;
 
     public class IncludeAsyncInfoCarrierTest : IncludeAsyncTestBase<NorthwindQueryInfoCarrierFixture>
     {

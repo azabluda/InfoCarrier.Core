@@ -2,7 +2,6 @@
 {
     using Client;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
 
     public abstract class TestStoreBase : TestStore
     {

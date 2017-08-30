@@ -8,23 +8,18 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
-    using Microsoft.Extensions.Logging;
 
     public class InfoCarrierDatabase : Database, IInfoCarrierDatabase
     {
         private readonly IInfoCarrierBackend infoCarrierBackend;
-        private readonly ILogger<InfoCarrierDatabase> logger;
 
         public InfoCarrierDatabase(
-            IQueryCompilationContextFactory queryCompilationContextFactory,
-            IDbContextOptions options,
-            ILogger<InfoCarrierDatabase> logger)
-            : base(queryCompilationContextFactory)
+            DatabaseDependencies dependencies,
+            IDbContextOptions options)
+            : base(dependencies)
         {
-            this.logger = logger;
             this.infoCarrierBackend = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
         }
 
@@ -47,7 +42,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             // Merge the results / update properties modified during SaveChanges on the server-side
             foreach (var merge in entries.Zip(result.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
             {
-                foreach (var p in merge.Dto.JoinScalarProperties(merge.Entry.ToEntityEntry()))
+                foreach (var p in merge.Dto.JoinScalarProperties(merge.Entry.ToEntityEntry(), result.Mapper))
                 {
                     // Can not (and need not) merge non-temporary PK values
                     if (p.EfProperty.Metadata.IsKey() && !p.EfProperty.IsTemporary)
@@ -55,7 +50,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                         continue;
                     }
 
-                    p.EfProperty.CurrentValue = p.DtoProperty.CurrentValue;
+                    p.EfProperty.CurrentValue = p.CurrentValue;
                 }
             }
 

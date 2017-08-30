@@ -1,30 +1,24 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using System;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels.Inheritance;
+    using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.Inheritance;
 
-    public class InheritanceInfoCarrierFixture : InheritanceFixtureBase, IDisposable
+    public class InheritanceInfoCarrierFixture : InheritanceFixtureBase<TestStoreBase>
     {
         private readonly InfoCarrierTestHelper<InheritanceContext> helper;
-        private readonly TestStoreBase testStore;
 
         public InheritanceInfoCarrierFixture()
         {
             this.helper = InMemoryTestStore<InheritanceContext>.CreateHelper(
                 this.OnModelCreating,
                 opt => new InheritanceContext(opt),
-                this.SeedData);
-
-            this.testStore = this.helper.CreateTestStore();
+                InheritanceModelInitializer.SeedData);
         }
 
-        public override InheritanceContext CreateContext()
-            => this.helper.CreateInfoCarrierContext(this.testStore);
+        public override TestStoreBase CreateTestStore()
+            => this.helper.CreateTestStore();
 
-        public void Dispose()
-        {
-            this.testStore.Dispose();
-        }
+        public override InheritanceContext CreateContext(TestStoreBase testStore)
+            => this.helper.CreateInfoCarrierContext(testStore);
     }
 }

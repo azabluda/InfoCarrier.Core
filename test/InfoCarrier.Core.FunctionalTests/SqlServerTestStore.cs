@@ -5,10 +5,6 @@
     using System.Data.SqlClient;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
-    using Microsoft.EntityFrameworkCore.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
     using Microsoft.Extensions.DependencyInjection;
 
     public class SqlServerTestStore<TDbContext> : TestStoreImplBase<TDbContext>
@@ -29,7 +25,7 @@
                   {
                       if (initializeDatabase != null)
                       {
-                          c.Database.EnsureDeleted();
+                          EnsureDatabaseDeleted(databaseName);
                           c.Database.EnsureCreated();
                           initializeDatabase(c);
                       }
@@ -93,10 +89,14 @@
 
         private static string CreateConnectionString(string name, bool multipleActiveResultSets)
         {
-            var builder = new SqlConnectionStringBuilder(@"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30")
+            string connectionString =
+                Environment.GetEnvironmentVariable(@"Test__SqlServer__DefaultConnection")
+                ?? @"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30";
+
+            var builder = new SqlConnectionStringBuilder(connectionString)
             {
                 MultipleActiveResultSets = multipleActiveResultSets,
-                InitialCatalog = name
+                InitialCatalog = name,
             };
 
             return builder.ToString();
@@ -113,24 +113,30 @@
                 onModelCreating,
                 () => new SqlServerTestStore<TDbContext>(
                     createContext,
-                    MakeStoreServiceConfigurator<SqlServerModelSource>(onModelCreating, p => new TestSqlServerModelSource(p)),
+                    MakeStoreServiceConfigurator(onModelCreating),
                     initializeDatabase,
                     databaseName),
                 useSharedStore);
         }
 
-        private class TestSqlServerModelSource : SqlServerModelSource
+        private static void EnsureDatabaseDeleted(string databaseName)
         {
-            private readonly TestModelSourceParams testModelSourceParams;
-
-            public TestSqlServerModelSource(TestModelSourceParams p)
-                : base(p.SetFinder, p.CoreConventionSetBuilder, p.ModelCustomizer, p.ModelCacheKeyFactory)
+            using (var master = new SqlConnection(CreateConnectionString("master", false)))
             {
-                this.testModelSourceParams = p;
-            }
+                master.Open();
+                using (var cmd = master.CreateCommand())
+                {
+                    cmd.CommandText = $@"
+                        IF EXISTS (SELECT * FROM sys.databases WHERE name = N'{databaseName}')
+                        BEGIN
+                            ALTER DATABASE[{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                            DROP DATABASE[{databaseName}];
+                        END";
+                    cmd.ExecuteNonQuery();
+                }
 
-            public override IModel GetModel(DbContext context, IConventionSetBuilder conventionSetBuilder, IModelValidator validator)
-                => this.testModelSourceParams.GetModel(context, conventionSetBuilder, validator);
+                SqlConnection.ClearAllPools();
+            }
         }
     }
 }

@@ -2,16 +2,16 @@
 {
     using System.Collections.Generic;
     using System.Threading.Tasks;
-    using Aqua.Dynamic;
     using Common;
     using Microsoft.EntityFrameworkCore.Update;
-    using Remote.Linq.Expressions;
 
     public interface IInfoCarrierBackend
     {
-        IEnumerable<DynamicObject> QueryData(Expression rlinq);
+        string LogFragment { get; }
 
-        Task<IEnumerable<DynamicObject>> QueryDataAsync(Expression rlinq);
+        QueryDataResult QueryData(QueryDataRequest request);
+
+        Task<QueryDataResult> QueryDataAsync(QueryDataRequest request);
 
         SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries);
 

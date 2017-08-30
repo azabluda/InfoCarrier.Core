@@ -4,9 +4,7 @@
     using System.Reflection;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
-    using Microsoft.EntityFrameworkCore.Specification.Tests.TestModels;
+    using Microsoft.EntityFrameworkCore.TestModels;
     using Microsoft.Extensions.DependencyInjection;
     using Xunit.Abstractions;
 
@@ -98,21 +96,33 @@
         {
             this.ConfigureContext(opt => new SnapshotMonsterContext(
                 opt,
-                b => { b.HasChangeTrackingStrategy(ChangeTrackingStrategy.Snapshot); }));
+                b =>
+                {
+                    b.HasChangeTrackingStrategy(ChangeTrackingStrategy.Snapshot);
+                    this.OnModelCreating<SnapshotMonsterContext.Message, SnapshotMonsterContext.ProductPhoto, SnapshotMonsterContext.ProductReview>(b);
+                }));
         }
 
         private void ConfigureChangedChangingMonsterContext()
         {
             this.ConfigureContext(opt => new ChangedChangingMonsterContext(
                 opt,
-                b => { b.HasChangeTrackingStrategy(ChangeTrackingStrategy.ChangingAndChangedNotifications); }));
+                b =>
+                {
+                    b.HasChangeTrackingStrategy(ChangeTrackingStrategy.ChangingAndChangedNotifications);
+                    this.OnModelCreating<ChangedChangingMonsterContext.Message, ChangedChangingMonsterContext.ProductPhoto, ChangedChangingMonsterContext.ProductReview>(b);
+                }));
         }
 
         private void ConfigureChangedOnlyMonsterContext()
         {
             this.ConfigureContext(opt => new ChangedOnlyMonsterContext(
                 opt,
-                b => { b.HasChangeTrackingStrategy(ChangeTrackingStrategy.ChangedNotifications); }));
+                b =>
+                {
+                    b.HasChangeTrackingStrategy(ChangeTrackingStrategy.ChangedNotifications);
+                    this.OnModelCreating<ChangedOnlyMonsterContext.Message, ChangedOnlyMonsterContext.ProductPhoto, ChangedOnlyMonsterContext.ProductReview>(b);
+                }));
         }
 
         protected override void CreateAndSeedDatabase(
@@ -143,7 +153,7 @@
             return serviceCollection.BuildServiceProvider();
         }
 
-        public override void OnModelCreating<TMessage, TProductPhoto, TProductReview>(ModelBuilder builder)
+        protected override void OnModelCreating<TMessage, TProductPhoto, TProductReview>(ModelBuilder builder)
         {
             base.OnModelCreating<TMessage, TProductPhoto, TProductReview>(builder);
 

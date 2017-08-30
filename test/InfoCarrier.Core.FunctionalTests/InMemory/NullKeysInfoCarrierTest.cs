@@ -2,7 +2,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Specification.Tests;
+    using Microsoft.EntityFrameworkCore.Query;
 
     public class NullKeysInfoCarrierTest : NullKeysTestBase<NullKeysInfoCarrierTest.NullKeysInfoCarrierFixture>
     {

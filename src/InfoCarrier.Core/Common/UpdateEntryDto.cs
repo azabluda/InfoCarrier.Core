@@ -17,19 +17,33 @@
         {
         }
 
-        public UpdateEntryDto(IUpdateEntry entry)
+        public UpdateEntryDto(IUpdateEntry entry, IDynamicObjectMapper mapper)
         {
-            this.EntityTypeName = entry.EntityType.Name;
+            this.EntityTypeName = entry.EntityType.DisplayName();
             this.EntityState = entry.EntityState;
             this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
                 {
                     Name = prop.Metadata.Name,
-                    OriginalValue = prop.Metadata.GetOriginalValueIndex() >= 0 ? prop.OriginalValue : null,
-                    CurrentValue = prop.CurrentValue,
+                    OriginalValueDto = prop.Metadata.GetOriginalValueIndex() >= 0 ? mapper.MapObject(prop.OriginalValue) : null,
+                    CurrentValueDto = mapper.MapObject(prop.CurrentValue),
                     IsModified = prop.IsModified,
                     IsTemporary = prop.IsTemporary,
                 }).ToList();
+
+            if (entry.EntityType.HasDefiningNavigation())
+            {
+                var ownership = entry.EntityType.GetForeignKeys().Single(fk => fk.IsOwnership);
+                this.DelegatedIdentityDatas = ownership.Properties.Select(
+                    prop => new PropertyData
+                    {
+                        Name = prop.Name,
+                        OriginalValueDto = mapper.MapObject(entry.GetOriginalValue(prop)),
+                        CurrentValueDto = mapper.MapObject(entry.GetCurrentValue(prop)),
+                        IsModified = entry.IsModified(prop),
+                        IsTemporary = entry.HasTemporaryValue(prop),
+                    }).ToList();
+            }
         }
 
         [DataMember]
@@ -41,57 +55,44 @@
         [DataMember]
         private List<PropertyData> PropertyDatas { get; } = new List<PropertyData>();
 
-        public IReadOnlyList<JoinedProperty> JoinScalarProperties(EntityEntry entry)
+        [DataMember]
+        private List<PropertyData> DelegatedIdentityDatas { get; } = new List<PropertyData>();
+
+        public IReadOnlyList<(PropertyEntry EfProperty, PropertyData DtoProperty, object OriginalValue, object CurrentValue)> JoinScalarProperties(
+            EntityEntry entry,
+            IDynamicObjectMapper mapper)
         {
             return (
                 from ef in entry.Properties
                 join dto in this.PropertyDatas
                 on ef.Metadata.Name equals dto.Name
-                select new JoinedProperty { EfProperty = ef, DtoProperty = dto }).ToList();
+                select (ef, dto, mapper.Map(dto.OriginalValueDto), mapper.Map(dto.CurrentValueDto))).ToList();
         }
 
-        public IList<object> GetCurrentValues(IEntityType entityType)
+        public object[] GetCurrentValues(IEntityType entityType, IDynamicObjectMapper mapper)
         {
             return entityType
                 .GetProperties()
-                .Select(p => this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValue)
-                .ToList();
+                .Select(p => mapper.Map(this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValueDto))
+                .ToArray();
         }
 
-        public struct JoinedProperty
+        public object[] GetDelegatedIdentityKeys(IDynamicObjectMapper mapper)
         {
-            public PropertyEntry EfProperty;
-            public PropertyData DtoProperty;
+            return this.DelegatedIdentityDatas.Select(d => mapper.Map(d.CurrentValueDto)).ToArray();
         }
 
         [DataContract]
         public class PropertyData
         {
-            private static readonly DynamicObjectMapper Mapper
-                = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true });
-
             [DataMember]
             public string Name { get; set; }
 
-            [IgnoreDataMember]
-            public object OriginalValue { get; set; }
-
-            [IgnoreDataMember]
-            public object CurrentValue { get; set; }
+            [DataMember]
+            internal DynamicObject OriginalValueDto { get; set; }
 
             [DataMember]
-            private DynamicObject OriginalValueDto
-            {
-                get => Mapper.MapObject(this.OriginalValue);
-                set => this.OriginalValue = Mapper.Map(value);
-            }
-
-            [DataMember]
-            private DynamicObject CurrentValueDto
-            {
-                get => Mapper.MapObject(this.CurrentValue);
-                set => this.CurrentValue = Mapper.Map(value);
-            }
+            internal DynamicObject CurrentValueDto { get; set; }
 
             [DataMember]
             public bool IsModified { get; set; }

@@ -13,6 +13,8 @@
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
@@ -34,14 +36,17 @@
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
 
-        public QueryDataHelper(Func<DbContext> dbContextFactory, Remote.Linq.Expressions.Expression rlinq)
+        public QueryDataHelper(
+            Func<DbContext> dbContextFactory,
+            QueryDataRequest request)
         {
             this.dbContext = dbContextFactory();
+            this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
 
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
             // prematurely)
-            this.linqExpression = rlinq
+            this.linqExpression = request.Query
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
@@ -56,7 +61,7 @@
             this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
-        public IEnumerable<DynamicObject> QueryData()
+        public QueryDataResult QueryData()
         {
             var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
             resultType = resultType == null ? this.linqExpression.Type : typeof(IEnumerable<>).MakeGenericType(resultType);
@@ -82,10 +87,10 @@
                 }
             }
 
-            return this.MapResult(queryResult);
+            return new QueryDataResult(this.MapResult(queryResult));
         }
 
-        public async Task<IEnumerable<DynamicObject>> QueryDataAsync()
+        public async Task<QueryDataResult> QueryDataAsync()
         {
             Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
 
@@ -94,7 +99,7 @@
                 .ToDelegate<Func<Task<object>>>(this)
                 .Invoke();
 
-            return this.MapResult(queryResult);
+            return new QueryDataResult(this.MapResult(queryResult));
         }
 
         private object ExecuteExpression<T>()
@@ -124,7 +129,8 @@
             IEnumerable<DynamicObject> result =
                 Remote.Linq.Expressions.ExpressionExtensions.ConvertResultToDynamicObjects(
                     queryResult,
-                    new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver));
+                    new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver),
+                    t => true);
 
             return result;
         }
@@ -141,13 +147,18 @@
                     .GetGenericMethodDefinition();
 
             private readonly IStateManager stateManager;
+            private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
             private readonly Dictionary<object, DynamicObject> cachedEntities =
                 new Dictionary<object, DynamicObject>();
 
             public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
             {
-                this.stateManager = dbContext.GetInfrastructure().GetRequiredService<IStateManager>();
+                this.stateManager = dbContext.GetInfrastructure<IServiceProvider>().GetRequiredService<IStateManager>();
+                this.detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
+                    .Where(et => et.ClrType != null)
+                    .GroupBy(et => et.ClrType)
+                    .ToDictionary(x => x.Key, x => x.First());
             }
 
             protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>
@@ -186,30 +197,50 @@
                     return (DynamicObject)mappedGrouping;
                 }
 
-                // Special mapping of entities
-                if (this.stateManager.Context.Model.FindEntityType(objType) != null)
+                // Check if obj is a tracked or detached entity
+                InternalEntityEntry entry = this.stateManager.TryGetEntry(obj);
+                if (entry == null
+                    && this.detachedEntityTypeMap.TryGetValue(objType, out IEntityType entityType))
                 {
-                    if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
-                    {
-                        return dto;
-                    }
+                    // Create detached entity entry
+                    entry = this.stateManager.GetOrCreateEntry(obj, entityType);
+                }
 
-                    this.cachedEntities.Add(obj, dto = new DynamicObject(objType));
+                return entry == null
+                    ? base.MapToDynamicObjectGraph(obj, setTypeInformation) // Default mapping
+                    : this.MapToDynamicObjectGraph(obj, setTypeInformation, entry); // Special mapping of entities
+            }
 
-                    InternalEntityEntry entry = this.stateManager.GetOrCreateEntry(obj);
-                    dto.Add(@"__EntityType", entry.EntityType.Name);
-
-                    foreach (MemberEntry prop in entry.ToEntityEntry().Members)
-                    {
-                        dto.Add(
-                            prop.Metadata.Name,
-                            this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation));
-                    }
-
+            private DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation, InternalEntityEntry entry)
+            {
+                if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
+                {
                     return dto;
                 }
 
-                return base.MapToDynamicObjectGraph(obj, setTypeInformation);
+                this.cachedEntities.Add(obj, dto = new DynamicObject(obj.GetType()));
+
+                dto.Add(@"__EntityType", entry.EntityType.DisplayName());
+
+                if (entry.EntityState != EntityState.Detached)
+                {
+                    dto.Add(
+                        @"__EntityLoadedCollections",
+                        entry.EntityType.GetNavigations()
+                            .Where(n => n.IsCollection())
+                            .Where(n => entry.IsLoaded(n))
+                            .Select(n => n.Name).ToList());
+                }
+
+                foreach (MemberEntry prop in entry.ToEntityEntry().Members)
+                {
+                    DynamicObject value = prop is ReferenceEntry refProp && refProp.TargetEntry != null
+                        ? this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation, refProp.TargetEntry.GetInfrastructure())
+                        : this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation);
+                    dto.Add(prop.Metadata.Name, value);
+                }
+
+                return dto;
             }
 
             private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)

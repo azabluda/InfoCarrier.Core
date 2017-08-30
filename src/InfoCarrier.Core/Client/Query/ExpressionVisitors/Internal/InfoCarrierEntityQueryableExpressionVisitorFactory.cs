@@ -1,5 +1,6 @@
 namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
 {
+    using System;
     using System.Linq.Expressions;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
@@ -9,8 +10,6 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     {
         public virtual ExpressionVisitor Create(
             EntityQueryModelVisitor queryModelVisitor, IQuerySource querySource)
-            => new InfoCarrierEntityQueryableExpressionVisitor(
-                queryModelVisitor,
-                querySource);
+            => throw new InvalidOperationException(@"InfoCarrier.Core is not using EntityQueryModelVisitor");
     }
 }
