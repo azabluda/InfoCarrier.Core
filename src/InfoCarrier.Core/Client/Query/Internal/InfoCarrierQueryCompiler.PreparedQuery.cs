@@ -91,7 +91,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                     this.rlinq = expression
-                        .ToRemoteLinqExpression()
+                        .ToRemoteLinqExpression(Remote.Linq.EntityFrameworkCore.ExpressionEvaluator.CanBeEvaluated)
                         .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                         .ReplaceGenericQueryArgumentsByNonGenericArguments();
                 }
