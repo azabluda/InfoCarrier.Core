@@ -29,7 +29,7 @@
 
         public abstract TestStoreBase FromShared();
 
-        protected abstract DbContext CreateContextInternal();
+        protected abstract DbContext CreateStoreContextInternal(DbContext clientDbContext);
 
         public virtual void BeginTransaction()
         {
@@ -45,17 +45,17 @@
         {
         }
 
-        public QueryDataResult QueryData(QueryDataRequest request)
+        public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(request)))
+            using (var helper = new QueryDataHelper(() => this.CreateStoreContextInternal(dbContext), SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
         }
 
-        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request)
+        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext)
         {
-            using (var helper = new QueryDataHelper(this.CreateContextInternal, SimulateNetworkTransferJson(request)))
+            using (var helper = new QueryDataHelper(() => this.CreateStoreContextInternal(dbContext), SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync());
             }
@@ -96,7 +96,7 @@
         protected virtual SaveChangesHelper CreateSaveChangesHelper(IEnumerable<IUpdateEntry> entries)
         {
             var request = SimulateNetworkTransferJson(new SaveChangesRequest(entries));
-            return new SaveChangesHelper(this.CreateContextInternal, request);
+            return new SaveChangesHelper(() => this.CreateStoreContextInternal(null), request);
         }
 
         private static T SimulateNetworkTransferJson<T>(T value)

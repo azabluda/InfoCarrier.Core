@@ -3,15 +3,16 @@
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using Common;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Update;
 
     public interface IInfoCarrierBackend
     {
         string LogFragment { get; }
 
-        QueryDataResult QueryData(QueryDataRequest request);
+        QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext);
 
-        Task<QueryDataResult> QueryDataAsync(QueryDataRequest request);
+        Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext);
 
         SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries);
 

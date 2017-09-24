@@ -15,7 +15,7 @@
         where TDbContext : DbContext
     {
         private InMemoryTestStore(
-            Func<DbContextOptions, TDbContext> createContext,
+            Func<DbContextOptions, TDbContext, TDbContext> createContext,
             Action<IServiceCollection> configureStoreService,
             Action<TDbContext> initializeDatabase,
             Action<WarningsConfigurationBuilder> configureWarnings = null)
@@ -66,7 +66,7 @@
 
         public static InfoCarrierTestHelper<TDbContext> CreateHelper(
             Action<ModelBuilder> onModelCreating,
-            Func<DbContextOptions, TDbContext> createContext,
+            Func<DbContextOptions, TDbContext, TDbContext> createContext,
             Action<TDbContext> initializeDatabase,
             bool useSharedStore = true,
             Action<WarningsConfigurationBuilder> configureWarnings = null)
@@ -80,5 +80,18 @@
                     configureWarnings),
                 useSharedStore);
         }
+
+        public static InfoCarrierTestHelper<TDbContext> CreateHelper(
+            Action<ModelBuilder> onModelCreating,
+            Func<DbContextOptions, TDbContext> createContext,
+            Action<TDbContext> initializeDatabase,
+            bool useSharedStore = true,
+            Action<WarningsConfigurationBuilder> configureWarnings = null)
+            => CreateHelper(
+                onModelCreating,
+                (o, _) => createContext(o),
+                initializeDatabase,
+                useSharedStore,
+                configureWarnings);
     }
 }
