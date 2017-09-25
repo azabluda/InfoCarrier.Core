@@ -70,8 +70,7 @@
             Action<TDbContext> initializeDatabase,
             bool useSharedStore = true,
             Action<WarningsConfigurationBuilder> configureWarnings = null)
-        {
-            return CreateTestHelper(
+            => CreateTestHelper(
                 onModelCreating,
                 () => new InMemoryTestStore<TDbContext>(
                     createContext,
@@ -79,7 +78,6 @@
                     initializeDatabase,
                     configureWarnings),
                 useSharedStore);
-        }
 
         public static InfoCarrierTestHelper<TDbContext> CreateHelper(
             Action<ModelBuilder> onModelCreating,

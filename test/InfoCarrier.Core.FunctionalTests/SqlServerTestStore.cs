@@ -108,8 +108,7 @@
             Action<TDbContext> initializeDatabase,
             bool useSharedStore,
             string databaseName)
-        {
-            return CreateTestHelper(
+            => CreateTestHelper(
                 onModelCreating,
                 () => new SqlServerTestStore<TDbContext>(
                     (o, _) => createContext(o),
@@ -117,7 +116,6 @@
                     initializeDatabase,
                     databaseName),
                 useSharedStore);
-        }
 
         private static void EnsureDatabaseDeleted(string databaseName)
         {
