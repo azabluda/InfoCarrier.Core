@@ -15,7 +15,15 @@
         {
             this.helper = InMemoryTestStore<NorthwindContext>.CreateHelper(
                 this.OnModelCreating,
-                opt => new NorthwindContext(opt),
+                (opt, clientDbContext) =>
+                {
+                    var dbContext = new NorthwindContext(opt);
+                    if (clientDbContext != null)
+                    {
+                        dbContext.TenantPrefix = clientDbContext.TenantPrefix;
+                    }
+                    return dbContext;
+                },
                 NorthwindData.Seed);
 
             this.testStore = this.helper.CreateTestStore();

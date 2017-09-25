@@ -6,27 +6,27 @@
     public abstract class TestStoreImplBase<TDbContext> : TestStoreImplBase
         where TDbContext : DbContext
     {
-        private readonly Func<DbContextOptions, TDbContext> createContext;
+        private readonly Func<DbContextOptions, TDbContext, TDbContext> createContext;
         private Action<TDbContext> initializeDatabase;
 
         protected TestStoreImplBase(
-            Func<DbContextOptions, TDbContext> createContext,
+            Func<DbContextOptions, TDbContext, TDbContext> createContext,
             Action<TDbContext> initializeDatabase)
         {
             this.createContext = createContext;
             this.initializeDatabase = initializeDatabase;
         }
 
-        protected sealed override DbContext CreateContextInternal()
-            => this.CreateContext();
+        protected sealed override DbContext CreateStoreContextInternal(DbContext clientDbContext)
+            => this.CreateStoreContext(clientDbContext as TDbContext);
 
         public TDbContext CreateContext(DbContextOptions options)
-            => this.createContext(options);
+            => this.createContext(options, null);
 
-        public virtual TDbContext CreateContext()
+        public virtual TDbContext CreateStoreContext(TDbContext clientDbContext)
         {
             this.EnsureInitialized();
-            return this.CreateContext(this.DbContextOptions);
+            return this.createContext(this.DbContextOptions, clientDbContext);
         }
 
         protected void EnsureInitialized()
@@ -38,7 +38,7 @@
 
             var init = this.initializeDatabase;
             this.initializeDatabase = null;
-            using (TDbContext context = this.CreateContext())
+            using (TDbContext context = this.CreateStoreContext(null))
             {
                 init(context);
             }

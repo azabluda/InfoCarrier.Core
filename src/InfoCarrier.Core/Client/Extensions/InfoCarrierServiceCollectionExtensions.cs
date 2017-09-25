@@ -11,6 +11,7 @@ namespace InfoCarrier.Core.Client
     using Microsoft.Extensions.DependencyInjection;
     using Query.ExpressionVisitors.Internal;
     using Query.Internal;
+    using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
     using Storage.Internal;
 
     public static class InfoCarrierServiceCollectionExtensions
@@ -27,6 +28,7 @@ namespace InfoCarrier.Core.Client
                 .TryAdd<IQueryContextFactory, InfoCarrierQueryContextFactory>()
                 .TryAdd<IEntityQueryModelVisitorFactory, InfoCarrierQueryModelVisitorFactory>()
                 .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
+                .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
                 .TryAddProviderSpecificServices(b => b
                     .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
                     .TryAddScoped<IMaterializerFactory, MaterializerFactory>());

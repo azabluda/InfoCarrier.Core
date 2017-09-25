@@ -91,7 +91,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                     this.rlinq = expression
-                        .ToRemoteLinqExpression()
+                        .ToRemoteLinqExpression(Remote.Linq.EntityFrameworkCore.ExpressionEvaluator.CanBeEvaluated)
                         .ReplaceQueryableByResourceDescriptors(this.typeResolver)
                         .ReplaceGenericQueryArgumentsByNonGenericArguments();
                 }
@@ -101,7 +101,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     QueryDataResult result = this.infoCarrierBackend.QueryData(
                         new QueryDataRequest(
                             this.rlinq,
-                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior));
+                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
+                        this.queryContext.Context);
                     return this.MapAndTrackResults(result.MappedResults);
                 }
 
@@ -112,7 +113,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         QueryDataResult result = await this.infoCarrierBackend.QueryDataAsync(
                             new QueryDataRequest(
                                 this.rlinq,
-                                this.queryContext.Context.ChangeTracker.QueryTrackingBehavior));
+                                this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
+                            this.queryContext.Context);
                         return this.MapAndTrackResults(result.MappedResults);
                     }
 

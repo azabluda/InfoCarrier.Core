@@ -15,7 +15,7 @@
         private DbTransaction transaction;
 
         private SqlServerTestStore(
-            Func<DbContextOptions, TDbContext> createContext,
+            Func<DbContextOptions, TDbContext, TDbContext> createContext,
             Action<IServiceCollection> configureStoreService,
             Action<TDbContext> initializeDatabase,
             string databaseName)
@@ -46,9 +46,9 @@
 
         protected override DbContextOptions DbContextOptions { get; }
 
-        public override TDbContext CreateContext()
+        public override TDbContext CreateStoreContext(TDbContext clientDbContext)
         {
-            var context = base.CreateContext();
+            var context = base.CreateStoreContext(clientDbContext);
             context.Database.UseTransaction(this.transaction);
             return context;
         }
@@ -108,16 +108,14 @@
             Action<TDbContext> initializeDatabase,
             bool useSharedStore,
             string databaseName)
-        {
-            return CreateTestHelper(
+            => CreateTestHelper(
                 onModelCreating,
                 () => new SqlServerTestStore<TDbContext>(
-                    createContext,
+                    (o, _) => createContext(o),
                     MakeStoreServiceConfigurator(onModelCreating),
                     initializeDatabase,
                     databaseName),
                 useSharedStore);
-        }
 
         private static void EnsureDatabaseDeleted(string databaseName)
         {
