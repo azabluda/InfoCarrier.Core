@@ -8,7 +8,7 @@
 
     public interface IInfoCarrierBackend
     {
-        string LogFragment { get; }
+        string ServerUrl { get; }
 
         QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext);
 

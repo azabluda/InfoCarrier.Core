@@ -6,6 +6,7 @@
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Storage.Internal;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,9 @@
         }
 
         protected override DbContextOptions DbContextOptions { get; }
+
+        public override string ServerUrl
+            => this.DbContextOptions.GetExtension<InMemoryOptionsExtension>().StoreName;
 
         public override TestStoreBase FromShared()
             => new Decorator(this);

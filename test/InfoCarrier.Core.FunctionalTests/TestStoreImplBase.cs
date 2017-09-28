@@ -20,7 +20,7 @@
 
         public override IInfoCarrierBackend InfoCarrierBackend => this;
 
-        public string LogFragment => this.DbContextOptions.GetExtension<CoreOptionsExtension>().LogFragment;
+        public abstract string ServerUrl { get; }
 
         public override TDbContext CreateContext<TDbContext>(DbContextOptions dbContextOptions)
         {
