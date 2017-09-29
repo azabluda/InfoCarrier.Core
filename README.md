@@ -66,7 +66,11 @@ public class WcfBackendImpl : IInfoCarrierBackend
 {
     private readonly ChannelFactory<IMyRemoteService> channelFactory
         = new ChannelFactory<IMyRemoteService>(...);
-    
+
+    // Service URL string (used for logging)
+    public string ServerUrl
+        => this.channelFactory.Endpoint.Address.ToString();
+
     public IC.QueryDataResult QueryData(IC.QueryDataRequest request, DbContext dbContext)
     {
         IMyRemoteService channel = this.channelFactory.CreateChannel()
