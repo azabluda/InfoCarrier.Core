@@ -1,5 +1,6 @@
 ﻿namespace InfoCarrier.Core.Common
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Runtime.Serialization;
@@ -13,6 +14,7 @@
     [DataContract]
     public class UpdateEntryDto
     {
+        [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
         public UpdateEntryDto()
         {
         }

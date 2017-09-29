@@ -14,9 +14,9 @@
 
         Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext);
 
-        SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries);
+        SaveChangesResult SaveChanges(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries);
 
-        Task<SaveChangesResult> SaveChangesAsync(IReadOnlyList<IUpdateEntry> entries);
+        Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries);
 
         void BeginTransaction();
 

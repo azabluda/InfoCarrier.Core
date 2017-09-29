@@ -1,5 +1,6 @@
 ﻿namespace InfoCarrier.Core.Common
 {
+    using System;
     using System.Collections.Generic;
     using System.Runtime.Serialization;
     using Aqua.Dynamic;
@@ -7,11 +8,12 @@
     [DataContract]
     public class QueryDataResult
     {
+        [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
         public QueryDataResult()
         {
         }
 
-        public QueryDataResult(IEnumerable<DynamicObject> result)
+        internal QueryDataResult(IEnumerable<DynamicObject> result)
         {
             this.MappedResults = result;
         }

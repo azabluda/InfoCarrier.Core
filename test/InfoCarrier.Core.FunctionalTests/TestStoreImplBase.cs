@@ -61,9 +61,9 @@
             }
         }
 
-        public SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)
+        public SaveChangesResult SaveChanges(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
         {
-            using (SaveChangesHelper helper = this.CreateSaveChangesHelper(entries))
+            using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
                 try
                 {
@@ -77,9 +77,9 @@
             }
         }
 
-        public async Task<SaveChangesResult> SaveChangesAsync(IReadOnlyList<IUpdateEntry> entries)
+        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
         {
-            using (SaveChangesHelper helper = this.CreateSaveChangesHelper(entries))
+            using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
                 try
                 {
@@ -93,9 +93,9 @@
             }
         }
 
-        protected virtual SaveChangesHelper CreateSaveChangesHelper(IEnumerable<IUpdateEntry> entries)
+        protected virtual SaveChangesHelper CreateSaveChangesHelper(SaveChangesRequest request)
         {
-            var request = SimulateNetworkTransferJson(new SaveChangesRequest(entries));
+            request = SimulateNetworkTransferJson(request);
             return new SaveChangesHelper(() => this.CreateStoreContextInternal(null), request);
         }
 

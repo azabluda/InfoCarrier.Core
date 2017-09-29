@@ -1,14 +1,13 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
+    using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Storage.Internal;
-    using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
     using Server;
 
@@ -40,9 +39,9 @@
         public override TestStoreBase FromShared()
             => new Decorator(this);
 
-        protected override SaveChangesHelper CreateSaveChangesHelper(IEnumerable<IUpdateEntry> entries)
+        protected override SaveChangesHelper CreateSaveChangesHelper(SaveChangesRequest request)
         {
-            SaveChangesHelper helper = base.CreateSaveChangesHelper(entries);
+            SaveChangesHelper helper = base.CreateSaveChangesHelper(request);
 
             // Temporary values for Key properties generated on the client side should
             // be treated a permanent if the backend database is InMemory
