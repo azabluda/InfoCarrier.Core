@@ -1,14 +1,10 @@
 ﻿namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using System.Threading.Tasks;
     using Client;
     using Common;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.Extensions.DependencyInjection;
     using Newtonsoft.Json;
     using Remote.Linq;
@@ -61,35 +57,19 @@
             }
         }
 
-        public SaveChangesResult SaveChanges(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
+        public SaveChangesResult SaveChanges(SaveChangesRequest request)
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
-                try
-                {
-                    return SimulateNetworkTransferJson(helper.SaveChanges());
-                }
-                catch (DbUpdateException e)
-                {
-                    SimulateNetworkTransferException(e, helper, entries);
-                    throw;
-                }
+                return SimulateNetworkTransferJson(helper.SaveChanges());
             }
         }
 
-        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
+        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
-                try
-                {
-                    return SimulateNetworkTransferJson(await helper.SaveChangesAsync());
-                }
-                catch (DbUpdateException e)
-                {
-                    SimulateNetworkTransferException(e, helper, entries);
-                    throw;
-                }
+                return SimulateNetworkTransferJson(await helper.SaveChangesAsync());
             }
         }
 
@@ -109,29 +89,6 @@
             var serializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
             var json = JsonConvert.SerializeObject(value, serializerSettings);
             return (T)JsonConvert.DeserializeObject(json, value.GetType(), serializerSettings);
-        }
-
-        private static void SimulateNetworkTransferException(
-            DbUpdateException dbUpdateException,
-            SaveChangesHelper helper,
-            IReadOnlyList<IUpdateEntry> entries)
-        {
-            var map = helper.Entries
-                .Select((e, i) => new { Index = i, Entry = e })
-                .ToDictionary(x => x.Entry, x => x.Index);
-
-            var entityIndexes = dbUpdateException.Entries.Select(re => map[re.GetInfrastructure()]).ToArray();
-
-            IReadOnlyList<IUpdateEntry> failedEntries = entityIndexes.Select(x => entries[x]).ToList();
-
-            if (dbUpdateException is DbUpdateConcurrencyException)
-            {
-                throw new DbUpdateConcurrencyException(dbUpdateException.Message, failedEntries);
-            }
-
-            throw failedEntries.Any()
-                ? new DbUpdateException(dbUpdateException.Message, dbUpdateException.InnerException, failedEntries)
-                : new DbUpdateException(dbUpdateException.Message, dbUpdateException.InnerException);
         }
 
         protected static Action<IServiceCollection> MakeStoreServiceConfigurator(

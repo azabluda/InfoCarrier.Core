@@ -17,7 +17,10 @@
 
         internal SaveChangesRequest(IEnumerable<IUpdateEntry> entries)
         {
-            this.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e, this.Mapper)));
+            if (entries != null)
+            {
+                this.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e, this.Mapper)));
+            }
         }
 
         [IgnoreDataMember]

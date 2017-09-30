@@ -1,10 +1,8 @@
 ﻿namespace InfoCarrier.Core.Client
 {
-    using System.Collections.Generic;
     using System.Threading.Tasks;
     using Common;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Update;
 
     public interface IInfoCarrierBackend
     {
@@ -14,9 +12,9 @@
 
         Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext);
 
-        SaveChangesResult SaveChanges(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries);
+        SaveChangesResult SaveChanges(SaveChangesRequest request);
 
-        Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries);
+        Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request);
 
         void BeginTransaction();
 
