@@ -145,27 +145,27 @@
             this.dbContext.Dispose();
         }
 
-        public SaveChangesResult SaveChanges()
+        public ISaveChangesResult SaveChanges()
         {
             try
             {
-                return new SaveChangesResult(this.dbContext.SaveChanges(), this.Entries);
+                return new SaveChangesResult.Success(this.dbContext.SaveChanges(), this.Entries);
             }
             catch (DbUpdateException e)
             {
-                return new SaveChangesResult(e, this.Entries);
+                return new SaveChangesResult.Error(e, this.Entries);
             }
         }
 
-        public async Task<SaveChangesResult> SaveChangesAsync()
+        public async Task<ISaveChangesResult> SaveChangesAsync()
         {
             try
             {
-                return new SaveChangesResult(await this.dbContext.SaveChangesAsync(), this.Entries);
+                return new SaveChangesResult.Success(await this.dbContext.SaveChangesAsync(), this.Entries);
             }
             catch (DbUpdateException e)
             {
-                return new SaveChangesResult(e, this.Entries);
+                return new SaveChangesResult.Error(e, this.Entries);
             }
         }
     }

@@ -57,7 +57,7 @@
             }
         }
 
-        public SaveChangesResult SaveChanges(SaveChangesRequest request)
+        public ISaveChangesResult SaveChanges(SaveChangesRequest request)
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
@@ -65,7 +65,7 @@
             }
         }
 
-        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
+        public async Task<ISaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {

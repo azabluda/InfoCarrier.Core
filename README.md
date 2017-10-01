@@ -80,7 +80,7 @@ public class WcfBackendImpl : IInfoCarrierBackend
         }
     }
 
-    public IC.SaveChangesResult SaveChanges(IC.SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
+    public IC.ISaveChangesResult SaveChanges(IC.SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
     {
         IMyRemoteService channel = this.channelFactory.CreateChannel()
         using ((IDisposable)channel)

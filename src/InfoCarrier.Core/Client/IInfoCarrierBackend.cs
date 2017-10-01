@@ -12,9 +12,9 @@
 
         Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext);
 
-        SaveChangesResult SaveChanges(SaveChangesRequest request);
+        ISaveChangesResult SaveChanges(SaveChangesRequest request);
 
-        Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request);
+        Task<ISaveChangesResult> SaveChangesAsync(SaveChangesRequest request);
 
         void BeginTransaction();
 
