@@ -7,11 +7,10 @@ services: mssql2016
 
 before_build:
   - dotnet --info
-  - dotnet restore
 
 build_script:
   - for /f "delims=" %%i in ('tools\GitVersion.CommandLine\tools\GitVersion.exe /showvariable NuGetVersion') do set NuGetVersion=%%i
-  - dotnet build test\InfoCarrier.Core.FunctionalTests\InfoCarrier.Core.FunctionalTests.csproj
+  - dotnet build
   - dotnet pack src\InfoCarrier.Core\InfoCarrier.Core.csproj --output "..\..\artifacts" --configuration Debug --include-symbols
 
 test_script:

@@ -32,6 +32,8 @@ InfoCarrier.Core is bringing together the following open source projects
 
 ## Sample
 
+The complete WCF sample is located in the [/sample](https://github.com/azabluda/InfoCarrier.Core/tree/develop/sample) folder.
+
 ### Entities and DbContext
 
 This code/assembly can be shared between client and server
