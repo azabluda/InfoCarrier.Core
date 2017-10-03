@@ -10,6 +10,8 @@
     [DataContract]
     public class SaveChangesRequest
     {
+        private IDynamicObjectMapper mapper;
+
         [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
         public SaveChangesRequest()
         {
@@ -17,17 +19,14 @@
 
         internal SaveChangesRequest(IEnumerable<IUpdateEntry> entries)
         {
-            if (entries != null)
-            {
-                this.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e, this.Mapper)));
-            }
+            this.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e, this.Mapper)));
         }
 
         [IgnoreDataMember]
-        internal IDynamicObjectMapper Mapper { get; }
-            = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true });
+        internal IDynamicObjectMapper Mapper
+            => this.mapper ?? (this.mapper = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }));
 
         [DataMember]
-        public List<UpdateEntryDto> DataTransferObjects { get; } = new List<UpdateEntryDto>();
+        public List<UpdateEntryDto> DataTransferObjects { get; set; } = new List<UpdateEntryDto>();
     }
 }

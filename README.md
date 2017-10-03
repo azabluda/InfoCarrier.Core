@@ -52,7 +52,7 @@ public class BloggingContext : DbContext
 
     public DbSet<User> Users { get; set; }
 
-    protected override void OnModelCreating(DbModelBuilder modelBuilder) { ... }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) { ... }
 }
 ```
 
@@ -73,16 +73,16 @@ public class WcfBackendImpl : IInfoCarrierBackend
 
     public IC.QueryDataResult QueryData(IC.QueryDataRequest request, DbContext dbContext)
     {
-        IMyRemoteService channel = this.channelFactory.CreateChannel()
+        IMyRemoteService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
         {
             return channel.ProcessQueryDataRequest(request);
         }
     }
 
-    public IC.ISaveChangesResult SaveChanges(IC.SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
+    public IC.SaveChangesResult SaveChanges(IC.SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
     {
-        IMyRemoteService channel = this.channelFactory.CreateChannel()
+        IMyRemoteService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
         {
             return channel.ProcessSaveChangesRequest(request);
@@ -123,8 +123,10 @@ Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend s
 [ServiceContract]
 public interface IMyRemoteService
 {
+    [OperationContract]
     QueryDataResult ProcessQueryDataRequest(QueryDataRequest request);
 
+    [OperationContract]
     SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request);
 }
 

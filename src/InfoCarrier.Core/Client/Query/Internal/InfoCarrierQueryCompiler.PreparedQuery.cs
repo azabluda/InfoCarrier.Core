@@ -331,7 +331,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     if (entityIsTracked)
                     {
-                        var loadedCollections = dobj.Get<List<string>>(@"__EntityLoadedCollections");
+                        var loadedCollections = this.Map<List<string>>(dobj.Get<DynamicObject>(@"__EntityLoadedCollections"));
 
                         this.trackEntityActions.Add(sm =>
                         {

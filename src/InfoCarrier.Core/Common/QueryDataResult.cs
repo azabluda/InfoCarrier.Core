@@ -6,6 +6,7 @@
     using Aqua.Dynamic;
 
     [DataContract]
+    [KnownType(typeof(DynamicObject))]
     public class QueryDataResult
     {
         [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]

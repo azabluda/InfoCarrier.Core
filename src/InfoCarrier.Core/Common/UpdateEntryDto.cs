@@ -55,10 +55,10 @@
         public EntityState EntityState { get; private set; }
 
         [DataMember]
-        private List<PropertyData> PropertyDatas { get; } = new List<PropertyData>();
+        private List<PropertyData> PropertyDatas { get; set; } = new List<PropertyData>();
 
         [DataMember]
-        private List<PropertyData> DelegatedIdentityDatas { get; } = new List<PropertyData>();
+        private List<PropertyData> DelegatedIdentityDatas { get; set; } = new List<PropertyData>();
 
         public IReadOnlyList<(PropertyEntry EfProperty, PropertyData DtoProperty, object OriginalValue, object CurrentValue)> JoinScalarProperties(
             EntityEntry entry,

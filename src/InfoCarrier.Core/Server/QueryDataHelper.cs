@@ -226,10 +226,12 @@
                 {
                     dto.Add(
                         @"__EntityLoadedCollections",
-                        entry.EntityType.GetNavigations()
-                            .Where(n => n.IsCollection())
-                            .Where(n => entry.IsLoaded(n))
-                            .Select(n => n.Name).ToList());
+                        this.MapToDynamicObjectGraph(
+                            entry.EntityType.GetNavigations()
+                                .Where(n => n.IsCollection())
+                                .Where(n => entry.IsLoaded(n))
+                                .Select(n => n.Name).ToList(),
+                            setTypeInformation));
                 }
 
                 foreach (MemberEntry prop in entry.ToEntityEntry().Members)

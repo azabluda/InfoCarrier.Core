@@ -8,24 +8,49 @@
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Update;
 
-    public static class SaveChangesResult
+    [DataContract]
+    [KnownType(typeof(SuccessImpl))]
+    [KnownType(typeof(ErrorImpl))]
+    public class SaveChangesResult : ISaveChangesResult
     {
+        [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
+        public SaveChangesResult()
+        {
+        }
+
+        private SaveChangesResult(ISaveChangesResult impl)
+        {
+            this.Impl = impl;
+        }
+
+        [DataMember]
+        private ISaveChangesResult Impl { get; set; }
+
+        public static SaveChangesResult Success(int countPersisted, IEnumerable<IUpdateEntry> entries)
+            => new SaveChangesResult(new SuccessImpl(countPersisted, entries));
+
+        public static SaveChangesResult Error(DbUpdateException exception, IEnumerable<IUpdateEntry> entries)
+            => new SaveChangesResult(new ErrorImpl(exception, entries));
+
+        public int Process(IReadOnlyList<IUpdateEntry> entries)
+            => this.Impl.Process(entries);
+
         [DataContract]
-        public class Success : SaveChangesRequest, ISaveChangesResult
+        private class SuccessImpl : SaveChangesRequest, ISaveChangesResult
         {
             [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
-            public Success()
+            public SuccessImpl()
             {
             }
 
-            internal Success(int countPersisted, IEnumerable<IUpdateEntry> entries)
+            internal SuccessImpl(int countPersisted, IEnumerable<IUpdateEntry> entries)
                 : base(entries)
             {
                 this.CountPersisted = countPersisted;
             }
 
             [DataMember]
-            public int CountPersisted { get; set; }
+            private int CountPersisted { get; set; }
 
             int ISaveChangesResult.Process(IReadOnlyList<IUpdateEntry> entries)
             {
@@ -49,14 +74,14 @@
         }
 
         [DataContract]
-        public class Error : ISaveChangesResult
+        private class ErrorImpl : ISaveChangesResult
         {
             [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
-            public Error()
+            public ErrorImpl()
             {
             }
 
-            internal Error(DbUpdateException exception, IEnumerable<IUpdateEntry> entries)
+            internal ErrorImpl(DbUpdateException exception, IEnumerable<IUpdateEntry> entries)
             {
                 this.IsConcurrencyException = exception is DbUpdateConcurrencyException;
                 this.Message = exception.Message;
@@ -68,13 +93,13 @@
             }
 
             [DataMember]
-            public bool IsConcurrencyException { get; set; }
+            private bool IsConcurrencyException { get; set; }
 
             [DataMember]
-            public string Message { get; set; }
+            private string Message { get; set; }
 
             [DataMember]
-            public int[] FailedEntityIndexes { get; set; }
+            private int[] FailedEntityIndexes { get; set; }
 
             int ISaveChangesResult.Process(IReadOnlyList<IUpdateEntry> entries)
             {
