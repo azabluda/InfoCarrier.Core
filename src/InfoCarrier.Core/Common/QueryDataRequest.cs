@@ -1,5 +1,6 @@
 ﻿namespace InfoCarrier.Core.Common
 {
+    using System;
     using System.Runtime.Serialization;
     using Microsoft.EntityFrameworkCore;
     using RLinq = Remote.Linq.Expressions.Expression;
@@ -7,11 +8,12 @@
     [DataContract]
     public class QueryDataRequest
     {
+        [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
         public QueryDataRequest()
         {
         }
 
-        public QueryDataRequest(RLinq query, QueryTrackingBehavior trackingBehavior)
+        internal QueryDataRequest(RLinq query, QueryTrackingBehavior trackingBehavior)
         {
             this.Query = query;
             this.TrackingBehavior = trackingBehavior;

@@ -32,6 +32,8 @@ InfoCarrier.Core is bringing together the following open source projects
 
 ## Sample
 
+The complete WCF sample is located in the [/sample](https://github.com/azabluda/InfoCarrier.Core/tree/develop/sample) folder.
+
 ### Entities and DbContext
 
 This code/assembly can be shared between client and server
@@ -52,7 +54,7 @@ public class BloggingContext : DbContext
 
     public DbSet<User> Users { get; set; }
 
-    protected override void OnModelCreating(DbModelBuilder modelBuilder) { ... }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) { ... }
 }
 ```
 
@@ -66,21 +68,23 @@ public class WcfBackendImpl : IInfoCarrierBackend
 {
     private readonly ChannelFactory<IMyRemoteService> channelFactory
         = new ChannelFactory<IMyRemoteService>(...);
-    
+
+    // Service URL string (used for logging)
+    public string ServerUrl
+        => this.channelFactory.Endpoint.Address.ToString();
+
     public IC.QueryDataResult QueryData(IC.QueryDataRequest request, DbContext dbContext)
     {
-        IMyRemoteService channel = this.channelFactory.CreateChannel()
+        IMyRemoteService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
         {
             return channel.ProcessQueryDataRequest(request);
         }
     }
 
-    public IC.SaveChangesResult SaveChanges(IReadOnlyList<IUpdateEntry> entries)
+    public IC.SaveChangesResult SaveChanges(IC.SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
     {
-        var request = new IC.SaveChangesRequest(entries);
-
-        IMyRemoteService channel = this.channelFactory.CreateChannel()
+        IMyRemoteService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
         {
             return channel.ProcessSaveChangesRequest(request);
@@ -121,8 +125,10 @@ Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend s
 [ServiceContract]
 public interface IMyRemoteService
 {
+    [OperationContract]
     QueryDataResult ProcessQueryDataRequest(QueryDataRequest request);
 
+    [OperationContract]
     SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request);
 }
 

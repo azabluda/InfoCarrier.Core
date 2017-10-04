@@ -147,12 +147,26 @@
 
         public SaveChangesResult SaveChanges()
         {
-            return new SaveChangesResult(this.dbContext.SaveChanges(), this.Entries);
+            try
+            {
+                return SaveChangesResult.Success(this.dbContext.SaveChanges(), this.Entries);
+            }
+            catch (DbUpdateException e)
+            {
+                return SaveChangesResult.Error(e, this.Entries);
+            }
         }
 
         public async Task<SaveChangesResult> SaveChangesAsync()
         {
-            return new SaveChangesResult(await this.dbContext.SaveChangesAsync(), this.Entries);
+            try
+            {
+                return SaveChangesResult.Success(await this.dbContext.SaveChangesAsync(), this.Entries);
+            }
+            catch (DbUpdateException e)
+            {
+                return SaveChangesResult.Error(e, this.Entries);
+            }
         }
     }
 }

@@ -5,6 +5,7 @@
     using System.Data.SqlClient;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
     using Microsoft.Extensions.DependencyInjection;
 
     public class SqlServerTestStore<TDbContext> : TestStoreImplBase<TDbContext>
@@ -45,6 +46,9 @@
         }
 
         protected override DbContextOptions DbContextOptions { get; }
+
+        public override string ServerUrl
+            => this.DbContextOptions.GetExtension<SqlServerOptionsExtension>().ConnectionString;
 
         public override TDbContext CreateStoreContext(TDbContext clientDbContext)
         {

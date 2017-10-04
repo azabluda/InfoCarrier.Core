@@ -2,6 +2,7 @@
 {
     using System;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
 
     public class SimpleInMemoryTestStore : TestStoreImplBase
     {
@@ -11,6 +12,9 @@
         }
 
         protected override DbContextOptions DbContextOptions { get; }
+
+        public override string ServerUrl
+            => this.DbContextOptions.GetExtension<InMemoryOptionsExtension>().StoreName;
 
         public override TestStoreBase FromShared()
             => throw new NotImplementedException();

@@ -21,6 +21,11 @@ namespace InfoCarrier.Core.Client
             IInfoCarrierBackend infoCarrierBackend,
             Action<InfoCarrierDbContextOptionsBuilder> infoCarrierOptionsAction = null)
         {
+            if (optionsBuilder.Options.FindExtension<CoreOptionsExtension>() == null)
+            {
+                ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(new CoreOptionsExtension());
+            }
+
             var extension = optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>();
 
             extension = extension != null
