@@ -32,7 +32,7 @@ InfoCarrier.Core is bringing together the following open source projects
 
 ## Sample
 
-The complete WCF sample is located in the [/sample](https://github.com/azabluda/InfoCarrier.Core/tree/develop/sample) folder.
+The complete WCF sample is located in the [/sample](sample) folder.
 
 ### Entities and DbContext
 
