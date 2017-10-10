@@ -1,16 +1,19 @@
-﻿namespace WcfSample
+﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+namespace WcfSample
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
-    using System.Linq;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.Extensions.Logging;
 
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             Console.WriteLine(@"Wait until the server is ready, then press any key to start.");
             Console.ReadKey();
@@ -21,7 +24,9 @@
 
             // Activate console logging
             using (var context = new BloggingContext(options))
-                context.GetService<ILoggerFactory>().AddConsole((_, __) => true);
+            {
+                context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
+            }
 
             // Seed database
             using (var context = new BloggingContext(options))
@@ -32,8 +37,8 @@
                         Owner = new User { Name = "hi-its-me" },
                         Posts = new List<Post>
                         {
-                            new Post { Title = "my-blog-post" }
-                        }
+                            new Post { Title = "my-blog-post" },
+                        },
                     });
 
                 context.SaveChanges();

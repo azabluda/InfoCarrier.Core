@@ -1,7 +1,12 @@
-﻿using System;
+﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+#pragma warning disable SA1402
+#pragma warning disable SA1649
 
 namespace WcfSample
 {
+    using System;
     using System.Collections.Generic;
     using Microsoft.EntityFrameworkCore;
 
@@ -29,7 +34,6 @@ namespace WcfSample
         public Blog Blog { get; set; }
     }
 
-
     public class User
     {
         public decimal Id { get; set; }
@@ -37,12 +41,12 @@ namespace WcfSample
         public string Name { get; set; }
     }
 
-
     public class BloggingContext : DbContext
     {
         public BloggingContext(DbContextOptions options)
             : base(options)
-        { }
+        {
+        }
 
         public DbSet<Blog> Blogs { get; set; }
 

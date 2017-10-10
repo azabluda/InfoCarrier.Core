@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "documentationRules": {
+      "companyName": "on/off it-solutions gmbh",
+      "copyrightText": "Copyright (c) {companyName}. All rights reserved.\nLicensed under the {licenseName} license. See {licenseFile} file in the project root for license information.",
+      "xmlHeader": false,
+      "variables": {
+        "licenseName": "MIT",
+        "licenseFile": "license.txt"
+      }
+    }
+  }
+}
