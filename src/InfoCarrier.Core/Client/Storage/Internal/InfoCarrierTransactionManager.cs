@@ -65,7 +65,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             this.CheckNoTransaction();
-            await this.InfoCarrierBackend.BeginTransactionAsync();
+            await this.InfoCarrierBackend.BeginTransactionAsync(cancellationToken);
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 

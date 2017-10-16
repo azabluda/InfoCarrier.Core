@@ -4,6 +4,7 @@
 namespace InfoCarrier.Core.Client
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Common;
     using Microsoft.EntityFrameworkCore;
@@ -52,12 +53,19 @@ namespace InfoCarrier.Core.Client
         ///     The corresponding local <see cref="DbContext" /> which may contain additional
         ///     properties you might want to send to the service as well.
         /// </param>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
         /// <returns>
         ///     A task that represents the asynchronous operation.
         ///     The task result contains the result of the query execution
         ///     on the server-side.
         /// </returns>
-        Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext);
+        Task<QueryDataResult> QueryDataAsync(
+            QueryDataRequest request,
+            DbContext dbContext,
+            CancellationToken cancellationToken);
 
         /// <summary>
         ///     Sends a <see cref="SaveChangesRequest" /> object to the remote service for
@@ -78,11 +86,17 @@ namespace InfoCarrier.Core.Client
         /// <param name="request">
         ///     The <see cref="SaveChangesRequest" /> object to be sent.
         /// </param>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
         /// <returns>
         ///     A task that represents the asynchronous operation.
         ///     The task result contains the result of the server-side operation.
         /// </returns>
-        Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request);
+        Task<SaveChangesResult> SaveChangesAsync(
+            SaveChangesRequest request,
+            CancellationToken cancellationToken);
 
         /// <summary>
         ///     Sends a command to start a transaction on the remote server
@@ -94,10 +108,14 @@ namespace InfoCarrier.Core.Client
         ///     Asynchronously sends a command to start a transaction on the server
         ///     if it generally supports transactions, otherwise throws <see cref="NotSupportedException" />.
         /// </summary>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
         /// <returns>
         ///     A task that represents the asynchronous operation.
         /// </returns>
-        Task BeginTransactionAsync();
+        Task BeginTransactionAsync(CancellationToken cancellationToken);
 
         /// <summary>
         ///     Sends a command to commit the current transaction on the server.

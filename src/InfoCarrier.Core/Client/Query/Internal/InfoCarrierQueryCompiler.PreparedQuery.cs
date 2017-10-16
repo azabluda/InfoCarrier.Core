@@ -119,7 +119,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             new QueryDataRequest(
                                 this.rlinq,
                                 this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
-                            this.queryContext.Context);
+                            this.queryContext.Context,
+                            this.queryContext.CancellationToken);
                         return this.MapAndTrackResults(result.MappedResults);
                     }
 

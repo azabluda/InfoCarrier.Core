@@ -58,7 +58,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             IReadOnlyList<IUpdateEntry> entries,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(new SaveChangesRequest(entries));
+            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(new SaveChangesRequest(entries), cancellationToken);
             return result.ApplyTo(entries);
         }
     }

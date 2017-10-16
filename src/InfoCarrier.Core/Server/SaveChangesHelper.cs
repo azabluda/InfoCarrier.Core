@@ -6,6 +6,7 @@ namespace InfoCarrier.Core.Server
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using Client;
     using Common;
@@ -186,16 +187,20 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Asynchronously saves the updated entities into the actual database.
         /// </summary>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
         /// <returns>
         ///     A task that represents the asynchronous operation.
         ///     The task result contains the save operation result which can either be
         ///     a SaveChangesResult.Success or SaveChangesResult.Error.
         /// </returns>
-        public async Task<SaveChangesResult> SaveChangesAsync()
+        public async Task<SaveChangesResult> SaveChangesAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             try
             {
-                return SaveChangesResult.Success(await this.dbContext.SaveChangesAsync(), this.Entries);
+                return SaveChangesResult.Success(await this.dbContext.SaveChangesAsync(cancellationToken), this.Entries);
             }
             catch (DbUpdateException e)
             {

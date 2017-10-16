@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.Server
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
+    using System.Threading;
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
@@ -112,18 +113,22 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Asynchronously executes the requested query against the actual database.
         /// </summary>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
         /// <returns>
         ///     A task that represents the asynchronous operation.
         ///     The task result contains the result of the query execution.
         /// </returns>
-        public async Task<QueryDataResult> QueryDataAsync()
+        public async Task<QueryDataResult> QueryDataAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
 
             object queryResult = await ExecuteExpressionAsyncMethod
                 .MakeGenericMethod(elementType)
-                .ToDelegate<Func<Task<object>>>(this)
-                .Invoke();
+                .ToDelegate<Func<CancellationToken, Task<object>>>(this)
+                .Invoke(cancellationToken);
 
             return new QueryDataResult(this.MapResult(queryResult));
         }
@@ -134,14 +139,14 @@ namespace InfoCarrier.Core.Server
             return provider.Execute<T>(this.linqExpression);
         }
 
-        private async Task<object> ExecuteExpressionAsync<T>()
+        private async Task<object> ExecuteExpressionAsync<T>(CancellationToken cancellationToken)
         {
             IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
 
             var queryResult = new List<T>();
             using (var enumerator = provider.ExecuteAsync<T>(this.linqExpression).GetEnumerator())
             {
-                while (await enumerator.MoveNext())
+                while (await enumerator.MoveNext(cancellationToken))
                 {
                     queryResult.Add(enumerator.Current);
                 }

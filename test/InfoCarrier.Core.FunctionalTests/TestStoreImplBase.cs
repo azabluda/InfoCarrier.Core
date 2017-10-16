@@ -4,6 +4,7 @@
 namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Client;
     using Common;
@@ -34,7 +35,7 @@ namespace InfoCarrier.Core.FunctionalTests
         {
         }
 
-        public virtual Task BeginTransactionAsync() => Task.CompletedTask;
+        public virtual Task BeginTransactionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public virtual void CommitTransaction()
         {
@@ -52,11 +53,11 @@ namespace InfoCarrier.Core.FunctionalTests
             }
         }
 
-        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext)
+        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
         {
             using (var helper = new QueryDataHelper(() => this.CreateStoreContextInternal(dbContext), SimulateNetworkTransferJson(request)))
             {
-                return SimulateNetworkTransferJson(await helper.QueryDataAsync());
+                return SimulateNetworkTransferJson(await helper.QueryDataAsync(cancellationToken));
             }
         }
 
@@ -68,11 +69,11 @@ namespace InfoCarrier.Core.FunctionalTests
             }
         }
 
-        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
+        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
-                return SimulateNetworkTransferJson(await helper.SaveChangesAsync());
+                return SimulateNetworkTransferJson(await helper.SaveChangesAsync(cancellationToken));
             }
         }
 

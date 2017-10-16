@@ -5,6 +5,7 @@ namespace WcfSample
 {
     using System;
     using System.ServiceModel;
+    using System.Threading;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using InfoCarrier.Core.Common;
@@ -39,15 +40,15 @@ namespace WcfSample
             }
         }
 
-        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext)
+        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
-        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
+        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         public void BeginTransaction() => throw new NotSupportedException();
 
-        public Task BeginTransactionAsync() => throw new NotSupportedException();
+        public Task BeginTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public void CommitTransaction() => throw new NotSupportedException();
 
