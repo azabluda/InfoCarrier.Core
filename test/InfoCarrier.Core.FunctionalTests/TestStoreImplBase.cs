@@ -1,6 +1,10 @@
-﻿namespace InfoCarrier.Core.FunctionalTests
+﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Client;
     using Common;
@@ -31,7 +35,7 @@
         {
         }
 
-        public virtual Task BeginTransactionAsync() => Task.CompletedTask;
+        public virtual Task BeginTransactionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public virtual void CommitTransaction()
         {
@@ -49,11 +53,11 @@
             }
         }
 
-        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext)
+        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
         {
             using (var helper = new QueryDataHelper(() => this.CreateStoreContextInternal(dbContext), SimulateNetworkTransferJson(request)))
             {
-                return SimulateNetworkTransferJson(await helper.QueryDataAsync());
+                return SimulateNetworkTransferJson(await helper.QueryDataAsync(cancellationToken));
             }
         }
 
@@ -65,11 +69,11 @@
             }
         }
 
-        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
+        public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
         {
             using (SaveChangesHelper helper = this.CreateSaveChangesHelper(request))
             {
-                return SimulateNetworkTransferJson(await helper.SaveChangesAsync());
+                return SimulateNetworkTransferJson(await helper.SaveChangesAsync(cancellationToken));
             }
         }
 

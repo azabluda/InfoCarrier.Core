@@ -1,8 +1,12 @@
+// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
 namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
@@ -23,6 +27,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Remote.Linq.ExpressionVisitors;
     using MethodInfo = System.Reflection.MethodInfo;
 
+    [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1601:PartialElementsMustBeDocumented", Justification = "Reviewed.")]
     public partial class InfoCarrierQueryCompiler
     {
         private sealed class PreparedQuery
@@ -114,7 +119,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             new QueryDataRequest(
                                 this.rlinq,
                                 this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
-                            this.queryContext.Context);
+                            this.queryContext.Context,
+                            this.queryContext.CancellationToken);
                         return this.MapAndTrackResults(result.MappedResults);
                     }
 

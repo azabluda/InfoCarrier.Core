@@ -1,8 +1,12 @@
-﻿namespace InfoCarrier.Core.FunctionalTests
+﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
     using System.Data.Common;
     using System.Data.SqlClient;
+    using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
@@ -70,10 +74,10 @@
             this.transaction = this.connection.BeginTransaction();
         }
 
-        public override async Task BeginTransactionAsync()
+        public override async Task BeginTransactionAsync(CancellationToken cancellationToken)
         {
             this.EnsureInitialized();
-            await this.connection.OpenAsync();
+            await this.connection.OpenAsync(cancellationToken);
             this.transaction = this.connection.BeginTransaction();
         }
 

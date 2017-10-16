@@ -1,9 +1,11 @@
-﻿// IMPORTED FROM https://github.com/aspnet/EntityFramework/blob/rel/1.1.0/src/Shared/SharedTypeExtensions.cs
-#pragma warning disable SA1200
+﻿#pragma warning disable SA1200
 #pragma warning disable SA1201
 #pragma warning disable SA1309
 #pragma warning disable SA1512
 #pragma warning disable SA1513
+#pragma warning disable SA1600
+#pragma warning disable SA1636
+// IMPORTED FROM https://github.com/aspnet/EntityFramework/blob/rel/1.1.0/src/Shared/SharedTypeExtensions.cs
 
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.

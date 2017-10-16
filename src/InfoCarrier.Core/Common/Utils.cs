@@ -1,4 +1,7 @@
-﻿namespace InfoCarrier.Core.Common
+﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+namespace InfoCarrier.Core.Common
 {
     using System;
     using System.Linq.Expressions;
@@ -7,18 +10,31 @@
     using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
 
+    /// <summary>
+    ///     A collection of miscellaneous helper functions.
+    /// </summary>
     public static class Utils
     {
+        /// <summary>
+        ///     Given a lambda expression that calls a method, returns the <see cref="MethodInfo"/>.
+        /// </summary>
+        /// <typeparam name="T">The return type of the method.</typeparam>
+        /// <param name="expression">The lambda expression.</param>
+        /// <returns>Method metadata.</returns>
         public static MethodInfo GetMethodInfo<T>(Expression<Action<T>> expression)
             => GetMethodInfo(expression.Body);
 
+        /// <summary>
+        ///     Given a lambda expression that calls a method, returns the <see cref="MethodInfo"/>.
+        /// </summary>
+        /// <param name="expression">The lambda expression.</param>
+        /// <returns>Method metadata.</returns>
         public static MethodInfo GetMethodInfo(Expression<Action> expression)
             => GetMethodInfo(expression.Body);
 
         private static MethodInfo GetMethodInfo(Expression expressionBody)
         {
-            var outermostExpression = expressionBody as MethodCallExpression;
-            if (outermostExpression != null)
+            if (expressionBody is MethodCallExpression outermostExpression)
             {
                 return outermostExpression.Method;
             }
@@ -26,39 +42,70 @@
             throw new ArgumentException(@"Invalid Expression. Expression should consist of a Method call only.");
         }
 
+        /// <summary>
+        ///     Converts the given <see cref="MethodInfo"/> to a strongly typed invokable delegate.
+        /// </summary>
+        /// <typeparam name="TDelegate">The type of the delegate.</typeparam>
+        /// <param name="methodInfo">Method metadata.</param>
+        /// <returns>The delegate for this method.</returns>
         public static TDelegate ToDelegate<TDelegate>(this MethodInfo methodInfo)
         {
             return (TDelegate)(object)methodInfo.CreateDelegate(typeof(TDelegate));
         }
 
-        public static TDelegate ToDelegate<TDelegate>(this MethodInfo methodInfo, object firstArgument)
+        /// <summary>
+        ///     Converts the given <see cref="MethodInfo"/> to a strongly typed invokable delegate.
+        /// </summary>
+        /// <typeparam name="TDelegate">The type of the delegate.</typeparam>
+        /// <param name="methodInfo">Method metadata.</param>
+        /// <param name="target">The object targeted by the delegate.</param>
+        /// <returns>The delegate for this method.</returns>
+        public static TDelegate ToDelegate<TDelegate>(this MethodInfo methodInfo, object target)
         {
-            return (TDelegate)(object)methodInfo.CreateDelegate(typeof(TDelegate), firstArgument);
+            return (TDelegate)(object)methodInfo.CreateDelegate(typeof(TDelegate), target);
         }
 
-        internal static Type TryGetQueryResultSequenceType(Type type)
+        /// <summary>
+        ///     Tries to guess the element type if the given type is a sequence.
+        /// </summary>
+        /// <param name="queryResultType">The result type of a Linq query.</param>
+        /// <returns>Guessed sequence element type or null.</returns>
+        internal static Type TryGetQueryResultSequenceType(Type queryResultType)
         {
             // Despite formally a string is a sequence of chars, we treat it as a scalar type
-            if (type == typeof(string))
+            if (queryResultType == typeof(string))
             {
                 return null;
             }
 
             // Arrays is another special case
-            if (type.IsArray)
+            if (queryResultType.IsArray)
             {
                 return null;
             }
 
             // Grouping is another special case
-            if (type.IsGrouping())
+            if (queryResultType.IsGrouping())
             {
                 return null;
             }
 
-            return type.TryGetSequenceType();
+            return queryResultType.TryGetSequenceType();
         }
 
+        /// <summary>
+        ///     Replace <see cref="NullConditionalExpression" /> nodes of the given expression tree with
+        ///     NullConditionalExpressionStub method calls to make the expression ready for translation
+        ///     to a serializable <see cref="Remote.Linq.Expressions.Expression"/>, and vice versa.
+        /// </summary>
+        /// <param name="expression">The original expression tree.</param>
+        /// <param name="toStub">
+        ///     <value>true</value> to replace <see cref="NullConditionalExpression" />'s with stubs.
+        ///     <value>false</value> to replace stubs with <see cref="NullConditionalExpression" />'s.
+        /// </param>
+        /// <returns>
+        ///     The new expression tree with replaced <see cref="NullConditionalExpression" /> nodes.
+        /// </returns>
         internal static Expression ReplaceNullConditional(Expression expression, bool toStub)
         {
             return new ReplaceNullConditionalExpressionVisitor(toStub).Visit(expression);

@@ -1,4 +1,7 @@
-﻿namespace InfoCarrier.Core.Common
+﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+namespace InfoCarrier.Core.Common
 {
     using System;
     using System.Collections.Generic;
@@ -8,11 +11,18 @@
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Update;
 
+    /// <summary>
+    ///     A serializable object containing the result of a SaveChanges/SaveChangesAsync operation
+    ///     executed on the server-side. It can either be Success or Error.
+    /// </summary>
     [DataContract]
     [KnownType(typeof(SuccessImpl))]
     [KnownType(typeof(ErrorImpl))]
     public class SaveChangesResult : ISaveChangesResult
     {
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="SaveChangesResult"/> class.
+        /// </summary>
         [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
         public SaveChangesResult()
         {
@@ -26,14 +36,37 @@
         [DataMember]
         private ISaveChangesResult Impl { get; set; }
 
-        public static SaveChangesResult Success(int countPersisted, IEnumerable<IUpdateEntry> entries)
+        /// <summary>
+        ///     Create a Success result object.
+        /// </summary>
+        /// <param name="countPersisted">The number of state entries written to the database.</param>
+        /// <param name="entries">
+        ///     State entries after they have been persisted on the server-side. They usually contain
+        ///     new values for keys which are to be sent back to the client.
+        /// </param>
+        /// <returns>The Success result object.</returns>
+        internal static SaveChangesResult Success(int countPersisted, IEnumerable<IUpdateEntry> entries)
             => new SaveChangesResult(new SuccessImpl(countPersisted, entries));
 
-        public static SaveChangesResult Error(DbUpdateException exception, IEnumerable<IUpdateEntry> entries)
+        /// <summary>
+        ///     Create an Error result object.
+        /// </summary>
+        /// <param name="exception">The <see cref="DbUpdateException" /> which occurred during SaveChanges operation.</param>
+        /// <param name="entries">
+        ///     The reference collection of <see cref="IUpdateEntry" />'s of the original <see cref="SaveChangesRequest"/>
+        ///     needed for determining the <see cref="ErrorImpl.FailedEntityIndexes" />.
+        /// </param>
+        /// <returns>The Error result object.</returns>
+        internal static SaveChangesResult Error(DbUpdateException exception, IEnumerable<IUpdateEntry> entries)
             => new SaveChangesResult(new ErrorImpl(exception, entries));
 
-        public int Process(IReadOnlyList<IUpdateEntry> entries)
-            => this.Impl.Process(entries);
+        /// <summary>
+        ///     Applies the server-side result to the client-side state entries.
+        /// </summary>
+        /// <param name="entries">The client-side state entries.</param>
+        /// <returns>The number of state entries written to the database.</returns>
+        public int ApplyTo(IReadOnlyList<IUpdateEntry> entries)
+            => this.Impl.ApplyTo(entries);
 
         [DataContract]
         private class SuccessImpl : SaveChangesRequest, ISaveChangesResult
@@ -52,7 +85,7 @@
             [DataMember]
             private int CountPersisted { get; set; }
 
-            int ISaveChangesResult.Process(IReadOnlyList<IUpdateEntry> entries)
+            int ISaveChangesResult.ApplyTo(IReadOnlyList<IUpdateEntry> entries)
             {
                 // Merge the results / update properties modified during SaveChanges on the server-side
                 foreach (var merge in entries.Zip(this.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
@@ -101,7 +134,7 @@
             [DataMember]
             private int[] FailedEntityIndexes { get; set; }
 
-            int ISaveChangesResult.Process(IReadOnlyList<IUpdateEntry> entries)
+            int ISaveChangesResult.ApplyTo(IReadOnlyList<IUpdateEntry> entries)
             {
                 IReadOnlyList<IUpdateEntry> failedEntries = this.FailedEntityIndexes.Select(x => entries[x]).ToList();
 

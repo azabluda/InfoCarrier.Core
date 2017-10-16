@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Description>EntityFrameworkCore provider for multitier applications</Description>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <Version>$(NuGetVersion)</Version>
     <Company>on/off it-solutions-gmbh</Company>
     <Authors>Alexander Zabluda</Authors>
@@ -17,11 +17,15 @@
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
     <RootNamespace>InfoCarrier.Core</RootNamespace>
+    <DocumentationFile>$(OutputPath)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
     <Exec Command="&quot;$(ProjectDir)..\..\tools\GitVersion.CommandLine\tools\GitVersion.exe&quot; /updateassemblyinfo &quot;$(ProjectDir)obj\GitVersionTaskAssemblyInfo.g.cs&quot; /ensureassemblyinfo" />
   </Target>  
   <ItemGroup>
+    <AdditionalFiles Include="..\..\stylecop.json">
+      <Link>stylecop.json</Link>
+    </AdditionalFiles>
     <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
   </ItemGroup>
   <ItemGroup>
