@@ -34,8 +34,7 @@ namespace InfoCarrier.Core.Common
 
         private static MethodInfo GetMethodInfo(Expression expressionBody)
         {
-            var outermostExpression = expressionBody as MethodCallExpression;
-            if (outermostExpression != null)
+            if (expressionBody is MethodCallExpression outermostExpression)
             {
                 return outermostExpression.Method;
             }
