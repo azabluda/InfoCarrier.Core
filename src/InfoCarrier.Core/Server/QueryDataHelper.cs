@@ -11,6 +11,7 @@ namespace InfoCarrier.Core.Server
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
+    using Client;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -24,6 +25,10 @@ namespace InfoCarrier.Core.Server
     using Remote.Linq.ExpressionVisitors;
     using MethodInfo = System.Reflection.MethodInfo;
 
+    /// <summary>
+    ///     Server-side implementation of <see cref="IInfoCarrierBackend.QueryData" /> and
+    ///     <see cref="IInfoCarrierBackend.QueryDataAsync" /> methods.
+    /// </summary>
     public sealed class QueryDataHelper : IDisposable
     {
         private static readonly MethodInfo ExecuteExpressionMethod
@@ -39,6 +44,11 @@ namespace InfoCarrier.Core.Server
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
 
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="QueryDataHelper" /> class.
+        /// </summary>
+        /// <param name="dbContextFactory"> Factory for <see cref="DbContext" /> against which the requested query will be executed. </param>
+        /// <param name="request"> The <see cref="QueryDataRequest" /> object from the client containing the query. </param>
         public QueryDataHelper(
             Func<DbContext> dbContextFactory,
             QueryDataRequest request)
@@ -64,6 +74,12 @@ namespace InfoCarrier.Core.Server
             this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
+        /// <summary>
+        ///     Executes the requested query against the actual database.
+        /// </summary>
+        /// <returns>
+        ///     The result of the query execution.
+        /// </returns>
         public QueryDataResult QueryData()
         {
             var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
@@ -93,6 +109,13 @@ namespace InfoCarrier.Core.Server
             return new QueryDataResult(this.MapResult(queryResult));
         }
 
+        /// <summary>
+        ///     Asynchronously executes the requested query against the actual database.
+        /// </summary>
+        /// <returns>
+        ///     A task that represents the asynchronous operation.
+        ///     The task result contains the result of the query execution.
+        /// </returns>
         public async Task<QueryDataResult> QueryDataAsync()
         {
             Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
@@ -138,6 +161,9 @@ namespace InfoCarrier.Core.Server
             return result;
         }
 
+        /// <summary>
+        ///     Disposes the <see cref="DbContext" /> against which the requested query has been executed.
+        /// </summary>
         public void Dispose()
         {
             this.dbContext.Dispose();

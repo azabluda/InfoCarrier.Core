@@ -7,6 +7,7 @@ namespace InfoCarrier.Core.Server
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
+    using Client;
     using Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -18,10 +19,19 @@ namespace InfoCarrier.Core.Server
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
 
+    /// <summary>
+    ///     Server-side implementation of <see cref="IInfoCarrierBackend.SaveChanges" /> and
+    ///     <see cref="IInfoCarrierBackend.SaveChangesAsync" /> methods.
+    /// </summary>
     public class SaveChangesHelper : IDisposable
     {
         private readonly DbContext dbContext;
 
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="SaveChangesHelper" /> class.
+        /// </summary>
+        /// <param name="dbContextFactory"> Factory for <see cref="DbContext" /> to save the updated entities into. </param>
+        /// <param name="request"> The <see cref="SaveChangesRequest" /> object from the client containing the updated entities. </param>
         public SaveChangesHelper(Func<DbContext> dbContextFactory, SaveChangesRequest request)
         {
             this.dbContext = dbContextFactory();
@@ -141,13 +151,26 @@ namespace InfoCarrier.Core.Server
             this.Entries = entries.Select(e => e.GetInfrastructure()).ToList();
         }
 
+        /// <summary>
+        ///     Gets the corresponding entries after painting the state of the updated entities.
+        /// </summary>
         public IEnumerable<IUpdateEntry> Entries { get; }
 
+        /// <summary>
+        ///     Disposes the <see cref="DbContext" /> into which the updated entities have been saved.
+        /// </summary>
         public void Dispose()
         {
             this.dbContext.Dispose();
         }
 
+        /// <summary>
+        ///     Saves the updated entities into the actual database.
+        /// </summary>
+        /// <returns>
+        ///     The save operation result which can either be
+        ///     a SaveChangesResult.Success or SaveChangesResult.Error.
+        /// </returns>
         public SaveChangesResult SaveChanges()
         {
             try
@@ -160,6 +183,14 @@ namespace InfoCarrier.Core.Server
             }
         }
 
+        /// <summary>
+        ///     Asynchronously saves the updated entities into the actual database.
+        /// </summary>
+        /// <returns>
+        ///     A task that represents the asynchronous operation.
+        ///     The task result contains the save operation result which can either be
+        ///     a SaveChangesResult.Success or SaveChangesResult.Error.
+        /// </returns>
         public async Task<SaveChangesResult> SaveChangesAsync()
         {
             try

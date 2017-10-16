@@ -8,26 +8,38 @@ namespace InfoCarrier.Core
     using System.Threading;
     using System.Threading.Tasks;
 
+    /// <summary>
+    ///     Adapter class which represents <see cref="Task{IEnumerable}" /> as <see cref="IAsyncEnumerable{T}" />.
+    /// </summary>
+    /// <typeparam name="T">Element type.</typeparam>
     internal class AsyncEnumerableAdapter<T> : IAsyncEnumerable<T>
     {
         private readonly Func<IAsyncEnumerator<T>> enumeratorFactory;
 
-        public AsyncEnumerableAdapter(Task<IEnumerable<T>> asyncResult)
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="AsyncEnumerableAdapter{T}"/> class.
+        /// </summary>
+        /// <param name="enumerableTask">A <see cref="Task{IEnumerable}"/> to adapt.</param>
+        public AsyncEnumerableAdapter(Task<IEnumerable<T>> enumerableTask)
         {
             this.enumeratorFactory =
-                () => new AsyncEnumerator(asyncResult);
+                () => new AsyncEnumerator(enumerableTask);
         }
 
+        /// <summary>
+        ///     Gets an asynchronous enumerator over the sequence.
+        /// </summary>
+        /// <returns>Enumerator for asynchronous enumeration over the sequence.</returns>
         public IAsyncEnumerator<T> GetEnumerator() => this.enumeratorFactory();
 
         private class AsyncEnumerator : IAsyncEnumerator<T>
         {
-            private readonly Task<IEnumerable<T>> asyncResult;
+            private readonly Task<IEnumerable<T>> enumerableTask;
             private IEnumerator<T> enumerator;
 
-            public AsyncEnumerator(Task<IEnumerable<T>> asyncResult)
+            public AsyncEnumerator(Task<IEnumerable<T>> enumerableTask)
             {
-                this.asyncResult = asyncResult;
+                this.enumerableTask = enumerableTask;
             }
 
             public T Current =>
@@ -44,7 +56,7 @@ namespace InfoCarrier.Core
             {
                 if (this.enumerator == null)
                 {
-                    this.enumerator = (await this.asyncResult).GetEnumerator();
+                    this.enumerator = (await this.enumerableTask).GetEnumerator();
                 }
 
                 return this.enumerator.MoveNext();

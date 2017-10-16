@@ -8,7 +8,7 @@
 
 
 ### Description:
-InfoCarrier.Core is a framework developed by [on/off it-solutions gmbh](http://www.onoff-it-solutions.info) for building multitier applications in .NET. This repository contains the key data access component of the framework which essentially is a non-relational provider for [Entity Framework Core](https://github.com/aspnet/EntityFramework) which can be deployed on the client-side of your 3-tier application allowing you to use the full power of EF.Core right in your client application (e.g. WPF, WinForms, etc). The main idea is that instead of querying the relational database the commands are translated into requests to your application server where they are executed against the real database.
+InfoCarrier.Core is a framework developed by [on/off it-solutions gmbh](http://www.onoff-it-solutions.info) for building multitier applications in .NET. This repository contains the key data access component of the framework which essentially is a non-relational provider for [Entity Framework Core](https://github.com/aspnet/EntityFramework) which can be deployed on the client-side of your 3-tier application allowing you to use the full power of EF.Core right in your client application (e.g. WPF, WinForms, Xamarin, UWP, etc). The main idea is that instead of querying the relational database the commands are translated into requests to your application server where they are executed against the real database.
 
 It is important to note that InfoCarrier.Core dictates neither the communication platform nor serialization framework. We had positive experience with [WCF](https://msdn.microsoft.com/en-us/library/ms731082.aspx) and [Json.NET](http://www.newtonsoft.com/json), but you are free to choose other frameworks and libraries. InfoCarrier.Core is only responsible for translating client commands into serializable objects, leaving it up to you how to deliver them to the server for actual execution. The same is valid for the execution results.
 
@@ -62,18 +62,16 @@ public class BloggingContext : DbContext
 
 Implement `IInfoCarrierBackend` interface, e.g. using Windows Communication Foundation
 ```C#
-using IC = InfoCarrier.Core.Common;
-
 public class WcfBackendImpl : IInfoCarrierBackend
 {
     private readonly ChannelFactory<IMyRemoteService> channelFactory
         = new ChannelFactory<IMyRemoteService>(...);
 
-    // Service URL string (used for logging)
+    // Gets the remote server address. Used for logging.
     public string ServerUrl
         => this.channelFactory.Endpoint.Address.ToString();
 
-    public IC.QueryDataResult QueryData(IC.QueryDataRequest request, DbContext dbContext)
+    public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
     {
         IMyRemoteService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
@@ -82,7 +80,7 @@ public class WcfBackendImpl : IInfoCarrierBackend
         }
     }
 
-    public IC.SaveChangesResult SaveChanges(IC.SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
+    public SaveChangesResult SaveChanges(SaveChangesRequest request, IReadOnlyList<IUpdateEntry> entries)
     {
         IMyRemoteService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
@@ -91,7 +89,7 @@ public class WcfBackendImpl : IInfoCarrierBackend
         }
     }
 
-    // Other methods of IInfoCarrierBackend may just throw NotImplementedException for now
+    // Let other methods of IInfoCarrierBackend just throw NotSupportedException for now.
     ...
 }
 ```

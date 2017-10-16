@@ -17,7 +17,7 @@ namespace WcfSample
                 new BasicHttpBinding(),
                 new EndpointAddress(new Uri(WcfShared.UriString)));
 
-        // Service URL string (used for logging)
+        // Gets the remote server address. Used for logging.
         public string ServerUrl
             => this.channelFactory.Endpoint.Address.ToString();
 
@@ -40,17 +40,17 @@ namespace WcfSample
         }
 
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext)
-            => throw new NotImplementedException();
+            => throw new NotSupportedException();
 
         public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request)
-            => throw new NotImplementedException();
+            => throw new NotSupportedException();
 
-        public void BeginTransaction() => throw new NotImplementedException();
+        public void BeginTransaction() => throw new NotSupportedException();
 
-        public Task BeginTransactionAsync() => throw new NotImplementedException();
+        public Task BeginTransactionAsync() => throw new NotSupportedException();
 
-        public void CommitTransaction() => throw new NotImplementedException();
+        public void CommitTransaction() => throw new NotSupportedException();
 
-        public void RollbackTransaction() => throw new NotImplementedException();
+        public void RollbackTransaction() => throw new NotSupportedException();
     }
 }
