@@ -14,9 +14,16 @@ namespace WcfSample
             MyRemoteService.RecreateDatabase();
 
             // Start self-hosted WCF server
-            using (var host = new ServiceHost(new MyRemoteService(), new Uri(WcfShared.UriString)))
+            using (var host = new ServiceHost(
+                new MyRemoteService(),
+                new Uri($"http://{WcfShared.BaseUrl}/{WcfShared.ServiceName}")))
             {
                 host.AddDefaultEndpoints();
+                foreach (var ep in host.Description.Endpoints)
+                {
+                    ep.Binding = new BasicHttpBinding { MaxReceivedMessageSize = WcfShared.MaxReceivedMessageSize };
+                }
+
                 host.Open();
                 foreach (Uri addr in host.BaseAddresses)
                 {
