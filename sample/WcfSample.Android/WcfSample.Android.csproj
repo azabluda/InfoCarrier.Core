@@ -52,9 +52,6 @@
     <Reference Include="Aqua, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\aqua-core.4.2.0\lib\netstandard2.0\Aqua.dll</HintPath>
     </Reference>
-    <Reference Include="InfoCarrier.Core, Version=2.0.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\InfoCarrier.Core.2.0.3\lib\netstandard2.0\InfoCarrier.Core.dll</HintPath>
-    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.EntityFrameworkCore, Version=2.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.EntityFrameworkCore.2.0.0\lib\netstandard2.0\Microsoft.EntityFrameworkCore.dll</HintPath>
@@ -148,6 +145,10 @@
     <Folder Include="Resources\drawable\" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj">
+      <Project>{6b24f793-c93b-4869-a99b-ac51ee2c82af}</Project>
+      <Name>InfoCarrier.Core</Name>
+    </ProjectReference>
     <ProjectReference Include="..\WcfSample.Shared\WcfSample.Shared.csproj">
       <Project>{4af12b6e-9979-4146-86bc-f59f6d00e4a0}</Project>
       <Name>WcfSample.Shared</Name>
