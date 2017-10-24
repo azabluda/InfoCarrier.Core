@@ -7,7 +7,6 @@ namespace InfoCarrier.Core.Client
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
-    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
@@ -53,8 +52,7 @@ namespace InfoCarrier.Core.Client
                 .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
                 .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
                 .TryAddProviderSpecificServices(b => b
-                    .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>()
-                    .TryAddScoped<IMaterializerFactory, MaterializerFactory>());
+                    .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>());
 
             builder.TryAddCoreServices();
 
