@@ -439,13 +439,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     public abstract Type ElementType { get; }
 
-                    protected static dynamic NotImplemented => throw new NotImplementedException();
+                    public Expression Expression => throw new NotImplementedException();
 
-                    public Expression Expression => NotImplemented;
+                    public IQueryProvider Provider => throw new NotImplementedException();
 
-                    public IQueryProvider Provider => NotImplemented;
-
-                    public IEnumerator GetEnumerator() => NotImplemented;
+                    public IEnumerator GetEnumerator() => throw new NotImplementedException();
 
                     internal static IQueryable<T> Create<T>()
                     {
@@ -457,7 +455,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     public override Type ElementType => typeof(T);
 
-                    IEnumerator<T> IEnumerable<T>.GetEnumerator() => NotImplemented;
+                    IEnumerator<T> IEnumerable<T>.GetEnumerator() => throw new NotImplementedException();
                 }
             }
         }
