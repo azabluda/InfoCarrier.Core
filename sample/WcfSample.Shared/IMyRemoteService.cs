@@ -4,6 +4,7 @@
 namespace WcfSample
 {
     using System.ServiceModel;
+    using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
 
     [ServiceContract]
@@ -12,7 +13,13 @@ namespace WcfSample
         [OperationContract]
         QueryDataResult ProcessQueryDataRequest(QueryDataRequest request);
 
+        [OperationContract(Name = "ProcessQueryDataRequestAsync")]
+        Task<QueryDataResult> ProcessQueryDataRequestAsync(QueryDataRequest request);
+
         [OperationContract]
         SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request);
+
+        [OperationContract(Name = "ProcessSaveChangesRequestAsync")]
+        Task<SaveChangesResult> ProcessSaveChangesRequestAsync(SaveChangesRequest request);
     }
 }

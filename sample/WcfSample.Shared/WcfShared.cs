@@ -7,8 +7,12 @@ namespace WcfSample
 
     public static class WcfShared
     {
-        public static string UriString =>
-            Environment.GetEnvironmentVariable(@"Wcf__DefaultUri")
-            ?? @"http://localhost:8080/MyRemoteService";
+        public static string BaseUrl =>
+            Environment.GetEnvironmentVariable(@"Wcf__DefaultBaseUri")
+            ?? @"localhost:8080";
+
+        public static string ServiceName => "MyRemoteService";
+
+        public static long MaxReceivedMessageSize => 1024 * 1024;
     }
 }

@@ -44,7 +44,7 @@ namespace InfoCarrier.Core
 
             public T Current =>
                 this.enumerator == null
-                    ? default(T)
+                    ? default
                     : this.enumerator.Current;
 
             public void Dispose()

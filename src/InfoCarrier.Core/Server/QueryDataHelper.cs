@@ -121,7 +121,7 @@ namespace InfoCarrier.Core.Server
         ///     A task that represents the asynchronous operation.
         ///     The task result contains the result of the query execution.
         /// </returns>
-        public async Task<QueryDataResult> QueryDataAsync(CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<QueryDataResult> QueryDataAsync(CancellationToken cancellationToken = default)
         {
             Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
 

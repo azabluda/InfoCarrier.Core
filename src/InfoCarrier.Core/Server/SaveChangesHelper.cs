@@ -196,7 +196,7 @@ namespace InfoCarrier.Core.Server
         ///     The task result contains the save operation result which can either be
         ///     a SaveChangesResult.Success or SaveChangesResult.Error.
         /// </returns>
-        public async Task<SaveChangesResult> SaveChangesAsync(CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<SaveChangesResult> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             try
             {

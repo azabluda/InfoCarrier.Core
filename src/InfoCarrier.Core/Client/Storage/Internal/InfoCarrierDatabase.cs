@@ -56,7 +56,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public override async Task<int> SaveChangesAsync(
             IReadOnlyList<IUpdateEntry> entries,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(new SaveChangesRequest(entries), cancellationToken);
             return result.ApplyTo(entries);

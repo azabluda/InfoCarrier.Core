@@ -4,8 +4,10 @@
 namespace WcfSample
 {
     using System;
+    using System.Collections.Generic;
     using System.Data.SqlClient;
     using System.ServiceModel;
+    using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
     using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
@@ -41,14 +43,26 @@ namespace WcfSample
 
             SqlConnection.ClearAllPools();
 
-            // Create database
+            // Create and seed database
             using (var ctx = CreateDbContext())
             {
                 ctx.Database.EnsureCreated();
+
+                ctx.Blogs.Add(
+                    new Blog
+                    {
+                        Owner = new User { Name = "hi-its-me" },
+                        Posts = new List<Post>
+                        {
+                            new Post { Title = "my-blog-post" },
+                        },
+                    });
+
+                ctx.SaveChanges();
             }
         }
 
-        public static DbContext CreateDbContext()
+        public static BloggingContext CreateDbContext()
         {
             var connectionString =
                 new SqlConnectionStringBuilder(MasterConnectionString) { InitialCatalog = SampleDbName }.ToString();
@@ -68,11 +82,27 @@ namespace WcfSample
             }
         }
 
+        public async Task<QueryDataResult> ProcessQueryDataRequestAsync(QueryDataRequest request)
+        {
+            using (var helper = new QueryDataHelper(CreateDbContext, request))
+            {
+                return await helper.QueryDataAsync();
+            }
+        }
+
         public SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request)
         {
             using (var helper = new SaveChangesHelper(CreateDbContext, request))
             {
                 return helper.SaveChanges();
+            }
+        }
+
+        public async Task<SaveChangesResult> ProcessSaveChangesRequestAsync(SaveChangesRequest request)
+        {
+            using (var helper = new SaveChangesHelper(CreateDbContext, request))
+            {
+                return await helper.SaveChangesAsync();
             }
         }
     }

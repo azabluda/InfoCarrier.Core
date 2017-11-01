@@ -36,7 +36,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        public virtual Task<bool> EnsureDeletedAsync(CancellationToken cancellationToken = default(CancellationToken))
+        public virtual Task<bool> EnsureDeletedAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(this.EnsureDeleted());
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        public virtual Task<bool> EnsureCreatedAsync(CancellationToken cancellationToken = default(CancellationToken))
+        public virtual Task<bool> EnsureCreatedAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(this.EnsureCreated());
     }
 }

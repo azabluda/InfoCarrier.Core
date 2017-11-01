@@ -4,8 +4,8 @@
 namespace WcfSample
 {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -13,7 +13,7 @@ namespace WcfSample
 
     internal class Program
     {
-        private static void Main(string[] args)
+        private static async Task Main(string[] args)
         {
             Console.WriteLine(@"Wait until the server is ready, then press any key to start.");
             Console.ReadKey();
@@ -28,25 +28,6 @@ namespace WcfSample
                 context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
             }
 
-            // Seed database
-            using (var context = new BloggingContext(options))
-            {
-                context.Blogs.Add(
-                    new Blog
-                    {
-                        Owner = new User { Name = "hi-its-me" },
-                        Posts = new List<Post>
-                        {
-                            new Post { Title = "my-blog-post" },
-                        },
-                    });
-
-                context.SaveChanges();
-            }
-
-            Console.WriteLine(@"Database is seeded. Press any key to continue.");
-            Console.ReadKey();
-
             // Select and update
             using (var context = new BloggingContext(options))
             {
@@ -58,11 +39,12 @@ namespace WcfSample
                     where post.Title == "my-blog-post"
                     select post).Single();
 
-                Console.WriteLine($@"Blog post '{myBlogPost.Title}' is retrieved. Press any key to continue.");
+                Console.WriteLine($@"Blog post '{myBlogPost.Title}' is retrieved.");
+                Console.WriteLine(@"Press any key to continue.");
                 Console.ReadKey();
 
                 myBlogPost.CreationDate = DateTime.Now;
-                context.SaveChanges();
+                await context.SaveChangesAsync();
                 Console.WriteLine($@"CreationDate is set to '{myBlogPost.CreationDate}'.");
             }
 

@@ -118,6 +118,7 @@ namespace InfoCarrier.Core.Common
             {
                 this.IsConcurrencyException = exception is DbUpdateConcurrencyException;
                 this.Message = exception.Message;
+                this.InnerMessage = exception.InnerException?.Message;
 
                 var map = entries
                     .Select((e, i) => new { Index = i, Entry = e })
@@ -132,6 +133,9 @@ namespace InfoCarrier.Core.Common
             private string Message { get; set; }
 
             [DataMember]
+            private string InnerMessage { get; set; }
+
+            [DataMember]
             private int[] FailedEntityIndexes { get; set; }
 
             int ISaveChangesResult.ApplyTo(IReadOnlyList<IUpdateEntry> entries)
@@ -143,9 +147,11 @@ namespace InfoCarrier.Core.Common
                     throw new DbUpdateConcurrencyException(this.Message, failedEntries);
                 }
 
+                var inner = this.InnerMessage != null ? new Exception(this.InnerMessage) : null;
+
                 throw failedEntries.Any()
-                    ? new DbUpdateException(this.Message, failedEntries)
-                    : new DbUpdateException(this.Message, (Exception)null);
+                    ? new DbUpdateException(this.Message, inner, failedEntries)
+                    : new DbUpdateException(this.Message, inner);
             }
         }
     }

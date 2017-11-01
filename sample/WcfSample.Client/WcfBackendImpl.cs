@@ -13,16 +13,20 @@ namespace WcfSample
 
     public class WcfBackendImpl : IInfoCarrierBackend
     {
-        private readonly ChannelFactory<IMyRemoteService> channelFactory
-            = new ChannelFactory<IMyRemoteService>(
-                new BasicHttpBinding(),
-                new EndpointAddress(new Uri(WcfShared.UriString)));
+        private readonly ChannelFactory<IMyRemoteService> channelFactory;
+
+        public WcfBackendImpl(string serverUrl = null)
+        {
+            this.channelFactory = new ChannelFactory<IMyRemoteService>(
+                new BasicHttpBinding { MaxReceivedMessageSize = WcfShared.MaxReceivedMessageSize },
+                new EndpointAddress(new Uri($"http://{serverUrl ?? WcfShared.BaseUrl}/{WcfShared.ServiceName}")));
+        }
 
         // Gets the remote server address. Used for logging.
         public string ServerUrl
             => this.channelFactory.Endpoint.Address.ToString();
 
-        public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
+        public virtual QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
         {
             IMyRemoteService channel = this.channelFactory.CreateChannel();
             using ((IDisposable)channel)
@@ -31,7 +35,7 @@ namespace WcfSample
             }
         }
 
-        public SaveChangesResult SaveChanges(SaveChangesRequest request)
+        public virtual SaveChangesResult SaveChanges(SaveChangesRequest request)
         {
             IMyRemoteService channel = this.channelFactory.CreateChannel();
             using ((IDisposable)channel)
@@ -40,18 +44,30 @@ namespace WcfSample
             }
         }
 
-        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
+        public virtual async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
+        {
+            IMyRemoteService channel = this.channelFactory.CreateChannel();
+            using ((IDisposable)channel)
+            {
+                return await channel.ProcessQueryDataRequestAsync(request);
+            }
+        }
 
-        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
+        public virtual async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
+        {
+            IMyRemoteService channel = this.channelFactory.CreateChannel();
+            using ((IDisposable)channel)
+            {
+                return await channel.ProcessSaveChangesRequestAsync(request);
+            }
+        }
 
-        public void BeginTransaction() => throw new NotSupportedException();
+        public virtual void BeginTransaction() => throw new NotSupportedException();
 
-        public Task BeginTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public virtual Task BeginTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        public void CommitTransaction() => throw new NotSupportedException();
+        public virtual void CommitTransaction() => throw new NotSupportedException();
 
-        public void RollbackTransaction() => throw new NotSupportedException();
+        public virtual void RollbackTransaction() => throw new NotSupportedException();
     }
 }
