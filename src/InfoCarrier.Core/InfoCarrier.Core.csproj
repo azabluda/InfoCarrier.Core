@@ -17,7 +17,7 @@
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
     <RootNamespace>InfoCarrier.Core</RootNamespace>
-    <DocumentationFile>$(OutputPath)\$(AssemblyName).xml</DocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
