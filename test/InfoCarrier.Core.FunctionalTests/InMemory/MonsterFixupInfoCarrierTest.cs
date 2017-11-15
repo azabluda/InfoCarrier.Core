@@ -25,7 +25,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                 .GetValue(testOutputHelper)).TestCase.TestMethod.Method.Name;
 
             // UGLY: Different tests require different MonsterContext configurations
-            // but tests won't explicitely manifest it so we have to guess.
+            // but tests won't explicitly manifest it so we have to guess.
             switch (testMethod)
             {
                 case nameof(this.Can_build_monster_model_and_seed_data_using_FKs):
