@@ -14,12 +14,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         {
         }
 
-        [Fact(Skip = "Not valid for in-memory (from AsyncQueryInMemoryTest)")]
-        public override Task ToList_on_nav_in_projection_is_async()
-        {
-            return base.ToList_on_nav_in_projection_is_async();
-        }
-
         [Fact(Skip = "https://github.com/aspnet/EntityFramework/issues/9301")]
         public override Task Mixed_sync_async_query()
         {

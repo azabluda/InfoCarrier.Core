@@ -19,6 +19,18 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
             base.Nested_group_join_with_take();
         }
 
+        [Fact(Skip = "issue #9591 (from ComplexNavigationsQueryInMemoryTest)")]
+        public override void Multi_include_with_groupby_in_subquery()
+        {
+            base.Multi_include_with_groupby_in_subquery();
+        }
+
+        [Fact(Skip = "Issue #10060 (from ComplexNavigationsQueryInMemoryTest)")]
+        public override void Include_reference_collection_order_by_reference_navigation()
+        {
+            base.Include_reference_collection_order_by_reference_navigation();
+        }
+
         [Fact(Skip = "Client-side evaluation not fully supported")]
         public override void Complex_query_with_optional_navigations_and_client_side_evaluation()
         {
