@@ -1,6 +1,7 @@
 // Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+// ReSharper disable once CheckNamespace
 namespace InfoCarrier.Core.Client
 {
     using Infrastructure.Internal;
