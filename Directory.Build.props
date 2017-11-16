@@ -1,0 +1,5 @@
+﻿<Project>
+  <PropertyGroup>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)StyleNoDoc.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+</Project>

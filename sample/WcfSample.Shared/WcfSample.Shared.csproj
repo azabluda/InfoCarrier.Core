@@ -3,7 +3,6 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>WcfSample</RootNamespace>
-    <CodeAnalysisRuleSet>..\..\StyleNoDoc.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
   <ItemGroup>

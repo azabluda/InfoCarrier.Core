@@ -4,7 +4,6 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net461</TargetFramework>
     <RootNamespace>WcfSample</RootNamespace>
-    <CodeAnalysisRuleSet>..\..\StyleNoDoc.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
   <ItemGroup>
