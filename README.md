@@ -117,7 +117,7 @@ using (var context = new BloggingContext(optionsBuilder.Options))
 
 ### Server
 
-Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend service. Without transaction support it can be made very simple and virtually stateless.
+Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend service. In the simple case when no transaction support is required it may look like the following:
 
 ```C#
 [ServiceContract]
