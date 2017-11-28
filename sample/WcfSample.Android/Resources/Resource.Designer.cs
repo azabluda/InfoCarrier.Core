@@ -9,9 +9,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-[assembly: global::Android.Runtime.ResourceDesignerAttribute("WcfSample.Resource", IsApplication=true)]
+[assembly: global::Android.Runtime.ResourceDesignerAttribute("InfoCarrierSample.Resource", IsApplication=true)]
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
 	
 	

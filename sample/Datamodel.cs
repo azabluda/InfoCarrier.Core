@@ -4,7 +4,7 @@
 #pragma warning disable SA1402 // FileMayOnlyContainASingleType
 #pragma warning disable SA1649 // FileNameMustMatchTypeName
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
     using System;
     using System.Collections.Generic;

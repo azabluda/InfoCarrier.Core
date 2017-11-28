@@ -32,7 +32,7 @@ InfoCarrier.Core is bringing together the following open source projects
 
 ## Sample
 
-The complete WCF sample is located in the [/sample](sample) folder.
+The complete WCF sample is located in the [/sample](sample) folder. There you also find an ASP.NET Web API example.
 
 ### Entities and DbContext
 
@@ -64,8 +64,8 @@ Implement `IInfoCarrierBackend` interface, e.g. using Windows Communication Foun
 ```C#
 public class WcfBackendImpl : IInfoCarrierBackend
 {
-    private readonly ChannelFactory<IMyRemoteService> channelFactory
-        = new ChannelFactory<IMyRemoteService>(...);
+    private readonly ChannelFactory<IWcfService> channelFactory
+        = new ChannelFactory<IWcfService>(...);
 
     // Gets the remote server address. Used for logging.
     public string ServerUrl
@@ -73,7 +73,7 @@ public class WcfBackendImpl : IInfoCarrierBackend
 
     public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
     {
-        IMyRemoteService channel = this.channelFactory.CreateChannel();
+        IWcfService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
         {
             return channel.ProcessQueryDataRequest(request);
@@ -82,7 +82,7 @@ public class WcfBackendImpl : IInfoCarrierBackend
 
     public SaveChangesResult SaveChanges(SaveChangesRequest request)
     {
-        IMyRemoteService channel = this.channelFactory.CreateChannel();
+        IWcfService channel = this.channelFactory.CreateChannel();
         using ((IDisposable)channel)
         {
             return channel.ProcessSaveChangesRequest(request);
@@ -121,7 +121,7 @@ Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend s
 
 ```C#
 [ServiceContract]
-public interface IMyRemoteService
+public interface IWcfService
 {
     [OperationContract]
     QueryDataResult ProcessQueryDataRequest(QueryDataRequest request);
@@ -131,7 +131,7 @@ public interface IMyRemoteService
 }
 
 [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
-public class MyRemoteService : IMyRemoteService
+public class InfoCarrierService : IWcfService
 {
     private DbContext CreateDbContext()
     {

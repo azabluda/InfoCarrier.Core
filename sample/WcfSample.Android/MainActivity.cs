@@ -1,7 +1,7 @@
 ﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
     using System;
     using System.Linq;

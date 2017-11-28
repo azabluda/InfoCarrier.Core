@@ -9,7 +9,7 @@
     <ProjectTypeGuids>{EFBA0AD7-5A72-4C68-AF49-83D382785DCF};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>WcfSample</RootNamespace>
+    <RootNamespace>InfoCarrierSample</RootNamespace>
     <AssemblyName>WcfSample.Android</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <AndroidApplication>True</AndroidApplication>
@@ -117,8 +117,17 @@
     <AdditionalFiles Include="..\..\stylecop.json">
       <Link>stylecop.json</Link>
     </AdditionalFiles>
+    <Compile Include="..\Datamodel.cs">
+      <Link>Datamodel.cs</Link>
+    </Compile>
+    <Compile Include="..\IWcfService.cs">
+      <Link>IWcfService.cs</Link>
+    </Compile>
     <Compile Include="..\WcfSample.Client\WcfBackendImpl.cs">
       <Link>WcfBackendImpl.cs</Link>
+    </Compile>
+    <Compile Include="..\WcfShared.cs">
+      <Link>WcfShared.cs</Link>
     </Compile>
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.Designer.cs" />
@@ -148,10 +157,6 @@
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj">
       <Project>{6b24f793-c93b-4869-a99b-ac51ee2c82af}</Project>
       <Name>InfoCarrier.Core</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\WcfSample.Shared\WcfSample.Shared.csproj">
-      <Project>{4af12b6e-9979-4146-86bc-f59f6d00e4a0}</Project>
-      <Name>WcfSample.Shared</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

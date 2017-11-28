@@ -1,7 +1,7 @@
 ﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
     using System;
     using System.ServiceModel;
@@ -11,11 +11,11 @@ namespace WcfSample
         private static void Main(string[] args)
         {
             Console.WriteLine(@"Preparing the database...");
-            MyRemoteService.RecreateDatabase();
+            SqlServerShared.RecreateDatabase();
 
             // Start self-hosted WCF server
             using (var host = new ServiceHost(
-                new MyRemoteService(),
+                new InfoCarrierService(),
                 new Uri($"http://{WcfShared.BaseUrl}/{WcfShared.ServiceName}")))
             {
                 host.AddDefaultEndpoints();

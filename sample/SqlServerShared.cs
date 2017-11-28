@@ -1,27 +1,22 @@
 ﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
     using System;
     using System.Collections.Generic;
     using System.Data.SqlClient;
-    using System.ServiceModel;
-    using System.Threading.Tasks;
-    using InfoCarrier.Core.Common;
-    using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.Extensions.Logging;
 
-    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
-    public class MyRemoteService : IMyRemoteService
+    public static class SqlServerShared
     {
-        private static readonly string MasterConnectionString =
+        public static string MasterConnectionString { get; } =
             Environment.GetEnvironmentVariable(@"SqlServer__DefaultConnection")
             ?? @"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30";
 
-        private static readonly string SampleDbName = "InfoCarrierWcfSample";
+        public static string SampleDbName => "InfoCarrierSample";
 
         public static void RecreateDatabase()
         {
@@ -72,38 +67,6 @@ namespace WcfSample
             var context = new BloggingContext(optionsBuilder.Options);
             context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
             return context;
-        }
-
-        public QueryDataResult ProcessQueryDataRequest(QueryDataRequest request)
-        {
-            using (var helper = new QueryDataHelper(CreateDbContext, request))
-            {
-                return helper.QueryData();
-            }
-        }
-
-        public async Task<QueryDataResult> ProcessQueryDataRequestAsync(QueryDataRequest request)
-        {
-            using (var helper = new QueryDataHelper(CreateDbContext, request))
-            {
-                return await helper.QueryDataAsync();
-            }
-        }
-
-        public SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request)
-        {
-            using (var helper = new SaveChangesHelper(CreateDbContext, request))
-            {
-                return helper.SaveChanges();
-            }
-        }
-
-        public async Task<SaveChangesResult> ProcessSaveChangesRequestAsync(SaveChangesRequest request)
-        {
-            using (var helper = new SaveChangesHelper(CreateDbContext, request))
-            {
-                return await helper.SaveChangesAsync();
-            }
         }
     }
 }

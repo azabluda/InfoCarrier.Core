@@ -3,8 +3,14 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
-    <RootNamespace>WcfSample</RootNamespace>
+    <RootNamespace>InfoCarrierSample</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Datamodel.cs" Link="Datamodel.cs" />
+    <Compile Include="..\IWcfService.cs" Link="IWcfService.cs" />
+    <Compile Include="..\WcfShared.cs" Link="WcfShared.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.0.0" />
@@ -12,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WcfSample.Shared\WcfSample.Shared.csproj" />
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
   </ItemGroup>
 
 </Project>

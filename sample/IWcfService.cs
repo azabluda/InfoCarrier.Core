@@ -1,25 +1,25 @@
 ﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
     using System.ServiceModel;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
 
     [ServiceContract]
-    public interface IMyRemoteService
+    public interface IWcfService
     {
         [OperationContract]
         QueryDataResult ProcessQueryDataRequest(QueryDataRequest request);
 
-        [OperationContract(Name = "ProcessQueryDataRequestAsync")]
+        [OperationContract(Name = nameof(ProcessQueryDataRequestAsync))]
         Task<QueryDataResult> ProcessQueryDataRequestAsync(QueryDataRequest request);
 
         [OperationContract]
         SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request);
 
-        [OperationContract(Name = "ProcessSaveChangesRequestAsync")]
+        [OperationContract(Name = nameof(ProcessSaveChangesRequestAsync))]
         Task<SaveChangesResult> ProcessSaveChangesRequestAsync(SaveChangesRequest request);
     }
 }
