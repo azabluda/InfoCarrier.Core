@@ -32,7 +32,7 @@ InfoCarrier.Core is bringing together the following open source projects
 
 ## Sample
 
-The complete WCF sample is located in the [/sample](sample) folder. There you also find an ASP.NET Web API example.
+The complete WCF sample is located in the [/sample](sample) folder. There you also find an ASP.NET Web API example which also showcases a simple implementation of transcations.
 
 ### Entities and DbContext
 

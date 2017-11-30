@@ -3,6 +3,7 @@
 
 namespace InfoCarrierSample
 {
+    using System;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Configuration;
@@ -26,6 +27,8 @@ namespace InfoCarrierSample
             services
                 .AddMvc()
                 .AddJsonOptions(options => options.SerializerSettings.ConfigureRemoteLinq());
+
+            services.AddMemoryCache(opt => opt.ExpirationScanFrequency = TimeSpan.FromSeconds(10));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

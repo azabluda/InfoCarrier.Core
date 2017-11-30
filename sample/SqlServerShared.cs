@@ -5,6 +5,7 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Collections.Generic;
+    using System.Data.Common;
     using System.Data.SqlClient;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -17,6 +18,9 @@ namespace InfoCarrierSample
             ?? @"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30";
 
         public static string SampleDbName => "InfoCarrierSample";
+
+        public static string ConnectionString { get; } =
+            new SqlConnectionStringBuilder(MasterConnectionString) { InitialCatalog = SampleDbName }.ToString();
 
         public static void RecreateDatabase()
         {
@@ -57,13 +61,18 @@ namespace InfoCarrierSample
             }
         }
 
-        public static BloggingContext CreateDbContext()
+        public static BloggingContext CreateDbContext(DbConnection dbConnection = null)
         {
-            var connectionString =
-                new SqlConnectionStringBuilder(MasterConnectionString) { InitialCatalog = SampleDbName }.ToString();
-
             var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseSqlServer(connectionString);
+            if (dbConnection != null)
+            {
+                optionsBuilder.UseSqlServer(dbConnection);
+            }
+            else
+            {
+                optionsBuilder.UseSqlServer(ConnectionString);
+            }
+
             var context = new BloggingContext(optionsBuilder.Options);
             context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
             return context;
