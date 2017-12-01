@@ -32,12 +32,16 @@ namespace InfoCarrierSample
                 where post.Title == "my-blog-post"
                 select post).Single();
 
-            Console.WriteLine($"[{DateTime.Now}] Blog post '{myBlogPost.Title}' created {myBlogPost.CreationDate} is retrieved by Alice.");
+            Console.WriteLine($"[{DateTime.Now}] Blog post '{myBlogPost.Title}' from '{myBlogPost.CreationDate}' is retrieved by Alice.");
             Console.WriteLine("Press Enter to continue.");
             Console.ReadKey();
 
             using (await aliceContext.Database.BeginTransactionAsync())
             {
+                Console.WriteLine($"[{DateTime.Now}] Alice started a transaction.");
+                Console.WriteLine("Quickly press Enter to continue before Alice's transaction expires.");
+                Console.ReadKey();
+
                 myBlogPost.CreationDate = DateTime.Now;
                 await aliceContext.SaveChangesAsync();
                 Console.WriteLine($"[{DateTime.Now}] CreationDate is set to '{myBlogPost.CreationDate}' by Alice.");

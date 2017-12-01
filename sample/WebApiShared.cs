@@ -10,5 +10,7 @@ namespace InfoCarrierSample
         public static string BaseAddress { get; } =
             Environment.GetEnvironmentVariable(@"WebApi__DefaultBaseAddress")
                 ?? @"http://localhost:4809";
+
+        public static string TransactionIdHeader => "InfoCarrierTransactionId";
     }
 }

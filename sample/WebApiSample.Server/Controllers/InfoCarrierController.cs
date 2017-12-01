@@ -25,7 +25,9 @@ namespace InfoCarrierSample.Controllers
             this.cache = memoryCache;
         }
 
-        private string ClientId => this.Request.Headers["InfoCarrierClientId"];
+        private string TransactionId => this.Request.Headers[WebApiShared.TransactionIdHeader];
+
+        private bool ExecuteInTransaction => !string.IsNullOrEmpty(this.TransactionId);
 
         [HttpPost]
         [Route("QueryData")]
@@ -49,90 +51,84 @@ namespace InfoCarrierSample.Controllers
 
         [HttpPost]
         [Route("BeginTransaction")]
-        public async Task PostBeginTransactionAsync()
+        public async Task<Tuple<string>> PostBeginTransaction()
         {
-            var sessionEntry = this.GetSessionEntry();
-            if (sessionEntry.DbTransaction != null)
+            if (this.ExecuteInTransaction)
             {
                 throw new TransactionException(RelationalStrings.TransactionAlreadyStarted);
             }
 
-            await sessionEntry.DbConnection.OpenAsync();
-            sessionEntry.DbTransaction = sessionEntry.DbConnection.BeginTransaction();
+            var options = new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(10) };
+            options.RegisterPostEvictionCallback(
+                (key, value, reason, state) =>
+                {
+                    if (value is DbTransaction transactionValue)
+                    {
+                        Console.WriteLine($"Dispose transaction {key}.");
+                        transactionValue.Connection?.Dispose();
+                    }
+                });
+
+            string transactionId = Guid.NewGuid().ToString();
+            Console.WriteLine($"Create transaction {transactionId}.");
+
+            var connection = new SqlConnection { ConnectionString = SqlServerShared.ConnectionString };
+            await connection.OpenAsync();
+            DbTransaction transaction = connection.BeginTransaction();
+
+            this.cache.Set(transactionId, transaction, options);
+            return Tuple.Create(transactionId);
         }
 
         [HttpPost]
         [Route("CommitTransaction")]
         public void PostCommitTransaction()
         {
-            var sessionEntry = this.GetSessionEntry();
-            if (sessionEntry.DbTransaction == null)
-            {
-                throw new TransactionException(RelationalStrings.NoActiveTransaction);
-            }
-
-            sessionEntry.DbTransaction.Commit();
-            sessionEntry.DbTransaction = null;
-            sessionEntry.DbConnection.Close();
+            this.EndTransaction(t => t.Commit());
         }
 
         [HttpPost]
         [Route("RollbackTransaction")]
         public void PostRollbackTransaction()
         {
-            var sessionEntry = this.GetSessionEntry();
-            if (sessionEntry.DbTransaction == null)
+            this.EndTransaction(t => t.Rollback());
+        }
+
+        private void EndTransaction(Action<DbTransaction> endAction)
+        {
+            if (!this.ExecuteInTransaction)
             {
-                throw new TransactionException(RelationalStrings.NoActiveTransaction);
+                return;
             }
 
-            sessionEntry.DbTransaction.Rollback();
-            sessionEntry.DbTransaction = null;
-            sessionEntry.DbConnection.Close();
+            DbTransaction transaction = this.GetOpenTransaction();
+            DbConnection connection = transaction.Connection;
+            endAction(transaction);
+            connection.Close();
+            this.cache.Remove(this.TransactionId);
         }
 
         private DbContext CreateDbContext()
         {
-            SessionEntry sessionEntry = this.GetSessionEntry();
-            DbContext dbContext = SqlServerShared.CreateDbContext(sessionEntry.DbConnection);
-            dbContext.Database.UseTransaction(sessionEntry.DbTransaction);
+            if (!this.ExecuteInTransaction)
+            {
+                return SqlServerShared.CreateDbContext();
+            }
+
+            DbTransaction transaction = this.GetOpenTransaction();
+            DbContext dbContext = SqlServerShared.CreateDbContext(transaction.Connection);
+            dbContext.Database.UseTransaction(transaction);
             return dbContext;
         }
 
-        private SessionEntry GetSessionEntry()
-            => this.cache.GetOrCreate(
-                this.ClientId,
-                entry =>
-                {
-                    entry.SlidingExpiration = TimeSpan.FromSeconds(10);
-                    entry.Priority = CacheItemPriority.Low;
-                    entry.RegisterPostEvictionCallback(
-                        (key, value, reason, state) =>
-                        {
-                            if (value is SessionEntry sessionEntry)
-                            {
-                                Console.WriteLine($"Dispose session {key}.");
-                                sessionEntry.Dispose();
-                            }
-                        });
-
-                    Console.WriteLine($"Create session {this.ClientId}.");
-                    return new SessionEntry();
-                });
-
-        private sealed class SessionEntry : IDisposable
+        private DbTransaction GetOpenTransaction()
         {
-            public SessionEntry()
+            if (this.cache.TryGetValue(this.TransactionId, out DbTransaction transaction) && transaction.Connection != null)
             {
-                this.DbConnection = new SqlConnection { ConnectionString = SqlServerShared.ConnectionString };
+                return transaction;
             }
 
-            public DbConnection DbConnection { get; }
-
-            public DbTransaction DbTransaction { get; set; }
-
-            public void Dispose()
-                => this.DbConnection.Dispose();
+            throw new TransactionException(RelationalStrings.NoActiveTransaction);
         }
     }
 }

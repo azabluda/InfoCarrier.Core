@@ -16,11 +16,8 @@ namespace InfoCarrierSample
 
     internal class WebApiBackendImpl : IInfoCarrierBackend
     {
-        private readonly HttpClient client = new HttpClient
-        {
-            BaseAddress = new Uri(WebApiShared.BaseAddress),
-            DefaultRequestHeaders = { { "InfoCarrierClientId", Guid.NewGuid().ToString() } },
-        };
+        private readonly HttpClient client = new HttpClient { BaseAddress = new Uri(WebApiShared.BaseAddress) };
+        private string transactionId;
 
         private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
 
@@ -31,19 +28,27 @@ namespace InfoCarrierSample
             => this.BeginTransactionAsync(default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
 
         public async Task BeginTransactionAsync(CancellationToken cancellationToken)
-            => await this.CallApiAsync<object>("BeginTransaction", null, cancellationToken);
+        {
+            this.transactionId = (await this.CallApiAsync<Tuple<string>>("BeginTransaction", null, cancellationToken)).Item1;
+        }
 
         public void CommitTransaction()
-            => this.CallApiAsync<object>("CommitTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+        {
+            this.CallApiAsync<object>("CommitTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+            this.transactionId = null;
+        }
+
+        public void RollbackTransaction()
+        {
+            this.CallApiAsync<object>("RollbackTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+            this.transactionId = null;
+        }
 
         public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
             => this.QueryDataAsync(request, dbContext, default).Result; // Watchout: https://stackoverflow.com/a/35831540
 
         public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
             => await this.CallApiAsync<QueryDataResult>("QueryData", request, cancellationToken);
-
-        public void RollbackTransaction()
-            => this.CallApiAsync<object>("RollbackTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
 
         public SaveChangesResult SaveChanges(SaveChangesRequest request)
             => this.SaveChangesAsync(request, default).Result; // Watchout: https://stackoverflow.com/a/35831540
@@ -56,7 +61,10 @@ namespace InfoCarrierSample
             string requestJson = JsonConvert.SerializeObject(request, JsonSerializerSettings);
             HttpResponseMessage response = await this.client.PostAsync(
                 $"api/{action}",
-                new StringContent(requestJson, Encoding.UTF8, "application/json"),
+                new StringContent(requestJson, Encoding.UTF8, "application/json")
+                {
+                    Headers = { { WebApiShared.TransactionIdHeader, this.transactionId } },
+                },
                 cancellationToken);
             response.EnsureSuccessStatusCode();
 
