@@ -7,7 +7,6 @@ namespace InfoCarrierSample.Controllers
     using System.Data.Common;
     using System.Data.SqlClient;
     using System.Threading.Tasks;
-    using System.Transactions;
     using InfoCarrier.Core.Common;
     using InfoCarrier.Core.Server;
     using Microsoft.AspNetCore.Mvc;
@@ -55,7 +54,7 @@ namespace InfoCarrierSample.Controllers
         {
             if (this.ExecuteInTransaction)
             {
-                throw new TransactionException(RelationalStrings.TransactionAlreadyStarted);
+                throw new InvalidOperationException(RelationalStrings.TransactionAlreadyStarted);
             }
 
             var options = new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(10) };
@@ -128,7 +127,7 @@ namespace InfoCarrierSample.Controllers
                 return transaction;
             }
 
-            throw new TransactionException(RelationalStrings.NoActiveTransaction);
+            throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
         }
     }
 }
