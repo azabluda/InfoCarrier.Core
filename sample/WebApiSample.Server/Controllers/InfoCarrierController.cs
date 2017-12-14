@@ -15,7 +15,7 @@ namespace InfoCarrierSample.Controllers
     using Microsoft.Extensions.Caching.Memory;
 
     [Route("api")]
-    public class InfoCarrierController : Controller
+    public class InfoCarrierController : ControllerBase
     {
         private readonly IMemoryCache cache;
 
@@ -50,7 +50,7 @@ namespace InfoCarrierSample.Controllers
 
         [HttpPost]
         [Route("BeginTransaction")]
-        public async Task<Tuple<string>> PostBeginTransaction()
+        public async Task<IActionResult> PostBeginTransaction()
         {
             if (this.ExecuteInTransaction)
             {
@@ -76,7 +76,7 @@ namespace InfoCarrierSample.Controllers
             DbTransaction transaction = connection.BeginTransaction();
 
             this.cache.Set(transactionId, transaction, options);
-            return Tuple.Create(transactionId);
+            return this.Content(transactionId);
         }
 
         [HttpPost]

@@ -29,7 +29,7 @@ namespace InfoCarrierSample
 
         public async Task BeginTransactionAsync(CancellationToken cancellationToken)
         {
-            this.transactionId = (await this.CallApiAsync<Tuple<string>>("BeginTransaction", null, cancellationToken)).Item1;
+            this.transactionId = await this.CallApiAsync<string>("BeginTransaction", null, cancellationToken);
         }
 
         public void CommitTransaction()
@@ -68,8 +68,18 @@ namespace InfoCarrierSample
                 cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            string responseJson = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<TResult>(responseJson, JsonSerializerSettings);
+            switch (response.Content.Headers.ContentType?.MediaType)
+            {
+                case null:
+                    return default;
+
+                case "application/json":
+                    string responseJson = await response.Content.ReadAsStringAsync();
+                    return JsonConvert.DeserializeObject<TResult>(responseJson, JsonSerializerSettings);
+
+                default:
+                    return (TResult)(object)await response.Content.ReadAsStringAsync();
+            }
         }
     }
 }
