@@ -77,8 +77,11 @@ namespace InfoCarrierSample
                     string responseJson = await response.Content.ReadAsStringAsync();
                     return JsonConvert.DeserializeObject<TResult>(responseJson, JsonSerializerSettings);
 
-                default:
+                case System.Net.Mime.MediaTypeNames.Text.Plain:
                     return (TResult)(object)await response.Content.ReadAsStringAsync();
+
+                default:
+                    throw new NotSupportedException(response.Content.Headers.ContentType.ToString());
             }
         }
     }
