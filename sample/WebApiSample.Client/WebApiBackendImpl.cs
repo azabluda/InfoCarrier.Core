@@ -29,18 +29,18 @@ namespace InfoCarrierSample
 
         public async Task BeginTransactionAsync(CancellationToken cancellationToken)
         {
-            this.transactionId = await this.CallApiAsync<string>("BeginTransaction", null, cancellationToken);
+            this.transactionId = await this.CallApiAsync("BeginTransaction", null, cancellationToken);
         }
 
         public void CommitTransaction()
         {
-            this.CallApiAsync<object>("CommitTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+            this.CallApiAsync("CommitTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
             this.transactionId = null;
         }
 
         public void RollbackTransaction()
         {
-            this.CallApiAsync<object>("RollbackTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+            this.CallApiAsync("RollbackTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
             this.transactionId = null;
         }
 
@@ -48,15 +48,19 @@ namespace InfoCarrierSample
             => this.QueryDataAsync(request, dbContext, default).Result; // Watchout: https://stackoverflow.com/a/35831540
 
         public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
-            => await this.CallApiAsync<QueryDataResult>("QueryData", request, cancellationToken);
+            => JsonConvert.DeserializeObject<QueryDataResult>(
+                await this.CallApiAsync("QueryData", request, cancellationToken),
+                JsonSerializerSettings);
 
         public SaveChangesResult SaveChanges(SaveChangesRequest request)
             => this.SaveChangesAsync(request, default).Result; // Watchout: https://stackoverflow.com/a/35831540
 
         public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
-            => await this.CallApiAsync<SaveChangesResult>("SaveChanges", request, cancellationToken);
+            => JsonConvert.DeserializeObject<SaveChangesResult>(
+                await this.CallApiAsync("SaveChanges", request, cancellationToken),
+                JsonSerializerSettings);
 
-        private async Task<TResult> CallApiAsync<TResult>(string action, object request, CancellationToken cancellationToken)
+        private async Task<string> CallApiAsync(string action, object request, CancellationToken cancellationToken)
         {
             string requestJson = JsonConvert.SerializeObject(request, JsonSerializerSettings);
             HttpResponseMessage response = await this.client.PostAsync(
@@ -67,22 +71,7 @@ namespace InfoCarrierSample
                 },
                 cancellationToken);
             response.EnsureSuccessStatusCode();
-
-            switch (response.Content.Headers.ContentType?.MediaType)
-            {
-                case null:
-                    return default;
-
-                case "application/json":
-                    string responseJson = await response.Content.ReadAsStringAsync();
-                    return JsonConvert.DeserializeObject<TResult>(responseJson, JsonSerializerSettings);
-
-                case System.Net.Mime.MediaTypeNames.Text.Plain:
-                    return (TResult)(object)await response.Content.ReadAsStringAsync();
-
-                default:
-                    throw new NotSupportedException(response.Content.Headers.ContentType.ToString());
-            }
+            return await response.Content.ReadAsStringAsync();
         }
     }
 }
