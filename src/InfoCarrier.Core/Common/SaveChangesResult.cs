@@ -68,6 +68,16 @@ namespace InfoCarrier.Core.Common
         public int ApplyTo(IReadOnlyList<IUpdateEntry> entries)
             => this.Impl.ApplyTo(entries);
 
+
+        /// <summary>
+        ///     Convert this object into a string representation.
+        /// </summary>
+        /// <returns>
+        ///     A string that represents this object.
+        /// </returns>
+        public override string ToString()
+            => this.Impl.ToString();
+
         [DataContract]
         private class SuccessImpl : SaveChangesRequest, ISaveChangesResult
         {
@@ -104,6 +114,9 @@ namespace InfoCarrier.Core.Common
 
                 return this.CountPersisted;
             }
+
+            public override string ToString()
+                => $"CountPersisted = {this.CountPersisted}";
         }
 
         [DataContract]
@@ -153,6 +166,9 @@ namespace InfoCarrier.Core.Common
                     ? new DbUpdateException(this.Message, inner, failedEntries)
                     : new DbUpdateException(this.Message, inner);
             }
+
+            public override string ToString()
+                => $"Error = {this.Message}";
         }
     }
 }

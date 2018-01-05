@@ -49,5 +49,14 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         [DataMember]
         public List<UpdateEntryDto> DataTransferObjects { get; set; } = new List<UpdateEntryDto>();
+
+        /// <summary>
+        ///     Convert this object into a string representation.
+        /// </summary>
+        /// <returns>
+        ///     A string that represents this object.
+        /// </returns>
+        public override string ToString()
+            => $"Count = {this.DataTransferObjects?.Count()}";
     }
 }
