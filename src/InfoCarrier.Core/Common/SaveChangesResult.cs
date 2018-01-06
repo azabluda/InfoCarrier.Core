@@ -68,7 +68,6 @@ namespace InfoCarrier.Core.Common
         public int ApplyTo(IReadOnlyList<IUpdateEntry> entries)
             => this.Impl.ApplyTo(entries);
 
-
         /// <summary>
         ///     Convert this object into a string representation.
         /// </summary>
