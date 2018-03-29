@@ -12,9 +12,9 @@ namespace InfoCarrierSample
 
     public class ServiceStackBackend : IInfoCarrierBackend
     {
-        private readonly ServiceClientBase client;
+        private readonly JsonHttpClient client;
 
-        public ServiceStackBackend(ServiceClientBase client)
+        public ServiceStackBackend(JsonHttpClient client)
         {
             this.client = client;
         }

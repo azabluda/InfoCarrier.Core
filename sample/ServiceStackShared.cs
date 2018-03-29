@@ -16,7 +16,7 @@ namespace InfoCarrierSample
     {
         public static string BaseAddress { get; } =
             Environment.GetEnvironmentVariable(@"ServiceStack__DefaultBaseAddress")
-                ?? @"http://localhost:1337/";
+                ?? @"https://localhost:1337/";
     }
 
     public abstract class HasData

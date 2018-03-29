@@ -5,6 +5,7 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Linq;
+    using System.Net.Http;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
@@ -78,7 +79,11 @@ namespace InfoCarrierSample
 
         private static BloggingContext CreateContext(string userName, string password)
         {
-            var client = new JsonServiceClient(ServiceStackShared.BaseAddress);
+            var client = new JsonHttpClient(ServiceStackShared.BaseAddress)
+            {
+                HttpMessageHandler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (req, cert, chain, errors) => true },
+            };
+
             client.Post(new Authenticate
             {
                 provider = CredentialsAuthProvider.Name,
