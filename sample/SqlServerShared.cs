@@ -50,7 +50,7 @@ namespace InfoCarrierSample
                 ctx.Blogs.Add(
                     new Blog
                     {
-                        Owner = new User { Name = "hi-its-me" },
+                        Author = new Author { Name = "hi-its-me" },
                         Posts = new List<Post>
                         {
                             new Post { Title = "my-blog-post" },

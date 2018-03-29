@@ -36,8 +36,8 @@ namespace InfoCarrierSample
             Post myBlogPost = (
                 from blog in aliceContext.Blogs
                 from post in blog.Posts
-                join owner in aliceContext.Users on blog.OwnerId equals owner.Id
-                where owner.Name == "hi-its-me"
+                join author in aliceContext.Authors on blog.AuthorId equals author.Id
+                where author.Name == "hi-its-me"
                 where post.Title == "my-blog-post"
                 select post).Single();
 

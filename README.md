@@ -8,7 +8,7 @@
 
 
 ### Description:
-InfoCarrier.Core is a framework developed by [on/off it-solutions gmbh](http://www.onoff-it-solutions.info) for building multitier applications in .NET. This repository contains the key data access component of the framework which essentially is a non-relational provider for [Entity Framework Core](https://github.com/aspnet/EntityFramework) which can be deployed on the client-side of your 3-tier application allowing you to use the full power of EF.Core right in your client application (e.g. WPF, WinForms, Xamarin, UWP, etc). The main idea is that instead of querying the relational database the commands are translated into requests to your application server where they are executed against the real database.
+InfoCarrier.Core is a framework developed by [on/off it-solutions gmbh](http://www.onoff-it-solutions.info) for building multi-tier applications in .NET. This repository contains the key data access component of the framework which essentially is a non-relational provider for [Entity Framework Core](https://github.com/aspnet/EntityFramework) which can be deployed on the client-side of your 3-tier application allowing you to use the full power of EF.Core right in your client application (e.g. WPF, WinForms, Xamarin, UWP, etc). The main idea is that instead of querying the relational database the commands are translated into requests to your application server where they are executed against the real database.
 
 It is important to note that InfoCarrier.Core dictates neither the communication platform nor serialization framework. We had positive experience with [WCF](https://msdn.microsoft.com/en-us/library/ms731082.aspx) and [Json.NET](http://www.newtonsoft.com/json), but you are free to choose other frameworks and libraries. InfoCarrier.Core is only responsible for translating client commands into serializable objects, leaving it up to you how to deliver them to the server for actual execution. The same is valid for the execution results.
 
@@ -32,7 +32,7 @@ InfoCarrier.Core is bringing together the following open source projects
 
 ## Sample
 
-The complete WCF sample is located in the [/sample](sample) folder. There you also find an ASP.NET Web API example which also showcases a simple implementation of transcations.
+The complete WCF sample is located in the [/sample](sample) folder. There you also find simple client/server applications based on [ASP.NET Core](https://docs.microsoft.com/en-us/aspnet/core/index) Web API and [ServiceStack](https://servicestack.net/) with basic support of transactions.
 
 ### Entities and DbContext
 
@@ -42,7 +42,7 @@ public class Blog { ... }
 
 public class Post { ... }
 
-public class User { ... }
+public class Author { ... }
 
 public class BloggingContext : DbContext
 {
@@ -52,7 +52,7 @@ public class BloggingContext : DbContext
 
     public DbSet<Blog> Blogs { get; set; }
 
-    public DbSet<User> Users { get; set; }
+    public DbSet<Author> Authors { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) { ... }
 }
@@ -104,8 +104,8 @@ using (var context = new BloggingContext(optionsBuilder.Options))
     Post myBlogPost = (
         from blog in context.Blogs
         from post in blog.Posts
-        join owner in context.Users on blog.OwnerId equals owner.Id
-        where owner.login == "hi-its-me"
+        join author in context.Authors on blog.AuthorId equals author.Id
+        where author.login == "hi-its-me"
         where post.Title == "my-blog-post"
         select post).Single();
 
@@ -117,7 +117,7 @@ using (var context = new BloggingContext(optionsBuilder.Options))
 
 ### Server
 
-Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the backend service. In the simple case when no transaction support is required it may look like the following:
+Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the back-end service. In the simple case when no transaction support is required it may look like the following:
 
 ```C#
 [ServiceContract]

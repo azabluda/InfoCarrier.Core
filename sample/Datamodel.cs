@@ -14,9 +14,9 @@ namespace InfoCarrierSample
     {
         public decimal Id { get; set; }
 
-        public decimal OwnerId { get; set; }
+        public decimal AuthorId { get; set; }
 
-        public User Owner { get; set; }
+        public Author Author { get; set; }
 
         public IList<Post> Posts { get; set; }
     }
@@ -34,7 +34,7 @@ namespace InfoCarrierSample
         public Blog Blog { get; set; }
     }
 
-    public class User
+    public class Author
     {
         public decimal Id { get; set; }
 
@@ -50,7 +50,7 @@ namespace InfoCarrierSample
 
         public DbSet<Blog> Blogs { get; set; }
 
-        public DbSet<User> Users { get; set; }
+        public DbSet<Author> Authors { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
