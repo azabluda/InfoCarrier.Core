@@ -49,7 +49,8 @@ namespace InfoCarrier.Core.Server
                 object MaterializeEntity()
                 {
                     var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType, request.Mapper));
-                    return entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
+                    var materializationContext = new MaterializationContext(valueBuffer, this.dbContext);
+                    return entityMaterializerSource.GetMaterializer(entityType).Invoke(materializationContext);
                 }
 
                 EntityEntry entry;
@@ -74,7 +75,8 @@ namespace InfoCarrier.Core.Server
                                     ? p.ClrType.GetDefaultValue()
                                     : keyValues[idx];
                             }).ToArray());
-                        object ownerEntity = entityMaterializerSource.GetMaterializer(entityType.DefiningEntityType).Invoke(ownerValueBuffer);
+                        var materializationContext = new MaterializationContext(ownerValueBuffer, this.dbContext);
+                        object ownerEntity = entityMaterializerSource.GetMaterializer(entityType.DefiningEntityType).Invoke(materializationContext);
                         ownerEntry = stateManager.GetOrCreateEntry(ownerEntity, entityType.DefiningEntityType).ToEntityEntry();
                         ownerEntry.State = EntityState.Unchanged;
                     }

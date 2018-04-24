@@ -319,18 +319,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedCollections");
 
                     // Get entity instance from EFC's identity map, or create a new one
-                    Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
+                    Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
+                    var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
                     entity =
                         this.queryContext
                             .QueryBuffer
                             .GetEntity(
                                 entityType.FindPrimaryKey(),
                                 new EntityLoadInfo(
-                                    valueBuffer,
+                                    materializationContext,
                                     materializer),
                                 queryStateManager: entityIsTracked,
                                 throwOnNullKey: false)
-                        ?? materializer.Invoke(valueBuffer);
+                        ?? materializer.Invoke(materializationContext);
 
                     this.map.Add(dobj, entity);
                     object entityNoRef = entity;

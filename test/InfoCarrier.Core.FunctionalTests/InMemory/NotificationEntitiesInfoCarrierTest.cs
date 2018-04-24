@@ -3,40 +3,27 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using System;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
+    using TestUtilities;
 
-    public class NotificationEntitiesInfoCarrierTest
-        : NotificationEntitiesTestBase<TestStoreBase, NotificationEntitiesInfoCarrierTest.NotificationEntitiesInfoCarrierFixture>
+    public class NotificationEntitiesInfoCarrierTest : NotificationEntitiesTestBase<NotificationEntitiesInfoCarrierTest.TestFixture>
     {
-        public NotificationEntitiesInfoCarrierTest(NotificationEntitiesInfoCarrierFixture fixture)
+        public NotificationEntitiesInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
-        public class NotificationEntitiesInfoCarrierFixture : NotificationEntitiesFixtureBase, IDisposable
+        public class TestFixture : NotificationEntitiesFixtureBase
         {
-            private readonly InfoCarrierTestHelper<DbContext> helper;
-            private TestStoreBase testStore;
+            private ITestStoreFactory testStoreFactory;
 
-            public NotificationEntitiesInfoCarrierFixture()
-            {
-                this.helper = InMemoryTestStore<DbContext>.CreateHelper(
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.CreateOrGet(
+                    ref this.testStoreFactory,
+                    this.ContextType,
                     this.OnModelCreating,
-                    opt => new DbContext(opt),
-                    _ => this.EnsureCreated());
-            }
-
-            public override DbContext CreateContext()
-                => this.helper.CreateInfoCarrierContext(this.testStore);
-
-            public override TestStoreBase CreateTestStore()
-                => this.testStore = this.helper.CreateTestStore();
-
-            public void Dispose()
-            {
-                this.testStore?.Dispose();
-            }
+                    InfoCarrierTestStoreFactory.InMemory);
         }
     }
 }

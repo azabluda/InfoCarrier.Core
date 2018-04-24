@@ -4,32 +4,26 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
+    using TestUtilities;
 
-    public class LoadInfoCarrierTest
-        : LoadTestBase<TestStoreBase, LoadInfoCarrierTest.LoadInfoCarrierFixture>
+    public class LoadInfoCarrierTest : LoadTestBase<LoadInfoCarrierTest.TestFixture>
     {
-        public LoadInfoCarrierTest(LoadInfoCarrierFixture fixture)
+        public LoadInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
-        public class LoadInfoCarrierFixture : LoadFixtureBase
+        public class TestFixture : LoadFixtureBase
         {
-            private readonly InfoCarrierTestHelper<LoadContext> helper;
+            private ITestStoreFactory testStoreFactory;
 
-            public LoadInfoCarrierFixture()
-            {
-                this.helper = InMemoryTestStore<LoadContext>.CreateHelper(
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.CreateOrGet(
+                    ref this.testStoreFactory,
+                    this.ContextType,
                     this.OnModelCreating,
-                    opt => new LoadContext(opt),
-                    this.Seed);
-            }
-
-            public override DbContext CreateContext(TestStoreBase testStore)
-                => this.helper.CreateInfoCarrierContext(testStore);
-
-            public override TestStoreBase CreateTestStore()
-                => this.helper.CreateTestStore();
+                    InfoCarrierTestStoreFactory.InMemory);
         }
     }
 }
