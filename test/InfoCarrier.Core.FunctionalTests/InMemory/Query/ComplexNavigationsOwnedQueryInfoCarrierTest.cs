@@ -21,11 +21,11 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             private ITestStoreFactory testStoreFactory;
 
             protected override ITestStoreFactory TestStoreFactory =>
-                InfoCarrierTestStoreFactory.CreateOrGet(
+                InfoCarrierTestStoreFactory.EnsureInitialized(
                     ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.InMemory,
                     this.ContextType,
-                    this.OnModelCreating,
-                    InfoCarrierTestStoreFactory.InMemory);
+                    this.OnModelCreating);
         }
     }
 }

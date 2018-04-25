@@ -6,6 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     using System;
     using Client;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
 
@@ -26,13 +27,16 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public static InfoCarrierBackendTestStoreFactory SqlServer => (name, shared, props) => new SqlServerTestStore(name, shared, props);
 
-        public static ITestStoreFactory CreateOrGet(
+        public static ITestStoreFactory EnsureInitialized(
             ref ITestStoreFactory inst,
+            InfoCarrierBackendTestStoreFactory backendTestStoreFactory,
             Type contextType,
             Action<ModelBuilder, DbContext> onModelCreating,
-            InfoCarrierBackendTestStoreFactory backendTestStoreFactory,
             Func<DbContextOptionsBuilder, DbContextOptionsBuilder> onAddOptions = null)
-            => inst ?? (inst = new InfoCarrierTestStoreFactory(
+            => NonCapturingLazyInitializer.EnsureInitialized(
+                ref inst,
+                inst,
+                _ => new InfoCarrierTestStoreFactory(
                    new SharedTestStoreProperties
                    {
                        ContextType = contextType,

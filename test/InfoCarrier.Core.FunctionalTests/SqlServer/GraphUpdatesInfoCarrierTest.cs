@@ -22,11 +22,11 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
             private ITestStoreFactory testStoreFactory;
 
             protected override ITestStoreFactory TestStoreFactory =>
-                InfoCarrierTestStoreFactory.CreateOrGet(
+                InfoCarrierTestStoreFactory.EnsureInitialized(
                     ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.SqlServer,
                     this.ContextType,
-                    this.OnModelCreating,
-                    InfoCarrierTestStoreFactory.SqlServer);
+                    this.OnModelCreating);
 
             protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
             {
