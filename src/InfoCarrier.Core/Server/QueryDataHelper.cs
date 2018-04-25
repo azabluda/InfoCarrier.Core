@@ -41,6 +41,9 @@ namespace InfoCarrier.Core.Server
         private static readonly MethodInfo DbContextSetMethod
             = Utils.GetMethodInfo<DbContext>(c => c.Set<object>()).GetGenericMethodDefinition();
 
+        private static readonly MethodInfo DbContextQueryMethod
+            = Utils.GetMethodInfo<DbContext>(c => c.Query<object>()).GetGenericMethodDefinition();
+
         private readonly DbContext dbContext;
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
@@ -65,10 +68,13 @@ namespace InfoCarrier.Core.Server
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
                     provider: type =>
-                        DbContextSetMethod
+                    {
+                        var entityType = this.dbContext.Model.FindEntityType(type);
+                        return (entityType.IsQueryType ? DbContextQueryMethod : DbContextSetMethod)
                             .MakeGenericMethod(type)
                             .ToDelegate<Func<IQueryable>>(this.dbContext)
-                            .Invoke())
+                            .Invoke();
+                    })
                 .ToLinqExpression(this.typeResolver);
 
             // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression

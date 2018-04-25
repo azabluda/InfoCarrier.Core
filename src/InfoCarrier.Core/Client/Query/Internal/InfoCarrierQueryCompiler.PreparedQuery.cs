@@ -321,17 +321,25 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     // Get entity instance from EFC's identity map, or create a new one
                     Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
                     var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
-                    entity =
-                        this.queryContext
+
+                    IKey pk = entityType.FindPrimaryKey();
+                    if (pk != null)
+                    {
+                        entity = this.queryContext
                             .QueryBuffer
                             .GetEntity(
-                                entityType.FindPrimaryKey(),
+                                pk,
                                 new EntityLoadInfo(
                                     materializationContext,
                                     materializer),
                                 queryStateManager: entityIsTracked,
-                                throwOnNullKey: false)
-                        ?? materializer.Invoke(materializationContext);
+                                throwOnNullKey: false);
+                    }
+
+                    if (entity == null)
+                    {
+                        entity = materializer.Invoke(materializationContext);
+                    }
 
                     this.map.Add(dobj, entity);
                     object entityNoRef = entity;
