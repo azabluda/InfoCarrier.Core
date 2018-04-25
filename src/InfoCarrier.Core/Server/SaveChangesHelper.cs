@@ -96,7 +96,7 @@ namespace InfoCarrier.Core.Server
                 // Correlate properties of DTO and entry
                 var props = dto.JoinScalarProperties(entry, request.Mapper);
 
-                // Set Key values
+                // Set Key properties
                 foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
                 {
                     p.EfProperty.CurrentValue = p.CurrentValue;
@@ -110,20 +110,31 @@ namespace InfoCarrier.Core.Server
                 // This will add entities to identity map.
                 entry.State = dto.EntityState;
 
-                // Set non key / non temporary (e.g. TPH discriminators) values
-                foreach (var p in props.Where(
-                    x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
+                // Set non key properties
+                foreach (var p in props.Where(x => !x.EfProperty.Metadata.IsKey()))
                 {
-                    p.EfProperty.CurrentValue = p.CurrentValue;
-                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
+                    bool canSetCurrentValue =
+                        p.EfProperty.Metadata.IsShadowProperty ||
+                        p.EfProperty.Metadata.TryGetMemberInfo(forConstruction: false, forSet: true, out _, out _);
+
+                    if (canSetCurrentValue)
+                    {
+                        p.EfProperty.CurrentValue = p.CurrentValue;
+                    }
+
+                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0
+                        && p.EfProperty.OriginalValue != p.OriginalValue)
                     {
                         p.EfProperty.OriginalValue = p.OriginalValue;
                     }
 
-                    p.EfProperty.IsModified = p.DtoProperty.IsModified;
+                    if (canSetCurrentValue)
+                    {
+                        p.EfProperty.IsModified = p.DtoProperty.IsModified;
+                    }
                 }
 
-                // Mark temporary values
+                // Mark temporary property values
                 foreach (var p in props.Where(x => x.DtoProperty.IsTemporary))
                 {
                     p.EfProperty.IsTemporary = true;
