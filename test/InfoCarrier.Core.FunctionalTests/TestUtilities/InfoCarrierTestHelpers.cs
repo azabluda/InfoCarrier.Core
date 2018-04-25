@@ -21,15 +21,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         protected override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
             => optionsBuilder.UseInfoCarrierBackend(
-                new TestInfoCarrierBackend(
-                    new SqlServerTestStore(
-                        "DummyDatabase",
-                        false,
-                        new SharedTestStoreProperties
-                        {
-                            ContextType = typeof(DbContext),
-                            OnModelCreating = (b, c) => { },
-                        })));
+                new SqlServerTestStore(
+                    "DummyDatabase",
+                    false,
+                    new SharedTestStoreProperties
+                    {
+                        ContextType = typeof(DbContext),
+                        OnModelCreating = (b, c) => { },
+                    }));
 
         public DbContextOptionsBuilder CreateOptionsBuilder()
         {

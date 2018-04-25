@@ -42,12 +42,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
                    backendTestStoreFactory));
 
         public virtual TestStore Create(string storeName)
-            => new InfoCarrierTestStore(
-                new TestInfoCarrierBackend(this.backendTestStoreFactory(storeName, false, this.testStoreProperties)));
+            => new InfoCarrierTestStore(this.backendTestStoreFactory(storeName, false, this.testStoreProperties));
 
         public virtual TestStore GetOrCreate(string storeName)
-            => new InfoCarrierTestStore(
-                new TestInfoCarrierBackend(this.backendTestStoreFactory(storeName, true, this.testStoreProperties)));
+            => new InfoCarrierTestStore(this.backendTestStoreFactory(storeName, true, this.testStoreProperties));
 
         public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
             => serviceCollection.AddEntityFrameworkInfoCarrierBackend()

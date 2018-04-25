@@ -10,9 +10,9 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
     public class InfoCarrierTestStore : TestStore
     {
-        private readonly TestInfoCarrierBackend backend;
+        private readonly InfoCarrierBackendTestStore backend;
 
-        public InfoCarrierTestStore(TestInfoCarrierBackend backend)
+        public InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
             : base(null, false)
         {
             this.backend = backend;
@@ -26,7 +26,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         protected override void Initialize(Func<DbContext> createContext, Action<DbContext> seed)
         {
-            this.backend.Initialize(seed);
+            this.backend.Initialize(this.backend.ServiceProvider, this.backend.CreateDbContext, seed);
         }
 
         public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
@@ -34,7 +34,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public override void Clean(DbContext context)
         {
-            this.backend.Clean();
+            using (var dbContext = this.backend.CreateDbContext())
+            {
+                this.backend.Clean(dbContext);
+            }
         }
     }
 }
