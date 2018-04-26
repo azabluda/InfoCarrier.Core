@@ -187,6 +187,7 @@ namespace InfoCarrier.Core.Server
                     .GetGenericMethodDefinition();
 
             private readonly IStateManager stateManager;
+            private readonly IInternalEntityEntryFactory entityEntryFactory;
             private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
             private readonly Dictionary<object, DynamicObject> cachedEntities =
                 new Dictionary<object, DynamicObject>();
@@ -194,7 +195,9 @@ namespace InfoCarrier.Core.Server
             public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver)
                 : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
             {
-                this.stateManager = dbContext.GetInfrastructure<IServiceProvider>().GetRequiredService<IStateManager>();
+                IServiceProvider serviceProvider = dbContext.GetInfrastructure();
+                this.stateManager = serviceProvider.GetRequiredService<IStateManager>();
+                this.entityEntryFactory = serviceProvider.GetRequiredService<IInternalEntityEntryFactory>();
                 this.detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
                     .Where(et => et.ClrType != null)
                     .GroupBy(et => et.ClrType)
@@ -259,6 +262,15 @@ namespace InfoCarrier.Core.Server
                 }
 
                 this.cachedEntities.Add(obj, dto = new DynamicObject(obj.GetType()));
+
+                if (entry.Entity.GetType() != entry.EntityType.ClrType)
+                {
+                    IEntityType entityType = this.stateManager.Context.Model.FindEntityType(entry.Entity.GetType());
+                    if (entityType != null)
+                    {
+                        entry = this.entityEntryFactory.Create(this.stateManager, entityType, entry.Entity);
+                    }
+                }
 
                 dto.Add(@"__EntityType", entry.EntityType.DisplayName());
 
