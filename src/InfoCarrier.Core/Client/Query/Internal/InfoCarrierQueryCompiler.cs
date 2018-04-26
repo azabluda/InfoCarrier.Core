@@ -152,7 +152,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     try
                     {
-                        return this.CreateCompiledEnumerableQuery<TResult>(query)(qc).First();
+                        return this.CreateCompiledEnumerableQuery<TResult, IEnumerable<TResult>>(query)(qc).First();
                     }
                     catch (Exception exception)
                     {
@@ -164,7 +164,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             try
             {
-                return (Func<QueryContext, TResult>)CreateCompiledEnumerableQueryMethod.MakeGenericMethod(sequenceType)
+                return (Func<QueryContext, TResult>)CreateCompiledEnumerableQueryMethod.MakeGenericMethod(sequenceType, typeof(TResult))
                     .Invoke(this, new object[] { query });
             }
             catch (TargetInvocationException ex)
@@ -174,14 +174,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
         }
 
-        private Func<QueryContext, IEnumerable<TResult>> CreateCompiledEnumerableQuery<TResult>(Expression query)
+        private Func<QueryContext, TCollection> CreateCompiledEnumerableQuery<TItem, TCollection>(Expression query)
         {
             var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
             {
-                IEnumerable<TResult> result = preparedQuery.Execute<TResult>(queryContext);
-                return (IEnumerable<TResult>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
+                IEnumerable<TItem> result = preparedQuery.Execute<TItem>(queryContext);
+                result = (IEnumerable<TItem>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
                     .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+
+                if (result is TCollection collection)
+                {
+                    return collection;
+                }
+
+                // determine and materialize concrete collection type
+                Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(typeof(TItem), typeof(TCollection)) ?? typeof(TCollection);
+                return (TCollection)Activator.CreateInstance(collType, result);
             };
         }
 
