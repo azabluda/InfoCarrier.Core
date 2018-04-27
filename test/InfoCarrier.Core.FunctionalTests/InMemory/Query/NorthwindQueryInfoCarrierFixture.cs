@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using TestUtilities;
 
@@ -18,6 +19,12 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
                 ref this.testStoreFactory,
                 InfoCarrierTestStoreFactory.InMemory,
                 this.ContextType,
-                this.OnModelCreating);
+                this.OnModelCreating,
+                copyDbContextParameters: (c1, c2) => CopyDbContextParameters((NorthwindContext)c1, (NorthwindContext)c2));
+
+        private static void CopyDbContextParameters(NorthwindContext clientDbContext, NorthwindContext backendDbContext)
+        {
+            backendDbContext.TenantPrefix = clientDbContext.TenantPrefix;
+        }
     }
 }
