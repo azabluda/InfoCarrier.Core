@@ -7,9 +7,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
     using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using TestUtilities;
-    using Xunit;
 
-    [Collection("SqlServer")]
     public class OptimisticConcurrencyInfoCarrierTest
         : OptimisticConcurrencyTestBase<OptimisticConcurrencyInfoCarrierTest.TestFixture>
     {

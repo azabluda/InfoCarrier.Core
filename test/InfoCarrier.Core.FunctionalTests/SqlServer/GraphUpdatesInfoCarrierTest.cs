@@ -6,9 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using TestUtilities;
-    using Xunit;
 
-    [Collection("SqlServer")]
     public class GraphUpdatesInfoCarrierTest
         : GraphUpdatesTestBase<GraphUpdatesInfoCarrierTest.TestFixture>
     {
