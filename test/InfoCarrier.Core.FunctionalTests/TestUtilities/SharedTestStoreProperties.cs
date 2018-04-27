@@ -13,5 +13,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
         public Action<ModelBuilder, DbContext> OnModelCreating;
 
         public Func<DbContextOptionsBuilder, DbContextOptionsBuilder> OnAddOptions;
+
+        public Action<DbContext, DbContext> CopyDbContextParameters;
     }
 }

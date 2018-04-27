@@ -32,7 +32,8 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             InfoCarrierBackendTestStoreFactory backendTestStoreFactory,
             Type contextType,
             Action<ModelBuilder, DbContext> onModelCreating,
-            Func<DbContextOptionsBuilder, DbContextOptionsBuilder> onAddOptions = null)
+            Func<DbContextOptionsBuilder, DbContextOptionsBuilder> onAddOptions = null,
+            Action<DbContext, DbContext> copyDbContextParameters = null)
             => NonCapturingLazyInitializer.EnsureInitialized(
                 ref inst,
                 inst,
@@ -42,6 +43,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
                        ContextType = contextType,
                        OnModelCreating = onModelCreating,
                        OnAddOptions = onAddOptions ?? (o => o),
+                       CopyDbContextParameters = copyDbContextParameters,
                    },
                    backendTestStoreFactory));
 

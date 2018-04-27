@@ -3,6 +3,7 @@
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
+    using System;
     using System.Threading;
     using System.Threading.Tasks;
     using Client;
@@ -47,7 +48,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
         {
-            using (var helper = new QueryDataHelper(this.CreateDbContext, SimulateNetworkTransferJson(request)))
+            using (var helper = new QueryDataHelper(this.CreateDbContextWithParameters(dbContext), SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(helper.QueryData());
             }
@@ -55,7 +56,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
         {
-            using (var helper = new QueryDataHelper(this.CreateDbContext, SimulateNetworkTransferJson(request)))
+            using (var helper = new QueryDataHelper(this.CreateDbContextWithParameters(dbContext), SimulateNetworkTransferJson(request)))
             {
                 return SimulateNetworkTransferJson(await helper.QueryDataAsync(cancellationToken));
             }
@@ -96,5 +97,13 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             var json = JsonConvert.SerializeObject(value, serializerSettings);
             return (T)JsonConvert.DeserializeObject(json, value.GetType(), serializerSettings);
         }
+
+        private Func<DbContext> CreateDbContextWithParameters(DbContext clientDbContext) =>
+            () =>
+            {
+                var backendDbContext = this.CreateDbContext();
+                this.testStoreProperties.CopyDbContextParameters?.Invoke(clientDbContext, backendDbContext);
+                return backendDbContext;
+            };
     }
 }
