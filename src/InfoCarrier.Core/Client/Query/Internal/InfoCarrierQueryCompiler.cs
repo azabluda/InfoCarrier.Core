@@ -179,19 +179,41 @@ namespace InfoCarrier.Core.Client.Query.Internal
             var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
             {
-                IEnumerable<TItem> result = preparedQuery.Execute<TItem>(queryContext);
-                result = (IEnumerable<TItem>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
-                    .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+                object items = preparedQuery.Execute<TItem>(queryContext);
+                items = InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
+                    .Invoke(null, new[] { items, queryContext.Context.GetType(), this.logger, queryContext });
 
-                if (result is TCollection collection)
+                if (items is TCollection collection)
                 {
                     return collection;
                 }
 
                 // determine and materialize concrete collection type
                 Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(typeof(TItem), typeof(TCollection)) ?? typeof(TCollection);
-                return (TCollection)Activator.CreateInstance(collType, result);
+                return (TCollection)MaterializeCollection(collType, items, queryContext);
             };
+        }
+
+        private static object MaterializeCollection(Type collType, object items, QueryContext queryContext)
+        {
+            // materialize IOrderedEnumerable<>
+            if (collType.GetTypeInfo().IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
+            {
+                return new LinqOperatorProvider().ToOrdered.MakeGenericMethod(collType.GenericTypeArguments)
+                    .Invoke(null, new[] { items });
+            }
+
+            // materialize IQueryable<> / IOrderedQueryable<>
+            if (collType.GetTypeInfo().IsGenericType
+                && (collType.GetGenericTypeDefinition() == typeof(IQueryable<>)
+                    || collType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)))
+            {
+                return new LinqOperatorProvider().ToQueryable.MakeGenericMethod(collType.GenericTypeArguments)
+                    .Invoke(null, new[] { items, queryContext });
+            }
+
+            // materialize concrete collection
+            return Activator.CreateInstance(collType, items);
         }
 
         private Expression ExtractParameters(

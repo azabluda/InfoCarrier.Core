@@ -195,24 +195,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return list; // no further mapping required
                     }
 
-                    // materialize IOrderedEnumerable<>
-                    if (collType.GetTypeInfo().IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
-                    {
-                        return new LinqOperatorProvider().ToOrdered.MakeGenericMethod(collType.GenericTypeArguments)
-                            .Invoke(null, new[] { list });
-                    }
-
-                    // materialize IQueryable<> / IOrderedQueryable<>
-                    if (collType.GetTypeInfo().IsGenericType
-                        && (collType.GetGenericTypeDefinition() == typeof(IQueryable<>)
-                            || collType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)))
-                    {
-                        return new LinqOperatorProvider().ToQueryable.MakeGenericMethod(collType.GenericTypeArguments)
-                            .Invoke(null, new[] { list, this.queryContext });
-                    }
-
-                    // materialize concrete collection
-                    return Activator.CreateInstance(collType, list);
+                    return MaterializeCollection(collType, list, this.queryContext);
                 }
 
                 private bool TryMapArray(DynamicObject dobj, Type targetType, out object array)
