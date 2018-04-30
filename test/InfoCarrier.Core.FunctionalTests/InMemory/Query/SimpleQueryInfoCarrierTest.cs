@@ -5,12 +5,11 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
     using System;
     using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Microsoft.Extensions.DependencyInjection;
     using Xunit;
     using Xunit.Abstractions;
 
@@ -25,80 +24,32 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 
         public override void Throws_on_concurrent_query_list()
         {
-            // UGLY: have to copy the whole test and add .AsEnumerable() to avoid stack overflow
-            // https://github.com/aspnet/EntityFrameworkCore/blob/2.1.0-preview2-final/src/EFCore.Specification.Tests/Query/SimpleQueryTestBase.cs#L2597
+            // Old implementation prior to
+            // https://github.com/aspnet/EntityFrameworkCore/commit/654dbcc408d4649a54d0ed7de5f1f06b64114f8b
             using (var context = this.CreateContext())
             {
-                context.Database.EnsureCreated();
+                ((IInfrastructure<IServiceProvider>)context).Instance.GetService<IConcurrencyDetector>().EnterCriticalSection();
 
-                using (var synchronizationEvent = new ManualResetEventSlim(false))
-                {
-                    using (var blockingSemaphore = new SemaphoreSlim(0))
-                    {
-                        var blockingTask = Task.Run(() =>
-                            context.Customers.AsEnumerable().Select(
-                                c => Process(c, synchronizationEvent, blockingSemaphore)).ToList());
-
-                        var throwingTask = Task.Run(() =>
-                        {
-                            synchronizationEvent.Wait();
-                            Assert.Equal(
-                                CoreStrings.ConcurrentMethodInvocation,
-                                Assert.Throws<InvalidOperationException>(
-                                    () => context.Customers.ToList()).Message);
-                        });
-
-                        throwingTask.Wait();
-
-                        blockingSemaphore.Release(1);
-
-                        blockingTask.Wait();
-                    }
-                }
+                Assert.Equal(
+                    CoreStrings.ConcurrentMethodInvocation,
+                    Assert.Throws<InvalidOperationException>(
+                        () => context.Customers.ToList()).Message);
             }
         }
 
         public override void Throws_on_concurrent_query_first()
         {
-            // UGLY: have to copy the whole test and add .AsEnumerable() to avoid stack overflow
-            // https://github.com/aspnet/EntityFrameworkCore/blob/2.1.0-preview2-final/src/EFCore.Specification.Tests/Query/SimpleQueryTestBase.cs#LL2632
+            // Old implementation prior to
+            // https://github.com/aspnet/EntityFrameworkCore/commit/654dbcc408d4649a54d0ed7de5f1f06b64114f8b
             using (var context = this.CreateContext())
             {
-                context.Database.EnsureCreated();
+                ((IInfrastructure<IServiceProvider>)context).Instance.GetService<IConcurrencyDetector>().EnterCriticalSection();
 
-                using (var synchronizationEvent = new ManualResetEventSlim(false))
-                {
-                    using (var blockingSemaphore = new SemaphoreSlim(0))
-                    {
-                        var blockingTask = Task.Run(() =>
-                            context.Customers.AsEnumerable().Select(
-                                c => Process(c, synchronizationEvent, blockingSemaphore)).ToList());
-
-                        var throwingTask = Task.Run(() =>
-                        {
-                            synchronizationEvent.Wait();
-                            Assert.Equal(
-                                CoreStrings.ConcurrentMethodInvocation,
-                                Assert.Throws<InvalidOperationException>(
-                                    () => context.Customers.First()).Message);
-                        });
-
-                        throwingTask.Wait();
-
-                        blockingSemaphore.Release(1);
-
-                        blockingTask.Wait();
-                    }
-                }
+                Assert.Equal(
+                    CoreStrings.ConcurrentMethodInvocation,
+                    Assert.Throws<InvalidOperationException>(
+                        () => context.Customers.First()).Message);
             }
-        }
-
-        private static Customer Process(Customer c, ManualResetEventSlim e, SemaphoreSlim s)
-        {
-            e.Set();
-            s.Wait();
-            s.Release(1);
-            return c;
         }
     }
 }
