@@ -38,11 +38,11 @@ namespace InfoCarrier.Core.Server
             this.dbContext = dbContextFactory();
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-            IStateManager stateManager = this.dbContext.GetService<IStateManager>();
+            var stateManager = this.dbContext.GetService<IStateManager>();
+            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
 
             // Materialize entities and add entries to dbContext
-            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
-            var entries = request.DataTransferObjects.Select(dto =>
+            EntityEntry MaterializeAndTrackEntity(UpdateEntryDto dto)
             {
                 IEntityType entityType = typeMap[dto.EntityTypeName];
 
@@ -86,6 +86,7 @@ namespace InfoCarrier.Core.Server
                     {
                         referenceEntry.CurrentValue = MaterializeEntity();
                     }
+
                     entry = referenceEntry.TargetEntry;
                 }
                 else
@@ -141,7 +142,10 @@ namespace InfoCarrier.Core.Server
                 }
 
                 return entry;
-            }).ToList();
+            }
+
+            request.SharedIdentityDataTransferObjects.ForEach(dto => MaterializeAndTrackEntity(dto));
+            var entries = request.DataTransferObjects.Select(MaterializeAndTrackEntity).ToList();
 
             // Replace temporary PKs coming from client with generated values (e.g. HiLoSequence)
             var valueGeneratorSelector = this.dbContext.GetService<IValueGeneratorSelector>();
@@ -168,7 +172,7 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Gets the corresponding entries after painting the state of the updated entities.
         /// </summary>
-        public IEnumerable<IUpdateEntry> Entries { get; }
+        public IReadOnlyList<IUpdateEntry> Entries { get; }
 
         /// <summary>
         ///     Disposes the <see cref="DbContext" /> into which the updated entities have been saved.
