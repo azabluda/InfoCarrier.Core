@@ -32,6 +32,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
     {
         private sealed class PreparedQuery
         {
+            private static readonly MethodInfo MakeGenericQueryableMethod
+                = Utils.GetMethodInfo(() => MakeGenericQueryable<object>(null))
+                    .GetGenericMethodDefinition();
+
             private static readonly MethodInfo MakeGenericGroupingMethod
                 = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition();
@@ -60,6 +64,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(QueryContext queryContext)
                 => new QueryExecutor<TResult>(this, queryContext, this.entityTypeMap).ExecuteAsyncQuery();
+
+            private static IQueryable<TElement> MakeGenericQueryable<TElement>(IEnumerable<TElement> elements)
+            {
+                return elements.AsQueryable();
+            }
 
             private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
             {
@@ -170,6 +179,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             return array;
                         }
 
+                        // is obj a queryable
+                        if (this.TryMapQueryable(dobj, targetType, out object queryable))
+                        {
+                            return queryable;
+                        }
+
                         // is obj a grouping
                         if (this.TryMapGrouping(dobj, targetType, out object grouping))
                         {
@@ -231,6 +246,34 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     return false;
+                }
+
+                private bool TryMapQueryable(DynamicObject dobj, Type targetType, out object queryable)
+                {
+                    queryable = null;
+
+                    Type type = dobj.Type?.ResolveType(this.typeResolver) ?? targetType;
+
+                    if (type == null
+                        || !type.GetTypeInfo().IsGenericType
+                        || type.GetGenericTypeDefinition() != typeof(IQueryable<>))
+                    {
+                        return false;
+                    }
+
+                    if (!dobj.TryGet("Elements", out object elements))
+                    {
+                        return false;
+                    }
+
+                    Type elementType = type.GenericTypeArguments[0];
+
+                    elements = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
+
+                    queryable = MakeGenericQueryableMethod
+                        .MakeGenericMethod(elementType)
+                        .Invoke(null, new[] { elements });
+                    return true;
                 }
 
                 private bool TryMapGrouping(DynamicObject dobj, Type targetType, out object grouping)

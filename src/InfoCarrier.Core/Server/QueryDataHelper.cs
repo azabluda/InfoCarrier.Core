@@ -186,6 +186,10 @@ namespace InfoCarrier.Core.Server
                 = Utils.GetMethodInfo<EntityToDynamicObjectMapper>(x => x.MapGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition();
 
+            private static readonly MethodInfo MapQueryableMethod
+                = Utils.GetMethodInfo<EntityToDynamicObjectMapper>(x => x.MapQueryable<object>(null, null))
+                    .GetGenericMethodDefinition();
+
             private readonly IStateManager stateManager;
             private readonly IInternalEntityEntryFactory entityEntryFactory;
             private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
@@ -205,7 +209,8 @@ namespace InfoCarrier.Core.Server
             }
 
             protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>
-                collection.GetType().GetGenericTypeImplementations(typeof(IGrouping<,>)).Any()
+                collection.GetType().GetGenericTypeImplementations(typeof(IQueryable<>)).Any()
+                || collection.GetType().GetGenericTypeImplementations(typeof(IGrouping<,>)).Any()
                 || base.ShouldMapToDynamicObject(collection);
 
             protected override DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation)
@@ -228,6 +233,16 @@ namespace InfoCarrier.Core.Server
                     dto.Add("ArrayType", new Aqua.TypeSystem.TypeInfo(objType, includePropertyInfos: false));
                     dto.Add("Elements", array);
                     return dto;
+                }
+
+                // Special mapping of IQueryable<>
+                foreach (var queryableType in objType.GetGenericTypeImplementations(typeof(IQueryable<>)))
+                {
+                    object mappedQueryable =
+                        MapQueryableMethod
+                            .MakeGenericMethod(queryableType.GenericTypeArguments)
+                            .Invoke(this, new[] { obj, setTypeInformation });
+                    return (DynamicObject)mappedQueryable;
                 }
 
                 // Special mapping of IGrouping<,>
@@ -295,6 +310,17 @@ namespace InfoCarrier.Core.Server
                 }
 
                 return dto;
+            }
+
+            private DynamicObject MapQueryable<TElement>(IQueryable<TElement> queryable, Func<Type, bool> setTypeInformation)
+            {
+                var mappedQueryable = new DynamicObject(typeof(IQueryable<TElement>));
+                mappedQueryable.Add(
+                    "Elements",
+                    new DynamicObject(
+                        this.MapCollection(queryable.ToList(), setTypeInformation).ToList(),
+                        this));
+                return mappedQueryable;
             }
 
             private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
