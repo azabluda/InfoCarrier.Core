@@ -32,6 +32,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
     {
         private sealed class PreparedQuery
         {
+            private static readonly MethodInfo ToOrderedMethod
+                = new LinqOperatorProvider().ToOrdered;
+
             private static readonly MethodInfo MakeGenericQueryableMethod
                 = Utils.GetMethodInfo(() => MakeGenericQueryable<object>(null))
                     .GetGenericMethodDefinition();
@@ -179,16 +182,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             return array;
                         }
 
-                        // is obj a queryable
-                        if (this.TryMapQueryable(dobj, targetType, out object queryable))
-                        {
-                            return queryable;
-                        }
-
                         // is obj a grouping
                         if (this.TryMapGrouping(dobj, targetType, out object grouping))
                         {
                             return grouping;
+                        }
+
+                        // is obj a collection
+                        if (this.TryMapCollection(dobj, targetType, out object collection))
+                        {
+                            return collection;
                         }
                     }
 
@@ -248,15 +251,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return false;
                 }
 
-                private bool TryMapQueryable(DynamicObject dobj, Type targetType, out object queryable)
+                private bool TryMapCollection(DynamicObject dobj, Type targetType, out object collection)
                 {
-                    queryable = null;
+                    collection = null;
 
                     Type type = dobj.Type?.ResolveType(this.typeResolver) ?? targetType;
 
                     if (type == null
                         || !type.GetTypeInfo().IsGenericType
-                        || type.GetGenericTypeDefinition() != typeof(IQueryable<>))
+                        || type.GetGenericTypeDefinition() != typeof(IEnumerable<>))
                     {
                         return false;
                     }
@@ -268,11 +271,21 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     Type elementType = type.GenericTypeArguments[0];
 
-                    elements = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
+                    collection = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
 
-                    queryable = MakeGenericQueryableMethod
-                        .MakeGenericMethod(elementType)
-                        .Invoke(null, new[] { elements });
+                    if (dobj.TryGet("IsQueryable", out _))
+                    {
+                        collection = MakeGenericQueryableMethod
+                            .MakeGenericMethod(elementType)
+                            .Invoke(null, new[] { collection });
+                    }
+                    else if (dobj.TryGet("IsOrdered", out _))
+                    {
+                        collection = ToOrderedMethod
+                            .MakeGenericMethod(elementType)
+                            .Invoke(null, new[] { collection });
+                    }
+
                     return true;
                 }
 
