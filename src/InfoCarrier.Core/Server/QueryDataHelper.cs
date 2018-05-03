@@ -208,7 +208,8 @@ namespace InfoCarrier.Core.Server
                     .ToDictionary(x => x.Key, x => x.First());
             }
 
-            protected override bool ShouldMapToDynamicObject(IEnumerable collection) => true;
+            protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>
+                !(collection is List<DynamicObject>);
 
             protected override DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation)
             {
