@@ -89,28 +89,27 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public QueryDataResult QueryData()
         {
-            var resultType = this.linqExpression.Type.GetGenericTypeImplementations(typeof(IQueryable<>)).Select(t => t.GetGenericArguments().Single()).FirstOrDefault();
-            resultType = resultType == null ? this.linqExpression.Type : typeof(IEnumerable<>).MakeGenericType(resultType);
+            bool queryReturnsSingleResult = Utils.QueryReturnsSingleResult(this.linqExpression);
+            var resultType = queryReturnsSingleResult
+                ? this.linqExpression.Type
+                : typeof(IEnumerable<>).MakeGenericType(this.linqExpression.Type.GenericTypeArguments.First());
 
             object queryResult = ExecuteExpressionMethod
                 .MakeGenericMethod(resultType)
                 .ToDelegate<Func<object>>(this)
                 .Invoke();
 
-            if (queryResult is IEnumerable enumerable)
+            if (queryReturnsSingleResult)
             {
-                if (Utils.TryGetQueryResultSequenceType(resultType) != null)
-                {
-                    // TRICKY: sometimes EF returns enumerable result as ExceptionInterceptor<T> which
-                    // isn't fully ready for mapping to DynamicObjects (some complex self-referencing navigation
-                    // properties may not have received their values yet). We have to force materialization.
-                    queryResult = enumerable.Cast<object>().ToList();
-                }
-                else
-                {
-                    // Little trick for a single result item of type IGrouping/array/string
-                    queryResult = new[] { queryResult };
-                }
+                // Little trick for a single result item of type
+                queryResult = new[] { queryResult };
+            }
+            else
+            {
+                // TRICKY: sometimes EF returns enumerable result as ExceptionInterceptor<T> which
+                // isn't fully ready for mapping to DynamicObjects (some complex self-referencing navigation
+                // properties may not have received their values yet). We have to force materialization.
+                queryResult = ((IEnumerable)queryResult).Cast<object>().ToList();
             }
 
             return new QueryDataResult(this.MapResult(queryResult));

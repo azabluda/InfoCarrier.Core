@@ -195,25 +195,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         }
                     }
 
-                    // is targetType a collection?
-                    Type elementType = Utils.TryGetQueryResultSequenceType(targetType);
-                    if (elementType == null)
-                    {
-                        return BaseImpl();
-                    }
-
-                    // map to list (supported directly by aqua-core)
-                    Type listType = typeof(List<>).MakeGenericType(elementType);
-                    object list = base.MapFromDynamicObjectGraph(obj, listType) ?? Activator.CreateInstance(listType);
-
-                    // determine concrete collection type
-                    Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(elementType, targetType) ?? targetType;
-                    if (listType == collType)
-                    {
-                        return list; // no further mapping required
-                    }
-
-                    return MaterializeCollection(collType, list, this.queryContext);
+                    return BaseImpl();
                 }
 
                 private bool TryMapArray(DynamicObject dobj, Type targetType, out object array)
@@ -271,7 +253,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     Type elementType = type.GenericTypeArguments[0];
 
-                    collection = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
+                    // map to list (supported directly by aqua-core)
+                    Type listType = typeof(List<>).MakeGenericType(elementType);
+                    collection = this.MapFromDynamicObjectGraph(elements, listType);
 
                     if (dobj.TryGet("IsQueryable", out _))
                     {

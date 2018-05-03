@@ -141,10 +141,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
             }
 
-            Type sequenceType =
-                typeof(TResult) == typeof(IEnumerable)
-                ? typeof(object)
-                : Utils.TryGetQueryResultSequenceType(typeof(TResult));
+            Type sequenceType = Utils.QueryReturnsSingleResult(query)
+                ? null
+                : typeof(TResult) == typeof(IEnumerable) ? typeof(object) : Utils.TryGetQueryResultSequenceType(typeof(TResult));
 
             if (sequenceType == null)
             {
@@ -152,7 +151,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     try
                     {
-                        return this.CreateCompiledEnumerableQuery<TResult, IEnumerable<TResult>>(query)(qc).First();
+                        return this.CreateCompiledEnumerableQuery<TResult>(query)(qc).First();
                     }
                     catch (Exception exception)
                     {
@@ -164,7 +163,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             try
             {
-                return (Func<QueryContext, TResult>)CreateCompiledEnumerableQueryMethod.MakeGenericMethod(sequenceType, typeof(TResult))
+                return (Func<QueryContext, TResult>)CreateCompiledEnumerableQueryMethod.MakeGenericMethod(sequenceType)
                     .Invoke(this, new object[] { query });
             }
             catch (TargetInvocationException ex)
@@ -174,7 +173,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
         }
 
-        private Func<QueryContext, TCollection> CreateCompiledEnumerableQuery<TItem, TCollection>(Expression query)
+        private Func<QueryContext, IEnumerable<TItem>> CreateCompiledEnumerableQuery<TItem>(Expression query)
         {
             var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
@@ -182,38 +181,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 object items = preparedQuery.Execute<TItem>(queryContext);
                 items = InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
                     .Invoke(null, new[] { items, queryContext.Context.GetType(), this.logger, queryContext });
-
-                if (items is TCollection collection)
-                {
-                    return collection;
-                }
-
-                // determine and materialize concrete collection type
-                Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(typeof(TItem), typeof(TCollection)) ?? typeof(TCollection);
-                return (TCollection)MaterializeCollection(collType, items, queryContext);
+                return (IEnumerable<TItem>)items;
             };
-        }
-
-        private static object MaterializeCollection(Type collType, object items, QueryContext queryContext)
-        {
-            // materialize IOrderedEnumerable<>
-            if (collType.GetTypeInfo().IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
-            {
-                return new LinqOperatorProvider().ToOrdered.MakeGenericMethod(collType.GenericTypeArguments)
-                    .Invoke(null, new[] { items });
-            }
-
-            // materialize IQueryable<> / IOrderedQueryable<>
-            if (collType.GetTypeInfo().IsGenericType
-                && (collType.GetGenericTypeDefinition() == typeof(IQueryable<>)
-                    || collType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)))
-            {
-                return new LinqOperatorProvider().ToQueryable.MakeGenericMethod(collType.GenericTypeArguments)
-                    .Invoke(null, new[] { items, queryContext });
-            }
-
-            // materialize concrete collection
-            return Activator.CreateInstance(collType, items);
         }
 
         private Expression ExtractParameters(

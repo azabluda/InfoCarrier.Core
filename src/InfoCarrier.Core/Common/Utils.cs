@@ -4,6 +4,9 @@
 namespace InfoCarrier.Core.Common
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
     using Microsoft.EntityFrameworkCore.Extensions.Internal;
@@ -15,6 +18,19 @@ namespace InfoCarrier.Core.Common
     /// </summary>
     public static class Utils
     {
+        // ReSharper disable once InvokeAsExtensionMethod
+        private static readonly ImmutableHashSet<MethodInfo> SingleResultMethods =
+            Enumerable.Concat(
+                typeof(Queryable).GetMethods().Where(
+                    m => !m.ReturnType.IsGenericType ||
+                    !new[] { typeof(IQueryable<>), typeof(IOrderedQueryable<>) }
+                        .Contains(m.ReturnType.GetGenericTypeDefinition())),
+                typeof(Enumerable).GetMethods().Where(
+                    m => !m.ReturnType.IsGenericType ||
+                    !new[] { typeof(IEnumerable<>), typeof(IOrderedEnumerable<>) }
+                        .Contains(m.ReturnType.GetGenericTypeDefinition())))
+            .ToImmutableHashSet();
+
         /// <summary>
         ///     Given a lambda expression that calls a method, returns the <see cref="MethodInfo"/>.
         /// </summary>
@@ -91,6 +107,27 @@ namespace InfoCarrier.Core.Common
             }
 
             return queryResultType.TryGetSequenceType();
+        }
+
+        /// <summary>
+        ///     Checks whether the given query returns single result.
+        /// </summary>
+        /// <param name="query"> The query to inspect. </param>
+        /// <returns>True if the given query returns single result</returns>
+        internal static bool QueryReturnsSingleResult(Expression query)
+        {
+            if (query is MethodCallExpression methodCall)
+            {
+                MethodInfo method = methodCall.Method;
+                if (method.IsGenericMethod)
+                {
+                    method = method.GetGenericMethodDefinition();
+                }
+
+                return SingleResultMethods.Contains(method);
+            }
+
+            return false;
         }
 
         /// <summary>
