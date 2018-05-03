@@ -237,7 +237,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     collection = null;
 
-                    Type type = dobj.Type?.ResolveType(this.typeResolver) ?? targetType;
+                    Type type = dobj.Type?.ResolveType(this.typeResolver);
 
                     if (type == null
                         || !type.GetTypeInfo().IsGenericType
@@ -252,21 +252,28 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     Type elementType = type.GenericTypeArguments[0];
+                    Type listType = typeof(List<>).MakeGenericType(elementType);
 
                     // map to list (supported directly by aqua-core)
-                    Type listType = typeof(List<>).MakeGenericType(elementType);
                     collection = this.MapFromDynamicObjectGraph(elements, listType);
 
-                    if (dobj.TryGet("IsQueryable", out _))
+                    if (dobj.TryGet("CollectionType", out object collTypeObj)
+                        && collTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
                     {
-                        collection = MakeGenericQueryableMethod
-                            .MakeGenericMethod(elementType)
+                        // copy from list to specialized collection
+                        Type collType = typeInfo.ResolveType(this.typeResolver);
+                        collection = Activator.CreateInstance(collType, collection);
+                    }
+                    else if (typeof(IQueryable).IsAssignableFrom(targetType))
+                    {
+                        // .AsQueryable
+                        collection = MakeGenericQueryableMethod.MakeGenericMethod(elementType)
                             .Invoke(null, new[] { collection });
                     }
-                    else if (dobj.TryGet("IsOrdered", out _))
+                    else if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
                     {
-                        collection = ToOrderedMethod
-                            .MakeGenericMethod(elementType)
+                        // to OrderedEnumerable
+                        collection = ToOrderedMethod.MakeGenericMethod(elementType)
                             .Invoke(null, new[] { collection });
                     }
 

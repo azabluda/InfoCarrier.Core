@@ -319,14 +319,14 @@ namespace InfoCarrier.Core.Server
                         this.MapCollection(enumerable.ToList(), setTypeInformation).ToList(),
                         this));
 
-                switch (enumerable)
+                var collectionType = enumerable.GetType();
+                if (collectionType != typeof(List<TElement>))
                 {
-                    case IQueryable<TElement> _:
-                        mappedEnumerable.Add("IsQueryable", true);
-                        break;
-                    case IOrderedEnumerable<TElement> _:
-                        mappedEnumerable.Add("IsOrdered", true);
-                        break;
+                    var constructor = collectionType.GetDeclaredConstructor(new[] { typeof(IEnumerable<TElement>) });
+                    if (constructor != null && constructor.IsPublic)
+                    {
+                        mappedEnumerable.Add("CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
+                    }
                 }
 
                 return mappedEnumerable;
