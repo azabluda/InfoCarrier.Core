@@ -38,12 +38,6 @@ namespace InfoCarrier.Core.Server
         private static readonly MethodInfo ExecuteExpressionAsyncMethod
             = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpressionAsync));
 
-        private static readonly MethodInfo DbContextSetMethod
-            = Utils.GetMethodInfo<DbContext>(c => c.Set<object>()).GetGenericMethodDefinition();
-
-        private static readonly MethodInfo DbContextQueryMethod
-            = Utils.GetMethodInfo<DbContext>(c => c.Query<object>()).GetGenericMethodDefinition();
-
         private readonly DbContext dbContext;
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
@@ -59,6 +53,7 @@ namespace InfoCarrier.Core.Server
         {
             this.dbContext = dbContextFactory();
             this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
+            IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
 
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
@@ -67,14 +62,7 @@ namespace InfoCarrier.Core.Server
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
-                    provider: type =>
-                    {
-                        var entityType = this.dbContext.Model.FindEntityType(type);
-                        return (entityType.IsQueryType ? DbContextQueryMethod : DbContextSetMethod)
-                            .MakeGenericMethod(type)
-                            .ToDelegate<Func<IQueryable>>(this.dbContext)
-                            .Invoke();
-                    })
+                    provider: type => (IQueryable)Activator.CreateInstance(typeof(EntityQueryable<>).MakeGenericType(type), provider))
                 .ToLinqExpression(this.typeResolver);
 
             // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
