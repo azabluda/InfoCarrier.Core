@@ -291,7 +291,9 @@ namespace InfoCarrier.Core.Server
                 {
                     DynamicObject value = prop is ReferenceEntry refProp && refProp.TargetEntry != null
                         ? this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation, refProp.TargetEntry.GetInfrastructure())
-                        : this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation);
+                        : this.MapToDynamicObjectGraph(
+                            Utils.ConvertToProvider(prop.CurrentValue, prop.Metadata as IProperty),
+                            setTypeInformation);
                     dto.Add(prop.Metadata.Name, value);
                 }
 

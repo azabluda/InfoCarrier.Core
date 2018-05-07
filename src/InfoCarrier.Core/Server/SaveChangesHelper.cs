@@ -56,17 +56,16 @@ namespace InfoCarrier.Core.Server
                 EntityEntry entry;
                 if (entityType.HasDefiningNavigation())
                 {
-                    object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper);
+                    IKey key = entityType.DefiningEntityType.FindPrimaryKey();
+                    object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper, key);
 
                     // Here we assume that the owner entry is already present in the context
-                    EntityEntry ownerEntry = stateManager.TryGetEntry(
-                        entityType.DefiningEntityType.FindPrimaryKey(),
-                        keyValues)?.ToEntityEntry();
+                    EntityEntry ownerEntry = stateManager.TryGetEntry(key, keyValues)?.ToEntityEntry();
 
                     // If not, then we create a dummy instance, set only PK values, and track it as Unchanged
                     if (ownerEntry == null)
                     {
-                        var pkProps = entityType.DefiningEntityType.FindPrimaryKey().Properties.ToList();
+                        var pkProps = key.Properties.ToList();
                         var ownerValueBuffer = new ValueBuffer(
                             entityType.DefiningEntityType.GetProperties().Select(p =>
                             {

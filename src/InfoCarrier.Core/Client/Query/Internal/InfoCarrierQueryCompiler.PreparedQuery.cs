@@ -339,11 +339,21 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return true;
                     }
 
-                    // Map only scalar properties for now, navigations must be set later
+                    // Map only scalar properties for now, navigations have to be set later
                     var valueBuffer = new ValueBuffer(
                         entityType
                             .GetProperties()
-                            .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
+                            .Select(p =>
+                            {
+                                object value = dobj.Get(p.Name);
+                                if (p.GetValueConverter() != null)
+                                {
+                                    value = this.MapFromDynamicObjectGraph(value, typeof(object));
+                                    value = Utils.ConvertFromProvider(value, p);
+                                }
+
+                                return this.MapFromDynamicObjectGraph(value, p.ClrType);
+                            })
                             .ToArray());
 
                     bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedCollections");
