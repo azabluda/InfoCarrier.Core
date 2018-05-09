@@ -1,4 +1,4 @@
-image: Visual Studio 2017
+image: Visual Studio 2017 Preview
 
 environment:
   Test__SqlServer__DefaultConnection: Server=(local)\SQL2016;Database=master;User ID=sa;Password=Password12!
