@@ -18,7 +18,7 @@ It is important to note that InfoCarrier.Core dictates neither the communication
   * Change Tracking
   * Identity Map
   * Navigation Property Fix-up
-  * Eager/Explicit Loading of Navigation Properties
+  * Eager/Lazy/Explicit Loading of Navigation Properties
   * etc.
 * DbContext and entity classes shared between client and server, no need to duplicate this code
 * Concise client-side interface `IInfoCarrierBackend`
