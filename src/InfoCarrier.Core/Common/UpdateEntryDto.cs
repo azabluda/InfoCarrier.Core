@@ -36,14 +36,20 @@ namespace InfoCarrier.Core.Common
         /// <param name="mapper">The <see cref="IDynamicObjectMapper" /> used for mapping the property values.</param>
         public UpdateEntryDto(IUpdateEntry entry, IDynamicObjectMapper mapper)
         {
+            DynamicObject CreateValueDto(IProperty propertyBase, object value)
+            {
+                value = Utils.ConvertToProvider(value, propertyBase);
+                return mapper.MapObject(value);
+            }
+
             this.EntityTypeName = entry.EntityType.DisplayName();
             this.EntityState = entry.EntityState;
             this.PropertyDatas = entry.ToEntityEntry().Properties.Select(
                 prop => new PropertyData
                 {
                     Name = prop.Metadata.Name,
-                    OriginalValueDto = prop.Metadata.GetOriginalValueIndex() >= 0 ? mapper.MapObject(prop.OriginalValue) : null,
-                    CurrentValueDto = mapper.MapObject(prop.CurrentValue),
+                    OriginalValueDto = prop.Metadata.GetOriginalValueIndex() >= 0 ? CreateValueDto(prop.Metadata, prop.OriginalValue) : null,
+                    CurrentValueDto = CreateValueDto(prop.Metadata, prop.CurrentValue),
                     IsModified = prop.IsModified,
                     IsTemporary = prop.IsTemporary,
                 }).ToList();
@@ -55,8 +61,8 @@ namespace InfoCarrier.Core.Common
                     prop => new PropertyData
                     {
                         Name = prop.Name,
-                        OriginalValueDto = mapper.MapObject(entry.GetOriginalValue(prop)),
-                        CurrentValueDto = mapper.MapObject(entry.GetCurrentValue(prop)),
+                        OriginalValueDto = CreateValueDto(prop, entry.GetOriginalValue(prop)),
+                        CurrentValueDto = CreateValueDto(prop, entry.GetCurrentValue(prop)),
                         IsModified = entry.IsModified(prop),
                         IsTemporary = entry.HasTemporaryValue(prop),
                     }).ToList();
@@ -105,7 +111,9 @@ namespace InfoCarrier.Core.Common
                 from ef in entry.Properties
                 join dto in this.PropertyDatas
                 on ef.Metadata.Name equals dto.Name
-                select (ef, dto, mapper.Map(dto.OriginalValueDto), mapper.Map(dto.CurrentValueDto))).ToList();
+                select (ef, dto,
+                    Utils.ConvertFromProvider(mapper.Map(dto.OriginalValueDto), ef.Metadata),
+                    Utils.ConvertFromProvider(mapper.Map(dto.CurrentValueDto), ef.Metadata))).ToList();
         }
 
         /// <summary>
@@ -120,7 +128,9 @@ namespace InfoCarrier.Core.Common
         {
             return entityType
                 .GetProperties()
-                .Select(p => mapper.Map(this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValueDto))
+                .Select(p => Utils.ConvertFromProvider(
+                    mapper.Map(this.PropertyDatas.SingleOrDefault(pd => pd.Name == p.Name)?.CurrentValueDto),
+                    p))
                 .ToArray();
         }
 
@@ -129,12 +139,15 @@ namespace InfoCarrier.Core.Common
         ///     (for owned entities only).
         /// </summary>
         /// <param name="mapper">The <see cref="IDynamicObjectMapper" /> used for mapping the key values.</param>
+        /// <param name="key"> The primary key of the defining entity. </param>
         /// <returns>
         ///     The values of the delegated identity key of the entity mapped back to their original types.
         /// </returns>
-        public object[] GetDelegatedIdentityKeys(IDynamicObjectMapper mapper)
+        public object[] GetDelegatedIdentityKeys(IDynamicObjectMapper mapper, IKey key)
         {
-            return this.DelegatedIdentityDatas.Select(d => mapper.Map(d.CurrentValueDto)).ToArray();
+            return this.DelegatedIdentityDatas.Zip(
+                key.Properties,
+                (d, p) => Utils.ConvertFromProvider(mapper.Map(d.CurrentValueDto), p)).ToArray();
         }
 
         /// <summary>

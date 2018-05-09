@@ -45,7 +45,7 @@ namespace InfoCarrier.Core.Common
         ///     new values for keys which are to be sent back to the client.
         /// </param>
         /// <returns>The Success result object.</returns>
-        internal static SaveChangesResult Success(int countPersisted, IEnumerable<IUpdateEntry> entries)
+        internal static SaveChangesResult Success(int countPersisted, IReadOnlyList<IUpdateEntry> entries)
             => new SaveChangesResult(new SuccessImpl(countPersisted, entries));
 
         /// <summary>
@@ -57,7 +57,7 @@ namespace InfoCarrier.Core.Common
         ///     needed for determining the <see cref="ErrorImpl.FailedEntityIndexes" />.
         /// </param>
         /// <returns>The Error result object.</returns>
-        internal static SaveChangesResult Error(DbUpdateException exception, IEnumerable<IUpdateEntry> entries)
+        internal static SaveChangesResult Error(DbUpdateException exception, IReadOnlyList<IUpdateEntry> entries)
             => new SaveChangesResult(new ErrorImpl(exception, entries));
 
         /// <summary>
@@ -78,14 +78,14 @@ namespace InfoCarrier.Core.Common
             => this.Impl.ToString();
 
         [DataContract]
-        private class SuccessImpl : SaveChangesRequest, ISaveChangesResult
+        private class SuccessImpl : EntityDtoHolder, ISaveChangesResult
         {
             [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
             public SuccessImpl()
             {
             }
 
-            internal SuccessImpl(int countPersisted, IEnumerable<IUpdateEntry> entries)
+            internal SuccessImpl(int countPersisted, IReadOnlyList<IUpdateEntry> entries)
                 : base(entries)
             {
                 this.CountPersisted = countPersisted;

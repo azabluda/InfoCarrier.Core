@@ -8,6 +8,9 @@
         "licenseName": "MIT",
         "licenseFile": "license.txt"
       }
+    },
+    "layoutRules": {
+      "newlineAtEndOfFile": "require"
     }
   }
 }

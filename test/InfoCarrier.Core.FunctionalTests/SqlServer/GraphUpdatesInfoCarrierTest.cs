@@ -4,42 +4,33 @@
 namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
     using Microsoft.EntityFrameworkCore;
-    using Xunit;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
+    using TestUtilities;
 
-    [Collection("SqlServer")]
     public class GraphUpdatesInfoCarrierTest
-        : GraphUpdatesTestBase<TestStoreBase, GraphUpdatesInfoCarrierTest.GraphUpdatesInfoCarrierFixture>
+        : GraphUpdatesTestBase<GraphUpdatesInfoCarrierTest.TestFixture>
     {
-        public GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierFixture fixture)
+        public GraphUpdatesInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
-        public class GraphUpdatesInfoCarrierFixture : GraphUpdatesFixtureBase
+        public class TestFixture : GraphUpdatesFixtureBase
         {
-            private readonly InfoCarrierTestHelper<GraphUpdatesContext> helper;
+            private ITestStoreFactory testStoreFactory;
 
-            public GraphUpdatesInfoCarrierFixture()
-            {
-                this.helper = SqlServerTestStore<GraphUpdatesContext>.CreateHelper(
-                    this.OnModelCreating,
-                    opt => new GraphUpdatesContext(opt),
-                    this.Seed,
-                    true,
-                    "GraphSequenceUpdatesTest");
-            }
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.EnsureInitialized(
+                    ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.SqlServer,
+                    this.ContextType,
+                    this.OnModelCreating);
 
-            public override TestStoreBase CreateTestStore()
-                => this.helper.CreateTestStore();
-
-            public override DbContext CreateContext(TestStoreBase testStore)
-                => this.helper.CreateInfoCarrierContext(testStore);
-
-            protected override void OnModelCreating(ModelBuilder modelBuilder)
+            protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
             {
                 modelBuilder.ForSqlServerUseSequenceHiLo(); // ensure model uses sequences
 
-                base.OnModelCreating(modelBuilder);
+                base.OnModelCreating(modelBuilder, context);
             }
         }
     }

@@ -4,17 +4,36 @@
 namespace InfoCarrier.Core.Common
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Extensions.Internal;
+    using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
+    using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
     /// <summary>
     ///     A collection of miscellaneous helper functions.
     /// </summary>
     public static class Utils
     {
+        // ReSharper disable once InvokeAsExtensionMethod
+        private static readonly ImmutableHashSet<MethodInfo> SingleResultMethods =
+            Enumerable.Concat(
+                typeof(Queryable).GetMethods().Where(
+                    m => !m.ReturnType.IsGenericType ||
+                    !new[] { typeof(IQueryable<>), typeof(IOrderedQueryable<>) }
+                        .Contains(m.ReturnType.GetGenericTypeDefinition())),
+                typeof(Enumerable).GetMethods().Where(
+                    m => !m.ReturnType.IsGenericType ||
+                    !new[] { typeof(IEnumerable<>), typeof(IOrderedEnumerable<>) }
+                        .Contains(m.ReturnType.GetGenericTypeDefinition())))
+            .ToImmutableHashSet();
+
         /// <summary>
         ///     Given a lambda expression that calls a method, returns the <see cref="MethodInfo"/>.
         /// </summary>
@@ -91,6 +110,61 @@ namespace InfoCarrier.Core.Common
             }
 
             return queryResultType.TryGetSequenceType();
+        }
+
+        /// <summary>
+        ///     Checks whether the given query returns single result.
+        /// </summary>
+        /// <param name="query"> The query to inspect. </param>
+        /// <returns>True if the given query returns single result</returns>
+        internal static bool QueryReturnsSingleResult(Expression query)
+        {
+            if (query is MethodCallExpression methodCall)
+            {
+                MethodInfo method = methodCall.Method;
+                if (method.IsGenericMethod)
+                {
+                    method = method.GetGenericMethodDefinition();
+                }
+
+                return SingleResultMethods.Contains(method);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        ///     Converts the given store value to its model counterpart if there is a <see cref="ValueConverter" />
+        ///     defined for the given <paramref name="property"/>.
+        /// </summary>
+        /// <remarks>
+        ///     If the <paramref name="property"/> is null or defines no <see cref="ValueConverter" /> then
+        ///     no conversion is applied to the <paramref name="value"/>.
+        /// </remarks>
+        /// <param name="value"> The value to convert. </param>
+        /// <param name="property"> The property metadata which may define a converter. </param>
+        /// <returns> The converted value. </returns>
+        internal static object ConvertFromProvider(object value, IProperty property)
+        {
+            ValueConverter valueConverter = property?.GetValueConverter();
+            return valueConverter != null ? valueConverter.ConvertFromProvider(value) : value;
+        }
+
+        /// <summary>
+        ///     Converts the given model value to its store counterpart if there is a <see cref="ValueConverter" />
+        ///     defined for the given <paramref name="property"/>.
+        /// </summary>
+        /// <remarks>
+        ///     If the <paramref name="property"/> is null or defines no <see cref="ValueConverter" /> then
+        ///     no conversion is applied to the <paramref name="value"/>.
+        /// </remarks>
+        /// <param name="value"> The value to convert. </param>
+        /// <param name="property"> The property metadata which may define a converter. </param>
+        /// <returns> The converted value. </returns>
+        internal static object ConvertToProvider(object value, IProperty property)
+        {
+            ValueConverter valueConverter = property?.GetValueConverter();
+            return valueConverter != null ? valueConverter.ConvertToProvider(value) : value;
         }
 
         /// <summary>

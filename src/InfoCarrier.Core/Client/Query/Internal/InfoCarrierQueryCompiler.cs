@@ -44,6 +44,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private readonly ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator;
         private readonly IDiagnosticsLogger<DbLoggerCategory.Query> logger;
         private readonly IEvaluatableExpressionFilter evaluatableExpressionFilter;
+        private readonly Type contextType;
         private readonly Lazy<IReadOnlyDictionary<string, IEntityType>> entityTypeMap;
 
         /// <summary>
@@ -57,6 +58,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             ICompiledQueryCache compiledQueryCache,
             ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator,
             IDiagnosticsLogger<DbLoggerCategory.Query> logger,
+            ICurrentDbContext currentContext,
             IEvaluatableExpressionFilter evaluatableExpressionFilter)
         {
             this.queryContextFactory = queryContextFactory;
@@ -64,6 +66,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.compiledQueryCacheKeyGenerator = compiledQueryCacheKeyGenerator;
             this.logger = logger;
             this.evaluatableExpressionFilter = evaluatableExpressionFilter;
+            this.contextType = currentContext.Context.GetType();
 
             this.entityTypeMap = new Lazy<IReadOnlyDictionary<string, IEntityType>>(() =>
             {
@@ -138,10 +141,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
             }
 
-            Type sequenceType =
-                typeof(TResult) == typeof(IEnumerable)
-                ? typeof(object)
-                : Utils.TryGetQueryResultSequenceType(typeof(TResult));
+            Type sequenceType = Utils.QueryReturnsSingleResult(query)
+                ? null
+                : typeof(TResult) == typeof(IEnumerable) ? typeof(object) : Utils.TryGetQueryResultSequenceType(typeof(TResult));
 
             if (sequenceType == null)
             {
@@ -171,28 +173,32 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
         }
 
-        private Func<QueryContext, IEnumerable<TResult>> CreateCompiledEnumerableQuery<TResult>(Expression query)
+        private Func<QueryContext, IEnumerable<TItem>> CreateCompiledEnumerableQuery<TItem>(Expression query)
         {
             var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
             {
-                IEnumerable<TResult> result = preparedQuery.Execute<TResult>(queryContext);
-                return (IEnumerable<TResult>)InterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
-                    .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+                object items = preparedQuery.Execute<TItem>(queryContext);
+                items = InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
+                    .Invoke(null, new[] { items, queryContext.Context.GetType(), this.logger, queryContext });
+                return (IEnumerable<TItem>)items;
             };
         }
 
         private Expression ExtractParameters(
             Expression query,
-            QueryContext queryContext,
-            bool parameterize)
+            IParameterValues parameterValues,
+            bool parameterize = true,
+            bool generateContextAccessors = false)
         {
             var visitor
                 = new ParameterExtractingExpressionVisitor(
                     this.evaluatableExpressionFilter,
-                    queryContext,
+                    parameterValues,
                     this.logger,
-                    parameterize);
+                    this.contextType,
+                    parameterize,
+                    generateContextAccessors);
 
             return visitor.ExtractParameters(query);
         }
@@ -219,7 +225,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             using (QueryContext queryContext = this.queryContextFactory.Create())
             {
-                query = this.ExtractParameters(query, queryContext, true);
+                query = this.ExtractParameters(query, queryContext);
                 return this.compiledQueryCache.GetOrAddQuery(
                     this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, false),
                     () => this.CreateCompiledQuery<TResult>(query, false)).Invoke(queryContext);
@@ -237,7 +243,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             using (QueryContext queryContext = this.queryContextFactory.Create())
             {
-                query = this.ExtractParameters(query, queryContext, true);
+                query = this.ExtractParameters(query, queryContext);
                 return this.compiledQueryCache.GetOrAddAsyncQuery(
                     this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, true),
                     () => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, false)).Invoke(queryContext);

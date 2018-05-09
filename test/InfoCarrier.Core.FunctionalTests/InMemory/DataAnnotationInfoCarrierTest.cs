@@ -4,11 +4,14 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
+    using TestUtilities;
     using Xunit;
 
-    public class DataAnnotationInfoCarrierTest : DataAnnotationTestBase<TestStoreBase, DataAnnotationInfoCarrierFixture>
+    public class DataAnnotationInfoCarrierTest : DataAnnotationTestBase<DataAnnotationInfoCarrierTest.TestFixture>
     {
-        public DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierFixture fixture)
+        public DataAnnotationInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
@@ -33,7 +36,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         {
             using (var context = this.CreateContext())
             {
-                Assert.True(context.Model.FindEntityType(typeof(BookDetail)).FindNavigation("Book").ForeignKey.IsRequired);
+                Assert.True(context.Model.FindEntityType(typeof(BookDetails)).FindNavigation(nameof(BookDetails.AnotherBook)).ForeignKey.IsRequired);
             }
         }
 
@@ -59,6 +62,19 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
             {
                 Assert.True(context.Model.FindEntityType(typeof(Two)).FindProperty("Timestamp").IsConcurrencyToken);
             }
+        }
+
+        public class TestFixture : DataAnnotationFixtureBase
+        {
+            private ITestStoreFactory testStoreFactory;
+
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.EnsureInitialized(
+                    ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.InMemory,
+                    this.ContextType,
+                    this.OnModelCreating,
+                    o => o.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
         }
     }
 }

@@ -32,6 +32,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
     {
         private sealed class PreparedQuery
         {
+            private static readonly MethodInfo ToOrderedMethod
+                = new LinqOperatorProvider().ToOrdered;
+
+            private static readonly MethodInfo MakeGenericQueryableMethod
+                = Utils.GetMethodInfo(() => MakeGenericQueryable<object>(null))
+                    .GetGenericMethodDefinition();
+
             private static readonly MethodInfo MakeGenericGroupingMethod
                 = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition();
@@ -60,6 +67,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(QueryContext queryContext)
                 => new QueryExecutor<TResult>(this, queryContext, this.entityTypeMap).ExecuteAsyncQuery();
+
+            private static IQueryable<TElement> MakeGenericQueryable<TElement>(IEnumerable<TElement> elements)
+            {
+                return elements.AsQueryable();
+            }
 
             private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
             {
@@ -175,44 +187,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         {
                             return grouping;
                         }
+
+                        // is obj a collection
+                        if (this.TryMapCollection(dobj, targetType, out object collection))
+                        {
+                            return collection;
+                        }
                     }
 
-                    // is targetType a collection?
-                    Type elementType = Utils.TryGetQueryResultSequenceType(targetType);
-                    if (elementType == null)
-                    {
-                        return BaseImpl();
-                    }
-
-                    // map to list (supported directly by aqua-core)
-                    Type listType = typeof(List<>).MakeGenericType(elementType);
-                    object list = base.MapFromDynamicObjectGraph(obj, listType) ?? Activator.CreateInstance(listType);
-
-                    // determine concrete collection type
-                    Type collType = new CollectionTypeFactory().TryFindTypeToInstantiate(elementType, targetType) ?? targetType;
-                    if (listType == collType)
-                    {
-                        return list; // no further mapping required
-                    }
-
-                    // materialize IOrderedEnumerable<>
-                    if (collType.GetTypeInfo().IsGenericType && collType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
-                    {
-                        return new LinqOperatorProvider().ToOrdered.MakeGenericMethod(collType.GenericTypeArguments)
-                            .Invoke(null, new[] { list });
-                    }
-
-                    // materialize IQueryable<> / IOrderedQueryable<>
-                    if (collType.GetTypeInfo().IsGenericType
-                        && (collType.GetGenericTypeDefinition() == typeof(IQueryable<>)
-                            || collType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)))
-                    {
-                        return new LinqOperatorProvider().ToQueryable.MakeGenericMethod(collType.GenericTypeArguments)
-                            .Invoke(null, new[] { list, this.queryContext });
-                    }
-
-                    // materialize concrete collection
-                    return Activator.CreateInstance(collType, list);
+                    return BaseImpl();
                 }
 
                 private bool TryMapArray(DynamicObject dobj, Type targetType, out object array)
@@ -248,6 +231,53 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     return false;
+                }
+
+                private bool TryMapCollection(DynamicObject dobj, Type targetType, out object collection)
+                {
+                    collection = null;
+
+                    Type type = dobj.Type?.ResolveType(this.typeResolver);
+
+                    if (type == null
+                        || !type.GetTypeInfo().IsGenericType
+                        || type.GetGenericTypeDefinition() != typeof(IEnumerable<>))
+                    {
+                        return false;
+                    }
+
+                    if (!dobj.TryGet("Elements", out object elements))
+                    {
+                        return false;
+                    }
+
+                    Type elementType = type.GenericTypeArguments[0];
+                    Type listType = typeof(List<>).MakeGenericType(elementType);
+
+                    // map to list (supported directly by aqua-core)
+                    collection = this.MapFromDynamicObjectGraph(elements, listType);
+
+                    if (dobj.TryGet("CollectionType", out object collTypeObj)
+                        && collTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
+                    {
+                        // copy from list to specialized collection
+                        Type collType = typeInfo.ResolveType(this.typeResolver);
+                        collection = Activator.CreateInstance(collType, collection);
+                    }
+                    else if (typeof(IQueryable).IsAssignableFrom(targetType))
+                    {
+                        // .AsQueryable
+                        collection = MakeGenericQueryableMethod.MakeGenericMethod(elementType)
+                            .Invoke(null, new[] { collection });
+                    }
+                    else if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
+                    {
+                        // to OrderedEnumerable
+                        collection = ToOrderedMethod.MakeGenericMethod(elementType)
+                            .Invoke(null, new[] { collection });
+                    }
+
+                    return true;
                 }
 
                 private bool TryMapGrouping(DynamicObject dobj, Type targetType, out object grouping)
@@ -309,28 +339,47 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         return true;
                     }
 
-                    // Map only scalar properties for now, navigations must be set later
+                    // Map only scalar properties for now, navigations have to be set later
                     var valueBuffer = new ValueBuffer(
                         entityType
                             .GetProperties()
-                            .Select(p => this.MapFromDynamicObjectGraph(dobj.Get(p.Name), p.ClrType))
+                            .Select(p =>
+                            {
+                                object value = dobj.Get(p.Name);
+                                if (p.GetValueConverter() != null)
+                                {
+                                    value = this.MapFromDynamicObjectGraph(value, typeof(object));
+                                    value = Utils.ConvertFromProvider(value, p);
+                                }
+
+                                return this.MapFromDynamicObjectGraph(value, p.ClrType);
+                            })
                             .ToArray());
 
                     bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedCollections");
 
                     // Get entity instance from EFC's identity map, or create a new one
-                    Func<ValueBuffer, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
-                    entity =
-                        this.queryContext
+                    Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
+                    var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
+
+                    IKey pk = entityType.FindPrimaryKey();
+                    if (pk != null)
+                    {
+                        entity = this.queryContext
                             .QueryBuffer
                             .GetEntity(
-                                entityType.FindPrimaryKey(),
+                                pk,
                                 new EntityLoadInfo(
-                                    valueBuffer,
+                                    materializationContext,
                                     materializer),
                                 queryStateManager: entityIsTracked,
-                                throwOnNullKey: false)
-                        ?? materializer.Invoke(valueBuffer);
+                                throwOnNullKey: false);
+                    }
+
+                    if (entity == null)
+                    {
+                        entity = materializer.Invoke(materializationContext);
+                    }
 
                     this.map.Add(dobj, entity);
                     object entityNoRef = entity;

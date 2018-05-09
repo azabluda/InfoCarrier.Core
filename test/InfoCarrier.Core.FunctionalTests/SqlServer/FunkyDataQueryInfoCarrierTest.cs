@@ -3,38 +3,37 @@
 
 namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestModels.FunkyDataModel;
-    using Xunit;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
+    using TestUtilities;
+    using Xunit.Abstractions;
 
-    [Collection("SqlServer")]
-    public class FunkyDataQueryInfoCarrierTest
-        : FunkyDataQueryTestBase<TestStoreBase, FunkyDataQueryInfoCarrierTest.FunkyDataQueryInfoCarrierFixture>
+    public class FunkyDataQueryInfoCarrierTest : FunkyDataQueryTestBase<FunkyDataQueryInfoCarrierTest.TestFixture>
     {
-        public FunkyDataQueryInfoCarrierTest(FunkyDataQueryInfoCarrierFixture fixture)
+        public FunkyDataQueryInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
         }
 
-        public class FunkyDataQueryInfoCarrierFixture : FunkyDataQueryFixtureBase<TestStoreBase>
+        public class TestFixture : FunkyDataQueryFixtureBase
         {
-            private readonly InfoCarrierTestHelper<FunkyDataContext> helper;
+            private ITestStoreFactory testStoreFactory;
 
-            public FunkyDataQueryInfoCarrierFixture()
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.EnsureInitialized(
+                    ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.SqlServer,
+                    this.ContextType,
+                    this.OnModelCreating);
+
+            public override FunkyDataContext CreateContext()
             {
-                this.helper = SqlServerTestStore<FunkyDataContext>.CreateHelper(
-                    this.OnModelCreating,
-                    opt => new FunkyDataContext(opt),
-                    FunkyDataModelInitializer.Seed,
-                    true,
-                    "FunkyDataQueryTest");
+                var context = base.CreateContext();
+                context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+                return context;
             }
-
-            public override TestStoreBase CreateTestStore()
-                => this.helper.CreateTestStore();
-
-            public override FunkyDataContext CreateContext(TestStoreBase testStore)
-                => this.helper.CreateInfoCarrierContext(testStore);
         }
     }
 }
