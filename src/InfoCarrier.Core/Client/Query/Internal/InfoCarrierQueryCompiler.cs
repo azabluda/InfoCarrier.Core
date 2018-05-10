@@ -43,8 +43,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private readonly ICompiledQueryCache compiledQueryCache;
         private readonly ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator;
         private readonly IDiagnosticsLogger<DbLoggerCategory.Query> logger;
+        private readonly ICurrentDbContext currentDbContext;
         private readonly IEvaluatableExpressionFilter evaluatableExpressionFilter;
-        private readonly Type contextType;
         private readonly Lazy<IReadOnlyDictionary<string, IEntityType>> entityTypeMap;
 
         /// <summary>
@@ -58,15 +58,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
             ICompiledQueryCache compiledQueryCache,
             ICompiledQueryCacheKeyGenerator compiledQueryCacheKeyGenerator,
             IDiagnosticsLogger<DbLoggerCategory.Query> logger,
-            ICurrentDbContext currentContext,
+            ICurrentDbContext currentDbContext,
             IEvaluatableExpressionFilter evaluatableExpressionFilter)
         {
             this.queryContextFactory = queryContextFactory;
             this.compiledQueryCache = compiledQueryCache;
             this.compiledQueryCacheKeyGenerator = compiledQueryCacheKeyGenerator;
             this.logger = logger;
+            this.currentDbContext = currentDbContext;
             this.evaluatableExpressionFilter = evaluatableExpressionFilter;
-            this.contextType = currentContext.Context.GetType();
 
             this.entityTypeMap = new Lazy<IReadOnlyDictionary<string, IEntityType>>(() =>
             {
@@ -196,7 +196,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     this.evaluatableExpressionFilter,
                     parameterValues,
                     this.logger,
-                    this.contextType,
+                    this.currentDbContext.Context,
                     parameterize,
                     generateContextAccessors);
 

@@ -6,7 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests
     using Microsoft.EntityFrameworkCore;
     using TestUtilities;
 
-    public class InfoCarrierServiceCollectionExtensionsTest : EntityFrameworkServiceCollectionExtensionsTest
+    public class InfoCarrierServiceCollectionExtensionsTest : EntityFrameworkServiceCollectionExtensionsTestBase
     {
         public InfoCarrierServiceCollectionExtensionsTest()
             : base(InfoCarrierTestHelpers.Instance)

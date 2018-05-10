@@ -8,15 +8,15 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
     using TestUtilities;
     using Xunit.Abstractions;
 
-    public class ComplexNavigationsOwnedQueryInfoCarrierTest :
-        ComplexNavigationsOwnedQueryTestBase<ComplexNavigationsOwnedQueryInfoCarrierTest.TestFixture>
+    public class ComplexNavigationsWeakQueryInfoCarrierTest :
+        ComplexNavigationsWeakQueryTestBase<ComplexNavigationsWeakQueryInfoCarrierTest.TestFixture>
     {
-        public ComplexNavigationsOwnedQueryInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
+        public ComplexNavigationsWeakQueryInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
         }
 
-        public class TestFixture : ComplexNavigationsOwnedQueryFixtureBase
+        public class TestFixture : ComplexNavigationsWeakQueryFixtureBase
         {
             private ITestStoreFactory testStoreFactory;
 

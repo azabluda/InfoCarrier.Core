@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.1.0-preview2-final" />
-    <PackageReference Include="System.ServiceModel.Http" Version="4.5.0-preview2-26410-01" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.1.0-rc1-final" />
+    <PackageReference Include="System.ServiceModel.Http" Version="4.5.0-rc1-26502-06" />
   </ItemGroup>
 
   <ItemGroup>
