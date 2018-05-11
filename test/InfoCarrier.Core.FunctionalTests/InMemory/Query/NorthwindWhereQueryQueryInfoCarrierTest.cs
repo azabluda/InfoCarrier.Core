@@ -3,7 +3,9 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Linq;
     using System.Threading.Tasks;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.InMemory.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -15,6 +17,18 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         public NorthwindWhereQueryQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
             : base(fixture)
         {
+        }
+
+        public override void Where_navigation_contains()
+        {
+            using (var context = this.CreateContext())
+            {
+                var customer = context.Customers.Include(c => c.Orders).Single(c => c.CustomerID == "ALFKI");
+                customer.Context = null; // Prevent Remote.Linq from serializing the entire DbContext
+                var orderDetails = context.OrderDetails.Where(od => customer.Orders.Contains(od.Order)).ToList();
+
+                Assert.Equal(12, orderDetails.Count);
+            }
         }
 
         [ConditionalTheory(Skip = "Issue#17386")]
