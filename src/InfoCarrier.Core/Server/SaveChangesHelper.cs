@@ -8,8 +8,8 @@ namespace InfoCarrier.Core.Server
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using Client;
-    using Common;
+    using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;

@@ -5,8 +5,8 @@
 namespace InfoCarrier.Core.Client
 {
     using System;
-    using Infrastructure;
-    using Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Infrastructure;
+    using InfoCarrier.Core.Client.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
 

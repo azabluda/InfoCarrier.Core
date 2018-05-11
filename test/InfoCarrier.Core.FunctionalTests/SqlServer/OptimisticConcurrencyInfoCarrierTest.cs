@@ -3,10 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class OptimisticConcurrencyInfoCarrierTest
         : OptimisticConcurrencyTestBase<OptimisticConcurrencyInfoCarrierTest.TestFixture>

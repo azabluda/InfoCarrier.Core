@@ -3,10 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestModels;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class MonsterFixupSnapshotInfoCarrierTest : MonsterFixupTestBase<MonsterFixupSnapshotInfoCarrierTest.TestFixture>
     {

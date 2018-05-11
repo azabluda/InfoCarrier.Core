@@ -4,9 +4,9 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System.Threading.Tasks;
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public abstract class FindInfoCarrierTest : FindTestBase<FindInfoCarrierTest.TestFixture>
     {

@@ -12,8 +12,8 @@ namespace InfoCarrier.Core.Server
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
-    using Client;
-    using Common;
+    using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;

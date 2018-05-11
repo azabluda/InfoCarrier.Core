@@ -6,14 +6,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     using System;
     using System.Threading;
     using System.Threading.Tasks;
-    using Client;
-    using Common;
+    using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common;
+    using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
     using Newtonsoft.Json;
     using Remote.Linq;
-    using Server;
 
     public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierBackend
     {

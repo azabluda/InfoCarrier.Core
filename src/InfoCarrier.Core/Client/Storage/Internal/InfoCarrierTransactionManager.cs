@@ -8,7 +8,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Storage;

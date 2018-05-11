@@ -5,9 +5,9 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System;
     using System.Linq;
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
     using Xunit;
 
     public class CustomConvertersInfoCarrierTest : CustomConvertersTestBase<CustomConvertersInfoCarrierTest.TestFixture>

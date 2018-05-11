@@ -3,8 +3,8 @@
 
 namespace InfoCarrier.Core.FunctionalTests
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
-    using TestUtilities;
 
     public class InfoCarrierServiceCollectionExtensionsTest : EntityFrameworkServiceCollectionExtensionsTestBase
     {

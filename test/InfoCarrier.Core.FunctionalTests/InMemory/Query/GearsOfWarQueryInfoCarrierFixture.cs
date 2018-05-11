@@ -3,9 +3,9 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class GearsOfWarQueryInfoCarrierFixture : GearsOfWarQueryFixtureBase
     {

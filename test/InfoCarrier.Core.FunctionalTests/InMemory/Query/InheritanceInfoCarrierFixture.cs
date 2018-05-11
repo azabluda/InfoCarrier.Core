@@ -5,12 +5,12 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
     using System;
     using System.Linq;
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestModels.Inheritance;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class InheritanceInfoCarrierFixture : InheritanceFixtureBase
     {

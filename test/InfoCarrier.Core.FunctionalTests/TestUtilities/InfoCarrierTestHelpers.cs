@@ -3,7 +3,7 @@
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
-    using Client;
+    using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;

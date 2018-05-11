@@ -61,8 +61,8 @@ namespace InfoCarrier.Core.Common
         /// <summary>
         ///     Converts <see cref="IUpdateEntry" />'s to/from <see cref="UpdateEntryDto" />'s.
         /// </summary>
-        /// <param name="entries">The <see cref="IUpdateEntry" />'s which need to be converted to DTOs.</param>
-        /// <returns>Converted <see cref="UpdateEntryDto" />'s</returns>
+        /// <param name="entries"> The <see cref="IUpdateEntry" />'s which need to be converted to DTOs. </param>
+        /// <returns> Converted <see cref="UpdateEntryDto" />'s. </returns>
         protected IEnumerable<UpdateEntryDto> ToUpdateEntryDtos(IEnumerable<IUpdateEntry> entries)
             => entries.Select(e => new UpdateEntryDto(e, this.Mapper));
     }
