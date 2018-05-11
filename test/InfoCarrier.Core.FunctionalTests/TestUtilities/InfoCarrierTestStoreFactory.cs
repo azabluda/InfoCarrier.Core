@@ -4,7 +4,7 @@
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
     using System;
-    using Client;
+    using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;

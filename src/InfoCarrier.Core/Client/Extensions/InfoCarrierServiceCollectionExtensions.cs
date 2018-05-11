@@ -4,7 +4,10 @@
 // ReSharper disable once CheckNamespace
 namespace InfoCarrier.Core.Client
 {
-    using Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal;
+    using InfoCarrier.Core.Client.Query.Internal;
+    using InfoCarrier.Core.Client.Storage.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
@@ -12,10 +15,7 @@ namespace InfoCarrier.Core.Client
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.Extensions.DependencyInjection;
-    using Query.ExpressionVisitors.Internal;
-    using Query.Internal;
     using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
-    using Storage.Internal;
 
     /// <summary>
     ///     InfoCarrier specific extension methods for <see cref="IServiceCollection" />.

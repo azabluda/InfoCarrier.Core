@@ -3,11 +3,11 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
         where TModelCustomizer : IModelCustomizer, new()

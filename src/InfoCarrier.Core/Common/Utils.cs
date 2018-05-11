@@ -116,7 +116,7 @@ namespace InfoCarrier.Core.Common
         ///     Checks whether the given query returns single result.
         /// </summary>
         /// <param name="query"> The query to inspect. </param>
-        /// <returns>True if the given query returns single result</returns>
+        /// <returns> True if the given query returns single result. </returns>
         internal static bool QueryReturnsSingleResult(Expression query)
         {
             if (query is MethodCallExpression methodCall)

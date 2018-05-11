@@ -5,7 +5,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
-    using Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Infrastructure.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
 

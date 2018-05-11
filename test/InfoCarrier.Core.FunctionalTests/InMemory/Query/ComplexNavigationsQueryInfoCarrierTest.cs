@@ -3,10 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
-    using TestUtilities;
     using Xunit.Abstractions;
 
     public class ComplexNavigationsQueryInfoCarrierTest : ComplexNavigationsQueryTestBase<ComplexNavigationsQueryInfoCarrierTest.TestFixture>

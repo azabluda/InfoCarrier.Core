@@ -3,10 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.InMemory.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class UpdatesInfoCarrierWithSensitiveDataLoggingTest : UpdatesInfoCarrierTestBase<UpdatesInfoCarrierWithSensitiveDataLoggingTest.TestFixture>
     {
@@ -16,7 +16,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         }
 
         protected override string UpdateConcurrencyTokenMessage
-            => InMemoryStrings.UpdateConcurrencyTokenExceptionSensitive("Product", "{Id: 984ade3c-2f7b-4651-a351-642e92ab7146}", $"{{Price: {3.49}}}", $"{{Price: {1.49}}}");
+            => InMemoryStrings.UpdateConcurrencyTokenExceptionSensitive("Product", "{Id: 984ade3c-2f7b-4651-a351-642e92ab7146}", "{Price: 3.49}", "{Price: 1.49}");
 
         public class TestFixture : UpdatesInfoCarrierFixtureBase
         {

@@ -3,10 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
-    using TestUtilities;
 
     public abstract class ProxyGraphUpdatesInfoCarrierTest
     {

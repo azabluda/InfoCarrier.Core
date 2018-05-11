@@ -13,7 +13,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
-    using Common;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -356,7 +356,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             })
                             .ToArray());
 
-                    bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedCollections");
+                    bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedNavigations");
 
                     // Get entity instance from EFC's identity map, or create a new one
                     Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
@@ -386,14 +386,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     if (entityIsTracked)
                     {
-                        var loadedCollections = this.Map<List<string>>(dobj.Get<DynamicObject>(@"__EntityLoadedCollections"));
+                        var loadedNavigations = this.Map<List<string>>(dobj.Get<DynamicObject>(@"__EntityLoadedNavigations"));
 
                         this.trackEntityActions.Add(sm =>
                         {
                             InternalEntityEntry entry
                                 = sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null);
 
-                            foreach (INavigation nav in loadedCollections.Select(name => entry.EntityType.FindNavigation(name)))
+                            foreach (INavigation nav in loadedNavigations.Select(name => entry.EntityType.FindNavigation(name)))
                             {
                                 entry.SetIsLoaded(nav);
                             }

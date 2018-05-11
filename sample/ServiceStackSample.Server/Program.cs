@@ -4,6 +4,8 @@
 namespace InfoCarrierSample
 {
     using System;
+    using System.Linq;
+    using Microsoft.AspNetCore.Hosting.Server.Features;
 
     internal class Program
     {
@@ -12,15 +14,13 @@ namespace InfoCarrierSample
             Console.WriteLine(@"Preparing the database...");
             SqlServerShared.RecreateDatabase();
 
-            string listeningOn = ServiceStackShared.BaseAddress;
-
             // Start self-hosted server
-            using (new AppHost().Init().Start(listeningOn))
+            using (var host = new AppHost().Init().Start(ServiceStackShared.BaseAddress))
             {
                 Console.WriteLine(
                     "AppHost Created at {0}, listening on {1}",
                     DateTime.Now,
-                    listeningOn);
+                    ((AppHost)host).WebHost.ServerFeatures.Get<IServerAddressesFeature>().Addresses.Single());
 
                 Console.ReadKey();
             }

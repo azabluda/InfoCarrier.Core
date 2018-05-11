@@ -4,10 +4,10 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System.Linq;
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using TestUtilities;
 
     public class WithConstructorsInfoCarrierTest : WithConstructorsTestBase<WithConstructorsInfoCarrierTest.TestFixture>
     {

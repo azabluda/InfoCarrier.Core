@@ -12,8 +12,8 @@ namespace InfoCarrier.Core.Server
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
-    using Client;
-    using Common;
+    using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
@@ -278,10 +278,9 @@ namespace InfoCarrier.Core.Server
                 if (entry.EntityState != EntityState.Detached)
                 {
                     dto.Add(
-                        @"__EntityLoadedCollections",
+                        @"__EntityLoadedNavigations",
                         this.MapToDynamicObjectGraph(
                             entry.EntityType.GetNavigations()
-                                .Where(n => n.IsCollection())
                                 .Where(n => entry.IsLoaded(n))
                                 .Select(n => n.Name).ToList(),
                             setTypeInformation));

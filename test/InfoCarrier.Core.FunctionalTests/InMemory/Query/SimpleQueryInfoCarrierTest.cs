@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
     using System;
     using System.Linq;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Query;
@@ -20,6 +21,18 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
+        }
+
+        public override void Where_navigation_contains()
+        {
+            using (var context = this.CreateContext())
+            {
+                var customer = context.Customers.Include(c => c.Orders).Single(c => c.CustomerID == "ALFKI");
+                customer.Context = null; // Prevent Remote.Linq from serializing the entire DbContext
+                var orderDetails = context.OrderDetails.Where(od => customer.Orders.Contains(od.Order)).ToList();
+
+                Assert.Equal(12, orderDetails.Count);
+            }
         }
 
         public override void Throws_on_concurrent_query_list()
