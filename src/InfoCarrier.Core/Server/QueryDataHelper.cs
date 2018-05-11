@@ -278,10 +278,9 @@ namespace InfoCarrier.Core.Server
                 if (entry.EntityState != EntityState.Detached)
                 {
                     dto.Add(
-                        @"__EntityLoadedCollections",
+                        @"__EntityLoadedNavigations",
                         this.MapToDynamicObjectGraph(
                             entry.EntityType.GetNavigations()
-                                .Where(n => n.IsCollection())
                                 .Where(n => entry.IsLoaded(n))
                                 .Select(n => n.Name).ToList(),
                             setTypeInformation));
