@@ -60,25 +60,7 @@ namespace InfoCarrier.Core.Server
                     object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper, key);
 
                     // Here we assume that the owner entry is already present in the context
-                    EntityEntry ownerEntry = stateManager.TryGetEntry(key, keyValues)?.ToEntityEntry();
-
-                    // If not, then we create a dummy instance, set only PK values, and track it as Unchanged
-                    if (ownerEntry == null)
-                    {
-                        var pkProps = key.Properties.ToList();
-                        var ownerValueBuffer = new ValueBuffer(
-                            entityType.DefiningEntityType.GetProperties().Select(p =>
-                            {
-                                int idx = pkProps.IndexOf(p);
-                                return idx < 0
-                                    ? p.ClrType.GetDefaultValue()
-                                    : keyValues[idx];
-                            }).ToArray());
-                        var materializationContext = new MaterializationContext(ownerValueBuffer, this.dbContext);
-                        object ownerEntity = entityMaterializerSource.GetMaterializer(entityType.DefiningEntityType).Invoke(materializationContext);
-                        ownerEntry = stateManager.GetOrCreateEntry(ownerEntity, entityType.DefiningEntityType).ToEntityEntry();
-                        ownerEntry.State = EntityState.Unchanged;
-                    }
+                    EntityEntry ownerEntry = stateManager.TryGetEntry(key, keyValues).ToEntityEntry();
 
                     ReferenceEntry referenceEntry = ownerEntry.Reference(entityType.DefiningNavigationName);
                     if (referenceEntry.CurrentValue == null)

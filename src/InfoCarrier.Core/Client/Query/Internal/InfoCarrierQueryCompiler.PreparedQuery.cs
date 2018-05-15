@@ -141,11 +141,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 private IEnumerable<TResult> MapAndTrackResults(IEnumerable<DynamicObject> dataRecords)
                 {
-                    if (dataRecords == null)
-                    {
-                        return Enumerable.Repeat(default(TResult), 1);
-                    }
-
                     var result = this.Map<TResult>(dataRecords);
 
                     this.queryContext.BeginTrackingQuery();
