@@ -3,6 +3,7 @@
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
+    using System;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -20,21 +21,16 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             => services.AddEntityFrameworkInfoCarrierBackend();
 
         protected override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
-            => optionsBuilder.UseInfoCarrierBackend(
-                new SqlServerTestStore(
-                    "DummyDatabase",
-                    false,
-                    new SharedTestStoreProperties
-                    {
-                        ContextType = typeof(DbContext),
-                        OnModelCreating = (b, c) => { },
-                    }));
+            => optionsBuilder.UseInfoCarrierBackend(CreateDummyBackend(optionsBuilder.Options.ContextType));
 
-        public DbContextOptionsBuilder CreateOptionsBuilder()
-        {
-            var builder = new DbContextOptionsBuilder();
-            this.UseProviderOptions(builder);
-            return builder;
-        }
+        public static IInfoCarrierBackend CreateDummyBackend(Type contextType)
+            => new SqlServerTestStore(
+                "DummyDatabase",
+                false,
+                new SharedTestStoreProperties
+                {
+                    ContextType = contextType,
+                    OnModelCreating = (b, c) => { },
+                });
     }
 }

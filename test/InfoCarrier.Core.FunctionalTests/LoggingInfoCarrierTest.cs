@@ -3,6 +3,7 @@
 
 namespace InfoCarrier.Core.FunctionalTests
 {
+    using InfoCarrier.Core.Client;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ namespace InfoCarrier.Core.FunctionalTests
         protected override string DefaultOptions => @"InfoCarrierServerUrl=DummyDatabase ";
 
         protected override DbContextOptionsBuilder CreateOptionsBuilder()
-            => InfoCarrierTestHelpers.Instance.CreateOptionsBuilder();
+            => new DbContextOptionsBuilder()
+                .UseInfoCarrierBackend(InfoCarrierTestHelpers.CreateDummyBackend(typeof(DbContext)));
     }
 }
