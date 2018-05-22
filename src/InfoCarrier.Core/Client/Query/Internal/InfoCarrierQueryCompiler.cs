@@ -13,22 +13,25 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Runtime.ExceptionServices;
     using System.Threading;
     using System.Threading.Tasks;
+    using Aqua.TypeSystem;
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
+    using Remote.Linq;
+    using Remote.Linq.ExpressionVisitors;
     using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
+    using MethodInfo = System.Reflection.MethodInfo;
 
     /// <summary>
     ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
     ///     directly from your code. This API may change or be removed in future releases.
     /// </summary>
-    public partial class InfoCarrierQueryCompiler : IQueryCompiler
+    public class InfoCarrierQueryCompiler : IQueryCompiler
     {
         private static readonly MethodInfo CreateCompiledEnumerableQueryMethod
             = typeof(InfoCarrierQueryCompiler).GetTypeInfo().GetDeclaredMethod(nameof(CreateCompiledEnumerableQuery));
@@ -68,13 +71,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.currentDbContext = currentDbContext;
             this.evaluatableExpressionFilter = evaluatableExpressionFilter;
 
-            this.entityTypeMap = new Lazy<IReadOnlyDictionary<string, IEntityType>>(() =>
-            {
-                using (QueryContext qc = this.queryContextFactory.Create())
-                {
-                     return qc.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-                }
-            });
+            this.entityTypeMap = new Lazy<IReadOnlyDictionary<string, IEntityType>>(
+                () => InfoCarrierQueryResultMapper.BuildEntityTypeMap(currentDbContext.Context));
         }
 
         private IReadOnlyDictionary<string, IEntityType> EntityTypeMap => this.entityTypeMap.Value;
@@ -260,6 +258,150 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public Task<TResult> ExecuteAsync<TResult>(Expression query, CancellationToken cancellationToken)
         {
             return AsyncEnumerableFirst(this.ExecuteAsync<TResult>(query), cancellationToken);
+        }
+
+        private sealed class PreparedQuery
+        {
+            private readonly Func<QueryContext, QueryExecutor> createQueryExecutor;
+
+            public PreparedQuery(Expression expression, IReadOnlyDictionary<string, IEntityType> entityTypeMap)
+            {
+                this.createQueryExecutor = qc => new QueryExecutor(this, qc, entityTypeMap);
+
+                // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
+                expression = Utils.ReplaceNullConditional(expression, true);
+
+                // Replace EntityQueryable with stub
+                expression = EntityQueryableStubVisitor.Replace(expression);
+
+                this.Expression = expression.SimplifyIncorporationOfRemoteQueryables();
+            }
+
+            private Expression Expression { get; }
+
+            private ITypeResolver TypeResolver { get; } = new TypeResolver();
+
+            public IEnumerable<TResult> Execute<TResult>(QueryContext queryContext)
+                => this.createQueryExecutor(queryContext).ExecuteQuery<TResult>();
+
+            public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(QueryContext queryContext)
+                => this.createQueryExecutor(queryContext).ExecuteAsyncQuery<TResult>();
+
+            private sealed class QueryExecutor
+            {
+                private readonly QueryContext queryContext;
+                private readonly Func<InfoCarrierQueryResultMapper> createResultMapper;
+                private readonly IInfoCarrierBackend infoCarrierBackend;
+                private readonly Remote.Linq.Expressions.Expression rlinq;
+
+                public QueryExecutor(
+                    PreparedQuery preparedQuery,
+                    QueryContext queryContext,
+                    IReadOnlyDictionary<string, IEntityType> entityTypeMap)
+                {
+                    this.queryContext = queryContext;
+                    this.createResultMapper = () => new InfoCarrierQueryResultMapper(queryContext, preparedQuery.TypeResolver, entityTypeMap);
+                    this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
+
+                    // Substitute query parameters
+                    Expression expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(preparedQuery.Expression);
+
+                    // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
+                    this.rlinq = expression
+                        .ToRemoteLinqExpression(Remote.Linq.EntityFrameworkCore.ExpressionEvaluator.CanBeEvaluated)
+                        .ReplaceQueryableByResourceDescriptors(preparedQuery.TypeResolver)
+                        .ReplaceGenericQueryArgumentsByNonGenericArguments();
+                }
+
+                public IEnumerable<TResult> ExecuteQuery<TResult>()
+                {
+                    QueryDataResult result = this.infoCarrierBackend.QueryData(
+                        new QueryDataRequest(
+                            this.rlinq,
+                            this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
+                        this.queryContext.Context);
+                    return this.createResultMapper().MapAndTrackResults<TResult>(result.MappedResults);
+                }
+
+                public IAsyncEnumerable<TResult> ExecuteAsyncQuery<TResult>()
+                {
+                    async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
+                    {
+                        QueryDataResult result = await this.infoCarrierBackend.QueryDataAsync(
+                            new QueryDataRequest(
+                                this.rlinq,
+                                this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
+                            this.queryContext.Context,
+                            this.queryContext.CancellationToken);
+                        return this.createResultMapper().MapAndTrackResults<TResult>(result.MappedResults);
+                    }
+
+                    return new AsyncEnumerableAdapter<TResult>(MapAndTrackResultsAsync());
+                }
+            }
+
+            private class SubstituteParametersExpressionVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
+            {
+                private readonly QueryContext queryContext;
+
+                public SubstituteParametersExpressionVisitor(QueryContext queryContext)
+                {
+                    this.queryContext = queryContext;
+                }
+
+                protected override Expression VisitParameter(ParameterExpression node)
+                {
+                    if (node.Name?.StartsWith(CompiledQueryCache.CompiledQueryParameterPrefix, StringComparison.Ordinal) == true)
+                    {
+                        object paramValue = Activator.CreateInstance(
+                            typeof(ValueWrapper<>).MakeGenericType(node.Type),
+                            this.queryContext.ParameterValues[node.Name]);
+
+                        return Expression.Property(
+                            Expression.Constant(paramValue),
+                            nameof(ValueWrapper<object>.Value));
+                    }
+
+                    return base.VisitParameter(node);
+                }
+
+                private struct ValueWrapper<T>
+                {
+                    public ValueWrapper(T value) => this.Value = value;
+
+                    public T Value { get; set; }
+                }
+            }
+
+            private class EntityQueryableStubVisitor : ExpressionVisitorBase
+            {
+                internal static Expression Replace(Expression expression)
+                    => new EntityQueryableStubVisitor().Visit(expression);
+
+                protected override Expression VisitConstant(ConstantExpression constantExpression)
+                    => constantExpression.IsEntityQueryable()
+                        ? this.VisitEntityQueryable(((IQueryable)constantExpression.Value).ElementType)
+                        : constantExpression;
+
+                private Expression VisitEntityQueryable(Type elementType)
+                {
+                    object stub = Activator.CreateInstance(typeof(RemoteQueryableStub<>).MakeGenericType(elementType));
+                    return Expression.Constant(stub);
+                }
+
+                private class RemoteQueryableStub<T> : IRemoteQueryable, IQueryable<T>
+                {
+                    public Type ElementType => typeof(T);
+
+                    public Expression Expression => throw new NotImplementedException();
+
+                    public IQueryProvider Provider => throw new NotImplementedException();
+
+                    public IEnumerator GetEnumerator() => throw new NotImplementedException();
+
+                    IEnumerator<T> IEnumerable<T>.GetEnumerator() => throw new NotImplementedException();
+                }
+            }
         }
     }
 }
