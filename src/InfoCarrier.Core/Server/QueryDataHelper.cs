@@ -78,7 +78,7 @@ namespace InfoCarrier.Core.Server
         public QueryDataResult QueryData()
         {
             bool queryReturnsSingleResult = Utils.QueryReturnsSingleResult(this.linqExpression);
-            var resultType = queryReturnsSingleResult
+            Type resultType = queryReturnsSingleResult
                 ? this.linqExpression.Type
                 : typeof(IEnumerable<>).MakeGenericType(this.linqExpression.Type.GenericTypeArguments.First());
 
@@ -116,10 +116,12 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public async Task<QueryDataResult> QueryDataAsync(CancellationToken cancellationToken = default)
         {
-            Type elementType = Utils.TryGetQueryResultSequenceType(this.linqExpression.Type) ?? this.linqExpression.Type;
+            Type resultType = Utils.QueryReturnsSingleResult(this.linqExpression)
+                ? this.linqExpression.Type
+                : this.linqExpression.Type.GetSequenceType();
 
             object queryResult = await ExecuteExpressionAsyncMethod
-                .MakeGenericMethod(elementType)
+                .MakeGenericMethod(resultType)
                 .ToDelegate<Func<CancellationToken, Task<object>>>(this)
                 .Invoke(cancellationToken);
 
@@ -231,14 +233,16 @@ namespace InfoCarrier.Core.Server
                 }
 
                 // Special mapping of collections
-                Type elementType = Utils.TryGetQueryResultSequenceType(objType);
-                if (elementType != null && elementType != typeof(DynamicObject))
+                if (objType != typeof(string))
                 {
-                    object mappedEnumerable =
-                        MapCollectionMethod
+                    Type elementType = objType.TryGetSequenceType();
+                    if (elementType != null && elementType != typeof(DynamicObject))
+                    {
+                        object mappedEnumerable = MapCollectionMethod
                             .MakeGenericMethod(elementType)
                             .Invoke(this, new[] { obj, setTypeInformation });
-                    return (DynamicObject)mappedEnumerable;
+                        return (DynamicObject)mappedEnumerable;
+                    }
                 }
 
                 // Check if obj is a tracked or detached entity

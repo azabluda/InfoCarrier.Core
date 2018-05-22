@@ -141,7 +141,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             Type sequenceType = Utils.QueryReturnsSingleResult(query)
                 ? null
-                : typeof(TResult) == typeof(IEnumerable) ? typeof(object) : Utils.TryGetQueryResultSequenceType(typeof(TResult));
+                : typeof(TResult) == typeof(IEnumerable) ? typeof(object) : typeof(TResult).TryGetSequenceType();
 
             if (sequenceType == null)
             {

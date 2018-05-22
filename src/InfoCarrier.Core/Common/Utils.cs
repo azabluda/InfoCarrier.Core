@@ -85,34 +85,6 @@ namespace InfoCarrier.Core.Common
         }
 
         /// <summary>
-        ///     Tries to guess the element type if the given type is a sequence.
-        /// </summary>
-        /// <param name="queryResultType">The result type of a Linq query.</param>
-        /// <returns>Guessed sequence element type or null.</returns>
-        internal static Type TryGetQueryResultSequenceType(Type queryResultType)
-        {
-            // Despite formally a string is a sequence of chars, we treat it as a scalar type
-            if (queryResultType == typeof(string))
-            {
-                return null;
-            }
-
-            // Arrays is another special case
-            if (queryResultType.IsArray)
-            {
-                return null;
-            }
-
-            // Grouping is another special case
-            if (queryResultType.IsGrouping())
-            {
-                return null;
-            }
-
-            return queryResultType.TryGetSequenceType();
-        }
-
-        /// <summary>
         ///     Checks whether the given query returns single result.
         /// </summary>
         /// <param name="query"> The query to inspect. </param>
