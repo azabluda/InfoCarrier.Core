@@ -23,5 +23,21 @@ namespace InfoCarrier.Core.FunctionalTests
 
             Assert.Equal("DummyDatabase", extension.InfoCarrierBackend.ServerUrl);
         }
+
+        [Fact]
+        public void Can_replace_extension()
+        {
+            IInfoCarrierBackend backend = InfoCarrierTestHelpers.CreateDummyBackend(typeof(DbContext));
+            var optionsBuilder = new DbContextOptionsBuilder();
+
+            optionsBuilder.UseInfoCarrierBackend(backend);
+            var extension1 = optionsBuilder.Options.Extensions.OfType<InfoCarrierOptionsExtension>().Single();
+
+            optionsBuilder.UseInfoCarrierBackend(backend);
+            var extension2 = optionsBuilder.Options.Extensions.OfType<InfoCarrierOptionsExtension>().Single();
+
+            Assert.NotSame(extension1, extension2);
+            Assert.Same(extension1.InfoCarrierBackend, extension2.InfoCarrierBackend);
+        }
     }
 }
