@@ -382,20 +382,17 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return Expression.Constant(stub);
                 }
 
+                [ExcludeFromCoverage]
                 private class RemoteQueryableStub<T> : IRemoteQueryable, IQueryable<T>
                 {
                     public Type ElementType => typeof(T);
 
-                    [ExcludeFromCoverage]
                     public Expression Expression => throw new NotImplementedException();
 
-                    [ExcludeFromCoverage]
                     public IQueryProvider Provider => throw new NotImplementedException();
 
-                    [ExcludeFromCoverage]
                     public IEnumerator GetEnumerator() => throw new NotImplementedException();
 
-                    [ExcludeFromCoverage]
                     IEnumerator<T> IEnumerable<T>.GetEnumerator() => throw new NotImplementedException();
                 }
             }
