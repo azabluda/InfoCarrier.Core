@@ -10,7 +10,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
-    using System.Runtime.ExceptionServices;
     using System.Threading;
     using System.Threading.Tasks;
     using Aqua.TypeSystem;
@@ -158,16 +157,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
                 };
             }
-
-            try
+            else
             {
                 return (Func<QueryContext, TResult>)CreateCompiledEnumerableQueryMethod.MakeGenericMethod(sequenceType)
                     .Invoke(this, new object[] { query });
-            }
-            catch (TargetInvocationException ex)
-            {
-                ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-                throw;
             }
         }
 
