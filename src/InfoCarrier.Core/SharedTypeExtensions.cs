@@ -21,6 +21,7 @@ using System.Reflection;
 namespace System
 {
     [DebuggerStepThrough]
+    [InfoCarrier.Core.ExcludeFromCoverage]
     internal static class SharedTypeExtensions
     {
         public static Type UnwrapNullableType(this Type type) => Nullable.GetUnderlyingType(type) ?? type;

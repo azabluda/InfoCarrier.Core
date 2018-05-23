@@ -205,6 +205,7 @@ namespace InfoCarrier.Core.Common
                 return base.VisitMethodCall(node);
             }
 
+            [ExcludeFromCoverage]
             public static TResult NullConditionalExpressionStub<T1, T2, TResult>(T1 caller, T2 accessOperation)
             {
                 throw new InvalidOperationException("The NullConditionalExpressionStub&lt;T&gt; method may only be used within LINQ queries.");

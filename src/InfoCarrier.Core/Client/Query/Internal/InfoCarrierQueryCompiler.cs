@@ -393,12 +393,16 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     public Type ElementType => typeof(T);
 
+                    [ExcludeFromCoverage]
                     public Expression Expression => throw new NotImplementedException();
 
+                    [ExcludeFromCoverage]
                     public IQueryProvider Provider => throw new NotImplementedException();
 
+                    [ExcludeFromCoverage]
                     public IEnumerator GetEnumerator() => throw new NotImplementedException();
 
+                    [ExcludeFromCoverage]
                     IEnumerator<T> IEnumerable<T>.GetEnumerator() => throw new NotImplementedException();
                 }
             }

@@ -55,6 +55,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     A string that represents this object.
         /// </returns>
+        [ExcludeFromCoverage]
         public override string ToString()
             => $"Count = {this.DataTransferObjects?.Count()}";
 

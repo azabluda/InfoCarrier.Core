@@ -74,6 +74,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     A string that represents this object.
         /// </returns>
+        [ExcludeFromCoverage]
         public override string ToString()
             => this.Impl.ToString();
 
@@ -114,6 +115,7 @@ namespace InfoCarrier.Core.Common
                 return this.CountPersisted;
             }
 
+            [ExcludeFromCoverage]
             public override string ToString()
                 => $"CountPersisted = {this.CountPersisted}";
         }
@@ -166,6 +168,7 @@ namespace InfoCarrier.Core.Common
                     : new DbUpdateException(this.Message, inner);
             }
 
+            [ExcludeFromCoverage]
             public override string ToString()
                 => $"Error = {this.Message}";
         }
