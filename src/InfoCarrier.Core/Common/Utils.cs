@@ -152,7 +152,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     The new expression tree with replaced <see cref="NullConditionalExpression" /> nodes.
         /// </returns>
-        internal static Expression ReplaceNullConditional(Expression expression, bool toStub)
+        public static Expression ReplaceNullConditional(Expression expression, bool toStub)
         {
             return new ReplaceNullConditionalExpressionVisitor(toStub).Visit(expression);
         }
