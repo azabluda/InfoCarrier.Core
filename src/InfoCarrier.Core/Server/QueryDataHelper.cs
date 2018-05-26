@@ -118,7 +118,7 @@ namespace InfoCarrier.Core.Server
         {
             Type resultType = Utils.QueryReturnsSingleResult(this.linqExpression)
                 ? this.linqExpression.Type
-                : this.linqExpression.Type.GetSequenceType();
+                : Utils.TryGetSequenceType(this.linqExpression.Type);
 
             object queryResult = await ExecuteExpressionAsyncMethod
                 .MakeGenericMethod(resultType)
@@ -223,7 +223,7 @@ namespace InfoCarrier.Core.Server
                 }
 
                 // Special mapping of IGrouping<,>
-                foreach (var groupingType in objType.GetGenericTypeImplementations(typeof(IGrouping<,>)))
+                foreach (var groupingType in Utils.GetGenericTypeImplementations(objType, typeof(IGrouping<,>)))
                 {
                     object mappedGrouping =
                         MapGroupingMethod
@@ -235,7 +235,7 @@ namespace InfoCarrier.Core.Server
                 // Special mapping of collections
                 if (objType != typeof(string))
                 {
-                    Type elementType = objType.TryGetSequenceType();
+                    Type elementType = Utils.TryGetSequenceType(objType);
                     if (elementType != null && elementType != typeof(DynamicObject))
                     {
                         object mappedEnumerable = MapCollectionMethod
@@ -315,7 +315,7 @@ namespace InfoCarrier.Core.Server
                 var collectionType = enumerable.GetType();
                 if (collectionType != typeof(List<TElement>))
                 {
-                    var constructor = collectionType.GetDeclaredConstructor(new[] { typeof(IEnumerable<TElement>) });
+                    var constructor = Utils.GetDeclaredConstructor(collectionType, new[] { typeof(IEnumerable<TElement>) });
                     if (constructor != null && constructor.IsPublic)
                     {
                         mappedEnumerable.Add("CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
