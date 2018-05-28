@@ -15,7 +15,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
         {
         }
 
-        public class TestFixture : QueryFilterFuncletizationRelationalFixture
+        public class TestFixture : QueryFilterFuncletizationFixtureBase
         {
             private ITestStoreFactory testStoreFactory;
 

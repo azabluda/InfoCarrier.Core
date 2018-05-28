@@ -51,10 +51,5 @@ namespace InfoCarrierSample
         public DbSet<Blog> Blogs { get; set; }
 
         public DbSet<Author> Authors { get; set; }
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<Post>().ToTable("Posts");
-        }
     }
 }

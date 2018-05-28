@@ -16,7 +16,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
         {
         }
 
-        public class TestFixture : F1RelationalFixture
+        public class TestFixture : F1FixtureBase
         {
             private ITestStoreFactory testStoreFactory;
 
@@ -30,6 +30,8 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
             protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
             {
                 base.OnModelCreating(modelBuilder, context);
+
+                modelBuilder.Entity<Team>().Property(e => e.Id).ValueGeneratedNever();
 
                 modelBuilder.Entity<Chassis>().Property<byte[]>("Version").IsRowVersion();
                 modelBuilder.Entity<Driver>().Property<byte[]>("Version").IsRowVersion();

@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.Client
     using InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal;
     using InfoCarrier.Core.Client.Query.Internal;
     using InfoCarrier.Core.Client.Storage.Internal;
+    using InfoCarrier.Core.Client.ValueGeneration;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
@@ -44,7 +45,7 @@ namespace InfoCarrier.Core.Client
             var builder = new EntityFrameworkServicesBuilder(serviceCollection)
                 .TryAdd<IQueryCompiler, InfoCarrierQueryCompiler>()
                 .TryAdd<IDatabaseProvider, DatabaseProvider<InfoCarrierOptionsExtension>>()
-                .TryAdd<IValueGeneratorSelector, RelationalValueGeneratorSelector>()
+                .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
                 .TryAdd<IDatabase>(p => p.GetService<IInfoCarrierDatabase>())
                 .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
                 .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
