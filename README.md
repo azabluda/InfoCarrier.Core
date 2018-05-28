@@ -1,9 +1,9 @@
 # InfoCarrier.Core
 
-| branch | package | AppVeyor |
-| --- | --- | --- |
-| `master` | [![NuGet](https://img.shields.io/nuget/v/InfoCarrier.Core.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/InfoCarrier.Core/) | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/master?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/master) |
-| `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) |
+| branch | package | AppVeyor | Code Coverage |
+| --- | --- | --- | --- |
+| `master` | [![NuGet Badge](https://buildstats.info/nuget/InfoCarrier.Core)](http://www.nuget.org/packages/InfoCarrier.Core) | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/master?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/master) | - |
+| `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) | [![codecov](https://codecov.io/gh/azabluda/InfoCarrier.Core/branch/develop/graph/badge.svg)](https://codecov.io/gh/azabluda/InfoCarrier.Core/branch/develop) |
 
 
 
