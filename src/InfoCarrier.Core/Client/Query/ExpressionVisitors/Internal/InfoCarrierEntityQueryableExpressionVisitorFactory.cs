@@ -6,6 +6,7 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
     using System;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq.Expressions;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Remotion.Linq.Clauses;
@@ -25,6 +26,6 @@ namespace InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public virtual ExpressionVisitor Create(
             EntityQueryModelVisitor queryModelVisitor, IQuerySource querySource)
-            => throw new InvalidOperationException(@"InfoCarrier.Core is not using EntityQueryModelVisitor");
+            => throw new InvalidOperationException(InfoCarrierStrings.NotUsingEntityQueryableExpressionVisitor);
     }
 }

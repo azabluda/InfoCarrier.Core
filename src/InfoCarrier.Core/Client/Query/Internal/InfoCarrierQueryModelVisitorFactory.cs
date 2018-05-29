@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore.Query;
 
     /// <summary>
@@ -34,6 +35,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public override EntityQueryModelVisitor Create(
             QueryCompilationContext queryCompilationContext,
             EntityQueryModelVisitor parentEntityQueryModelVisitor)
-            => throw new InvalidOperationException(@"InfoCarrier.Core is not using EntityQueryModelVisitor");
+            => throw new InvalidOperationException(InfoCarrierStrings.NotUsingEntityQueryModelVisitor);
     }
 }

@@ -7,9 +7,9 @@ namespace InfoCarrierSample
     using System.Data.Common;
     using System.Data.SqlClient;
     using System.Threading.Tasks;
+    using InfoCarrier.Core.Properties;
     using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Internal;
     using ServiceStack;
 
     [Authenticate]
@@ -49,7 +49,7 @@ namespace InfoCarrierSample
         {
             if (this.SessionDbTransaction != null)
             {
-                throw new InvalidOperationException(RelationalStrings.TransactionAlreadyStarted);
+                throw new InvalidOperationException(InfoCarrierStrings.TransactionAlreadyStarted);
             }
 
             var connection = new SqlConnection { ConnectionString = SqlServerShared.ConnectionString };
@@ -71,7 +71,7 @@ namespace InfoCarrierSample
         {
             if (this.SessionDbTransaction == null)
             {
-                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
+                throw new InvalidOperationException(InfoCarrierStrings.NoActiveTransaction);
             }
 
             var conn = this.SessionDbTransaction.Connection;

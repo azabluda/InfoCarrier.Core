@@ -9,8 +9,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using System.Threading;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client.Infrastructure.Internal;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
 
     /// <summary>
@@ -77,7 +77,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction == null)
             {
-                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
+                throw new InvalidOperationException(InfoCarrierStrings.NoActiveTransaction);
             }
 
             this.CurrentTransaction.Commit();
@@ -91,7 +91,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction == null)
             {
-                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
+                throw new InvalidOperationException(InfoCarrierStrings.NoActiveTransaction);
             }
 
             this.CurrentTransaction.Rollback();
@@ -101,7 +101,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.CurrentTransaction != null)
             {
-                throw new InvalidOperationException(RelationalStrings.TransactionAlreadyStarted);
+                throw new InvalidOperationException(InfoCarrierStrings.TransactionAlreadyStarted);
             }
         }
 

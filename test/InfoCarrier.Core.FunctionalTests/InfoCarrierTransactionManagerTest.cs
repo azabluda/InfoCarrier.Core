@@ -7,8 +7,8 @@ namespace InfoCarrier.Core.FunctionalTests
     using InfoCarrier.Core.Client;
     using InfoCarrier.Core.FunctionalTests.SqlServer;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Xunit;
 
@@ -29,7 +29,7 @@ namespace InfoCarrier.Core.FunctionalTests
                 using (context.Database.BeginTransaction())
                 {
                     Assert.Equal(
-                        RelationalStrings.TransactionAlreadyStarted,
+                        InfoCarrierStrings.TransactionAlreadyStarted,
                         Assert.Throws<InvalidOperationException>(
                             () => context.Database.BeginTransaction()).Message);
                 }
@@ -46,7 +46,7 @@ namespace InfoCarrier.Core.FunctionalTests
                     tr.Commit();
 
                     Assert.Equal(
-                        RelationalStrings.NoActiveTransaction,
+                        InfoCarrierStrings.NoActiveTransaction,
                         Assert.Throws<InvalidOperationException>(
                             () => tr.Commit()).Message);
                 }
@@ -63,7 +63,7 @@ namespace InfoCarrier.Core.FunctionalTests
                     context.Database.CommitTransaction();
 
                     Assert.Equal(
-                        RelationalStrings.NoActiveTransaction,
+                        InfoCarrierStrings.NoActiveTransaction,
                         Assert.Throws<InvalidOperationException>(
                             () => context.Database.CommitTransaction()).Message);
                 }
@@ -76,7 +76,7 @@ namespace InfoCarrier.Core.FunctionalTests
             using (var context = this.createContext())
             {
                 Assert.Equal(
-                    RelationalStrings.NoActiveTransaction,
+                    InfoCarrierStrings.NoActiveTransaction,
                     Assert.Throws<InvalidOperationException>(
                         () => context.Database.CommitTransaction()).Message);
             }
@@ -92,7 +92,7 @@ namespace InfoCarrier.Core.FunctionalTests
                     tr.Rollback();
 
                     Assert.Equal(
-                        RelationalStrings.NoActiveTransaction,
+                        InfoCarrierStrings.NoActiveTransaction,
                         Assert.Throws<InvalidOperationException>(
                             () => tr.Rollback()).Message);
                 }
@@ -109,7 +109,7 @@ namespace InfoCarrier.Core.FunctionalTests
                     context.Database.RollbackTransaction();
 
                     Assert.Equal(
-                        RelationalStrings.NoActiveTransaction,
+                        InfoCarrierStrings.NoActiveTransaction,
                         Assert.Throws<InvalidOperationException>(
                             () => context.Database.RollbackTransaction()).Message);
                 }
@@ -122,7 +122,7 @@ namespace InfoCarrier.Core.FunctionalTests
             using (var context = this.createContext())
             {
                 Assert.Equal(
-                    RelationalStrings.NoActiveTransaction,
+                    InfoCarrierStrings.NoActiveTransaction,
                     Assert.Throws<InvalidOperationException>(
                         () => context.Database.RollbackTransaction()).Message);
             }

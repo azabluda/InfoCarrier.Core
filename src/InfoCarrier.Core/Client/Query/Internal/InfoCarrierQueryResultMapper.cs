@@ -150,12 +150,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return false;
             }
 
-            if (!dobj.TryGet("Elements", out object elements))
+            if (!dobj.TryGet(@"Elements", out object elements))
             {
                 return false;
             }
 
-            if (!dobj.TryGet("ArrayType", out object arrayTypeObj))
+            if (!dobj.TryGet(@"ArrayType", out object arrayTypeObj))
             {
                 return false;
             }
@@ -188,7 +188,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return false;
             }
 
-            if (!dobj.TryGet("Elements", out object elements))
+            if (!dobj.TryGet(@"Elements", out object elements))
             {
                 return false;
             }
@@ -199,7 +199,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // map to list (supported directly by aqua-core)
             collection = this.MapFromDynamicObjectGraph(elements, listType);
 
-            if (dobj.TryGet("CollectionType", out object collTypeObj)
+            if (dobj.TryGet(@"CollectionType", out object collTypeObj)
                 && collTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
             {
                 // copy from list to specialized collection
@@ -235,12 +235,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return false;
             }
 
-            if (!dobj.TryGet("Key", out object key))
+            if (!dobj.TryGet(@"Key", out object key))
             {
                 return false;
             }
 
-            if (!dobj.TryGet("Elements", out object elements))
+            if (!dobj.TryGet(@"Elements", out object elements))
             {
                 return false;
             }

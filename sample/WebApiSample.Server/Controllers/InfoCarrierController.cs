@@ -8,10 +8,10 @@ namespace InfoCarrierSample.Controllers
     using System.Data.SqlClient;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
+    using InfoCarrier.Core.Properties;
     using InfoCarrier.Core.Server;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.Extensions.Caching.Memory;
 
     [Route("api")]
@@ -54,7 +54,7 @@ namespace InfoCarrierSample.Controllers
         {
             if (this.ExecuteInTransaction)
             {
-                throw new InvalidOperationException(RelationalStrings.TransactionAlreadyStarted);
+                throw new InvalidOperationException(InfoCarrierStrings.TransactionAlreadyStarted);
             }
 
             var options = new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(10) };
@@ -127,7 +127,7 @@ namespace InfoCarrierSample.Controllers
                 return transaction;
             }
 
-            throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
+            throw new InvalidOperationException(InfoCarrierStrings.NoActiveTransaction);
         }
     }
 }

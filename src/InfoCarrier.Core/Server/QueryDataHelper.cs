@@ -217,8 +217,8 @@ namespace InfoCarrier.Core.Server
                         .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
                         .ToArray();
                     var dto = new DynamicObject();
-                    dto.Add("ArrayType", new Aqua.TypeSystem.TypeInfo(objType, includePropertyInfos: false));
-                    dto.Add("Elements", array);
+                    dto.Add(@"ArrayType", new Aqua.TypeSystem.TypeInfo(objType, includePropertyInfos: false));
+                    dto.Add(@"Elements", array);
                     return dto;
                 }
 
@@ -307,7 +307,7 @@ namespace InfoCarrier.Core.Server
             {
                 var mappedEnumerable = new DynamicObject(typeof(IEnumerable<TElement>));
                 mappedEnumerable.Add(
-                    "Elements",
+                    @"Elements",
                     new DynamicObject(
                         this.MapCollection(enumerable.ToList(), setTypeInformation).ToList(),
                         this));
@@ -318,7 +318,7 @@ namespace InfoCarrier.Core.Server
                     var constructor = Utils.GetDeclaredConstructor(collectionType, new[] { typeof(IEnumerable<TElement>) });
                     if (constructor != null && constructor.IsPublic)
                     {
-                        mappedEnumerable.Add("CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
+                        mappedEnumerable.Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
                     }
                 }
 
@@ -328,9 +328,9 @@ namespace InfoCarrier.Core.Server
             private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
             {
                 var mappedGrouping = new DynamicObject(typeof(IGrouping<TKey, TElement>));
-                mappedGrouping.Add("Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
+                mappedGrouping.Add(@"Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
                 mappedGrouping.Add(
-                    "Elements",
+                    @"Elements",
                     new DynamicObject(
                         this.MapCollection(grouping, setTypeInformation).ToList(),
                         this));

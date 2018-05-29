@@ -10,6 +10,7 @@ namespace InfoCarrier.Core.Common
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
@@ -115,7 +116,7 @@ namespace InfoCarrier.Core.Common
                 return outermostExpression.Method;
             }
 
-            throw new ArgumentException(@"Invalid Expression. Expression should consist of a Method call only.");
+            throw new ArgumentException(InfoCarrierStrings.InvalidMethodCallExpression(expressionBody));
         }
 
         /// <summary>
@@ -265,7 +266,7 @@ namespace InfoCarrier.Core.Common
             [ExcludeFromCoverage]
             public static TResult NullConditionalExpressionStub<T1, T2, TResult>(T1 caller, T2 accessOperation)
             {
-                throw new InvalidOperationException("The NullConditionalExpressionStub&lt;T&gt; method may only be used within LINQ queries.");
+                throw new InvalidOperationException(InfoCarrierStrings.NullConditionalExpressionStubMethodInvoked);
             }
         }
     }
