@@ -3,42 +3,35 @@
 
 namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
-    using Xunit;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
 
-    [Collection("SqlServer")]
     public class OptimisticConcurrencyInfoCarrierTest
-        : OptimisticConcurrencyTestBase<TestStoreBase, OptimisticConcurrencyInfoCarrierTest.OptimisticConcurrencyInfoCarrierFixture>
+        : OptimisticConcurrencyTestBase<OptimisticConcurrencyInfoCarrierTest.TestFixture>
     {
-        public OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarrierFixture fixture)
+        public OptimisticConcurrencyInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
-        public class OptimisticConcurrencyInfoCarrierFixture : F1RelationalFixture<TestStoreBase>
+        public class TestFixture : F1FixtureBase
         {
-            private readonly InfoCarrierTestHelper<F1Context> helper;
+            private ITestStoreFactory testStoreFactory;
 
-            public OptimisticConcurrencyInfoCarrierFixture()
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.EnsureInitialized(
+                    ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.SqlServer,
+                    this.ContextType,
+                    this.OnModelCreating);
+
+            protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
             {
-                this.helper = SqlServerTestStore<F1Context>.CreateHelper(
-                    this.OnModelCreating,
-                    opt => new F1Context(opt),
-                    ConcurrencyModelInitializer.Seed,
-                    true,
-                    "OptimisticConcurrencyTest");
-            }
+                base.OnModelCreating(modelBuilder, context);
 
-            public override TestStoreBase CreateTestStore()
-                => this.helper.CreateTestStore();
-
-            public override F1Context CreateContext(TestStoreBase testStore)
-                => this.helper.CreateInfoCarrierContext(testStore);
-
-            protected override void OnModelCreating(ModelBuilder modelBuilder)
-            {
-                base.OnModelCreating(modelBuilder);
+                modelBuilder.Entity<Team>().Property(e => e.Id).ValueGeneratedNever();
 
                 modelBuilder.Entity<Chassis>().Property<byte[]>("Version").IsRowVersion();
                 modelBuilder.Entity<Driver>().Property<byte[]>("Version").IsRowVersion();
@@ -46,6 +39,10 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                 modelBuilder.Entity<Team>().Property<byte[]>("Version")
                     .ValueGeneratedOnAddOrUpdate()
                     .IsConcurrencyToken();
+
+                modelBuilder.Entity<TitleSponsor>()
+                    .OwnsOne(s => s.Details)
+                    .Property(d => d.Space).HasColumnType("decimal(18,2)");
             }
         }
     }

@@ -3,30 +3,27 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net461</TargetFramework>
-    <RootNamespace>WcfSample</RootNamespace>
-    <CodeAnalysisRuleSet>..\..\StyleNoDoc.ruleset</CodeAnalysisRuleSet>
+    <RootNamespace>InfoCarrierSample</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="..\..\stylecop.json">
-      <Link>stylecop.json</Link>
-    </AdditionalFiles>
+    <Compile Include="..\Datamodel.cs" Link="Datamodel.cs" />
+    <Compile Include="..\IWcfService.cs" Link="IWcfService.cs" />
+    <Compile Include="..\SqlServerShared.cs" Link="SqlServerShared.cs" />
+    <Compile Include="..\WcfShared.cs" Link="WcfShared.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="2.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.0.0" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System.ServiceModel" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\WcfSample.Shared\WcfSample.Shared.csproj" />
   </ItemGroup>
 
 </Project>

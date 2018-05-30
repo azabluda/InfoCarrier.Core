@@ -1,4 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <Description>EntityFrameworkCore provider for multitier applications</Description>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -12,28 +13,50 @@
     <PackageLicenseUrl>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicenseUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
     <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
-    <RootNamespace>InfoCarrier.Core</RootNamespace>
-    <DocumentationFile>$(OutputPath)\$(AssemblyName).xml</DocumentationFile>
-    <LangVersion>latest</LangVersion>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
+
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
     <Exec Command="&quot;$(ProjectDir)..\..\tools\GitVersion.CommandLine\tools\GitVersion.exe&quot; /updateassemblyinfo &quot;$(ProjectDir)obj\GitVersionTaskAssemblyInfo.g.cs&quot; /ensureassemblyinfo" />
   </Target>  
+
   <ItemGroup>
-    <AdditionalFiles Include="..\..\stylecop.json">
-      <Link>stylecop.json</Link>
-    </AdditionalFiles>
     <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
   </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="2.0.0" />
-    <PackageReference Include="Remote.Linq.EntityFrameworkCore" Version="2.0.0" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <None Update="Properties\InfoCarrierStrings.Designer.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>InfoCarrierStrings.Designer.cs</LastGenOutput>
+    </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\InfoCarrierStrings.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>InfoCarrierStrings.Designer.tt</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\InfoCarrierStrings.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="2.1.0" />
+    <PackageReference Include="Remote.Linq.EntityFrameworkCore" Version="2.0.0" />
+  </ItemGroup>
+
 </Project>

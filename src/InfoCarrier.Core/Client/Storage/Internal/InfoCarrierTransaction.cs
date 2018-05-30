@@ -5,7 +5,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
-    using Microsoft.EntityFrameworkCore.Internal;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore.Storage;
 
     /// <summary>
@@ -87,7 +87,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         {
             if (this.finished)
             {
-                throw new InvalidOperationException(RelationalStrings.NoActiveTransaction);
+                throw new InvalidOperationException(InfoCarrierStrings.NoActiveTransaction);
             }
         }
 

@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore.Query;
 
     /// <summary>
@@ -28,11 +29,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
+        [ExcludeFromCoverage]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public override EntityQueryModelVisitor Create(
             QueryCompilationContext queryCompilationContext,
             EntityQueryModelVisitor parentEntityQueryModelVisitor)
-            => throw new InvalidOperationException(@"InfoCarrier.Core is not using EntityQueryModelVisitor");
+            => throw new InvalidOperationException(InfoCarrierStrings.NotUsingEntityQueryModelVisitor);
     }
 }

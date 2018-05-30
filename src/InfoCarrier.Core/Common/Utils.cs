@@ -4,17 +4,94 @@
 namespace InfoCarrier.Core.Common
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Diagnostics.CodeAnalysis;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using InfoCarrier.Core.Properties;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Extensions.Internal;
+    using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
+    using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
     /// <summary>
     ///     A collection of miscellaneous helper functions.
     /// </summary>
     public static class Utils
     {
+        // ReSharper disable once InvokeAsExtensionMethod
+        private static readonly ImmutableHashSet<MethodInfo> SingleResultMethods =
+            Enumerable.Concat(
+                typeof(Queryable).GetMethods().Where(
+                    m => !m.ReturnType.IsGenericType ||
+                    !new[] { typeof(IQueryable<>), typeof(IOrderedQueryable<>) }
+                        .Contains(m.ReturnType.GetGenericTypeDefinition())),
+                typeof(Enumerable).GetMethods().Where(
+                    m => !m.ReturnType.IsGenericType ||
+                    !new[] { typeof(IEnumerable<>), typeof(IOrderedEnumerable<>) }
+                        .Contains(m.ReturnType.GetGenericTypeDefinition())))
+            .ToImmutableHashSet();
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        internal static Type TryGetSequenceType(Type type)
+        {
+            var types = GetGenericTypeImplementations(type, typeof(IEnumerable<>));
+            return types.SingleOrDefault()?.GetTypeInfo().GenericTypeArguments.FirstOrDefault();
+        }
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        internal static IEnumerable<Type> GetGenericTypeImplementations(Type type, Type interfaceOrBaseType)
+        {
+            var typeInfo = type.GetTypeInfo();
+            if (!typeInfo.IsGenericTypeDefinition)
+            {
+                foreach (var baseType in typeInfo.ImplementedInterfaces)
+                {
+                    if (baseType.GetTypeInfo().IsGenericType
+                        && baseType.GetGenericTypeDefinition() == interfaceOrBaseType)
+                    {
+                        yield return baseType;
+                    }
+                }
+
+                if (type.GetTypeInfo().IsGenericType
+                    && type.GetGenericTypeDefinition() == interfaceOrBaseType)
+                {
+                    yield return type;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        internal static ConstructorInfo GetDeclaredConstructor(Type type, Type[] types)
+        {
+            types = types ?? Array.Empty<Type>();
+
+            return type.GetTypeInfo().DeclaredConstructors
+                .SingleOrDefault(
+                    c => !c.IsStatic
+                         && c.GetParameters().Select(p => p.ParameterType).SequenceEqual(types));
+        }
+
         /// <summary>
         ///     Given a lambda expression that calls a method, returns the <see cref="MethodInfo"/>.
         /// </summary>
@@ -39,7 +116,7 @@ namespace InfoCarrier.Core.Common
                 return outermostExpression.Method;
             }
 
-            throw new ArgumentException(@"Invalid Expression. Expression should consist of a Method call only.");
+            throw new ArgumentException(InfoCarrierStrings.InvalidMethodCallExpression(expressionBody));
         }
 
         /// <summary>
@@ -66,31 +143,58 @@ namespace InfoCarrier.Core.Common
         }
 
         /// <summary>
-        ///     Tries to guess the element type if the given type is a sequence.
+        ///     Checks whether the given query returns single result.
         /// </summary>
-        /// <param name="queryResultType">The result type of a Linq query.</param>
-        /// <returns>Guessed sequence element type or null.</returns>
-        internal static Type TryGetQueryResultSequenceType(Type queryResultType)
+        /// <param name="query"> The query to inspect. </param>
+        /// <returns> True if the given query returns single result. </returns>
+        internal static bool QueryReturnsSingleResult(Expression query)
         {
-            // Despite formally a string is a sequence of chars, we treat it as a scalar type
-            if (queryResultType == typeof(string))
+            if (query is MethodCallExpression methodCall)
             {
-                return null;
+                MethodInfo method = methodCall.Method;
+                if (method.IsGenericMethod)
+                {
+                    method = method.GetGenericMethodDefinition();
+                }
+
+                return SingleResultMethods.Contains(method);
             }
 
-            // Arrays is another special case
-            if (queryResultType.IsArray)
-            {
-                return null;
-            }
+            return false;
+        }
 
-            // Grouping is another special case
-            if (queryResultType.IsGrouping())
-            {
-                return null;
-            }
+        /// <summary>
+        ///     Converts the given store value to its model counterpart if there is a <see cref="ValueConverter" />
+        ///     defined for the given <paramref name="property"/>.
+        /// </summary>
+        /// <remarks>
+        ///     If the <paramref name="property"/> is null or defines no <see cref="ValueConverter" /> then
+        ///     no conversion is applied to the <paramref name="value"/>.
+        /// </remarks>
+        /// <param name="value"> The value to convert. </param>
+        /// <param name="property"> The property metadata which may define a converter. </param>
+        /// <returns> The converted value. </returns>
+        internal static object ConvertFromProvider(object value, IProperty property)
+        {
+            ValueConverter valueConverter = property?.GetValueConverter();
+            return valueConverter != null ? valueConverter.ConvertFromProvider(value) : value;
+        }
 
-            return queryResultType.TryGetSequenceType();
+        /// <summary>
+        ///     Converts the given model value to its store counterpart if there is a <see cref="ValueConverter" />
+        ///     defined for the given <paramref name="property"/>.
+        /// </summary>
+        /// <remarks>
+        ///     If the <paramref name="property"/> is null or defines no <see cref="ValueConverter" /> then
+        ///     no conversion is applied to the <paramref name="value"/>.
+        /// </remarks>
+        /// <param name="value"> The value to convert. </param>
+        /// <param name="property"> The property metadata which may define a converter. </param>
+        /// <returns> The converted value. </returns>
+        internal static object ConvertToProvider(object value, IProperty property)
+        {
+            ValueConverter valueConverter = property?.GetValueConverter();
+            return valueConverter != null ? valueConverter.ConvertToProvider(value) : value;
         }
 
         /// <summary>
@@ -106,7 +210,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     The new expression tree with replaced <see cref="NullConditionalExpression" /> nodes.
         /// </returns>
-        internal static Expression ReplaceNullConditional(Expression expression, bool toStub)
+        public static Expression ReplaceNullConditional(Expression expression, bool toStub)
         {
             return new ReplaceNullConditionalExpressionVisitor(toStub).Visit(expression);
         }
@@ -159,9 +263,10 @@ namespace InfoCarrier.Core.Common
                 return base.VisitMethodCall(node);
             }
 
+            [ExcludeFromCoverage]
             public static TResult NullConditionalExpressionStub<T1, T2, TResult>(T1 caller, T2 accessOperation)
             {
-                throw new InvalidOperationException("The NullConditionalExpressionStub&lt;T&gt; method may only be used within LINQ queries.");
+                throw new InvalidOperationException(InfoCarrierStrings.NullConditionalExpressionStubMethodInvoked);
             }
         }
     }

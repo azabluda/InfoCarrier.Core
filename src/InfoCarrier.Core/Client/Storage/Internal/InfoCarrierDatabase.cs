@@ -8,8 +8,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using Common;
-    using Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Infrastructure.Internal;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;

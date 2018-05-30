@@ -6,7 +6,7 @@ namespace InfoCarrier.Core.Client
     using System;
     using System.Threading;
     using System.Threading.Tasks;
-    using Common;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
 
     /// <summary>

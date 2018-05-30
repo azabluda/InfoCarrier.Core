@@ -8,8 +8,8 @@ namespace InfoCarrier.Core.Server
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using Client;
-    using Common;
+    using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
@@ -38,52 +38,36 @@ namespace InfoCarrier.Core.Server
             this.dbContext = dbContextFactory();
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-            IStateManager stateManager = this.dbContext.GetService<IStateManager>();
+            var stateManager = this.dbContext.GetService<IStateManager>();
+            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
 
             // Materialize entities and add entries to dbContext
-            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
-            var entries = request.DataTransferObjects.Select(dto =>
+            EntityEntry MaterializeAndTrackEntity(UpdateEntryDto dto)
             {
                 IEntityType entityType = typeMap[dto.EntityTypeName];
 
                 object MaterializeEntity()
                 {
                     var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType, request.Mapper));
-                    return entityMaterializerSource.GetMaterializer(entityType).Invoke(valueBuffer);
+                    var materializationContext = new MaterializationContext(valueBuffer, this.dbContext);
+                    return entityMaterializerSource.GetMaterializer(entityType).Invoke(materializationContext);
                 }
 
                 EntityEntry entry;
                 if (entityType.HasDefiningNavigation())
                 {
-                    object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper);
+                    IKey key = entityType.DefiningEntityType.FindPrimaryKey();
+                    object[] keyValues = dto.GetDelegatedIdentityKeys(request.Mapper, key);
 
                     // Here we assume that the owner entry is already present in the context
-                    EntityEntry ownerEntry = stateManager.TryGetEntry(
-                        entityType.DefiningEntityType.FindPrimaryKey(),
-                        keyValues)?.ToEntityEntry();
-
-                    // If not, then we create a dummy instance, set only PK values, and track it as Unchanged
-                    if (ownerEntry == null)
-                    {
-                        var pkProps = entityType.DefiningEntityType.FindPrimaryKey().Properties.ToList();
-                        var ownerValueBuffer = new ValueBuffer(
-                            entityType.DefiningEntityType.GetProperties().Select(p =>
-                            {
-                                int idx = pkProps.IndexOf(p);
-                                return idx < 0
-                                    ? p.ClrType.GetDefaultValue()
-                                    : keyValues[idx];
-                            }).ToArray());
-                        object ownerEntity = entityMaterializerSource.GetMaterializer(entityType.DefiningEntityType).Invoke(ownerValueBuffer);
-                        ownerEntry = stateManager.GetOrCreateEntry(ownerEntity, entityType.DefiningEntityType).ToEntityEntry();
-                        ownerEntry.State = EntityState.Unchanged;
-                    }
+                    EntityEntry ownerEntry = stateManager.TryGetEntry(key, keyValues).ToEntityEntry();
 
                     ReferenceEntry referenceEntry = ownerEntry.Reference(entityType.DefiningNavigationName);
                     if (referenceEntry.CurrentValue == null)
                     {
                         referenceEntry.CurrentValue = MaterializeEntity();
                     }
+
                     entry = referenceEntry.TargetEntry;
                 }
                 else
@@ -94,7 +78,7 @@ namespace InfoCarrier.Core.Server
                 // Correlate properties of DTO and entry
                 var props = dto.JoinScalarProperties(entry, request.Mapper);
 
-                // Set Key values
+                // Set Key properties
                 foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
                 {
                     p.EfProperty.CurrentValue = p.CurrentValue;
@@ -108,27 +92,41 @@ namespace InfoCarrier.Core.Server
                 // This will add entities to identity map.
                 entry.State = dto.EntityState;
 
-                // Set non key / non temporary (e.g. TPH discriminators) values
-                foreach (var p in props.Where(
-                    x => !x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
+                // Set non key properties
+                foreach (var p in props.Where(x => !x.EfProperty.Metadata.IsKey()))
                 {
-                    p.EfProperty.CurrentValue = p.CurrentValue;
-                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
+                    bool canSetCurrentValue =
+                        p.EfProperty.Metadata.IsShadowProperty ||
+                        p.EfProperty.Metadata.TryGetMemberInfo(forConstruction: false, forSet: true, out _, out _);
+
+                    if (canSetCurrentValue)
+                    {
+                        p.EfProperty.CurrentValue = p.CurrentValue;
+                    }
+
+                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0
+                        && p.EfProperty.OriginalValue != p.OriginalValue)
                     {
                         p.EfProperty.OriginalValue = p.OriginalValue;
                     }
 
-                    p.EfProperty.IsModified = p.DtoProperty.IsModified;
+                    if (canSetCurrentValue)
+                    {
+                        p.EfProperty.IsModified = p.DtoProperty.IsModified;
+                    }
                 }
 
-                // Mark temporary values
+                // Mark temporary property values
                 foreach (var p in props.Where(x => x.DtoProperty.IsTemporary))
                 {
                     p.EfProperty.IsTemporary = true;
                 }
 
                 return entry;
-            }).ToList();
+            }
+
+            request.SharedIdentityDataTransferObjects.ForEach(dto => MaterializeAndTrackEntity(dto));
+            var entries = request.DataTransferObjects.Select(MaterializeAndTrackEntity).ToList();
 
             // Replace temporary PKs coming from client with generated values (e.g. HiLoSequence)
             var valueGeneratorSelector = this.dbContext.GetService<IValueGeneratorSelector>();
@@ -155,7 +153,7 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Gets the corresponding entries after painting the state of the updated entities.
         /// </summary>
-        public IEnumerable<IUpdateEntry> Entries { get; }
+        public IReadOnlyList<IUpdateEntry> Entries { get; }
 
         /// <summary>
         ///     Disposes the <see cref="DbContext" /> into which the updated entities have been saved.

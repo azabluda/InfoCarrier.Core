@@ -3,36 +3,36 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
 
-    public class FieldMappingInfoCarrierTest
-        : FieldMappingTestBase<TestStoreBase, FieldMappingInfoCarrierTest.FieldMappingInfoCarrierFixture>
+    public class FieldMappingInfoCarrierTest : FieldMappingTestBase<FieldMappingInfoCarrierTest.TestFixture>
     {
-        public FieldMappingInfoCarrierTest(FieldMappingInfoCarrierFixture fixture)
+        public FieldMappingInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
-        public class FieldMappingInfoCarrierFixture : FieldMappingFixtureBase
+        protected override void Update<TBlog>(string navigation)
         {
-            private readonly InfoCarrierTestHelper<FieldMappingContext> helper;
+            base.Update<TBlog>(navigation);
 
-            public FieldMappingInfoCarrierFixture()
-            {
-                this.helper = InMemoryTestStore<FieldMappingContext>.CreateHelper(
+            this.Fixture.Reseed();
+        }
+
+        public class TestFixture : FieldMappingFixtureBase
+        {
+            private ITestStoreFactory testStoreFactory;
+
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.EnsureInitialized(
+                    ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.InMemory,
+                    this.ContextType,
                     this.OnModelCreating,
-                    opt => new FieldMappingContext(opt),
-                    this.Seed,
-                    false,
-                    w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-            }
-
-            public override DbContext CreateContext(TestStoreBase testStore)
-                => this.helper.CreateInfoCarrierContext(testStore);
-
-            public override TestStoreBase CreateTestStore()
-                => this.helper.CreateTestStore();
+                    o => o.ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning)));
         }
     }
 }

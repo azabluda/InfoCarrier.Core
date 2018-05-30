@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Common
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Runtime.Serialization;
     using Aqua.Dynamic;
 
@@ -37,5 +38,15 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         [DataMember]
         public IEnumerable<DynamicObject> MappedResults { get; set; }
+
+        /// <summary>
+        ///     Convert this object into a string representation.
+        /// </summary>
+        /// <returns>
+        ///     A string that represents this object.
+        /// </returns>
+        [ExcludeFromCoverage]
+        public override string ToString()
+            => $"Count = {this.MappedResults?.Count()}";
     }
 }

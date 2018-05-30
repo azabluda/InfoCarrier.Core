@@ -44,5 +44,15 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         [DataMember]
         public QueryTrackingBehavior TrackingBehavior { get; set; }
+
+        /// <summary>
+        ///     Convert this object into a string representation.
+        /// </summary>
+        /// <returns>
+        ///     A string that represents this object.
+        /// </returns>
+        [ExcludeFromCoverage]
+        public override string ToString()
+            => $"{this.Query} {this.TrackingBehavior}";
     }
 }

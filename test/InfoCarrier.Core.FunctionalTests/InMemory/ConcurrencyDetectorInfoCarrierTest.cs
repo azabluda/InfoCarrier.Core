@@ -3,11 +3,13 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
+    using InfoCarrier.Core.FunctionalTests.InMemory.Query;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
 
-    public class ConcurrencyDetectorInfoCarrierTest : ConcurrencyDetectorTestBase<NorthwindQueryInfoCarrierFixture>
+    public class ConcurrencyDetectorInfoCarrierTest : ConcurrencyDetectorTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
     {
-        public ConcurrencyDetectorInfoCarrierTest(NorthwindQueryInfoCarrierFixture fixture)
+        public ConcurrencyDetectorInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
             : base(fixture)
         {
         }

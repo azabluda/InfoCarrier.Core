@@ -1,7 +1,7 @@
 ﻿// Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace WcfSample
+namespace InfoCarrierSample
 {
     using System;
     using System.ServiceModel;
@@ -13,11 +13,11 @@ namespace WcfSample
 
     public class WcfBackendImpl : IInfoCarrierBackend
     {
-        private readonly ChannelFactory<IMyRemoteService> channelFactory;
+        private readonly ChannelFactory<IWcfService> channelFactory;
 
         public WcfBackendImpl(string serverUrl = null)
         {
-            this.channelFactory = new ChannelFactory<IMyRemoteService>(
+            this.channelFactory = new ChannelFactory<IWcfService>(
                 new BasicHttpBinding { MaxReceivedMessageSize = WcfShared.MaxReceivedMessageSize },
                 new EndpointAddress(new Uri($"http://{serverUrl ?? WcfShared.BaseUrl}/{WcfShared.ServiceName}")));
         }
@@ -28,7 +28,7 @@ namespace WcfSample
 
         public virtual QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
         {
-            IMyRemoteService channel = this.channelFactory.CreateChannel();
+            IWcfService channel = this.channelFactory.CreateChannel();
             using ((IDisposable)channel)
             {
                 return channel.ProcessQueryDataRequest(request);
@@ -37,7 +37,7 @@ namespace WcfSample
 
         public virtual SaveChangesResult SaveChanges(SaveChangesRequest request)
         {
-            IMyRemoteService channel = this.channelFactory.CreateChannel();
+            IWcfService channel = this.channelFactory.CreateChannel();
             using ((IDisposable)channel)
             {
                 return channel.ProcessSaveChangesRequest(request);
@@ -46,7 +46,7 @@ namespace WcfSample
 
         public virtual async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
         {
-            IMyRemoteService channel = this.channelFactory.CreateChannel();
+            IWcfService channel = this.channelFactory.CreateChannel();
             using ((IDisposable)channel)
             {
                 return await channel.ProcessQueryDataRequestAsync(request);
@@ -55,7 +55,7 @@ namespace WcfSample
 
         public virtual async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
         {
-            IMyRemoteService channel = this.channelFactory.CreateChannel();
+            IWcfService channel = this.channelFactory.CreateChannel();
             using ((IDisposable)channel)
             {
                 return await channel.ProcessSaveChangesRequestAsync(request);

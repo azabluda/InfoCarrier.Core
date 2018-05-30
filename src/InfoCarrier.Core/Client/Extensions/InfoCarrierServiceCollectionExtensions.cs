@@ -1,9 +1,14 @@
 // Copyright (c) on/off it-solutions gmbh. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+// ReSharper disable once CheckNamespace
 namespace InfoCarrier.Core.Client
 {
-    using Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Infrastructure.Internal;
+    using InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal;
+    using InfoCarrier.Core.Client.Query.Internal;
+    using InfoCarrier.Core.Client.Storage.Internal;
+    using InfoCarrier.Core.Client.ValueGeneration;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
@@ -11,10 +16,7 @@ namespace InfoCarrier.Core.Client
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.Extensions.DependencyInjection;
-    using Query.ExpressionVisitors.Internal;
-    using Query.Internal;
     using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
-    using Storage.Internal;
 
     /// <summary>
     ///     InfoCarrier specific extension methods for <see cref="IServiceCollection" />.
@@ -43,7 +45,7 @@ namespace InfoCarrier.Core.Client
             var builder = new EntityFrameworkServicesBuilder(serviceCollection)
                 .TryAdd<IQueryCompiler, InfoCarrierQueryCompiler>()
                 .TryAdd<IDatabaseProvider, DatabaseProvider<InfoCarrierOptionsExtension>>()
-                .TryAdd<IValueGeneratorSelector, RelationalValueGeneratorSelector>()
+                .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
                 .TryAdd<IDatabase>(p => p.GetService<IInfoCarrierDatabase>())
                 .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
                 .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()

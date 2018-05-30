@@ -4,19 +4,20 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using System.Threading.Tasks;
+    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.TestUtilities;
 
-    public abstract class FindInfoCarrierTest
-        : FindTestBase<TestStoreBase, FindInfoCarrierTest.FindInfoCarrierFixture>
+    public abstract class FindInfoCarrierTest : FindTestBase<FindInfoCarrierTest.TestFixture>
     {
-        protected FindInfoCarrierTest(FindInfoCarrierFixture fixture)
+        protected FindInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
         public class FindInfoCarrierTestSet : FindInfoCarrierTest
         {
-            public FindInfoCarrierTestSet(FindInfoCarrierFixture fixture)
+            public FindInfoCarrierTestSet(TestFixture fixture)
                 : base(fixture)
             {
             }
@@ -30,7 +31,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 
         public class FindInfoCarrierTestContext : FindInfoCarrierTest
         {
-            public FindInfoCarrierTestContext(FindInfoCarrierFixture fixture)
+            public FindInfoCarrierTestContext(TestFixture fixture)
                 : base(fixture)
             {
             }
@@ -44,7 +45,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 
         public class FindInfoCarrierTestNonGeneric : FindInfoCarrierTest
         {
-            public FindInfoCarrierTestNonGeneric(FindInfoCarrierFixture fixture)
+            public FindInfoCarrierTestNonGeneric(TestFixture fixture)
                 : base(fixture)
             {
             }
@@ -56,23 +57,16 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                 => (TEntity)await context.FindAsync(typeof(TEntity), keyValues);
         }
 
-        public class FindInfoCarrierFixture : FindFixtureBase
+        public class TestFixture : FindFixtureBase
         {
-            private readonly InfoCarrierTestHelper<FindContext> helper;
+            private ITestStoreFactory testStoreFactory;
 
-            public FindInfoCarrierFixture()
-            {
-                this.helper = InMemoryTestStore<FindContext>.CreateHelper(
-                    this.OnModelCreating,
-                    opt => new FindContext(opt),
-                    this.Seed);
-            }
-
-            public override DbContext CreateContext(TestStoreBase testStore)
-                => this.helper.CreateInfoCarrierContext(testStore);
-
-            public override TestStoreBase CreateTestStore()
-                => this.helper.CreateTestStore();
+            protected override ITestStoreFactory TestStoreFactory =>
+                InfoCarrierTestStoreFactory.EnsureInitialized(
+                    ref this.testStoreFactory,
+                    InfoCarrierTestStoreFactory.InMemory,
+                    this.ContextType,
+                    this.OnModelCreating);
         }
     }
 }

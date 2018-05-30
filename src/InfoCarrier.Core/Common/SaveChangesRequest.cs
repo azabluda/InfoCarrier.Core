@@ -7,7 +7,6 @@ namespace InfoCarrier.Core.Common
     using System.Collections.Generic;
     using System.Linq;
     using System.Runtime.Serialization;
-    using Aqua.Dynamic;
     using Microsoft.EntityFrameworkCore.Update;
 
     /// <summary>
@@ -15,10 +14,8 @@ namespace InfoCarrier.Core.Common
     ///     updated entities into the actual database on the server-side.
     /// </summary>
     [DataContract]
-    public class SaveChangesRequest
+    public class SaveChangesRequest : EntityDtoHolder
     {
-        private IDynamicObjectMapper mapper;
-
         /// <summary>
         ///     Initializes a new instance of the <see cref="SaveChangesRequest"/> class.
         /// </summary>
@@ -31,23 +28,17 @@ namespace InfoCarrier.Core.Common
         ///     Initializes a new instance of the <see cref="SaveChangesRequest"/> class.
         /// </summary>
         /// <param name="entries">The <see cref="IUpdateEntry" />'s which need to be saved.</param>
-        internal SaveChangesRequest(IEnumerable<IUpdateEntry> entries)
+        internal SaveChangesRequest(IReadOnlyList<IUpdateEntry> entries)
+            : base(entries)
         {
-            this.DataTransferObjects.AddRange(entries.Select(e => new UpdateEntryDto(e, this.Mapper)));
+            this.SharedIdentityDataTransferObjects.AddRange(
+                this.ToUpdateEntryDtos(entries.Select(e => e.SharedIdentityEntry).Where(e => e != null)));
         }
 
         /// <summary>
-        ///     Gets the <see cref="IDynamicObjectMapper" /> instance which is used internally for mapping
-        ///     scalar properties of <see cref="IUpdateEntry" />'s to/from <see cref="DynamicObject" />.
-        /// </summary>
-        [IgnoreDataMember]
-        internal IDynamicObjectMapper Mapper
-            => this.mapper ?? (this.mapper = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }));
-
-        /// <summary>
-        ///     Gets or sets state entires mapped to <see cref="UpdateEntryDto" />'s.
+        ///     Gets or sets state shared state entires mapped to <see cref="UpdateEntryDto" />'s.
         /// </summary>
         [DataMember]
-        public List<UpdateEntryDto> DataTransferObjects { get; set; } = new List<UpdateEntryDto>();
+        public List<UpdateEntryDto> SharedIdentityDataTransferObjects { get; set; } = new List<UpdateEntryDto>();
     }
 }
