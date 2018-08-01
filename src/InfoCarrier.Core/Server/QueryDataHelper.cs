@@ -151,15 +151,7 @@ namespace InfoCarrier.Core.Server
         }
 
         private IEnumerable<DynamicObject> MapResult(object queryResult)
-        {
-            IEnumerable<DynamicObject> result =
-                Remote.Linq.Expressions.ExpressionExtensions.ConvertResultToDynamicObjects(
-                    queryResult,
-                    new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver),
-                    t => true);
-
-            return result;
-        }
+            => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver).MapCollection(queryResult, t => true);
 
         /// <summary>
         ///     Disposes the <see cref="DbContext" /> against which the requested query has been executed.
