@@ -55,8 +55,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public InfoCarrierQueryResultMapper(
             QueryContext queryContext,
             ITypeResolver typeResolver,
+            ITypeInfoProvider typeInfoProvider,
             IReadOnlyDictionary<string, IEntityType> entityTypeMap = null)
-            : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
+            : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
         {
             this.queryContext = queryContext;
             this.typeResolver = typeResolver;

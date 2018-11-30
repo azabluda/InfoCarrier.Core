@@ -274,6 +274,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private ITypeResolver TypeResolver { get; } = new TypeResolver();
 
+            private ITypeInfoProvider TypeInfoProvider { get; } = new TypeInfoProvider();
+
             public IEnumerable<TResult> Execute<TResult>(QueryContext queryContext)
                 => this.createQueryExecutor(queryContext).ExecuteQuery<TResult>();
 
@@ -293,7 +295,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     IReadOnlyDictionary<string, IEntityType> entityTypeMap)
                 {
                     this.queryContext = queryContext;
-                    this.createResultMapper = () => new InfoCarrierQueryResultMapper(queryContext, preparedQuery.TypeResolver, entityTypeMap);
+                    this.createResultMapper = () => new InfoCarrierQueryResultMapper(queryContext, preparedQuery.TypeResolver, preparedQuery.TypeInfoProvider, entityTypeMap);
                     this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
 
                     // Substitute query parameters
@@ -301,8 +303,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                     // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                     this.rlinq = expression
-                        .ToRemoteLinqExpression(Remote.Linq.EntityFrameworkCore.ExpressionEvaluator.CanBeEvaluated)
-                        .ReplaceQueryableByResourceDescriptors(preparedQuery.TypeResolver)
+                        .ToRemoteLinqExpression(preparedQuery.TypeInfoProvider, Remote.Linq.EntityFrameworkCore.ExpressionEvaluator.CanBeEvaluated)
+                        .ReplaceQueryableByResourceDescriptors(preparedQuery.TypeInfoProvider)
                         .ReplaceGenericQueryArgumentsByNonGenericArguments();
                 }
 
