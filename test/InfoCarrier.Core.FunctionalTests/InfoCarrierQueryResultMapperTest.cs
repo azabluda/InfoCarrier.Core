@@ -30,7 +30,8 @@ namespace InfoCarrier.Core.FunctionalTests
 
             this.queryResultMapper = new InfoCarrierQueryResultMapper(
                 this.context.GetService<IQueryContextFactory>().Create(),
-                new Aqua.TypeSystem.TypeResolver());
+                new Aqua.TypeSystem.TypeResolver(),
+                new Aqua.TypeSystem.TypeInfoProvider());
 
             IEnumerable<DynamicObject> Yield(params DynamicObject[] dynamicObjects) => dynamicObjects;
 

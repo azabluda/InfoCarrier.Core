@@ -41,6 +41,7 @@ namespace InfoCarrier.Core.Server
         private readonly DbContext dbContext;
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
+        private readonly ITypeInfoProvider typeInfoProvider = new TypeInfoProvider();
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="QueryDataHelper" /> class.
@@ -151,7 +152,7 @@ namespace InfoCarrier.Core.Server
         }
 
         private IEnumerable<DynamicObject> MapResult(object queryResult)
-            => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver).MapCollection(queryResult, t => true);
+            => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver, this.typeInfoProvider).MapCollection(queryResult, t => true);
 
         /// <summary>
         ///     Disposes the <see cref="DbContext" /> against which the requested query has been executed.
@@ -177,8 +178,8 @@ namespace InfoCarrier.Core.Server
             private readonly Dictionary<object, DynamicObject> cachedEntities =
                 new Dictionary<object, DynamicObject>();
 
-            public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver)
-                : base(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }, typeResolver)
+            public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver, ITypeInfoProvider typeInfoProvider)
+                : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
                 IServiceProvider serviceProvider = dbContext.GetInfrastructure();
                 this.stateManager = serviceProvider.GetRequiredService<IStateManager>();
