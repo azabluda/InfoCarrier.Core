@@ -106,7 +106,7 @@
       <NoWarn>NU1605</NoWarn>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore">
-      <Version>2.1.1</Version>
+      <Version>2.1.4</Version>
     </PackageReference>
     <PackageReference Include="Xamarin.Android.Support.Design" Version="27.0.2" />
   </ItemGroup>
