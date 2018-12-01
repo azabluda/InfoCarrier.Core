@@ -10,7 +10,7 @@
     <Title>InfoCarrier.Core</Title>
     <PackageTags>EF;ORM;multi-tier;n-tier</PackageTags>
     <PackageProjectUrl>https://github.com/azabluda/InfoCarrier.Core</PackageProjectUrl>
-    <PackageLicenseUrl>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicenseUrl>
+    <PackageLicense>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicense>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
   </PropertyGroup>
