@@ -53,6 +53,7 @@ namespace InfoCarrier.Core.Client
                 .TryAdd<IEntityQueryModelVisitorFactory, InfoCarrierQueryModelVisitorFactory>()
                 .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
                 .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
+                .TryAdd<ITypeMappingSource, InfoCarrierTypeMappingSource>()
                 .TryAddProviderSpecificServices(b => b
                     .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>());
 
