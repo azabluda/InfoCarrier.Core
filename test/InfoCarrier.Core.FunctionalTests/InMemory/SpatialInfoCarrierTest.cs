@@ -5,17 +5,23 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.InMemory.Metadata.Conventions.Internal;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.TestUtilities;
 
-    public class DatabindingInfoCarrierTest : DatabindingTestBase<DatabindingInfoCarrierTest.TestFixture>
+    public class SpatialInfoCarrierTest : SpatialTestBase<SpatialInfoCarrierTest.TestFixture>
     {
-        public DatabindingInfoCarrierTest(TestFixture fixture)
+        public SpatialInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }
 
-        public class TestFixture : F1InfoCarrierFixtureBase
+        protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        {
+        }
+
+        public class TestFixture : SpatialFixtureBase
         {
             private ITestStoreFactory testStoreFactory;
 
@@ -25,10 +31,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                     InfoCarrierTestStoreFactory.InMemory,
                     this.ContextType,
                     this.OnModelCreating,
-                    b => b.UseModel(this.CreateModelExternal()));
-
-            public override ModelBuilder CreateModelBuilder() =>
-                new ModelBuilder(InMemoryConventionSetBuilder.Build());
+                    o => o.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
         }
     }
 }

@@ -121,7 +121,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         /// </summary>
         public void ResetState()
         {
-            throw new NotImplementedException();
         }
     }
 }

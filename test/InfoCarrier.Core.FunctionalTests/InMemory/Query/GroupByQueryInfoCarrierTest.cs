@@ -5,7 +5,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
     using Xunit.Abstractions;
 
     public class GroupByQueryInfoCarrierTest : GroupByQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
@@ -15,12 +14,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
-        }
-
-        [ConditionalFact(Skip = "See issue #9591")]
-        public override void Select_Distinct_GroupBy()
-        {
-            base.Select_Distinct_GroupBy();
         }
     }
 }

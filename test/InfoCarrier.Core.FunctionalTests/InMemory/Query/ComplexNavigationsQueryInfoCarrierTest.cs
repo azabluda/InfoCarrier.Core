@@ -6,7 +6,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
     using Xunit.Abstractions;
 
     public class ComplexNavigationsQueryInfoCarrierTest : ComplexNavigationsQueryTestBase<ComplexNavigationsQueryInfoCarrierTest.TestFixture>
@@ -14,18 +13,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         public ComplexNavigationsQueryInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
-        }
-
-        [ConditionalFact(Skip = "issue #4311")]
-        public override void Nested_group_join_with_take()
-        {
-            base.Nested_group_join_with_take();
-        }
-
-        [ConditionalFact(Skip = "issue #9591")]
-        public override void Multi_include_with_groupby_in_subquery()
-        {
-            base.Multi_include_with_groupby_in_subquery();
         }
 
         public class TestFixture : ComplexNavigationsQueryFixtureBase
