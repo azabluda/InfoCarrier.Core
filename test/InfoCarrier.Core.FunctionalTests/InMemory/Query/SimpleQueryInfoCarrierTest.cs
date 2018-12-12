@@ -4,6 +4,7 @@
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
     using System.Linq;
+    using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -42,6 +43,12 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         public override void Throws_on_concurrent_query_first()
         {
             base.Throws_on_concurrent_query_first();
+        }
+
+        [ConditionalTheory(Skip = "Client-side evaluation is not supported")]
+        public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool isAsync)
+        {
+            return base.Client_OrderBy_GroupBy_Group_ordering_works(isAsync);
         }
     }
 }

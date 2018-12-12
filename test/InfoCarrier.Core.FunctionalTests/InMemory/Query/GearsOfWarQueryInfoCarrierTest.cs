@@ -20,5 +20,11 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
             return base.Double_order_by_on_nullable_bool_coming_from_optional_navigation(isAsync);
         }
+
+        [ConditionalFact(Skip = "Client-side evaluation is not supported")]
+        public override Task Multiple_includes_with_client_method_around_qsre_and_also_projecting_included_collection()
+        {
+            return base.Multiple_includes_with_client_method_around_qsre_and_also_projecting_included_collection();
+        }
     }
 }
