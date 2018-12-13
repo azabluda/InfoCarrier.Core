@@ -7,6 +7,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
 
     public class FieldMappingInfoCarrierTest : FieldMappingTestBase<FieldMappingInfoCarrierTest.TestFixture>
     {
@@ -20,6 +21,18 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
             base.Update<TBlog>(navigation);
 
             this.Fixture.Reseed();
+        }
+
+        [ConditionalTheory(Skip = "https://github.com/6bee/aqua-core/issues/27")]
+        public override void Include_collection_hiding_props(bool tracking)
+        {
+            base.Include_collection_hiding_props(tracking);
+        }
+
+        [ConditionalTheory(Skip = "https://github.com/6bee/aqua-core/issues/27")]
+        public override void Include_reference_hiding_props(bool tracking)
+        {
+            base.Include_reference_hiding_props(tracking);
         }
 
         public class TestFixture : FieldMappingFixtureBase
