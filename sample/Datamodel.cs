@@ -12,9 +12,9 @@ namespace InfoCarrierSample
 
     public class Blog
     {
-        public decimal Id { get; set; }
+        public long Id { get; set; }
 
-        public decimal AuthorId { get; set; }
+        public long AuthorId { get; set; }
 
         public Author Author { get; set; }
 
@@ -23,9 +23,9 @@ namespace InfoCarrierSample
 
     public class Post
     {
-        public decimal Id { get; set; }
+        public long Id { get; set; }
 
-        public decimal BlogId { get; set; }
+        public long BlogId { get; set; }
 
         public DateTime CreationDate { get; set; }
 
@@ -36,7 +36,7 @@ namespace InfoCarrierSample
 
     public class Author
     {
-        public decimal Id { get; set; }
+        public long Id { get; set; }
 
         public string Name { get; set; }
     }
