@@ -175,7 +175,7 @@ namespace InfoCarrier.Core.Server
             private readonly IStateManager stateManager;
             private readonly IInternalEntityEntryFactory entityEntryFactory;
             private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
-            private readonly Dictionary<object, DynamicObject> cachedEntities =
+            private readonly Dictionary<object, DynamicObject> cachedDtos =
                 new Dictionary<object, DynamicObject>();
 
             public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver, ITypeInfoProvider typeInfoProvider)
@@ -200,16 +200,22 @@ namespace InfoCarrier.Core.Server
                     return null;
                 }
 
+                if (this.cachedDtos.TryGetValue(obj, out DynamicObject cached))
+                {
+                    return cached;
+                }
+
                 Type objType = obj.GetType();
 
                 // Special mapping of arrays
                 if (objType.IsArray)
                 {
+                    DynamicObject dto = this.CreateAndCacheDynamicObject(obj, null);
+
                     var array = ((IEnumerable)obj)
                         .Cast<object>()
                         .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
                         .ToArray();
-                    var dto = new DynamicObject();
                     dto.Add(@"ArrayType", new Aqua.TypeSystem.TypeInfo(objType, includePropertyInfos: false));
                     dto.Add(@"Elements", array);
                     return dto;
@@ -254,12 +260,12 @@ namespace InfoCarrier.Core.Server
 
             private DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation, InternalEntityEntry entry)
             {
-                if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
+                if (this.cachedDtos.TryGetValue(obj, out DynamicObject cached))
                 {
-                    return dto;
+                    return cached;
                 }
 
-                this.cachedEntities.Add(obj, dto = new DynamicObject(obj.GetType()));
+                DynamicObject dto = this.CreateAndCacheDynamicObject(obj, obj.GetType());
 
                 if (entry.Entity.GetType() != entry.EntityType.ClrType)
                 {
@@ -298,8 +304,9 @@ namespace InfoCarrier.Core.Server
 
             private DynamicObject MapEnumerable<TElement>(IEnumerable<TElement> enumerable, Func<Type, bool> setTypeInformation)
             {
-                var mappedEnumerable = new DynamicObject(typeof(IEnumerable<TElement>));
-                mappedEnumerable.Add(
+                DynamicObject dto = this.CreateAndCacheDynamicObject(enumerable, typeof(IEnumerable<TElement>));
+
+                dto.Add(
                     @"Elements",
                     new DynamicObject(
                         this.MapCollection(enumerable.ToList(), setTypeInformation).ToList(),
@@ -308,26 +315,35 @@ namespace InfoCarrier.Core.Server
                 var collectionType = enumerable.GetType();
                 if (collectionType != typeof(List<TElement>))
                 {
-                    var constructor = Utils.GetDeclaredConstructor(collectionType, new[] { typeof(IEnumerable<TElement>) });
-                    if (constructor != null && constructor.IsPublic)
+                    bool hasDefaultCtor = collectionType.GetTypeInfo().DeclaredConstructors.Any(
+                        c => !c.IsStatic && c.IsPublic && c.GetParameters().Length == 0);
+                    if (hasDefaultCtor)
                     {
-                        mappedEnumerable.Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
+                        dto.Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
                     }
                 }
 
-                return mappedEnumerable;
+                return dto;
             }
 
             private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
             {
-                var mappedGrouping = new DynamicObject(typeof(IGrouping<TKey, TElement>));
-                mappedGrouping.Add(@"Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
-                mappedGrouping.Add(
+                DynamicObject dto = this.CreateAndCacheDynamicObject(grouping, typeof(IGrouping<TKey, TElement>));
+
+                dto.Add(@"Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
+                dto.Add(
                     @"Elements",
                     new DynamicObject(
                         this.MapCollection(grouping, setTypeInformation).ToList(),
                         this));
-                return mappedGrouping;
+                return dto;
+            }
+
+            private DynamicObject CreateAndCacheDynamicObject(object obj, Type type)
+            {
+                var dto = new DynamicObject(type);
+                this.cachedDtos.Add(obj, dto);
+                return dto;
             }
         }
     }

@@ -8,17 +8,18 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
+    using System.Linq.Expressions;
     using System.Reflection;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
     using InfoCarrier.Core.Common;
+    using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using MethodInfo = System.Reflection.MethodInfo;
 
@@ -28,11 +29,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
     /// </summary>
     public class InfoCarrierQueryResultMapper : DynamicObjectMapper
     {
-        private static readonly MethodInfo ToOrderedMethod
-            = new LinqOperatorProvider().ToOrdered;
-
-        private static readonly MethodInfo MakeGenericQueryableMethod
-            = Utils.GetMethodInfo(() => MakeGenericQueryable<object>(null))
+        private static readonly MethodInfo AddElementsToCollectionMethod
+            = Utils.GetMethodInfo(() => AddElementsToCollection<object>(null, null))
                 .GetGenericMethodDefinition();
 
         private static readonly MethodInfo MakeGenericGroupingMethod
@@ -113,6 +111,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             if (obj is DynamicObject dobj)
             {
+                if (this.map.TryGetValue(dobj, out object cached))
+                {
+                    return cached;
+                }
+
                 // is obj an entity?
                 if (this.TryMapEntity(dobj, out object entity))
                 {
@@ -164,12 +167,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
             if (targetType.IsArray)
             {
                 array = this.MapFromDynamicObjectGraph(elements, targetType);
+                this.map.Add(dobj, array);
                 return true;
             }
 
             if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
             {
                 array = this.MapFromDynamicObjectGraph(elements, typeInfo.ResolveType(this.typeResolver));
+                this.map.Add(dobj, array);
                 return true;
             }
 
@@ -195,29 +200,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
 
             Type elementType = type.GenericTypeArguments[0];
+
+            // instantiate collection and add it to map
+            Type resultType =
+                dobj.TryGet(@"CollectionType", out object collTypeObj) && collTypeObj is Aqua.TypeSystem.TypeInfo typeInfo
+                ? typeInfo.ResolveType(this.typeResolver)
+                : typeof(OrderedQueryableList<>).MakeGenericType(elementType);
+            collection = Activator.CreateInstance(resultType);
+            this.map.Add(dobj, collection);
+
+            // map elements to list AFTER adding to map to avoid endless recursion
             Type listType = typeof(List<>).MakeGenericType(elementType);
+            elements = this.MapFromDynamicObjectGraph(elements, listType);
 
-            // map to list (supported directly by aqua-core)
-            collection = this.MapFromDynamicObjectGraph(elements, listType);
-
-            if (dobj.TryGet(@"CollectionType", out object collTypeObj)
-                && collTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
+            // copy elements from list to resulting collection
+            try
             {
-                // copy from list to specialized collection
-                Type collType = typeInfo.ResolveType(this.typeResolver);
-                collection = Activator.CreateInstance(collType, collection);
+                AddElementsToCollectionMethod.MakeGenericMethod(elementType).Invoke(null, new[] { collection, elements });
             }
-            else if (typeof(IQueryable).IsAssignableFrom(targetType))
+            catch (TargetInvocationException e) when (e.InnerException != null)
             {
-                // .AsQueryable
-                collection = MakeGenericQueryableMethod.MakeGenericMethod(elementType)
-                    .Invoke(null, new[] { collection });
-            }
-            else if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
-            {
-                // to OrderedEnumerable
-                collection = ToOrderedMethod.MakeGenericMethod(elementType)
-                    .Invoke(null, new[] { collection });
+                throw e.InnerException;
             }
 
             return true;
@@ -255,6 +258,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             grouping = MakeGenericGroupingMethod
                 .MakeGenericMethod(keyType, elementType)
                 .Invoke(null, new[] { key, elements });
+            this.map.Add(dobj, grouping);
+
             return true;
         }
 
@@ -275,11 +280,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             if (!this.entityTypeMap.TryGetValue(entityTypeName.ToString(), out IEntityType entityType))
             {
                 return false;
-            }
-
-            if (this.map.TryGetValue(dobj, out entity))
-            {
-                return true;
             }
 
             // Map only scalar properties for now, navigations have to be set later
@@ -365,14 +365,61 @@ namespace InfoCarrier.Core.Client.Query.Internal
             return true;
         }
 
-        private static IQueryable<TElement> MakeGenericQueryable<TElement>(IEnumerable<TElement> elements)
+        private static void AddElementsToCollection<TElement>(object collection, List<TElement> elements)
         {
-            return elements.AsQueryable();
+            switch (collection)
+            {
+                case ISet<TElement> set:
+                    set.UnionWith(elements);
+                    break;
+
+                case List<TElement> list:
+                    list.AddRange(elements);
+                    break;
+
+                case ICollection<TElement> coll:
+                    foreach (var element in elements)
+                    {
+                        coll.Add(element);
+                    }
+
+                    break;
+
+                default:
+                    throw new NotSupportedException(
+                        InfoCarrierStrings.CannotAddElementsToCollection(
+                            typeof(TElement),
+                            collection.GetType()));
+            }
         }
 
         private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
         {
             return elements.GroupBy(x => key).Single();
+        }
+
+        private class OrderedQueryableList<T> : List<T>, IOrderedEnumerable<T>, IOrderedQueryable<T>
+        {
+            private readonly IQueryable<T> queryable;
+
+            public OrderedQueryableList()
+            {
+                this.queryable = new EnumerableQuery<T>(this);
+            }
+
+            public Type ElementType => queryable.ElementType;
+
+            public Expression Expression => queryable.Expression;
+
+            public IQueryProvider Provider => queryable.Provider;
+
+            public IOrderedEnumerable<T> CreateOrderedEnumerable<TKey>(
+                Func<T, TKey> keySelector,
+                IComparer<TKey> comparer,
+                bool descending)
+            {
+                return descending ? this.OrderByDescending(keySelector, comparer) : this.OrderBy(keySelector, comparer);
+            }
         }
     }
 }

@@ -4,7 +4,9 @@
 namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.Linq;
     using Aqua.Dynamic;
     using InfoCarrier.Core.Client.Query.Internal;
@@ -153,6 +155,42 @@ namespace InfoCarrier.Core.FunctionalTests
         }
 
         [Fact]
+        public void Can_map_ObservableCollection()
+        {
+            // Arrange
+            this.listDto.Single().Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(typeof(ObservableCollection<int>), includePropertyInfos: false));
+
+            // Act
+            var result = this.queryResultMapper.MapAndTrackResults<ObservableCollection<int>>(this.listDto).ToList();
+
+            // Assert
+            Assert.Equal(1, result.Count);
+            Assert.Equal(3, result.Single().Count);
+        }
+
+        [Fact]
+        public void Can_map_IOrderedEnumerable()
+        {
+            // Act
+            var result = this.queryResultMapper.MapAndTrackResults<IOrderedEnumerable<int>>(this.listDto).ToList();
+
+            // Assert
+            Assert.Equal(1, result.Count);
+            Assert.Equal(3, result.Single().ThenBy(x => x).Count());
+        }
+
+        [Fact]
+        public void Can_map_IQueryable()
+        {
+            // Act
+            var result = this.queryResultMapper.MapAndTrackResults<IQueryable<int>>(this.listDto).ToList();
+
+            // Assert
+            Assert.Equal(1, result.Count);
+            Assert.Equal(typeof(int), result.Single().ElementType);
+        }
+
+        [Fact]
         public void Throws_on_list_with_missing_Elements()
         {
             // Arrange
@@ -160,6 +198,16 @@ namespace InfoCarrier.Core.FunctionalTests
 
             // Act / Assert
             Assert.Throws<ArgumentException>(() => this.queryResultMapper.MapAndTrackResults<int[]>(this.listDto));
+        }
+
+        [Fact]
+        public void Throws_on_nongeneric_collection()
+        {
+            // Arrange
+            this.listDto.Single().Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(typeof(ArrayList), includePropertyInfos: false));
+
+            // Act / Assert
+            Assert.Throws<NotSupportedException>(() => this.queryResultMapper.MapAndTrackResults<ArrayList>(this.listDto));
         }
 
         [Fact]
