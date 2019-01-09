@@ -13,6 +13,7 @@
     <PackageLicense>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicense>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/icon.png</PackageIconUrl>
   </PropertyGroup>
 
   <PropertyGroup>
