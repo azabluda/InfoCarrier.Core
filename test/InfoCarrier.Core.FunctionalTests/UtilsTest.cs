@@ -18,9 +18,17 @@ namespace InfoCarrier.Core.FunctionalTests
         }
 
         [Fact]
+        public void ToDelegate_with_target()
+        {
+            MethodInfo method = Utils.GetMethodInfo<UtilsTest>(x => x.Return42());
+            object fortyTwo = method.ToDelegate<Func<object>>(this).Invoke();
+            Assert.Equal(42, fortyTwo);
+        }
+
+        [Fact]
         public void ToDelegate_without_target()
         {
-            MethodInfo method = Utils.GetMethodInfo(() => Return42());
+            MethodInfo method = Utils.GetMethodInfo(() => StaticReturn42());
             object fortyTwo = method.ToDelegate<Func<object>>().Invoke();
             Assert.Equal(42, fortyTwo);
         }
@@ -34,7 +42,9 @@ namespace InfoCarrier.Core.FunctionalTests
             Assert.Equal(ExpressionType.Constant, replaced.NodeType);
         }
 
-        private static object Return42() => 42;
+        private object Return42() => 42;
+
+        private static object StaticReturn42() => 42;
 
         private class AnswerToEverythingExpression : Expression
         {
