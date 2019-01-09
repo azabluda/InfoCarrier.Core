@@ -7,6 +7,7 @@ namespace InfoCarrierSample
     using System.Collections.Generic;
     using System.Data.Common;
     using System.Data.SqlClient;
+    using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
@@ -15,6 +16,7 @@ namespace InfoCarrierSample
     {
         private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
             .AddEntityFrameworkSqlServer()
+            .AddInfoCarrierServer()
             .AddLogging(loggingBuilder => loggingBuilder.AddConsole())
             .BuildServiceProvider();
 
@@ -82,5 +84,8 @@ namespace InfoCarrierSample
             var context = new BloggingContext(optionsBuilder.Options);
             return context;
         }
+
+        public static IInfoCarrierServer CreateInfoCarrierServer()
+            => ServiceProvider.GetRequiredService<IInfoCarrierServer>();
     }
 }

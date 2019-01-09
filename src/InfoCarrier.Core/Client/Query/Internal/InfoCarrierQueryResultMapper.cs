@@ -8,12 +8,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
-    using System.Linq.Expressions;
-    using System.Reflection;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
     using InfoCarrier.Core.Common;
-    using InfoCarrier.Core.Properties;
+    using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -21,7 +19,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Storage;
-    using MethodInfo = System.Reflection.MethodInfo;
 
     /// <summary>
     ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -29,18 +26,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
     /// </summary>
     public class InfoCarrierQueryResultMapper : DynamicObjectMapper
     {
-        private static readonly MethodInfo AddElementsToCollectionMethod
-            = Utils.GetMethodInfo(() => AddElementsToCollection<object>(null, null))
-                .GetGenericMethodDefinition();
-
-        private static readonly MethodInfo MakeGenericGroupingMethod
-            = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
-                .GetGenericMethodDefinition();
-
         private readonly QueryContext queryContext;
         private readonly ITypeResolver typeResolver;
         private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
         private readonly IEntityMaterializerSource entityMaterializerSource;
+        private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
         private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
         private readonly List<Action<IStateManager>> trackEntityActions = new List<Action<IStateManager>>();
 
@@ -61,6 +51,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.typeResolver = typeResolver;
             this.entityTypeMap = entityTypeMap ?? BuildEntityTypeMap(queryContext.Context);
             this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
+            this.valueMappers = queryContext.Context.GetService<IEnumerable<IInfoCarrierValueMapper>>()
+                .Concat(StandardValueMappers.Mappers);
         }
 
         /// <summary>
@@ -116,170 +108,24 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     return cached;
                 }
 
-                // is obj an entity?
-                if (this.TryMapEntity(dobj, out object entity))
+                var valueMappingContext = new MapFromDynamicObjectContext(dobj, this);
+                foreach (IInfoCarrierValueMapper valueMapper in this.valueMappers)
                 {
-                    return entity;
-                }
-
-                // is obj an array
-                if (this.TryMapArray(dobj, targetType, out object array))
-                {
-                    return array;
-                }
-
-                // is obj a grouping
-                if (this.TryMapGrouping(dobj, targetType, out object grouping))
-                {
-                    return grouping;
-                }
-
-                // is obj a collection
-                if (this.TryMapCollection(dobj, targetType, out object collection))
-                {
-                    return collection;
+                    if (valueMapper.TryMapFromDynamicObject(valueMappingContext, out var mapped))
+                    {
+                        return mapped;
+                    }
                 }
             }
 
             return BaseImpl();
         }
 
-        private bool TryMapArray(DynamicObject dobj, Type targetType, out object array)
+        private object TryMapEntity(IMapFromDynamicObjectContext context, string entityTypeName, IReadOnlyList<string> loadedNavigations)
         {
-            array = null;
-
-            if (dobj.Type != null)
+            if (!this.entityTypeMap.TryGetValue(entityTypeName, out IEntityType entityType))
             {
-                // Our custom mapping of arrays doesn't contain Type
-                return false;
-            }
-
-            if (!dobj.TryGet(@"Elements", out object elements))
-            {
-                return false;
-            }
-
-            if (!dobj.TryGet(@"ArrayType", out object arrayTypeObj))
-            {
-                return false;
-            }
-
-            if (targetType.IsArray)
-            {
-                array = this.MapFromDynamicObjectGraph(elements, targetType);
-                this.map.Add(dobj, array);
-                return true;
-            }
-
-            if (arrayTypeObj is Aqua.TypeSystem.TypeInfo typeInfo)
-            {
-                array = this.MapFromDynamicObjectGraph(elements, typeInfo.ResolveType(this.typeResolver));
-                this.map.Add(dobj, array);
-                return true;
-            }
-
-            return false;
-        }
-
-        private bool TryMapCollection(DynamicObject dobj, Type targetType, out object collection)
-        {
-            collection = null;
-
-            Type type = dobj.Type?.ResolveType(this.typeResolver);
-
-            if (type == null
-                || !type.GetTypeInfo().IsGenericType
-                || type.GetGenericTypeDefinition() != typeof(IEnumerable<>))
-            {
-                return false;
-            }
-
-            if (!dobj.TryGet(@"Elements", out object elements))
-            {
-                return false;
-            }
-
-            Type elementType = type.GenericTypeArguments[0];
-
-            // instantiate collection and add it to map
-            Type resultType =
-                dobj.TryGet(@"CollectionType", out object collTypeObj) && collTypeObj is Aqua.TypeSystem.TypeInfo typeInfo
-                ? typeInfo.ResolveType(this.typeResolver)
-                : typeof(OrderedQueryableList<>).MakeGenericType(elementType);
-            collection = Activator.CreateInstance(resultType);
-            this.map.Add(dobj, collection);
-
-            // map elements to list AFTER adding to map to avoid endless recursion
-            Type listType = typeof(List<>).MakeGenericType(elementType);
-            elements = this.MapFromDynamicObjectGraph(elements, listType);
-
-            // copy elements from list to resulting collection
-            try
-            {
-                AddElementsToCollectionMethod.MakeGenericMethod(elementType).Invoke(null, new[] { collection, elements });
-            }
-            catch (TargetInvocationException e) when (e.InnerException != null)
-            {
-                throw e.InnerException;
-            }
-
-            return true;
-        }
-
-        private bool TryMapGrouping(DynamicObject dobj, Type targetType, out object grouping)
-        {
-            grouping = null;
-
-            Type type = dobj.Type?.ResolveType(this.typeResolver) ?? targetType;
-
-            if (type == null
-                || !type.GetTypeInfo().IsGenericType
-                || type.GetGenericTypeDefinition() != typeof(IGrouping<,>))
-            {
-                return false;
-            }
-
-            if (!dobj.TryGet(@"Key", out object key))
-            {
-                return false;
-            }
-
-            if (!dobj.TryGet(@"Elements", out object elements))
-            {
-                return false;
-            }
-
-            Type keyType = type.GenericTypeArguments[0];
-            Type elementType = type.GenericTypeArguments[1];
-
-            key = this.MapFromDynamicObjectGraph(key, keyType);
-            elements = this.MapFromDynamicObjectGraph(elements, typeof(List<>).MakeGenericType(elementType));
-
-            grouping = MakeGenericGroupingMethod
-                .MakeGenericMethod(keyType, elementType)
-                .Invoke(null, new[] { key, elements });
-            this.map.Add(dobj, grouping);
-
-            return true;
-        }
-
-        private bool TryMapEntity(DynamicObject dobj, out object entity)
-        {
-            entity = null;
-
-            if (!dobj.TryGet(@"__EntityType", out object entityTypeName))
-            {
-                return false;
-            }
-
-            if (!(entityTypeName is string))
-            {
-                return false;
-            }
-
-            if (!this.entityTypeMap.TryGetValue(entityTypeName.ToString(), out IEntityType entityType))
-            {
-                return false;
+                return null;
             }
 
             // Map only scalar properties for now, navigations have to be set later
@@ -288,23 +134,24 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     .GetProperties()
                     .Select(p =>
                     {
-                        object value = dobj.Get(p.Name);
+                        object value = context.Dto.Get(p.Name);
                         if (p.GetValueConverter() != null)
                         {
-                            value = this.MapFromDynamicObjectGraph(value, typeof(object));
+                            value = context.MapFromDynamicObjectGraph(value);
                             value = Utils.ConvertFromProvider(value, p);
                         }
 
-                        return this.MapFromDynamicObjectGraph(value, p.ClrType);
+                        return context.MapFromDynamicObjectGraph(value, p.ClrType);
                     })
                     .ToArray());
 
-            bool entityIsTracked = dobj.PropertyNames.Contains(@"__EntityLoadedNavigations");
+            bool entityIsTracked = loadedNavigations != null;
 
             // Get entity instance from EFC's identity map, or create a new one
             Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
             var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
 
+            object entity = null;
             IKey pk = entityType.FindPrimaryKey();
             if (pk != null)
             {
@@ -324,13 +171,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 entity = materializer.Invoke(materializationContext);
             }
 
-            this.map.Add(dobj, entity);
+            context.AddToCache(entity);
             object entityNoRef = entity;
 
             if (entityIsTracked)
             {
-                var loadedNavigations = this.Map<List<string>>(dobj.Get<DynamicObject>(@"__EntityLoadedNavigations"));
-
                 this.trackEntityActions.Add(sm =>
                 {
                     InternalEntityEntry entry
@@ -347,9 +192,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             foreach (INavigation navigation in entityType.GetNavigations())
             {
                 // TODO: shall we skip already loaded navigations if the entity is already tracked?
-                if (dobj.TryGet(navigation.Name, out object value) && value != null)
+                if (context.Dto.TryGet(navigation.Name, out object value) && value != null)
                 {
-                    value = this.MapFromDynamicObjectGraph(value, navigation.ClrType);
+                    value = context.MapFromDynamicObjectGraph(value, navigation.ClrType);
                     if (navigation.IsCollection())
                     {
                         // TODO: clear or skip collection if it already contains something?
@@ -362,64 +207,33 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
             }
 
-            return true;
+            return entity;
         }
 
-        private static void AddElementsToCollection<TElement>(object collection, List<TElement> elements)
+        private class MapFromDynamicObjectContext : IMapFromDynamicObjectContext
         {
-            switch (collection)
+            private readonly InfoCarrierQueryResultMapper mapper;
+
+            public MapFromDynamicObjectContext(DynamicObject dto, InfoCarrierQueryResultMapper mapper)
             {
-                case ISet<TElement> set:
-                    set.UnionWith(elements);
-                    break;
-
-                case List<TElement> list:
-                    list.AddRange(elements);
-                    break;
-
-                case ICollection<TElement> coll:
-                    foreach (var element in elements)
-                    {
-                        coll.Add(element);
-                    }
-
-                    break;
-
-                default:
-                    throw new NotSupportedException(
-                        InfoCarrierStrings.CannotAddElementsToCollection(
-                            typeof(TElement),
-                            collection.GetType()));
-            }
-        }
-
-        private static IGrouping<TKey, TElement> MakeGenericGrouping<TKey, TElement>(TKey key, IEnumerable<TElement> elements)
-        {
-            return elements.GroupBy(x => key).Single();
-        }
-
-        private class OrderedQueryableList<T> : List<T>, IOrderedEnumerable<T>, IOrderedQueryable<T>
-        {
-            private readonly IQueryable<T> queryable;
-
-            public OrderedQueryableList()
-            {
-                this.queryable = new EnumerableQuery<T>(this);
+                this.mapper = mapper;
+                this.Dto = dto;
             }
 
-            public Type ElementType => queryable.ElementType;
+            public DynamicObject Dto { get; }
 
-            public Expression Expression => queryable.Expression;
+            public ITypeResolver TypeResolver => this.mapper.typeResolver;
 
-            public IQueryProvider Provider => queryable.Provider;
+            public object MapFromDynamicObjectGraph(object obj, Type targetType = null)
+                => this.mapper.MapFromDynamicObjectGraph(obj, targetType ?? typeof(object));
 
-            public IOrderedEnumerable<T> CreateOrderedEnumerable<TKey>(
-                Func<T, TKey> keySelector,
-                IComparer<TKey> comparer,
-                bool descending)
-            {
-                return descending ? this.OrderByDescending(keySelector, comparer) : this.OrderBy(keySelector, comparer);
-            }
+            public void AddToCache(object obj)
+                => this.mapper.map.Add(this.Dto, obj);
+
+            public object TryMapEntity(
+                string entityTypeName,
+                IReadOnlyList<string> loadedNavigations)
+                => this.mapper.TryMapEntity(this, entityTypeName, loadedNavigations);
         }
     }
 }

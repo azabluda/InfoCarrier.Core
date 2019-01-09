@@ -17,6 +17,7 @@ namespace InfoCarrierSample.Controllers
     [Route("api")]
     public class InfoCarrierController : ControllerBase
     {
+        private readonly IInfoCarrierServer infoCarrierServer = SqlServerShared.CreateInfoCarrierServer();
         private readonly IMemoryCache cache;
 
         public InfoCarrierController(IMemoryCache memoryCache)
@@ -30,23 +31,13 @@ namespace InfoCarrierSample.Controllers
 
         [HttpPost]
         [Route("QueryData")]
-        public async Task<QueryDataResult> PostQueryDataAsync([FromBody] QueryDataRequest request)
-        {
-            using (var helper = new QueryDataHelper(this.CreateDbContext, request))
-            {
-                return await helper.QueryDataAsync();
-            }
-        }
+        public Task<QueryDataResult> PostQueryDataAsync([FromBody] QueryDataRequest request)
+            => this.infoCarrierServer.QueryDataAsync(this.CreateDbContext, request);
 
         [HttpPost]
         [Route("SaveChanges")]
-        public async Task<SaveChangesResult> PostSaveChangesAsync([FromBody] SaveChangesRequest request)
-        {
-            using (var helper = new SaveChangesHelper(this.CreateDbContext, request))
-            {
-                return await helper.SaveChangesAsync();
-            }
-        }
+        public Task<SaveChangesResult> PostSaveChangesAsync([FromBody] SaveChangesRequest request)
+            => this.infoCarrierServer.SaveChangesAsync(this.CreateDbContext, request);
 
         [HttpPost]
         [Route("BeginTransaction")]

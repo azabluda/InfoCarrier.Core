@@ -19,13 +19,13 @@ namespace InfoCarrier.Core.Client
     using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
 
     /// <summary>
-    ///     InfoCarrier specific extension methods for <see cref="IServiceCollection" />.
+    ///     InfoCarrier client specific extension methods for <see cref="IServiceCollection" />.
     /// </summary>
     public static class InfoCarrierServiceCollectionExtensions
     {
         /// <summary>
         ///     <para>
-        ///         Adds the services required by InfoCarrier.Core for Entity Framework
+        ///         Adds the client related services required by InfoCarrier.Core for Entity Framework
         ///         to an <see cref="IServiceCollection" />. You use this method when using dependency injection
         ///         in your application, such as with ASP.NET. For more information on setting up dependency
         ///         injection, see http://go.microsoft.com/fwlink/?LinkId=526890.

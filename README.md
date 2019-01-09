@@ -117,7 +117,7 @@ using (var context = new BloggingContext(optionsBuilder.Options))
 
 ### Server
 
-Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the back-end service. In the simple case when no transaction support is required it may look like the following:
+Implement your back-end service with the help of `IInfoCarrierServer`. In the simple case when no transaction support is required it may look like the following:
 
 ```C#
 [ServiceContract]
@@ -133,27 +133,32 @@ public interface IWcfService
 [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
 public class InfoCarrierService : IWcfService
 {
-    private DbContext CreateDbContext()
+    private readonly ServiceProvider serviceProvider;
+    private readonly DbContextOptions dbContextOptions;
+    private readonly IInfoCarrierServer infoCarrierServer;
+
+    public InfoCarrierService()
     {
+        this.serviceProvider = new ServiceCollection()
+            .AddEntityFrameworkSqlServer()
+            .AddInfoCarrierServer() // add IInfoCarrierServer service
+            .BuildServiceProvider();
+
         var optionsBuilder = new DbContextOptionsBuilder();
+        optionsBuilder.UseInternalServiceProvider(this.serviceProvider);
         optionsBuilder.UseSqlServer(connectionString);
-        return new BloggingContext(optionsBuilder.Options);
+        this.dbContextOptions = optionsBuilder.Options;
+
+        this.infoCarrierServer = this.serviceProvider.GetRequiredService<IInfoCarrierServer>();
     }
+
+    private DbContext CreateDbContext()
+        => new BloggingContext(dbContextOptions);
 
     public QueryDataResult ProcessQueryDataRequest(QueryDataRequest request)
-    {
-        using (var helper = new QueryDataHelper(this.CreateDbContext, request))
-        {
-            return helper.QueryData();
-        }
-    }
+        => this.infoCarrierServer.QueryData(this.CreateDbContext, request);
 
     public SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request)
-    {
-        using (var helper = new SaveChangesHelper(this.CreateDbContext, request))
-        {
-            return helper.SaveChanges();
-        }
-    }
+        => this.infoCarrierServer.SaveChanges(this.CreateDbContext, request);
 }
 ```

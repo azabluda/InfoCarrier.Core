@@ -24,6 +24,7 @@ namespace InfoCarrier.Core.Server
     ///     Server-side implementation of <see cref="IInfoCarrierBackend.SaveChanges" /> and
     ///     <see cref="IInfoCarrierBackend.SaveChangesAsync" /> methods.
     /// </summary>
+    [Obsolete("Use IInfoCarrierServer instead.")]
     public class SaveChangesHelper : IDisposable
     {
         private readonly DbContext dbContext;
