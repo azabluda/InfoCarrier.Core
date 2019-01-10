@@ -8,6 +8,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using InfoCarrier.Core.Common;
+    using InfoCarrier.Core.Common.ValueMapping;
     using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -28,6 +29,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             this.testStoreProperties = testStoreProperties;
             this.ServiceProvider = this.AddServices(new ServiceCollection())
                 .AddInfoCarrierServer()
+                .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton(TestModelSource.GetFactory(this.testStoreProperties.OnModelCreating))
                 .AddDbContext(
                     this.testStoreProperties.ContextType,

@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
     using System;
     using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -55,6 +56,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
             => serviceCollection.AddEntityFrameworkInfoCarrierBackend()
+                .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton(TestModelSource.GetFactory(this.testStoreProperties.OnModelCreating));
 
         public virtual ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
