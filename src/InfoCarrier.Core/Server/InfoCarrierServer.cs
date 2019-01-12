@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Server
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
@@ -16,15 +17,15 @@ namespace InfoCarrier.Core.Server
     /// </summary>
     public class InfoCarrierServer : IInfoCarrierServer
     {
-        private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
+        private readonly IEnumerable<IInfoCarrierValueMapper> customValueMappers;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="InfoCarrierServer"/> class.
         /// </summary>
-        /// <param name="valueMappers"> Custom value mappers. </param>
-        public InfoCarrierServer(IEnumerable<IInfoCarrierValueMapper> valueMappers)
+        /// <param name="customValueMappers"> Custom value mappers. </param>
+        public InfoCarrierServer(IEnumerable<IInfoCarrierValueMapper> customValueMappers = null)
         {
-            this.valueMappers = valueMappers;
+            this.customValueMappers = customValueMappers ?? Enumerable.Empty<IInfoCarrierValueMapper>();
         }
 
         /// <summary>
@@ -43,7 +44,7 @@ namespace InfoCarrier.Core.Server
         {
             using (DbContext dbContext = dbContextFactory())
             {
-                return new QueryDataHelper(dbContext, request, this.valueMappers).QueryData();
+                return new QueryDataHelper(dbContext, request, this.customValueMappers).QueryData();
             }
         }
 
@@ -67,7 +68,7 @@ namespace InfoCarrier.Core.Server
         {
             using (DbContext dbContext = dbContextFactory())
             {
-                return await new QueryDataHelper(dbContext, request, this.valueMappers).QueryDataAsync(cancellationToken);
+                return await new QueryDataHelper(dbContext, request, this.customValueMappers).QueryDataAsync(cancellationToken);
             }
         }
 

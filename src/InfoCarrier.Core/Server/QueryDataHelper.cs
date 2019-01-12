@@ -47,14 +47,14 @@ namespace InfoCarrier.Core.Server
         /// </summary>
         /// <param name="dbContext"> <see cref="DbContext" /> against which the requested query will be executed. </param>
         /// <param name="request"> The <see cref="QueryDataRequest" /> object from the client containing the query. </param>
-        /// <param name="valueMappers"> Custom value mappers. </param>
+        /// <param name="customValueMappers"> Custom value mappers. </param>
         public QueryDataHelper(
             DbContext dbContext,
             QueryDataRequest request,
-            IEnumerable<IInfoCarrierValueMapper> valueMappers)
+            IEnumerable<IInfoCarrierValueMapper> customValueMappers)
         {
             this.dbContext = dbContext;
-            this.valueMappers = valueMappers.Concat(StandardValueMappers.Mappers);
+            this.valueMappers = customValueMappers.Concat(StandardValueMappers.Mappers);
 
             this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
             IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
@@ -166,7 +166,11 @@ namespace InfoCarrier.Core.Server
             private readonly Dictionary<object, DynamicObject> cachedDtos =
                 new Dictionary<object, DynamicObject>();
 
-            public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver, ITypeInfoProvider typeInfoProvider, IEnumerable<IInfoCarrierValueMapper> valueMappers)
+            public EntityToDynamicObjectMapper(
+                DbContext dbContext,
+                ITypeResolver typeResolver,
+                ITypeInfoProvider typeInfoProvider,
+                IEnumerable<IInfoCarrierValueMapper> valueMappers)
                 : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
                 this.valueMappers = valueMappers;
