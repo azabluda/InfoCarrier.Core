@@ -15,14 +15,14 @@ namespace InfoCarrierSample
     using Newtonsoft.Json;
     using Remote.Linq;
 
-    internal class WebApiBackendImpl : IInfoCarrierBackend
+    internal class WebApiInfoCarrierClientImpl : IInfoCarrierClient
     {
         private readonly HttpClient client;
         private string transactionId;
 
         private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
 
-        public WebApiBackendImpl()
+        public WebApiInfoCarrierClientImpl()
         {
             var handler = new HttpClientHandler
             {

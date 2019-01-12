@@ -3,14 +3,12 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
-    using System;
     using System.Linq;
+    using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
     using Xunit;
     using Xunit.Abstractions;
 
@@ -35,34 +33,22 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             }
         }
 
+        [ConditionalFact(Skip = "Concurrency detection mechanism cannot be used")]
         public override void Throws_on_concurrent_query_list()
         {
-            // Old implementation prior to
-            // https://github.com/aspnet/EntityFrameworkCore/commit/654dbcc408d4649a54d0ed7de5f1f06b64114f8b
-            using (var context = this.CreateContext())
-            {
-                ((IInfrastructure<IServiceProvider>)context).Instance.GetService<IConcurrencyDetector>().EnterCriticalSection();
-
-                Assert.Equal(
-                    CoreStrings.ConcurrentMethodInvocation,
-                    Assert.Throws<InvalidOperationException>(
-                        () => context.Customers.ToList()).Message);
-            }
+            base.Throws_on_concurrent_query_list();
         }
 
+        [ConditionalFact(Skip = "Concurrency detection mechanism cannot be used")]
         public override void Throws_on_concurrent_query_first()
         {
-            // Old implementation prior to
-            // https://github.com/aspnet/EntityFrameworkCore/commit/654dbcc408d4649a54d0ed7de5f1f06b64114f8b
-            using (var context = this.CreateContext())
-            {
-                ((IInfrastructure<IServiceProvider>)context).Instance.GetService<IConcurrencyDetector>().EnterCriticalSection();
+            base.Throws_on_concurrent_query_first();
+        }
 
-                Assert.Equal(
-                    CoreStrings.ConcurrentMethodInvocation,
-                    Assert.Throws<InvalidOperationException>(
-                        () => context.Customers.First()).Message);
-            }
+        [ConditionalTheory(Skip = "Client-side evaluation is not supported")]
+        public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool isAsync)
+        {
+            return base.Client_OrderBy_GroupBy_Group_ordering_works(isAsync);
         }
     }
 }

@@ -3,6 +3,7 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Threading.Tasks;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -16,16 +17,10 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
         }
 
-        [ConditionalFact(Skip = "issue #4311")]
-        public override void Nested_group_join_with_take()
+        [ConditionalTheory(Skip = "issue #13561")]
+        public override Task Complex_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_with_other_query_operators_composed_on_top(bool isAsync)
         {
-            base.Nested_group_join_with_take();
-        }
-
-        [ConditionalFact(Skip = "issue #9591")]
-        public override void Multi_include_with_groupby_in_subquery()
-        {
-            base.Multi_include_with_groupby_in_subquery();
+            return base.Complex_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_with_other_query_operators_composed_on_top(isAsync);
         }
 
         public class TestFixture : ComplexNavigationsQueryFixtureBase

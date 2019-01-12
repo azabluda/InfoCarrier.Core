@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
 {
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Metadata.Conventions;
     using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
     using Microsoft.EntityFrameworkCore.TestUtilities;
 
@@ -16,7 +17,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
         {
         }
 
-        public class TestFixture : F1FixtureBase
+        public class TestFixture : F1InfoCarrierFixtureBase
         {
             private ITestStoreFactory testStoreFactory;
 
@@ -25,11 +26,15 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                     ref this.testStoreFactory,
                     InfoCarrierTestStoreFactory.SqlServer,
                     this.ContextType,
-                    this.OnModelCreating);
+                    this.OnModelCreating,
+                    b => b.UseModel(this.CreateModelExternal()));
 
-            protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
+            public override ModelBuilder CreateModelBuilder() =>
+                new ModelBuilder(SqlServerConventionSetBuilder.Build());
+
+            protected override void BuildModelExternal(ModelBuilder modelBuilder)
             {
-                base.OnModelCreating(modelBuilder, context);
+                base.BuildModelExternal(modelBuilder);
 
                 modelBuilder.Entity<Team>().Property(e => e.Id).ValueGeneratedNever();
 

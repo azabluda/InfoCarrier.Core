@@ -4,12 +4,9 @@
 namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
-    using InfoCarrier.Core.Client;
     using InfoCarrier.Core.FunctionalTests.SqlServer;
-    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.Extensions.DependencyInjection;
     using Xunit;
 
     public class InfoCarrierTransactionManagerTest : IClassFixture<InfoCarrierTransactionManagerTest.TestFixture>
@@ -126,25 +123,6 @@ namespace InfoCarrier.Core.FunctionalTests
                     Assert.Throws<InvalidOperationException>(
                         () => context.Database.RollbackTransaction()).Message);
             }
-        }
-
-        [Fact]
-        public void Context_pooling_is_not_supported()
-        {
-            var serviceProvider =
-                new ServiceCollection()
-                    .AddEntityFrameworkInfoCarrierBackend()
-                    .AddDbContextPool<DbContext>(
-                        ob => ob.UseInfoCarrierBackend(
-                            InfoCarrierTestHelpers.CreateDummyBackend(typeof(DbContext))))
-                    .BuildServiceProvider();
-
-            var serviceScope = serviceProvider.CreateScope();
-            var scopedProvider = serviceScope.ServiceProvider;
-            var context = scopedProvider.GetService<DbContext>();
-            context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-
-            Assert.Throws<NotImplementedException>(() => serviceScope.Dispose());
         }
 
         public class TestFixture : GraphUpdatesInfoCarrierTest.TestFixture

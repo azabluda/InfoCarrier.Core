@@ -18,12 +18,12 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
         public static InfoCarrierTestHelpers Instance { get; } = new InfoCarrierTestHelpers();
 
         public override IServiceCollection AddProviderServices(IServiceCollection services)
-            => services.AddEntityFrameworkInfoCarrierBackend();
+            => services.AddEntityFrameworkInfoCarrierClient();
 
         protected override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
-            => optionsBuilder.UseInfoCarrierBackend(CreateDummyBackend(optionsBuilder.Options.ContextType));
+            => optionsBuilder.UseInfoCarrierClient(CreateDummyClient(optionsBuilder.Options.ContextType));
 
-        public static IInfoCarrierBackend CreateDummyBackend(Type contextType)
+        public static IInfoCarrierClient CreateDummyClient(Type contextType)
             => new SqlServerTestStore(
                 "DummyDatabase",
                 false,

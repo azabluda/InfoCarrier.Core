@@ -19,13 +19,13 @@ namespace InfoCarrier.Core.Client
     using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
 
     /// <summary>
-    ///     InfoCarrier specific extension methods for <see cref="IServiceCollection" />.
+    ///     InfoCarrier client specific extension methods for <see cref="IServiceCollection" />.
     /// </summary>
     public static class InfoCarrierServiceCollectionExtensions
     {
         /// <summary>
         ///     <para>
-        ///         Adds the services required by InfoCarrier.Core for Entity Framework
+        ///         Adds the client related services required by InfoCarrier.Core for Entity Framework
         ///         to an <see cref="IServiceCollection" />. You use this method when using dependency injection
         ///         in your application, such as with ASP.NET. For more information on setting up dependency
         ///         injection, see http://go.microsoft.com/fwlink/?LinkId=526890.
@@ -40,7 +40,7 @@ namespace InfoCarrier.Core.Client
         /// <returns>
         ///     The same service collection so that multiple calls can be chained.
         /// </returns>
-        public static IServiceCollection AddEntityFrameworkInfoCarrierBackend(this IServiceCollection serviceCollection)
+        public static IServiceCollection AddEntityFrameworkInfoCarrierClient(this IServiceCollection serviceCollection)
         {
             var builder = new EntityFrameworkServicesBuilder(serviceCollection)
                 .TryAdd<IQueryCompiler, InfoCarrierQueryCompiler>()
@@ -53,6 +53,7 @@ namespace InfoCarrier.Core.Client
                 .TryAdd<IEntityQueryModelVisitorFactory, InfoCarrierQueryModelVisitorFactory>()
                 .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
                 .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
+                .TryAdd<ITypeMappingSource, InfoCarrierTypeMappingSource>()
                 .TryAddProviderSpecificServices(b => b
                     .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>());
 

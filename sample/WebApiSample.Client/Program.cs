@@ -8,11 +8,16 @@ namespace InfoCarrierSample
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
 
     internal class Program
     {
+        private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
+            .AddEntityFrameworkInfoCarrierClient()
+            .AddLogging(loggingBuilder => loggingBuilder.AddConsole().AddFilter((msg, level) => true))
+            .BuildServiceProvider();
+
         private static async Task Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionTrapper;
@@ -70,13 +75,12 @@ namespace InfoCarrierSample
 
         private static BloggingContext CreateContext()
         {
-            var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseInfoCarrierBackend(new WebApiBackendImpl());
-            var options = optionsBuilder.Options;
+            var optionsBuilder = new DbContextOptionsBuilder()
+                .UseInternalServiceProvider(ServiceProvider)
+                .EnableSensitiveDataLogging()
+                .UseInfoCarrierClient(new WebApiInfoCarrierClientImpl());
 
-            BloggingContext context = new BloggingContext(options);
-            context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
-            return context;
+            return new BloggingContext(optionsBuilder.Options);
         }
 
         private static void UnhandledExceptionTrapper(object sender, UnhandledExceptionEventArgs e)

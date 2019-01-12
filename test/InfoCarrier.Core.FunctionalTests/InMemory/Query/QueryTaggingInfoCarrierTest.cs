@@ -7,9 +7,9 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Xunit.Abstractions;
 
-    public class AsyncQueryNavigationsInfoCarrierTest : AsyncQueryNavigationsTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
+    public class QueryTaggingInfoCarrierTest : QueryTaggingTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
     {
-        public AsyncQueryNavigationsInfoCarrierTest(
+        public QueryTaggingInfoCarrierTest(
             NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {

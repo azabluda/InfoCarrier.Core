@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
     using System;
     using InfoCarrier.Core.Client;
+    using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -54,7 +55,11 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             => new InfoCarrierTestStore(this.backendTestStoreFactory(storeName, true, this.testStoreProperties));
 
         public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
-            => serviceCollection.AddEntityFrameworkInfoCarrierBackend()
+            => serviceCollection.AddEntityFrameworkInfoCarrierClient()
+                .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton(TestModelSource.GetFactory(this.testStoreProperties.OnModelCreating));
+
+        public virtual ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
+            => new ListLoggerFactory(shouldLogCategory);
     }
 }

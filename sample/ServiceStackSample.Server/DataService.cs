@@ -15,6 +15,8 @@ namespace InfoCarrierSample
     [Authenticate]
     public class DataService : Service
     {
+        private readonly IInfoCarrierServer infoCarrierServer = SqlServerShared.CreateInfoCarrierServer();
+
         private DbTransaction SessionDbTransaction
         {
             get => this.SessionAs<UserSession>()?.DbTransaction;
@@ -30,20 +32,10 @@ namespace InfoCarrierSample
         }
 
         public async Task<QueryDataResponse> Any(QueryData request)
-        {
-            using (var helper = new QueryDataHelper(this.CreateContext, request.Request))
-            {
-                return new QueryDataResponse(await helper.QueryDataAsync());
-            }
-        }
+            => new QueryDataResponse(await this.infoCarrierServer.QueryDataAsync(this.CreateContext, request.Request));
 
         public async Task<SaveChangesResponse> Any(SaveChanges request)
-        {
-            using (var helper = new SaveChangesHelper(this.CreateContext, request.Request))
-            {
-                return new SaveChangesResponse(await helper.SaveChangesAsync());
-            }
-        }
+            => new SaveChangesResponse(await this.infoCarrierServer.SaveChangesAsync(this.CreateContext, request.Request));
 
         public async Task Any(BeginTransaction request)
         {

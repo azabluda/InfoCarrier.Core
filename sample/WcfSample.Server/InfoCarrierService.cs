@@ -12,37 +12,19 @@ namespace InfoCarrierSample
     [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
     public class InfoCarrierService : IWcfService
     {
-        public QueryDataResult ProcessQueryDataRequest(QueryDataRequest request)
-        {
-            using (var helper = new QueryDataHelper(this.CreateDbContext, request))
-            {
-                return helper.QueryData();
-            }
-        }
+        private readonly IInfoCarrierServer infoCarrierServer = SqlServerShared.CreateInfoCarrierServer();
 
-        public async Task<QueryDataResult> ProcessQueryDataRequestAsync(QueryDataRequest request)
-        {
-            using (var helper = new QueryDataHelper(this.CreateDbContext, request))
-            {
-                return await helper.QueryDataAsync();
-            }
-        }
+        public QueryDataResult ProcessQueryDataRequest(QueryDataRequest request)
+            => this.infoCarrierServer.QueryData(this.CreateDbContext, request);
+
+        public Task<QueryDataResult> ProcessQueryDataRequestAsync(QueryDataRequest request)
+            => this.infoCarrierServer.QueryDataAsync(this.CreateDbContext, request);
 
         public SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request)
-        {
-            using (var helper = new SaveChangesHelper(this.CreateDbContext, request))
-            {
-                return helper.SaveChanges();
-            }
-        }
+            => this.infoCarrierServer.SaveChanges(this.CreateDbContext, request);
 
-        public async Task<SaveChangesResult> ProcessSaveChangesRequestAsync(SaveChangesRequest request)
-        {
-            using (var helper = new SaveChangesHelper(this.CreateDbContext, request))
-            {
-                return await helper.SaveChangesAsync();
-            }
-        }
+        public Task<SaveChangesResult> ProcessSaveChangesRequestAsync(SaveChangesRequest request)
+            => this.infoCarrierServer.SaveChangesAsync(this.CreateDbContext, request);
 
         private DbContext CreateDbContext() => SqlServerShared.CreateDbContext();
     }

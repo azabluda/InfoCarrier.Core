@@ -15,6 +15,6 @@ namespace InfoCarrier.Core.FunctionalTests
 
         protected override DbContextOptionsBuilder CreateOptionsBuilder()
             => new DbContextOptionsBuilder()
-                .UseInfoCarrierBackend(InfoCarrierTestHelpers.CreateDummyBackend(typeof(DbContext)));
+                .UseInfoCarrierClient(InfoCarrierTestHelpers.CreateDummyClient(typeof(DbContext)));
     }
 }

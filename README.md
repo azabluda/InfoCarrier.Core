@@ -3,7 +3,7 @@
 | branch | package | AppVeyor | Code Coverage |
 | --- | --- | --- | --- |
 | `master` | [![NuGet Badge](https://buildstats.info/nuget/InfoCarrier.Core)](http://www.nuget.org/packages/InfoCarrier.Core) | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/master?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/master) | - |
-| `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) | [![codecov](https://codecov.io/gh/azabluda/InfoCarrier.Core/branch/develop/graph/badge.svg)](https://codecov.io/gh/azabluda/InfoCarrier.Core/branch/develop) |
+| `develop` | - | [![Build status](https://ci.appveyor.com/api/projects/status/7jd134yd7m2w035h/branch/develop?svg=true)](https://ci.appveyor.com/project/azabluda/infocarrier-core/branch/develop) | [![codecov](https://codecov.io/gh/azabluda/InfoCarrier.Core/branch/develop/graph/badge.svg)](https://codecov.io/gh/azabluda/InfoCarrier.Core) |
 
 
 
@@ -21,8 +21,8 @@ It is important to note that InfoCarrier.Core dictates neither the communication
   * Eager/Lazy/Explicit Loading of Navigation Properties
   * etc.
 * DbContext and entity classes shared between client and server, no need to duplicate this code
-* Concise client-side interface `IInfoCarrierBackend`
-* Easy to use server-side classes `QueryDataHelper` and `SaveChangesHelper`
+* Concise client-side interface `IInfoCarrierClient`
+* Easy to use server-side service `IInfoCarrierServer`
 * You decide what communication platform to use
 
 ### Credits:
@@ -60,9 +60,9 @@ public class BloggingContext : DbContext
 
 ### Client
 
-Implement `IInfoCarrierBackend` interface, e.g. using Windows Communication Foundation
+Implement `IInfoCarrierClient` interface, e.g. using Windows Communication Foundation
 ```C#
-public class WcfBackendImpl : IInfoCarrierBackend
+public class WcfInfoCarrierClient : IInfoCarrierClient
 {
     private readonly ChannelFactory<IWcfService> channelFactory
         = new ChannelFactory<IWcfService>(...);
@@ -89,15 +89,15 @@ public class WcfBackendImpl : IInfoCarrierBackend
         }
     }
 
-    // Let other methods of IInfoCarrierBackend just throw NotSupportedException for now.
+    // Let other methods of IInfoCarrierClient just throw NotSupportedException for now.
     ...
 }
 ```
 
 Configure and use Entity Framework Core
 ```C#
-var optionsBuilder = new DbContextOptionsBuilder();
-optionsBuilder.UseInfoCarrierBackend(new WcfBackendImpl());
+var optionsBuilder = new DbContextOptionsBuilder()
+    .UseInfoCarrierClient(new WcfInfoCarrierClient());
 
 using (var context = new BloggingContext(optionsBuilder.Options))
 {
@@ -117,7 +117,7 @@ using (var context = new BloggingContext(optionsBuilder.Options))
 
 ### Server
 
-Use `QueryDataHelper` and `SaveChangesHelper` classes to implement the back-end service. In the simple case when no transaction support is required it may look like the following:
+Implement your back-end service with the help of `IInfoCarrierServer`. In the simple case when no transaction support is required it may look like the following:
 
 ```C#
 [ServiceContract]
@@ -133,27 +133,32 @@ public interface IWcfService
 [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
 public class InfoCarrierService : IWcfService
 {
-    private DbContext CreateDbContext()
+    private readonly ServiceProvider serviceProvider;
+    private readonly DbContextOptions dbContextOptions;
+    private readonly IInfoCarrierServer infoCarrierServer;
+
+    public InfoCarrierService()
     {
-        var optionsBuilder = new DbContextOptionsBuilder();
-        optionsBuilder.UseSqlServer(connectionString);
-        return new BloggingContext(optionsBuilder.Options);
+        this.serviceProvider = new ServiceCollection()
+            .AddEntityFrameworkSqlServer()
+            .AddInfoCarrierServer() // add IInfoCarrierServer service
+            .BuildServiceProvider();
+
+        var optionsBuilder = new DbContextOptionsBuilder()
+            .UseInternalServiceProvider(this.serviceProvider)
+            .UseSqlServer(connectionString);
+        this.dbContextOptions = optionsBuilder.Options;
+
+        this.infoCarrierServer = this.serviceProvider.GetRequiredService<IInfoCarrierServer>();
     }
+
+    private DbContext CreateDbContext()
+        => new BloggingContext(dbContextOptions);
 
     public QueryDataResult ProcessQueryDataRequest(QueryDataRequest request)
-    {
-        using (var helper = new QueryDataHelper(this.CreateDbContext, request))
-        {
-            return helper.QueryData();
-        }
-    }
+        => this.infoCarrierServer.QueryData(this.CreateDbContext, request);
 
     public SaveChangesResult ProcessSaveChangesRequest(SaveChangesRequest request)
-    {
-        using (var helper = new SaveChangesHelper(this.CreateDbContext, request))
-        {
-            return helper.SaveChanges();
-        }
-    }
+        => this.infoCarrierServer.SaveChanges(this.CreateDbContext, request);
 }
 ```

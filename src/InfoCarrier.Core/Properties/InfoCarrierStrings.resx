@@ -135,4 +135,7 @@
   <data name="NullConditionalExpressionStubMethodInvoked" xml:space="preserve">
     <value>The NullConditionalExpressionStub&amp;lt;T&amp;gt; method may only be used within LINQ queries.</value>
   </data>
+  <data name="CannotAddElementsToCollection" xml:space="preserve">
+    <value>Cannot add elements of type '{elementType}' to a collection of type '{collectionType}'.</value>
+  </data>
 </root>

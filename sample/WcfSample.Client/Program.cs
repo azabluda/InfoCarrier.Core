@@ -8,28 +8,28 @@ namespace InfoCarrierSample
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
 
     internal class Program
     {
+        private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
+            .AddEntityFrameworkInfoCarrierClient()
+            .AddLogging(loggingBuilder => loggingBuilder.AddConsole().AddFilter((msg, level) => true))
+            .BuildServiceProvider();
+
         private static async Task Main(string[] args)
         {
             Console.WriteLine(@"Wait until the server is ready, then press any key to start.");
             Console.ReadKey();
 
-            var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseInfoCarrierBackend(new WcfBackendImpl());
-            var options = optionsBuilder.Options;
-
-            // Activate console logging
-            using (var context = new BloggingContext(options))
-            {
-                context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
-            }
+            var optionsBuilder = new DbContextOptionsBuilder()
+                .UseInternalServiceProvider(ServiceProvider)
+                .EnableSensitiveDataLogging()
+                .UseInfoCarrierClient(new WcfInfoCarrierClientImpl());
 
             // Select and update
-            using (var context = new BloggingContext(options))
+            using (var context = new BloggingContext(optionsBuilder.Options))
             {
                 Post myBlogPost = (
                     from blog in context.Blogs

@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1642:ConstructorSummaryDocumentationMustBeginWithStandardText", Justification = "Entity Framework Core internal.")]
         public InfoCarrierOptionsExtension(InfoCarrierOptionsExtension copyFrom)
         {
-            this.InfoCarrierBackend = copyFrom.InfoCarrierBackend;
+            this.InfoCarrierClient = copyFrom.InfoCarrierClient;
         }
 
         /// <summary>
@@ -38,14 +38,14 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1623:PropertySummaryDocumentationMustMatchAccessors", Justification = "Entity Framework Core internal.")]
-        public IInfoCarrierBackend InfoCarrierBackend { get; set; }
+        public IInfoCarrierClient InfoCarrierClient { get; set; }
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1623:PropertySummaryDocumentationMustMatchAccessors", Justification = "Entity Framework Core internal.")]
-        public string LogFragment => $"InfoCarrierServerUrl={this.InfoCarrierBackend.ServerUrl} ";
+        public string LogFragment => $"InfoCarrierServerUrl={this.InfoCarrierClient.ServerUrl} ";
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -55,7 +55,7 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public virtual bool ApplyServices(IServiceCollection services)
         {
-            services.AddEntityFrameworkInfoCarrierBackend();
+            services.AddEntityFrameworkInfoCarrierClient();
             return true;
         }
 

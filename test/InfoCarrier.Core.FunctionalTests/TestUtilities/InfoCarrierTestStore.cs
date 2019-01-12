@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
         }
 
         public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-            => builder.UseInfoCarrierBackend(this.backend);
+            => builder.UseInfoCarrierClient(this.backend);
 
         public override void Clean(DbContext context)
         {

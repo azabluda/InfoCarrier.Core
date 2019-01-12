@@ -83,6 +83,12 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                         b.Property(e => e.OnUpdateThrowBeforeThrowAfter).HasDefaultValue("Rabbit");
                     });
 
+                modelBuilder.Entity<WithBackingFields>(b =>
+                {
+                    b.Property(e => e.NullableAsNonNullable).HasComputedColumnSql("1");
+                    b.Property(e => e.NonNullableAsNullable).HasComputedColumnSql("1");
+                });
+
                 base.OnModelCreating(modelBuilder, context);
             }
         }

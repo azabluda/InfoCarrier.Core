@@ -15,7 +15,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     /// </summary>
     public class InfoCarrierQueryContextFactory : QueryContextFactory
     {
-        private readonly IInfoCarrierBackend infoCarrierBackend;
+        private readonly IInfoCarrierClient infoCarrierClient;
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -28,7 +28,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IDbContextOptions contextOptions)
             : base(dependencies)
         {
-            this.infoCarrierBackend = contextOptions.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
+            this.infoCarrierClient = contextOptions.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierClient;
         }
 
         /// <summary>
@@ -37,6 +37,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public override QueryContext Create()
-            => new InfoCarrierQueryContext(this.Dependencies, this.CreateQueryBuffer, this.infoCarrierBackend);
+            => new InfoCarrierQueryContext(this.Dependencies, this.CreateQueryBuffer, this.infoCarrierClient);
     }
 }

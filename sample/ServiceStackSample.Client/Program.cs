@@ -9,13 +9,18 @@ namespace InfoCarrierSample
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using ServiceStack;
     using ServiceStack.Auth;
 
     internal class Program
     {
+        private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
+            .AddEntityFrameworkInfoCarrierClient()
+            .AddLogging(loggingBuilder => loggingBuilder.AddConsole().AddFilter((msg, level) => true))
+            .BuildServiceProvider();
+
         private static async Task Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
@@ -92,13 +97,12 @@ namespace InfoCarrierSample
                 RememberMe = true,
             });
 
-            var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseInfoCarrierBackend(new ServiceStackBackend(client));
-            var options = optionsBuilder.Options;
+            var optionsBuilder = new DbContextOptionsBuilder()
+                .UseInternalServiceProvider(ServiceProvider)
+                .EnableSensitiveDataLogging()
+                .UseInfoCarrierClient(new ServiceStackInfoCarrierClient(client));
 
-            var context = new BloggingContext(options);
-            context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
-            return context;
+            return new BloggingContext(optionsBuilder.Options);
         }
     }
 }

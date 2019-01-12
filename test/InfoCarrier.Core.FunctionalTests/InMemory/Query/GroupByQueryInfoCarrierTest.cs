@@ -3,6 +3,7 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
@@ -17,10 +18,10 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
         }
 
-        [ConditionalFact(Skip = "See issue #9591")]
-        public override void Select_Distinct_GroupBy()
+        [ConditionalTheory(Skip = "See issue #9591")]
+        public override Task Select_Distinct_GroupBy(bool isAsync)
         {
-            base.Select_Distinct_GroupBy();
+            return base.Select_Distinct_GroupBy(isAsync);
         }
     }
 }

@@ -7,12 +7,19 @@ namespace InfoCarrierSample
     using System.Collections.Generic;
     using System.Data.Common;
     using System.Data.SqlClient;
+    using InfoCarrier.Core.Server;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
 
     public static class SqlServerShared
     {
+        private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
+            .AddEntityFrameworkSqlServer()
+            .AddInfoCarrierServer()
+            .AddLogging(loggingBuilder => loggingBuilder.AddConsole())
+            .BuildServiceProvider();
+
         public static string MasterConnectionString { get; } =
             Environment.GetEnvironmentVariable(@"SqlServer__DefaultConnection")
             ?? @"Data Source=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=True;Connect Timeout=30";
@@ -64,6 +71,7 @@ namespace InfoCarrierSample
         public static BloggingContext CreateDbContext(DbConnection dbConnection = null)
         {
             var optionsBuilder = new DbContextOptionsBuilder();
+            optionsBuilder.UseInternalServiceProvider(ServiceProvider);
             if (dbConnection != null)
             {
                 optionsBuilder.UseSqlServer(dbConnection);
@@ -74,8 +82,10 @@ namespace InfoCarrierSample
             }
 
             var context = new BloggingContext(optionsBuilder.Options);
-            context.GetService<ILoggerFactory>().AddConsole((msg, level) => true);
             return context;
         }
+
+        public static IInfoCarrierServer CreateInfoCarrierServer()
+            => ServiceProvider.GetRequiredService<IInfoCarrierServer>();
     }
 }

@@ -12,14 +12,12 @@ namespace InfoCarrier.Core.Server
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
-    using InfoCarrier.Core.Client;
     using InfoCarrier.Core.Common;
+    using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
@@ -27,10 +25,10 @@ namespace InfoCarrier.Core.Server
     using MethodInfo = System.Reflection.MethodInfo;
 
     /// <summary>
-    ///     Server-side implementation of <see cref="IInfoCarrierBackend.QueryData" /> and
-    ///     <see cref="IInfoCarrierBackend.QueryDataAsync" /> methods.
+    ///     Implementation of <see cref="IInfoCarrierServer.QueryData" /> and
+    ///     <see cref="IInfoCarrierServer.QueryDataAsync" /> methods.
     /// </summary>
-    public sealed class QueryDataHelper : IDisposable
+    internal class QueryDataHelper
     {
         private static readonly MethodInfo ExecuteExpressionMethod
             = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpression));
@@ -39,6 +37,7 @@ namespace InfoCarrier.Core.Server
             = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpressionAsync));
 
         private readonly DbContext dbContext;
+        private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
         private readonly System.Linq.Expressions.Expression linqExpression;
         private readonly ITypeResolver typeResolver = new TypeResolver();
         private readonly ITypeInfoProvider typeInfoProvider = new TypeInfoProvider();
@@ -46,13 +45,17 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Initializes a new instance of the <see cref="QueryDataHelper" /> class.
         /// </summary>
-        /// <param name="dbContextFactory"> Factory for <see cref="DbContext" /> against which the requested query will be executed. </param>
+        /// <param name="dbContext"> <see cref="DbContext" /> against which the requested query will be executed. </param>
         /// <param name="request"> The <see cref="QueryDataRequest" /> object from the client containing the query. </param>
+        /// <param name="customValueMappers"> Custom value mappers. </param>
         public QueryDataHelper(
-            Func<DbContext> dbContextFactory,
-            QueryDataRequest request)
+            DbContext dbContext,
+            QueryDataRequest request,
+            IEnumerable<IInfoCarrierValueMapper> customValueMappers)
         {
-            this.dbContext = dbContextFactory();
+            this.dbContext = dbContext;
+            this.valueMappers = customValueMappers.Concat(StandardValueMappers.Mappers);
+
             this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
             IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
 
@@ -152,38 +155,27 @@ namespace InfoCarrier.Core.Server
         }
 
         private IEnumerable<DynamicObject> MapResult(object queryResult)
-            => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver, this.typeInfoProvider).MapCollection(queryResult, t => true);
-
-        /// <summary>
-        ///     Disposes the <see cref="DbContext" /> against which the requested query has been executed.
-        /// </summary>
-        public void Dispose()
-        {
-            this.dbContext.Dispose();
-        }
+            => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver, this.typeInfoProvider, this.valueMappers)
+                .MapCollection(queryResult, t => true);
 
         private class EntityToDynamicObjectMapper : DynamicObjectMapper
         {
-            private static readonly MethodInfo MapGroupingMethod
-                = Utils.GetMethodInfo<EntityToDynamicObjectMapper>(x => x.MapGrouping<object, object>(null, null))
-                    .GetGenericMethodDefinition();
-
-            private static readonly MethodInfo MapCollectionMethod
-                = Utils.GetMethodInfo<EntityToDynamicObjectMapper>(x => x.MapEnumerable<object>(null, null))
-                    .GetGenericMethodDefinition();
-
+            private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
             private readonly IStateManager stateManager;
-            private readonly IInternalEntityEntryFactory entityEntryFactory;
             private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
-            private readonly Dictionary<object, DynamicObject> cachedEntities =
+            private readonly Dictionary<object, DynamicObject> cachedDtos =
                 new Dictionary<object, DynamicObject>();
 
-            public EntityToDynamicObjectMapper(DbContext dbContext, ITypeResolver typeResolver, ITypeInfoProvider typeInfoProvider)
+            public EntityToDynamicObjectMapper(
+                DbContext dbContext,
+                ITypeResolver typeResolver,
+                ITypeInfoProvider typeInfoProvider,
+                IEnumerable<IInfoCarrierValueMapper> valueMappers)
                 : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
             {
+                this.valueMappers = valueMappers;
                 IServiceProvider serviceProvider = dbContext.GetInfrastructure();
                 this.stateManager = serviceProvider.GetRequiredService<IStateManager>();
-                this.entityEntryFactory = serviceProvider.GetRequiredService<IInternalEntityEntryFactory>();
                 this.detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
                     .Where(et => et.ClrType != null)
                     .GroupBy(et => et.ClrType)
@@ -200,134 +192,63 @@ namespace InfoCarrier.Core.Server
                     return null;
                 }
 
-                Type objType = obj.GetType();
-
-                // Special mapping of arrays
-                if (objType.IsArray)
+                if (this.cachedDtos.TryGetValue(obj, out DynamicObject cached))
                 {
-                    var array = ((IEnumerable)obj)
-                        .Cast<object>()
-                        .Select(x => this.MapToDynamicObjectGraph(x, setTypeInformation))
-                        .ToArray();
-                    var dto = new DynamicObject();
-                    dto.Add(@"ArrayType", new Aqua.TypeSystem.TypeInfo(objType, includePropertyInfos: false));
-                    dto.Add(@"Elements", array);
-                    return dto;
+                    return cached;
                 }
 
-                // Special mapping of IGrouping<,>
-                foreach (var groupingType in Utils.GetGenericTypeImplementations(objType, typeof(IGrouping<,>)))
+                InternalEntityEntry EntityEntryGetter()
                 {
-                    object mappedGrouping =
-                        MapGroupingMethod
-                            .MakeGenericMethod(groupingType.GenericTypeArguments)
-                            .Invoke(this, new[] { obj, setTypeInformation });
-                    return (DynamicObject)mappedGrouping;
-                }
-
-                // Special mapping of collections
-                if (objType != typeof(string))
-                {
-                    Type elementType = Utils.TryGetSequenceType(objType);
-                    if (elementType != null && elementType != typeof(DynamicObject))
+                    // Check if obj is a tracked or detached entity
+                    InternalEntityEntry entry = this.stateManager.TryGetEntry(obj);
+                    if (entry == null && this.detachedEntityTypeMap.TryGetValue(obj.GetType(), out IEntityType entityType))
                     {
-                        object mappedEnumerable = MapCollectionMethod
-                            .MakeGenericMethod(elementType)
-                            .Invoke(this, new[] { obj, setTypeInformation });
-                        return (DynamicObject)mappedEnumerable;
+                        // Create detached entity entry
+                        entry = this.stateManager.GetOrCreateEntry(obj, entityType);
+                    }
+
+                    return entry;
+                }
+
+                var valueMappingContext = new MapToDynamicObjectContext(obj, EntityEntryGetter, this, setTypeInformation);
+                foreach (IInfoCarrierValueMapper valueMapper in this.valueMappers)
+                {
+                    if (valueMapper.TryMapToDynamicObject(valueMappingContext, out DynamicObject dto))
+                    {
+                        return dto;
                     }
                 }
 
-                // Check if obj is a tracked or detached entity
-                InternalEntityEntry entry = this.stateManager.TryGetEntry(obj);
-                if (entry == null
-                    && this.detachedEntityTypeMap.TryGetValue(objType, out IEntityType entityType))
-                {
-                    // Create detached entity entry
-                    entry = this.stateManager.GetOrCreateEntry(obj, entityType);
-                }
-
-                return entry == null
-                    ? base.MapToDynamicObjectGraph(obj, setTypeInformation) // Default mapping
-                    : this.MapToDynamicObjectGraph(obj, setTypeInformation, entry); // Special mapping of entities
+                return base.MapToDynamicObjectGraph(obj, setTypeInformation);
             }
 
-            private DynamicObject MapToDynamicObjectGraph(object obj, Func<Type, bool> setTypeInformation, InternalEntityEntry entry)
+            private class MapToDynamicObjectContext : IMapToDynamicObjectContext
             {
-                if (this.cachedEntities.TryGetValue(obj, out DynamicObject dto))
+                private readonly EntityToDynamicObjectMapper mapper;
+                private readonly Func<Type, bool> setTypeInformation;
+                private readonly Lazy<InternalEntityEntry> entityEntry;
+
+                public MapToDynamicObjectContext(
+                    object obj,
+                    Func<InternalEntityEntry> entityEntryGetter,
+                    EntityToDynamicObjectMapper mapper,
+                    Func<Type, bool> setTypeInformation)
                 {
-                    return dto;
+                    this.mapper = mapper;
+                    this.setTypeInformation = setTypeInformation;
+                    this.Object = obj;
+                    this.entityEntry = new Lazy<InternalEntityEntry>(entityEntryGetter);
                 }
 
-                this.cachedEntities.Add(obj, dto = new DynamicObject(obj.GetType()));
+                public object Object { get; }
 
-                if (entry.Entity.GetType() != entry.EntityType.ClrType)
-                {
-                    IEntityType entityType = this.stateManager.Context.Model.FindEntityType(entry.Entity.GetType());
-                    if (entityType != null)
-                    {
-                        entry = this.entityEntryFactory.Create(this.stateManager, entityType, entry.Entity);
-                    }
-                }
+                public InternalEntityEntry EntityEntry => entityEntry.Value;
 
-                dto.Add(@"__EntityType", entry.EntityType.DisplayName());
+                public DynamicObject MapToDynamicObjectGraph(object obj)
+                    => this.mapper.MapToDynamicObjectGraph(obj, this.setTypeInformation);
 
-                if (entry.EntityState != EntityState.Detached)
-                {
-                    dto.Add(
-                        @"__EntityLoadedNavigations",
-                        this.MapToDynamicObjectGraph(
-                            entry.EntityType.GetNavigations()
-                                .Where(n => entry.IsLoaded(n))
-                                .Select(n => n.Name).ToList(),
-                            setTypeInformation));
-                }
-
-                foreach (MemberEntry prop in entry.ToEntityEntry().Members)
-                {
-                    DynamicObject value = prop is ReferenceEntry refProp && refProp.TargetEntry != null
-                        ? this.MapToDynamicObjectGraph(prop.CurrentValue, setTypeInformation, refProp.TargetEntry.GetInfrastructure())
-                        : this.MapToDynamicObjectGraph(
-                            Utils.ConvertToProvider(prop.CurrentValue, prop.Metadata as IProperty),
-                            setTypeInformation);
-                    dto.Add(prop.Metadata.Name, value);
-                }
-
-                return dto;
-            }
-
-            private DynamicObject MapEnumerable<TElement>(IEnumerable<TElement> enumerable, Func<Type, bool> setTypeInformation)
-            {
-                var mappedEnumerable = new DynamicObject(typeof(IEnumerable<TElement>));
-                mappedEnumerable.Add(
-                    @"Elements",
-                    new DynamicObject(
-                        this.MapCollection(enumerable.ToList(), setTypeInformation).ToList(),
-                        this));
-
-                var collectionType = enumerable.GetType();
-                if (collectionType != typeof(List<TElement>))
-                {
-                    var constructor = Utils.GetDeclaredConstructor(collectionType, new[] { typeof(IEnumerable<TElement>) });
-                    if (constructor != null && constructor.IsPublic)
-                    {
-                        mappedEnumerable.Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(collectionType, includePropertyInfos: false));
-                    }
-                }
-
-                return mappedEnumerable;
-            }
-
-            private DynamicObject MapGrouping<TKey, TElement>(IGrouping<TKey, TElement> grouping, Func<Type, bool> setTypeInformation)
-            {
-                var mappedGrouping = new DynamicObject(typeof(IGrouping<TKey, TElement>));
-                mappedGrouping.Add(@"Key", this.MapToDynamicObjectGraph(grouping.Key, setTypeInformation));
-                mappedGrouping.Add(
-                    @"Elements",
-                    new DynamicObject(
-                        this.MapCollection(grouping, setTypeInformation).ToList(),
-                        this));
-                return mappedGrouping;
+                public void AddToCache(DynamicObject dynamicObject)
+                    => this.mapper.cachedDtos.Add(this.Object, dynamicObject);
             }
         }
     }

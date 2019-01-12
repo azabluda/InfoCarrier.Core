@@ -57,6 +57,14 @@ namespace InfoCarrier.Core.Properties
         public static string NullConditionalExpressionStubMethodInvoked
             => GetString("NullConditionalExpressionStubMethodInvoked");
 
+        /// <summary>
+        ///     Cannot add elements of type '{elementType}' to a collection of type '{collectionType}'.
+        /// </summary>
+        public static string CannotAddElementsToCollection(object elementType, object collectionType)
+            => string.Format(
+                GetString("CannotAddElementsToCollection", nameof(elementType), nameof(collectionType)),
+                elementType, collectionType);
+
         private static string GetString(string name, params string[] formatterNames)
         {
             var value = _resourceManager.GetString(name);
