@@ -3,12 +3,10 @@
 
 namespace InfoCarrier.Core.Server
 {
-    using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using InfoCarrier.Core.Client;
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -21,22 +19,21 @@ namespace InfoCarrier.Core.Server
     using Microsoft.EntityFrameworkCore.ValueGeneration;
 
     /// <summary>
-    ///     Server-side implementation of <see cref="IInfoCarrierBackend.SaveChanges" /> and
-    ///     <see cref="IInfoCarrierBackend.SaveChangesAsync" /> methods.
+    ///     Implementation of <see cref="IInfoCarrierServer.SaveChanges" /> and
+    ///     <see cref="IInfoCarrierServer.SaveChangesAsync" /> methods.
     /// </summary>
-    [Obsolete("Use IInfoCarrierServer instead.")]
-    public class SaveChangesHelper : IDisposable
+    internal class SaveChangesHelper
     {
         private readonly DbContext dbContext;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="SaveChangesHelper" /> class.
         /// </summary>
-        /// <param name="dbContextFactory"> Factory for <see cref="DbContext" /> to save the updated entities into. </param>
+        /// <param name="dbContext"> <see cref="DbContext" /> against which the requested query will be executed. </param>
         /// <param name="request"> The <see cref="SaveChangesRequest" /> object from the client containing the updated entities. </param>
-        public SaveChangesHelper(Func<DbContext> dbContextFactory, SaveChangesRequest request)
+        public SaveChangesHelper(DbContext dbContext, SaveChangesRequest request)
         {
-            this.dbContext = dbContextFactory();
+            this.dbContext = dbContext;
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
             var stateManager = this.dbContext.GetService<IStateManager>();
@@ -154,15 +151,7 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Gets the corresponding entries after painting the state of the updated entities.
         /// </summary>
-        public IReadOnlyList<IUpdateEntry> Entries { get; }
-
-        /// <summary>
-        ///     Disposes the <see cref="DbContext" /> into which the updated entities have been saved.
-        /// </summary>
-        public void Dispose()
-        {
-            this.dbContext.Dispose();
-        }
+        private IReadOnlyList<IUpdateEntry> Entries { get; }
 
         /// <summary>
         ///     Saves the updated entities into the actual database.

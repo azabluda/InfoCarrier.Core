@@ -286,7 +286,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             {
                 private readonly QueryContext queryContext;
                 private readonly Func<InfoCarrierQueryResultMapper> createResultMapper;
-                private readonly IInfoCarrierBackend infoCarrierBackend;
+                private readonly IInfoCarrierClient infoCarrierClient;
                 private readonly Remote.Linq.Expressions.Expression rlinq;
 
                 public QueryExecutor(
@@ -296,7 +296,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     this.queryContext = queryContext;
                     this.createResultMapper = () => new InfoCarrierQueryResultMapper(queryContext, preparedQuery.TypeResolver, preparedQuery.TypeInfoProvider, entityTypeMap);
-                    this.infoCarrierBackend = ((InfoCarrierQueryContext)queryContext).InfoCarrierBackend;
+                    this.infoCarrierClient = ((InfoCarrierQueryContext)queryContext).InfoCarrierClient;
 
                     // Substitute query parameters
                     Expression expression = new SubstituteParametersExpressionVisitor(queryContext).Visit(preparedQuery.Expression);
@@ -310,7 +310,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
                 public IEnumerable<TResult> ExecuteQuery<TResult>()
                 {
-                    QueryDataResult result = this.infoCarrierBackend.QueryData(
+                    QueryDataResult result = this.infoCarrierClient.QueryData(
                         new QueryDataRequest(
                             this.rlinq,
                             this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),
@@ -322,7 +322,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 {
                     async Task<IEnumerable<TResult>> MapAndTrackResultsAsync()
                     {
-                        QueryDataResult result = await this.infoCarrierBackend.QueryDataAsync(
+                        QueryDataResult result = await this.infoCarrierClient.QueryDataAsync(
                             new QueryDataRequest(
                                 this.rlinq,
                                 this.queryContext.Context.ChangeTracker.QueryTrackingBehavior),

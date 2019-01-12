@@ -10,11 +10,11 @@ namespace InfoCarrierSample
     using Microsoft.EntityFrameworkCore;
     using ServiceStack;
 
-    public class ServiceStackBackend : IInfoCarrierBackend
+    public class ServiceStackInfoCarrierClient : IInfoCarrierClient
     {
         private readonly JsonHttpClient client;
 
-        public ServiceStackBackend(JsonHttpClient client)
+        public ServiceStackInfoCarrierClient(JsonHttpClient client)
         {
             this.client = client;
         }

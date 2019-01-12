@@ -16,9 +16,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     using Newtonsoft.Json;
     using Remote.Linq;
 
-    public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierBackend
+    public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClient
     {
         private readonly SharedTestStoreProperties testStoreProperties;
+        private readonly IInfoCarrierServer infoCarrierServer;
 
         protected InfoCarrierBackendTestStore(
             string name,
@@ -37,15 +38,13 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
                     ServiceLifetime.Transient,
                     ServiceLifetime.Singleton)
                 .BuildServiceProvider();
+            this.infoCarrierServer = this.ServiceProvider.GetRequiredService<IInfoCarrierServer>();
         }
 
         public string ServerUrl => this.Name;
 
         public virtual DbContext CreateDbContext()
             => (DbContext)this.ServiceProvider.GetRequiredService(this.testStoreProperties.ContextType);
-
-        public virtual IInfoCarrierServer CreateInfoCarrierServer()
-            => this.ServiceProvider.GetRequiredService<IInfoCarrierServer>();
 
         protected abstract IServiceCollection AddServices(IServiceCollection serviceCollection);
 
@@ -54,26 +53,26 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public QueryDataResult QueryData(QueryDataRequest request, DbContext dbContext)
             => SimulateNetworkTransferJson(
-                this.CreateInfoCarrierServer().QueryData(
+                this.infoCarrierServer.QueryData(
                     this.CreateDbContextWithParameters(dbContext),
                     SimulateNetworkTransferJson(request)));
 
         public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
             => SimulateNetworkTransferJson(
-                await this.CreateInfoCarrierServer().QueryDataAsync(
+                await this.infoCarrierServer.QueryDataAsync(
                     this.CreateDbContextWithParameters(dbContext),
                     SimulateNetworkTransferJson(request),
                     cancellationToken));
 
         public SaveChangesResult SaveChanges(SaveChangesRequest request)
             => SimulateNetworkTransferJson(
-                this.CreateInfoCarrierServer().SaveChanges(
+                this.infoCarrierServer.SaveChanges(
                     this.CreateDbContext,
                     SimulateNetworkTransferJson(request)));
 
         public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
             => SimulateNetworkTransferJson(
-                await this.CreateInfoCarrierServer().SaveChangesAsync(
+                await this.infoCarrierServer.SaveChangesAsync(
                     this.CreateDbContext,
                     SimulateNetworkTransferJson(request),
                     cancellationToken));

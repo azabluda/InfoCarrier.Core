@@ -27,7 +27,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1642:ConstructorSummaryDocumentationMustBeginWithStandardText", Justification = "Entity Framework Core internal.")]
         public InfoCarrierTransactionManager(IDbContextOptions options)
         {
-            this.InfoCarrierBackend = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
+            this.InfoCarrierClient = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierClient;
         }
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1623:PropertySummaryDocumentationMustMatchAccessors", Justification = "Entity Framework Core internal.")]
-        internal IInfoCarrierBackend InfoCarrierBackend { get; }
+        internal IInfoCarrierClient InfoCarrierClient { get; }
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -52,7 +52,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public virtual IDbContextTransaction BeginTransaction()
         {
             this.CheckNoTransaction();
-            this.InfoCarrierBackend.BeginTransaction();
+            this.InfoCarrierClient.BeginTransaction();
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 
@@ -65,7 +65,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
         {
             this.CheckNoTransaction();
-            await this.InfoCarrierBackend.BeginTransactionAsync(cancellationToken);
+            await this.InfoCarrierClient.BeginTransactionAsync(cancellationToken);
             return this.CurrentTransaction = new InfoCarrierTransaction(this);
         }
 

@@ -11,11 +11,11 @@ namespace InfoCarrierSample
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
 
-    public class WcfBackendImpl : IInfoCarrierBackend
+    public class WcfInfoCarrierClientImpl : IInfoCarrierClient
     {
         private readonly ChannelFactory<IWcfService> channelFactory;
 
-        public WcfBackendImpl(string serverUrl = null)
+        public WcfInfoCarrierClientImpl(string serverUrl = null)
         {
             this.channelFactory = new ChannelFactory<IWcfService>(
                 new BasicHttpBinding { MaxReceivedMessageSize = WcfShared.MaxReceivedMessageSize },

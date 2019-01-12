@@ -12,7 +12,6 @@ namespace InfoCarrier.Core.Server
     using System.Threading.Tasks;
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
-    using InfoCarrier.Core.Client;
     using InfoCarrier.Core.Common;
     using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
@@ -26,11 +25,10 @@ namespace InfoCarrier.Core.Server
     using MethodInfo = System.Reflection.MethodInfo;
 
     /// <summary>
-    ///     Server-side implementation of <see cref="IInfoCarrierBackend.QueryData" /> and
-    ///     <see cref="IInfoCarrierBackend.QueryDataAsync" /> methods.
+    ///     Implementation of <see cref="IInfoCarrierServer.QueryData" /> and
+    ///     <see cref="IInfoCarrierServer.QueryDataAsync" /> methods.
     /// </summary>
-    [Obsolete("Use IInfoCarrierServer instead.")]
-    public sealed class QueryDataHelper : IDisposable
+    internal class QueryDataHelper
     {
         private static readonly MethodInfo ExecuteExpressionMethod
             = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpression));
@@ -47,28 +45,15 @@ namespace InfoCarrier.Core.Server
         /// <summary>
         ///     Initializes a new instance of the <see cref="QueryDataHelper" /> class.
         /// </summary>
-        /// <param name="dbContextFactory"> Factory for <see cref="DbContext" /> against which the requested query will be executed. </param>
-        /// <param name="request"> The <see cref="QueryDataRequest" /> object from the client containing the query. </param>
-        [ExcludeFromCoverage]
-        public QueryDataHelper(
-            Func<DbContext> dbContextFactory,
-            QueryDataRequest request)
-            : this(dbContextFactory, request, Enumerable.Empty<IInfoCarrierValueMapper>())
-        {
-        }
-
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="QueryDataHelper" /> class.
-        /// </summary>
-        /// <param name="dbContextFactory"> Factory for <see cref="DbContext" /> against which the requested query will be executed. </param>
+        /// <param name="dbContext"> <see cref="DbContext" /> against which the requested query will be executed. </param>
         /// <param name="request"> The <see cref="QueryDataRequest" /> object from the client containing the query. </param>
         /// <param name="valueMappers"> Custom value mappers. </param>
         public QueryDataHelper(
-            Func<DbContext> dbContextFactory,
+            DbContext dbContext,
             QueryDataRequest request,
             IEnumerable<IInfoCarrierValueMapper> valueMappers)
         {
-            this.dbContext = dbContextFactory();
+            this.dbContext = dbContext;
             this.valueMappers = valueMappers.Concat(StandardValueMappers.Mappers);
 
             this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
@@ -172,14 +157,6 @@ namespace InfoCarrier.Core.Server
         private IEnumerable<DynamicObject> MapResult(object queryResult)
             => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver, this.typeInfoProvider, this.valueMappers)
                 .MapCollection(queryResult, t => true);
-
-        /// <summary>
-        ///     Disposes the <see cref="DbContext" /> against which the requested query has been executed.
-        /// </summary>
-        public void Dispose()
-        {
-            this.dbContext.Dispose();
-        }
 
         private class EntityToDynamicObjectMapper : DynamicObjectMapper
         {

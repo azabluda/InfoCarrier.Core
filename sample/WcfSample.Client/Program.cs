@@ -19,7 +19,7 @@ namespace InfoCarrierSample
             Console.ReadKey();
 
             var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseInfoCarrierBackend(new WcfBackendImpl());
+            optionsBuilder.UseInfoCarrierClient(new WcfInfoCarrierClientImpl());
             var options = optionsBuilder.Options;
 
             // Activate console logging

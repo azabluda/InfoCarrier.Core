@@ -93,7 +93,7 @@ namespace InfoCarrierSample
             });
 
             var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseInfoCarrierBackend(new ServiceStackBackend(client));
+            optionsBuilder.UseInfoCarrierClient(new ServiceStackInfoCarrierClient(client));
             var options = optionsBuilder.Options;
 
             var context = new BloggingContext(options);

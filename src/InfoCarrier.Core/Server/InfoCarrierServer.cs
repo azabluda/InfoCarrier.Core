@@ -41,11 +41,9 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public QueryDataResult QueryData(Func<DbContext> dbContextFactory, QueryDataRequest request)
         {
-#pragma warning disable 618
-            using (var helper = new QueryDataHelper(dbContextFactory, request, this.valueMappers))
-#pragma warning restore 618
+            using (DbContext dbContext = dbContextFactory())
             {
-                return helper.QueryData();
+                return new QueryDataHelper(dbContext, request, this.valueMappers).QueryData();
             }
         }
 
@@ -67,11 +65,9 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public async Task<QueryDataResult> QueryDataAsync(Func<DbContext> dbContextFactory, QueryDataRequest request, CancellationToken cancellationToken = default)
         {
-#pragma warning disable 618
-            using (var helper = new QueryDataHelper(dbContextFactory, request, this.valueMappers))
-#pragma warning restore 618
+            using (DbContext dbContext = dbContextFactory())
             {
-                return await helper.QueryDataAsync(cancellationToken);
+                return await new QueryDataHelper(dbContext, request, this.valueMappers).QueryDataAsync(cancellationToken);
             }
         }
 
@@ -90,11 +86,9 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public SaveChangesResult SaveChanges(Func<DbContext> dbContextFactory, SaveChangesRequest request)
         {
-#pragma warning disable 618
-            using (var helper = new SaveChangesHelper(dbContextFactory, request))
-#pragma warning restore 618
+            using (DbContext dbContext = dbContextFactory())
             {
-                return helper.SaveChanges();
+                return new SaveChangesHelper(dbContext, request).SaveChanges();
             }
         }
 
@@ -117,11 +111,9 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public async Task<SaveChangesResult> SaveChangesAsync(Func<DbContext> dbContextFactory, SaveChangesRequest request, CancellationToken cancellationToken = default)
         {
-#pragma warning disable 618
-            using (var helper = new SaveChangesHelper(dbContextFactory, request))
-#pragma warning restore 618
+            using (DbContext dbContext = dbContextFactory())
             {
-                return await helper.SaveChangesAsync(cancellationToken);
+                return await new SaveChangesHelper(dbContext, request).SaveChangesAsync(cancellationToken);
             }
         }
     }

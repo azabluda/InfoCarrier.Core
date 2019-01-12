@@ -12,14 +12,14 @@ namespace InfoCarrier.Core.Client
     /// <summary>
     ///     <para>
     ///         Represents a connection with a remote service. The implementation should be passed
-    ///         to <see cref="InfoCarrierDbContextOptionsExtensions.UseInfoCarrierBackend{TContext}"/>
+    ///         to <see cref="InfoCarrierDbContextOptionsExtensions.UseInfoCarrierClient{TContext}"/>
     ///         method to configure the context to interact with that remote service.
     ///     </para>
     ///     <para>
     ///         This interface is to be implemented on the client-side of a multi-tier application.
     ///     </para>
     /// </summary>
-    public interface IInfoCarrierBackend
+    public interface IInfoCarrierClient
     {
         /// <summary>
         ///     Gets the remote server address. Used for logging.

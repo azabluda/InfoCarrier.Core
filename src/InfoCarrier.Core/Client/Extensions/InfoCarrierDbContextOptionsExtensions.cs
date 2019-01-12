@@ -14,32 +14,32 @@ namespace InfoCarrier.Core.Client
     public static class InfoCarrierDbContextOptionsExtensions
     {
         /// <summary>
-        ///     Configures the context to connect to a remote service via <see cref="IInfoCarrierBackend" /> interface.
+        ///     Configures the context to connect to a remote service via <see cref="IInfoCarrierClient" /> interface.
         /// </summary>
         /// <typeparam name="TContext"> The type of context being configured. </typeparam>
         /// <param name="optionsBuilder"> The builder being used to configure the context. </param>
-        /// <param name="infoCarrierBackend">
-        ///     The actual implementation of the <see cref="IInfoCarrierBackend" /> interface.
+        /// <param name="infoCarrierClient">
+        ///     The actual implementation of the <see cref="IInfoCarrierClient" /> interface.
         /// </param>
         /// <returns> The options builder so that further configuration can be chained. </returns>
-        public static DbContextOptionsBuilder<TContext> UseInfoCarrierBackend<TContext>(
+        public static DbContextOptionsBuilder<TContext> UseInfoCarrierClient<TContext>(
             this DbContextOptionsBuilder<TContext> optionsBuilder,
-            IInfoCarrierBackend infoCarrierBackend)
+            IInfoCarrierClient infoCarrierClient)
             where TContext : DbContext
-            => (DbContextOptionsBuilder<TContext>)UseInfoCarrierBackend(
-                (DbContextOptionsBuilder)optionsBuilder, infoCarrierBackend);
+            => (DbContextOptionsBuilder<TContext>)UseInfoCarrierClient(
+                (DbContextOptionsBuilder)optionsBuilder, infoCarrierClient);
 
         /// <summary>
-        ///     Configures the context to connect to a remote service via <see cref="IInfoCarrierBackend" /> interface.
+        ///     Configures the context to connect to a remote service via <see cref="IInfoCarrierClient" /> interface.
         /// </summary>
         /// <param name="optionsBuilder"> The builder being used to configure the context. </param>
-        /// <param name="infoCarrierBackend">
-        ///     The actual implementation of the <see cref="IInfoCarrierBackend" /> interface.
+        /// <param name="infoCarrierClient">
+        ///     The actual implementation of the <see cref="IInfoCarrierClient" /> interface.
         /// </param>
         /// <returns> The options builder so that further configuration can be chained. </returns>
-        public static DbContextOptionsBuilder UseInfoCarrierBackend(
+        public static DbContextOptionsBuilder UseInfoCarrierClient(
             this DbContextOptionsBuilder optionsBuilder,
-            IInfoCarrierBackend infoCarrierBackend)
+            IInfoCarrierClient infoCarrierClient)
         {
             if (optionsBuilder.Options.FindExtension<CoreOptionsExtension>() == null)
             {
@@ -52,7 +52,7 @@ namespace InfoCarrier.Core.Client
                 ? new InfoCarrierOptionsExtension(extension)
                 : new InfoCarrierOptionsExtension();
 
-            extension.InfoCarrierBackend = infoCarrierBackend;
+            extension.InfoCarrierClient = infoCarrierClient;
 
             ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
 

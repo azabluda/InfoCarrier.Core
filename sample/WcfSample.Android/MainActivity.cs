@@ -56,7 +56,7 @@ namespace InfoCarrierSample
 
                 string serverUrl = this.editServerUrl.Text;
                 var optionsBuilder = new DbContextOptionsBuilder();
-                optionsBuilder.UseInfoCarrierBackend(new WcfBackendXamarinImpl(serverUrl));
+                optionsBuilder.UseInfoCarrierClient(new WcfInfoCarrierClientXamarinImpl(serverUrl));
                 var options = optionsBuilder.Options;
 
                 using (var contextEdit = this.sharedPreferences.Edit())
@@ -92,9 +92,9 @@ namespace InfoCarrierSample
         // Xamarin.Android implementation of asynchronous WCF method calls is broken in a very
         // weird way (throws no exception but just never executes the continuation after await).
         // We have to simulate asynchrony by calling synchronous methods on the thread pool.
-        private class WcfBackendXamarinImpl : WcfBackendImpl
+        private class WcfInfoCarrierClientXamarinImpl : WcfInfoCarrierClientImpl
         {
-            public WcfBackendXamarinImpl(string serverUrl)
+            public WcfInfoCarrierClientXamarinImpl(string serverUrl)
                 : base(serverUrl)
             {
             }

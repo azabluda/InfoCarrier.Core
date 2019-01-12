@@ -45,7 +45,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
             try
             {
-                this.transactionManager.InfoCarrierBackend.CommitTransaction();
+                this.transactionManager.InfoCarrierClient.CommitTransaction();
             }
             finally
             {
@@ -63,7 +63,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
             try
             {
-                this.transactionManager.InfoCarrierBackend.RollbackTransaction();
+                this.transactionManager.InfoCarrierClient.RollbackTransaction();
             }
             finally
             {

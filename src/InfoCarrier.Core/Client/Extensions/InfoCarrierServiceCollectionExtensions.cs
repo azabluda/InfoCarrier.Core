@@ -40,7 +40,7 @@ namespace InfoCarrier.Core.Client
         /// <returns>
         ///     The same service collection so that multiple calls can be chained.
         /// </returns>
-        public static IServiceCollection AddEntityFrameworkInfoCarrierBackend(this IServiceCollection serviceCollection)
+        public static IServiceCollection AddEntityFrameworkInfoCarrierClient(this IServiceCollection serviceCollection)
         {
             var builder = new EntityFrameworkServicesBuilder(serviceCollection)
                 .TryAdd<IQueryCompiler, InfoCarrierQueryCompiler>()

@@ -55,7 +55,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             => new InfoCarrierTestStore(this.backendTestStoreFactory(storeName, true, this.testStoreProperties));
 
         public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
-            => serviceCollection.AddEntityFrameworkInfoCarrierBackend()
+            => serviceCollection.AddEntityFrameworkInfoCarrierClient()
                 .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton(TestModelSource.GetFactory(this.testStoreProperties.OnModelCreating));
 

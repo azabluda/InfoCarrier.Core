@@ -21,8 +21,8 @@ It is important to note that InfoCarrier.Core dictates neither the communication
   * Eager/Lazy/Explicit Loading of Navigation Properties
   * etc.
 * DbContext and entity classes shared between client and server, no need to duplicate this code
-* Concise client-side interface `IInfoCarrierBackend`
-* Easy to use server-side classes `QueryDataHelper` and `SaveChangesHelper`
+* Concise client-side interface `IInfoCarrierClient`
+* Easy to use server-side service `IInfoCarrierServer`
 * You decide what communication platform to use
 
 ### Credits:
@@ -60,9 +60,9 @@ public class BloggingContext : DbContext
 
 ### Client
 
-Implement `IInfoCarrierBackend` interface, e.g. using Windows Communication Foundation
+Implement `IInfoCarrierClient` interface, e.g. using Windows Communication Foundation
 ```C#
-public class WcfBackendImpl : IInfoCarrierBackend
+public class WcfInfoCarrierClient : IInfoCarrierClient
 {
     private readonly ChannelFactory<IWcfService> channelFactory
         = new ChannelFactory<IWcfService>(...);
@@ -89,15 +89,15 @@ public class WcfBackendImpl : IInfoCarrierBackend
         }
     }
 
-    // Let other methods of IInfoCarrierBackend just throw NotSupportedException for now.
+    // Let other methods of IInfoCarrierClient just throw NotSupportedException for now.
     ...
 }
 ```
 
 Configure and use Entity Framework Core
 ```C#
-var optionsBuilder = new DbContextOptionsBuilder();
-optionsBuilder.UseInfoCarrierBackend(new WcfBackendImpl());
+var optionsBuilder = new DbContextOptionsBuilder()
+    .UseInfoCarrierClient(new WcfInfoCarrierClient());
 
 using (var context = new BloggingContext(optionsBuilder.Options))
 {
@@ -144,9 +144,9 @@ public class InfoCarrierService : IWcfService
             .AddInfoCarrierServer() // add IInfoCarrierServer service
             .BuildServiceProvider();
 
-        var optionsBuilder = new DbContextOptionsBuilder();
-        optionsBuilder.UseInternalServiceProvider(this.serviceProvider);
-        optionsBuilder.UseSqlServer(connectionString);
+        var optionsBuilder = new DbContextOptionsBuilder()
+            .UseInternalServiceProvider(this.serviceProvider)
+            .UseSqlServer(connectionString);
         this.dbContextOptions = optionsBuilder.Options;
 
         this.infoCarrierServer = this.serviceProvider.GetRequiredService<IInfoCarrierServer>();

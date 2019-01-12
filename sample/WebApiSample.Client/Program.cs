@@ -71,7 +71,7 @@ namespace InfoCarrierSample
         private static BloggingContext CreateContext()
         {
             var optionsBuilder = new DbContextOptionsBuilder();
-            optionsBuilder.UseInfoCarrierBackend(new WebApiBackendImpl());
+            optionsBuilder.UseInfoCarrierClient(new WebApiInfoCarrierClientImpl());
             var options = optionsBuilder.Options;
 
             BloggingContext context = new BloggingContext(options);

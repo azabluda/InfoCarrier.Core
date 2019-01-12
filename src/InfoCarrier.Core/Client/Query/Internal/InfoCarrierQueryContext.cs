@@ -23,10 +23,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public InfoCarrierQueryContext(
             QueryContextDependencies dependencies,
             Func<IQueryBuffer> queryBufferFactory,
-            IInfoCarrierBackend infoCarrierBackend)
+            IInfoCarrierClient infoCarrierClient)
             : base(dependencies, queryBufferFactory)
         {
-            this.InfoCarrierBackend = infoCarrierBackend;
+            this.InfoCarrierClient = infoCarrierClient;
         }
 
         /// <summary>
@@ -34,6 +34,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1623:PropertySummaryDocumentationMustMatchAccessors", Justification = "Entity Framework Core internal.")]
-        public IInfoCarrierBackend InfoCarrierBackend { get; }
+        public IInfoCarrierClient InfoCarrierClient { get; }
     }
 }

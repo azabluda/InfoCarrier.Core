@@ -16,28 +16,28 @@ namespace InfoCarrier.Core.FunctionalTests
         public void Can_add_extension_with_server_url_using_generic_options()
         {
             var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
-            optionsBuilder.UseInfoCarrierBackend(
-                InfoCarrierTestHelpers.CreateDummyBackend(optionsBuilder.Options.ContextType));
+            optionsBuilder.UseInfoCarrierClient(
+                InfoCarrierTestHelpers.CreateDummyClient(optionsBuilder.Options.ContextType));
 
             var extension = optionsBuilder.Options.Extensions.OfType<InfoCarrierOptionsExtension>().Single();
 
-            Assert.Equal("DummyDatabase", extension.InfoCarrierBackend.ServerUrl);
+            Assert.Equal("DummyDatabase", extension.InfoCarrierClient.ServerUrl);
         }
 
         [Fact]
         public void Can_replace_extension()
         {
-            IInfoCarrierBackend backend = InfoCarrierTestHelpers.CreateDummyBackend(typeof(DbContext));
+            IInfoCarrierClient client = InfoCarrierTestHelpers.CreateDummyClient(typeof(DbContext));
             var optionsBuilder = new DbContextOptionsBuilder();
 
-            optionsBuilder.UseInfoCarrierBackend(backend);
+            optionsBuilder.UseInfoCarrierClient(client);
             var extension1 = optionsBuilder.Options.Extensions.OfType<InfoCarrierOptionsExtension>().Single();
 
-            optionsBuilder.UseInfoCarrierBackend(backend);
+            optionsBuilder.UseInfoCarrierClient(client);
             var extension2 = optionsBuilder.Options.Extensions.OfType<InfoCarrierOptionsExtension>().Single();
 
             Assert.NotSame(extension1, extension2);
-            Assert.Same(extension1.InfoCarrierBackend, extension2.InfoCarrierBackend);
+            Assert.Same(extension1.InfoCarrierClient, extension2.InfoCarrierClient);
         }
     }
 }

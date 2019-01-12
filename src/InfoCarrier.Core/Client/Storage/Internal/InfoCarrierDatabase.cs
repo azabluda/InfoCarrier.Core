@@ -20,7 +20,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     /// </summary>
     public class InfoCarrierDatabase : Database, IInfoCarrierDatabase
     {
-        private readonly IInfoCarrierBackend infoCarrierBackend;
+        private readonly IInfoCarrierClient infoCarrierClient;
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -33,7 +33,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             IDbContextOptions options)
             : base(dependencies)
         {
-            this.infoCarrierBackend = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierBackend;
+            this.infoCarrierClient = options.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierClient;
         }
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public override int SaveChanges(IReadOnlyList<IUpdateEntry> entries)
         {
-            SaveChangesResult result = this.infoCarrierBackend.SaveChanges(new SaveChangesRequest(entries));
+            SaveChangesResult result = this.infoCarrierClient.SaveChanges(new SaveChangesRequest(entries));
             return result.ApplyTo(entries);
         }
 
@@ -58,7 +58,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             IReadOnlyList<IUpdateEntry> entries,
             CancellationToken cancellationToken = default)
         {
-            SaveChangesResult result = await this.infoCarrierBackend.SaveChangesAsync(new SaveChangesRequest(entries), cancellationToken);
+            SaveChangesResult result = await this.infoCarrierClient.SaveChangesAsync(new SaveChangesRequest(entries), cancellationToken);
             return result.ApplyTo(entries);
         }
     }

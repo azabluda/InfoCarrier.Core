@@ -65,8 +65,8 @@
     <Compile Include="..\IWcfService.cs">
       <Link>IWcfService.cs</Link>
     </Compile>
-    <Compile Include="..\WcfSample.Client\WcfBackendImpl.cs">
-      <Link>WcfBackendImpl.cs</Link>
+    <Compile Include="..\WcfSample.Client\WcfInfoCarrierClientImpl.cs">
+      <Link>WcfInfoCarrierClientImpl.cs</Link>
     </Compile>
     <Compile Include="..\WcfShared.cs">
       <Link>WcfShared.cs</Link>
