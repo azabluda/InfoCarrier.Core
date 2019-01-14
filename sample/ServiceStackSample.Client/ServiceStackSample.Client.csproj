@@ -12,10 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.2.0" />
-    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.7.0" />
-    <PackageReference Include="ServiceStack" Version="5.1.0" />
-    <PackageReference Include="ServiceStack.HttpClient" Version="5.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingConsolePackageVersion)" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="$(RemoteLinqPackageVersion)" />
+    <PackageReference Include="ServiceStack" Version="$(ServiceStackPackageVersion)" />
+    <PackageReference Include="ServiceStack.HttpClient" Version="$(ServiceStackPackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>
