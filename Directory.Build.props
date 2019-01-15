@@ -1,7 +1,7 @@
 ﻿<Project>
 
   <PropertyGroup Label="Package Versions">
-    <CoverletMsbuildPackageVersion>1.2.0</CoverletMsbuildPackageVersion>
+    <CoverletMsbuildPackageVersion>2.5.0</CoverletMsbuildPackageVersion>
     <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>2.2.0</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
     <MicrosoftEntityFrameworkCorePackageVersion>2.2.1</MicrosoftEntityFrameworkCorePackageVersion>
     <MicrosoftExtensionsLoggingConsolePackageVersion>2.2.0</MicrosoftExtensionsLoggingConsolePackageVersion>
