@@ -1,6 +1,32 @@
 ﻿<Project>
+
+  <PropertyGroup Label="Package Versions">
+    <CoverletMsbuildPackageVersion>2.5.0</CoverletMsbuildPackageVersion>
+    <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>2.2.0</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
+    <MicrosoftEntityFrameworkCorePackageVersion>2.2.1</MicrosoftEntityFrameworkCorePackageVersion>
+    <MicrosoftExtensionsLoggingConsolePackageVersion>2.2.0</MicrosoftExtensionsLoggingConsolePackageVersion>
+    <MicrosoftNETTestSdkPackageVersion>15.6.1</MicrosoftNETTestSdkPackageVersion>
+    <MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>2.0.1</MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>
+    <NetTopologySuiteIOSGeoJSONPackageVersion>1.15.0</NetTopologySuiteIOSGeoJSONPackageVersion>
+    <PluralsightCryptoPackageVersion>1.1.0</PluralsightCryptoPackageVersion>
+    <RemoteLinqPackageVersion>5.8.0</RemoteLinqPackageVersion>
+    <ServiceStackPackageVersion>5.1.0</ServiceStackPackageVersion>
+    <StyleCopAnalyzersPackageVersion>1.1.0-beta007</StyleCopAnalyzersPackageVersion>
+    <SystemServiceModelHttpPackageVersion>4.5.3</SystemServiceModelHttpPackageVersion>
+    <XamarinAndroidSupportDesignPackageVersion>27.0.2</XamarinAndroidSupportDesignPackageVersion>
+    <XunitCorePackageVersion>2.4.0</XunitCorePackageVersion>
+    <XunitRunnerVisualStudioPackageVersion>2.4.0</XunitRunnerVisualStudioPackageVersion>
+
+    <!-- Workaround for ServiceStackSample.Server -->
+    <MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>2.0.1</MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>
+
+    <!-- Workaround for WcfSample.Android -->
+    <SystemBuffersPackageVersion>4.5.0</SystemBuffersPackageVersion>
+  </PropertyGroup>
+
   <PropertyGroup>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)StyleNoDoc.ruleset</CodeAnalysisRuleSet>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
 </Project>

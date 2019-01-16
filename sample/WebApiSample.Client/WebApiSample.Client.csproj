@@ -16,8 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.2.0" />
-    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingConsolePackageVersion)" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="$(RemoteLinqPackageVersion)" />
   </ItemGroup>
 
 </Project>

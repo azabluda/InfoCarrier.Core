@@ -5,15 +5,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.msbuild" Version="1.2.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="2.2.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="2.2.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="2.2.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.6.1" />
-    <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="1.15.0" />
-    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="5.7.0" />
-    <PackageReference Include="xunit.core" Version="2.4.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
+    <PackageReference Include="coverlet.msbuild" Version="$(CoverletMsbuildPackageVersion)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkPackageVersion)" />
+    <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="$(NetTopologySuiteIOSGeoJSONPackageVersion)" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="$(RemoteLinqPackageVersion)" />
+    <PackageReference Include="xunit.core" Version="$(XunitCorePackageVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioPackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>

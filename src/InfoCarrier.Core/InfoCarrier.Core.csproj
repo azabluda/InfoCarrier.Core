@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>EntityFrameworkCore provider for multitier applications</Description>
+    <Description>EntityFrameworkCore provider for multitier applications.</Description>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Version>$(NuGetVersion)</Version>
     <Company>on/off it-solutions-gmbh</Company>
@@ -10,10 +10,11 @@
     <Title>InfoCarrier.Core</Title>
     <PackageTags>EF;ORM;multi-tier;n-tier</PackageTags>
     <PackageProjectUrl>https://github.com/azabluda/InfoCarrier.Core</PackageProjectUrl>
-    <PackageLicense>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicense>
+    <PackageLicenseUrl>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/license.txt</PackageLicenseUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/icon.png</PackageIconUrl>
+    <NoWarn>NU5125</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -56,8 +57,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="2.2.0" />
-    <PackageReference Include="Remote.Linq.EntityFrameworkCore" Version="5.8.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
+    <PackageReference Include="Remote.Linq.EntityFrameworkCore" Version="$(RemoteLinqPackageVersion)" />
   </ItemGroup>
 
 </Project>
