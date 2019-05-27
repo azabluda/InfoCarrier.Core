@@ -1,4 +1,4 @@
-image: Visual Studio 2017 Preview
+image: Visual Studio 2017
 
 environment:
   Test__SqlServer__DefaultConnection: Server=(local)\SQL2016;Database=master;User ID=sa;Password=Password12!
@@ -7,9 +7,10 @@ services: mssql2016
 
 before_build:
   - dotnet --info
+  - dotnet tool install --global GitVersion.Tool --version 4.0.1-beta1-65
 
 build_script:
-  - for /f "delims=" %%i in ('tools\GitVersion.CommandLine\tools\GitVersion.exe /showvariable NuGetVersion') do set NuGetVersion=%%i
+  - for /f "delims=" %%i in ('dotnet-gitversion /showvariable NuGetVersion') do set NuGetVersion=%%i
   - dotnet build
   - dotnet pack src\InfoCarrier.Core\InfoCarrier.Core.csproj --output "..\..\artifacts" --configuration Debug --include-symbols
 

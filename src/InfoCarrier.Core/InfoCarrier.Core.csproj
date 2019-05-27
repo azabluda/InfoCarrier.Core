@@ -25,14 +25,6 @@
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
 
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="&quot;$(ProjectDir)..\..\tools\GitVersion.CommandLine\tools\GitVersion.exe&quot; /updateassemblyinfo &quot;$(ProjectDir)obj\GitVersionTaskAssemblyInfo.g.cs&quot; /ensureassemblyinfo" />
-  </Target>  
-
-  <ItemGroup>
-    <Compile Include="obj\GitVersionTaskAssemblyInfo.g.cs" />
-  </ItemGroup>
-
   <ItemGroup>
     <None Update="Properties\InfoCarrierStrings.Designer.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
@@ -59,6 +51,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
     <PackageReference Include="Remote.Linq.EntityFrameworkCore" Version="$(RemoteLinqPackageVersion)" />
+    <PackageReference Include="GitVersionTask" Version="$(GitVersionTaskPackageVersion)" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>
