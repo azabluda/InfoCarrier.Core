@@ -4,7 +4,7 @@
     <CoverletMsbuildPackageVersion>2.5.0</CoverletMsbuildPackageVersion>
     <GitVersionTaskPackageVersion>5.0.0-beta3-27</GitVersionTaskPackageVersion>
     <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>2.2.0</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
-    <MicrosoftEntityFrameworkCorePackageVersion>2.2.1</MicrosoftEntityFrameworkCorePackageVersion>
+    <MicrosoftEntityFrameworkCorePackageVersion>2.2.4</MicrosoftEntityFrameworkCorePackageVersion>
     <MicrosoftExtensionsLoggingConsolePackageVersion>2.2.0</MicrosoftExtensionsLoggingConsolePackageVersion>
     <MicrosoftNETTestSdkPackageVersion>15.6.1</MicrosoftNETTestSdkPackageVersion>
     <MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>2.0.1</MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>
