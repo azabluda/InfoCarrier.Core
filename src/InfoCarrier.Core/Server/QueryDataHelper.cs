@@ -171,7 +171,7 @@ namespace InfoCarrier.Core.Server
                 ITypeResolver typeResolver,
                 ITypeInfoProvider typeInfoProvider,
                 IEnumerable<IInfoCarrierValueMapper> valueMappers)
-                : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
+                : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatNativeTypesAsString = true })
             {
                 this.valueMappers = valueMappers;
                 IServiceProvider serviceProvider = dbContext.GetInfrastructure();

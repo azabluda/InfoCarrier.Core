@@ -1,6 +1,7 @@
 ﻿<Project>
 
   <PropertyGroup Label="Package Versions">
+    <AquaCorePackageVersion>4.5.2</AquaCorePackageVersion>
     <CoverletMsbuildPackageVersion>2.5.0</CoverletMsbuildPackageVersion>
     <GitVersionTaskPackageVersion>5.0.0-beta3-27</GitVersionTaskPackageVersion>
     <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>2.2.0</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
@@ -10,7 +11,7 @@
     <MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>2.0.1</MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>
     <NetTopologySuiteIOSGeoJSONPackageVersion>1.15.0</NetTopologySuiteIOSGeoJSONPackageVersion>
     <PluralsightCryptoPackageVersion>1.1.0</PluralsightCryptoPackageVersion>
-    <RemoteLinqPackageVersion>5.8.0</RemoteLinqPackageVersion>
+    <RemoteLinqPackageVersion>5.8.2</RemoteLinqPackageVersion>
     <ServiceStackPackageVersion>5.1.0</ServiceStackPackageVersion>
     <StyleCopAnalyzersPackageVersion>1.1.0-beta007</StyleCopAnalyzersPackageVersion>
     <SystemServiceModelHttpPackageVersion>4.5.3</SystemServiceModelHttpPackageVersion>
