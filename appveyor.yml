@@ -7,7 +7,7 @@ services: mssql2016
 
 before_build:
   - dotnet --info
-  - dotnet tool install --global GitVersion.Tool --version 4.0.1-beta1-65
+  - dotnet tool install --global GitVersion.Tool --version 5.0.0-beta3-27
 
 build_script:
   - for /f "delims=" %%i in ('dotnet-gitversion /showvariable NuGetVersion') do set NuGetVersion=%%i
