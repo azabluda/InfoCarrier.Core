@@ -213,9 +213,10 @@ namespace InfoCarrier.Core.Server
                 var valueMappingContext = new MapToDynamicObjectContext(obj, EntityEntryGetter, this, setTypeInformation);
                 foreach (IInfoCarrierValueMapper valueMapper in this.valueMappers)
                 {
-                    if (valueMapper.TryMapToDynamicObject(valueMappingContext, out DynamicObject dto))
+                    if (valueMapper.TryMapToDynamicObject(valueMappingContext, out object mapped))
                     {
-                        return dto;
+                        obj = mapped;
+                        break;
                     }
                 }
 
