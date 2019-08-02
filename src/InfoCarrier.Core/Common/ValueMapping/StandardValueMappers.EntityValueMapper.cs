@@ -21,15 +21,15 @@ namespace InfoCarrier.Core.Common.ValueMapping
             private const string EntityType = @"__EntityType";
             private const string EntityLoadedNavigations = @"__EntityLoadedNavigations";
 
-            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out DynamicObject dto)
+            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped)
             {
                 if (context.EntityEntry == null)
                 {
-                    dto = null;
+                    mapped = null;
                     return false;
                 }
 
-                dto = new DynamicObject(context.Object.GetType());
+                var dto = new DynamicObject(context.Object.GetType());
                 context.AddToCache(dto);
 
                 dto.Add(EntityType, context.EntityEntry.EntityType.DisplayName());
@@ -52,6 +52,7 @@ namespace InfoCarrier.Core.Common.ValueMapping
                     dto.Add(prop.Metadata.Name, value);
                 }
 
+                mapped = dto;
                 return true;
             }
 

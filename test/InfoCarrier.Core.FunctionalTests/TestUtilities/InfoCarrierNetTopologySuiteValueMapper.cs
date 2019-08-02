@@ -13,18 +13,20 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     {
         private const string Data = @"Data";
 
-        public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out DynamicObject dto)
+        public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped)
         {
             if (!(context.Object is IGeometry geometry))
             {
-                dto = null;
+                mapped = null;
                 return false;
             }
 
-            dto = new DynamicObject(typeof(IGeometry));
+            var dto = new DynamicObject(typeof(IGeometry));
             context.AddToCache(dto);
 
             dto.Add(Data, new GeoJsonWriter().Write(geometry));
+
+            mapped = dto;
             return true;
         }
 

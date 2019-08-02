@@ -171,7 +171,7 @@ namespace InfoCarrier.Core.Server
                 ITypeResolver typeResolver,
                 ITypeInfoProvider typeInfoProvider,
                 IEnumerable<IInfoCarrierValueMapper> valueMappers)
-                : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
+                : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatNativeTypesAsString = true })
             {
                 this.valueMappers = valueMappers;
                 IServiceProvider serviceProvider = dbContext.GetInfrastructure();
@@ -213,9 +213,10 @@ namespace InfoCarrier.Core.Server
                 var valueMappingContext = new MapToDynamicObjectContext(obj, EntityEntryGetter, this, setTypeInformation);
                 foreach (IInfoCarrierValueMapper valueMapper in this.valueMappers)
                 {
-                    if (valueMapper.TryMapToDynamicObject(valueMappingContext, out DynamicObject dto))
+                    if (valueMapper.TryMapToDynamicObject(valueMappingContext, out object mapped))
                     {
-                        return dto;
+                        obj = mapped;
+                        break;
                     }
                 }
 

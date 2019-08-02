@@ -41,7 +41,7 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         [IgnoreDataMember]
         internal IDynamicObjectMapper Mapper
-            => this.mapper ?? (this.mapper = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true }));
+            => this.mapper ?? (this.mapper = new DynamicObjectMapper(new DynamicObjectMapperSettings { FormatNativeTypesAsString = true }));
 
         /// <summary>
         ///     Gets or sets state entires mapped to <see cref="UpdateEntryDto" />'s.

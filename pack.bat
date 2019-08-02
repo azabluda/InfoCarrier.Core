@@ -1,4 +1,4 @@
-for /f "delims=" %%i in ('tools\GitVersion.CommandLine\tools\GitVersion.exe /showvariable NuGetVersion') do set NuGetVersion=%%i
+for /f "delims=" %%i in ('dotnet-gitversion /showvariable NuGetVersion') do set NuGetVersion=%%i
 
 clean ^
   && dotnet build ^

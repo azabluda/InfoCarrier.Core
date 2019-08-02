@@ -14,20 +14,25 @@ namespace InfoCarrier.Core.Common.ValueMapping
     {
         /// <summary>
         /// Probes the <see cref="IMapToDynamicObjectContext.Object"/> whether it can be mapped by this mapper,
-        /// and (if so) performs its mapping to <see cref="DynamicObject"/>.
+        /// and (if so) performs its mapping either to <see cref="DynamicObject"/> (if no further mapping is necessary)
+        /// or to any other object which will then be passed to the standard <see cref="DynamicObjectMapper.MapToDynamicObjectGraph" />.
         /// </summary>
         /// <param name="context"> Mapping context. </param>
-        /// <param name="dto"> Mapping result. Null if this mapper isn't applicable. </param>
-        /// <returns> True if this mapper has actually mapped the object. </returns>
-        bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out DynamicObject dto);
+        /// <param name="mapped"> Mapping result. Null if this mapper isn't applicable. </param>
+        /// <returns> True if this mapper is applicable. </returns>
+        bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped);
 
         /// <summary>
         /// Probes the <see cref="IMapFromDynamicObjectContext.Dto"/> whether it can be mapped by this mapper,
         /// and (if so) performs its mapping back to its normal representation.
         /// </summary>
         /// <param name="context"> Mapping context. </param>
-        /// <param name="obj"> Mapping result. Null if this mapper isn't applicable. </param>
-        /// <returns> True if this mapper has actually mapped the <see cref="DynamicObject"/>. </returns>
+        /// <param name="obj">
+        ///     Mapping result, or a <see cref="DynamicObject"/> which will then be passed
+        ///     to the standard <see cref="DynamicObjectMapper.MapFromDynamicObjectGraph" />.
+        ///     Null if this mapper isn't applicable.
+        /// </param>
+        /// <returns> True if this mapper is applicable. </returns>
         bool TryMapFromDynamicObject(IMapFromDynamicObjectContext context, out object obj);
     }
 }

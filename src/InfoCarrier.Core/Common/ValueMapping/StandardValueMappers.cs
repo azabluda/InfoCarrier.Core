@@ -16,6 +16,7 @@ namespace InfoCarrier.Core.Common.ValueMapping
         public static IEnumerable<IInfoCarrierValueMapper> Mappers { get; } =
             new IInfoCarrierValueMapper[]
             {
+                new ByteArrayValueMapper(),
                 new ArrayValueMapper(),
                 new GroupingValueMapper(),
                 new EnumerableValueMapper(),

@@ -45,7 +45,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             ITypeResolver typeResolver,
             ITypeInfoProvider typeInfoProvider,
             IReadOnlyDictionary<string, IEntityType> entityTypeMap = null)
-            : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatPrimitiveTypesAsString = true })
+            : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatNativeTypesAsString = true })
         {
             this.queryContext = queryContext;
             this.typeResolver = typeResolver;
@@ -93,12 +93,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "InfoCarrier.Core internal.")]
         protected override object MapFromDynamicObjectGraph(object obj, Type targetType)
         {
-            object BaseImpl() => base.MapFromDynamicObjectGraph(obj, targetType);
-
             // mapping required?
             if (obj == null || targetType == obj.GetType())
             {
-                return BaseImpl();
+                return base.MapFromDynamicObjectGraph(obj, targetType);
             }
 
             if (obj is DynamicObject dobj)
@@ -111,14 +109,22 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 var valueMappingContext = new MapFromDynamicObjectContext(dobj, this);
                 foreach (IInfoCarrierValueMapper valueMapper in this.valueMappers)
                 {
-                    if (valueMapper.TryMapFromDynamicObject(valueMappingContext, out var mapped))
+                    if (!valueMapper.TryMapFromDynamicObject(valueMappingContext, out var mapped))
                     {
-                        return mapped;
+                        continue;
                     }
+
+                    if (mapped is DynamicObject)
+                    {
+                        obj = mapped;
+                        break;
+                    }
+
+                    return mapped;
                 }
             }
 
-            return BaseImpl();
+            return base.MapFromDynamicObjectGraph(obj, targetType);
         }
 
         private object TryMapEntity(IMapFromDynamicObjectContext context, string entityTypeName, IReadOnlyList<string> loadedNavigations)

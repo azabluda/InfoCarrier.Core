@@ -19,21 +19,23 @@ namespace InfoCarrier.Core.Common.ValueMapping
             private const string ArrayType = @"ArrayType";
             private const string Elements = @"Elements";
 
-            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out DynamicObject dto)
+            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped)
             {
                 Type objType = context.Object.GetType();
                 if (!objType.IsArray)
                 {
-                    dto = null;
+                    mapped = null;
                     return false;
                 }
 
-                dto = new DynamicObject();
+                var dto = new DynamicObject();
                 context.AddToCache(dto);
                 dto.Add(ArrayType, new TypeInfo(objType, includePropertyInfos: false));
                 dto.Add(
                     Elements,
                     ((IEnumerable)context.Object).Cast<object>().Select(context.MapToDynamicObjectGraph).ToArray());
+
+                mapped = dto;
                 return true;
             }
 

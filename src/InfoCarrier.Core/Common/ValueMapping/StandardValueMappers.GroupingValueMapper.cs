@@ -24,22 +24,24 @@ namespace InfoCarrier.Core.Common.ValueMapping
                 = Utils.GetMethodInfo(() => MakeGenericGrouping<object, object>(null, null))
                     .GetGenericMethodDefinition();
 
-            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out DynamicObject dto)
+            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped)
             {
                 var groupingType = Utils.GetGenericTypeImplementations(context.Object.GetType(), typeof(IGrouping<,>)).SingleOrDefault();
 
                 if (groupingType == null)
                 {
-                    dto = null;
+                    mapped = null;
                     return false;
                 }
 
-                dto = new DynamicObject(groupingType);
+                var dto = new DynamicObject(groupingType);
                 context.AddToCache(dto);
                 dto.Add(Key, context.MapToDynamicObjectGraph(groupingType.GetProperty(Key)?.GetValue(context.Object)));
                 dto.Add(
                     Elements,
                     new DynamicObject(((IEnumerable)context.Object).Cast<object>().Select(context.MapToDynamicObjectGraph).ToList()));
+
+                mapped = dto;
                 return true;
             }
 

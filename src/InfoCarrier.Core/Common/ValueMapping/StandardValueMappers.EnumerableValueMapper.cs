@@ -27,23 +27,23 @@ namespace InfoCarrier.Core.Common.ValueMapping
                 = Utils.GetMethodInfo(() => AddElementsToCollection<object>(null, null))
                     .GetGenericMethodDefinition();
 
-            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out DynamicObject dto)
+            public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped)
             {
                 Type objType = context.Object.GetType();
                 if (objType == typeof(string))
                 {
-                    dto = null;
+                    mapped = null;
                     return false;
                 }
 
                 Type elementType = Utils.TryGetSequenceType(objType);
                 if (elementType == null || elementType == typeof(DynamicObject))
                 {
-                    dto = null;
+                    mapped = null;
                     return false;
                 }
 
-                dto = new DynamicObject(typeof(IEnumerable<>).MakeGenericType(elementType));
+                var dto = new DynamicObject(typeof(IEnumerable<>).MakeGenericType(elementType));
                 context.AddToCache(dto);
                 dto.Add(
                     Elements,
@@ -59,6 +59,7 @@ namespace InfoCarrier.Core.Common.ValueMapping
                     }
                 }
 
+                mapped = dto;
                 return true;
             }
 
