@@ -94,7 +94,26 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
             var serializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
             var json = JsonConvert.SerializeObject(value, serializerSettings);
-            return (T)JsonConvert.DeserializeObject(json, value.GetType(), serializerSettings);
+
+            T result = default;
+            void Deserialize()
+                => result = (T)JsonConvert.DeserializeObject(json, value.GetType(), serializerSettings);
+
+            // For larger json strings we may hit the stack size limit during deserialization.
+            // [UGLY] Perform deserialization on a thread with higher maxStackSize.
+            // https://stackoverflow.com/a/28952640
+            if (json.Length > 1000000)
+            {
+                var thread = new Thread(Deserialize, 10000000);
+                thread.Start();
+                thread.Join();
+            }
+            else
+            {
+                Deserialize();
+            }
+
+            return result;
         }
 
         private Func<DbContext> CreateDbContextWithParameters(DbContext clientDbContext) =>
