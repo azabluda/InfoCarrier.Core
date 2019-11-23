@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27703.1
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29519.87
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InfoCarrier.Core", "src\InfoCarrier.Core\InfoCarrier.Core.csproj", "{6B24F793-C93B-4869-A99B-AC51EE2C82AF}"
 EndProject
@@ -26,6 +26,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceStackSample.Client", "sample\ServiceStackSample.Client\ServiceStackSample.Client.csproj", "{AB0A2B6A-851C-4FC0-A32A-5C2F05B12EDF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceStackSample.Server", "sample\ServiceStackSample.Server\ServiceStackSample.Server.csproj", "{D41E3818-D469-4F75-8AD2-D7CDE5190E4F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BuildScript", "BuildScript\BuildScript.csproj", "{3EFE62B6-AB88-4D1A-97F7-2C0B571891A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -69,6 +71,10 @@ Global
 		{D41E3818-D469-4F75-8AD2-D7CDE5190E4F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D41E3818-D469-4F75-8AD2-D7CDE5190E4F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D41E3818-D469-4F75-8AD2-D7CDE5190E4F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EFE62B6-AB88-4D1A-97F7-2C0B571891A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EFE62B6-AB88-4D1A-97F7-2C0B571891A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EFE62B6-AB88-4D1A-97F7-2C0B571891A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EFE62B6-AB88-4D1A-97F7-2C0B571891A6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

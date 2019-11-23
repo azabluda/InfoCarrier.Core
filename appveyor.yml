@@ -1,21 +1,20 @@
-image: Visual Studio 2017
+image: Visual Studio 2019
 
 environment:
-  Test__SqlServer__DefaultConnection: Server=(local)\SQL2016;Database=master;User ID=sa;Password=Password12!
+  Test__SqlServer__DefaultConnection: Server=(local)\SQL2017;Database=master;User ID=sa;Password=Password12!
 
-services: mssql2016
+services: mssql2017
 
 before_build:
   - dotnet --info
-  - dotnet tool install --global GitVersion.Tool --version 5.0.0-beta3-27
+  - dotnet tool restore
 
 build_script:
-  - for /f "delims=" %%i in ('dotnet-gitversion /showvariable NuGetVersion') do set NuGetVersion=%%i
-  - dotnet build
-  - dotnet pack src\InfoCarrier.Core\InfoCarrier.Core.csproj --output "..\..\artifacts" --configuration Debug --include-symbols
+  - dotnet flubu build
+  - dotnet flubu pack
 
 test_script:
-  - dotnet test test\InfoCarrier.Core.FunctionalTests\InfoCarrier.Core.FunctionalTests.csproj
+  - dotnet flubu test
 
 artifacts:
   path: artifacts

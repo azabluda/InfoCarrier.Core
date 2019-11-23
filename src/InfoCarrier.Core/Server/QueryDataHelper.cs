@@ -243,7 +243,7 @@ namespace InfoCarrier.Core.Server
 
                 public object Object { get; }
 
-                public InternalEntityEntry EntityEntry => entityEntry.Value;
+                public InternalEntityEntry EntityEntry => this.entityEntry.Value;
 
                 public DynamicObject MapToDynamicObjectGraph(object obj)
                     => this.mapper.MapToDynamicObjectGraph(obj, this.setTypeInformation);

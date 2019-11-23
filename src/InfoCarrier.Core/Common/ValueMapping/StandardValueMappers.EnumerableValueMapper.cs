@@ -145,11 +145,11 @@ namespace InfoCarrier.Core.Common.ValueMapping
                     this.queryable = new EnumerableQuery<T>(this);
                 }
 
-                public Type ElementType => queryable.ElementType;
+                public Type ElementType => this.queryable.ElementType;
 
-                public System.Linq.Expressions.Expression Expression => queryable.Expression;
+                public System.Linq.Expressions.Expression Expression => this.queryable.Expression;
 
-                public IQueryProvider Provider => queryable.Provider;
+                public IQueryProvider Provider => this.queryable.Provider;
 
                 public IOrderedEnumerable<T> CreateOrderedEnumerable<TKey>(
                     Func<T, TKey> keySelector,

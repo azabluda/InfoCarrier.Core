@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "flubucore.globaltool": {
+      "version": "4.3.1",
+      "commands": [
+        "flubu"
+      ]
+    },
+    "dotnet-reportgenerator-globaltool": {
+      "version": "4.3.6",
+      "commands": [
+        "reportgenerator"
+      ]
+    }
+  }
+}
