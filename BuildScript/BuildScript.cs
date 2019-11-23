@@ -42,6 +42,7 @@ namespace BuildScript
                     @"/p:CollectCoverage=true",
                     @"/p:CoverletOutputFormat=opencover",
                     @"/p:CoverletOutput=..\..\TestResults\coverage.xml",
+                    @"/p:ExcludeByFile=""**\GitVersionInformation_InfoCarrier.Core*.cs""",
                     @"/p:Include=""[InfoCarrier.Core]*"""))
                 .AddCoreTask(x => x.ExecuteDotnetTask("reportgenerator").WithArguments(
                     @"-reports:TestResults\coverage.xml",
