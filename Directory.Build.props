@@ -3,28 +3,24 @@
   <PropertyGroup Label="Package Versions">
 
     <!-- Dev dependencies -->
-    <CoverletMsbuildPackageVersion>2.7.0</CoverletMsbuildPackageVersion>
-    <FlubuCorePackageVersion>4.3.1</FlubuCorePackageVersion>
-    <GitVersionTaskPackageVersion>5.1.2</GitVersionTaskPackageVersion>
+    <CoverletMsbuildPackageVersion>2.8.1</CoverletMsbuildPackageVersion>
+    <FlubuCorePackageVersion>5.1.1</FlubuCorePackageVersion>
+    <GitVersionTaskPackageVersion>5.2.4</GitVersionTaskPackageVersion>
     <MicrosoftNETTestSdkPackageVersion>15.6.1</MicrosoftNETTestSdkPackageVersion>
     <StyleCopAnalyzersPackageVersion>1.1.118</StyleCopAnalyzersPackageVersion>
-    <XunitCorePackageVersion>2.4.0</XunitCorePackageVersion>
-    <XunitRunnerVisualStudioPackageVersion>2.4.0</XunitRunnerVisualStudioPackageVersion>
+    <XunitCorePackageVersion>2.4.1</XunitCorePackageVersion>
+    <XunitRunnerVisualStudioPackageVersion>2.4.1</XunitRunnerVisualStudioPackageVersion>
 
     <!-- Build dependencies -->
-    <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>2.2.0</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
-    <MicrosoftEntityFrameworkCorePackageVersion>2.2.6</MicrosoftEntityFrameworkCorePackageVersion>
-    <MicrosoftExtensionsLoggingConsolePackageVersion>2.2.0</MicrosoftExtensionsLoggingConsolePackageVersion>
-    <MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>2.0.1</MicrosoftVisualStudioWebCodeGenerationToolsPackageVersion>
-    <NetTopologySuiteIOSGeoJSONPackageVersion>1.15.0</NetTopologySuiteIOSGeoJSONPackageVersion>
+    <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>3.1.3</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
+    <MicrosoftEntityFrameworkCorePackageVersion>3.1.3</MicrosoftEntityFrameworkCorePackageVersion>
+    <MicrosoftExtensionsLoggingConsolePackageVersion>3.1.3</MicrosoftExtensionsLoggingConsolePackageVersion>
+    <NetTopologySuiteIOSGeoJSONPackageVersion>2.0.2</NetTopologySuiteIOSGeoJSONPackageVersion>
     <PluralsightCryptoPackageVersion>1.1.0</PluralsightCryptoPackageVersion>
-    <RemoteLinqPackageVersion>6.0.0</RemoteLinqPackageVersion>
-    <ServiceStackPackageVersion>5.1.0</ServiceStackPackageVersion>
-    <SystemServiceModelHttpPackageVersion>4.5.3</SystemServiceModelHttpPackageVersion>
-    <XamarinAndroidSupportDesignPackageVersion>27.0.2</XamarinAndroidSupportDesignPackageVersion>
-
-    <!-- Workaround for ServiceStackSample.Server -->
-    <MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>2.0.1</MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>
+    <RemoteLinqPackageVersion>6.2.0</RemoteLinqPackageVersion>
+    <ServiceStackPackageVersion>5.8.0</ServiceStackPackageVersion>
+    <SystemServiceModelHttpPackageVersion>4.7.0</SystemServiceModelHttpPackageVersion>
+    <XamarinAndroidSupportDesignPackageVersion>28.0.0.3</XamarinAndroidSupportDesignPackageVersion>
 
     <!-- Workaround for WcfSample.Android -->
     <SystemBuffersPackageVersion>4.5.0</SystemBuffersPackageVersion>
@@ -32,8 +28,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <DefaultNetCoreTargetFramework>netcoreapp3.1</DefaultNetCoreTargetFramework>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)StyleNoDoc.ruleset</CodeAnalysisRuleSet>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
 
 </Project>

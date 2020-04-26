@@ -37,15 +37,13 @@ namespace BuildScript
             context.CreateTarget("coverage")
                 .AddCoreTask(x => x.Test().WithArguments(
                     @"test\InfoCarrier.Core.FunctionalTests\InfoCarrier.Core.FunctionalTests.csproj",
-                    @"-f",
-                    @"netcoreapp2.1",
                     @"/p:CollectCoverage=true",
                     @"/p:CoverletOutputFormat=opencover",
                     @"/p:CoverletOutput=..\..\TestResults\coverage.xml",
                     @"/p:ExcludeByFile=""**\GitVersionInformation_InfoCarrier.Core*.cs""",
                     @"/p:Include=""[InfoCarrier.Core]*"""))
                 .AddCoreTask(x => x.ExecuteDotnetTask("reportgenerator").WithArguments(
-                    @"-reports:TestResults\coverage.xml",
+                    @"-reports:TestResults\coverage*.xml",
                     @"-targetdir:TestResults\coverage"))
                 .AddTask(x => x.ExecutePowerShellScript("start").WithArguments(
                     string.Empty,
