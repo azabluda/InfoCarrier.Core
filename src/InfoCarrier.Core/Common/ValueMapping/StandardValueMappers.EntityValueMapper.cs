@@ -9,7 +9,6 @@ namespace InfoCarrier.Core.Common.ValueMapping
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
     /// <summary>
     /// Standard value mapper for EF entities.

@@ -45,7 +45,7 @@ namespace InfoCarrier.Core.Common
         ///     new values for keys which are to be sent back to the client.
         /// </param>
         /// <returns>The Success result object.</returns>
-        internal static SaveChangesResult Success(int countPersisted, IReadOnlyList<IUpdateEntry> entries)
+        internal static SaveChangesResult Success(int countPersisted, IList<IUpdateEntry> entries)
             => new SaveChangesResult(new SuccessImpl(countPersisted, entries));
 
         /// <summary>
@@ -57,7 +57,7 @@ namespace InfoCarrier.Core.Common
         ///     needed for determining the <see cref="ErrorImpl.FailedEntityIndexes" />.
         /// </param>
         /// <returns>The Error result object.</returns>
-        internal static SaveChangesResult Error(DbUpdateException exception, IReadOnlyList<IUpdateEntry> entries)
+        internal static SaveChangesResult Error(DbUpdateException exception, IList<IUpdateEntry> entries)
             => new SaveChangesResult(new ErrorImpl(exception, entries));
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         /// <param name="entries">The client-side state entries.</param>
         /// <returns>The number of state entries written to the database.</returns>
-        public int ApplyTo(IReadOnlyList<IUpdateEntry> entries)
+        public int ApplyTo(IList<IUpdateEntry> entries)
             => this.Impl.ApplyTo(entries);
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace InfoCarrier.Core.Common
             {
             }
 
-            internal SuccessImpl(int countPersisted, IReadOnlyList<IUpdateEntry> entries)
+            internal SuccessImpl(int countPersisted, IList<IUpdateEntry> entries)
                 : base(entries)
             {
                 this.CountPersisted = countPersisted;
@@ -95,7 +95,7 @@ namespace InfoCarrier.Core.Common
             [DataMember]
             private int CountPersisted { get; set; }
 
-            int ISaveChangesResult.ApplyTo(IReadOnlyList<IUpdateEntry> entries)
+            int ISaveChangesResult.ApplyTo(IList<IUpdateEntry> entries)
             {
                 // Merge the results / update properties modified during SaveChanges on the server-side
                 foreach (var merge in entries.Zip(this.DataTransferObjects, (e, d) => new { Entry = e, Dto = d }))
@@ -152,7 +152,7 @@ namespace InfoCarrier.Core.Common
             [DataMember]
             private int[] FailedEntityIndexes { get; set; }
 
-            int ISaveChangesResult.ApplyTo(IReadOnlyList<IUpdateEntry> entries)
+            int ISaveChangesResult.ApplyTo(IList<IUpdateEntry> entries)
             {
                 IReadOnlyList<IUpdateEntry> failedEntries = this.FailedEntityIndexes.Select(x => entries[x]).ToList();
 

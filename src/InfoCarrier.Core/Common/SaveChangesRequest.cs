@@ -28,7 +28,7 @@ namespace InfoCarrier.Core.Common
         ///     Initializes a new instance of the <see cref="SaveChangesRequest"/> class.
         /// </summary>
         /// <param name="entries">The <see cref="IUpdateEntry" />'s which need to be saved.</param>
-        internal SaveChangesRequest(IReadOnlyList<IUpdateEntry> entries)
+        internal SaveChangesRequest(IList<IUpdateEntry> entries)
             : base(entries)
         {
             this.SharedIdentityDataTransferObjects.AddRange(

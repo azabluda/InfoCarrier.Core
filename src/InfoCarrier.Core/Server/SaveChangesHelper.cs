@@ -14,6 +14,7 @@ namespace InfoCarrier.Core.Server
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
+    using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
@@ -94,7 +95,7 @@ namespace InfoCarrier.Core.Server
                 foreach (var p in props.Where(x => !x.EfProperty.Metadata.IsKey()))
                 {
                     bool canSetCurrentValue =
-                        p.EfProperty.Metadata.IsShadowProperty ||
+                        p.EfProperty.Metadata.IsShadowProperty() ||
                         p.EfProperty.Metadata.TryGetMemberInfo(forConstruction: false, forSet: true, out _, out _);
 
                     if (canSetCurrentValue)
@@ -145,13 +146,13 @@ namespace InfoCarrier.Core.Server
                 }
             }
 
-            this.Entries = entries.Select(e => e.GetInfrastructure()).ToList();
+            this.Entries = entries.Select(e => e.GetInfrastructure()).Cast<IUpdateEntry>().ToList();
         }
 
         /// <summary>
         ///     Gets the corresponding entries after painting the state of the updated entities.
         /// </summary>
-        private IReadOnlyList<IUpdateEntry> Entries { get; }
+        private IList<IUpdateEntry> Entries { get; }
 
         /// <summary>
         ///     Saves the updated entities into the actual database.

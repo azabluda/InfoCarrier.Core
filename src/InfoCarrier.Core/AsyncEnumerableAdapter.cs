@@ -30,7 +30,8 @@ namespace InfoCarrier.Core
         ///     Gets an asynchronous enumerator over the sequence.
         /// </summary>
         /// <returns>Enumerator for asynchronous enumeration over the sequence.</returns>
-        public IAsyncEnumerator<T> GetEnumerator() => this.enumeratorFactory();
+        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+            => this.enumeratorFactory();
 
         private class AsyncEnumerator : IAsyncEnumerator<T>
         {
@@ -47,12 +48,13 @@ namespace InfoCarrier.Core
                     ? default
                     : this.enumerator.Current;
 
-            public void Dispose()
+            public ValueTask DisposeAsync()
             {
                 this.enumerator?.Dispose();
+                return default;
             }
 
-            public async Task<bool> MoveNext(CancellationToken cancellationToken)
+            public async ValueTask<bool> MoveNextAsync()
             {
                 if (this.enumerator == null)
                 {

@@ -12,10 +12,7 @@ namespace InfoCarrier.Core.Common
     using System.Reflection;
     using InfoCarrier.Core.Properties;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Extensions.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
-    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
     /// <summary>
@@ -42,10 +39,34 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        internal static Type TryGetSequenceType(Type type)
+        public static Type TryGetSequenceType(this Type type)
+            => type.TryGetElementType(typeof(IEnumerable<>))
+               ?? type.TryGetElementType(typeof(IAsyncEnumerable<>));
+
+        public static Type TryGetElementType(this Type type, Type interfaceOrBaseType)
         {
-            var types = GetGenericTypeImplementations(type, typeof(IEnumerable<>));
-            return types.SingleOrDefault()?.GetTypeInfo().GenericTypeArguments.FirstOrDefault();
+            if (type.GetTypeInfo().IsGenericTypeDefinition)
+            {
+                return null;
+            }
+
+            var types = GetGenericTypeImplementations(type, interfaceOrBaseType);
+
+            Type singleImplementation = null;
+            foreach (var implementation in types)
+            {
+                if (singleImplementation == null)
+                {
+                    singleImplementation = implementation;
+                }
+                else
+                {
+                    singleImplementation = null;
+                    break;
+                }
+            }
+
+            return singleImplementation?.GetTypeInfo().GenericTypeArguments.FirstOrDefault();
         }
 
         /// <summary>
@@ -179,79 +200,6 @@ namespace InfoCarrier.Core.Common
         {
             ValueConverter valueConverter = property?.GetValueConverter();
             return valueConverter != null ? valueConverter.ConvertToProvider(value) : value;
-        }
-
-        /// <summary>
-        ///     Replace <see cref="NullConditionalExpression" /> nodes of the given expression tree with
-        ///     NullConditionalExpressionStub method calls to make the expression ready for translation
-        ///     to a serializable <see cref="Remote.Linq.Expressions.Expression"/>, and vice versa.
-        /// </summary>
-        /// <param name="expression">The original expression tree.</param>
-        /// <param name="toStub">
-        ///     <value>true</value> to replace <see cref="NullConditionalExpression" />'s with stubs.
-        ///     <value>false</value> to replace stubs with <see cref="NullConditionalExpression" />'s.
-        /// </param>
-        /// <returns>
-        ///     The new expression tree with replaced <see cref="NullConditionalExpression" /> nodes.
-        /// </returns>
-        public static Expression ReplaceNullConditional(Expression expression, bool toStub)
-        {
-            return new ReplaceNullConditionalExpressionVisitor(toStub).Visit(expression);
-        }
-
-        private class ReplaceNullConditionalExpressionVisitor : ExpressionVisitorBase
-        {
-            private readonly bool toStub;
-
-            private static readonly MethodInfo NullConditionalExpressionStubMethod
-                = GetMethodInfo(() => NullConditionalExpressionStub<object, object, object>(null, null))
-                    .GetGenericMethodDefinition();
-
-            public ReplaceNullConditionalExpressionVisitor(bool toStub)
-            {
-                this.toStub = toStub;
-            }
-
-            protected override Expression VisitExtension(Expression node)
-            {
-                if (this.toStub)
-                {
-                    if (node is NullConditionalExpression nullConditionalExpression)
-                    {
-                        return Expression.Call(
-                            null,
-                            NullConditionalExpressionStubMethod.MakeGenericMethod(
-                                nullConditionalExpression.Caller.Type,
-                                nullConditionalExpression.AccessOperation.Type,
-                                node.Type),
-                            this.Visit(nullConditionalExpression.Caller),
-                            this.Visit(nullConditionalExpression.AccessOperation));
-                    }
-                }
-
-                return base.VisitExtension(node);
-            }
-
-            protected override Expression VisitMethodCall(MethodCallExpression node)
-            {
-                if (!this.toStub)
-                {
-                    if (node.Method.MethodIsClosedFormOf(NullConditionalExpressionStubMethod))
-                    {
-                        return new NullConditionalExpression(
-                            this.Visit(node.Arguments[0]),
-                            this.Visit(node.Arguments[1]));
-                    }
-                }
-
-                return base.VisitMethodCall(node);
-            }
-
-            [ExcludeFromCoverage]
-            public static TResult NullConditionalExpressionStub<T1, T2, TResult>(T1 caller, T2 accessOperation)
-            {
-                throw new InvalidOperationException(InfoCarrierStrings.NullConditionalExpressionStubMethodInvoked);
-            }
         }
     }
 }

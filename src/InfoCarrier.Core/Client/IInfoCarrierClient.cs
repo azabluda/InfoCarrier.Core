@@ -123,8 +123,32 @@ namespace InfoCarrier.Core.Client
         void CommitTransaction();
 
         /// <summary>
+        ///     Sends a command to commit the current transaction on the server.
+        /// </summary>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
+        /// <returns>
+        ///     A task that represents the asynchronous operation.
+        /// </returns>
+        Task CommitTransactionAsync(CancellationToken cancellationToken);
+
+        /// <summary>
         ///     Sends a command to rollback the current transaction on the server.
         /// </summary>
         void RollbackTransaction();
+
+        /// <summary>
+        ///     Sends a command to rollback the current transaction on the server.
+        /// </summary>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
+        /// <returns>
+        ///     A task that represents the asynchronous operation.
+        /// </returns>
+        Task RollbackTransactionAsync(CancellationToken cancellationToken);
     }
 }

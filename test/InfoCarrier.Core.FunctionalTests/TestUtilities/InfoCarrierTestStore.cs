@@ -24,9 +24,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             base.Dispose();
         }
 
-        protected override void Initialize(Func<DbContext> createContext, Action<DbContext> seed)
+        public override TestStore Initialize(IServiceProvider serviceProvider, Func<DbContext> createContext, Action<DbContext> seed = null, Action<DbContext> clean = null)
         {
             this.backend.Initialize(this.backend.ServiceProvider, this.backend.CreateDbContext, seed);
+            return this;
         }
 
         public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)

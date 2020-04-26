@@ -16,6 +16,6 @@ namespace InfoCarrier.Core.Common
         /// </summary>
         /// <param name="entries">The client-side state entries.</param>
         /// <returns>The number of state entries written to the database.</returns>
-        int ApplyTo(IReadOnlyList<IUpdateEntry> entries);
+        int ApplyTo(IList<IUpdateEntry> entries);
     }
 }

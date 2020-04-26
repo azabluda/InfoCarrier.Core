@@ -6,6 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests
     using InfoCarrier.Core.Client;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.DependencyInjection;
 
     public class LoggingInfoCarrierTest : LoggingTestBase
     {
@@ -13,8 +14,9 @@ namespace InfoCarrier.Core.FunctionalTests
 
         protected override string DefaultOptions => @"InfoCarrierServerUrl=DummyDatabase ";
 
-        protected override DbContextOptionsBuilder CreateOptionsBuilder()
+        protected override DbContextOptionsBuilder CreateOptionsBuilder(IServiceCollection services)
             => new DbContextOptionsBuilder()
-                .UseInfoCarrierClient(InfoCarrierTestHelpers.CreateDummyClient(typeof(DbContext)));
+                .UseInfoCarrierClient(InfoCarrierTestHelpers.CreateDummyClient(typeof(DbContext)))
+                .UseInternalServiceProvider(services.AddEntityFrameworkInfoCarrierClient().BuildServiceProvider());
     }
 }

@@ -16,14 +16,13 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
-    using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
     using MethodInfo = System.Reflection.MethodInfo;
 
     /// <summary>
@@ -35,11 +34,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private static readonly MethodInfo CreateCompiledEnumerableQueryMethod
             = typeof(InfoCarrierQueryCompiler).GetTypeInfo().GetDeclaredMethod(nameof(CreateCompiledEnumerableQuery));
 
-        private static readonly MethodInfo InterceptExceptionsMethod
-            = new LinqOperatorProvider().InterceptExceptions;
+        //private static readonly MethodInfo InterceptExceptionsMethod
+        //    = new LinqOperatorProvider().InterceptExceptions;
 
-        private static readonly MethodInfo AsyncInterceptExceptionsMethod
-            = new AsyncLinqOperatorProvider().InterceptExceptions;
+        //private static readonly MethodInfo AsyncInterceptExceptionsMethod
+        //    = new AsyncLinqOperatorProvider().InterceptExceptions;
 
         private readonly IQueryContextFactory queryContextFactory;
         private readonly ICompiledQueryCache compiledQueryCache;
@@ -83,39 +82,25 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1618:GenericTypeParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        public Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query)
-            => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, true);
+        public Func<QueryContext, TResult> CreateCompiledAsyncQuery<TResult>(Expression query)
+            => this.CreateCompiledAsyncQuery<TResult>(query, true);
 
-        private Func<QueryContext, IAsyncEnumerable<TResult>> CreateCompiledAsyncEnumerableQuery<TResult>(Expression query, bool extractParams)
+        private Func<QueryContext, TResult> CreateCompiledAsyncQuery<TResult>(Expression query, bool extractParams)
         {
             if (extractParams)
             {
-                using (QueryContext qc = this.queryContextFactory.Create())
-                {
-                    query = this.ExtractParameters(query, qc, false);
-                }
+                QueryContext qc = this.queryContextFactory.Create();
+                query = this.ExtractParameters(query, qc, false);
             }
 
             var preparedQuery = new PreparedQuery(query, this.EntityTypeMap);
             return queryContext =>
             {
-                IAsyncEnumerable<TResult> result = preparedQuery.ExecuteAsync<TResult>(queryContext);
-                return (IAsyncEnumerable<TResult>)AsyncInterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
-                    .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
+                TResult result = preparedQuery.ExecuteAsync<TResult>(queryContext);
+                return result;
+                //return (IAsyncEnumerable<TResult>)AsyncInterceptExceptionsMethod.MakeGenericMethod(typeof(TResult))
+                //    .Invoke(null, new object[] { result, queryContext.Context.GetType(), this.logger, queryContext });
             };
-        }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1618:GenericTypeParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        public Func<QueryContext, Task<TResult>> CreateCompiledAsyncTaskQuery<TResult>(Expression query)
-        {
-            var compiledAsyncQuery = this.CreateCompiledAsyncEnumerableQuery<TResult>(query);
-            return queryContext => AsyncEnumerableFirst(compiledAsyncQuery(queryContext), queryContext.CancellationToken);
         }
 
         /// <summary>
@@ -132,10 +117,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             if (extractParams)
             {
-                using (QueryContext qc = this.queryContextFactory.Create())
-                {
-                    query = this.ExtractParameters(query, qc, false);
-                }
+                QueryContext qc = this.queryContextFactory.Create();
+                query = this.ExtractParameters(query, qc, false);
             }
 
             Type sequenceType = Utils.QueryReturnsSingleResult(query)
@@ -170,8 +153,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
             return queryContext =>
             {
                 object items = preparedQuery.Execute<TItem>(queryContext);
-                items = InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
-                    .Invoke(null, new[] { items, queryContext.Context.GetType(), this.logger, queryContext });
+                //items = InterceptExceptionsMethod.MakeGenericMethod(typeof(TItem))
+                //    .Invoke(null, new[] { items, queryContext.Context.GetType(), this.logger, queryContext });
                 return (IEnumerable<TItem>)items;
             };
         }
@@ -186,8 +169,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 = new ParameterExtractingExpressionVisitor(
                     this.evaluatableExpressionFilter,
                     parameterValues,
+                    this.currentDbContext.Context.GetType(),
+                    this.currentDbContext.Context.Model,
                     this.logger,
-                    this.currentDbContext.Context,
                     parameterize,
                     generateContextAccessors);
 
@@ -198,11 +182,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IAsyncEnumerable<TResult> asyncEnumerable,
             CancellationToken cancellationToken)
         {
-            using (var asyncEnumerator = asyncEnumerable.GetEnumerator())
-            {
-                await asyncEnumerator.MoveNext(cancellationToken);
-                return asyncEnumerator.Current;
-            }
+            await using var asyncEnumerator = asyncEnumerable.GetAsyncEnumerator(cancellationToken);
+            await asyncEnumerator.MoveNextAsync();
+            return asyncEnumerator.Current;
         }
 
         /// <summary>
@@ -214,13 +196,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1618:GenericTypeParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public TResult Execute<TResult>(Expression query)
         {
-            using (QueryContext queryContext = this.queryContextFactory.Create())
-            {
-                query = this.ExtractParameters(query, queryContext);
-                return this.compiledQueryCache.GetOrAddQuery(
-                    this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, false),
-                    () => this.CreateCompiledQuery<TResult>(query, false)).Invoke(queryContext);
-            }
+            QueryContext queryContext = this.queryContextFactory.Create();
+            query = this.ExtractParameters(query, queryContext);
+            return this.compiledQueryCache.GetOrAddQuery(
+                this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, false),
+                () => this.CreateCompiledQuery<TResult>(query, false)).Invoke(queryContext);
         }
 
         /// <summary>
@@ -232,13 +212,11 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1618:GenericTypeParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public IAsyncEnumerable<TResult> ExecuteAsync<TResult>(Expression query)
         {
-            using (QueryContext queryContext = this.queryContextFactory.Create())
-            {
-                query = this.ExtractParameters(query, queryContext);
-                return this.compiledQueryCache.GetOrAddAsyncQuery(
-                    this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, true),
-                    () => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, false)).Invoke(queryContext);
-            }
+            QueryContext queryContext = this.queryContextFactory.Create();
+            query = this.ExtractParameters(query, queryContext);
+            return this.compiledQueryCache.GetOrAddAsyncQuery(
+                this.compiledQueryCacheKeyGenerator.GenerateCacheKey(query, true),
+                () => this.CreateCompiledAsyncEnumerableQuery<TResult>(query, false)).Invoke(queryContext);
         }
 
         /// <summary>
@@ -262,7 +240,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 this.createQueryExecutor = qc => new QueryExecutor(this, qc, entityTypeMap);
 
                 // Replace NullConditionalExpression with NullConditionalExpressionStub MethodCallExpression
-                expression = Utils.ReplaceNullConditional(expression, true);
+                //expression = Utils.ReplaceNullConditional(expression, true);
 
                 // Replace EntityQueryable with stub
                 expression = EntityQueryableStubVisitor.Replace(expression);
@@ -335,7 +313,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 }
             }
 
-            private class SubstituteParametersExpressionVisitor : Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.ExpressionVisitorBase
+            private class SubstituteParametersExpressionVisitor : ExpressionVisitor
             {
                 private readonly QueryContext queryContext;
 
@@ -395,6 +373,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     public IQueryProvider Provider
+                    {
+                        [ExcludeFromCoverage]
+                        get => throw new NotImplementedException();
+                    }
+
+                    IRemoteQueryProvider IRemoteQueryable.Provider
                     {
                         [ExcludeFromCoverage]
                         get => throw new NotImplementedException();

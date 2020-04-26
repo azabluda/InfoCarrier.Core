@@ -45,10 +45,10 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             base.Throws_on_concurrent_query_first();
         }
 
-        [ConditionalTheory(Skip = "Client-side evaluation is not supported")]
-        public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool isAsync)
-        {
-            return base.Client_OrderBy_GroupBy_Group_ordering_works(isAsync);
-        }
+        //[ConditionalTheory(Skip = "Client-side evaluation is not supported")]
+        //public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool isAsync)
+        //{
+        //    return base.Client_OrderBy_GroupBy_Group_ordering_works(isAsync);
+        //}
     }
 }

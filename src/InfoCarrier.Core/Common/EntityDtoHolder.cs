@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.Common
         ///     Initializes a new instance of the <see cref="EntityDtoHolder"/> class.
         /// </summary>
         /// <param name="entries">The <see cref="IUpdateEntry" />'s which need to be saved.</param>
-        internal EntityDtoHolder(IReadOnlyList<IUpdateEntry> entries)
+        internal EntityDtoHolder(IList<IUpdateEntry> entries)
         {
             this.DataTransferObjects.AddRange(this.ToUpdateEntryDtos(entries));
         }

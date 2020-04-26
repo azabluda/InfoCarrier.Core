@@ -33,14 +33,14 @@ namespace InfoCarrier.Core.FunctionalTests
             Assert.Equal(42, fortyTwo);
         }
 
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public void ReplaceNullConditional_bypasses_other_extension_expressions(bool toStub)
-        {
-            var replaced = Utils.ReplaceNullConditional(new AnswerToEverythingExpression(), toStub);
-            Assert.Equal(ExpressionType.Constant, replaced.NodeType);
-        }
+        //[Theory]
+        //[InlineData(true)]
+        //[InlineData(false)]
+        //public void ReplaceNullConditional_bypasses_other_extension_expressions(bool toStub)
+        //{
+        //    var replaced = Utils.ReplaceNullConditional(new AnswerToEverythingExpression(), toStub);
+        //    Assert.Equal(ExpressionType.Constant, replaced.NodeType);
+        //}
 
         private object Return42() => 42;
 

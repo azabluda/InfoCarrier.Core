@@ -75,7 +75,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             var result = this.Map<TResult>(dataRecords);
 
-            this.queryContext.BeginTrackingQuery();
+            //this.queryContext.BeginTrackingQuery();
 
             foreach (var action in this.trackEntityActions)
             {
@@ -154,26 +154,20 @@ namespace InfoCarrier.Core.Client.Query.Internal
             bool entityIsTracked = loadedNavigations != null;
 
             // Get entity instance from EFC's identity map, or create a new one
-            Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
-            var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
-
             object entity = null;
             IKey pk = entityType.FindPrimaryKey();
-            if (pk != null)
+            if (pk != null && entityIsTracked)
             {
                 entity = this.queryContext
-                    .QueryBuffer
-                    .GetEntity(
-                        pk,
-                        new EntityLoadInfo(
-                            materializationContext,
-                            materializer),
-                        queryStateManager: entityIsTracked,
-                        throwOnNullKey: false);
+                    .StateManager
+                    .TryGetEntry(pk, pk.Properties.Select(p => valueBuffer[p.GetIndex()]).ToArray())
+                    ?.Entity;
             }
 
             if (entity == null)
             {
+                Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
+                var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
                 entity = materializer.Invoke(materializationContext);
             }
 
@@ -185,7 +179,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 this.trackEntityActions.Add(sm =>
                 {
                     InternalEntityEntry entry
-                        = sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer, handledForeignKeys: null);
+                        = sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer);
 
                     foreach (INavigation nav in loadedNavigations.Select(name => entry.EntityType.FindNavigation(name)))
                     {
@@ -204,11 +198,23 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     if (navigation.IsCollection())
                     {
                         // TODO: clear or skip collection if it already contains something?
-                        navigation.GetCollectionAccessor().AddRange(entity, ((IEnumerable)value).Cast<object>());
+                        var coll = navigation.GetCollectionAccessor();
+                        foreach (var item in (IEnumerable)value)
+                        {
+                            coll.Add(entity, item, false);
+                        }
                     }
                     else
                     {
-                        navigation.GetSetter().SetClrValue(entity, value);
+                        var mem = navigation.GetMemberInfo(false, true);
+                        if (mem is System.Reflection.FieldInfo fieldInfo)
+                        {
+                            fieldInfo.SetValue(entity, value);
+                        }
+                        else if (mem is System.Reflection.PropertyInfo propInfo)
+                        {
+                            propInfo.SetValue(entity, value);
+                        }
                     }
                 }
             }

@@ -70,7 +70,7 @@ namespace InfoCarrier.Core.Server
                 .ToLinqExpression(this.typeResolver);
 
             // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
-            this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
+            //this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
         /// <summary>
@@ -120,14 +120,30 @@ namespace InfoCarrier.Core.Server
         /// </returns>
         public async Task<QueryDataResult> QueryDataAsync(CancellationToken cancellationToken = default)
         {
-            Type resultType = Utils.QueryReturnsSingleResult(this.linqExpression)
-                ? this.linqExpression.Type
-                : Utils.TryGetSequenceType(this.linqExpression.Type);
+            bool queryReturnsSingleResult = Utils.QueryReturnsSingleResult(this.linqExpression);
+            Type resultType = this.linqExpression.Type;
+
+            Type elementType;
+            if (queryReturnsSingleResult)
+            {
+                if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(Task<>))
+                {
+                    elementType = resultType.GenericTypeArguments.Single();
+                }
+                else
+                {
+                    elementType = resultType;
+                }
+            }
+            else
+            {
+                elementType = resultType.TryGetSequenceType();
+            }
 
             object queryResult = await ExecuteExpressionAsyncMethod
-                .MakeGenericMethod(resultType)
-                .ToDelegate<Func<CancellationToken, Task<object>>>(this)
-                .Invoke(cancellationToken);
+                .MakeGenericMethod(elementType)
+                .ToDelegate<Func<bool, CancellationToken, Task<object>>>(this)
+                .Invoke(queryReturnsSingleResult, cancellationToken);
 
             return new QueryDataResult(this.MapResult(queryResult));
         }
@@ -138,16 +154,21 @@ namespace InfoCarrier.Core.Server
             return provider.Execute<T>(this.linqExpression);
         }
 
-        private async Task<object> ExecuteExpressionAsync<T>(CancellationToken cancellationToken)
+        private async Task<object> ExecuteExpressionAsync<T>(bool queryReturnsSingleResult, CancellationToken cancellationToken)
         {
             IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
 
             var queryResult = new List<T>();
-            using (var enumerator = provider.ExecuteAsync<T>(this.linqExpression).GetEnumerator())
+            if (queryReturnsSingleResult)
             {
-                while (await enumerator.MoveNext(cancellationToken))
+                var x = await provider.ExecuteAsync<Task<T>>(this.linqExpression, cancellationToken);
+                queryResult.Add(x);
+            }
+            else
+            {
+                await foreach (var x in provider.ExecuteAsync<IAsyncEnumerable<T>>(this.linqExpression, cancellationToken))
                 {
-                    queryResult.Add(enumerator.Current);
+                    queryResult.Add(x);
                 }
             }
 

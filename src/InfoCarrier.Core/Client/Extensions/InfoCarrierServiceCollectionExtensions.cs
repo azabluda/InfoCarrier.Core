@@ -5,18 +5,16 @@
 namespace InfoCarrier.Core.Client
 {
     using InfoCarrier.Core.Client.Infrastructure.Internal;
-    using InfoCarrier.Core.Client.Query.ExpressionVisitors.Internal;
     using InfoCarrier.Core.Client.Query.Internal;
     using InfoCarrier.Core.Client.Storage.Internal;
     using InfoCarrier.Core.Client.ValueGeneration;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.Extensions.DependencyInjection;
-    using Remotion.Linq.Parsing.ExpressionVisitors.TreeEvaluation;
 
     /// <summary>
     ///     InfoCarrier client specific extension methods for <see cref="IServiceCollection" />.
@@ -43,23 +41,23 @@ namespace InfoCarrier.Core.Client
         public static IServiceCollection AddEntityFrameworkInfoCarrierClient(this IServiceCollection serviceCollection)
         {
             var builder = new EntityFrameworkServicesBuilder(serviceCollection)
-                .TryAdd<IQueryCompiler, InfoCarrierQueryCompiler>()
+                .TryAdd<LoggingDefinitions, InfoCarrierLoggingDefinitions>()
                 .TryAdd<IDatabaseProvider, DatabaseProvider<InfoCarrierOptionsExtension>>()
                 .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
-                .TryAdd<IDatabase>(p => p.GetService<IInfoCarrierDatabase>())
+                .TryAdd<IDatabase, InfoCarrierDatabase>()
                 .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
                 .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
                 .TryAdd<IQueryContextFactory, InfoCarrierQueryContextFactory>()
-                .TryAdd<IEntityQueryModelVisitorFactory, InfoCarrierQueryModelVisitorFactory>()
-                .TryAdd<IEntityQueryableExpressionVisitorFactory, InfoCarrierEntityQueryableExpressionVisitorFactory>()
                 .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
-                .TryAdd<ITypeMappingSource, InfoCarrierTypeMappingSource>()
-                .TryAddProviderSpecificServices(b => b
-                    .TryAddScoped<IInfoCarrierDatabase, InfoCarrierDatabase>());
+                .TryAdd<ITypeMappingSource, InfoCarrierTypeMappingSource>();
 
             builder.TryAddCoreServices();
 
             return serviceCollection;
         }
+    }
+
+    public class InfoCarrierLoggingDefinitions : LoggingDefinitions
+    {
     }
 }

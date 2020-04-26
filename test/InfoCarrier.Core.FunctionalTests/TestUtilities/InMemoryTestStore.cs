@@ -35,7 +35,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         private void TransactionIgnoredWarning()
         {
-            this.ServiceProvider.GetRequiredService<IDiagnosticsLogger<DbLoggerCategory.Database.Transaction>>().TransactionIgnoredWarning();
+            //this.ServiceProvider.GetRequiredService<IDiagnosticsLogger<DbLoggerCategory.Database.Transaction>>().TransactionIgnoredWarning();
         }
 
         public override void BeginTransaction()

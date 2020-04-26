@@ -3,10 +3,8 @@
 
 namespace InfoCarrier.Core.Client.Query.Internal
 {
-    using System;
     using System.Diagnostics.CodeAnalysis;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.Internal;
 
     /// <summary>
     ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -22,9 +20,8 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1642:ConstructorSummaryDocumentationMustBeginWithStandardText", Justification = "Entity Framework Core internal.")]
         public InfoCarrierQueryContext(
             QueryContextDependencies dependencies,
-            Func<IQueryBuffer> queryBufferFactory,
             IInfoCarrierClient infoCarrierClient)
-            : base(dependencies, queryBufferFactory)
+            : base(dependencies)
         {
             this.InfoCarrierClient = infoCarrierClient;
         }

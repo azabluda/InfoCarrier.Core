@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             this.testStoreProperties = testStoreProperties;
             this.ServiceProvider = this.AddServices(new ServiceCollection())
                 .AddInfoCarrierServer()
-                .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
+                //.AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton(TestModelSource.GetFactory(this.testStoreProperties.OnModelCreating))
                 .AddDbContext(
                     this.testStoreProperties.ContextType,
@@ -83,7 +83,17 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public abstract void CommitTransaction();
 
+        public Task CommitTransactionAsync(CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+
         public abstract void RollbackTransaction();
+
+        public Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
 
         private static T SimulateNetworkTransferJson<T>(T value)
         {
