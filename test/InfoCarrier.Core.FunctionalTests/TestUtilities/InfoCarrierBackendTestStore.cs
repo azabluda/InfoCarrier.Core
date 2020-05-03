@@ -97,21 +97,6 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         private static T SimulateNetworkTransferJson<T>(T value)
         {
-            // TODO: revert after https://github.com/6bee/aqua-core/issues/29 is fixed
-            var oldCultureInfo = System.Globalization.CultureInfo.CurrentCulture;
-            try
-            {
-                System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
-                return SimulateNetworkTransferJson2(value);
-            }
-            finally
-            {
-                System.Globalization.CultureInfo.CurrentCulture = oldCultureInfo;
-            }
-        }
-
-        private static T SimulateNetworkTransferJson2<T>(T value)
-        {
             if (value == null)
             {
                 return default;
