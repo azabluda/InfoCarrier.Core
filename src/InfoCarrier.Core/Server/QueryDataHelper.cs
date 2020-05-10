@@ -218,14 +218,17 @@ namespace InfoCarrier.Core.Server
                     return cached;
                 }
 
+                var pinObj = obj;
                 InternalEntityEntry EntityEntryGetter()
                 {
                     // Check if obj is a tracked or detached entity
-                    InternalEntityEntry entry = this.stateManager.TryGetEntry(obj);
-                    if (entry == null && this.detachedEntityTypeMap.TryGetValue(obj.GetType(), out IEntityType entityType))
+                    InternalEntityEntry entry = this.stateManager.TryGetEntry(pinObj);
+                    if (entry == null
+                        && this.detachedEntityTypeMap.TryGetValue(pinObj.GetType(), out IEntityType entityType)
+                        && entityType.FindPrimaryKey() != null)
                     {
                         // Create detached entity entry
-                        entry = this.stateManager.GetOrCreateEntry(obj, entityType);
+                        entry = this.stateManager.GetOrCreateEntry(pinObj, entityType);
                     }
 
                     return entry;
