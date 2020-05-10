@@ -33,6 +33,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             }
         }
 
+        [ConditionalTheory(Skip = "Self referencing loop because of Customer.Context property. Not supported.")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Context_based_client_method(bool isAsync)
+        {
+            return base.Context_based_client_method(isAsync);
+        }
+
         [ConditionalFact(Skip = "Concurrency detection mechanism cannot be used")]
         public override void Throws_on_concurrent_query_list()
         {
