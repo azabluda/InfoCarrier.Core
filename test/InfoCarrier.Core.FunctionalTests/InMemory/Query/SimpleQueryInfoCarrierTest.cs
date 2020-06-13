@@ -7,7 +7,9 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
     using System.Linq;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Query;
+    using Microsoft.EntityFrameworkCore.TestModels.Northwind;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Xunit;
     using Xunit.Abstractions;
@@ -244,10 +246,52 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             base.Throws_on_concurrent_query_first();
         }
 
-        //[ConditionalTheory(Skip = "Client-side evaluation is not supported")]
-        //public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool isAsync)
-        //{
-        //    return base.Client_OrderBy_GroupBy_Group_ordering_works(isAsync);
-        //}
+        [ConditionalTheory(Skip = "Client-side evaluation is not supported")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool isAsync)
+        {
+            return base.Client_OrderBy_GroupBy_Group_ordering_works(isAsync);
+        }
+
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
+        public override async Task Default_if_empty_top_level_arg(bool isAsync)
+        {
+            var message = (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => this.AssertQuery(
+                    isAsync,
+                    ss => from e in ss.Set<Employee>().Where(c => c.EmployeeID == NonExistentID).DefaultIfEmpty(new Employee())
+                        select e,
+                    entryCount: 1))).Message;
+
+            Assert.Equal(
+                CoreStrings.QueryFailed(
+                    @"DbSet<Employee>
+    .Where(c => c.EmployeeID == 4294967295)
+    .DefaultIfEmpty(__Value_0)", // Remote.Linq generates '__Value_0' instead of '__p_0'
+                    "NavigationExpandingExpressionVisitor"),
+                message,
+                ignoreLineEndingDifferences: true);
+        }
+
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
+        public override async Task Default_if_empty_top_level_arg_followed_by_projecting_constant(bool isAsync)
+        {
+            var message = (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => this.AssertQueryScalar(
+                    isAsync,
+                    ss => from e in ss.Set<Employee>().Where(c => c.EmployeeID == NonExistentID).DefaultIfEmpty(new Employee())
+                        select 42))).Message;
+
+            Assert.Equal(
+                CoreStrings.QueryFailed(
+                    @"DbSet<Employee>
+    .Where(c => c.EmployeeID == 4294967295)
+    .DefaultIfEmpty(__Value_0)", // Remote.Linq generates '__Value_0' instead of '__p_0'
+                    "NavigationExpandingExpressionVisitor"),
+                message,
+                ignoreLineEndingDifferences: true);
+        }
     }
 }
