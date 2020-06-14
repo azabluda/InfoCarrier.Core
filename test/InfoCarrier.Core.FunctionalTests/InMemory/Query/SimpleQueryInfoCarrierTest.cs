@@ -293,5 +293,12 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
                 message,
                 ignoreLineEndingDifferences: true);
         }
+
+        [ConditionalTheory(Skip = "ImmutableHashSet has no public constructor, aqua-core is sad about it.")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task ImmutableHashSet_Contains_with_parameter(bool isAsync)
+        {
+            return base.ImmutableHashSet_Contains_with_parameter(isAsync);
+        }
     }
 }
