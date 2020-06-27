@@ -165,7 +165,7 @@ namespace InfoCarrier.Core.Common
                 return SingleResultMethods.Contains(method);
             }
 
-            return false;
+            return query is BinaryExpression;
         }
 
         /// <summary>
