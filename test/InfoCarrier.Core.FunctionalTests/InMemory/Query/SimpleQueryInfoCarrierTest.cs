@@ -300,5 +300,19 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
             return base.ImmutableHashSet_Contains_with_parameter(isAsync);
         }
+
+        [ConditionalTheory(Skip = "Need to transfer all tracked entities from server to client.")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Client_method_in_projection_requiring_materialization_1(bool isAsync)
+        {
+            return base.Client_method_in_projection_requiring_materialization_1(isAsync);
+        }
+
+        [ConditionalTheory(Skip = "Need to transfer all tracked entities from server to client.")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Client_method_in_projection_requiring_materialization_2(bool isAsync)
+        {
+            return base.Client_method_in_projection_requiring_materialization_2(isAsync);
+        }
     }
 }

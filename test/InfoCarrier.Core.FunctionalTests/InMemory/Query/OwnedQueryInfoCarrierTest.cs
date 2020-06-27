@@ -3,9 +3,13 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Linq;
+    using System.Threading.Tasks;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Xunit;
     using Xunit.Abstractions;
 
     public class OwnedQueryInfoCarrierTest : OwnedQueryTestBase<OwnedQueryInfoCarrierTest.TestFixture>
@@ -13,6 +17,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         public OwnedQueryInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
+        }
+
+        [ConditionalTheory(Skip = "Need to transfer all tracked entities from server to client.")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Unmapped_property_projection_loads_owned_navigations(bool isAsync)
+        {
+            return base.Unmapped_property_projection_loads_owned_navigations(isAsync);
         }
 
         public class TestFixture : OwnedQueryFixtureBase
