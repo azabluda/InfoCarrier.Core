@@ -3,8 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Xunit;
 
     public class CompiledQueryInfoCarrierTest : CompiledQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
     {
@@ -12,5 +14,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             : base(fixture)
         {
         }
+
+        [ConditionalFact(Skip = "See issue #17386")]
+        public override void Query_with_array_parameter()
+        {
+        }
+
+        [ConditionalFact(Skip = "See issue #17386")]
+        public override Task Query_with_array_parameter_async() => null;
     }
 }
