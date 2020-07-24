@@ -36,7 +36,6 @@
     <Compile Remove="SqlServer\ProxyGraphUpdatesInfoCarrierTest.cs" />
     <Compile Remove="SqlServer\QueryFilterFuncletizationInfoCarrierTest.cs" />
     <Compile Remove="SqlServer\StoreGeneratedInfoCarrierTest.cs" />
-    <Compile Remove="TestUtilities\InfoCarrierNetTopologySuiteValueMapper.cs" />
     <Compile Remove="TestUtilities\InfoCarrierTestHelpers.cs" />
     <Compile Remove="TestUtilities\SqlServerTestStore.cs" />
   </ItemGroup>
@@ -73,7 +72,6 @@
     <None Include="SqlServer\ProxyGraphUpdatesInfoCarrierTest.cs" />
     <None Include="SqlServer\QueryFilterFuncletizationInfoCarrierTest.cs" />
     <None Include="SqlServer\StoreGeneratedInfoCarrierTest.cs" />
-    <None Include="TestUtilities\InfoCarrierNetTopologySuiteValueMapper.cs" />
     <None Include="TestUtilities\InfoCarrierTestHelpers.cs" />
     <None Include="TestUtilities\SqlServerTestStore.cs" />
   </ItemGroup>

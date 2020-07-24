@@ -5,8 +5,8 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
     using Aqua.Dynamic;
     using Aqua.TypeSystem;
-    using GeoAPI.Geometries;
     using InfoCarrier.Core.Common.ValueMapping;
+    using NetTopologySuite.Geometries;
     using NetTopologySuite.IO;
 
     public class InfoCarrierNetTopologySuiteValueMapper : IInfoCarrierValueMapper
@@ -15,13 +15,13 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public bool TryMapToDynamicObject(IMapToDynamicObjectContext context, out object mapped)
         {
-            if (!(context.Object is IGeometry geometry))
+            if (!(context.Object is Geometry geometry))
             {
                 mapped = null;
                 return false;
             }
 
-            var dto = new DynamicObject(typeof(IGeometry));
+            var dto = new DynamicObject(typeof(Geometry));
             context.AddToCache(dto);
 
             dto.Add(Data, new GeoJsonWriter().Write(geometry));
@@ -32,7 +32,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public bool TryMapFromDynamicObject(IMapFromDynamicObjectContext context, out object obj)
         {
-            if (context.Dto.Type.ResolveType(context.TypeResolver) != typeof(IGeometry))
+            if (context.Dto.Type.ResolveType(context.TypeResolver) != typeof(Geometry))
             {
                 obj = null;
                 return false;
@@ -44,7 +44,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
                 return false;
             }
 
-            obj = new GeoJsonReader().Read<IGeometry>(json);
+            obj = new GeoJsonReader().Read<Geometry>(json);
             context.AddToCache(obj);
             return true;
         }

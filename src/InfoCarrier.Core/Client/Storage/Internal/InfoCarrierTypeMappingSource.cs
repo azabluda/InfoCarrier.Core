@@ -5,6 +5,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
+    using System.Linq;
+    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.Storage;
 
@@ -46,8 +48,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 return new InfoCarrierTypeMapping(clrType, structuralComparer: new ArrayStructuralComparer<byte>());
             }
 
-            if (clrType.FullName == "GeoAPI.Geometries.IGeometry"
-                || clrType.GetInterface("GeoAPI.Geometries.IGeometry") != null)
+            if (clrType.FullName == "NetTopologySuite.Geometries.Geometry"
+                || clrType.GetBaseTypes().Any(t => t.FullName == "NetTopologySuite.Geometries.Geometry"))
             {
                 var comparer = (ValueComparer)Activator.CreateInstance(typeof(GeometryValueComparer<>).MakeGenericType(clrType));
 

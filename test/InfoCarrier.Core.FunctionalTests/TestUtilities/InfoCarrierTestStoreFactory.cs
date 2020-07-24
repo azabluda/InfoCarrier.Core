@@ -56,7 +56,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
             => serviceCollection.AddEntityFrameworkInfoCarrierClient()
-                //.AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
+                .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton(TestModelSource.GetFactory(this.testStoreProperties.OnModelCreating));
 
         public virtual ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)

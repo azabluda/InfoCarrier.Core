@@ -6,11 +6,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     using System;
     using System.Threading;
     using System.Threading.Tasks;
+    using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.InMemory.Storage.Internal;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +22,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
             => serviceCollection.AddEntityFrameworkInMemoryDatabase()
+                .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton<TestStoreIndex>();
 
         protected override TestStoreIndex GetTestStoreIndex(IServiceProvider serviceProvider)

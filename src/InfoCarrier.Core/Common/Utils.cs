@@ -98,6 +98,24 @@ namespace InfoCarrier.Core.Common
         }
 
         /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        public static IEnumerable<Type> GetBaseTypes(this Type type)
+        {
+            type = type.GetTypeInfo().BaseType;
+
+            while (type != null)
+            {
+                yield return type;
+
+                type = type.GetTypeInfo().BaseType;
+            }
+        }
+
+        /// <summary>
         ///     Given a lambda expression that calls a method, returns the <see cref="MethodInfo"/>.
         /// </summary>
         /// <typeparam name="T">The return type of the method.</typeparam>
