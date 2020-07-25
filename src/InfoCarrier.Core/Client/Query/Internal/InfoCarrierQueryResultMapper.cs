@@ -179,7 +179,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 this.trackEntityActions.Add(sm =>
                 {
                     InternalEntityEntry entry
-                        = sm.StartTrackingFromQuery(entityType, entityNoRef, valueBuffer);
+                        = sm.StartTrackingFromQuery(entityType, entityNoRef, default);
 
                     foreach (INavigation nav in loadedNavigations.Select(name => entry.EntityType.FindNavigation(name)))
                     {
