@@ -199,6 +199,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     {
                         // TODO: clear or skip collection if it already contains something?
                         var coll = navigation.GetCollectionAccessor();
+                        coll.GetOrCreate(entity, forMaterialization: false);
                         foreach (var item in (IEnumerable)value)
                         {
                             coll.Add(entity, item, false);
