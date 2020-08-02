@@ -185,7 +185,7 @@ namespace InfoCarrier.Core.Server
             private readonly IStateManager stateManager;
             private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
             private readonly Dictionary<object, DynamicObject> cachedDtos =
-                new Dictionary<object, DynamicObject>();
+                new Dictionary<object, DynamicObject>(new ReferenceEqualityComparer());
 
             public EntityToDynamicObjectMapper(
                 DbContext dbContext,
@@ -245,6 +245,15 @@ namespace InfoCarrier.Core.Server
                 }
 
                 return base.MapToDynamicObjectGraph(obj, setTypeInformation);
+            }
+
+            private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+            {
+                int IEqualityComparer<object>.GetHashCode(object value)
+                    => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
+
+                bool IEqualityComparer<object>.Equals(object left, object right)
+                    => ReferenceEquals(left, right);
             }
 
             private class MapToDynamicObjectContext : IMapToDynamicObjectContext
