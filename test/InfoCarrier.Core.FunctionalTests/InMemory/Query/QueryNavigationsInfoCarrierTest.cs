@@ -3,8 +3,10 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Xunit;
     using Xunit.Abstractions;
 
     public class QueryNavigationsInfoCarrierTest : QueryNavigationsTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
@@ -13,6 +15,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
+        }
+
+        [ConditionalTheory(Skip = "Issue#17386")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Where_subquery_on_navigation_client_eval(bool isAsync)
+        {
+            return base.Where_subquery_on_navigation_client_eval(isAsync);
         }
     }
 }
