@@ -16,9 +16,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.Metadata.Internal;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Storage;
 
     /// <summary>
     ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -134,11 +132,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 return null;
             }
 
-            // Map only scalar properties for now, navigations have to be set later
-            var valueBuffer = new ValueBuffer(
-                entityType
-                    .GetProperties()
-                    .Select(p =>
+            // Map only scalar properties for now, navigations are to be set later
+            var values = entityType
+                .GetProperties()
+                .ToDictionary(
+                    p => p.Name,
+                    p =>
                     {
                         object value = context.Dto.Get(p.Name);
                         if (p.GetValueConverter() != null)
@@ -148,38 +147,36 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         }
 
                         return context.MapFromDynamicObjectGraph(value, p.ClrType);
-                    })
-                    .ToArray());
+                    });
 
             bool entityIsTracked = loadedNavigations != null;
 
             // Get entity instance from EFC's identity map, or create a new one
-            object entity = null;
+            InternalEntityEntry entry = null;
             IKey pk = entityType.FindPrimaryKey();
             if (pk != null && entityIsTracked)
             {
-                entity = this.queryContext
+                entry = this.queryContext
                     .StateManager
-                    .TryGetEntry(pk, pk.Properties.Select(p => valueBuffer[p.GetIndex()]).ToArray())
-                    ?.Entity;
+                    .TryGetEntry(pk, pk.Properties.Select(p => values[p.Name]).ToArray());
             }
 
-            if (entity == null)
+            if (entry == null)
             {
-                Func<MaterializationContext, object> materializer = this.entityMaterializerSource.GetMaterializer(entityType);
-                var materializationContext = new MaterializationContext(valueBuffer, this.queryContext.Context);
-                entity = materializer.Invoke(materializationContext);
+                entry = this.queryContext.StateManager.CreateEntry(values, entityType);
             }
 
+            var entity = entry.Entity;
             context.AddToCache(entity);
-            object entityNoRef = entity;
 
             if (entityIsTracked)
             {
                 this.trackEntityActions.Add(sm =>
                 {
-                    InternalEntityEntry entry
-                        = sm.StartTrackingFromQuery(entityType, entityNoRef, default);
+                    if (entry.EntityState == EntityState.Detached)
+                    {
+                        entry.SetEntityState(EntityState.Unchanged);
+                    }
 
                     foreach (INavigation nav in loadedNavigations.Select(name => entry.EntityType.FindNavigation(name)))
                     {
