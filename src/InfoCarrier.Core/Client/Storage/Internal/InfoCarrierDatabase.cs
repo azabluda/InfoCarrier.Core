@@ -12,7 +12,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using System.Reflection;
     using System.Threading;
     using System.Threading.Tasks;
-    using Aqua.Dynamic;
     using Aqua.TypeSystem;
     using InfoCarrier.Core.Client.Infrastructure.Internal;
     using InfoCarrier.Core.Client.Query.Internal;
@@ -34,6 +33,9 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     /// </summary>
     public class InfoCarrierDatabase : IDatabase
     {
+        private static readonly System.Reflection.MethodInfo ExecuteQueryMethod
+            = typeof(InfoCarrierDatabase).GetTypeInfo().GetDeclaredMethod(nameof(InfoCarrierDatabase.ExecuteQuery));
+
         private readonly IInfoCarrierClient infoCarrierClient;
 
         /// <summary>
@@ -78,24 +80,21 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 elementType = resultType.TryGetSequenceType();
             }
 
-            var preparedQueryType = typeof(PreparedQuery<>).MakeGenericType(elementType);
-            var executePreparedQuery = preparedQueryType.GetTypeInfo()
-                .GetDeclaredMethod(nameof(PreparedQuery<int>.Execute));
-                //.ToDelegate<Func<object, bool, object>>();
+            var executeQuery = ExecuteQueryMethod.MakeGenericMethod(elementType)
+                .ToDelegate<Func<QueryContext, Expression, IInfoCarrierClient, bool, bool, object>>();
 
-            return queryContext =>
-            {
-                object x = Activator.CreateInstance(preparedQueryType, queryContext, expression, infoCarrierClient);
-                try
-                {
-                    return (TResult)executePreparedQuery.Invoke(x, new object[] { async, singleResult });
-                }
-                catch (TargetInvocationException e) when (e.InnerException != null)
-                {
-                    throw e.InnerException;
-                }
-                //return (TResult)executePreparedQuery(x, async);
-            };
+            return queryContext => (TResult)executeQuery(queryContext, expression, this.infoCarrierClient, async, singleResult);
+        }
+
+        private static object ExecuteQuery<TElement>(
+            QueryContext queryContext,
+            Expression query,
+            IInfoCarrierClient infoCarrierClient,
+            bool async,
+            bool singleResult)
+        {
+            return new QueryExecutor<TElement>(queryContext, query, infoCarrierClient)
+                .Execute(async, singleResult);
         }
 
         /// <summary>
@@ -124,14 +123,14 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             return result.ApplyTo(entries);
         }
 
-        class PreparedQuery<TElement>
+        private class QueryExecutor<TElement>
         {
             private readonly QueryContext queryContext;
             private readonly IInfoCarrierClient infoCarrierClient;
             private readonly InfoCarrierQueryResultMapper resultMapper;
             private QueryDataRequest queryDataRequest;
 
-            public PreparedQuery(QueryContext queryContext, Expression query, IInfoCarrierClient infoCarrierClient)
+            public QueryExecutor(QueryContext queryContext, Expression query, IInfoCarrierClient infoCarrierClient)
             {
                 this.queryContext = queryContext;
                 this.infoCarrierClient = infoCarrierClient;
@@ -161,18 +160,18 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
                 if (async)
                 {
-                    var asyncEnum = ExecuteAsync();
-                    return singleResult ? (object)XXX(asyncEnum) : asyncEnum;
+                    var asyncEnum = this.ExecuteAsync();
+                    return singleResult ? (object)FirstOrDefaultAsync(asyncEnum) : asyncEnum;
                 }
 
-                var queryDataResult = this.infoCarrierClient.QueryData(this.queryDataRequest, queryContext.Context);
+                var queryDataResult = this.infoCarrierClient.QueryData(this.queryDataRequest, this.queryContext.Context);
                 var mapped = this.resultMapper.MapAndTrackResults<TElement>(queryDataResult.MappedResults);
                 return singleResult ? (object)mapped.FirstOrDefault() : mapped;
             }
 
             private async IAsyncEnumerable<TElement> ExecuteAsync()
             {
-                var queryDataResult = await this.infoCarrierClient.QueryDataAsync(this.queryDataRequest, queryContext.Context, default);
+                var queryDataResult = await this.infoCarrierClient.QueryDataAsync(this.queryDataRequest, this.queryContext.Context, default);
                 var mapped = this.resultMapper.MapAndTrackResults<TElement>(queryDataResult.MappedResults);
                 foreach (var element in mapped)
                 {
@@ -180,11 +179,11 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 }
             }
 
-            private async Task<TElement> XXX(IAsyncEnumerable<TElement> asyncEnum)
+            private static async Task<TElement> FirstOrDefaultAsync(IAsyncEnumerable<TElement> asyncEnum)
             {
-                await foreach (var VARIABLE in asyncEnum)
+                await foreach (var value in asyncEnum)
                 {
-                    return VARIABLE;
+                    return value;
                 }
 
                 return default;
@@ -230,9 +229,11 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 => new EntityQueryableStubVisitor().Visit(expression);
 
             protected override Expression VisitConstant(ConstantExpression constantExpression)
+#pragma warning disable EF1001 // Internal EF Core API usage.
                 => constantExpression.IsEntityQueryable()
                     ? this.VisitEntityQueryable(((IQueryable)constantExpression.Value).ElementType)
                     : constantExpression;
+#pragma warning restore EF1001 // Internal EF Core API usage.
 
             private Expression VisitEntityQueryable(Type elementType)
             {

@@ -24,12 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Client\Query\Internal\InfoCarrierQueryCompiler.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="..\..\license.txt" Link="license.txt" Pack="true" PackagePath="" />
-    <None Include="Client\Query\Internal\InfoCarrierQueryCompiler.cs" />
   </ItemGroup>
 
   <ItemGroup>
