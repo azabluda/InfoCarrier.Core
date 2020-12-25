@@ -157,6 +157,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
             public object Execute(bool async, bool singleResult)
             {
+                using var cs = this.queryContext.ConcurrencyDetector.EnterCriticalSection();
+
                 if (async)
                 {
                     var asyncEnum = ExecuteAsync();
