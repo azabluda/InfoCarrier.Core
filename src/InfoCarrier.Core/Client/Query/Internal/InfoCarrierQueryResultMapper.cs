@@ -214,11 +214,21 @@ namespace InfoCarrier.Core.Client.Query.Internal
                             propInfo.SetValue(entity, value);
                         }
                     }
+
+                    SetIsLoadedNoTracking(entity, navigation);
                 }
             }
 
             return entity;
         }
+
+        private static void SetIsLoadedNoTracking(object entity, INavigation navigation)
+            => ((ILazyLoader)navigation
+                        .DeclaringEntityType
+                        .GetServiceProperties()
+                        .FirstOrDefault(p => p.ClrType == typeof(ILazyLoader))
+                    ?.GetGetter().GetClrValue(entity))
+                ?.SetLoaded(entity, navigation.Name);
 
         private class MapFromDynamicObjectContext : IMapFromDynamicObjectContext
         {
