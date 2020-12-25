@@ -77,7 +77,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             }
             else
             {
-                elementType = resultType.TryGetSequenceType();
+                elementType = typeof(TResult) == typeof(IEnumerable) ? typeof(object) : resultType.TryGetSequenceType();
             }
 
             var executeQuery = ExecuteQueryMethod.MakeGenericMethod(elementType)
