@@ -17,6 +17,12 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         {
         }
 
+        [ConditionalFact(Skip = "TODO: Better translation of sequential equality")]
+        public override void Can_perform_query_with_max_length()
+        {
+            base.Can_perform_query_with_max_length();
+        }
+
         // Disabled: In-memory database is case-sensitive
         public override void Can_insert_and_read_back_with_case_insensitive_string_key()
         {
