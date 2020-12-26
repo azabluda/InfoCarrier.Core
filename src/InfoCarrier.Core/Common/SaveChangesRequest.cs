@@ -5,7 +5,6 @@ namespace InfoCarrier.Core.Common
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Runtime.Serialization;
     using Microsoft.EntityFrameworkCore.Update;
 
@@ -31,14 +30,6 @@ namespace InfoCarrier.Core.Common
         internal SaveChangesRequest(IList<IUpdateEntry> entries)
             : base(entries)
         {
-            this.SharedIdentityDataTransferObjects.AddRange(
-                this.ToUpdateEntryDtos(entries.Select(e => e.SharedIdentityEntry).Where(e => e != null)));
         }
-
-        /// <summary>
-        ///     Gets or sets state shared state entires mapped to <see cref="UpdateEntryDto" />'s.
-        /// </summary>
-        [DataMember]
-        public List<UpdateEntryDto> SharedIdentityDataTransferObjects { get; set; } = new List<UpdateEntryDto>();
     }
 }

@@ -124,7 +124,6 @@ namespace InfoCarrier.Core.Server
                 return entry;
             }
 
-            request.SharedIdentityDataTransferObjects.ForEach(dto => MaterializeAndTrackEntity(dto));
             var entries = request.DataTransferObjects.Select(MaterializeAndTrackEntity).ToList();
 
             // Replace temporary PKs coming from client with generated values (e.g. HiLoSequence)
