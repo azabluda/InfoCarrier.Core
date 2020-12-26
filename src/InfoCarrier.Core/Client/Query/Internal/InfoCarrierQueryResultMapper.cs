@@ -196,15 +196,15 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     {
                         // TODO: clear or skip collection if it already contains something?
                         var coll = navigation.GetCollectionAccessor();
-                        coll.GetOrCreate(entity, forMaterialization: false);
+                        coll.GetOrCreate(entity, forMaterialization: true);
                         foreach (var item in (IEnumerable)value)
                         {
-                            coll.Add(entity, item, false);
+                            coll.Add(entity, item, forMaterialization: true);
                         }
                     }
                     else
                     {
-                        var mem = navigation.GetMemberInfo(false, true);
+                        var mem = navigation.GetMemberInfo(forMaterialization: true, forSet: true);
                         if (mem is System.Reflection.FieldInfo fieldInfo)
                         {
                             fieldInfo.SetValue(entity, value);
