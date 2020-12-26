@@ -5,7 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.InMemory.Metadata.Conventions.Internal;
+    using Microsoft.EntityFrameworkCore.InMemory.Metadata.Conventions;
     using Microsoft.EntityFrameworkCore.TestUtilities;
 
     public class DatabindingInfoCarrierTest : DatabindingTestBase<DatabindingInfoCarrierTest.TestFixture>

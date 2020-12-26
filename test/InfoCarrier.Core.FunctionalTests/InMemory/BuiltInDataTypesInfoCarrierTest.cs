@@ -36,6 +36,8 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 
             public override bool SupportsBinaryKeys => false;
 
+            public override bool SupportsDecimalComparisons => true;
+
             public override DateTime DefaultDateTime => default;
         }
     }
