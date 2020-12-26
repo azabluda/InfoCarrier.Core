@@ -52,7 +52,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkPackageVersion)" />
-    <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="$(NetTopologySuiteIOSGeoJSONPackageVersion)" />
+    <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="$(NetTopologySuiteIOGeoJSONPackageVersion)" />
     <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="$(RemoteLinqPackageVersion)" />
     <PackageReference Include="xunit.core" Version="$(XunitCorePackageVersion)" />
     <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioPackageVersion)" />
