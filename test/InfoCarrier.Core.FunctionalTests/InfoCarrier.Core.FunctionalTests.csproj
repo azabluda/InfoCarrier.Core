@@ -17,7 +17,6 @@
     <Compile Remove="SqlServer\QueryFilterFuncletizationInfoCarrierTest.cs" />
     <Compile Remove="SqlServer\StoreGeneratedInfoCarrierTest.cs" />
     <Compile Remove="TestUtilities\InfoCarrierTestHelpers.cs" />
-    <Compile Remove="TestUtilities\SqlServerTestStore.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,7 +32,6 @@
     <None Include="SqlServer\QueryFilterFuncletizationInfoCarrierTest.cs" />
     <None Include="SqlServer\StoreGeneratedInfoCarrierTest.cs" />
     <None Include="TestUtilities\InfoCarrierTestHelpers.cs" />
-    <None Include="TestUtilities\SqlServerTestStore.cs" />
   </ItemGroup>
 
   <ItemGroup>

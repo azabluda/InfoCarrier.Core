@@ -26,7 +26,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public static InfoCarrierBackendTestStoreFactory InMemory => (name, shared, props) => new InMemoryTestStore(name, shared, props);
 
-        //public static InfoCarrierBackendTestStoreFactory SqlServer => (name, shared, props) => new SqlServerTestStore(name, shared, props);
+        public static InfoCarrierBackendTestStoreFactory SqlServer => (name, shared, props) => new SqlServerTestStore(name, shared, props);
 
         public static ITestStoreFactory EnsureInitialized(
             ref ITestStoreFactory inst,
