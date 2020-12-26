@@ -10,12 +10,6 @@
     <Compile Remove="InfoCarrierServiceCollectionExtensionsTest.cs" />
     <Compile Remove="InfoCarrierTransactionManagerTest.cs" />
     <Compile Remove="LoggingInfoCarrierTest.cs" />
-    <Compile Remove="SqlServer\FunkyDataQueryInfoCarrierTest.cs" />
-    <Compile Remove="SqlServer\GraphUpdatesInfoCarrierTest.cs" />
-    <Compile Remove="SqlServer\OptimisticConcurrencyInfoCarrierTest.cs" />
-    <Compile Remove="SqlServer\ProxyGraphUpdatesInfoCarrierTest.cs" />
-    <Compile Remove="SqlServer\QueryFilterFuncletizationInfoCarrierTest.cs" />
-    <Compile Remove="SqlServer\StoreGeneratedInfoCarrierTest.cs" />
     <Compile Remove="TestUtilities\InfoCarrierTestHelpers.cs" />
   </ItemGroup>
 
@@ -25,12 +19,6 @@
     <None Include="InfoCarrierServiceCollectionExtensionsTest.cs" />
     <None Include="InfoCarrierTransactionManagerTest.cs" />
     <None Include="LoggingInfoCarrierTest.cs" />
-    <None Include="SqlServer\FunkyDataQueryInfoCarrierTest.cs" />
-    <None Include="SqlServer\GraphUpdatesInfoCarrierTest.cs" />
-    <None Include="SqlServer\OptimisticConcurrencyInfoCarrierTest.cs" />
-    <None Include="SqlServer\ProxyGraphUpdatesInfoCarrierTest.cs" />
-    <None Include="SqlServer\QueryFilterFuncletizationInfoCarrierTest.cs" />
-    <None Include="SqlServer\StoreGeneratedInfoCarrierTest.cs" />
     <None Include="TestUtilities\InfoCarrierTestHelpers.cs" />
   </ItemGroup>
 
