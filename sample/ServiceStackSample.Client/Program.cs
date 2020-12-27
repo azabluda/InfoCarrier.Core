@@ -17,8 +17,8 @@ namespace InfoCarrierSample
     internal class Program
     {
         private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
-            .AddEntityFrameworkInfoCarrierClient()
             .AddLogging(loggingBuilder => loggingBuilder.AddConsole().AddFilter((msg, level) => true))
+            .AddEntityFrameworkInfoCarrierClient()
             .BuildServiceProvider();
 
         private static async Task Main(string[] args)

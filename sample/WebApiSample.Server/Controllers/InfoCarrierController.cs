@@ -5,12 +5,12 @@ namespace InfoCarrierSample.Controllers
 {
     using System;
     using System.Data.Common;
-    using System.Data.SqlClient;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
     using InfoCarrier.Core.Properties;
     using InfoCarrier.Core.Server;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.Data.SqlClient;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Caching.Memory;
 

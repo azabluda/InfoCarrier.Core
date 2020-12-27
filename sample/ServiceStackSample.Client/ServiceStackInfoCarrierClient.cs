@@ -56,9 +56,19 @@ namespace InfoCarrierSample
             this.client.Send(new CommitTransaction());
         }
 
+        public Task CommitTransactionAsync(CancellationToken cancellationToken)
+        {
+            return this.client.SendAsync(new CommitTransaction());
+        }
+
         public void RollbackTransaction()
         {
             this.client.Send(new RollbackTransaction());
+        }
+
+        public Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            return this.client.SendAsync(new RollbackTransaction());
         }
     }
 }

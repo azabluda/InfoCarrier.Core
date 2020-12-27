@@ -6,8 +6,8 @@ namespace InfoCarrierSample
     using System;
     using System.Collections.Generic;
     using System.Data.Common;
-    using System.Data.SqlClient;
     using InfoCarrier.Core.Server;
+    using Microsoft.Data.SqlClient;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
@@ -15,9 +15,9 @@ namespace InfoCarrierSample
     public static class SqlServerShared
     {
         private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
+            .AddLogging(loggingBuilder => loggingBuilder.AddConsole())
             .AddEntityFrameworkSqlServer()
             .AddInfoCarrierServer()
-            .AddLogging(loggingBuilder => loggingBuilder.AddConsole())
             .BuildServiceProvider();
 
         public static string MasterConnectionString { get; } =

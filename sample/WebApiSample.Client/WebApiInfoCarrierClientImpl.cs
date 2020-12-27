@@ -46,13 +46,23 @@ namespace InfoCarrierSample
 
         public void CommitTransaction()
         {
-            this.CallApiAsync("CommitTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+            this.CommitTransactionAsync(default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+        }
+
+        public async Task CommitTransactionAsync(CancellationToken cancellationToken)
+        {
+            await this.CallApiAsync("CommitTransaction", null, cancellationToken);
             this.transactionId = null;
         }
 
         public void RollbackTransaction()
         {
-            this.CallApiAsync("RollbackTransaction", null, default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+            this.RollbackTransactionAsync(default).Wait(); // Watchout: https://stackoverflow.com/a/35831540
+        }
+
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            await this.CallApiAsync("RollbackTransaction", null, cancellationToken);
             this.transactionId = null;
         }
 

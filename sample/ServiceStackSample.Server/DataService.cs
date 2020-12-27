@@ -5,10 +5,10 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Data.Common;
-    using System.Data.SqlClient;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Properties;
     using InfoCarrier.Core.Server;
+    using Microsoft.Data.SqlClient;
     using Microsoft.EntityFrameworkCore;
     using ServiceStack;
 

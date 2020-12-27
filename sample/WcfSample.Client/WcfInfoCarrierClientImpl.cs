@@ -68,6 +68,10 @@ namespace InfoCarrierSample
 
         public virtual void CommitTransaction() => throw new NotSupportedException();
 
+        public Task CommitTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public virtual void RollbackTransaction() => throw new NotSupportedException();
+
+        public Task RollbackTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

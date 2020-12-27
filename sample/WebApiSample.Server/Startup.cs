@@ -8,6 +8,7 @@ namespace InfoCarrierSample
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Hosting;
     using Remote.Linq;
 
     public class Startup
@@ -25,14 +26,14 @@ namespace InfoCarrierSample
         public void ConfigureServices(IServiceCollection services)
         {
             services
-                .AddMvc()
-                .AddJsonOptions(options => options.SerializerSettings.ConfigureRemoteLinq());
+                .AddMvc(options => options.EnableEndpointRouting = false)
+                .AddNewtonsoftJson(options => options.SerializerSettings.ConfigureRemoteLinq());
 
             services.AddMemoryCache(opt => opt.ExpirationScanFrequency = TimeSpan.FromSeconds(10));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
             {
