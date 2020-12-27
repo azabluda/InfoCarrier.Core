@@ -74,7 +74,9 @@ namespace InfoCarrier.Core.Common.ValueMapping
                     loadedNavigations = context.MapFromDynamicObjectGraph(loadedNavigations);
                 }
 
-                entity = context.TryMapEntity(entityTypeName.ToString(), (IReadOnlyList<string>)loadedNavigations);
+                entity = context.TryMapEntity(
+                    entityTypeName.ToString(),
+                    loadedNavigations != null ? new HashSet<string>((IEnumerable<string>)loadedNavigations) : null);
                 return entity != null;
             }
         }

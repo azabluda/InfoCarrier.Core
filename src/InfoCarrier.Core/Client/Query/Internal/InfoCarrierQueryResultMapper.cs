@@ -125,7 +125,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             return base.MapFromDynamicObjectGraph(obj, targetType);
         }
 
-        private object TryMapEntity(IMapFromDynamicObjectContext context, string entityTypeName, IReadOnlyList<string> loadedNavigations)
+        private object TryMapEntity(IMapFromDynamicObjectContext context, string entityTypeName, ISet<string> loadedNavigations)
         {
             if (!this.entityTypeMap.TryGetValue(entityTypeName, out IEntityType entityType))
             {
@@ -260,7 +260,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             public object TryMapEntity(
                 string entityTypeName,
-                IReadOnlyList<string> loadedNavigations)
+                ISet<string> loadedNavigations)
                 => this.mapper.TryMapEntity(this, entityTypeName, loadedNavigations);
         }
     }

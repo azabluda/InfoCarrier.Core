@@ -52,6 +52,6 @@ namespace InfoCarrier.Core.Common.ValueMapping
         /// <returns> Instance of an entity, or null if <paramref name="entityTypeName"/> is not a valid entity type name. </returns>
         object TryMapEntity(
             string entityTypeName,
-            IReadOnlyList<string> loadedNavigations);
+            ISet<string> loadedNavigations);
     }
 }
