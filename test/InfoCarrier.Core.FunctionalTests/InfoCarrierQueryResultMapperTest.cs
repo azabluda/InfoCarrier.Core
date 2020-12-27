@@ -73,7 +73,7 @@ namespace InfoCarrier.Core.FunctionalTests
             {
                 var mappedProduct = new DynamicObject(typeof(Product));
                 mappedProduct.Add("__EntityType", "Product");
-                mappedProduct.Add("__EntityLoadedNavigations", new DynamicObject(new List<string>()));
+                mappedProduct.Add("__EntityLoadedNavigations", new DynamicObject(new HashSet<string>()));
                 mappedProduct.Add("ProductID", new DynamicObject(1));
                 mappedProduct.Add("ProductName", new DynamicObject("Potato"));
                 mappedProduct.Add("Discontinued", new DynamicObject(false));

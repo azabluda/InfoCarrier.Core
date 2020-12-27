@@ -23,14 +23,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
         protected override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
             => optionsBuilder.UseInfoCarrierClient(CreateDummyClient(optionsBuilder.Options.ContextType));
 
-        //public static IInfoCarrierClient CreateDummyClient(Type contextType)
-        //    => new SqlServerTestStore(
-        //        "DummyDatabase",
-        //        false,
-        //        new SharedTestStoreProperties
-        //        {
-        //            ContextType = contextType,
-        //            OnModelCreating = (b, c) => { },
-        //        });
+        public static IInfoCarrierClient CreateDummyClient(Type contextType)
+            => new SqlServerTestStore(
+                "DummyDatabase",
+                false,
+                new SharedTestStoreProperties
+                {
+                    ContextType = contextType,
+                    OnModelCreating = (b, c) => { },
+                });
     }
 }
