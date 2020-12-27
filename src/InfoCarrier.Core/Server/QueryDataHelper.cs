@@ -68,9 +68,6 @@ namespace InfoCarrier.Core.Server
                     this.typeResolver,
                     provider: type => (IQueryable)Activator.CreateInstance(typeof(EntityQueryable<>).MakeGenericType(type), provider))
                 .ToLinqExpression(this.typeResolver);
-
-            // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
-            //this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
         }
 
         /// <summary>

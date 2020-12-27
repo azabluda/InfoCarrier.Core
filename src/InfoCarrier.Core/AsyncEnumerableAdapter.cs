@@ -29,6 +29,10 @@ namespace InfoCarrier.Core
         /// <summary>
         ///     Gets an asynchronous enumerator over the sequence.
         /// </summary>
+        /// <param name="cancellationToken">
+        ///     A <see cref="CancellationToken" /> to observe while waiting for the task to
+        ///     complete.
+        /// </param>
         /// <returns>Enumerator for asynchronous enumeration over the sequence.</returns>
         public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
             => this.enumeratorFactory();

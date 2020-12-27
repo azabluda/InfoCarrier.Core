@@ -73,8 +73,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         {
             var result = this.Map<TResult>(dataRecords);
 
-            //this.queryContext.BeginTrackingQuery();
-
             foreach (var action in this.trackEntityActions)
             {
                 action(this.queryContext.StateManager);

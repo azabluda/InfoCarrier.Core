@@ -16,7 +16,7 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
     /// </summary>
     public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     {
-        private DbContextOptionsExtensionInfo _info;
+        private DbContextOptionsExtensionInfo info;
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -49,15 +49,15 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1623:PropertySummaryDocumentationMustMatchAccessors", Justification = "Entity Framework Core internal.")]
         public virtual DbContextOptionsExtensionInfo Info
-            => _info ??= new ExtensionInfo(this);
+            => this.info ??= new ExtensionInfo(this);
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public virtual void ApplyServices(IServiceCollection services)
             => services.AddEntityFrameworkInfoCarrierClient();
 
@@ -72,7 +72,7 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
 
         private sealed class ExtensionInfo : DbContextOptionsExtensionInfo
         {
-            private string _logFragment;
+            private string logFragment;
 
             public ExtensionInfo(IDbContextOptionsExtension extension)
                 : base(extension)
@@ -88,24 +88,24 @@ namespace InfoCarrier.Core.Client.Infrastructure.Internal
             {
                 get
                 {
-                    if (_logFragment == null)
+                    if (this.logFragment == null)
                     {
                         var builder = new StringBuilder();
 
-                        builder.Append("InfoCarrierServerUrl=").Append(Extension.InfoCarrierClient.ServerUrl).Append(' ');
+                        builder.Append("InfoCarrierServerUrl=").Append(this.Extension.InfoCarrierClient.ServerUrl).Append(' ');
 
-                        _logFragment = builder.ToString();
+                        this.logFragment = builder.ToString();
                     }
 
-                    return _logFragment;
+                    return this.logFragment;
                 }
             }
 
-            public override long GetServiceProviderHashCode() => Extension.InfoCarrierClient.ServerUrl?.GetHashCode() ?? 0L;
+            public override long GetServiceProviderHashCode() => this.Extension.InfoCarrierClient.ServerUrl?.GetHashCode() ?? 0L;
 
             public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
                 => debugInfo["InfoCarrierDatabase:ServerUrl"]
-                    = (Extension.InfoCarrierClient.ServerUrl?.GetHashCode() ?? 0L).ToString(CultureInfo.InvariantCulture);
+                    = (this.Extension.InfoCarrierClient.ServerUrl?.GetHashCode() ?? 0L).ToString(CultureInfo.InvariantCulture);
         }
     }
 }

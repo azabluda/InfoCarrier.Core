@@ -14,6 +14,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
     /// </summary>
     public class InfoCarrierEvaluatableExpressionFilter : EvaluatableExpressionFilter
     {
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
+        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1642:Constructor summary documentation should begin with standard text", Justification = "Entity Framework Core internal.")]
         public InfoCarrierEvaluatableExpressionFilter(EvaluatableExpressionFilterDependencies dependencies)
             : base(dependencies)
         {

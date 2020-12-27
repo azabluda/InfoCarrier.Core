@@ -77,7 +77,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         [MemberData(nameof(IsAsyncData))]
         public override Task GroupBy_with_boolean_groupin_key_thru_navigation_access(bool isAsync)
         {
-            return GroupBy_with_boolean_groupin_key_thru_navigation_access(isAsync);
+            return this.GroupBy_with_boolean_groupin_key_thru_navigation_access(isAsync);
         }
 
         [ConditionalTheory(Skip = "issue #17260")]

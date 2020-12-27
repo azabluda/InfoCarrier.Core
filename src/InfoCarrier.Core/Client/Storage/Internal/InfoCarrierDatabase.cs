@@ -229,11 +229,9 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 => new EntityQueryableStubVisitor().Visit(expression);
 
             protected override Expression VisitConstant(ConstantExpression constantExpression)
-#pragma warning disable EF1001 // Internal EF Core API usage.
                 => constantExpression.IsEntityQueryable()
                     ? this.VisitEntityQueryable(((IQueryable)constantExpression.Value).ElementType)
                     : constantExpression;
-#pragma warning restore EF1001 // Internal EF Core API usage.
 
             private Expression VisitEntityQueryable(Type elementType)
             {

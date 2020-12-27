@@ -3,10 +3,8 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
-    using System.Linq;
     using System.Threading.Tasks;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
-    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Xunit;

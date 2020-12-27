@@ -11,7 +11,6 @@ namespace InfoCarrier.Core.Client
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
     using Microsoft.Extensions.DependencyInjection;
@@ -55,9 +54,5 @@ namespace InfoCarrier.Core.Client
 
             return serviceCollection;
         }
-    }
-
-    public class InfoCarrierLoggingDefinitions : LoggingDefinitions
-    {
     }
 }
