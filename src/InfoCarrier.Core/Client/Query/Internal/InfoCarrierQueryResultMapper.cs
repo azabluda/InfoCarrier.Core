@@ -188,6 +188,14 @@ namespace InfoCarrier.Core.Client.Query.Internal
             // Set navigation properties AFTER adding to map to avoid endless recursion
             foreach (INavigation navigation in entityType.GetNavigations())
             {
+                // Avoid accidental loading of navigations of a tracked entity
+                if (entry.EntityState != EntityState.Detached &&
+                    !entry.IsLoaded(navigation) &&
+                    !loadedNavigations.Contains(navigation.Name))
+                {
+                    continue;
+                }
+
                 // TODO: shall we skip already loaded navigations if the entity is already tracked?
                 if (context.Dto.TryGet(navigation.Name, out object value) && value != null)
                 {
