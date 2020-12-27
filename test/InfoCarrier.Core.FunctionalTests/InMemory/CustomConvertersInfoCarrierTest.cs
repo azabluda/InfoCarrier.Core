@@ -23,9 +23,10 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
             base.Can_perform_query_with_max_length();
         }
 
-        // Disabled: In-memory database is case-sensitive
+        [ConditionalFact(Skip = "Disabled: In-memory database is case-sensitive")]
         public override void Can_insert_and_read_back_with_case_insensitive_string_key()
         {
+            base.Can_insert_and_read_back_with_case_insensitive_string_key();
         }
 
         [ConditionalTheory(Skip = "Issue#14042")]

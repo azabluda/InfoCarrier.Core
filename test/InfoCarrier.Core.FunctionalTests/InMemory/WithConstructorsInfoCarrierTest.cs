@@ -17,6 +17,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         {
         }
 
+        [ConditionalFact]
         public override void Query_and_update_using_constructors_with_property_parameters()
         {
             base.Query_and_update_using_constructors_with_property_parameters();

@@ -23,6 +23,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
         }
 
+        [ConditionalFact]
         public override void Where_navigation_contains()
         {
             using (var context = this.CreateContext())
@@ -36,57 +37,74 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         }
 
         // InMemory can throw server side exception
+        [ConditionalFact]
         public override void Average_no_data_subquery()
         {
             Assert.Throws<InvalidOperationException>(() => base.Average_no_data_subquery());
         }
 
+        [ConditionalFact]
         public override void Max_no_data_subquery()
         {
             Assert.Throws<InvalidOperationException>(() => base.Max_no_data_subquery());
         }
 
+        [ConditionalFact]
         public override void Min_no_data_subquery()
         {
             Assert.Throws<InvalidOperationException>(() => base.Min_no_data_subquery());
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Where_query_composition_entity_equality_one_element_Single(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Where_query_composition_entity_equality_one_element_Single(isAsync));
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Where_query_composition_entity_equality_one_element_First(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Where_query_composition_entity_equality_one_element_First(isAsync));
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Where_query_composition_entity_equality_no_elements_Single(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Where_query_composition_entity_equality_no_elements_Single(isAsync));
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Where_query_composition_entity_equality_no_elements_First(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Where_query_composition_entity_equality_no_elements_First(isAsync));
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Where_query_composition_entity_equality_multiple_elements_SingleOrDefault(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Where_query_composition_entity_equality_multiple_elements_SingleOrDefault(isAsync));
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Where_query_composition_entity_equality_multiple_elements_Single(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Where_query_composition_entity_equality_multiple_elements_Single(isAsync));
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
         public override Task Collection_Last_member_access_in_projection_translated(bool isAsync)
         {
             return Assert.ThrowsAsync<InvalidOperationException>(
@@ -224,8 +242,12 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             return base.Where_equals_on_null_nullable_int_types(isAsync);
         }
 
-        // Casting int to object to string is invalid for InMemory
-        public override Task Like_with_non_string_column_using_double_cast(bool isAsync) => Task.CompletedTask;
+        [ConditionalTheory(Skip = "Casting int to object to string is invalid for InMemory")]
+        [MemberData(nameof(IsAsyncData))]
+        public override Task Like_with_non_string_column_using_double_cast(bool isAsync)
+        {
+            return base.Like_with_non_string_column_using_double_cast(isAsync);
+        }
 
         [ConditionalTheory(Skip = "Self referencing loop because of Customer.Context property. Not supported.")]
         [MemberData(nameof(IsAsyncData))]

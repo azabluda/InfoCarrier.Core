@@ -92,7 +92,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<int[]>(this.arrayDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(3, result.Single().Length);
         }
 
@@ -103,7 +103,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<object>(this.arrayDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.IsType<int[]>(result.Single());
             Assert.Equal(3, ((int[])result.Single()).Length);
         }
@@ -139,7 +139,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<object>(this.arrayDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.IsNotType<int[]>(result.Single());
         }
 
@@ -150,7 +150,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<List<int>>(this.listDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(3, result.Single().Count);
         }
 
@@ -164,7 +164,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<ObservableCollection<int>>(this.listDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(3, result.Single().Count);
         }
 
@@ -175,7 +175,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<IOrderedEnumerable<int>>(this.listDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(3, result.Single().ThenBy(x => x).Count());
         }
 
@@ -186,7 +186,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<IQueryable<int>>(this.listDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(typeof(int), result.Single().ElementType);
         }
 
@@ -217,7 +217,7 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<IGrouping<string, int>>(this.groupingDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal("hello", result.Single().Key);
             Assert.Equal(3, result.Single().Count());
         }
@@ -249,10 +249,10 @@ namespace InfoCarrier.Core.FunctionalTests
             var result = this.queryResultMapper.MapAndTrackResults<Product>(this.productDto).ToList();
 
             // Assert
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(1, result.Single().ProductID);
             Assert.Equal("Potato", result.Single().ProductName);
-            Assert.Equal(1, this.context.ChangeTracker.Entries().Count());
+            Assert.Single(this.context.ChangeTracker.Entries());
             Assert.Same(result.Single(), this.context.ChangeTracker.Entries().Single().Entity);
         }
 
@@ -267,7 +267,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.queryResultMapper.MapAndTrackResults<Product>(this.productDto);
 
             // Assert
-            Assert.Equal(0, this.context.ChangeTracker.Entries().Count());
+            Assert.Empty(this.context.ChangeTracker.Entries());
         }
 
         [Fact]
@@ -281,7 +281,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.queryResultMapper.MapAndTrackResults<Product>(this.productDto);
 
             // Assert
-            Assert.Equal(0, this.context.ChangeTracker.Entries().Count());
+            Assert.Empty(this.context.ChangeTracker.Entries());
         }
     }
 }
