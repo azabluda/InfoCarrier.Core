@@ -31,7 +31,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                 modelBuilder.Entity<Gumball>(
                     b =>
                     {
-                        b.Property(e => e.Id).UseSqlServerIdentityColumn();
+                        b.Property(e => e.Id).UseIdentityColumn();
                         b.Property(e => e.Identity).HasDefaultValue("Banana Joe");
                         b.Property(e => e.IdentityReadOnlyBeforeSave).HasDefaultValue("Doughnut Sheriff");
                         b.Property(e => e.IdentityReadOnlyAfterSave).HasDefaultValue("Anton");

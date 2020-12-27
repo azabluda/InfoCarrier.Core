@@ -28,7 +28,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
 
             protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
             {
-                modelBuilder.ForSqlServerUseSequenceHiLo(); // ensure model uses sequences
+                modelBuilder.UseHiLo(); // ensure model uses sequences
 
                 base.OnModelCreating(modelBuilder, context);
             }

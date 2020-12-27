@@ -50,7 +50,7 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
 
                 protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
                 {
-                    modelBuilder.ForSqlServerUseIdentityColumns();
+                    modelBuilder.UseIdentityColumns();
 
                     base.OnModelCreating(modelBuilder, context);
                 }
