@@ -8,7 +8,9 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
     using System.Threading.Tasks;
     using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
+    using Microsoft.EntityFrameworkCore.InMemory.Internal;
     using Microsoft.EntityFrameworkCore.InMemory.Storage.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +37,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         private void TransactionIgnoredWarning()
         {
-            //this.ServiceProvider.GetRequiredService<IDiagnosticsLogger<DbLoggerCategory.Database.Transaction>>().TransactionIgnoredWarning();
+            this.ServiceProvider.GetRequiredService<IDiagnosticsLogger<DbLoggerCategory.Database.Transaction>>().TransactionIgnoredWarning();
         }
 
         public override void BeginTransaction()
