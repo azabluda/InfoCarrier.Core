@@ -23,7 +23,6 @@ namespace InfoCarrier.Core.FunctionalTests
         private readonly InfoCarrierQueryResultMapper queryResultMapper;
         private readonly IEnumerable<DynamicObject> arrayDto;
         private readonly IEnumerable<DynamicObject> listDto;
-        private readonly IEnumerable<DynamicObject> groupingDto;
         private readonly IEnumerable<DynamicObject> productDto;
 
         public InfoCarrierQueryResultMapperTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
@@ -55,18 +54,6 @@ namespace InfoCarrier.Core.FunctionalTests
                     "Elements",
                     new DynamicObject(enumerable.Select(x => new DynamicObject(x)).ToList()));
                 this.listDto = Yield(mappedEnumerable);
-            }
-
-            // Mapped grouping
-            {
-                var key = "hello";
-                var elements = new List<int> { 1, 2, 3 };
-                var mappedGrouping = new DynamicObject(typeof(IGrouping<string, int>));
-                mappedGrouping.Add("Key", new DynamicObject(key));
-                mappedGrouping.Add(
-                    "Elements",
-                    new DynamicObject(elements.Select(x => new DynamicObject(x)).ToList()));
-                this.groupingDto = Yield(mappedGrouping);
             }
 
             // Mapped product entity
@@ -208,38 +195,6 @@ namespace InfoCarrier.Core.FunctionalTests
 
             // Act / Assert
             Assert.Throws<NotSupportedException>(() => this.queryResultMapper.MapAndTrackResults<ArrayList>(this.listDto));
-        }
-
-        [Fact]
-        public void Can_map_grouping()
-        {
-            // Act
-            var result = this.queryResultMapper.MapAndTrackResults<IGrouping<string, int>>(this.groupingDto).ToList();
-
-            // Assert
-            Assert.Single(result);
-            Assert.Equal("hello", result.Single().Key);
-            Assert.Equal(3, result.Single().Count());
-        }
-
-        [Fact]
-        public void Throws_on_grouping_with_missing_Key()
-        {
-            // Arrange
-            this.groupingDto.Single().Remove("Key");
-
-            // Act / Assert
-            Assert.Throws<Exception>(() => this.queryResultMapper.MapAndTrackResults<IGrouping<string, int>>(this.groupingDto));
-        }
-
-        [Fact]
-        public void Throws_on_grouping_with_missing_Elements()
-        {
-            // Arrange
-            this.groupingDto.Single().Remove("Elements");
-
-            // Act / Assert
-            Assert.Throws<Exception>(() => this.queryResultMapper.MapAndTrackResults<IGrouping<string, int>>(this.groupingDto));
         }
 
         [Fact]

@@ -18,7 +18,6 @@ namespace InfoCarrier.Core.Common.ValueMapping
             {
                 new ByteArrayValueMapper(),
                 new ArrayValueMapper(),
-                new GroupingValueMapper(),
                 new EnumerableValueMapper(),
                 new EntityValueMapper(),
             };
