@@ -103,8 +103,7 @@ namespace InfoCarrier.Core.Server
                         p.EfProperty.CurrentValue = p.CurrentValue;
                     }
 
-                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0
-                        && p.EfProperty.OriginalValue != p.OriginalValue)
+                    if (p.EfProperty.OriginalValue != p.OriginalValue)
                     {
                         p.EfProperty.OriginalValue = p.OriginalValue;
                     }

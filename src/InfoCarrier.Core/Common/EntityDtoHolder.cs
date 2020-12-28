@@ -33,7 +33,7 @@ namespace InfoCarrier.Core.Common
         /// <param name="entries">The <see cref="IUpdateEntry" />'s which need to be saved.</param>
         internal EntityDtoHolder(IList<IUpdateEntry> entries)
         {
-            this.DataTransferObjects.AddRange(this.ToUpdateEntryDtos(entries));
+            this.DataTransferObjects = this.ToUpdateEntryDtos(entries).ToList();
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace InfoCarrier.Core.Common
         ///     Gets or sets state entires mapped to <see cref="UpdateEntryDto" />'s.
         /// </summary>
         [DataMember]
-        public List<UpdateEntryDto> DataTransferObjects { get; set; } = new List<UpdateEntryDto>();
+        public List<UpdateEntryDto> DataTransferObjects { get; set; }
 
         /// <summary>
         ///     Convert this object into a string representation.

@@ -119,23 +119,7 @@ namespace InfoCarrier.Core.Server
         {
             bool queryReturnsSingleResult = Utils.QueryReturnsSingleResult(this.linqExpression);
             Type resultType = this.linqExpression.Type;
-
-            Type elementType;
-            if (queryReturnsSingleResult)
-            {
-                if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(Task<>))
-                {
-                    elementType = resultType.GenericTypeArguments.Single();
-                }
-                else
-                {
-                    elementType = resultType;
-                }
-            }
-            else
-            {
-                elementType = resultType.TryGetSequenceType();
-            }
+            Type elementType = queryReturnsSingleResult ? resultType : resultType.TryGetSequenceType();
 
             object queryResult = await ExecuteExpressionAsyncMethod
                 .MakeGenericMethod(elementType)
