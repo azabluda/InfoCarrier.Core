@@ -4,9 +4,6 @@
 namespace InfoCarrier.Core.Client.Query.Internal
 {
     using System.Diagnostics.CodeAnalysis;
-    using System.Linq;
-    using InfoCarrier.Core.Client.Infrastructure.Internal;
-    using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
 
     /// <summary>
@@ -16,7 +13,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
     public class InfoCarrierQueryContextFactory : IQueryContextFactory
     {
         private readonly QueryContextDependencies dependencies;
-        private readonly IInfoCarrierClient infoCarrierClient;
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -25,11 +21,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "Entity Framework Core internal.")]
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1642:ConstructorSummaryDocumentationMustBeginWithStandardText", Justification = "Entity Framework Core internal.")]
         public InfoCarrierQueryContextFactory(
-            QueryContextDependencies dependencies,
-            IDbContextOptions contextOptions)
+            QueryContextDependencies dependencies)
         {
             this.dependencies = dependencies;
-            this.infoCarrierClient = contextOptions.Extensions.OfType<InfoCarrierOptionsExtension>().First().InfoCarrierClient;
         }
 
         /// <summary>
@@ -38,6 +32,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         /// </summary>
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "Entity Framework Core internal.")]
         public virtual QueryContext Create()
-            => new InfoCarrierQueryContext(this.dependencies, this.infoCarrierClient);
+            => new InfoCarrierQueryContext(this.dependencies);
     }
 }
