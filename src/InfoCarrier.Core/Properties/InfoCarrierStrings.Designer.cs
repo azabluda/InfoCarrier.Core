@@ -13,7 +13,7 @@ namespace InfoCarrier.Core.Properties
     ///		This API supports the Entity Framework Core infrastructure and is not intended to be used
     ///     directly from your code. This API may change or be removed in future releases.
     /// </summary>
-    [InfoCarrier.Core.ExcludeFromCoverage]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public static class InfoCarrierStrings
     {
         private static readonly ResourceManager _resourceManager

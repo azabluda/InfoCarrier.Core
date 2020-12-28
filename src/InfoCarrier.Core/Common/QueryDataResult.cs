@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Common
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Runtime.Serialization;
     using Aqua.Dynamic;
@@ -45,7 +46,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     A string that represents this object.
         /// </returns>
-        [ExcludeFromCoverage]
+        [ExcludeFromCodeCoverage]
         public override string ToString()
             => $"Count = {this.MappedResults?.Count()}";
     }

@@ -245,26 +245,26 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
                 public Expression Expression
                 {
-                    [ExcludeFromCoverage]
+                    [ExcludeFromCodeCoverage]
                     get => throw new NotImplementedException();
                 }
 
                 public IQueryProvider Provider
                 {
-                    [ExcludeFromCoverage]
+                    [ExcludeFromCodeCoverage]
                     get => throw new NotImplementedException();
                 }
 
                 IRemoteQueryProvider IRemoteQueryable.Provider
                 {
-                    [ExcludeFromCoverage]
+                    [ExcludeFromCodeCoverage]
                     get => throw new NotImplementedException();
                 }
 
-                [ExcludeFromCoverage]
+                [ExcludeFromCodeCoverage]
                 IEnumerator IEnumerable.GetEnumerator() => throw new NotImplementedException();
 
-                [ExcludeFromCoverage]
+                [ExcludeFromCodeCoverage]
                 IEnumerator<T> IEnumerable<T>.GetEnumerator() => throw new NotImplementedException();
             }
         }

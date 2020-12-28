@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.Common
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Runtime.Serialization;
     using Microsoft.EntityFrameworkCore;
@@ -74,7 +75,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     A string that represents this object.
         /// </returns>
-        [ExcludeFromCoverage]
+        [ExcludeFromCodeCoverage]
         public override string ToString()
             => this.Impl.ToString();
 
@@ -115,7 +116,7 @@ namespace InfoCarrier.Core.Common
                 return this.CountPersisted;
             }
 
-            [ExcludeFromCoverage]
+            [ExcludeFromCodeCoverage]
             public override string ToString()
                 => $"CountPersisted = {this.CountPersisted}";
         }
@@ -168,7 +169,7 @@ namespace InfoCarrier.Core.Common
                     : new DbUpdateException(this.Message, inner);
             }
 
-            [ExcludeFromCoverage]
+            [ExcludeFromCodeCoverage]
             public override string ToString()
                 => $"Error = {this.Message}";
         }

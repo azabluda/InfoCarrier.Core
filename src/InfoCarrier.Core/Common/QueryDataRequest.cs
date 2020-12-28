@@ -4,6 +4,7 @@
 namespace InfoCarrier.Core.Common
 {
     using System;
+    using System.Diagnostics.CodeAnalysis;
     using System.Runtime.Serialization;
     using Microsoft.EntityFrameworkCore;
     using RLinq = Remote.Linq.Expressions.Expression;
@@ -51,7 +52,7 @@ namespace InfoCarrier.Core.Common
         /// <returns>
         ///     A string that represents this object.
         /// </returns>
-        [ExcludeFromCoverage]
+        [ExcludeFromCodeCoverage]
         public override string ToString()
             => $"{this.Query} {this.TrackingBehavior}";
     }
