@@ -56,9 +56,21 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             this.TransactionIgnoredWarning();
         }
 
+        public override Task CommitTransactionAsync(CancellationToken cancellationToken)
+        {
+            this.TransactionIgnoredWarning();
+            return Task.CompletedTask;
+        }
+
         public override void RollbackTransaction()
         {
             this.TransactionIgnoredWarning();
+        }
+
+        public override Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            this.TransactionIgnoredWarning();
+            return Task.CompletedTask;
         }
 
         public override void Clean(DbContext context)

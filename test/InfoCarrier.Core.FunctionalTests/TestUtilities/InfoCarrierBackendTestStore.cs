@@ -81,17 +81,11 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public abstract void CommitTransaction();
 
-        public Task CommitTransactionAsync(CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Task CommitTransactionAsync(CancellationToken cancellationToken);
 
         public abstract void RollbackTransaction();
 
-        public Task RollbackTransactionAsync(CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Task RollbackTransactionAsync(CancellationToken cancellationToken);
 
         private static T SimulateNetworkTransferJson<T>(T value)
         {

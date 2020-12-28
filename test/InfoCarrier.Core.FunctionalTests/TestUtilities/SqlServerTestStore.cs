@@ -53,11 +53,25 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             this.connection.Close();
         }
 
+        public override async Task CommitTransactionAsync(CancellationToken cancellationToken)
+        {
+            await this.transaction.CommitAsync(cancellationToken);
+            this.transaction = null;
+            await this.connection.CloseAsync();
+        }
+
         public override void RollbackTransaction()
         {
             this.transaction.Rollback();
             this.transaction = null;
             this.connection.Close();
+        }
+
+        public override async Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            await this.transaction.RollbackAsync(cancellationToken);
+            this.transaction = null;
+            await this.connection.CloseAsync();
         }
 
         public override void Clean(DbContext context)
