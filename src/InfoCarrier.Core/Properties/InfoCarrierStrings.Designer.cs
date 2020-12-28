@@ -40,18 +40,6 @@ namespace InfoCarrier.Core.Properties
                 expression);
 
         /// <summary>
-        ///     InfoCarrier.Core is not using EntityQueryableExpressionVisitor
-        /// </summary>
-        public static string NotUsingEntityQueryableExpressionVisitor
-            => GetString("NotUsingEntityQueryableExpressionVisitor");
-
-        /// <summary>
-        ///     InfoCarrier.Core is not using EntityQueryModelVisitor.
-        /// </summary>
-        public static string NotUsingEntityQueryModelVisitor
-            => GetString("NotUsingEntityQueryModelVisitor");
-
-        /// <summary>
         ///     The NullConditionalExpressionStub&lt;T&gt; method may only be used within LINQ queries.
         /// </summary>
         public static string NullConditionalExpressionStubMethodInvoked

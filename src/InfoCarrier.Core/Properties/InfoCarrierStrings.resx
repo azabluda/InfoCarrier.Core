@@ -126,12 +126,6 @@
   <data name="InvalidMethodCallExpression" xml:space="preserve">
     <value>The expression '{expression}' is not a valid method call expression.  The expression should represent a method call: 't =&gt; t.MyMethod(...)'.</value>
   </data>
-  <data name="NotUsingEntityQueryableExpressionVisitor" xml:space="preserve">
-    <value>InfoCarrier.Core is not using EntityQueryableExpressionVisitor</value>
-  </data>
-  <data name="NotUsingEntityQueryModelVisitor" xml:space="preserve">
-    <value>InfoCarrier.Core is not using EntityQueryModelVisitor.</value>
-  </data>
   <data name="NullConditionalExpressionStubMethodInvoked" xml:space="preserve">
     <value>The NullConditionalExpressionStub&amp;lt;T&amp;gt; method may only be used within LINQ queries.</value>
   </data>
