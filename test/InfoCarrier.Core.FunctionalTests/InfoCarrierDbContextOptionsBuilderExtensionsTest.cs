@@ -39,5 +39,14 @@ namespace InfoCarrier.Core.FunctionalTests
             Assert.NotSame(extension1, extension2);
             Assert.Same(extension1.InfoCarrierClient, extension2.InfoCarrierClient);
         }
+
+        [ConditionalFact]
+        public void Can_create_db_context_without_internal_provider()
+        {
+            IInfoCarrierClient client = InfoCarrierTestHelpers.CreateDummyClient(typeof(DbContext));
+            var options = new DbContextOptionsBuilder().UseInfoCarrierClient(client).Options;
+            using var context = new DbContext(options);
+            Assert.Equal("InfoCarrier.Core", context.Database.ProviderName);
+        }
     }
 }
