@@ -28,7 +28,8 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
                     @"DbSet<Bird>
     .Select(b => InheritanceInfoCarrierFixture.MaterializeView(b))
     .OrderBy(a => a.CountryId)"),
-                message);
+                message,
+                ignoreLineEndingDifferences: true);
         }
     }
 }
