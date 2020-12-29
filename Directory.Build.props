@@ -12,7 +12,6 @@
     <XunitRunnerVisualStudioPackageVersion>2.4.1</XunitRunnerVisualStudioPackageVersion>
 
     <!-- Build dependencies -->
-    <AquaCorePackageVersion>4.6.4</AquaCorePackageVersion>
     <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>3.1.3</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
     <MicrosoftAspNetCoreMvcNewtonsoftJsonPackageVersion>3.1.3</MicrosoftAspNetCoreMvcNewtonsoftJsonPackageVersion>
     <MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>2.2.0</MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>
@@ -21,7 +20,7 @@
     <MicrosoftExtensionsLoggingConsolePackageVersion>3.1.3</MicrosoftExtensionsLoggingConsolePackageVersion>
     <NetTopologySuiteIOGeoJSONPackageVersion>2.0.4</NetTopologySuiteIOGeoJSONPackageVersion>
     <PluralsightCryptoPackageVersion>1.1.0</PluralsightCryptoPackageVersion>
-    <RemoteLinqPackageVersion>6.2.2</RemoteLinqPackageVersion>
+    <RemoteLinqPackageVersion>6.2.3</RemoteLinqPackageVersion>
     <ServiceStackPackageVersion>5.8.0</ServiceStackPackageVersion>
     <SystemServiceModelHttpPackageVersion>4.7.0</SystemServiceModelHttpPackageVersion>
     <XamarinAndroidSupportDesignPackageVersion>28.0.0.3</XamarinAndroidSupportDesignPackageVersion>

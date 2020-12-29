@@ -51,9 +51,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="aqua-core-newtonsoft-json" Version="$(AquaCorePackageVersion)" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(MicrosoftEntityFrameworkCorePackageVersion)" />
-    <PackageReference Include="Remote.Linq.EntityFrameworkCore" Version="$(RemoteLinqPackageVersion)" />
+    <PackageReference Include="Remote.Linq" Version="$(RemoteLinqPackageVersion)" />
     <PackageReference Include="GitVersionTask" Version="$(GitVersionTaskPackageVersion)" PrivateAssets="All" />
   </ItemGroup>
 

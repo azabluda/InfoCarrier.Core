@@ -145,7 +145,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
                 // UGLY: this resembles Remote.Linq.DynamicQuery.RemoteQueryProvider<>.TranslateExpression()
                 var rlinq = query
-                    .ToRemoteLinqExpression(typeInfoProvider, Remote.Linq.EntityFrameworkCore.ExpressionEvaluator.CanBeEvaluated)
+                    .ToRemoteLinqExpression(typeInfoProvider, InfoCarrierEvaluatableExpressionFilter.CanBeEvaluated)
                     .ReplaceQueryableByResourceDescriptors(typeInfoProvider)
                     .ReplaceGenericQueryArgumentsByNonGenericArguments();
 
