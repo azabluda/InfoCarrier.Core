@@ -24,6 +24,9 @@ namespace InfoCarrierSample
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddControllersWithViews();
+            services.AddRazorPages();
+
             services
                 .AddMvc(options => options.EnableEndpointRouting = false)
                 .AddNewtonsoftJson(options => options.SerializerSettings.ConfigureInfoCarrier());
@@ -37,7 +40,24 @@ namespace InfoCarrierSample
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+                app.UseWebAssemblyDebugging();
             }
+            else
+            {
+                app.UseExceptionHandler("/Error");
+            }
+
+            app.UseBlazorFrameworkFiles();
+            app.UseStaticFiles();
+
+            app.UseRouting();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapRazorPages();
+                endpoints.MapControllers();
+                endpoints.MapFallbackToFile("index.html");
+            });
 
             app.UseMvc();
         }

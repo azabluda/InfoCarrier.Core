@@ -1,7 +1,23 @@
 ﻿@page "/"
+@inject Model Model;
 
-<h1>Hello, world!</h1>
+<h1>InfoCarrier.Core</h1>
 
-Welcome to your new app.
+<p>This component demonstrates Entity Framework Core working inside your browser.</p>
 
-<SurveyPrompt Title="How is Blazor working for you?" />
+@if (Model.Output == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <p>@Model.Output</p>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        Model.Output = "dummy output";
+    }
+}
