@@ -7,9 +7,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\Datamodel.cs" Link="Datamodel.cs" />
+    <Compile Include="..\InfoCarrierJsonSerializerSettingsExtensions.cs" Link="InfoCarrierJsonSerializerSettingsExtensions.cs" />
+    <Compile Include="..\WebApiInfoCarrierClientImpl.cs" Link="WebApiInfoCarrierClientImpl.cs" />
+    <Compile Include="..\WebApiShared.cs" Link="WebApiShared.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="$(MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Build" Version="$(MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion)" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="$(MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion)" PrivateAssets="all" />
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="$(RemoteLinqPackageVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
   </ItemGroup>
 
 </Project>

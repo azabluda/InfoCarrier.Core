@@ -5,7 +5,6 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Net.Http;
-    using System.Security.Authentication;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
@@ -23,13 +22,7 @@ namespace InfoCarrierSample
 
         public WebApiInfoCarrierClientImpl()
         {
-            var handler = new HttpClientHandler
-            {
-                SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls,
-                ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true,
-            };
-
-            this.client = new HttpClient(handler, true) { BaseAddress = new Uri(WebApiShared.BaseAddress) };
+            this.client = new HttpClient() { BaseAddress = new Uri(WebApiShared.BaseAddress) };
         }
 
         public string ServerUrl

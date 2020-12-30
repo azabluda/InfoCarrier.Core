@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="..\Datamodel.cs" Link="Datamodel.cs" />
     <Compile Include="..\InfoCarrierJsonSerializerSettingsExtensions.cs" Link="InfoCarrierJsonSerializerSettingsExtensions.cs" />
+    <Compile Include="..\WebApiInfoCarrierClientImpl.cs" Link="WebApiInfoCarrierClientImpl.cs" />
     <Compile Include="..\WebApiShared.cs" Link="WebApiShared.cs" />
   </ItemGroup>
 

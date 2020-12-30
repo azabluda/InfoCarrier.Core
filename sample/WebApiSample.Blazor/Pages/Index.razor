@@ -5,19 +5,18 @@
 
 <p>This component demonstrates Entity Framework Core working inside your browser.</p>
 
-@if (Model.Output == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <p>@Model.Output</p>
-}
+<ul>
+    @foreach (var output in Model.Output)
+        {
+    <li>
+        <b>@output.Date.ToString("T")</b>
+        <pre>@output.Content</pre>
+    </li>
+        }
+</ul>
 
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        await Task.Delay(TimeSpan.FromSeconds(3));
-        Model.Output = "dummy output";
-    }
-}
+<button class="btn btn-primary"
+        @onclick="@Model.NextStepAsync"
+        disabled="@Model.IsBusy">
+    @Model.NextStepName
+</button>

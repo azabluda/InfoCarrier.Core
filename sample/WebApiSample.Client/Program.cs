@@ -43,7 +43,7 @@ namespace InfoCarrierSample
 
             using (await aliceContext.Database.BeginTransactionAsync())
             {
-                Console.WriteLine($"[{DateTime.Now}] Alice started a transaction.");
+                Console.WriteLine($"[{DateTime.Now}] Alice started the transaction.");
                 Console.WriteLine("Quickly press Enter to continue before Alice's transaction expires.");
                 Console.ReadKey();
 
@@ -59,7 +59,7 @@ namespace InfoCarrierSample
                 Console.ReadKey();
 
                 aliceContext.Database.CommitTransaction();
-                Console.WriteLine($"[{DateTime.Now}] Alice commits the transaction.");
+                Console.WriteLine($"[{DateTime.Now}] Alice committed the transaction.");
                 Console.WriteLine("Press Enter to continue.");
                 Console.ReadKey();
 
