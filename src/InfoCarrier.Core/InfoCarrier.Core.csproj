@@ -13,13 +13,11 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/azabluda/InfoCarrier.Core/master/icon.png</PackageIconUrl>
+    <Copyright>© Alexander Zabluda. All rights reserved.</Copyright>
   </PropertyGroup>
 
   <PropertyGroup>
     <CodeAnalysisRuleSet>..\..\Style.ruleset</CodeAnalysisRuleSet>
-    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
-    <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
-    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
 
