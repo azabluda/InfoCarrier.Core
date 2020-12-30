@@ -4,9 +4,7 @@
 namespace InfoCarrierSample
 {
     using System;
-    using System.Security.Cryptography.X509Certificates;
     using Microsoft.AspNetCore.Hosting;
-    using Pluralsight.Crypto;
     using ServiceStack;
     using ServiceStack.Auth;
     using ServiceStack.Caching;
@@ -23,8 +21,7 @@ namespace InfoCarrierSample
             return host
                 .UseKestrel(o => o.Listen(
                     System.Net.IPAddress.Any,
-                    new Uri(ServiceStackShared.BaseAddress).Port,
-                    listenOptions => listenOptions.UseHttps(GenerateCertificate()))).UseContentRoot(System.IO.Directory.GetCurrentDirectory())
+                    new Uri(ServiceStackShared.BaseAddress).Port)).UseContentRoot(System.IO.Directory.GetCurrentDirectory())
                 .UseWebRoot(System.IO.Directory.GetCurrentDirectory())
                 .UseStartup<Startup>()
                 .UseUrls(urlBases);
@@ -59,25 +56,6 @@ namespace InfoCarrierSample
             user.UserName = "bob";
             userRep.CreateUserAuth(user, "bob2");
             container.Register<IUserAuthRepository>(userRep);
-        }
-
-        private static X509Certificate2 GenerateCertificate()
-        {
-            string certName = new Uri(ServiceStackShared.BaseAddress).DnsSafeHost;
-
-            using (var ctx = new CryptContext())
-            {
-                ctx.Open();
-                return ctx.CreateSelfSignedCertificate(
-                    new SelfSignedCertProperties
-                    {
-                        IsPrivateKeyExportable = true,
-                        KeyBitLength = 4096,
-                        Name = new X500DistinguishedName($"cn={certName}"),
-                        ValidFrom = DateTime.Today.AddDays(-1),
-                        ValidTo = DateTime.Today.AddYears(1),
-                    });
-            }
         }
     }
 }
