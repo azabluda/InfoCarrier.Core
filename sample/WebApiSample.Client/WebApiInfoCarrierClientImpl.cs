@@ -13,14 +13,13 @@ namespace InfoCarrierSample
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Newtonsoft.Json;
-    using Remote.Linq;
 
     internal class WebApiInfoCarrierClientImpl : IInfoCarrierClient
     {
         private readonly HttpClient client;
         private string transactionId;
 
-        private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
+        private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureInfoCarrier();
 
         public WebApiInfoCarrierClientImpl()
         {

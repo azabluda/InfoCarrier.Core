@@ -9,7 +9,6 @@ namespace InfoCarrierSample
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
-    using Remote.Linq;
 
     public class Startup
     {
@@ -27,7 +26,7 @@ namespace InfoCarrierSample
         {
             services
                 .AddMvc(options => options.EnableEndpointRouting = false)
-                .AddNewtonsoftJson(options => options.SerializerSettings.ConfigureRemoteLinq());
+                .AddNewtonsoftJson(options => options.SerializerSettings.ConfigureInfoCarrier());
 
             services.AddMemoryCache(opt => opt.ExpirationScanFrequency = TimeSpan.FromSeconds(10));
         }

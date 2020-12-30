@@ -2,14 +2,12 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 #pragma warning disable SA1402 // FileMayOnlyContainASingleType
-#pragma warning disable SA1649 // FileNameMustMatchTypeName
 
 namespace InfoCarrierSample
 {
     using System;
     using InfoCarrier.Core.Common;
     using Newtonsoft.Json;
-    using Remote.Linq;
     using ServiceStack;
 
     public static class ServiceStackShared
@@ -21,7 +19,7 @@ namespace InfoCarrierSample
 
     public abstract class HasData
     {
-        private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureRemoteLinq();
+        private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureInfoCarrier();
 
         public string Data { get; set; }
 
