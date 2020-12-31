@@ -9,103 +9,19 @@ namespace InfoCarrierSample
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.Extensions.DependencyInjection;
 
-    public sealed class Model
+    public sealed class Model : IAsyncDisposable
     {
         private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
             .AddEntityFrameworkInfoCarrierClient()
             .BuildServiceProvider();
 
-        private readonly LinkedList<Func<Task<string>>> steps = new LinkedList<Func<Task<string>>>();
-        private LinkedListNode<Func<Task<string>>> nextStep;
+        private readonly IAsyncEnumerator<string> enumerator;
 
         public Model()
         {
-            BloggingContext aliceContext = null;
-            BloggingContext bobContext = null;
-            IDbContextTransaction tr = null;
-            Post myBlogPost = null;
-
-            this.steps = new LinkedList<Func<Task<string>>>(
-                new Func<Task<string>>[]
-                {
-                    async () =>
-                    {
-                        aliceContext = CreateContext();
-                        bobContext = CreateContext();
-                        bobContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-
-                        myBlogPost = await (
-                            from blog in aliceContext.Blogs
-                            from post in blog.Posts
-                            join author in aliceContext.Authors on blog.AuthorId equals author.Id
-                            where author.Name == "hi-its-me"
-                            where post.Title == "my-blog-post"
-                            select post).SingleAsync();
-
-                        return $"Blog post '{myBlogPost.Title}' from '{myBlogPost.CreationDate}' is retrieved by Alice.";
-                    },
-                    async () =>
-                    {
-                        tr = await aliceContext.Database.BeginTransactionAsync();
-                        return $"Alice started the transaction." +
-                            Environment.NewLine +
-                            "Quickly press Next to continue before Alice's transaction expires.";
-                    },
-                    async () =>
-                    {
-                        myBlogPost.CreationDate = DateTime.Now;
-                        await aliceContext.SaveChangesAsync();
-                        return $"CreationDate is set to '{myBlogPost.CreationDate}' by Alice." +
-                            Environment.NewLine +
-                            "Quickly press Next to continue before Alice's transaction expires.";
-                    },
-                    async () =>
-                    {
-                        Post checkBlogPost1 = await bobContext.Blogs.SelectMany(b => b.Posts).SingleAsync(p => p.Id == myBlogPost.Id);
-                        return $"Blog post '{myBlogPost.Title}' retrieved by Bob, but its CreationDate is still '{checkBlogPost1.CreationDate}'." +
-                            Environment.NewLine +
-                            "Quickly press Next to continue before Alice's transaction expires.";
-                    },
-                    async () =>
-                    {
-                        await tr.CommitAsync();
-                        await tr.DisposeAsync();
-                        tr = null;
-                        return "Alice committed the transaction.";
-                    },
-                    async () =>
-                    {
-                        Post checkBlogPost2 = await bobContext.Blogs.SelectMany(b => b.Posts).SingleAsync(p => p.Id == myBlogPost.Id);
-                        return $"Now Bob can see the new CreationDate '{checkBlogPost2.CreationDate}'.";
-                    },
-                    async () =>
-                    {
-                        if (tr != null)
-                        {
-                            await tr.DisposeAsync();
-                            tr = null;
-                        }
-
-                        if (aliceContext != null)
-                        {
-                            await aliceContext.DisposeAsync();
-                            aliceContext = null;
-                        }
-
-                        if (bobContext != null)
-                        {
-                            await bobContext.DisposeAsync();
-                            bobContext = null;
-                        }
-
-                        return "Finished. Reload the page to restart.";
-                    },
-                });
-
-            this.nextStep = this.steps.First;
+            this.enumerator = this.EntityFrameworkDemo().GetAsyncEnumerator();
         }
 
         public List<(DateTime Date, string Content)> Output { get; } = new List<(DateTime, string)>();
@@ -121,25 +37,71 @@ namespace InfoCarrierSample
             string result;
             try
             {
-                result = await this.nextStep.Value.Invoke();
+                await this.enumerator.MoveNextAsync();
+                result = this.enumerator.Current;
+                if (result == null)
+                {
+                    this.Output.Add((DateTime.Now, "That's all folks. Reload the page to restart."));
+                    this.NextStepName = "Finished";
+                }
+                else
+                {
+                    this.Output.Add((DateTime.Now, result));
+                    this.NextStepName = "Next";
+                    this.IsBusy = false;
+                }
             }
             catch (Exception ex)
             {
-                result = ex.ToString();
-                this.nextStep = this.steps.Last.Previous;
-            }
-
-            this.Output.Add((DateTime.Now, result));
-            this.nextStep = this.nextStep.Next;
-            if (this.nextStep != null)
-            {
-                this.NextStepName = "Next";
-                this.IsBusy = false;
-            }
-            else
-            {
+                this.Output.Add((DateTime.Now, ex.ToString()));
+                this.Output.Add((DateTime.Now, "Oops... Alice's transaction expired. Reload the page to restart."));
                 this.NextStepName = "Finished";
             }
+        }
+
+        public ValueTask DisposeAsync() => this.enumerator.DisposeAsync();
+
+        private async IAsyncEnumerable<string> EntityFrameworkDemo()
+        {
+            using BloggingContext aliceContext = CreateContext();
+            using BloggingContext bobContext = CreateContext();
+            bobContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+
+            Post myBlogPost = await (
+                from blog in aliceContext.Blogs
+                from post in blog.Posts
+                join author in aliceContext.Authors on blog.AuthorId equals author.Id
+                where author.Name == "hi-its-me"
+                where post.Title == "my-blog-post"
+                select post).SingleAsync();
+
+            yield return $"Blog post '{myBlogPost.Title}' from '{myBlogPost.CreationDate}' is retrieved by Alice.";
+
+            await using (var tr = await aliceContext.Database.BeginTransactionAsync())
+            {
+                yield return $"Alice started the transaction." +
+                    Environment.NewLine +
+                    "Quickly press Next to continue before Alice's transaction expires.";
+
+                myBlogPost.CreationDate = DateTime.Now;
+                await aliceContext.SaveChangesAsync();
+                yield return $"CreationDate is set to '{myBlogPost.CreationDate}' by Alice." +
+                    Environment.NewLine +
+                    "Quickly press Next to continue before Alice's transaction expires.";
+
+                Post checkBlogPost1 = await bobContext.Blogs.SelectMany(b => b.Posts).SingleAsync(p => p.Id == myBlogPost.Id);
+                yield return $"Blog post '{myBlogPost.Title}' retrieved by Bob, but its CreationDate is still '{checkBlogPost1.CreationDate}'." +
+                    Environment.NewLine +
+                    "Quickly press Next to continue before Alice's transaction expires.";
+
+                await tr.CommitAsync();
+                yield return "Alice committed the transaction.";
+
+                Post checkBlogPost2 = await bobContext.Blogs.SelectMany(b => b.Posts).SingleAsync(p => p.Id == myBlogPost.Id);
+                yield return $"Now Bob can see the new CreationDate '{checkBlogPost2.CreationDate}'.";
+            }
+
+            yield return null;
         }
 
         private static BloggingContext CreateContext()
