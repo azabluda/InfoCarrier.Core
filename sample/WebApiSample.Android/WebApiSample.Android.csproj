@@ -11,7 +11,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>InfoCarrierSample</RootNamespace>
-    <AssemblyName>WcfSample.Android</AssemblyName>
+    <AssemblyName>WebApiSample.Android</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <AndroidApplication>True</AndroidApplication>
     <AndroidResgenFile>Resources\Resource.Designer.cs</AndroidResgenFile>
@@ -50,10 +50,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Core" />
     <Reference Include="Mono.Android" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Remote.Linq.Newtonsoft.Json" Version="$(RemoteLinqPackageVersion)" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="..\..\stylecop.json">
@@ -62,14 +65,14 @@
     <Compile Include="..\Datamodel.cs">
       <Link>Datamodel.cs</Link>
     </Compile>
-    <Compile Include="..\IWcfService.cs">
-      <Link>IWcfService.cs</Link>
+    <Compile Include="..\InfoCarrierJsonSerializerSettingsExtensions.cs">
+      <Link>InfoCarrierJsonSerializerSettingsExtensions.cs</Link>
     </Compile>
-    <Compile Include="..\WcfSample.Client\WcfInfoCarrierClientImpl.cs">
-      <Link>WcfInfoCarrierClientImpl.cs</Link>
+    <Compile Include="..\WebApiInfoCarrierClientImpl.cs">
+      <Link>WebApiInfoCarrierClientImpl.cs</Link>
     </Compile>
-    <Compile Include="..\WcfShared.cs">
-      <Link>WcfShared.cs</Link>
+    <Compile Include="..\WebApiShared.cs">
+      <Link>WebApiShared.cs</Link>
     </Compile>
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.Designer.cs" />

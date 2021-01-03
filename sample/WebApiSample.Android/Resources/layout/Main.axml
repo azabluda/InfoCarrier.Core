@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
     <EditText
-        android:text="10.0.2.2:8080"
+        android:text="http://10.0.2.2:4809/"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/editServerUrl" />

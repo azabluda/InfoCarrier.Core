@@ -6,6 +6,7 @@ namespace InfoCarrierSample
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Net.Http;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
@@ -17,10 +18,12 @@ namespace InfoCarrierSample
             .AddEntityFrameworkInfoCarrierClient()
             .BuildServiceProvider();
 
+        private readonly HttpClient httpClient;
         private readonly IAsyncEnumerator<string> enumerator;
 
-        public Model()
+        public Model(HttpClient httpClient)
         {
+            this.httpClient = httpClient;
             this.enumerator = this.EntityFrameworkDemo().GetAsyncEnumerator();
         }
 
@@ -63,8 +66,8 @@ namespace InfoCarrierSample
 
         private async IAsyncEnumerable<string> EntityFrameworkDemo()
         {
-            using BloggingContext aliceContext = CreateContext();
-            using BloggingContext bobContext = CreateContext();
+            using BloggingContext aliceContext = this.CreateContext();
+            using BloggingContext bobContext = this.CreateContext();
             bobContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
             Post myBlogPost = await (
@@ -104,12 +107,12 @@ namespace InfoCarrierSample
             yield return null;
         }
 
-        private static BloggingContext CreateContext()
+        private BloggingContext CreateContext()
         {
             var optionsBuilder = new DbContextOptionsBuilder()
                 .UseInternalServiceProvider(ServiceProvider)
                 .EnableSensitiveDataLogging()
-                .UseInfoCarrierClient(new WebApiInfoCarrierClientImpl());
+                .UseInfoCarrierClient(new WebApiInfoCarrierClientImpl(this.httpClient));
 
             return new BloggingContext(optionsBuilder.Options);
         }

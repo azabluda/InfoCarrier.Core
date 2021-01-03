@@ -3,7 +3,6 @@
 
 namespace InfoCarrierSample
 {
-    using System;
     using System.Net.Http;
     using System.Text;
     using System.Threading;
@@ -20,10 +19,8 @@ namespace InfoCarrierSample
 
         private static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings().ConfigureInfoCarrier();
 
-        public WebApiInfoCarrierClientImpl()
-        {
-            this.client = new HttpClient() { BaseAddress = new Uri(WebApiShared.BaseAddress) };
-        }
+        public WebApiInfoCarrierClientImpl(HttpClient httpClient)
+            => this.client = httpClient;
 
         public string ServerUrl
             => this.client.BaseAddress.ToString();

@@ -5,6 +5,7 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Linq;
+    using System.Net.Http;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Client;
     using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace InfoCarrierSample
 
     internal class Program
     {
+        private static readonly HttpClient HttpClient = new HttpClient { BaseAddress = new Uri(WebApiShared.BaseAddress) };
         private static readonly ServiceProvider ServiceProvider = new ServiceCollection()
             .AddLogging(loggingBuilder => loggingBuilder.AddConsole().AddFilter((msg, level) => true))
             .AddEntityFrameworkInfoCarrierClient()
@@ -78,7 +80,7 @@ namespace InfoCarrierSample
             var optionsBuilder = new DbContextOptionsBuilder()
                 .UseInternalServiceProvider(ServiceProvider)
                 .EnableSensitiveDataLogging()
-                .UseInfoCarrierClient(new WebApiInfoCarrierClientImpl());
+                .UseInfoCarrierClient(new WebApiInfoCarrierClientImpl(HttpClient));
 
             return new BloggingContext(optionsBuilder.Options);
         }

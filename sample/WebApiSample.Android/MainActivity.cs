@@ -5,20 +5,22 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
+    using System.Net.Http;
     using Android.Content;
     using global::Android.App;
     using global::Android.OS;
     using global::Android.Widget;
     using InfoCarrier.Core.Client;
-    using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
+    using Xamarin.Android.Net;
 
-    [Activity(Label = "WcfSample.Android", MainLauncher = true, Icon = "@mipmap/icon")]
+    [Activity(Label = "WebApiSample.Android", MainLauncher = true, Icon = "@mipmap/icon")]
     public class MainActivity : Activity
     {
         private const string PropServerUrl = @"serverUrl";
+
+        private readonly HttpClient httpClient =
+            new HttpClient(new AndroidClientHandler()) { Timeout = TimeSpan.FromSeconds(3) };
 
         private readonly ISharedPreferences sharedPreferences =
             Application.Context.GetSharedPreferences(Application.Context.PackageName, FileCreationMode.Private);
@@ -55,15 +57,20 @@ namespace InfoCarrierSample
                 consoleTextView.Text = string.Empty;
 
                 string serverUrl = this.editServerUrl.Text;
-                var optionsBuilder = new DbContextOptionsBuilder();
-                optionsBuilder.UseInfoCarrierClient(new WcfInfoCarrierClientXamarinImpl(serverUrl));
-                var options = optionsBuilder.Options;
-
                 using (var contextEdit = this.sharedPreferences.Edit())
                 {
                     contextEdit.PutString(PropServerUrl, serverUrl);
                     contextEdit.Commit();
                 }
+
+                if (this.httpClient.BaseAddress?.AbsoluteUri != serverUrl)
+                {
+                    this.httpClient.BaseAddress = new Uri(serverUrl);
+                }
+
+                var optionsBuilder = new DbContextOptionsBuilder();
+                optionsBuilder.UseInfoCarrierClient(new WebApiInfoCarrierClientImpl(this.httpClient));
+                var options = optionsBuilder.Options;
 
                 // Select and update
                 using (var context = new BloggingContext(options))
@@ -87,23 +94,6 @@ namespace InfoCarrierSample
             {
                 ConsoleWriteLine(exception.ToString());
             }
-        }
-
-        // Xamarin.Android implementation of asynchronous WCF method calls is broken in a very
-        // weird way (throws no exception but just never executes the continuation after await).
-        // We have to simulate asynchrony by calling synchronous methods on the thread pool.
-        private class WcfInfoCarrierClientXamarinImpl : WcfInfoCarrierClientImpl
-        {
-            public WcfInfoCarrierClientXamarinImpl(string serverUrl)
-                : base(serverUrl)
-            {
-            }
-
-            public override async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext dbContext, CancellationToken cancellationToken)
-                => await Task.Run(() => this.QueryData(request, dbContext), cancellationToken);
-
-            public override async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken)
-                => await Task.Run(() => this.SaveChanges(request), cancellationToken);
         }
     }
 }
