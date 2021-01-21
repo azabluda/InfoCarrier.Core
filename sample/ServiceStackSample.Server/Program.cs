@@ -9,7 +9,7 @@ namespace InfoCarrierSample
 
     internal class Program
     {
-        private static void Main(string[] args)
+        private static void Main()
         {
             Console.WriteLine(@"Preparing the database...");
             SqlServerShared.RecreateDatabase();

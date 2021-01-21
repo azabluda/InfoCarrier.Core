@@ -27,10 +27,10 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private readonly QueryContext queryContext;
         private readonly ITypeResolver typeResolver;
         private readonly IReadOnlyDictionary<string, IEntityType> entityTypeMap;
-        private readonly IEntityMaterializerSource entityMaterializerSource;
+        private readonly IStateManager stateManager;
         private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
         private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
-        private readonly List<Action<IStateManager>> trackEntityActions = new List<Action<IStateManager>>();
+        private readonly List<Action> trackEntityActions = new List<Action>();
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -48,7 +48,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             this.queryContext = queryContext;
             this.typeResolver = typeResolver;
             this.entityTypeMap = entityTypeMap ?? BuildEntityTypeMap(queryContext.Context);
-            this.entityMaterializerSource = queryContext.Context.GetService<IEntityMaterializerSource>();
+            this.stateManager = queryContext.Context.GetService<IStateManager>();
             this.valueMappers = queryContext.Context.GetService<IEnumerable<IInfoCarrierValueMapper>>()
                 .Concat(StandardValueMappers.Mappers);
         }
@@ -72,12 +72,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
         public IEnumerable<TResult> MapAndTrackResults<TResult>(IEnumerable<DynamicObject> dataRecords)
         {
             var result = this.Map<TResult>(dataRecords);
-
-            foreach (var action in this.trackEntityActions)
-            {
-                action(this.queryContext.StateManager);
-            }
-
+            this.trackEntityActions.ForEach(action => action.Invoke());
             return result;
         }
 
@@ -154,14 +149,12 @@ namespace InfoCarrier.Core.Client.Query.Internal
             IKey pk = entityType.FindPrimaryKey();
             if (pk != null && entityIsTracked)
             {
-                entry = this.queryContext
-                    .StateManager
-                    .TryGetEntry(pk, pk.Properties.Select(p => values[p.Name]).ToArray());
+                entry = this.stateManager.TryGetEntry(pk, pk.Properties.Select(p => values[p.Name]).ToArray());
             }
 
             if (entry == null)
             {
-                entry = this.queryContext.StateManager.CreateEntry(values, entityType);
+                entry = this.stateManager.CreateEntry(values, entityType);
             }
 
             var entity = entry.Entity;
@@ -169,7 +162,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             if (entityIsTracked)
             {
-                this.trackEntityActions.Add(sm =>
+                this.trackEntityActions.Add(() =>
                 {
                     if (entry.EntityState == EntityState.Detached)
                     {
@@ -198,7 +191,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
                 if (context.Dto.TryGet(navigation.Name, out object value) && value != null)
                 {
                     value = context.MapFromDynamicObjectGraph(value, navigation.ClrType);
-                    if (navigation.IsCollection())
+                    if (navigation.IsCollection)
                     {
                         // TODO: clear or skip collection if it already contains something?
                         var coll = navigation.GetCollectionAccessor();

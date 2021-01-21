@@ -24,14 +24,12 @@ namespace InfoCarrier.Core.Client.Storage.Internal
         public InfoCarrierTypeMapping(
             Type clrType,
             ValueComparer comparer = null,
-            ValueComparer keyComparer = null,
-            ValueComparer structuralComparer = null)
+            ValueComparer keyComparer = null)
             : base(new CoreTypeMappingParameters(
                 clrType,
                 converter: null,
                 comparer,
                 keyComparer,
-                structuralComparer,
                 valueGeneratorFactory: null))
         {
         }

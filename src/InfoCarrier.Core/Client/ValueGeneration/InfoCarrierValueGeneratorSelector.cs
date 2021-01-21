@@ -7,7 +7,6 @@ namespace InfoCarrier.Core.Client.ValueGeneration
     using System.Diagnostics.CodeAnalysis;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
-    using Microsoft.EntityFrameworkCore.ValueGeneration.Internal;
 
     /// <summary>
     ///     This API supports the Entity Framework Core infrastructure and is not intended to be used

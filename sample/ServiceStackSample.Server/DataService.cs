@@ -5,6 +5,7 @@ namespace InfoCarrierSample
 {
     using System;
     using System.Data.Common;
+    using System.Diagnostics.CodeAnalysis;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Properties;
     using InfoCarrier.Core.Server;
@@ -37,6 +38,7 @@ namespace InfoCarrierSample
         public async Task<SaveChangesResponse> Any(SaveChanges request)
             => new SaveChangesResponse(await this.infoCarrierServer.SaveChangesAsync(this.CreateContext, request.Request));
 
+        [SuppressMessage("Usage", "CA1801:Review unused parameters", Justification = "ServiceStack uses it for routing.")]
         public async Task Any(BeginTransaction request)
         {
             if (this.SessionDbTransaction != null)
@@ -49,11 +51,13 @@ namespace InfoCarrierSample
             this.SessionDbTransaction = connection.BeginTransaction();
         }
 
+        [SuppressMessage("Usage", "CA1801:Review unused parameters", Justification = "ServiceStack uses it for routing.")]
         public void Any(CommitTransaction request)
         {
             this.EndTransaction(t => t.Commit());
         }
 
+        [SuppressMessage("Usage", "CA1801:Review unused parameters", Justification = "ServiceStack uses it for routing.")]
         public void Any(RollbackTransaction request)
         {
             this.EndTransaction(t => t.Rollback());

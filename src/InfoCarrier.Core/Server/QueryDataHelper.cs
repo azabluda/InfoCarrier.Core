@@ -18,6 +18,7 @@ namespace InfoCarrier.Core.Server
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
+    using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
@@ -59,6 +60,12 @@ namespace InfoCarrier.Core.Server
             this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
             IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
 
+            // TODO: deliver EntityType from client instead of this uglyness
+            var detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
+                .Where(et => et.ClrType != null)
+                .GroupBy(et => et.ClrType)
+                .ToDictionary(x => x.Key, x => x.First());
+
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
             // prematurely)
@@ -66,7 +73,7 @@ namespace InfoCarrier.Core.Server
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
-                    provider: type => (IQueryable)Activator.CreateInstance(typeof(EntityQueryable<>).MakeGenericType(type), provider))
+                    provider: type => (IQueryable)Activator.CreateInstance(typeof(EntityQueryable<>).MakeGenericType(type), provider, detachedEntityTypeMap[type]))
                 .ToLinqExpression(this.typeResolver);
         }
 

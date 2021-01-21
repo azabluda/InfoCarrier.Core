@@ -18,10 +18,8 @@ namespace InfoCarrier.Core.Client.Storage.Internal
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
     using Remote.Linq;
@@ -201,7 +199,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
             protected override Expression VisitParameter(ParameterExpression node)
             {
-                if (node.Name?.StartsWith(CompiledQueryCache.CompiledQueryParameterPrefix, StringComparison.Ordinal) == true)
+                if (node.Name?.StartsWith(QueryCompilationContext.QueryParameterPrefix, StringComparison.Ordinal) == true)
                 {
                     object paramValue = Activator.CreateInstance(
                         typeof(ValueWrapper<>).MakeGenericType(node.Type),
@@ -228,15 +226,16 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             internal static Expression Replace(Expression expression)
                 => new EntityQueryableStubVisitor().Visit(expression);
 
-            protected override Expression VisitConstant(ConstantExpression constantExpression)
-                => constantExpression.IsEntityQueryable()
-                    ? this.VisitEntityQueryable(((IQueryable)constantExpression.Value).ElementType)
-                    : constantExpression;
-
-            private Expression VisitEntityQueryable(Type elementType)
+            protected override Expression Visit(Expression expression)
             {
-                object stub = Activator.CreateInstance(typeof(RemoteQueryableStub<>).MakeGenericType(elementType));
-                return Expression.Constant(stub);
+                if (expression is QueryRootExpression queryRootExpression)
+                {
+                    object stub = Activator.CreateInstance(
+                        typeof(RemoteQueryableStub<>).MakeGenericType(queryRootExpression.EntityType.ClrType));
+                    return Expression.Constant(stub);
+                }
+
+                return base.Visit(expression);
             }
 
             private class RemoteQueryableStub<T> : IRemoteQueryable, IQueryable<T>

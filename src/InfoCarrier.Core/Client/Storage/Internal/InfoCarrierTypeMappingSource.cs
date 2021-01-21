@@ -38,14 +38,10 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             var clrType = mappingInfo.ClrType;
 
             if (clrType.IsValueType
-                || clrType == typeof(string))
+                || clrType == typeof(string)
+                || clrType == typeof(byte[]))
             {
                 return new InfoCarrierTypeMapping(clrType);
-            }
-
-            if (clrType == typeof(byte[]))
-            {
-                return new InfoCarrierTypeMapping(clrType, structuralComparer: new ArrayStructuralComparer<byte>());
             }
 
             if (clrType.FullName == "NetTopologySuite.Geometries.Geometry"
@@ -55,7 +51,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
                 return new InfoCarrierTypeMapping(
                     clrType,
-                    comparer,
                     comparer,
                     comparer);
             }

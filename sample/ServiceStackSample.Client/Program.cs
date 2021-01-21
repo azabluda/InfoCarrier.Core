@@ -21,7 +21,7 @@ namespace InfoCarrierSample
             .AddEntityFrameworkInfoCarrierClient()
             .BuildServiceProvider();
 
-        private static async Task Main(string[] args)
+        private static async Task Main()
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             {
