@@ -6,32 +6,28 @@
     <CoverletMsbuildPackageVersion>2.8.1</CoverletMsbuildPackageVersion>
     <FlubuCorePackageVersion>5.1.1</FlubuCorePackageVersion>
     <GitVersionTaskPackageVersion>5.3.7</GitVersionTaskPackageVersion>
-    <MicrosoftNETTestSdkPackageVersion>15.6.1</MicrosoftNETTestSdkPackageVersion>
+    <MicrosoftNETTestSdkPackageVersion>16.7.1</MicrosoftNETTestSdkPackageVersion>
     <StyleCopAnalyzersPackageVersion>1.1.118</StyleCopAnalyzersPackageVersion>
     <XunitCorePackageVersion>2.4.1</XunitCorePackageVersion>
-    <XunitRunnerVisualStudioPackageVersion>2.4.1</XunitRunnerVisualStudioPackageVersion>
+    <XunitRunnerVisualStudioPackageVersion>2.4.3</XunitRunnerVisualStudioPackageVersion>
 
     <!-- Build dependencies -->
-    <MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion>3.2.1</MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion>
-    <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>3.1.3</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
-    <MicrosoftAspNetCoreMvcNewtonsoftJsonPackageVersion>3.1.3</MicrosoftAspNetCoreMvcNewtonsoftJsonPackageVersion>
+    <MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion>5.0.2</MicrosoftAspNetCoreComponentsWebAssemblyPackageVersion>
+    <MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>5.0.2</MicrosoftAspNetCoreCryptographyKeyDerivationPackageVersion>
+    <MicrosoftAspNetCoreMvcNewtonsoftJsonPackageVersion>5.0.2</MicrosoftAspNetCoreMvcNewtonsoftJsonPackageVersion>
     <MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>2.2.0</MicrosoftAspNetCoreServerKestrelHttpsPackageVersion>
     <MicrosoftDataSqlClientPackageVersion>2.1.1</MicrosoftDataSqlClientPackageVersion>
-    <MicrosoftEntityFrameworkCorePackageVersion>3.1.3</MicrosoftEntityFrameworkCorePackageVersion>
-    <MicrosoftExtensionsLoggingConsolePackageVersion>3.1.3</MicrosoftExtensionsLoggingConsolePackageVersion>
+    <MicrosoftEntityFrameworkCorePackageVersion>5.0.2</MicrosoftEntityFrameworkCorePackageVersion>
+    <MicrosoftExtensionsLoggingConsolePackageVersion>5.0.0</MicrosoftExtensionsLoggingConsolePackageVersion>
     <NetTopologySuiteIOGeoJSONPackageVersion>2.0.4</NetTopologySuiteIOGeoJSONPackageVersion>
     <RemoteLinqPackageVersion>6.2.3</RemoteLinqPackageVersion>
     <ServiceStackPackageVersion>5.8.0</ServiceStackPackageVersion>
-    <SystemServiceModelHttpPackageVersion>4.7.0</SystemServiceModelHttpPackageVersion>
+    <SystemServiceModelHttpPackageVersion>4.8.0</SystemServiceModelHttpPackageVersion>
     <XamarinAndroidSupportDesignPackageVersion>28.0.0.3</XamarinAndroidSupportDesignPackageVersion>
-
-    <!-- Workaround for WcfSample.Android -->
-    <SystemBuffersPackageVersion>4.5.0</SystemBuffersPackageVersion>
 
   </PropertyGroup>
 
   <PropertyGroup>
-    <DefaultNetCoreTargetFramework>netcoreapp3.1</DefaultNetCoreTargetFramework>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)StyleNoDoc.ruleset</CodeAnalysisRuleSet>
     <LangVersion>8.0</LangVersion>
   </PropertyGroup>

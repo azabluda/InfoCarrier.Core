@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Description>EntityFrameworkCore provider for multitier applications.</Description>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <Company>on/off it-solutions-gmbh</Company>
     <Authors>Alexander Zabluda</Authors>
     <Product>InfoCarrier</Product>
