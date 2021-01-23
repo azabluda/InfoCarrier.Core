@@ -5,10 +5,9 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using Microsoft.EntityFrameworkCore;
 
-    // Currently no non-relational interceptors
-    public class InterceptionInfoCarrierTest : InterceptionTestBase
+    public class SerializationInfoCarrierTest : SerializationTestBase<F1InfoCarrierFixture>
     {
-        public InterceptionInfoCarrierTest(InterceptionFixtureBase fixture)
+        public SerializationInfoCarrierTest(F1InfoCarrierFixture fixture)
             : base(fixture)
         {
         }
