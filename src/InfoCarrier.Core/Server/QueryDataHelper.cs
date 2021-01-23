@@ -19,7 +19,6 @@ namespace InfoCarrier.Core.Server
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Query;
-    using Microsoft.EntityFrameworkCore.Query.Internal;
     using Microsoft.Extensions.DependencyInjection;
     using Remote.Linq;
     using Remote.Linq.ExpressionVisitors;
@@ -29,8 +28,11 @@ namespace InfoCarrier.Core.Server
     ///     Implementation of <see cref="IInfoCarrierServer.QueryData" /> and
     ///     <see cref="IInfoCarrierServer.QueryDataAsync" /> methods.
     /// </summary>
-    internal class QueryDataHelper
+    internal partial class QueryDataHelper
     {
+        private static readonly MethodInfo DbContextSetMethod
+            = Utils.GetMethodInfo<DbContext>(c => c.Set<object>()).GetGenericMethodDefinition();
+
         private static readonly MethodInfo ExecuteExpressionMethod
             = typeof(QueryDataHelper).GetTypeInfo().GetDeclaredMethod(nameof(ExecuteExpression));
 
@@ -58,13 +60,6 @@ namespace InfoCarrier.Core.Server
             this.valueMappers = customValueMappers.Concat(StandardValueMappers.Mappers);
 
             this.dbContext.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
-            IAsyncQueryProvider provider = this.dbContext.GetService<IAsyncQueryProvider>();
-
-            // TODO: deliver EntityType from client instead of this uglyness
-            var detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
-                .Where(et => et.ClrType != null)
-                .GroupBy(et => et.ClrType)
-                .ToDictionary(x => x.Key, x => x.First());
 
             // UGLY: this resembles Remote.Linq.Expressions.ExpressionExtensions.PrepareForExecution()
             // but excludes PartialEval (otherwise simple queries like db.Set<X>().First() are executed
@@ -73,8 +68,10 @@ namespace InfoCarrier.Core.Server
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
                     this.typeResolver,
-                    provider: type => (IQueryable)Activator.CreateInstance(typeof(EntityQueryable<>).MakeGenericType(type), provider, detachedEntityTypeMap[type]))
+                    provider: type => DbContextSetMethod.MakeGenericMethod(type).ToDelegate<Func<IQueryable>>(this.dbContext).Invoke())
                 .ToLinqExpression(this.typeResolver);
+
+            this.linqExpression = new DbSetRewritingExpressionVisitor(this.dbContext).Visit(this.linqExpression);
         }
 
         /// <summary>
