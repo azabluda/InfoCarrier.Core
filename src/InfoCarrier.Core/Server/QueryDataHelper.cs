@@ -168,7 +168,7 @@ namespace InfoCarrier.Core.Server
         {
             private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
             private readonly IStateManager stateManager;
-            private readonly IReadOnlyDictionary<Type, IEntityType> detachedEntityTypeMap;
+            private readonly IModel model;
             private readonly Dictionary<object, DynamicObject> cachedDtos =
                 new Dictionary<object, DynamicObject>(new ReferenceEqualityComparer());
 
@@ -180,12 +180,8 @@ namespace InfoCarrier.Core.Server
                 : base(typeResolver, typeInfoProvider, new DynamicObjectMapperSettings { FormatNativeTypesAsString = true })
             {
                 this.valueMappers = valueMappers;
-                IServiceProvider serviceProvider = dbContext.GetInfrastructure();
-                this.stateManager = serviceProvider.GetRequiredService<IStateManager>();
-                this.detachedEntityTypeMap = dbContext.Model.GetEntityTypes()
-                    .Where(et => et.ClrType != null)
-                    .GroupBy(et => et.ClrType)
-                    .ToDictionary(x => x.Key, x => x.First());
+                this.stateManager = dbContext.GetService<IStateManager>();
+                this.model = dbContext.Model;
             }
 
             protected override bool ShouldMapToDynamicObject(IEnumerable collection) =>
@@ -208,12 +204,14 @@ namespace InfoCarrier.Core.Server
                 {
                     // Check if obj is a tracked or detached entity
                     InternalEntityEntry entry = this.stateManager.TryGetEntry(pinObj);
-                    if (entry == null
-                        && this.detachedEntityTypeMap.TryGetValue(pinObj.GetType(), out IEntityType entityType)
-                        && entityType.FindPrimaryKey() != null)
+                    if (entry == null)
                     {
-                        // Create detached entity entry
-                        entry = this.stateManager.GetOrCreateEntry(pinObj, entityType);
+                        IEntityType entityType = this.model.FindRuntimeEntityType(pinObj.GetType());
+                        if (entityType?.FindPrimaryKey() != null)
+                        {
+                            // Create detached entity entry
+                            entry = this.stateManager.GetOrCreateEntry(pinObj, entityType);
+                        }
                     }
 
                     return entry;
