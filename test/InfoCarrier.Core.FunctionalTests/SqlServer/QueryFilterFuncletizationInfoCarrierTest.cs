@@ -6,11 +6,10 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using Xunit.Abstractions;
 
     public class QueryFilterFuncletizationInfoCarrierTest : QueryFilterFuncletizationTestBase<QueryFilterFuncletizationInfoCarrierTest.TestFixture>
     {
-        public QueryFilterFuncletizationInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
+        public QueryFilterFuncletizationInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }

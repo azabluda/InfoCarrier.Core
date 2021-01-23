@@ -38,6 +38,12 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
             {
             }
 
+            protected override bool DoesLazyLoading
+                => true;
+
+            protected override bool DoesChangeTracking
+                => false;
+
             public class TestFixture : ProxyGraphUpdatesInfoCarrierFixtureBase
             {
                 protected override string StoreName { get; } = "ProxyGraphLazyLoadingUpdatesTest";

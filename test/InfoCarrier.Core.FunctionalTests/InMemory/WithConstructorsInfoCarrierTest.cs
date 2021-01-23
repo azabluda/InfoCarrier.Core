@@ -102,7 +102,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                 modelBuilder
                     .Entity<BlogQuery>()
                     .HasNoKey()
-                    .ToQuery(() => context.Set<Blog>().Select(b => new BlogQuery(b.Title, b.MonthlyRevenue)));
+                    .ToInMemoryQuery(() => context.Set<Blog>().Select(b => new BlogQuery(b.Title, b.MonthlyRevenue)));
             }
         }
     }

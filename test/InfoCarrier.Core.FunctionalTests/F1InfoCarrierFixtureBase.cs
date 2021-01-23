@@ -6,7 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Metadata;
 
-    public abstract class F1InfoCarrierFixtureBase : F1FixtureBase
+    public abstract class F1InfoCarrierFixtureBase : F1FixtureBase<byte[]>
     {
         protected IModel CreateModelExternal()
         {

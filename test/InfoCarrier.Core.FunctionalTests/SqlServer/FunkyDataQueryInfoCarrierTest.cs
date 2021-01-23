@@ -8,11 +8,10 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestModels.FunkyDataModel;
     using Microsoft.EntityFrameworkCore.TestUtilities;
-    using Xunit.Abstractions;
 
     public class FunkyDataQueryInfoCarrierTest : FunkyDataQueryTestBase<FunkyDataQueryInfoCarrierTest.TestFixture>
     {
-        public FunkyDataQueryInfoCarrierTest(TestFixture fixture, ITestOutputHelper testOutputHelper)
+        public FunkyDataQueryInfoCarrierTest(TestFixture fixture)
             : base(fixture)
         {
         }

@@ -19,6 +19,8 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
         {
             private ITestStoreFactory testStoreFactory;
 
+            protected override string StoreName { get; } = "InfoCarrierGraphUpdatesTest";
+
             protected override ITestStoreFactory TestStoreFactory =>
                 InfoCarrierTestStoreFactory.EnsureInitialized(
                     ref this.testStoreFactory,

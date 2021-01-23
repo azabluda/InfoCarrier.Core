@@ -4,10 +4,10 @@
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 {
     using System;
+    using System.Threading;
     using InfoCarrier.Core.Client;
     using InfoCarrier.Core.Common.ValueMapping;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Internal;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
 
@@ -35,18 +35,28 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
             Action<ModelBuilder, DbContext> onModelCreating,
             Func<DbContextOptionsBuilder, DbContextOptionsBuilder> onAddOptions = null,
             Action<DbContext, DbContext> copyDbContextParameters = null)
-            => NonCapturingLazyInitializer.EnsureInitialized(
+        {
+            var tmp = Volatile.Read(ref inst);
+            if (tmp != null)
+            {
+                return tmp;
+            }
+
+            Interlocked.CompareExchange(
                 ref inst,
-                inst,
-                _ => new InfoCarrierTestStoreFactory(
-                   new SharedTestStoreProperties
-                   {
-                       ContextType = contextType,
-                       OnModelCreating = onModelCreating,
-                       OnAddOptions = onAddOptions ?? (o => o),
-                       CopyDbContextParameters = copyDbContextParameters,
-                   },
-                   backendTestStoreFactory));
+                new InfoCarrierTestStoreFactory(
+                    new SharedTestStoreProperties
+                    {
+                        ContextType = contextType,
+                        OnModelCreating = onModelCreating,
+                        OnAddOptions = onAddOptions ?? (o => o),
+                        CopyDbContextParameters = copyDbContextParameters,
+                    },
+                    backendTestStoreFactory),
+                null);
+
+            return inst;
+        }
 
         public virtual TestStore Create(string storeName)
             => new InfoCarrierTestStore(this.backendTestStoreFactory(storeName, false, this.testStoreProperties));

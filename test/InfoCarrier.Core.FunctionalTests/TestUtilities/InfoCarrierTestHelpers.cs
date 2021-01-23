@@ -20,7 +20,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
         public override IServiceCollection AddProviderServices(IServiceCollection services)
             => services.AddEntityFrameworkInfoCarrierClient();
 
-        protected override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
+        public override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
             => optionsBuilder.UseInfoCarrierClient(CreateDummyClient(optionsBuilder.Options.ContextType));
 
         public static IInfoCarrierClient CreateDummyClient(Type contextType)

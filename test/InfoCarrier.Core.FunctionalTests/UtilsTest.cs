@@ -4,7 +4,6 @@
 namespace InfoCarrier.Core.FunctionalTests
 {
     using System;
-    using System.Linq.Expressions;
     using System.Reflection;
     using InfoCarrier.Core.Common;
     using Xunit;
@@ -36,16 +35,5 @@ namespace InfoCarrier.Core.FunctionalTests
         private object Return42() => 42;
 
         private static object StaticReturn42() => 42;
-
-        private class AnswerToEverythingExpression : Expression
-        {
-            public override ExpressionType NodeType => ExpressionType.Extension;
-
-            public override Type Type => typeof(int);
-
-            public override bool CanReduce => true;
-
-            public override Expression Reduce() => Constant(42);
-        }
     }
 }

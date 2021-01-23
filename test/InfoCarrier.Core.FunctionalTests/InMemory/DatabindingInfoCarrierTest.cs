@@ -5,7 +5,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.InMemory.Metadata.Conventions;
     using Microsoft.EntityFrameworkCore.TestUtilities;
 
     public class DatabindingInfoCarrierTest : DatabindingTestBase<DatabindingInfoCarrierTest.TestFixture>
@@ -19,6 +18,9 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         {
             private ITestStoreFactory testStoreFactory;
 
+            public override TestHelpers TestHelpers
+                => InfoCarrierTestHelpers.Instance;
+
             protected override ITestStoreFactory TestStoreFactory =>
                 InfoCarrierTestStoreFactory.EnsureInitialized(
                     ref this.testStoreFactory,
@@ -26,9 +28,6 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                     this.ContextType,
                     this.OnModelCreating,
                     b => b.UseModel(this.CreateModelExternal()));
-
-            public override ModelBuilder CreateModelBuilder() =>
-                new ModelBuilder(InMemoryConventionSetBuilder.Build());
         }
     }
 }
