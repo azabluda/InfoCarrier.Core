@@ -11,23 +11,11 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
     public abstract class ProxyGraphUpdatesInfoCarrierTest
     {
         public abstract class ProxyGraphUpdatesInfoCarrierTestBase<TFixture> : ProxyGraphUpdatesTestBase<TFixture>
-            where TFixture : ProxyGraphUpdatesInfoCarrierTestBase<TFixture>.ProxyGraphUpdatesInfoCarrierFixtureBase, new()
+            where TFixture : ProxyGraphUpdatesTestBase<TFixture>.ProxyGraphUpdatesFixtureBase, new()
         {
             protected ProxyGraphUpdatesInfoCarrierTestBase(TFixture fixture)
                 : base(fixture)
             {
-            }
-
-            public abstract class ProxyGraphUpdatesInfoCarrierFixtureBase : ProxyGraphUpdatesFixtureBase
-            {
-                private ITestStoreFactory testStoreFactory;
-
-                protected override ITestStoreFactory TestStoreFactory =>
-                    InfoCarrierTestStoreFactory.EnsureInitialized(
-                        ref this.testStoreFactory,
-                        InfoCarrierTestStoreFactory.SqlServer,
-                        this.ContextType,
-                        this.OnModelCreating);
             }
         }
 
@@ -44,8 +32,18 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
             protected override bool DoesChangeTracking
                 => false;
 
-            public class TestFixture : ProxyGraphUpdatesInfoCarrierFixtureBase
+            public class TestFixture : ProxyGraphUpdatesFixtureBase
             {
+                private ITestStoreFactory testStoreFactory;
+
+                protected override ITestStoreFactory TestStoreFactory =>
+                    InfoCarrierTestStoreFactory.EnsureInitialized(
+                        ref this.testStoreFactory,
+                        InfoCarrierTestStoreFactory.SqlServer,
+                        this.ContextType,
+                        this.OnModelCreating,
+                        b => b.UseLazyLoadingProxies());
+
                 protected override string StoreName { get; } = "ProxyGraphLazyLoadingUpdatesTest";
 
                 public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)

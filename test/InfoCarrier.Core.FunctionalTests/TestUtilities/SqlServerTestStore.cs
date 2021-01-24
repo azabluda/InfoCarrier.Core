@@ -22,7 +22,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
         }
 
         protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
-            => serviceCollection.AddEntityFrameworkSqlServer();
+            => serviceCollection.AddEntityFrameworkSqlServer().AddEntityFrameworkProxies();
 
         public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
             => base.AddProviderOptions(builder).UseSqlServer(this.connection);
