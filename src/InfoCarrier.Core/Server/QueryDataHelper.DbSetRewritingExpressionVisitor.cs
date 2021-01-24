@@ -26,6 +26,19 @@ namespace InfoCarrier.Core.Server
                 this.provider = dbContext.GetService<IAsyncQueryProvider>();
             }
 
+            protected override Expression VisitUnary(UnaryExpression node)
+            {
+                if (node.NodeType == ExpressionType.Convert
+                    && node.Operand is UnaryExpression inner
+                    && inner.NodeType == ExpressionType.Convert
+                    && node.Type == inner.Type)
+                {
+                    return this.Visit(inner);
+                }
+
+                return base.VisitUnary(node);
+            }
+
             protected override Expression VisitConstant(ConstantExpression node)
                 => node.Type.IsGenericType && node.Type.GetGenericTypeDefinition() == typeof(InternalDbSet<>)
                 ? new QueryRootExpression(this.provider, this.model.FindRuntimeEntityType(node.Type.GetGenericArguments()[0]))

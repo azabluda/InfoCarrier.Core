@@ -201,13 +201,16 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             {
                 if (node.Name?.StartsWith(QueryCompilationContext.QueryParameterPrefix, StringComparison.Ordinal) == true)
                 {
+                    object value = this.queryContext.ParameterValues[node.Name];
                     object paramValue = Activator.CreateInstance(
-                        typeof(ValueWrapper<>).MakeGenericType(node.Type),
-                        this.queryContext.ParameterValues[node.Name]);
+                        typeof(ValueWrapper<>).MakeGenericType(value?.GetType() ?? typeof(object)),
+                        value);
 
-                    return Expression.Property(
+                    Expression propExpr = Expression.Property(
                         Expression.Constant(paramValue),
                         nameof(ValueWrapper<object>.Value));
+
+                    return propExpr.Type == node.Type ? propExpr : Expression.Convert(propExpr, node.Type);
                 }
 
                 return base.VisitParameter(node);
