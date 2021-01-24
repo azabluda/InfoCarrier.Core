@@ -83,11 +83,32 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                         b.Property(e => e.OnUpdateThrowBeforeThrowAfter).HasDefaultValue("Rabbit");
                     });
 
-                modelBuilder.Entity<WithBackingFields>(b =>
-                {
-                    b.Property(e => e.NullableAsNonNullable).HasComputedColumnSql("1");
-                    b.Property(e => e.NonNullableAsNullable).HasComputedColumnSql("1");
-                });
+                modelBuilder.Entity<WithBackingFields>(
+                    b =>
+                    {
+                        b.Property(e => e.NullableAsNonNullable).HasComputedColumnSql("1");
+                        b.Property(e => e.NonNullableAsNullable).HasComputedColumnSql("1");
+                    });
+
+                modelBuilder.Entity<WithNullableBackingFields>(
+                    b =>
+                    {
+                        b.Property(e => e.NullableBackedBoolTrueDefault).HasDefaultValue(true);
+                        b.Property(e => e.NullableBackedIntNonZeroDefault).HasDefaultValue(-1);
+                        b.Property(e => e.NullableBackedBoolFalseDefault).HasDefaultValue(false);
+                        b.Property(e => e.NullableBackedIntZeroDefault).HasDefaultValue(0);
+                    });
+
+                modelBuilder.Entity<WithObjectBackingFields>(
+                    b =>
+                    {
+                        b.Property(e => e.NullableBackedBoolTrueDefault).HasDefaultValue(true);
+                        b.Property(e => e.NullableBackedIntNonZeroDefault).HasDefaultValue(-1);
+                        b.Property(e => e.NullableBackedBoolFalseDefault).HasDefaultValue(false);
+                        b.Property(e => e.NullableBackedIntZeroDefault).HasDefaultValue(0);
+                    });
+
+                modelBuilder.Entity<NonStoreGenDependent>().Property(e => e.HasTemp).HasDefaultValue(777);
 
                 base.OnModelCreating(modelBuilder, context);
             }
