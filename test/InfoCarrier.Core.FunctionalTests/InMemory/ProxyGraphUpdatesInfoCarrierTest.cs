@@ -1,10 +1,13 @@
 ﻿// Copyright (c) Alexander Zabluda. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace InfoCarrier.Core.FunctionalTests.SqlServer
+namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
+    using System;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.ChangeTracking;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +19,91 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
             protected ProxyGraphUpdatesInfoCarrierTestBase(TFixture fixture)
                 : base(fixture)
             {
+            }
+
+            // #11552
+            public override void Save_required_one_to_one_changed_by_reference(ChangeMechanism changeMechanism)
+            {
+            }
+
+            public override void Optional_one_to_one_relationships_are_one_to_one()
+            {
+            }
+
+            public override void Optional_one_to_one_with_AK_relationships_are_one_to_one()
+            {
+            }
+
+            public override void Optional_many_to_one_dependents_with_alternate_key_are_orphaned_in_store(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Optional_many_to_one_dependents_are_orphaned_in_store(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_one_to_one_are_cascade_detached_when_Added(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_one_to_one_relationships_are_one_to_one()
+            {
+            }
+
+            public override void Required_one_to_one_with_AK_relationships_are_one_to_one()
+            {
+            }
+
+            public override void Required_one_to_one_with_alternate_key_are_cascade_detached_when_Added(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_one_to_one_with_alternate_key_are_cascade_deleted_in_store(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_many_to_one_dependents_are_cascade_deleted_in_store(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_many_to_one_dependents_with_alternate_key_are_cascade_deleted_in_store(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_non_PK_one_to_one_are_cascade_detached_when_Added(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            public override void Required_non_PK_one_to_one_with_alternate_key_are_cascade_detached_when_Added(
+                CascadeTiming cascadeDeleteTiming,
+                CascadeTiming deleteOrphansTiming)
+            {
+            }
+
+            protected override void ExecuteWithStrategyInTransaction(
+                Action<DbContext> testOperation,
+                Action<DbContext> nestedTestOperation1 = null,
+                Action<DbContext> nestedTestOperation2 = null,
+                Action<DbContext> nestedTestOperation3 = null)
+            {
+                base.ExecuteWithStrategyInTransaction(testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
+                this.Fixture.Reseed();
             }
         }
 
@@ -39,10 +127,11 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                 protected override ITestStoreFactory TestStoreFactory =>
                     InfoCarrierTestStoreFactory.EnsureInitialized(
                         ref this.testStoreFactory,
-                        InfoCarrierTestStoreFactory.SqlServer,
+                        InfoCarrierTestStoreFactory.InMemory,
                         this.ContextType,
                         this.OnModelCreating,
-                        b => b.UseLazyLoadingProxies());
+                        b => b.ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning))
+                              .UseLazyLoadingProxies());
 
                 protected override string StoreName { get; } = "ProxyGraphLazyLoadingUpdatesTest";
 
@@ -81,10 +170,11 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                 protected override ITestStoreFactory TestStoreFactory =>
                     InfoCarrierTestStoreFactory.EnsureInitialized(
                         ref this.testStoreFactory,
-                        InfoCarrierTestStoreFactory.SqlServer,
+                        InfoCarrierTestStoreFactory.InMemory,
                         this.ContextType,
                         this.OnModelCreating,
-                        b => b.UseChangeTrackingProxies());
+                        b => b.ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning))
+                              .UseChangeTrackingProxies());
 
                 protected override string StoreName { get; } = "ProxyGraphChangeTrackingUpdatesTest";
 
@@ -125,10 +215,12 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                 protected override ITestStoreFactory TestStoreFactory =>
                     InfoCarrierTestStoreFactory.EnsureInitialized(
                         ref this.testStoreFactory,
-                        InfoCarrierTestStoreFactory.SqlServer,
+                        InfoCarrierTestStoreFactory.InMemory,
                         this.ContextType,
                         this.OnModelCreating,
-                        b => b.UseLazyLoadingProxies().UseChangeTrackingProxies());
+                        b => b.ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning))
+                              .UseLazyLoadingProxies()
+                              .UseChangeTrackingProxies());
 
                 protected override string StoreName { get; } = "ProxyGraphChangeTrackingAndLazyLoadingUpdatesTest";
 

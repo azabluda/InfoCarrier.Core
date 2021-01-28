@@ -24,6 +24,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
             => serviceCollection.AddEntityFrameworkInMemoryDatabase()
+                .AddEntityFrameworkProxies()
                 .AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
                 .AddSingleton<TestStoreIndex>();
 

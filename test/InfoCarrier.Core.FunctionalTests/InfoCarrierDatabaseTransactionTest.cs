@@ -151,7 +151,7 @@ namespace InfoCarrier.Core.FunctionalTests
                     () => context.Database.RollbackTransaction()).Message);
         }
 
-        public class TestFixture : GraphUpdatesInfoCarrierTest.TestFixture
+        public class TestFixture : MusicStoreInfoCarrierTest.TestFixture
         {
             protected override string StoreName => base.StoreName + "TransactionManagerTest";
         }
