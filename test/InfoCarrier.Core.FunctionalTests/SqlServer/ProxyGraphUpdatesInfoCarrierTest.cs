@@ -60,5 +60,92 @@ namespace InfoCarrier.Core.FunctionalTests.SqlServer
                 }
             }
         }
+
+        public class ChangeTracking : ProxyGraphUpdatesInfoCarrierTestBase<ChangeTracking.TestFixture>
+        {
+            public ChangeTracking(TestFixture fixture)
+                : base(fixture)
+            {
+            }
+
+            protected override bool DoesLazyLoading
+                => false;
+
+            protected override bool DoesChangeTracking
+                => true;
+
+            public class TestFixture : ProxyGraphUpdatesFixtureBase
+            {
+                private ITestStoreFactory testStoreFactory;
+
+                protected override ITestStoreFactory TestStoreFactory =>
+                    InfoCarrierTestStoreFactory.EnsureInitialized(
+                        ref this.testStoreFactory,
+                        InfoCarrierTestStoreFactory.SqlServer,
+                        this.ContextType,
+                        this.OnModelCreating,
+                        b => b.UseChangeTrackingProxies());
+
+                protected override string StoreName { get; } = "ProxyGraphChangeTrackingUpdatesTest";
+
+                public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
+                    => base.AddOptions(builder.UseChangeTrackingProxies());
+
+                protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
+                    => base.AddServices(serviceCollection.AddEntityFrameworkProxies());
+
+                protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
+                {
+                    modelBuilder.UseIdentityColumns();
+                    modelBuilder.HasChangeTrackingStrategy(ChangeTrackingStrategy.ChangingAndChangedNotificationsWithOriginalValues);
+
+                    base.OnModelCreating(modelBuilder, context);
+                }
+            }
+        }
+
+        public class ChangeTrackingAndLazyLoading : ProxyGraphUpdatesInfoCarrierTestBase<
+            ChangeTrackingAndLazyLoading.TestFixture>
+        {
+            public ChangeTrackingAndLazyLoading(TestFixture fixture)
+                : base(fixture)
+            {
+            }
+
+            protected override bool DoesLazyLoading
+                => true;
+
+            protected override bool DoesChangeTracking
+                => true;
+
+            public class TestFixture : ProxyGraphUpdatesFixtureBase
+            {
+                private ITestStoreFactory testStoreFactory;
+
+                protected override ITestStoreFactory TestStoreFactory =>
+                    InfoCarrierTestStoreFactory.EnsureInitialized(
+                        ref this.testStoreFactory,
+                        InfoCarrierTestStoreFactory.SqlServer,
+                        this.ContextType,
+                        this.OnModelCreating,
+                        b => b.UseLazyLoadingProxies().UseChangeTrackingProxies());
+
+                protected override string StoreName { get; } = "ProxyGraphChangeTrackingAndLazyLoadingUpdatesTest";
+
+                public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
+                    => base.AddOptions(builder.UseLazyLoadingProxies().UseChangeTrackingProxies());
+
+                protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
+                    => base.AddServices(serviceCollection.AddEntityFrameworkProxies());
+
+                protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
+                {
+                    modelBuilder.UseIdentityColumns();
+                    modelBuilder.HasChangeTrackingStrategy(ChangeTrackingStrategy.ChangingAndChangedNotificationsWithOriginalValues);
+
+                    base.OnModelCreating(modelBuilder, context);
+                }
+            }
+        }
     }
 }
