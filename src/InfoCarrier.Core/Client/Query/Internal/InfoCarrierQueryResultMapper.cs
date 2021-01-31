@@ -169,7 +169,9 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         entry.SetEntityState(EntityState.Unchanged);
                     }
 
-                    foreach (INavigation nav in loadedNavigations.Select(name => entry.EntityType.FindNavigation(name)))
+                    foreach (INavigationBase nav in loadedNavigations
+                        .Select(name => (INavigationBase)entry.EntityType.FindNavigation(name)
+                            ?? entry.EntityType.FindSkipNavigation(name)))
                     {
                         entry.SetIsLoaded(nav);
                     }
@@ -177,7 +179,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
             }
 
             // Set navigation properties AFTER adding to map to avoid endless recursion
-            foreach (INavigation navigation in entityType.GetNavigations())
+            foreach (INavigationBase navigation in Utils.GetAllNavigations(entityType))
             {
                 // Avoid accidental loading of navigations of a tracked entity
                 if (entry.EntityState != EntityState.Detached &&
@@ -214,20 +216,27 @@ namespace InfoCarrier.Core.Client.Query.Internal
                         }
                     }
 
-                    SetIsLoadedNoTracking(entity, navigation);
+                    SetIsLoadedWhenNoTracking(navigation, entity);
                 }
             }
 
             return entity;
         }
 
-        private static void SetIsLoadedNoTracking(object entity, INavigation navigation)
-            => ((ILazyLoader)navigation
-                        .DeclaringEntityType
-                        .GetServiceProperties()
-                        .FirstOrDefault(p => p.ClrType == typeof(ILazyLoader))
-                    ?.GetGetter().GetClrValue(entity))
-                ?.SetLoaded(entity, navigation.Name);
+        private static void SetIsLoadedWhenNoTracking(INavigationBase navigation, object entity)
+        {
+            var serviceProperties = navigation
+                .DeclaringEntityType
+                .GetDerivedTypesInclusive()
+                .Where(t => t.ClrType.IsInstanceOfType(entity))
+                .SelectMany(e => e.GetServiceProperties())
+                .Where(p => p.ClrType == typeof(ILazyLoader));
+
+            foreach (var serviceProperty in serviceProperties)
+            {
+                ((ILazyLoader)serviceProperty.GetGetter().GetClrValue(entity))?.SetLoaded(entity, navigation.Name);
+            }
+        }
 
         private class MapFromDynamicObjectContext : IMapFromDynamicObjectContext
         {

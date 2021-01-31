@@ -38,7 +38,7 @@ namespace InfoCarrier.Core.Common.ValueMapping
                     dto.Add(
                         EntityLoadedNavigations,
                         context.MapToDynamicObjectGraph(
-                            context.EntityEntry.EntityType.GetNavigations()
+                            Utils.GetAllNavigations(context.EntityEntry.EntityType)
                                 .Where(n => context.EntityEntry.IsLoaded(n))
                                 .Select(n => n.Name)
                                 .ToList()));

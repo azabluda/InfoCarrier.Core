@@ -225,5 +225,13 @@ namespace InfoCarrier.Core.Common
             ValueConverter valueConverter = property?.GetValueConverter();
             return valueConverter != null ? valueConverter.ConvertToProvider(value) : value;
         }
+
+        /// <summary>
+        /// Gets all normal and skip navigation properties on the given entity type.
+        /// </summary>
+        /// <param name="entityType"> The entity type. </param>
+        /// <returns> All navigation properties on this entity type. </returns>
+        internal static IEnumerable<INavigationBase> GetAllNavigations(IEntityType entityType)
+            => entityType.GetNavigations().Cast<INavigationBase>().Concat(entityType.GetSkipNavigations());
     }
 }
