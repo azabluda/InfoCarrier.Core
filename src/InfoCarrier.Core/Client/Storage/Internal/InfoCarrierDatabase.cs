@@ -163,14 +163,14 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 }
 
                 var queryDataResult = this.infoCarrierClient.QueryData(this.queryDataRequest, this.queryContext.Context);
-                var mapped = this.resultMapper.MapAndTrackResults<TElement>(queryDataResult.MappedResults);
+                var mapped = this.resultMapper.Map<TElement>(queryDataResult.MappedResults);
                 return singleResult ? (object)mapped.FirstOrDefault() : mapped;
             }
 
             private async IAsyncEnumerable<TElement> ExecuteAsync()
             {
                 var queryDataResult = await this.infoCarrierClient.QueryDataAsync(this.queryDataRequest, this.queryContext.Context, default);
-                var mapped = this.resultMapper.MapAndTrackResults<TElement>(queryDataResult.MappedResults);
+                var mapped = this.resultMapper.Map<TElement>(queryDataResult.MappedResults);
                 foreach (var element in mapped)
                 {
                     yield return element;

@@ -30,7 +30,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         private readonly IStateManager stateManager;
         private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
         private readonly Dictionary<DynamicObject, object> map = new Dictionary<DynamicObject, object>();
-        private readonly List<Action> trackEntityActions = new List<Action>();
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -61,20 +60,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
         [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "InfoCarrier.Core internal.")]
         internal static IReadOnlyDictionary<string, IEntityType> BuildEntityTypeMap(DbContext context)
             => context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1611:ElementParametersMustBeDocumented", Justification = "InfoCarrier.Core internal.")]
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1615:ElementReturnValueMustBeDocumented", Justification = "InfoCarrier.Core internal.")]
-        [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1618:GenericTypeParametersMustBeDocumented", Justification = "InfoCarrier.Core internal.")]
-        public IEnumerable<TResult> MapAndTrackResults<TResult>(IEnumerable<DynamicObject> dataRecords)
-        {
-            var result = this.Map<TResult>(dataRecords);
-            this.trackEntityActions.ForEach(action => action.Invoke());
-            return result;
-        }
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -160,24 +145,6 @@ namespace InfoCarrier.Core.Client.Query.Internal
             var entity = entry.Entity;
             context.AddToCache(entity);
 
-            if (entityIsTracked)
-            {
-                this.trackEntityActions.Add(() =>
-                {
-                    if (entry.EntityState == EntityState.Detached)
-                    {
-                        entry.SetEntityState(EntityState.Unchanged);
-                    }
-
-                    foreach (INavigationBase nav in loadedNavigations
-                        .Select(name => (INavigationBase)entry.EntityType.FindNavigation(name)
-                            ?? entry.EntityType.FindSkipNavigation(name)))
-                    {
-                        entry.SetIsLoaded(nav);
-                    }
-                });
-            }
-
             // Set navigation properties AFTER adding to map to avoid endless recursion
             foreach (INavigationBase navigation in Utils.GetAllNavigations(entityType))
             {
@@ -217,6 +184,19 @@ namespace InfoCarrier.Core.Client.Query.Internal
                     }
 
                     SetIsLoadedWhenNoTracking(navigation, entity);
+                }
+            }
+
+            if (entityIsTracked)
+            {
+                if (entry.EntityState == EntityState.Detached)
+                {
+                    entry.SetEntityState(EntityState.Unchanged);
+                }
+
+                foreach (INavigationBase navigation in Utils.GetAllNavigations(entityType).Where(n => loadedNavigations.Contains(n.Name)))
+                {
+                    entry.SetIsLoaded(navigation);
                 }
             }
 

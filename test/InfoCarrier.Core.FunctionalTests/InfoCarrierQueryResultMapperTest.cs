@@ -76,7 +76,7 @@ namespace InfoCarrier.Core.FunctionalTests
         public void Can_map_array()
         {
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<int[]>(this.arrayDto).ToList();
+            var result = this.queryResultMapper.Map<int[]>(this.arrayDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -87,7 +87,7 @@ namespace InfoCarrier.Core.FunctionalTests
         public void Can_map_array_as_object()
         {
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<object>(this.arrayDto).ToList();
+            var result = this.queryResultMapper.Map<object>(this.arrayDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -102,7 +102,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.arrayDto.Single().Remove("ArrayType");
 
             // Act / Assert
-            Assert.Throws<ArgumentException>(() => this.queryResultMapper.MapAndTrackResults<int[]>(this.arrayDto));
+            Assert.Throws<ArgumentException>(() => this.queryResultMapper.Map<int[]>(this.arrayDto));
         }
 
         [Fact]
@@ -112,7 +112,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.arrayDto.Single().Remove("Elements");
 
             // Act / Assert
-            Assert.Throws<ArgumentException>(() => this.queryResultMapper.MapAndTrackResults<int[]>(this.arrayDto));
+            Assert.Throws<ArgumentException>(() => this.queryResultMapper.Map<int[]>(this.arrayDto));
         }
 
         [Fact]
@@ -123,7 +123,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.arrayDto.Single().Add("ArrayType", 1);
 
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<object>(this.arrayDto).ToList();
+            var result = this.queryResultMapper.Map<object>(this.arrayDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -134,7 +134,7 @@ namespace InfoCarrier.Core.FunctionalTests
         public void Can_map_list()
         {
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<List<int>>(this.listDto).ToList();
+            var result = this.queryResultMapper.Map<List<int>>(this.listDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -148,7 +148,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.listDto.Single().Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(typeof(ObservableCollection<int>), includePropertyInfos: false));
 
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<ObservableCollection<int>>(this.listDto).ToList();
+            var result = this.queryResultMapper.Map<ObservableCollection<int>>(this.listDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -159,7 +159,7 @@ namespace InfoCarrier.Core.FunctionalTests
         public void Can_map_IOrderedEnumerable()
         {
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<IOrderedEnumerable<int>>(this.listDto).ToList();
+            var result = this.queryResultMapper.Map<IOrderedEnumerable<int>>(this.listDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -170,7 +170,7 @@ namespace InfoCarrier.Core.FunctionalTests
         public void Can_map_IQueryable()
         {
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<IQueryable<int>>(this.listDto).ToList();
+            var result = this.queryResultMapper.Map<IQueryable<int>>(this.listDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -184,7 +184,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.listDto.Single().Remove("Elements");
 
             // Act / Assert
-            Assert.Throws<ArgumentException>(() => this.queryResultMapper.MapAndTrackResults<int[]>(this.listDto));
+            Assert.Throws<ArgumentException>(() => this.queryResultMapper.Map<int[]>(this.listDto));
         }
 
         [Fact]
@@ -194,14 +194,14 @@ namespace InfoCarrier.Core.FunctionalTests
             this.listDto.Single().Add(@"CollectionType", new Aqua.TypeSystem.TypeInfo(typeof(ArrayList), includePropertyInfos: false));
 
             // Act / Assert
-            Assert.Throws<NotSupportedException>(() => this.queryResultMapper.MapAndTrackResults<ArrayList>(this.listDto));
+            Assert.Throws<NotSupportedException>(() => this.queryResultMapper.Map<ArrayList>(this.listDto));
         }
 
         [Fact]
         public void Can_map_and_track_entity()
         {
             // Act
-            var result = this.queryResultMapper.MapAndTrackResults<Product>(this.productDto).ToList();
+            var result = this.queryResultMapper.Map<Product>(this.productDto).ToList();
 
             // Assert
             Assert.Single(result);
@@ -219,7 +219,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.productDto.Single().Add("__EntityType", 0);
 
             // Act
-            this.queryResultMapper.MapAndTrackResults<Product>(this.productDto);
+            this.queryResultMapper.Map<Product>(this.productDto);
 
             // Assert
             Assert.Empty(this.context.ChangeTracker.Entries());
@@ -233,7 +233,7 @@ namespace InfoCarrier.Core.FunctionalTests
             this.productDto.Single().Add("__EntityType", "Product2");
 
             // Act
-            this.queryResultMapper.MapAndTrackResults<Product>(this.productDto);
+            this.queryResultMapper.Map<Product>(this.productDto);
 
             // Assert
             Assert.Empty(this.context.ChangeTracker.Entries());
