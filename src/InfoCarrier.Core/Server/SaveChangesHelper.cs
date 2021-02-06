@@ -71,7 +71,7 @@ namespace InfoCarrier.Core.Server
                 }
                 else
                 {
-                    entry = stateManager.GetOrCreateEntry(MaterializeEntity()).ToEntityEntry();
+                    entry = stateManager.GetOrCreateEntry(MaterializeEntity(), entityType).ToEntityEntry();
                 }
 
                 // Correlate properties of DTO and entry
