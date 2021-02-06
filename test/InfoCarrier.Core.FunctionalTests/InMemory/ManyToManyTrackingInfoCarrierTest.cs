@@ -5,6 +5,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.TestUtilities;
 
     public class ManyToManyTrackingInfoCarrierTest : ManyToManyTrackingTestBase<ManyToManyTrackingInfoCarrierTest.TestFixture>
@@ -23,7 +24,8 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                     ref this.testStoreFactory,
                     InfoCarrierTestStoreFactory.InMemory,
                     this.ContextType,
-                    this.OnModelCreating);
+                    this.OnModelCreating,
+                    o => o.ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning)));
         }
     }
 }
