@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Alexander Zabluda. All rights reserved.
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory
+namespace InfoCarrier.Core.FunctionalTests.InMemory.GraphUpdates
 {
     using System;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
