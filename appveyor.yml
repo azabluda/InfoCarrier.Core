@@ -10,11 +10,11 @@ before_build:
   - dotnet tool restore
 
 build_script:
-  - dotnet flubu build
+  - dotnet build
   - dotnet flubu pack
 
 test_script:
-  - dotnet flubu test
+  - dotnet test
 
 artifacts:
   path: artifacts

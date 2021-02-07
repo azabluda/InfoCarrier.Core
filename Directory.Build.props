@@ -4,7 +4,7 @@
 
     <!-- Dev dependencies -->
     <CoverletMsbuildPackageVersion>2.8.1</CoverletMsbuildPackageVersion>
-    <FlubuCorePackageVersion>5.1.1</FlubuCorePackageVersion>
+    <FlubuCorePackageVersion>6.0.0</FlubuCorePackageVersion>
     <GitVersionTaskPackageVersion>5.3.7</GitVersionTaskPackageVersion>
     <MicrosoftNETTestSdkPackageVersion>16.7.1</MicrosoftNETTestSdkPackageVersion>
     <StyleCopAnalyzersPackageVersion>1.1.118</StyleCopAnalyzersPackageVersion>

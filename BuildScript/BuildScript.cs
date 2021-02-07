@@ -18,9 +18,6 @@ namespace BuildScript
                 .AddCoreTask(x => x.Clean())
                 .AddTask(x => x.DeleteDirectoryTask("artifacts", false));
 
-            context.CreateTarget("build")
-                .AddCoreTask(x => x.Build());
-
             context.CreateTarget("pack")
                 .AddCoreTask(x => x.Pack().WithArguments(
                     @"src\InfoCarrier.Core\InfoCarrier.Core.csproj",
@@ -29,10 +26,6 @@ namespace BuildScript
                     @"--configuration",
                     @"Debug",
                     @"--include-symbols"));
-
-            context.CreateTarget("test")
-                .AddCoreTask(x => x.Test().WithArguments(
-                    @"test\InfoCarrier.Core.FunctionalTests\InfoCarrier.Core.FunctionalTests.csproj"));
 
             context.CreateTarget("coverage")
                 .AddCoreTask(x => x.Test().WithArguments(
