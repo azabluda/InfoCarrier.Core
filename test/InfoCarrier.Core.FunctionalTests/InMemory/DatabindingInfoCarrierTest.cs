@@ -3,35 +3,13 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
-    using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Metadata;
-    using Microsoft.EntityFrameworkCore.TestUtilities;
 
-    public class DatabindingInfoCarrierTest : DatabindingTestBase<DatabindingInfoCarrierTest.TestFixture>
+    public class DatabindingInfoCarrierTest : DatabindingTestBase<F1InfoCarrierFixture>
     {
-        public DatabindingInfoCarrierTest(TestFixture fixture)
+        public DatabindingInfoCarrierTest(F1InfoCarrierFixture fixture)
             : base(fixture)
         {
-        }
-
-        public class TestFixture : F1InfoCarrierFixture
-        {
-            protected override ITestStoreFactory TestStoreFactory =>
-                InfoCarrierTestStoreFactory.EnsureInitialized(
-                    ref this.testStoreFactory,
-                    InfoCarrierTestStoreFactory.InMemory,
-                    this.ContextType,
-                    this.OnModelCreating,
-                    b => b.UseModel(this.CreateModelExternal()));
-
-            private IModel CreateModelExternal()
-            {
-                var builder = this.CreateModelBuilder();
-                this.BuildModelExternal(builder);
-                builder.FinalizeModel();
-                return builder.Model;
-            }
         }
     }
 }

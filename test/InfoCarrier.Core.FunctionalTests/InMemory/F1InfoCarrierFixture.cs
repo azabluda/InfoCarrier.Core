@@ -6,6 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
     using System.Diagnostics.CodeAnalysis;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.TestUtilities;
 
     public class F1InfoCarrierFixture : F1FixtureBase<byte[]>
@@ -21,6 +22,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                 ref this.testStoreFactory,
                 InfoCarrierTestStoreFactory.InMemory,
                 this.ContextType,
-                this.OnModelCreating);
+                this.OnModelCreating,
+                o => o.ConfigureWarnings(e => e.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
+        {
+            base.OnModelCreating(modelBuilder, context);
+            this.BuildModelExternal(modelBuilder);
+        }
     }
 }
