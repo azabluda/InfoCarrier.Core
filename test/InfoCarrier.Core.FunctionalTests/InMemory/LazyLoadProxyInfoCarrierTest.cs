@@ -19,16 +19,15 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         [ConditionalFact]
         public override void Top_level_projection_track_entities_before_passing_to_client_method()
         {
-            using (var context = this.CreateContext(lazyLoadingEnabled: true))
-            {
-                var query = (from p in context.Set<Parent>()
-                             select p).FirstOrDefault();
+            using var context = this.CreateContext(lazyLoadingEnabled: true);
+            var query = (from p in context.Set<Parent>()
+                         orderby p.Id
+                         select p).FirstOrDefault();
 
-                // [ClientEval] Cannot use DtoFactory.CreateDto on the server side
-                var dto = DtoFactory.CreateDto(query);
+            // [ClientEval] Cannot use DtoFactory.CreateDto on the server side
+            var dto = DtoFactory.CreateDto(query);
 
-                Assert.NotNull(((dynamic)dto).Single);
-            }
+            Assert.NotNull(((dynamic)dto).Single);
         }
 
         private static class DtoFactory
