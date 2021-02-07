@@ -15,6 +15,10 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         {
         }
 
+        public override void Optional_datetime_reading_null_from_database()
+        {
+        }
+
         public class TestFixture : BuiltInDataTypesFixtureBase
         {
             private ITestStoreFactory testStoreFactory;

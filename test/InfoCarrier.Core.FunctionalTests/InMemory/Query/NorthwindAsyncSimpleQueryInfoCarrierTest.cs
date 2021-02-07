@@ -3,8 +3,11 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System;
+    using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Xunit;
 
     public class NorthwindAsyncSimpleQueryInfoCarrierTest :
         NorthwindAsyncSimpleQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
@@ -13,5 +16,15 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             : base(fixture)
         {
         }
+
+        // InMemory can throw server side exception
+        public override Task Average_on_nav_subquery_in_projection()
+        {
+            return Assert.ThrowsAsync<InvalidOperationException>(() => base.Average_on_nav_subquery_in_projection());
+        }
+
+        // mapping to view not supported on InMemory
+        public override Task Query_backed_by_database_view()
+            => Task.CompletedTask;
     }
 }

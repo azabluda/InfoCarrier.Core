@@ -3,8 +3,11 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Threading.Tasks;
+    using Microsoft.EntityFrameworkCore.InMemory.Internal;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Xunit;
 
     public class NorthwindWhereQueryQueryInfoCarrierTest :
         NorthwindWhereQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>
@@ -13,5 +16,36 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
             : base(fixture)
         {
         }
+
+        [ConditionalTheory(Skip = "Issue#17386")]
+        public override Task Where_bool_client_side_negated(bool async)
+        {
+            return base.Where_bool_client_side_negated(async);
+        }
+
+        [ConditionalTheory(Skip = "Issue#17386")]
+        public override Task Where_equals_method_string_with_ignore_case(bool async)
+        {
+            return base.Where_equals_method_string_with_ignore_case(async);
+        }
+
+        [ConditionalTheory(Skip = "issue #17386")]
+        public override Task Where_equals_on_null_nullable_int_types(bool async)
+        {
+            return base.Where_equals_on_null_nullable_int_types(async);
+        }
+
+        public override async Task<string> Where_simple_closure(bool async)
+        {
+            var queryString = await base.Where_simple_closure(async);
+
+            Assert.Equal(InMemoryStrings.NoQueryStrings, queryString);
+
+            return null;
+        }
+
+        // Casting int to object to string is invalid for InMemory
+        public override Task Like_with_non_string_column_using_double_cast(bool async)
+            => Task.CompletedTask;
     }
 }

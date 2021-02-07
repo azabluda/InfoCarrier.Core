@@ -3,7 +3,9 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 {
+    using System.Linq;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestModels.Northwind;
@@ -25,6 +27,46 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         private static void CopyDbContextParameters(NorthwindContext clientDbContext, NorthwindContext backendDbContext)
         {
             backendDbContext.TenantPrefix = clientDbContext.TenantPrefix;
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
+        {
+            base.OnModelCreating(modelBuilder, context);
+
+            var northwindContext = (NorthwindContext)context;
+
+            modelBuilder.Entity<CustomerQuery>().ToInMemoryQuery(
+                () => northwindContext.Customers.Select(
+                    c => new CustomerQuery
+                    {
+                        Address = c.Address,
+                        City = c.City,
+                        CompanyName = c.CompanyName,
+                        ContactName = c.ContactName,
+                        ContactTitle = c.ContactTitle,
+                    }));
+
+            modelBuilder.Entity<OrderQuery>().ToInMemoryQuery(
+                () => northwindContext.Orders.Select(o => new OrderQuery { CustomerID = o.CustomerID }));
+
+            modelBuilder.Entity<ProductQuery>().ToInMemoryQuery(
+                () => northwindContext.Products.Where(p => !p.Discontinued)
+                    .Select(
+                        p => new ProductQuery
+                        {
+                            ProductID = p.ProductID,
+                            ProductName = p.ProductName,
+                            CategoryName = "Food",
+                        }));
+
+            modelBuilder.Entity<CustomerQueryWithQueryFilter>().ToInMemoryQuery(
+                () => northwindContext.Customers.Select(
+                    c => new CustomerQueryWithQueryFilter
+                    {
+                        CompanyName = c.CompanyName,
+                        OrderCount = c.Orders.Count(),
+                        SearchTerm = northwindContext.SearchTerm,
+                    }));
         }
     }
 }
