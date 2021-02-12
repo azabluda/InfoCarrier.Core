@@ -3,10 +3,12 @@
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory
 {
+    using System.Collections.Generic;
     using InfoCarrier.Core.FunctionalTests.TestUtilities;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.TestUtilities;
+    using Microsoft.Extensions.DependencyInjection;
     using Xunit;
 
     public abstract class SaveChangesInterceptionInfoCarrierTestBase : SaveChangesInterceptionTestBase
@@ -14,6 +16,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
         protected SaveChangesInterceptionInfoCarrierTestBase(InterceptionInfoCarrierFixtureBase fixture)
             : base(fixture)
         {
+            fixture.Reseed();
         }
 
         protected override bool SupportsOptimisticConcurrency
@@ -33,6 +36,11 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory
                     this.ContextType,
                     this.OnModelCreating,
                     o => o.ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning)));
+
+            protected override IServiceCollection InjectInterceptors(
+                IServiceCollection serviceCollection,
+                IEnumerable<IInterceptor> injectedInterceptors)
+                => base.InjectInterceptors(this.TestStoreFactory.AddProviderServices(serviceCollection), injectedInterceptors);
         }
 
         public class SaveChangesInterceptionInfoCarrierTest
