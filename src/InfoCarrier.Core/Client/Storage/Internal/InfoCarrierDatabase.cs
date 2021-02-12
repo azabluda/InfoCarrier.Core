@@ -91,8 +91,19 @@ namespace InfoCarrier.Core.Client.Storage.Internal
             bool async,
             bool singleResult)
         {
-            return new QueryExecutor<TElement>(queryContext, query, infoCarrierClient)
-                .Execute(async, singleResult);
+            using var cs = queryContext.ConcurrencyDetector.EnterCriticalSection();
+
+            bool oldLazyLoadingEnabled = queryContext.Context.ChangeTracker.LazyLoadingEnabled;
+            queryContext.Context.ChangeTracker.LazyLoadingEnabled = false;
+            try
+            {
+                return new QueryExecutor<TElement>(queryContext, query, infoCarrierClient)
+                    .Execute(async, singleResult);
+            }
+            finally
+            {
+                queryContext.Context.ChangeTracker.LazyLoadingEnabled = oldLazyLoadingEnabled;
+            }
         }
 
         /// <summary>
@@ -154,8 +165,6 @@ namespace InfoCarrier.Core.Client.Storage.Internal
 
             public object Execute(bool async, bool singleResult)
             {
-                using var cs = this.queryContext.ConcurrencyDetector.EnterCriticalSection();
-
                 if (async)
                 {
                     var asyncEnum = this.ExecuteAsync();
