@@ -6,7 +6,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
     using System.Linq;
     using System.Threading.Tasks;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.InMemory.Internal;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.TestUtilities;
     using Xunit;
@@ -53,7 +53,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
             var queryString = await base.Where_simple_closure(async);
 
-            Assert.Equal(InMemoryStrings.NoQueryStrings, queryString);
+            Assert.Equal(CoreStrings.NotQueryingEnumerable, queryString);
 
             return null;
         }
