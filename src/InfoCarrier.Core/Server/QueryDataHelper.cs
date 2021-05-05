@@ -39,7 +39,6 @@ namespace InfoCarrier.Core.Server
         private readonly DbContext dbContext;
         private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
         private readonly System.Linq.Expressions.Expression linqExpression;
-        private readonly ITypeResolver typeResolver = new TypeResolver();
         private readonly ITypeInfoProvider typeInfoProvider = new TypeInfoProvider();
 
         /// <summary>
@@ -65,9 +64,9 @@ namespace InfoCarrier.Core.Server
             this.linqExpression = request.Query
                 .ReplaceNonGenericQueryArgumentsByGenericArguments()
                 .ReplaceResourceDescriptorsByQueryable(
-                    this.typeResolver,
+                    TypeResolver.Instance,
                     provider: type => (IQueryable)Activator.CreateInstance(typeof(EntityQueryable<>).MakeGenericType(type), provider))
-                .ToLinqExpression(this.typeResolver);
+                .ToLinqExpression(TypeResolver.Instance);
 
             // Replace NullConditionalExpressionStub MethodCallExpression with NullConditionalExpression
             this.linqExpression = Utils.ReplaceNullConditional(this.linqExpression, false);
@@ -155,7 +154,7 @@ namespace InfoCarrier.Core.Server
         }
 
         private IEnumerable<DynamicObject> MapResult(object queryResult)
-            => new EntityToDynamicObjectMapper(this.dbContext, this.typeResolver, this.typeInfoProvider, this.valueMappers)
+            => new EntityToDynamicObjectMapper(this.dbContext, TypeResolver.Instance, this.typeInfoProvider, this.valueMappers)
                 .MapCollection(queryResult, t => true);
 
         private class EntityToDynamicObjectMapper : DynamicObjectMapper
