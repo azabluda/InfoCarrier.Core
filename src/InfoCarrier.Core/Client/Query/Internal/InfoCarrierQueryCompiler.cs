@@ -272,7 +272,7 @@ namespace InfoCarrier.Core.Client.Query.Internal
 
             private Expression Expression { get; }
 
-            private ITypeResolver TypeResolver { get; } = new TypeResolver();
+            private ITypeResolver TypeResolver { get; } = Aqua.TypeSystem.TypeResolver.Instance;
 
             private ITypeInfoProvider TypeInfoProvider { get; } = new TypeInfoProvider();
 
