@@ -136,7 +136,7 @@ namespace InfoCarrier.Core.Client.Storage.Internal
                 this.infoCarrierClient = infoCarrierClient;
 
                 IReadOnlyDictionary<string, IEntityType> entityTypeMap = queryContext.Context.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
-                ITypeResolver typeResolver = new TypeResolver();
+                ITypeResolver typeResolver = TypeResolver.Instance;
                 ITypeInfoProvider typeInfoProvider = new TypeInfoProvider();
                 this.resultMapper = new InfoCarrierQueryResultMapper(queryContext, typeResolver, typeInfoProvider, entityTypeMap);
 

@@ -39,7 +39,7 @@ namespace InfoCarrier.Core.Server
         private readonly DbContext dbContext;
         private readonly IEnumerable<IInfoCarrierValueMapper> valueMappers;
         private readonly System.Linq.Expressions.Expression linqExpression;
-        private readonly ITypeResolver typeResolver = new TypeResolver();
+        private readonly ITypeResolver typeResolver = TypeResolver.Instance;
         private readonly ITypeInfoProvider typeInfoProvider = new TypeInfoProvider();
 
         /// <summary>
