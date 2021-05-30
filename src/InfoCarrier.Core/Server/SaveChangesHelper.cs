@@ -3,18 +3,21 @@
 
 namespace InfoCarrier.Core.Server
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Linq.Expressions;
+    using System.Reflection;
     using System.Threading;
     using System.Threading.Tasks;
     using InfoCarrier.Core.Common;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.ChangeTracking;
     using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.EntityFrameworkCore.Infrastructure;
     using Microsoft.EntityFrameworkCore.Metadata;
     using Microsoft.EntityFrameworkCore.Metadata.Internal;
-    using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.EntityFrameworkCore.Storage;
     using Microsoft.EntityFrameworkCore.Update;
     using Microsoft.EntityFrameworkCore.ValueGeneration;
@@ -38,7 +41,6 @@ namespace InfoCarrier.Core.Server
 
             var typeMap = this.dbContext.Model.GetEntityTypes().ToDictionary(x => x.DisplayName());
             var stateManager = this.dbContext.GetService<IStateManager>();
-            var entityMaterializerSource = this.dbContext.GetService<IEntityMaterializerSource>();
 
             // Materialize entities and add entries to dbContext
             EntityEntry MaterializeAndTrackEntity(UpdateEntryDto dto)
@@ -49,7 +51,7 @@ namespace InfoCarrier.Core.Server
                 {
                     var valueBuffer = new ValueBuffer(dto.GetCurrentValues(entityType, request.Mapper));
                     var materializationContext = new MaterializationContext(valueBuffer, this.dbContext);
-                    return entityMaterializerSource.GetMaterializer(entityType).Invoke(materializationContext);
+                    return GetMaterializer(entityType).Invoke(materializationContext);
                 }
 
                 EntityEntry entry;
@@ -77,8 +79,8 @@ namespace InfoCarrier.Core.Server
                 // Correlate properties of DTO and entry
                 var props = dto.JoinScalarProperties(entry, request.Mapper);
 
-                // Set Key properties
-                foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey()))
+                // Set non-temporary Key properties
+                foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
                 {
                     p.EfProperty.CurrentValue = p.CurrentValue;
                     if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
@@ -87,7 +89,7 @@ namespace InfoCarrier.Core.Server
                     }
                 }
 
-                // Set EntityState after PK values (temp or perm) are set.
+                // Set EntityState after PK values are set.
                 // This will add entities to identity map.
                 entry.State = dto.EntityState;
 
@@ -117,6 +119,11 @@ namespace InfoCarrier.Core.Server
                 // Mark temporary property values
                 foreach (var p in props.Where(x => x.DtoProperty.IsTemporary))
                 {
+                    if (!Equals(p.EfProperty.CurrentValue, p.CurrentValue))
+                    {
+                        p.EfProperty.CurrentValue = p.CurrentValue;
+                    }
+
                     p.EfProperty.IsTemporary = true;
                 }
 
@@ -193,6 +200,32 @@ namespace InfoCarrier.Core.Server
             {
                 return SaveChangesResult.Error(e, this.Entries);
             }
+        }
+
+        // Partial copypasta from EntityMaterializerSource.CreateMaterializeExpression
+        private static Func<MaterializationContext, object> GetMaterializer(IEntityType entityType)
+        {
+            var constructorBinding = (InstantiationBinding)entityType[CoreAnnotationNames.ConstructorBinding];
+            if (constructorBinding == null)
+            {
+                var constructorInfo = entityType.ClrType.GetTypeInfo().DeclaredConstructors
+                    .SingleOrDefault(c => !c.IsStatic && !c.GetParameters().Any());
+
+                if (constructorInfo == null)
+                {
+                    throw new InvalidOperationException(CoreStrings.NoParameterlessConstructor(entityType.DisplayName()));
+                }
+
+                constructorBinding = new ConstructorBinding(constructorInfo, Array.Empty<ParameterBinding>());
+            }
+
+            var materializationContextParameter = Expression.Parameter(typeof(MaterializationContext), "materializationContext");
+            var bindingInfo = new ParameterBindingInfo(entityType, materializationContextParameter);
+            var materializeExpression = constructorBinding.CreateConstructorExpression(bindingInfo);
+
+            return Expression.Lambda<Func<MaterializationContext, object>>(
+                materializeExpression,
+                materializationContextParameter).Compile();
         }
     }
 }
