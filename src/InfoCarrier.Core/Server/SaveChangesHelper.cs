@@ -83,10 +83,7 @@ namespace InfoCarrier.Core.Server
                 foreach (var p in props.Where(x => x.EfProperty.Metadata.IsKey() && !x.DtoProperty.IsTemporary))
                 {
                     p.EfProperty.CurrentValue = p.CurrentValue;
-                    if (p.EfProperty.Metadata.GetOriginalValueIndex() >= 0)
-                    {
-                        p.EfProperty.OriginalValue = p.OriginalValue;
-                    }
+                    p.EfProperty.OriginalValue = p.OriginalValue;
                 }
 
                 // Set EntityState after PK values are set.
@@ -96,24 +93,9 @@ namespace InfoCarrier.Core.Server
                 // Set non key properties
                 foreach (var p in props.Where(x => !x.EfProperty.Metadata.IsKey()))
                 {
-                    bool canSetCurrentValue =
-                        p.EfProperty.Metadata.IsShadowProperty() ||
-                        p.EfProperty.Metadata.TryGetMemberInfo(forConstruction: false, forSet: true, out _, out _);
-
-                    if (canSetCurrentValue)
-                    {
-                        p.EfProperty.CurrentValue = p.CurrentValue;
-                    }
-
-                    if (p.EfProperty.OriginalValue != p.OriginalValue)
-                    {
-                        p.EfProperty.OriginalValue = p.OriginalValue;
-                    }
-
-                    if (canSetCurrentValue)
-                    {
-                        p.EfProperty.IsModified = p.DtoProperty.IsModified;
-                    }
+                    p.EfProperty.CurrentValue = p.CurrentValue;
+                    p.EfProperty.OriginalValue = p.OriginalValue;
+                    p.EfProperty.IsModified = p.DtoProperty.IsModified;
                 }
 
                 // Mark temporary property values
