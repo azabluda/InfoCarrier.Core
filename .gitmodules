@@ -1,3 +1,9 @@
 [submodule "submodules/efcore"]
 	path = submodules/efcore
 	url = https://github.com/dotnet/efcore.git
+[submodule "submodules/rlinq"]
+	path = submodules/rlinq
+	url = https://github.com/6bee/Remote.Linq.git
+[submodule "submodules/aqua"]
+	path = submodules/aqua
+	url = https://github.com/6bee/aqua-core.git
