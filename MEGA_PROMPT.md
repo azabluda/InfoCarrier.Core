@@ -117,6 +117,14 @@ InfoCarrier.Core/
 
 Before ANY code is written, the AI MUST complete these planning steps:
 
+### 3.0 Create the SpecKit Constitution
+
+**Deliverable**: `docs/constitution.md`
+
+Before any research or code, create the project constitution — the AI agent's rulebook
+that governs how work is done. See §11 for the full list of items that belong here
+(commit conventions, test skip policy, build discipline, etc.).
+
 ### 3.1 Expression Serialization Research
 
 **Task**: Investigate options for serializing `System.Linq.Expressions.Expression` trees.
@@ -196,83 +204,32 @@ dotnet new classlib -n InfoCarrier.Core.Abstractions -f net10.0
 dotnet new xunit -n InfoCarrier.Core.FunctionalTests -f net10.0
 ```
 
-### 4.2 Core Interfaces
+### 4.2 Consumer-Facing Contracts (SpecKit Planning)
 
-```csharp
-// Abstractions/IInfoCarrierClient.cs
-public interface IInfoCarrierClient
-{
-    QueryDataResult QueryData(QueryDataRequest request, DbContext context);
-    Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext context, CancellationToken ct);
-    SaveChangesResult SaveChanges(SaveChangesRequest request);
-    Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken ct);
-}
+> **⚠️ SpecKit Planning Phase**: The interfaces and DTOs below are v1's contracts —
+> provided as a reference point only. They are NOT authoritative for the new implementation.
+>
+> The SpecKit planning phase should design fresh, modern, DI-friendly contracts.
+> Consider:
+> - Generic `IInfoCarrierClient<TDbContext>` with typed context
+> - `IInfoCarrierServer` as a hosted service with `IServiceProvider` integration
+> - Streaming support (`IAsyncEnumerable<T>`) in the wire protocol
+> - `System.Text.Json` serialization contexts for AOT compatibility
+> - Strongly-typed message contracts (records or Protobuf)
+>
+> The v1 approach (simple interfaces + manual wire simulation) was pragmatic but
+> amateurish. The new implementation should look like a professional .NET library
+> with first-class DI, logging, and configuration.
 
-// Abstractions/IInfoCarrierServer.cs
-public interface IInfoCarrierServer
-{
-    QueryDataResult QueryData(Func<DbContext> dbContextFactory, QueryDataRequest request);
-    Task<QueryDataResult> QueryDataAsync(Func<DbContext> dbContextFactory, QueryDataRequest request, CancellationToken ct);
-    SaveChangesResult SaveChanges(Func<DbContext> dbContextFactory, SaveChangesRequest request);
-    Task<SaveChangesResult> SaveChangesAsync(Func<DbContext> dbContextFactory, SaveChangesRequest request, CancellationToken ct);
-}
-```
+### 4.3 High-Level Data Flow (Reference Only)
 
-### 4.3 Common DTOs
+The provider skeleton implements the same conceptual pipeline as v1:
 
-```csharp
-// Common/QueryDataRequest.cs
-public record QueryDataRequest(
-    SerializedExpression Query,          // serialized LINQ expression tree
-    QueryTrackingBehavior TrackingBehavior
-);
+- **Client → Server**: Serialized expression tree + change entries
+- **Server → Client**: Serialized query results + updated entry values
+- **Server internally**: EF Core `IQueryProvider.Execute()` / `DbContext.SaveChanges()`
 
-// Common/QueryDataResult.cs
-public record QueryDataResult(
-    SerializedData MappedResults         // serialized query results
-);
-
-// Common/SaveChangesRequest.cs
-public record SaveChangesRequest(
-    IReadOnlyList<UpdateEntryDto> Entries
-);
-
-// Common/SaveChangesResult.cs
-public record SaveChangesResult(
-    int AffectedRows,
-    IReadOnlyList<UpdateEntryDto> UpdatedEntries
-);
-```
-
-The `SerializedExpression` and `SerializedData` types depend on the serialization engine
-chosen in Phase 0.
-
-### 4.4 Client-Side IDatabase Implementation
-
-EF Core calls `IDatabase.CompileQuery<TResult>()` and `IDatabase.SaveChanges()` on the
-provider. InfoCarrier's implementation:
-
-1. **CompileQuery**: Serializes the expression tree, sends it via `IInfoCarrierClient`,
-   deserializes results, materializes into tracked entities.
-2. **SaveChanges**: Serializes `IUpdateEntry` list into `SaveChangesRequest`, sends it,
-   applies returned values to entries.
-
-### 4.5 Server-Side Query Execution
-
-1. **Deserialize** expression tree from `QueryDataRequest`
-2. **Rewire** `DbSet<T>` constants into the server's `DbContext`
-3. **Execute** via EF Core's `IQueryProvider.Execute()`
-4. **Materialize** results into a serializable format
-5. **Return** `QueryDataResult`
-
-### 4.6 Server-Side SaveChanges
-
-1. **Deserialize** `UpdateEntryDto` list
-2. **Create** a new `DbContext`
-3. **Apply** changes to the context (mark entities Added/Modified/Deleted)
-4. **Call** `SaveChanges()` on the real database
-5. **Capture** store-generated values (identity columns, computed columns, defaults)
-6. **Return** `SaveChangesResult` with updated entries
+The exact types, serialization format, and wire protocol are determined in Phase 0.
 
 ---
 
@@ -360,13 +317,19 @@ public class NorthwindQueryInfoCarrierTest
 }
 ```
 
-### 7.3 Skip Rules (from v1, adapted)
+### 7.3 Skip Rules
 
-1. If the upstream EF Core InMemory provider skips a test, InfoCarrier SHALL skip it
-   with the same justification (check `subrepos/efcore/test/EFCore.InMemory.FunctionalTests/`)
-2. Every skip MUST have a `[Fact(Skip = "InfoCarrier#reason: ... See MIGRATION_STATUS.md")]`
-   attribute with a traceable identifier
-3. NEVER skip silently — always document the root cause
+Test skip policy, commit conventions, build discipline, and documentation standards
+belong in `docs/constitution.md` — a SpecKit constitution file created during Phase 0.
+The AI agent MUST produce this file before writing any code.
+
+At minimum, the constitution should cover:
+- Test skip policy (upstream InMemory parity, traceable `InfoCarrier#` identifiers, no silent skips)
+- Commit frequency and message conventions
+- Build-before-commit rule
+- `MIGRATION_STATUS.md` maintenance
+
+See §11 for additional items that should move into the constitution.
 
 ---
 
@@ -408,7 +371,7 @@ samples/WebApi/
 See [`docs/ci-cd.md`](docs/ci-cd.md) for the full CI/CD strategy.
 
 Summary:
-- `build.yml`: Restore → Build → Test on push/PR, Ubuntu + Windows matrix, SqlServer tests on Windows only
+- `build.yml`: Restore → Build → Test on push/PR, ubuntu-latest with Docker SQL Server service container
 - `release.yml`: `dotnet pack` + NuGet publish on tag push
 
 ---
@@ -420,6 +383,7 @@ This is the execution order the AI agent MUST follow:
 | Step | Phase | Description |
 |------|-------|-------------|
 | 1 | 0 | Clone `subrepos/efcore` (reference only, git-ignored) |
+| 1.5 | 0 | Create `docs/constitution.md` (SpecKit rulebook — see §3.0, §7.3, §11) |
 | 2 | 0 | Research expression serialization options → write decision doc |
 | 3 | 0 | Design wire protocol → write contract types |
 | 4 | 1 | Create solution + projects |
@@ -442,21 +406,22 @@ This is the execution order the AI agent MUST follow:
 
 ---
 
-## 11. Meta-Instructions for the AI Agent
+## 11. SpecKit Constitution
 
-1. **Commit frequently** — after each meaningful step that compiles + passes new tests.
-2. **Never push** — commits stay local unless user explicitly requests push.
-3. **Always build** after each change: `dotnet build InfoCarrier.Core.sln`.
-4. **Always run relevant tests** after each change: `dotnet test --filter "FullyQualifiedName~TestClass"`.
-5. **When stuck on a design decision**: Pause, document options in `docs/`, and ask the user
-   to choose. Do NOT guess.
-6. **Reference `subrepos/efcore/`** for understanding how the real EF Core providers work
-   (especially `EFCore.InMemory` and `EFCore.SqlServer`).
-7. **Reference `subrepos/infocarrier-v1/`** (if cloned) as non-authoritative inspiration —
-   especially the test infrastructure (`InfoCarrierBackendTestStore`, `InfoCarrierTestStoreFactory`)
-   and the structure of test classes that inherit from EF Core's functional test bases.
-   Do NOT copy v1 code directly — it targets EF Core 5 and has known issues.
-8. **Keep `MIGRATION_STATUS.md`** updated with test pass/fail counts as the project grows.
+These meta-instructions, along with the skip rules from §7.3, should be formalized
+into `docs/constitution.md` during Phase 0. The constitution is the AI agent's
+rulebook — it governs how work is done, not what is built.
+
+Move these items to the constitution:
+- Commit frequency and conventions
+- Push policy (never push unless asked)
+- Build-before-test discipline
+- Test naming conventions and skip policy
+- When to pause and ask vs. when to proceed
+- Reference subrepos usage (`efcore/`, `infocarrier-v1/` if cloned)
+- `MIGRATION_STATUS.md` maintenance
+
+The constitution file should be created as part of Phase 0 Step 1.5 (see §10).
 
 ---
 
