@@ -43,10 +43,31 @@ Trigger: tag push (`v*`).
 - `dotnet pack src/InfoCarrier.Core/InfoCarrier.Core.csproj -c Release`
 - `dotnet nuget push` to NuGet.org (needs `NUGET_API_KEY` secret)
 
-### LocalDB for SqlServer Tests
+### Docker SQL Server for SqlServer Tests
 
-Windows runners have LocalDB pre-installed. For Linux runners, SqlServer tests are skipped
-(they need Windows).
+Both local development and CI use a Docker SQL Server container — NOT LocalDB.
+This ensures identical behavior across dev machines and CI runners (Ubuntu + Windows).
+
+**Local dev**: `docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=InfoCarrier1!' -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest`
+
+**CI (GitHub Actions)**: Use a service container:
+```yaml
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    env:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: InfoCarrier1!
+    ports:
+      - 1433:1433
+```
+
+**Test fixture**: The `InfoCarrierTestStoreFactory.SqlServer` should launch a pristine
+SQL Server container (or reuse an existing one) and create a fresh database per test batch.
+Connection string: `Server=localhost,1433;Database=InfoCarrierTest_{guid};User=sa;Password=InfoCarrier1!;TrustServerCertificate=true`
+
+This approach works identically on Ubuntu and Windows runners, and on developer machines
+with Docker installed.
 
 ## Pre-commit Hooks
 

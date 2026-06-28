@@ -341,6 +341,12 @@ Create a test `IInfoCarrierClient` implementation that:
 - Simulates the wire protocol via JSON serialization (like v1's `SimulateNetworkTransferJson`)
 - Runs on the same thread (no network, no HTTP)
 
+**SqlServer backend**: Use a Docker SQL Server container, NOT LocalDB.
+The test fixture should launch a pristine container (or reuse an existing one) and
+create a fresh database per test batch. This works identically on Ubuntu and Windows.
+Connection string template: `Server=localhost,1433;Database=InfoCarrierTest_{guid};User=sa;Password=InfoCarrier1!;TrustServerCertificate=true`
+See [`docs/ci-cd.md`](docs/ci-cd.md) for the Docker run command.
+
 ### 7.2 Functional Test Classes
 
 Each EF Core functional test base class gets an InfoCarrier subclass:
