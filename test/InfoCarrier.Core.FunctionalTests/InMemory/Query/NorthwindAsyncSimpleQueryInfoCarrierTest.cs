@@ -26,5 +26,15 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         // mapping to view not supported on InMemory
         public override Task Query_backed_by_database_view()
             => Task.CompletedTask;
+
+        // Skipped: Concurrent query detection is not supported through the Remote.Linq pipeline.
+        // Upstream InMemory NorthwindMiscellaneous test also skips this (Issue#17019).
+        [Fact(Skip = "Issue#17019: Concurrent query detection not supported through Remote.Linq wire protocol. Upstream InMemory also skips this.")]
+        public override Task Throws_on_concurrent_query_list()
+            => base.Throws_on_concurrent_query_list();
+
+        [Fact(Skip = "Issue#17019: Concurrent query detection not supported through Remote.Linq wire protocol. Upstream InMemory also skips this.")]
+        public override Task Throws_on_concurrent_query_first()
+            => base.Throws_on_concurrent_query_first();
     }
 }
