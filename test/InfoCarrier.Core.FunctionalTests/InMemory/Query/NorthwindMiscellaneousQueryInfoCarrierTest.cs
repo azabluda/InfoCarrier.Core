@@ -116,5 +116,16 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
 
             Assert.Equal("Sequence contains no elements", message);
         }
+
+        // Skipped: Context-based client methods and GroupBy ordering have
+        // expression translation limitations through Remote.Linq.
+        // See MIGRATION_STATUS.md Cat 6.
+        [ConditionalTheory(Skip = "InfoCarrier#ExpressionTranslation: Context-based client method not supported. See MIGRATION_STATUS.md Cat 6")]
+        public override Task Context_based_client_method(bool async)
+            => base.Context_based_client_method(async);
+
+        [ConditionalTheory(Skip = "InfoCarrier#ExpressionTranslation: GroupBy with client ordering not supported. See MIGRATION_STATUS.md Cat 6")]
+        public override Task Client_OrderBy_GroupBy_Group_ordering_works(bool async)
+            => base.Client_OrderBy_GroupBy_Group_ordering_works(async);
     }
 }

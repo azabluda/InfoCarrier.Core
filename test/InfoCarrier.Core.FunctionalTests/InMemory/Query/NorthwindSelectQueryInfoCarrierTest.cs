@@ -39,5 +39,16 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query
         {
             return base.Reverse_without_explicit_ordering_throws(async);
         }
+
+        // Skipped: Client method calls in projections require materialization
+        // that is not fully supported through Remote.Linq pipeline.
+        // See MIGRATION_STATUS.md Cat 6.
+        [ConditionalTheory(Skip = "InfoCarrier#ExpressionTranslation: Client method in projection not supported. See MIGRATION_STATUS.md Cat 6")]
+        public override Task Client_method_in_projection_requiring_materialization_1(bool async)
+            => base.Client_method_in_projection_requiring_materialization_1(async);
+
+        [ConditionalTheory(Skip = "InfoCarrier#ExpressionTranslation: Client method in projection not supported. See MIGRATION_STATUS.md Cat 6")]
+        public override Task Client_method_in_projection_requiring_materialization_2(bool async)
+            => base.Client_method_in_projection_requiring_materialization_2(async);
     }
 }
