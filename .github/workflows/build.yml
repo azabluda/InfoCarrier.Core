@@ -1,0 +1,38 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore InfoCarrier.Core-v2.sln
+
+      - name: Build
+        run: dotnet build InfoCarrier.Core-v2.sln --no-restore --configuration Release
+
+      - name: Test (InMemory)
+        run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --filter "FullyQualifiedName~InMemory" --verbosity normal
+
+      - name: Test (SqlServer)
+        if: matrix.os == 'windows-latest'
+        run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --filter "FullyQualifiedName~SqlServer" --verbosity normal

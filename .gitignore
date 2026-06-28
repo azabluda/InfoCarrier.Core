@@ -1,0 +1,21 @@
+[Oo]bj/
+[Bb]in/
+TestResults/
+.nuget/
+packages/
+artifacts/
+*.user
+*.suo
+*.cache
+.vs/
+.vscode/
+*.log
+*.DotSettings
+
+# 3rd-party source for reference only
+subrepos/
+
+# Scratch files
+test_results*.txt
+test_failures*.txt
+MIGRATION_STATUS.md
