@@ -51,10 +51,11 @@ InfoCarrier.Core-v2/
 ├── MEGA_PROMPT.md            ← ultra-comprehensive implementation prompt
 ├── .github/workflows/        ← CI/CD (placeholder)
 ├── docs/                     ← architecture decision records, design docs
-├── subrepos/                 ← 3rd-party source for reference (not submodules)
+├── subrepos/                 ← 3rd-party source for reference (not submodules, all git-ignored)
 │   ├── efcore/               ← EF Core source (for test compliance)
 │   ├── rlinq/                ← Remote.Linq source (if adopted)
-│   └── aqua/                 ← Aqua source (if adopted)
+│   ├── aqua/                 ← Aqua source (if adopted)
+│   └── infocarrier-v1/       ← original InfoCarrier.Core v1 (non-authoritative, for inspiration)
 └── samples/                  ← sample apps (design docs only for now)
 ```
 

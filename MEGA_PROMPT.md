@@ -83,7 +83,8 @@ InfoCarrier.Core-v2/
 ├── subrepos/                         ← 3rd-party source for reference (NOT git submodules)
 │   ├── efcore/                       ← `git clone https://github.com/dotnet/efcore`
 │   ├── rlinq/                        ← if Remote.Linq adopted
-│   └── aqua/                         ← if Aqua adopted
+│   ├── aqua/                         ← if Aqua adopted
+│   └── infocarrier-v1/               ← original InfoCarrier.Core v1 (non-authoritative, for inspiration only)
 │
 ├── src/
 │   ├── InfoCarrier.Core/             ← the provider library (netstandard2.1 or net10.0)
@@ -445,7 +446,11 @@ This is the execution order the AI agent MUST follow:
    to choose. Do NOT guess.
 6. **Reference `subrepos/efcore/`** for understanding how the real EF Core providers work
    (especially `EFCore.InMemory` and `EFCore.SqlServer`).
-7. **Keep `MIGRATION_STATUS.md`** updated with test pass/fail counts as the project grows.
+7. **Reference `subrepos/infocarrier-v1/`** (if cloned) as non-authoritative inspiration —
+   especially the test infrastructure (`InfoCarrierBackendTestStore`, `InfoCarrierTestStoreFactory`)
+   and the structure of test classes that inherit from EF Core's functional test bases.
+   Do NOT copy v1 code directly — it targets EF Core 5 and has known issues.
+8. **Keep `MIGRATION_STATUS.md`** updated with test pass/fail counts as the project grows.
 
 ---
 
