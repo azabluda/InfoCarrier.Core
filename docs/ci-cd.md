@@ -6,6 +6,9 @@
 
 Trigger: `push` to `main`/`develop`, `pull_request` to `main`.
 
+Runs on `ubuntu-latest` only — no Windows matrix needed. SQL Server is provided
+via a Docker service container, which works identically on Ubuntu.
+
 ```yaml
 name: Build & Test
 on:
@@ -19,10 +22,15 @@ env:
 
 jobs:
   build-and-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]     # SqlServer tests need Windows
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: InfoCarrier1!
+        ports:
+          - 1433:1433
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
@@ -33,7 +41,8 @@ jobs:
       - run: dotnet build InfoCarrier.Core-v2.sln --no-restore -c Release
       - run: dotnet test test/InfoCarrier.Core.FunctionalTests/ --no-build -c Release --filter "FullyQualifiedName~InMemory"
       - run: dotnet test test/InfoCarrier.Core.FunctionalTests/ --no-build -c Release --filter "FullyQualifiedName~SqlServer"
-        if: matrix.os == 'windows-latest'
+        env:
+          INFOCARRIER_SQL_CONNECTION: Server=localhost,1433;Database=InfoCarrierTest;User=sa;Password=InfoCarrier1!;TrustServerCertificate=true
 ```
 
 ### `release.yml` — NuGet Pack & Publish
