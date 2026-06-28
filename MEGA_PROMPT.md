@@ -1,7 +1,7 @@
-# MEGA_PROMPT — InfoCarrier.Core v2
+# MEGA_PROMPT — InfoCarrier.Core
 
 > **Purpose**: This document is a self-contained, executable prompt for an AI coding agent
-> (Cline, OpenCode, or SpecKit) to build InfoCarrier.Core v2 from scratch.
+> (Cline, OpenCode, or SpecKit) to build InfoCarrier.Core from scratch.
 >
 > **Target**: .NET 10, EF Core 10, greenfield implementation.
 >
@@ -36,11 +36,11 @@ Client DbContext.Orders.Where() ──► QueryDataRequest ──► Server DbCo
 The original InfoCarrier.Core v1 (EF Core 5, Remote.Linq v6.2.3, Aqua v4.5.3) works but has
 pain points. **Do NOT repeat these mistakes:**
 
-| Category | Problem | Root Cause | v2 Mitigation |
+| Category | Problem | Root Cause | Mitigation |
 |----------|---------|------------|---------------|
 | **Proxy serialization** | Castle.Core dynamic proxies are `[Serializable]` but base types are not → `SerializationException` | Aqua `DynamicObjectMapper` with `UtilizeFormatterServices=true` (default) | Defer serialization engine choice; if using Aqua, set `UtilizeFormatterServices=false` from day 1 |
 | **Expression partial eval** | `PartialEval` step tries to invoke `ValueWrapper<T>` constructor with wrong arg type | Generic struct type doesn't survive round-trip through DynamicObject | Avoid wrapping values in custom generic structs in expression trees |
-| **Shared type entities** | `FindRuntimeEntityType(typeof(Dictionary<string,object>))` returns null | EF Core 5 model API doesn't resolve shared types by CLR type alone | v2 must handle EF Core 10's shared type entity model correctly from the start |
+| **Shared type entities** | `FindRuntimeEntityType(typeof(Dictionary<string,object>))` returns null | EF Core 5 model API doesn't resolve shared types by CLR type alone | must handle EF Core 10's shared type entity model correctly from the start |
 | **GeoJSON Z/M loss** | `GeoJsonWriter` drops Z/M coordinates silently | Format limitation — not discovered until specific test ran | For spatial: prefer WKT with 3D ordinates, or ensure GeoJSON configured correctly |
 | **M2M SaveChanges fixup** | Join-table row counts mismatch after update | Wire protocol doesn't correctly track M2M navigation changes through save | Thoroughly test M2M scenarios from day 1 |
 | **Test suite ambition** | ~12,890 tests, 56 failures after months of work | Tried to retrofit a complex provider onto EF Core's full test suite | Build the test suite incrementally alongside the provider |
@@ -59,7 +59,7 @@ pain points. **Do NOT repeat these mistakes:**
 ## 2. Repository Structure
 
 ```
-InfoCarrier.Core-v2/
+InfoCarrier.Core/
 ├── README.md
 ├── MEGA_PROMPT.md                    ← this file
 ├── .gitignore
@@ -67,7 +67,7 @@ InfoCarrier.Core-v2/
 ├── global.json                       ← pin .NET 10 SDK
 ├── Directory.Build.props             ← shared MSBuild properties
 ├── Directory.Build.targets
-├── InfoCarrier.Core-v2.sln
+├── InfoCarrier.Core.sln
 │
 ├── .github/
 │   └── workflows/
@@ -157,7 +157,7 @@ The wire protocol defines the contract between client and server. It must suppor
 How does the server serialize EF Core entities, and how does the client deserialize them into
 tracked entities with proper identity resolution?
 
-v1 used Aqua `DynamicObject` as an intermediate representation. v2 must decide:
+v1 used Aqua `DynamicObject` as an intermediate representation. must decide:
 
 - Continue with DynamicObject? (if using Aqua)
 - Use a custom DTO layer?
@@ -167,7 +167,7 @@ v1 used Aqua `DynamicObject` as an intermediate representation. v2 must decide:
 
 ### 3.4 Test Strategy
 
-v2 **must** mirror EF Core's official functional test suite (like v1 did). EF Core publishes
+**must** mirror EF Core's official functional test suite (like v1 did). EF Core publishes
 a shared test suite at `EFCore.Specification.Tests` that provider authors can reuse.
 
 **Plan**:
@@ -190,7 +190,7 @@ a shared test suite at `EFCore.Specification.Tests` that provider authors can re
 ### 4.1 Project Setup
 
 ```
-dotnet new sln -n InfoCarrier.Core-v2
+dotnet new sln -n InfoCarrier.Core
 dotnet new classlib -n InfoCarrier.Core -f net10.0
 dotnet new classlib -n InfoCarrier.Core.Abstractions -f net10.0
 dotnet new xunit -n InfoCarrier.Core.FunctionalTests -f net10.0
@@ -446,7 +446,7 @@ This is the execution order the AI agent MUST follow:
 
 1. **Commit frequently** — after each meaningful step that compiles + passes new tests.
 2. **Never push** — commits stay local unless user explicitly requests push.
-3. **Always build** after each change: `dotnet build InfoCarrier.Core-v2.sln`.
+3. **Always build** after each change: `dotnet build InfoCarrier.Core.sln`.
 4. **Always run relevant tests** after each change: `dotnet test --filter "FullyQualifiedName~TestClass"`.
 5. **When stuck on a design decision**: Pause, document options in `docs/`, and ask the user
    to choose. Do NOT guess.
@@ -469,14 +469,13 @@ until these are resolved:
 2. **Wire format**: System.Text.Json? Protobuf? MessagePack? (Depends on #1)
 3. **Spatial handling**: Should NetTopologySuite be first-class or via value mapper?
 4. **Async streaming**: Does the wire protocol support `IAsyncEnumerable<T>` for large result sets?
-5. **Authentication/Authorization**: Out of scope for v2.0, but wire protocol should not preclude it.
+5. **Authentication/Authorization**: Out of scope for the initial release, but wire protocol should not preclude it.
 6. **Caching**: Should the client cache compiled queries? Entity data? Metadata?
-7. **Pagination / large result sets**: v1 materialized everything into `List<T>`. Should v2
-   support streaming for large queries? Affects wire protocol design.
+7. **Pagination / large result sets**: v1 materialized everything into `List<T>`. Should the new implementation support streaming for large queries? Affects wire protocol design.
 8. **Client-side query composition**: Can the client compose further LINQ on returned entities?
-   v1 disabled lazy loading during query execution — should v2 do the same?
-9. **Offline/disconnected scenarios**: Is v2 purely online, or should there be a local cache?
-10. **Multi-tenant server**: v1 used `CopyDbContextParameters` — v2 might want first-class
+   v1 disabled lazy loading during query execution — should do the same?
+9. **Offline/disconnected scenarios**: Is purely online, or should there be a local cache?
+10. **Multi-tenant server**: v1 used `CopyDbContextParameters` — might want first-class
     `DbContextFactory` pattern on the server side.
 
 ---

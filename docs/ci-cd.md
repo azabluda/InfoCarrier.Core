@@ -37,8 +37,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - run: dotnet restore InfoCarrier.Core-v2.sln
-      - run: dotnet build InfoCarrier.Core-v2.sln --no-restore -c Release
+      - run: dotnet restore InfoCarrier.Core.sln
+      - run: dotnet build InfoCarrier.Core.sln --no-restore -c Release
       - run: dotnet test test/InfoCarrier.Core.FunctionalTests/ --no-build -c Release --filter "FullyQualifiedName~InMemory"
       - run: dotnet test test/InfoCarrier.Core.FunctionalTests/ --no-build -c Release --filter "FullyQualifiedName~SqlServer"
         env:

@@ -1,4 +1,4 @@
-# InfoCarrier.Core v2
+# InfoCarrier.Core
 
 A next-generation **Entity Framework Core database provider** that remotes LINQ queries and
 change-tracking over a wire protocol — enabling true multi-tier applications with EF Core.
@@ -23,7 +23,7 @@ change-tracking over a wire protocol — enabling true multi-tier applications w
 4. **Entity identity, fixup, and change-tracking** operate normally on the client —
    but the data source is remote.
 
-## Why v2?
+## Why a Rewrite?
 
 The [original InfoCarrier.Core v1](https://github.com/azabluda/InfoCarrier.Core) (EF Core 5,
 Remote.Linq v6.2.3, Aqua v4.5.3) proved the concept works. But the serialization pipeline
@@ -35,7 +35,7 @@ Remote.Linq v6.2.3, Aqua v4.5.3) proved the concept works. But the serialization
 - GeoJSON Z/M coordinate loss
 - Many-to-many SaveChanges fixup through the wire
 
-**v2 is a greenfield rewrite** targeting EF Core 10, with a fresh look at the expression
+**is a greenfield rewrite** targeting EF Core 10, with a fresh look at the expression
 serialization strategy and lessons learned from v1.
 
 ## Status
@@ -46,7 +46,7 @@ implementation plan. No code yet.
 ## Repository Structure
 
 ```
-InfoCarrier.Core-v2/
+InfoCarrier.Core/
 ├── README.md                 ← this file
 ├── MEGA_PROMPT.md            ← ultra-comprehensive implementation prompt
 ├── .github/workflows/        ← CI/CD (placeholder)

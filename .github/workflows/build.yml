@@ -32,10 +32,10 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore InfoCarrier.Core-v2.sln
+        run: dotnet restore InfoCarrier.Core.sln
 
       - name: Build
-        run: dotnet build InfoCarrier.Core-v2.sln --no-restore --configuration Release
+        run: dotnet build InfoCarrier.Core.sln --no-restore --configuration Release
 
       - name: Test (InMemory)
         run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --filter "FullyQualifiedName~InMemory" --verbosity normal
