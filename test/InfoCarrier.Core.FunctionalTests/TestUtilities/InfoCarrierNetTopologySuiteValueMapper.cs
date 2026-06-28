@@ -32,7 +32,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities
 
         public bool TryMapFromDynamicObject(IMapFromDynamicObjectContext context, out object obj)
         {
-            if (context.Dto.Type.ResolveType(context.TypeResolver) != typeof(Geometry))
+            // Use IsAssignableFrom instead of strict equality because the DynamicObject's
+            // Type may be a subtype of Geometry (e.g., Point, LineString).
+            var resolvedType = context.Dto.Type?.ResolveType(context.TypeResolver);
+            if (resolvedType == null || !typeof(Geometry).IsAssignableFrom(resolvedType))
             {
                 obj = null;
                 return false;
