@@ -40,9 +40,36 @@ namespace InfoCarrier.Core.Server
             }
 
             protected override Expression VisitConstant(ConstantExpression node)
-                => node.Type.IsGenericType && node.Type.GetGenericTypeDefinition() == typeof(InternalDbSet<>)
-                ? new QueryRootExpression(this.provider, this.model.FindRuntimeEntityType(node.Type.GetGenericArguments()[0]))
-                : base.VisitConstant(node);
+            {
+                if (node.Type.IsGenericType
+                    && node.Type.GetGenericTypeDefinition() == typeof(InternalDbSet<>))
+                {
+                    var clrType = node.Type.GetGenericArguments()[0];
+                    var entityType = this.model.FindRuntimeEntityType(clrType)
+                        ?? this.model.FindEntityType(clrType);
+
+                    // For shared type entities, FindRuntimeEntityType/FindEntityType
+                    // may return null. Scan all entity types for a CLR type match.
+                    if (entityType == null)
+                    {
+                        foreach (var et in this.model.GetEntityTypes())
+                        {
+                            if (et.ClrType == clrType)
+                            {
+                                entityType = et;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (entityType != null)
+                    {
+                        return new QueryRootExpression(this.provider, entityType);
+                    }
+                }
+
+                return base.VisitConstant(node);
+            }
         }
     }
 }
