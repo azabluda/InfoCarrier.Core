@@ -40,8 +40,21 @@ serialization strategy and lessons learned from v1.
 
 ## Status
 
-**Phase 0 — Planning.** See [`MEGA_PROMPT.md`](MEGA_PROMPT.md) for the comprehensive
-implementation plan. No code yet.
+**Pre-implementation — research & specification.** We study third-party code
+(`subrepos/efcore`, `rlinq`, `aqua`, `infocarrier-v1`) and finalize the specs before writing
+product code. No code yet. Build order: [`MEGA_PROMPT.md`](MEGA_PROMPT.md) §10.
+
+### Documentation
+
+| Doc | Contents |
+|---|---|
+| [`docs/decisions.md`](docs/decisions.md) | ADR log — LOCKED vs PROVISIONAL design decisions |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture + test strategy + open questions |
+| [`docs/expression-serialization.md`](docs/expression-serialization.md) | Serializer research & design direction + open questions |
+| [`docs/wire-protocol.md`](docs/wire-protocol.md) | Client↔server contract + open questions |
+| [`docs/research-infrastructure.md`](docs/research-infrastructure.md) | Subrepos + CodeGraph MCP setup |
+| [`docs/infocarrier-core-requirements.md`](docs/infocarrier-core-requirements.md) | Authoritative requirements spec |
+| [`docs/ci-cd.md`](docs/ci-cd.md) | CI/CD strategy |
 
 ## Repository Structure
 

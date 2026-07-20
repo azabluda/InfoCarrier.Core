@@ -1,0 +1,135 @@
+# Design Decisions (ADR log)
+
+Record of design decisions for InfoCarrier.Core v2. Each entry states context, decision,
+and rationale.
+
+> **Status note.** The project is in a **pre-implementation phase**: we study third-party
+> code extensively before writing our own. Each entry is marked:
+> - **LOCKED** — decided and binding; reversing requires a dated supersession edit here.
+> - **PROVISIONAL** — current best understanding, **subject to change** as research
+>   continues. Provisional entries shape the specs but are not yet commitments; each links
+>   to the open research questions that must be resolved to lock it.
+
+Related: [`architecture.md`](architecture.md) · [`expression-serialization.md`](expression-serialization.md)
+· [`wire-protocol.md`](wire-protocol.md) · [`research-infrastructure.md`](research-infrastructure.md)
+
+---
+
+## ADR-001 — Serialization engine: greenfield, spec-only — LOCKED (2026-07-19)
+
+**Context.** The expression serializer is the heart of InfoCarrier. Remote.Linq + Aqua
+are the canonical prior art and v1's engine. Research (see
+[`expression-serialization.md`](expression-serialization.md)) shows they provide a proven
+~80% (node DTOs, shape-based `TypeInfo`, `DynamicObject`, translators, partial-eval) but
+with gaps that conflict directly with v2's stated goals.
+
+**Decision.** Build the serialization engine **from scratch**, using Remote.Linq's and
+Aqua's designs **as a written specification only**. No NuGet dependency on Remote.Linq or
+Aqua; no source fork.
+
+**Rationale.**
+- v2 requires **AOT/trimming compatibility** — Aqua's unknown-type fallback is RuntimeIL
+  emission (`TypeEmitter`), which is not AOT-safe, and its legacy path uses
+  `FormatterServices` (obsolete SYSLIB0050 on .NET 8+).
+- v2 is **DI-first** — Remote.Linq relies on a mutable static `TypeResolver.Instance`.
+- v2 requires a **versioned wire envelope** and **strict server-side allowlists** — neither
+  package has wire versioning or execution allowlists.
+- Adopting the packages as-is would import all four conflicts; wrapping them leaves the AOT
+  and DI goals unmet.
+
+**Consequences.** We re-implement: serializable expression node DTOs, shape-based type
+identity, dynamic value objects, bidirectional translators, partial evaluation. In return we
+get: canonical deterministic serialization (enables a compiled-query cache), a versioned
+envelope, allowlists on by default, DI-resolved components, and a clean AOT path.
+
+## ADR-002 — No SpecKit / no constitution file — LOCKED (2026-07-19)
+
+**Context.** `MEGA_PROMPT.md` §3.0/§7.3/§11 mandate a SpecKit "constitution" rulebook
+(`docs/constitution.md`) before any code.
+
+**Decision.** Do **not** adopt SpecKit. Never create `docs/constitution.md` or any
+constitution/rulebook file; drop all "SpecKit Planning Phase" framing. The constitution's
+*content* (test-skip policy, build discipline, architecture guardrails) is preserved as
+ordinary working agreements inside the relevant specs and `README.md` — not as a separate
+governing artifact.
+
+**Rationale.** User direction. Process overhead is kept proportional to a single-maintainer
+greenfield project; rules live next to the work they govern.
+
+## ADR-003 — Pre-implementation first, then MEGA_PROMPT §10 — LOCKED (2026-07-19)
+
+**Context.** "Start implementation" was given, but extensive third-party code study must
+precede writing our own code.
+
+**Decision.** Two-stage execution:
+1. **Pre-implementation (current phase)** — study `subrepos/*` (efcore authoritative;
+   rlinq / aqua / infocarrier-v1 inspiration-only), author the spec docs, and resolve the
+   open research questions tracked in each spec. **No product code is written in this
+   phase.**
+2. **Implementation** — begins only after the specs' open questions are resolved; then
+   follow `MEGA_PROMPT.md` §10 exactly, omitting only the constitution step (1.5, voided by
+   ADR-002): solution + projects → Common DTOs → `IInfoCarrierClient`/`IInfoCarrierServer`
+   → test infrastructure (`InfoCarrierBackendTestStore`) → server-side query execution →
+   client-side `IDatabase.CompileQuery` → expression serialization → result materialization
+   → server expression rewriting → SaveChanges pipeline → first green InMemory Northwind
+   functional test.
+
+**Rationale.** Locks the build order while acknowledging the specs are not yet final; the
+sequence builds a vertical slice so harness and wire are validated before the hardest part
+(expression-serialization fidelity) is hardened.
+
+## ADR-004 — Test strategy: inherit `EFCore.Specification.Tests` — LOCKED (2026-07-19)
+
+**Context.** v1's pain point was test-suite ambition: ~12,890 tests retrofitted late.
+
+**Decision.** Consume the **`Microsoft.EntityFrameworkCore.Specification.Tests` NuGet
+package** (not source), and inherit Microsoft's test base classes via an InfoCarrier
+fixture — the v1 pattern, rebuilt against EF Core 10. Build coverage **incrementally**,
+starting with the **InMemory** backend, then SQL Server (Docker, not LocalDB). Many-to-many
+`SaveChanges` is tested from day one.
+
+**Rationale.** Maximum, authoritative coverage with minimal hand-written tests; the v1
+fixture architecture (client `TestStore` wrapper + backend store doubling as
+`IInfoCarrierClient` + JSON round-trip simulation) ports cleanly (see
+[`architecture.md`](architecture.md) §Test Strategy).
+
+## ADR-005 — Research subrepos: ignored, no un-ignore exceptions — LOCKED (2026-07-19)
+
+**Context.** `subrepos/` holds four cloned repositories for source-level reference.
+
+**Decision.** The whole `subrepos/` tree is git-ignored with **no** un-ignore exceptions for
+nested folders. Contents are external code plus machine-generated CodeGraph indexes
+(`.codegraph/codegraph.db`), both non-portable and regenerable. Pinned revisions are recorded
+outside the ignored tree in [`research-infrastructure.md`](research-infrastructure.md).
+
+**Rationale.** Nothing inside `subrepos/` is ours to commit; notes about them belong in
+`docs/`, not inside a clone.
+
+## ADR-006 — Pipeline approach: evaluate both — PROVISIONAL (2026-07-19)
+
+**Context.** Two candidate capture points for the client query: **(A)** post-translation
+(capture EF Core's already-processed query) vs **(B)** raw capture (intercept the LINQ
+expression before EF's query pipeline).
+
+**Decision.** Defer the A/B choice; evaluate **both** against the real pipeline during
+implementation and lock it when the client `CompileQuery` work begins.
+
+**Rationale.** The correct capture point depends on EF Core 10 internals (shaper
+construction, `QueryRootExpression`, parameter funcletization) that are cheaper to probe
+against reference code than to decide up front.
+
+**Open questions.** See [`architecture.md`](architecture.md) §Open research questions. To be
+locked once the EF Core 10 query-pipeline study (subrepos/efcore) concludes.
+
+## ADR-007 — CodeGraph research tooling: `@colbymchenry/codegraph` via npx only — LOCKED (2026-07-19)
+
+**Context.** Large reference codebases (especially `subrepos/efcore`) need fast structural
+queries.
+
+**Decision.** Use **`@colbymchenry/codegraph`** as the only code-graph tool, invoked
+**exclusively via `npx`** — never `npm install -g`, never the interactive installer, never
+assuming it is on `PATH`. One MCP server entry in `.vscode/mcp.json`; subrepos are indexed
+one-shot (no file watcher, `CODEGRAPH_NO_DAEMON=1`). Do not use the `codebase-memory` skill.
+
+**Rationale.** Reproducible, install-free tooling that any contributor (or agent) can run
+identically. See [`research-infrastructure.md`](research-infrastructure.md).
