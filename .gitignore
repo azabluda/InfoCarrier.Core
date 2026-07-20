@@ -8,12 +8,15 @@ artifacts/
 *.suo
 *.cache
 .vs/
-.vscode/
 *.log
 *.DotSettings
 
 # 3rd-party source for reference only
 subrepos/
+!subrepos/*/
+
+# CodeGraph per-project indexes
+.codegraph/
 
 # Scratch files
 test_results*.txt
