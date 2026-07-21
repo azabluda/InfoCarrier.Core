@@ -44,8 +44,9 @@ envelope, allowlists on by default, DI-resolved components, and a clean AOT path
 
 ## ADR-002 — No SpecKit / no constitution file — LOCKED (2026-07-19)
 
-**Context.** `MEGA_PROMPT.md` §3.0/§7.3/§11 mandate a SpecKit "constitution" rulebook
-(`docs/constitution.md`) before any code.
+**Context.** The project's original implementation prompt (superseded by the specs in
+`docs/`) mandated a SpecKit "constitution" rulebook (`docs/constitution.md`) before any
+code.
 
 **Decision.** Do **not** adopt SpecKit. Never create `docs/constitution.md` or any
 constitution/rulebook file; drop all "SpecKit Planning Phase" framing. The constitution's
@@ -56,7 +57,7 @@ governing artifact.
 **Rationale.** User direction. Process overhead is kept proportional to a single-maintainer
 greenfield project; rules live next to the work they govern.
 
-## ADR-003 — Pre-implementation first, then MEGA_PROMPT §10 — LOCKED (2026-07-19)
+## ADR-003 — Pre-implementation first, then fixed build order — LOCKED (2026-07-19)
 
 **Context.** "Start implementation" was given, but extensive third-party code study must
 precede writing our own code.
@@ -66,13 +67,26 @@ precede writing our own code.
    rlinq / aqua / infocarrier-v1 inspiration-only), author the spec docs, and resolve the
    open research questions tracked in each spec. **No product code is written in this
    phase.**
-2. **Implementation** — begins only after the specs' open questions are resolved; then
-   follow `MEGA_PROMPT.md` §10 exactly, omitting only the constitution step (1.5, voided by
-   ADR-002): solution + projects → Common DTOs → `IInfoCarrierClient`/`IInfoCarrierServer`
-   → test infrastructure (`InfoCarrierBackendTestStore`) → server-side query execution →
-   client-side `IDatabase.CompileQuery` → expression serialization → result materialization
-   → server expression rewriting → SaveChanges pipeline → first green InMemory Northwind
-   functional test.
+2. **Implementation** — begins only after the specs' open questions are resolved, then
+   follows the fixed build order below (constitution step voided by ADR-002).
+
+**Build order (implementation sequence):**
+
+| Step | Deliverable |
+|---|---|
+| 1 | Solution + projects (`InfoCarrier.Core`, `InfoCarrier.Core.Abstractions`, functional tests) |
+| 2 | Common DTOs (wire envelope, Query/SaveChanges request/result) |
+| 3 | `IInfoCarrierClient` / `IInfoCarrierServer` contracts |
+| 4 | Test infrastructure (`InfoCarrierBackendTestStore`, in-process JSON round-trip transport) |
+| 5 | Server-side query execution |
+| 6 | Client-side `IDatabase.CompileQuery` capture |
+| 7 | Expression serialization (client → wire) |
+| 8 | Result materialization (wire → client) |
+| 9 | Server expression rewriting (stubs → `DbSet<T>` → `QueryRootExpression`) |
+| 10 | SaveChanges pipeline (incl. M2M from day 1) |
+| 11 | First green InMemory Northwind functional test |
+| 12 | Expand coverage incrementally; add SqlServer (Docker) tests |
+| 13 | Sample apps; CI/CD workflows; performance profiling |
 
 **Rationale.** Locks the build order while acknowledging the specs are not yet final; the
 sequence builds a vertical slice so harness and wire are validated before the hardest part

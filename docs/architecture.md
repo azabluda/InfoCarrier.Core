@@ -7,7 +7,7 @@ Status: **PRE-IMPLEMENTATION (structure + strategy defined; internal seams provi
 High-level architecture of the EF Core 10 remote provider: how client, wire, and server fit
 together; how entities materialize; and the test strategy. Authority: requirements in
 [`infocarrier-core-requirements.md`](infocarrier-core-requirements.md) + build order in
-`MEGA_PROMPT.md` §10 (per ADR-003).
+[`decisions.md`](decisions.md) ADR-003.
 
 ---
 

@@ -42,7 +42,7 @@ serialization strategy and lessons learned from v1.
 
 **Pre-implementation — research & specification.** We study third-party code
 (`subrepos/efcore`, `rlinq`, `aqua`, `infocarrier-v1`) and finalize the specs before writing
-product code. No code yet. Build order: [`MEGA_PROMPT.md`](MEGA_PROMPT.md) §10.
+product code. No code yet. Build order: [`docs/decisions.md`](docs/decisions.md) ADR-003.
 
 ### Documentation
 
@@ -61,7 +61,6 @@ product code. No code yet. Build order: [`MEGA_PROMPT.md`](MEGA_PROMPT.md) §10.
 ```
 InfoCarrier.Core/
 ├── README.md                 ← this file
-├── MEGA_PROMPT.md            ← ultra-comprehensive implementation prompt
 ├── .github/workflows/        ← CI/CD (placeholder)
 ├── docs/                     ← architecture decision records, design docs
 ├── subrepos/                 ← 3rd-party source for reference (not submodules, all git-ignored)
