@@ -119,21 +119,25 @@ outside the ignored tree in [`research-infrastructure.md`](research-infrastructu
 **Rationale.** Nothing inside `subrepos/` is ours to commit; notes about them belong in
 `docs/`, not inside a clone.
 
-## ADR-006 — Pipeline approach: evaluate both — PROVISIONAL (2026-07-19)
+## ADR-006 — Pipeline approach: raw capture at `IDatabase.CompileQuery` — LOCKED (2026-07-22)
 
 **Context.** Two candidate capture points for the client query: **(A)** post-translation
 (capture EF Core's already-processed query) vs **(B)** raw capture (intercept the LINQ
 expression before EF's query pipeline).
 
-**Decision.** Defer the A/B choice; evaluate **both** against the real pipeline during
-implementation and lock it when the client `CompileQuery` work begins.
+**Decision.** **(B) raw capture.** The client intercepts the LINQ expression at
+`IDatabase.CompileQuery` before EF's translation pipeline, replaces queryable roots with
+stubs, substitutes compiled-query parameters as plain constants, and ships the tree. The
+server owns translation against the real provider.
 
-**Rationale.** The correct capture point depends on EF Core 10 internals (shaper
-construction, `QueryRootExpression`, parameter funcletization) that are cheaper to probe
-against reference code than to decide up front.
+**Rationale.** Post-translation trees contain shaper delegates and provider-specific nodes
+that are not portable across the wire and not re-executable on a different provider. Raw
+capture keeps the tree re-translatable server-side — the same reason rlinq serializes the
+pre-translation tree, and the pattern v1 proved. See
+[`research-findings.md`](research-findings.md) §1.
 
-**Open questions.** See [`architecture.md`](architecture.md) §Open research questions. To be
-locked once the EF Core 10 query-pipeline study (subrepos/efcore) concludes.
+**Supersedes.** PROVISIONAL entry of 2026-07-19 (evaluate both). Locked after EF Core 10
+query-pipeline study.
 
 ## ADR-007 — CodeGraph research tooling: `@colbymchenry/codegraph` via npx only — LOCKED (2026-07-19)
 
