@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj" />
+    <Project Path="src/InfoCarrier.Core/InfoCarrier.Core.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Public contracts for InfoCarrier.Core — client/server/transport/serializer abstractions. DI-first testability seam.</Description>
+    <RootNamespace>InfoCarrier.Core</RootNamespace>
+    <AssemblyName>InfoCarrier.Core.Abstractions</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+</Project>
