@@ -24,9 +24,9 @@ produces; no Block/Loop/Try/Goto/Switch/Label.
 - [x] **A4.** Init/conditional nodes: `MemberInitNode` (+ bindings), `ListInitNode`,
       `ConditionalNode`, `TypeBinaryNode`, `InvocationNode`, `QueryRootStubNode`
       (research-findings §2 — entity-type identity, replaces `EntityQueryRootExpression`). ✅ `670172c`
-- [ ] **A5.** `DynamicValueNode` for non-primitive constants (aqua-style shape-based value
+- [x] **A5.** `DynamicValueNode` for non-primitive constants (aqua-style shape-based value
       graph: anonymous types, DTOs, collections, entities-by-key). Client-materialized, so
-      shape collisions acceptable (research-findings §7). Serializer source-gen context for AOT.
+      shape collisions acceptable (research-findings §7). Serializer source-gen context for AOT. ✅ `f7f0de7`
 
 ## Phase B — Bidirectional translators (System.Linq.Expressions ↔ DTO)
 
