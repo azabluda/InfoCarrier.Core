@@ -44,7 +44,7 @@ explicit/configurable (not rlinq's heuristic).
 - [x] **B5.** `DynamicValueMapper` — EF-metadata-driven (not blind reflection): entities via
       `IProperty` accessors; anonymous/records via ctor-param matching (aqua §2.3).
       Reference preservation per-message. ✅ `aa1087a`
-- [ ] **B6.** Round-trip unit tests: canonical tree shapes serialize→deserialize→identical.
+- [x] **B6.** Round-trip unit tests: canonical tree shapes serialize→deserialize→identical. ✅ `8f6dc65`
 
 ## Phase C — Client provider (capture)
 
