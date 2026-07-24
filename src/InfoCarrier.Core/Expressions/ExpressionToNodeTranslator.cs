@@ -18,13 +18,17 @@ namespace InfoCarrier.Core.Expressions;
 public class ExpressionToNodeTranslator : ExpressionVisitor
 {
     private readonly TypeNodeMapper _typeMapper;
+    private readonly IDynamicValueMapper _valueMapper;
     private ExpressionNode? _result;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ExpressionToNodeTranslator" /> class.
     /// </summary>
-    public ExpressionToNodeTranslator(TypeNodeMapper typeMapper)
-        => _typeMapper = typeMapper;
+    public ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValueMapper valueMapper)
+    {
+        _typeMapper = typeMapper;
+        _valueMapper = valueMapper;
+    }
 
     /// <summary>
     ///     Translates an expression to its node DTO.
@@ -53,10 +57,40 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     protected override Expression VisitConstant(ConstantExpression node)
     {
         TypeNode type = _typeMapper.ToTypeNode(node.Type);
+
+        // EF queryable roots (DbSet<T> / EntityQueryRootExpression-backed IQueryables) become
+        // query-root stubs (research-findings §2).
+        if (node.Value is IQueryable queryable)
+        {
+            _result = new QueryRootStubNode
+            {
+                ElementType = _typeMapper.ToTypeNode(queryable.ElementType),
+                Type = type,
+            };
+            return node;
+        }
+
         _result = IsPrimitive(node.Value)
             ? new ConstantNode { Type = type, PrimitiveValue = node.Value }
-            : new ConstantNode { Type = type, DynamicValue = TranslateDynamicValue(node.Value, node.Type) };
+            : new ConstantNode { Type = type, DynamicValue = _valueMapper.ToDynamicValue(node.Value, node.Type) };
         return node;
+    }
+
+    /// <inheritdoc />
+    protected override Expression VisitExtension(Expression node)
+    {
+        // EF Core's EntityQueryRootExpression (NodeType Extension) becomes a query-root stub.
+        if (node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root)
+        {
+            _result = new QueryRootStubNode
+            {
+                ElementType = _typeMapper.ToTypeNode(root.ElementType),
+                Type = _typeMapper.ToTypeNode(node.Type),
+            };
+            return node;
+        }
+
+        throw new NotSupportedException($"Unsupported extension expression: {node.GetType()}.");
     }
 
     /// <inheritdoc />
@@ -172,6 +206,93 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
         return node;
     }
 
+    /// <inheritdoc />
+    protected override Expression VisitTypeBinary(TypeBinaryExpression node)
+    {
+        ExpressionNode operand = Translate(node.Expression);
+        _result = new TypeBinaryNode
+        {
+            Operator = node.NodeType.ToString(),
+            Operand = operand,
+            TypeOperand = _typeMapper.ToTypeNode(node.TypeOperand),
+            Type = _typeMapper.ToTypeNode(node.Type),
+        };
+        return node;
+    }
+
+    /// <inheritdoc />
+    protected override Expression VisitConditional(ConditionalExpression node)
+    {
+        ExpressionNode test = Translate(node.Test);
+        ExpressionNode ifTrue = Translate(node.IfTrue);
+        ExpressionNode ifFalse = Translate(node.IfFalse);
+        _result = new ConditionalNode
+        {
+            Test = test,
+            IfTrue = ifTrue,
+            IfFalse = ifFalse,
+            Type = _typeMapper.ToTypeNode(node.Type),
+        };
+        return node;
+    }
+
+    /// <inheritdoc />
+    protected override Expression VisitMemberInit(MemberInitExpression node)
+    {
+        var newNode = (NewNode)Translate(node.NewExpression);
+        var bindings = node.Bindings
+            .Where(b => b.BindingType == MemberBindingType.Assignment)
+            .Select(b => new MemberBindingNode
+            {
+                DeclaringType = _typeMapper.ToTypeNode(b.Member.DeclaringType!),
+                MemberName = b.Member.Name,
+                MemberKind = b.Member is PropertyInfo ? MemberKind.Property : MemberKind.Field,
+                Value = Translate(((MemberAssignment)b).Expression),
+            })
+            .ToList();
+        _result = new MemberInitNode
+        {
+            NewExpression = newNode,
+            Bindings = bindings,
+            Type = _typeMapper.ToTypeNode(node.Type),
+        };
+        return node;
+    }
+
+    /// <inheritdoc />
+    protected override Expression VisitListInit(ListInitExpression node)
+    {
+        var newNode = (NewNode)Translate(node.NewExpression);
+        var initializers = node.Initializers
+            .Select(i => new ElementInitNode
+            {
+                AddMethod = ToMethodNode(i.AddMethod),
+                Arguments = i.Arguments.Select(Translate).ToList(),
+            })
+            .ToList();
+        _result = new ListInitNode
+        {
+            NewExpression = newNode,
+            Initializers = initializers,
+            Type = _typeMapper.ToTypeNode(node.Type),
+        };
+        return node;
+    }
+
+    /// <inheritdoc />
+    protected override Expression VisitInvocation(InvocationExpression node)
+    {
+        ExpressionNode expression = Translate(node.Expression);
+        var arguments = node.Arguments.Select(Translate).ToList();
+        _result = new InvocationNode
+        {
+            Expression = expression,
+            Arguments = arguments,
+            Type = _typeMapper.ToTypeNode(node.Type),
+        };
+        return node;
+    }
+
     /// <summary>
     ///     Maps a <see cref="MethodInfo" /> to a re-resolvable <see cref="MethodNode" />.
     /// </summary>
@@ -192,12 +313,4 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
             || value.GetType().IsPrimitive
             || value is string or decimal or DateTime or DateTimeOffset or TimeSpan or Guid or DateOnly or TimeOnly
             || value.GetType().IsEnum;
-
-    /// <summary>
-    ///     Translates a non-primitive constant to a <see cref="DynamicValueNode" />. Implemented
-    ///     in B3 (dynamic value mapping); throws until then.
-    /// </summary>
-    protected virtual DynamicValueNode TranslateDynamicValue(object? value, Type type)
-        => throw new NotSupportedException(
-            $"Dynamic constant values are handled in B3. Got: {type}.");
 }
