@@ -1,6 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core;
 
@@ -10,9 +12,9 @@ namespace InfoCarrier.Core;
 ///     This is the server half of the in-process test transport.
 /// </summary>
 /// <remarks>
-///     Query rebinding and execution (stub → <c>DbSet&lt;T&gt;</c> → <c>QueryRootExpression</c>)
-///     land in Step 5; SaveChanges replay lands in Step 10. This shell establishes the DI shape
-///     and the operation routing the test harness exercises.
+///     Query rebinding and execution run through <see cref="ServerQueryExecutor" /> (Step 5);
+///     SaveChanges replay lands in Step 10. The server resolves the context and serializer
+///     per-request from DI (DI-first, requirements §4.2).
 /// </remarks>
 public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
 {
@@ -25,8 +27,14 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
         => _serviceProvider = serviceProvider;
 
     /// <inheritdoc />
-    public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("Server query execution lands in Step 5.");
+    public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
+    {
+        // Resolve the server context + serializer per-request and execute.
+        DbContext context = _serviceProvider.GetRequiredService<DbContext>();
+        IExpressionSerializer serializer = _serviceProvider.GetRequiredService<IExpressionSerializer>();
+        var executor = new ServerQueryExecutor(context, serializer);
+        return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
