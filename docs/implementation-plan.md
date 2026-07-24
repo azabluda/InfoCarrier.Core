@@ -58,9 +58,9 @@ explicit/configurable (not rlinq's heuristic).
 
 ## Phase D — Server execution
 
-- [ ] **D1.** `ServerQueryExecutor` — deserialize tree, rebind `QueryRootStubNode`→
+- [x] **D1.** `ServerQueryExecutor` — deserialize tree, rebind `QueryRootStubNode`→
       `context.Set`/real query roots (shared-type by name), execute against server context
-      (`IQueryable` → EF compile), projection-boundary detection (research-findings §8).
+      (`IQueryable` → EF compile), projection-boundary detection (research-findings §8). ✅ `d339cbb`
 - [ ] **D2.** Wire `InProcessInfoCarrierServer.QueryDataAsync` → executor; map entity results
       to identity-keyed rows / projections to columnar data; `IsEntityResult` routing.
 
