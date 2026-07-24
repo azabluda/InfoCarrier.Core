@@ -33,8 +33,8 @@ produces; no Block/Loop/Try/Goto/Switch/Label.
 Direct recursive translators (no rlinq `ResultWrapperExpression` hack). Partial-eval policy
 explicit/configurable (not rlinq's heuristic).
 
-- [ ] **B1.** `IExpressionSerializer` seam: `ExpressionNode ToNode(Expression)` /
-      `Expression ToExpression(ExpressionNode)`. DI-resolved, no statics.
+- [x] **B1.** `IExpressionSerializer` seam: `ExpressionNode ToNode(Expression)` /
+      `Expression ToExpression(ExpressionNode)`. DI-resolved, no statics. ✅ `456e428`
 - [ ] **B2.** `ExpressionToNodeTranslator` — leaf + composite nodes (A2/A3).
 - [ ] **B3.** `ExpressionToNodeTranslator` — init/conditional + `QueryRootExpression`→
       `QueryRootStubNode` + constants → `DynamicValueNode` (A4/A5). Handles compiled-query
