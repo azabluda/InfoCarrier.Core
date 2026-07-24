@@ -69,8 +69,8 @@ explicit/configurable (not rlinq's heuristic).
 - [x] **E1.** Client materializer — entity identity resolution (reuse tracked / attach),
       populate scalars via value converters, nav fixup from FK, mark included loaded
       (requirements §2.5). ✅ `394a0bb`
-- [ ] **E2.** Projection application — non-entity results materialized client-side from
-      columnar data (requirements §3.2).
+- [x] **E2.** Projection application — non-entity results materialized client-side from
+      columnar data (requirements §3.2). ✅ `b746571`
 - [ ] **E3.** First green InMemory Northwind functional test via spec-test fixture
       (architecture §5). Commit milestone.
 
