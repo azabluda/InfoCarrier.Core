@@ -48,8 +48,8 @@ explicit/configurable (not rlinq's heuristic).
 
 ## Phase C — Client provider (capture)
 
-- [ ] **C1.** `InfoCarrierOptionsExtension` + `UseInfoCarrier(...)` `DbContextOptionsBuilder`
-      extension; `AddInfoCarrierClient` DI registration (DI-first, requirements §4.2).
+- [x] **C1.** `InfoCarrierOptionsExtension` + `UseInfoCarrier(...)` `DbContextOptionsBuilder`
+      extension; `AddInfoCarrierClient` DI registration (DI-first, requirements §4.2). ✅ `53df56d`
 - [ ] **C2.** `InfoCarrierDatabase : IDatabase` — `CompileQuery` raw capture (ADR-006):
       substitute compiled-query params as plain constants; route through `IExpressionSerializer`;
       build `QueryDataRequest`; `SaveChanges`/`SaveChangesAsync` → Step 10 shell.
