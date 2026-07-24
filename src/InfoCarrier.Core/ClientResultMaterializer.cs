@@ -29,13 +29,7 @@ public class ClientResultMaterializer
     /// </summary>
     public IEnumerable<TElement> Materialize<TElement>(QueryDataResult result)
     {
-        object? deserialized = Deserialize(result.SerializedResults);
-        if (deserialized is not IEnumerable rows)
-        {
-            yield break;
-        }
-
-        foreach (object? row in rows)
+        foreach (object? row in DeserializeRows<TElement>(result))
         {
             if (row is null)
             {
@@ -44,9 +38,31 @@ public class ClientResultMaterializer
 
             yield return result.IsEntityResult
                 ? MaterializeEntity<TElement>(row)
-                : MaterializeProjection<TElement>(row);
+                : (TElement)row; // Projection: row is already the typed projection (E2).
         }
     }
+
+    private IEnumerable<object?> DeserializeRows<TElement>(QueryDataResult result)
+    {
+        // Entity results: deserialize each row to its runtime entity type for identity resolution.
+        // Projection results: deserialize directly to TElement (anonymous/DTO/value-tuple) —
+        // the server returned columnar data shaped like the projection (requirements §3.2).
+        Type rowType = result.IsEntityResult
+            ? ResolveRowType(result) ?? typeof(TElement)
+            : typeof(TElement);
+
+        Type listType = typeof(List<>).MakeGenericType(rowType);
+        object? deserialized = System.Text.Json.JsonSerializer.Deserialize(result.SerializedResults, listType);
+        return deserialized as IEnumerable<object?> ?? [];
+    }
+
+    private Type? ResolveRowType(QueryDataResult result)
+        // Resolve the entity CLR type from the model by the element-type name carried on the wire.
+        => result.ElementTypeName is null
+            ? null
+            : _context.Model.GetEntityTypes()
+                .FirstOrDefault(e => e.ClrType.FullName == result.ElementTypeName || e.Name == result.ElementTypeName)
+                ?.ClrType;
 
     private TElement MaterializeEntity<TElement>(object row)
     {
@@ -74,10 +90,6 @@ public class ClientResultMaterializer
         return (TElement)entry.Entity;
     }
 
-    private TElement MaterializeProjection<TElement>(object row)
-        // Non-entity projections materialize directly from the row (E2 refines columnar mapping).
-        => (TElement)row;
-
     private static bool KeyEquals(EntityEntry entry, IKey key, object?[] keyValues)
     {
         for (int i = 0; i < key.Properties.Count; i++)
@@ -91,7 +103,4 @@ public class ClientResultMaterializer
 
         return true;
     }
-
-    private static object? Deserialize(byte[] payload)
-        => System.Text.Json.JsonSerializer.Deserialize<object>(payload);
 }
