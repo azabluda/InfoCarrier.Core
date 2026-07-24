@@ -35,7 +35,7 @@ explicit/configurable (not rlinq's heuristic).
 
 - [x] **B1.** `IExpressionSerializer` seam: `ExpressionNode ToNode(Expression)` /
       `Expression ToExpression(ExpressionNode)`. DI-resolved, no statics. ✅ `456e428`
-- [ ] **B2.** `ExpressionToNodeTranslator` — leaf + composite nodes (A2/A3).
+- [x] **B2.** `ExpressionToNodeTranslator` — leaf + composite nodes (A2/A3). ✅ `3d5209a`
 - [ ] **B3.** `ExpressionToNodeTranslator` — init/conditional + `QueryRootExpression`→
       `QueryRootStubNode` + constants → `DynamicValueNode` (A4/A5). Handles compiled-query
       parameters already substituted as plain constants (research-findings §6).
