@@ -41,9 +41,9 @@ explicit/configurable (not rlinq's heuristic).
       parameters already substituted as plain constants (research-findings §6). ✅ `8ebf2f8`
 - [x] **B4.** `NodeToExpressionTranslator` — full reverse; `QueryRootStubNode`→server
       `EntityQueryRootExpression` via `IModel` (research-findings §2/§3, shared-type by name). ✅ `76a742e`
-- [ ] **B5.** `DynamicValueMapper` — EF-metadata-driven (not blind reflection): entities via
+- [x] **B5.** `DynamicValueMapper` — EF-metadata-driven (not blind reflection): entities via
       `IProperty` accessors; anonymous/records via ctor-param matching (aqua §2.3).
-      Reference preservation per-message.
+      Reference preservation per-message. ✅ `aa1087a`
 - [ ] **B6.** Round-trip unit tests: canonical tree shapes serialize→deserialize→identical.
 
 ## Phase C — Client provider (capture)
