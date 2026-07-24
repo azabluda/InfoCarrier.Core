@@ -66,9 +66,9 @@ explicit/configurable (not rlinq's heuristic).
 
 ## Phase E — Materialization + first green
 
-- [ ] **E1.** Client materializer — entity identity resolution (reuse tracked / attach),
+- [x] **E1.** Client materializer — entity identity resolution (reuse tracked / attach),
       populate scalars via value converters, nav fixup from FK, mark included loaded
-      (requirements §2.5).
+      (requirements §2.5). ✅ `394a0bb`
 - [ ] **E2.** Projection application — non-entity results materialized client-side from
       columnar data (requirements §3.2).
 - [ ] **E3.** First green InMemory Northwind functional test via spec-test fixture
