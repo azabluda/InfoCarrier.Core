@@ -69,8 +69,8 @@ internal sealed class QueryExecutor<TElement>
     }
 
     private IEnumerable<TElement> Materialize(QueryDataResult result)
-        // Client materialization + identity resolution lands in Phase E (E1/E2).
-        => throw new NotImplementedException("Client materialization lands in Phase E.");
+        // Client materialization + identity resolution (Phase E).
+        => new ClientResultMaterializer(_queryContext.Context).Materialize<TElement>(result);
 
     private static byte[] SerializeNode(Expressions.ExpressionNode node)
         => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
