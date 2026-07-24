@@ -13,12 +13,12 @@ Not every substep is independently compilable — the milestone is the commit bo
 The serializable node-DTO set. Minimal per research-findings §5: only nodes LINQ-to-EF
 produces; no Block/Loop/Try/Goto/Switch/Label.
 
-- [ ] **A1.** `ExpressionNode` abstract base + `NodeKind` enum (explicit map, no int-cast ABI)
+- [x] **A1.** `ExpressionNode` abstract base + `NodeKind` enum (explicit map, no int-cast ABI)
       + `TypeNode` (assembly-free type identity: FullName + generic args; entity-typed values
-      carry EF entity-type name per research-findings §7).
-- [ ] **A2.** Leaf nodes: `ConstantNode` (typed value payload), `ParameterNode` (name + type),
+      carry EF entity-type name per research-findings §7). ✅ `196998e`
+- [x] **A2.** Leaf nodes: `ConstantNode` (typed value payload), `ParameterNode` (name + type),
       `MemberNode` (declaring type + member name + kind), `MethodNode` (declaring type +
-      name + generic args + signature hash).
+      name + generic args + signature hash). ✅ `85c82a8`
 - [ ] **A3.** Composite nodes: `MethodCallNode`, `LambdaNode`, `NewNode` (ctor + args),
       `NewArrayNode`, `BinaryNode`, `UnaryNode`.
 - [ ] **A4.** Init/conditional nodes: `MemberInitNode` (+ bindings), `ListInitNode`,
