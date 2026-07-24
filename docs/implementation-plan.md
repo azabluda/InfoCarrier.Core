@@ -19,8 +19,8 @@ produces; no Block/Loop/Try/Goto/Switch/Label.
 - [x] **A2.** Leaf nodes: `ConstantNode` (typed value payload), `ParameterNode` (name + type),
       `MemberNode` (declaring type + member name + kind), `MethodNode` (declaring type +
       name + generic args + signature hash). ✅ `85c82a8`
-- [ ] **A3.** Composite nodes: `MethodCallNode`, `LambdaNode`, `NewNode` (ctor + args),
-      `NewArrayNode`, `BinaryNode`, `UnaryNode`.
+- [x] **A3.** Composite nodes: `MethodCallNode`, `LambdaNode`, `NewNode` (ctor + args),
+      `NewArrayNode`, `BinaryNode`, `UnaryNode`. ✅ `96d1c07`
 - [ ] **A4.** Init/conditional nodes: `MemberInitNode` (+ bindings), `ListInitNode`,
       `ConditionalNode`, `TypeBinaryNode`, `InvocationNode`, `QueryRootStubNode`
       (research-findings §2 — entity-type identity, replaces `EntityQueryRootExpression`).
