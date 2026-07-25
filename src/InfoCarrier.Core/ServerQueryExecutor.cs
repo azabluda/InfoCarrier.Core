@@ -140,20 +140,37 @@ public class ServerQueryExecutor
     private QueryDataResult MapResults(object? result, Expression query)
     {
         // Entity-typed results → identity-keyed rows; projections → columnar data (E2 refines).
-        bool isEntityResult = result is IEnumerable enumerable
-            && enumerable.Cast<object?>().FirstOrDefault() is { } first
-            && _context.Model.FindEntityType(first.GetType()) is not null;
+        object? first = result is IEnumerable enumerable
+            ? enumerable.Cast<object?>().FirstOrDefault()
+            : result;
+        Type? elementType = first?.GetType();
+        bool isEntityResult = elementType is not null
+            && _context.Model.FindEntityType(elementType) is not null;
 
         return new QueryDataResult
         {
-            SerializedResults = SerializeResult(result),
+            SerializedResults = SerializeResult(result, elementType),
             IsEntityResult = isEntityResult,
-            ElementTypeName = result?.GetType().FullName,
+            ElementTypeName = elementType?.FullName,
         };
     }
 
-    private static byte[] SerializeResult(object? result)
-        => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result);
+    private static byte[] SerializeResult(object? result, Type? elementType)
+    {
+        // Serialize as a typed List<elementType> so the client reconstructs typed rows.
+        if (result is IEnumerable enumerable && elementType is not null)
+        {
+            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType))!;
+            foreach (object? item in enumerable)
+            {
+                list.Add(item);
+            }
+
+            return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(list, list.GetType());
+        }
+
+        return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result);
+    }
 
     private static ExpressionNode DeserializeNode(byte[] payload)
         => System.Text.Json.JsonSerializer.Deserialize<ExpressionNode>(

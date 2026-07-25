@@ -85,8 +85,11 @@ public class ClientResultMaterializer
             }
         }
 
-        // Attach the new instance; EF fixup wires navigations from FK relationships.
-        EntityEntry entry = _context.Attach(row);
+        // Attach the new instance as Unchanged; EF fixup wires navigations from FK relationships.
+        // Setting the state explicitly (rather than Attach) avoids the client provider's
+        // store-generated-key value generation — the server owns key generation (requirements §2.2).
+        EntityEntry entry = _context.Entry(row);
+        entry.State = EntityState.Unchanged;
         return (TElement)entry.Entity;
     }
 
