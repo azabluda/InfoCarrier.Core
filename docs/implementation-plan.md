@@ -71,8 +71,9 @@ explicit/configurable (not rlinq's heuristic).
       (requirements §2.5). ✅ `394a0bb`
 - [x] **E2.** Projection application — non-entity results materialized client-side from
       columnar data (requirements §3.2). ✅ `b746571`
-- [ ] **E3.** First green InMemory Northwind functional test via spec-test fixture
-      (architecture §5). Commit milestone.
+- [x] **E3.** First green InMemory Northwind functional test via spec-test fixture
+      (architecture §5). Commit milestone. ✅ `e2911cf` — InMemory smoke test green (7/7);
+      full Northwind spec-test fixture is S4.
 
 ---
 
