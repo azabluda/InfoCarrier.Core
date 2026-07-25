@@ -29,9 +29,12 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
-        // Resolve the server context + serializer per-request and execute.
-        DbContext context = _serviceProvider.GetRequiredService<DbContext>();
-        IExpressionSerializer serializer = _serviceProvider.GetRequiredService<IExpressionSerializer>();
+        // Resolve the server context within a per-request scope (the server is a singleton;
+        // the context is scoped). Build the model-aware serializer from the context's model —
+        // IModel is scoped to the context and must not be resolved from DI directly.
+        await using var scope = _serviceProvider.CreateAsyncScope();
+        DbContext context = scope.ServiceProvider.GetRequiredService<DbContext>();
+        ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(context.Model);
         var executor = new ServerQueryExecutor(context, serializer);
         return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
     }

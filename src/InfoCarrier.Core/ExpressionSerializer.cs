@@ -47,4 +47,18 @@ public class ExpressionSerializer : IExpressionSerializer
         ExpressionNode node,
         Func<QueryRootStubNode, Type, Expression> queryRootFactory)
         => new NodeToExpressionTranslator(_typeResolver, _valueMapper, queryRootFactory).Translate(node);
+
+    /// <summary>
+    ///     Builds a model-aware serializer pipeline for the given EF model. Used by the server,
+    ///     which constructs the pipeline from the resolved <see cref="Microsoft.EntityFrameworkCore.DbContext.Model" />
+    ///     rather than resolving <see cref="IModel" /> from DI (which is scoped to the context).
+    /// </summary>
+    public static ExpressionSerializer CreateForModel(Microsoft.EntityFrameworkCore.Metadata.IModel model)
+    {
+        var typeMapper = new TypeNodeMapper(model);
+        var typeResolver = new TypeNodeResolver(model);
+        var valueMapper = new DynamicValueMapper(model, typeMapper, typeResolver);
+        var forward = new ExpressionToNodeTranslator(typeMapper, valueMapper);
+        return new ExpressionSerializer(forward, typeResolver, valueMapper);
+    }
 }

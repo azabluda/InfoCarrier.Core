@@ -102,13 +102,21 @@ public class ServerQueryExecutor
         // translates it against the real provider (SQL Server / InMemory / …). We obtain the
         // provider from a DbSet of the query's element entity type, then CreateQuery over the
         // rebound expression.
-        Type elementType = query.Type.IsGenericType && query.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)
-            ? query.Type.GetGenericArguments()[0]
-            : query.Type;
+        Type elementType = GetElementType(query.Type);
 
         IQueryProvider provider = GetServerQueryProvider(elementType);
         Type queryableType = typeof(Microsoft.EntityFrameworkCore.Query.Internal.EntityQueryable<>).MakeGenericType(elementType);
         return (IQueryable)Activator.CreateInstance(queryableType, provider, query)!;
+    }
+
+    private static Type GetElementType(Type queryType)
+    {
+        // Find the IQueryable<T> interface (handles IOrderedQueryable<T>, EntityQueryable<T>, …).
+        Type? queryable = queryType.IsGenericType && queryType.GetGenericTypeDefinition() == typeof(IQueryable<>)
+            ? queryType
+            : queryType.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+        return queryable?.GetGenericArguments()[0] ?? queryType;
     }
 
     private IQueryProvider GetServerQueryProvider(Type elementType)
@@ -122,7 +130,8 @@ public class ServerQueryExecutor
 
         object set = _context
             .GetType()
-            .GetMethod(nameof(DbContext.Set), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .First(m => m.Name == nameof(DbContext.Set) && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
             .MakeGenericMethod(entityType.ClrType)
             .Invoke(_context, null)!;
         return ((IQueryable)set).Provider;
