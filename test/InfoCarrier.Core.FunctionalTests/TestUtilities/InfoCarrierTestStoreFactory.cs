@@ -39,36 +39,24 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     }
 
     /// <summary>
-    ///     Thread-safe lazy singleton per fixture (v1's NonCapturingLazyInitializer pattern,
-    ///     reimplemented since that helper is EF-internal).
+    ///     Creates a factory for the given backend + fixture properties. Fixtures typically cache
+    ///     the result in a field (<c>??=</c>) so it is created once per fixture instance.
     /// </summary>
-    public static ITestStoreFactory EnsureInitialized(
-        ref ITestStoreFactory? instance,
+    public static ITestStoreFactory Create(
         InfoCarrierBackendTestStoreFactory backendFactory,
         Type contextType,
         Action<ModelBuilder, DbContext>? onModelCreating,
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null,
         Action<DbContext, DbContext>? copyDbContextParameters = null)
-    {
-        if (instance is not null)
-        {
-            return instance;
-        }
-
-        var props = new SharedTestStoreProperties
-        {
-            ContextType = contextType,
-            OnModelCreating = onModelCreating,
-            OnAddOptions = onAddOptions,
-            CopyDbContextParameters = copyDbContextParameters,
-        };
-
-        Interlocked.CompareExchange(
-            ref instance,
-            new InfoCarrierTestStoreFactory(props, backendFactory),
-            null);
-        return instance;
-    }
+        => new InfoCarrierTestStoreFactory(
+            new SharedTestStoreProperties
+            {
+                ContextType = contextType,
+                OnModelCreating = onModelCreating,
+                OnAddOptions = onAddOptions,
+                CopyDbContextParameters = copyDbContextParameters,
+            },
+            backendFactory);
 
     /// <inheritdoc />
     public virtual TestStore Create(string storeName)
