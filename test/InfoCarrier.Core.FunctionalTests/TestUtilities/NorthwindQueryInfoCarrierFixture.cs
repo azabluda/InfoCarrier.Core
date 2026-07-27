@@ -17,11 +17,11 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
-    private ITestStoreFactory? _testStoreFactory;
+    private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
-        => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
+        => _infoCarrierTestStoreFactory ??= InfoCarrierTestStoreFactory.Create(
             InfoCarrierTestStoreFactory.InMemory,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
@@ -29,8 +29,5 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server));
 
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)
-    {
-        server.TenantPrefix = client.TenantPrefix;
-        server.SearchTerm = client.SearchTerm;
-    }
+        => server.TenantPrefix = client.TenantPrefix;
 }
