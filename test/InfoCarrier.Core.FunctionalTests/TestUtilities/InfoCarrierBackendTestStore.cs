@@ -13,28 +13,42 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     <c>InfoCarrierBackendTestStore</c> pattern, rebuilt for EF Core 10).
 /// </summary>
 /// <remarks>
-///     Two <see cref="IServiceProvider" />s exist: the client provider (the spec test's
-///     context) and this store's server provider. Every request and result round-trips
-///     through the configured <see cref="IInfoCarrierSerializer" /> in-process, so
-///     wire-serializability failures surface exactly as over a network.
+///     Two <see cref="IServiceProvider" />s exist: the client provider (built by the spec-test
+///     fixture) and this store's <em>server</em> provider (built eagerly here, with a
+///     <c>TestModelSource</c> for the server model and the server <see cref="DbContext" />).
+///     Every request and result round-trips through the configured
+///     <see cref="IInfoCarrierSerializer" /> in-process, so wire-serializability failures
+///     surface exactly as over a network (v1's <c>SimulateNetworkTransferJson</c>).
 /// </remarks>
 public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClient
 {
-    private readonly IInfoCarrierServer _server;
+    private readonly SharedTestStoreProperties _testStoreProperties;
     private readonly IInfoCarrierSerializer _serializer;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierBackendTestStore" /> class.
+    ///     Initializes a new instance of the <see cref="InfoCarrierBackendTestStore" /> class,
+    ///     building the server service provider eagerly.
     /// </summary>
-    protected InfoCarrierBackendTestStore(string name, bool shared)
+    protected InfoCarrierBackendTestStore(
+        string name,
+        bool shared,
+        SharedTestStoreProperties testStoreProperties)
         : base(name, shared)
     {
+        _testStoreProperties = testStoreProperties;
+
         ServiceProvider = AddServices(new ServiceCollection())
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+            .AddSingleton(TestModelSource.GetFactory(_testStoreProperties.OnModelCreating!))
+            .AddDbContext(
+                _testStoreProperties.ContextType,
+                (s, b) => AddProviderOptions(b),
+                ServiceLifetime.Transient,
+                ServiceLifetime.Singleton)
+            .AddScoped<DbContext>(sp => (DbContext)sp.GetRequiredService(_testStoreProperties.ContextType))
             .BuildServiceProvider(validateScopes: true);
 
-        _server = ServiceProvider.GetRequiredService<IInfoCarrierServer>();
         _serializer = ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
     }
 
@@ -44,35 +58,49 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public string ServerUrl => Name;
 
     /// <summary>
+    ///     Creates a server-side <see cref="DbContext" /> from the server provider.
+    /// </summary>
+    public virtual DbContext CreateDbContext()
+        => (DbContext)ServiceProvider.GetRequiredService(_testStoreProperties.ContextType);
+
+    /// <summary>
     ///     Adds the backend provider services (e.g. InMemory, SqlServer) to the collection.
     /// </summary>
     protected abstract IServiceCollection AddServices(IServiceCollection serviceCollection);
 
     /// <inheritdoc />
+    public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
+        => _testStoreProperties.OnAddOptions?.Invoke(builder.UseInternalServiceProvider(ServiceProvider))
+            ?? builder.UseInternalServiceProvider(ServiceProvider);
+
+    /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
         => await RoundTripAsync(
             request,
-            (r, ct) => _server.QueryDataAsync(r, ct),
+            (r, ct) => CreateServer().QueryDataAsync(r, ct),
             cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
     public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
         => await RoundTripAsync(
             request,
-            (r, ct) => _server.SaveChangesAsync(r, ct),
+            (r, ct) => CreateServer().SaveChangesAsync(r, ct),
             cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
     public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => await _server.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        => await CreateServer().BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => _server.CommitTransactionAsync(transactionId, cancellationToken);
+        => CreateServer().CommitTransactionAsync(transactionId, cancellationToken);
 
     /// <inheritdoc />
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => _server.RollbackTransactionAsync(transactionId, cancellationToken);
+        => CreateServer().RollbackTransactionAsync(transactionId, cancellationToken);
+
+    private IInfoCarrierServer CreateServer()
+        => ServiceProvider.GetRequiredService<IInfoCarrierServer>();
 
     private async Task<TResponse> RoundTripAsync<TRequest, TResponse>(
         TRequest request,

@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
@@ -15,16 +16,25 @@ public class InMemoryInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     /// <summary>
     ///     Initializes a new instance of the <see cref="InMemoryInfoCarrierBackendTestStore" /> class.
     /// </summary>
-    public InMemoryInfoCarrierBackendTestStore(string name, bool shared = true)
-        : base(name, shared)
+    public InMemoryInfoCarrierBackendTestStore(
+        string name,
+        bool shared,
+        SharedTestStoreProperties testStoreProperties)
+        : base(name, shared, testStoreProperties)
     {
     }
 
     /// <inheritdoc />
     protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
-        => serviceCollection.AddEntityFrameworkInMemoryDatabase();
+        => serviceCollection
+            .AddEntityFrameworkInMemoryDatabase()
+            .AddSingleton<TestStoreIndex>();
+
+    /// <inheritdoc />
+    protected override TestStoreIndex GetTestStoreIndex(IServiceProvider? serviceProvider)
+        => serviceProvider?.GetService<TestStoreIndex>() ?? base.GetTestStoreIndex(serviceProvider);
 
     /// <inheritdoc />
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => builder.UseInMemoryDatabase(Name);
+        => base.AddProviderOptions(builder).UseInMemoryDatabase(Name);
 }
