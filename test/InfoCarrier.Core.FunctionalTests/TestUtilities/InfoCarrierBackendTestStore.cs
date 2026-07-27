@@ -4,6 +4,7 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -37,7 +38,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     {
         _testStoreProperties = testStoreProperties;
 
-        ServiceProvider = AddServices(new ServiceCollection())
+        ServiceProvider = AddServices(new ServiceCollection().AddLogging())
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
             .AddSingleton(TestModelSource.GetFactory(_testStoreProperties.OnModelCreating!))
