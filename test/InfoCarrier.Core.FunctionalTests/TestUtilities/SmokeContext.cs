@@ -26,12 +26,4 @@ public class SmokeContext : DbContext
     }
 
     public DbSet<Blog> Blogs => Set<Blog>();
-
-    /// <inheritdoc />
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        // Keys are assigned explicitly (and by the server in the real pipeline) — disable
-        // client-side store-generation so the InfoCarrier client doesn't try to generate them.
-        modelBuilder.Entity<Blog>().Property(b => b.Id).ValueGeneratedNever();
-    }
 }

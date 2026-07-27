@@ -3,7 +3,8 @@
 using System.Collections;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core;
@@ -14,15 +15,26 @@ namespace InfoCarrier.Core;
 ///     new), populates scalar properties, and wires navigation fixup. Non-entity projections
 ///     are materialized from columnar data (E2).
 /// </summary>
+/// <remarks>
+///     Identity resolution and tracking go through EF's internal <see cref="IStateManager" />
+///     (the v1 pattern): <c>TryGetEntry</c> for the identity map, <c>GetOrCreateEntry</c> +
+///     <c>SetEntityState(Unchanged)</c> to attach — which bypasses the public-API value
+///     generation that would otherwise fire for store-generated keys (the server owns key
+///     generation; the client never suppresses it in the shared model).
+/// </remarks>
 public class ClientResultMaterializer
 {
     private readonly DbContext _context;
+    private readonly IStateManager _stateManager;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClientResultMaterializer" /> class.
     /// </summary>
     public ClientResultMaterializer(DbContext context)
-        => _context = context;
+    {
+        _context = context;
+        _stateManager = context.GetService<IStateManager>();
+    }
 
     /// <summary>
     ///     Materializes the wire result into a sequence of <typeparamref name="TElement" />.
@@ -66,44 +78,32 @@ public class ClientResultMaterializer
 
     private TElement MaterializeEntity<TElement>(object row)
     {
-        // Identity resolution: if an entity with the same key is already tracked, reuse it;
-        // otherwise attach the new instance (requirements §2.5 step 2).
         IEntityType? entityType = _context.Model.FindEntityType(row.GetType());
-        if (entityType?.FindPrimaryKey() is { } key)
+        if (entityType is null)
         {
-            object?[] keyValues = key.Properties
+            return (TElement)row;
+        }
+
+        // Identity resolution via EF's own identity map (v1 pattern): reuse the tracked
+        // instance if an entity with the same key is already tracked.
+        IKey? pk = entityType.FindPrimaryKey();
+        if (pk is not null)
+        {
+            object?[] keyValues = pk.Properties
                 .Select(p => p.GetGetter().GetClrValue(row))
                 .ToArray();
 
-            EntityEntry? tracked = _context.ChangeTracker.Entries()
-                .FirstOrDefault(e => e.Entity.GetType() == row.GetType()
-                    && KeyEquals(e, key, keyValues));
-
+            InternalEntityEntry? tracked = _stateManager.TryGetEntry(pk, keyValues);
             if (tracked is not null)
             {
-                return (TElement)tracked.Entity; // Reuse tracked instance.
+                return (TElement)tracked.Entity;
             }
         }
 
-        // Attach the new instance as Unchanged; EF fixup wires navigations from FK relationships.
-        // Setting the state explicitly (rather than Attach) avoids the client provider's
-        // store-generated-key value generation — the server owns key generation (requirements §2.2).
-        EntityEntry entry = _context.Entry(row);
-        entry.State = EntityState.Unchanged;
+        // Attach as Unchanged via the internal state manager — bypasses public-API value
+        // generation for store-generated keys (the server owns key generation).
+        InternalEntityEntry entry = _stateManager.GetOrCreateEntry(row, entityType);
+        entry.SetEntityState(EntityState.Unchanged);
         return (TElement)entry.Entity;
-    }
-
-    private static bool KeyEquals(EntityEntry entry, IKey key, object?[] keyValues)
-    {
-        for (int i = 0; i < key.Properties.Count; i++)
-        {
-            object? current = entry.Property(key.Properties[i].Name).CurrentValue;
-            if (!Equals(current, keyValues[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 }
