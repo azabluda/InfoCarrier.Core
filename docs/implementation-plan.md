@@ -84,3 +84,27 @@ explicit/configurable (not rlinq's heuristic).
 - [ ] **S3.** Transactions (begin/commit/rollback + token, wire W3).
 - [ ] **S4.** Compliance meta-test (`ComplianceTestBase`) + expand spec coverage; SqlServer
       (Docker) backend.
+
+---
+
+## Spec-test fixture (ADR-004 — the REAL test coverage, not the 7-test smoke)
+
+The 7-test smoke proves the vertical slice; the actual coverage goal is inheriting
+`EFCore.Specification.Tests` bases via an InfoCarrier fixture (v1 pattern → EF Core 10).
+Port map studied from v1 + EF Core 10 sources (see session research).
+
+- [ ] **F1.** `SharedTestStoreProperties` capture struct (ContextType, OnModelCreating,
+      OnAddOptions, CopyDbContextParameters).
+- [ ] **F2.** `InfoCarrierBackendTestStore : TestStore, IInfoCarrierClient` — server provider
+      in ctor, JSON round-trip (`SimulateNetworkTransferJson` via `IInfoCarrierSerializer`),
+      abstract `AddServices`. EF Core 10 async shape (`InitializeAsync`/`CleanAsync`/`DisposeAsync`).
+- [ ] **F3.** `InMemoryInfoCarrierBackendTestStore` — InMemory backend (`AddEntityFrameworkInMemoryDatabase`).
+- [ ] **F4.** `InfoCarrierTestStore : TestStore` — client wrapper; `InitializeAsync` delegates to
+      backend; `AddProviderOptions` → `UseInfoCarrier(backend)`.
+- [ ] **F5.** `InfoCarrierTestStoreFactory : ITestStoreFactory` (4 members) + `EnsureInitialized`
+      lazy singleton; `AddProviderServices` → `AddEntityFrameworkInfoCarrier`.
+- [ ] **F6.** `NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>`
+      (constraint `ITestModelCustomizer`), override `TestStoreFactory`.
+- [ ] **F7.** First concrete Northwind test class (e.g. `NorthwindWhereQueryInfoCarrierTest`)
+      — many inherited tests green; skip/override the not-yet-supported ones.
+- [ ] **F8.** `InfoCarrierComplianceTest : ComplianceTestBase` (`TargetAssembly` only).
