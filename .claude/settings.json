@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet format:*)",
+      "Bash(dotnet list:*)",
+      "Bash(dotnet --info)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git blame:*)",
+      "Bash(git check-ignore:*)"
+    ],
+    "deny": [
+      "Edit(subrepos/**)",
+      "Write(subrepos/**)"
+    ]
+  }
+}

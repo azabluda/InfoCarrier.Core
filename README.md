@@ -35,14 +35,23 @@ Remote.Linq v6.2.3, Aqua v4.5.3) proved the concept works. But the serialization
 - GeoJSON Z/M coordinate loss
 - Many-to-many SaveChanges fixup through the wire
 
-**is a greenfield rewrite** targeting EF Core 10, with a fresh look at the expression
-serialization strategy and lessons learned from v1.
+InfoCarrier.Core is **a greenfield rewrite** targeting EF Core 10, with a fresh look at the
+expression serialization strategy and lessons learned from v1.
 
 ## Status
 
-**Pre-implementation — research & specification.** We study third-party code
-(`subrepos/efcore`, `rlinq`, `aqua`, `infocarrier-v1`) and finalize the specs before writing
-product code. No code yet. Build order: [`docs/decisions.md`](docs/decisions.md) ADR-003.
+**Implementation — query pipeline.** The vertical slice is green end-to-end: client capture →
+serialize → transport → server rebind → EF execute → client materialization with identity
+resolution. Phases A–E complete; spec-test fixture F1–F7 online.
+
+The functional suite inherits Microsoft's `EFCore.Specification.Tests` (ADR-004) —
+**413 inherited tests discovered, 141 passing** as of 2026-08-01. See
+[`docs/implementation-plan.md`](docs/implementation-plan.md) for the live task list and
+failure triage.
+
+Not yet implemented: the client/server projection split (requirements §3), `SaveChanges`
+(incl. many-to-many), and transactions. Build order:
+[`docs/decisions.md`](docs/decisions.md) ADR-003.
 
 ### Documentation
 
@@ -71,15 +80,16 @@ InfoCarrier.Core/
 └── samples/                  ← sample apps (design docs only for now)
 ```
 
-## Key Dependencies (Planned)
+## Key Dependencies
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | .NET SDK | 10.0.x | Runtime |
 | EF Core | 10.0.x | Database provider framework |
-| Expression Serializer | TBD | LINQ expression tree serialization (options: Remote.Linq, custom, gRPC) |
-| xUnit.net | latest | Functional test suite |
-| ASP.NET Core | 10.0.x | Server hosting |
+| Expression Serializer | in-tree | Greenfield — no Remote.Linq/Aqua dependency (ADR-001) |
+| System.Text.Json | 10.0.x | Default wire serializer (source-generated, AOT-friendly) |
+| xUnit.net | 2.9.x | Functional test suite |
+| ASP.NET Core | 10.0.x | Server hosting (planned) |
 
 ## License
 

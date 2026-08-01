@@ -93,18 +93,31 @@ The 7-test smoke proves the vertical slice; the actual coverage goal is inheriti
 `EFCore.Specification.Tests` bases via an InfoCarrier fixture (v1 pattern → EF Core 10).
 Port map studied from v1 + EF Core 10 sources (see session research).
 
-- [ ] **F1.** `SharedTestStoreProperties` capture struct (ContextType, OnModelCreating,
-      OnAddOptions, CopyDbContextParameters).
-- [ ] **F2.** `InfoCarrierBackendTestStore : TestStore, IInfoCarrierClient` — server provider
+- [x] **F1.** `SharedTestStoreProperties` capture struct (ContextType, OnModelCreating,
+      OnAddOptions, CopyDbContextParameters). ✅ `9170e30`
+- [x] **F2.** `InfoCarrierBackendTestStore : TestStore, IInfoCarrierClient` — server provider
       in ctor, JSON round-trip (`SimulateNetworkTransferJson` via `IInfoCarrierSerializer`),
-      abstract `AddServices`. EF Core 10 async shape (`InitializeAsync`/`CleanAsync`/`DisposeAsync`).
-- [ ] **F3.** `InMemoryInfoCarrierBackendTestStore` — InMemory backend (`AddEntityFrameworkInMemoryDatabase`).
-- [ ] **F4.** `InfoCarrierTestStore : TestStore` — client wrapper; `InitializeAsync` delegates to
-      backend; `AddProviderOptions` → `UseInfoCarrier(backend)`.
-- [ ] **F5.** `InfoCarrierTestStoreFactory : ITestStoreFactory` (4 members) + `EnsureInitialized`
-      lazy singleton; `AddProviderServices` → `AddEntityFrameworkInfoCarrier`.
-- [ ] **F6.** `NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>`
-      (constraint `ITestModelCustomizer`), override `TestStoreFactory`.
-- [ ] **F7.** First concrete Northwind test class (e.g. `NorthwindWhereQueryInfoCarrierTest`)
-      — many inherited tests green; skip/override the not-yet-supported ones.
+      abstract `AddServices`. EF Core 10 async shape (`InitializeAsync`/`CleanAsync`/`DisposeAsync`). ✅ `89285f7`
+- [x] **F3.** `InMemoryInfoCarrierBackendTestStore` — InMemory backend (`AddEntityFrameworkInMemoryDatabase`). ✅ `89285f7`
+- [x] **F4.** `InfoCarrierTestStore : TestStore` — client wrapper; `InitializeAsync` delegates to
+      backend; `AddProviderOptions` → `UseInfoCarrier(backend)`. ✅ `d34f998`
+- [x] **F5.** `InfoCarrierTestStoreFactory : ITestStoreFactory` (4 members) + `EnsureInitialized`
+      lazy singleton; `AddProviderServices` → `AddEntityFrameworkInfoCarrier`. ✅ `a6a609b`
+- [x] **F6.** `NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>`
+      (constraint `ITestModelCustomizer`), override `TestStoreFactory`. ✅ `1468b02`
+- [~] **F7.** First concrete Northwind test class (`NorthwindWhereQueryInfoCarrierTest`).
+      **Fixture online; 413 inherited tests discovered.** `31dccb6` (class + fixture),
+      `45f7000` (ILoggerFactory resolution). **Currently 141 passed / 272 failed** — see
+      Failure triage below. Not complete until the mechanical causes are cleared.
 - [ ] **F8.** `InfoCarrierComplianceTest : ComplianceTestBase` (`TargetAssembly` only).
+
+### Failure triage (measured 2026-08-01, 141/413 passing)
+
+The 272 failures reduce to a handful of root causes, not 272 problems:
+
+| Count | Root cause | Fix |
+|---|---|---|
+| 138 | `NotSupportedException: Unsupported extension expression: QueryParameterExpression` | EF Core 10's funcletizer emits `QueryParameterExpression` (an *extension* node), but `QueryExecutor.SubstituteParametersExpressionVisitor` only overrides `VisitParameter`. Add a `VisitExtension` override resolving `qp.Name` against `QueryContext.Parameters`. |
+| 76 | `NotSupportedException: JsonTypeInfo metadata for type 'System.Int32' … not provided` | `ConstantNode.PrimitiveValue` is `object?`; `ExpressionJsonContext` registers the 19 node types but no primitives. Register primitives, or chain a fallback resolver. |
+| ~26 | `Entity type '<>f__AnonymousType…' / 'System.String' not found in the server model` | **Projection split (requirements §3) — unimplemented.** Real design work, not a bug. |
+| ~32 | Tail: `JsonElement`→`String` coercion, `IsGenericParameter`, value mismatches | Investigate after the above. |
