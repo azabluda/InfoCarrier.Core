@@ -34,9 +34,16 @@ public class NorthwindWhereQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture
     : NorthwindWhereQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
 {
     // ---------------------------------------------------------------------------------
-    // InMemory store limitation: structural (anonymous type / tuple) equality is not
-    // translated, so the comparison degrades to reference equality and matches nothing.
-    // EF Core's own NorthwindWhereQueryInMemoryTest no-ops each of these identically.
+    // Category 3 — UPSTREAM EF CORE LIMITATION, not a store limitation.
+    //
+    // Anonymous-type / tuple structural equality against a constant is not translated by EF
+    // Core on any provider: EF Core issue #14672. EF's own NorthwindWhereQuerySqliteTest
+    // overrides these same eight with AssertTranslationFailed, so moving to the SQLite backend
+    // (ADR-009 Tier B) will NOT fix them — the override changes shape rather than disappearing,
+    // because relational throws a translation failure where InMemory silently matches nothing.
+    //
+    // (Originally recorded as an InMemory store limitation in G4c. Corrected after checking
+    // EF's SQLite class.)
     // ---------------------------------------------------------------------------------
 
     public override Task Where_compare_constructed_equal(bool async)
@@ -64,8 +71,10 @@ public class NorthwindWhereQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture
         => Task.CompletedTask;
 
     // ---------------------------------------------------------------------------------
-    // InMemory store limitation: ElementAt/ElementAtOrDefault over a custom projection is
-    // not supported by the InMemory query pipeline. Also no-opped by EF Core's own class.
+    // Category 2 — genuine InMemory store limitation. ElementAt/ElementAtOrDefault over a
+    // custom projection is unsupported by the InMemory query pipeline. EF's SQLite class does
+    // NOT override these, so they should pass once the SQLite backend lands (ADR-009 Tier B)
+    // and these two overrides can then be deleted.
     // ---------------------------------------------------------------------------------
 
     public override Task ElementAt_over_custom_projection_compared_to_not_null(bool async)

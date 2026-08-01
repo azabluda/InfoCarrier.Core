@@ -154,16 +154,32 @@ override, and only with the reason stated at the override site.
 
 | # | Category | Handling | Permanent? |
 |---|---|---|---|
-| **1** | **Conceptually inapplicable to InfoCarrier** — cannot hold for *any* remoting provider: asserts generated SQL / `ToQueryString`, requires a client-side DB connection, or asserts provider-specific translation the client never performs. | Override with reason, or `IgnoredTestBases` | Permanent |
-| **2** | **Backing-store limitation** — the store can't do it; a *local* provider on the same store fails identically. Verify against EF's own test class for that provider before claiming this. | Override with reason, on the store-specific class only | Until Tier B/C |
-| **3** | **Not yet implemented** — a real InfoCarrier gap with a roadmap home. | **Stays red**, tracked here | No |
-| **4** | **Bug** — should already work. | Fix | No |
+| **1** | **Conceptually inapplicable to InfoCarrier** — cannot hold for *any* remoting provider. | Override with reason, or `IgnoredTestBases` | Permanent |
+| **2** | **Backing-store limitation** — the store can't do it; a *local* provider on the same store fails identically, and another store passes. Verify against EF's own test class for **both** providers before claiming this. | Override with reason, on the store-specific class only | Until Tier B/C |
+| **3** | **Upstream EF Core limitation** — EF itself cannot translate it on any provider, usually with a tracking issue. Handling differs by store: InMemory returns nothing, relational throws, so the override differs per backend (`Task.CompletedTask` vs `AssertTranslationFailed`). | Override with reason + upstream issue number | Until EF fixes it |
+| **4** | **Not yet implemented** — a real InfoCarrier gap with a roadmap home. | **Stays red**, tracked here | No |
+| **5** | **Bug** — should already work. | Fix | No |
 
-**Measured 2026-08-01 (2,600 tests): no category-1 failure has been found yet.** The
-client/server type boundary is the one place a conceptual limit was expected, and requirements
-§3.2 resolves it by splitting the query rather than declaring it impossible. Category 2 has 10
-confirmed members (all in `NorthwindWhereQueryInfoCarrierTest`, all matching EF's own InMemory
-class). Everything else measured so far is category 3 or 4.
+**Measured 2026-08-01 (2,600 tests): no category-1 failure has been found.** Two candidates
+were considered and both fell through:
+
+- *The client/server type boundary.* Requirements §3.2 resolves it by splitting the query,
+  not by declaring it impossible.
+- *SQL assertions.* Initially recorded (wrongly) as inapplicable because the **client**
+  provider is non-relational. But the **server** is relational and the harness owns its
+  service provider, so registering `TestSqlLoggerFactory` in
+  `InfoCarrierBackendTestStore.AddServices` and exposing it from the fixture makes the
+  inherited `AssertSql` assert on **server-generated** SQL. `AssertSql` is a fixture-level
+  hook, so the test bodies need almost no rewriting. For InfoCarrier this is a *stronger*
+  assertion than for a local provider: it proves a round-tripped tree yields the same SQL a
+  local query would. **This unblocks the relational spec bases** — see M6.
+
+**Correction (2026-08-01).** The 10 tests no-opped in G4c were labelled category 2. Only 2 of
+them (`ElementAt_over_custom_projection*`) actually are: EF's `NorthwindWhereQuerySqliteTest`
+does not override those, so they pass on a relational store. The other **8 are category 3** —
+EF's SQLite class overrides the identical 8 with `AssertTranslationFailed`, citing
+**EF Core issue #14672** (anonymous-type-to-constant comparison). SQLite will *not* fix them;
+on Tier B their override must change shape rather than disappear.
 
 ## Phase I — Compliance scoreboard
 
@@ -197,10 +213,18 @@ class). Everything else measured so far is category 3 or 4.
         not raw object JSON. This is the single highest-value fix in the project.
       - **260 (17%)** are one generic-arity bug in method resolution.
 
-- [ ] **I2.** Scope `GetBaseTestClasses()` to the core `Microsoft.EntityFrameworkCore.Specification.Tests`
-      assembly. Relational spec bases assert SQL and are inapplicable to a **non-relational
-      client provider** — InfoCarrier's client emits no SQL and has no migrations. Bounds the
-      inventory from "160+ bases, unbounded" to the core set.
+- [ ] ~~**I2.** Scope `GetBaseTestClasses()` to the core assembly; relational bases are
+      inapplicable to a non-relational client provider.~~ **Withdrawn 2026-08-01 — the premise
+      was wrong.** The client emits no SQL, but the *server* is relational and the harness owns
+      its service provider, so `AssertSql` can assert server-generated SQL (see the taxonomy
+      above). Relational bases are adoptable, so the inventory is **not** scoped down. Replaced
+      by I2′.
+
+- [ ] **I2′.** Expose the server's `TestSqlLoggerFactory` through the fixture: register it in
+      `InfoCarrierBackendTestStore.AddServices`, implement `ITestSqlLoggerFactory` on a
+      relational InfoCarrier fixture, and have `ListLoggerFactory` resolve from the **server**
+      provider. Unblocks `EFCore.Relational.Specification.Tests`. Requires Tier B (ADR-009), so
+      it lands with M3; SQL baselines are per-backend, so those classes are backend-specific.
 
 - [ ] **I3.** Seed `IgnoredTestBases` with the clearly-inapplicable bases, **each with a
       one-line comment giving the reason**. Every base ends up implemented or explicitly
