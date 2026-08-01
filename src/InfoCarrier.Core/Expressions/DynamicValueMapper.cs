@@ -313,11 +313,22 @@ public class DynamicValueMapper : IDynamicValueMapper
             return null;
         }
 
-        // Entity, anywhere in the graph — hand it to the client materializer, which owns
-        // identity resolution and shadow state. Must precede the object-shape branch.
-        if (node.EntityKey is not null && EntityMaterializer is { } materializeEntity)
+        // Entity, anywhere in the graph. Must precede the object-shape branch.
+        if (node.EntityKey is not null)
         {
-            return materializeEntity(node);
+            // Client: the materializer owns identity resolution and shadow state.
+            if (EntityMaterializer is { } materializeEntity)
+            {
+                return materializeEntity(node);
+            }
+
+            // Server: an entity inside a query tree travels as identity only, so the
+            // object-shape branch would rebuild an empty shell — which is what made
+            // `Contains(customer)` match nothing. Restore the key it does carry.
+            if (_model?.FindEntityType(node.EntityKey.EntityTypeName) is { } entityType)
+            {
+                return MaterializeEntityReference(node, entityType);
+            }
         }
 
         Type type = _typeResolver.Resolve(node.Type);
@@ -362,6 +373,39 @@ public class DynamicValueMapper : IDynamicValueMapper
 
         // Object shape: rehydrate via ctor-param matching (aqua §2.3) then settable properties.
         return RehydrateObject(node, type);
+    }
+
+    /// <summary>
+    ///     Rebuilds an entity that travelled as a <em>reference</em> — an
+    ///     <see cref="EntityKeyNode" /> and nothing else — with its primary key populated.
+    /// </summary>
+    /// <remarks>
+    ///     That key is the whole point of the reference form: EF rewrites
+    ///     <c>Contains(entity)</c> and <c>entity1 == entity2</c> into comparisons over key
+    ///     values, so an instance without them silently matches nothing rather than failing.
+    /// </remarks>
+    private object MaterializeEntityReference(DynamicValueNode node, IEntityType entityType)
+    {
+        object instance = Activator.CreateInstance(entityType.ClrType, nonPublic: true)!;
+        RegisterMaterialized(node.Id, instance);
+
+        IKey? primaryKey = entityType.FindPrimaryKey();
+        if (primaryKey is null || node.EntityKey!.KeyValues.Count != primaryKey.Properties.Count)
+        {
+            return instance;
+        }
+
+        for (int i = 0; i < primaryKey.Properties.Count; i++)
+        {
+            IProperty property = primaryKey.Properties[i];
+            if (property.PropertyInfo is { CanWrite: true } clrProperty)
+            {
+                clrProperty.SetValue(
+                    instance, PrimitiveCoercion.Coerce(node.EntityKey.KeyValues[i], property.ClrType));
+            }
+        }
+
+        return instance;
     }
 
     private object? RehydrateObject(DynamicValueNode node, Type type)
