@@ -36,6 +36,20 @@ public sealed record DynamicValueNode
     ///     For collection/array values: the element values, in order.
     /// </summary>
     public IReadOnlyList<DynamicValueNode>? Items { get; init; }
+
+    /// <summary>
+    ///     For scalar values: the primitive itself. Set when a primitive appears where a
+    ///     dynamic value is required — most commonly as an element of a collection constant
+    ///     (<c>List&lt;string&gt;</c> in a <c>Contains</c> closure). Null for entity,
+    ///     collection, and object shapes.
+    /// </summary>
+    /// <remarks>
+    ///     Without this slot a primitive element falls through to the object-shape branch,
+    ///     which is wrong in two ways: <see cref="string" /> maps its <c>Length</c> property
+    ///     and then fails to rehydrate at all, while <see cref="int" /> maps an empty property
+    ///     set and rehydrates <em>silently</em> as <c>0</c>.
+    /// </remarks>
+    public object? PrimitiveValue { get; init; }
 }
 
 /// <summary>

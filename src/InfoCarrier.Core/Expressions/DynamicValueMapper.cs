@@ -69,6 +69,14 @@ public class DynamicValueMapper : IDynamicValueMapper
             };
         }
 
+        // Scalar: a primitive standing where a dynamic value is required (typically a
+        // collection element). Must precede the collection branch — string is IEnumerable —
+        // and the object-shape branch, which cannot represent a primitive.
+        if (IsPrimitive(value))
+        {
+            return new DynamicValueNode { Type = typeNode, PrimitiveValue = PrimitiveCoercion.Normalize(value) };
+        }
+
         // Collection / array.
         if (value is IEnumerable enumerable && value is not string)
         {
@@ -124,6 +132,12 @@ public class DynamicValueMapper : IDynamicValueMapper
     {
         Type type = _typeResolver.Resolve(node.Type);
 
+        // Scalar (mirrors the primitive branch in MapToNode).
+        if (node.PrimitiveValue is not null)
+        {
+            return PrimitiveCoercion.Coerce(node.PrimitiveValue, type);
+        }
+
         // Collection / array.
         if (node.Items is { } items)
         {
@@ -167,7 +181,7 @@ public class DynamicValueMapper : IDynamicValueMapper
                 .Select(p =>
                 {
                     ctorBound.Add(p.Name!);
-                    return ReadValue(byName[p.Name!]);
+                    return ReadValue(byName[p.Name!], p.ParameterType);
                 })
                 .ToArray();
             instance = ctor.Invoke(args);
@@ -185,14 +199,22 @@ public class DynamicValueMapper : IDynamicValueMapper
                 continue;
             }
 
-            property.SetValue(instance, ReadValue(pv));
+            property.SetValue(instance, ReadValue(pv, property.PropertyType));
         }
 
         return instance;
     }
 
-    private object? ReadValue(DynamicPropertyValue pv)
-        => pv.Value is not null ? FromDynamicValue(pv.Value) : pv.PrimitiveValue;
+    /// <summary>
+    ///     Reads one member value. <paramref name="targetType" /> is required because after a
+    ///     serialization round-trip <see cref="DynamicPropertyValue.PrimitiveValue" /> arrives
+    ///     as a <see cref="System.Text.Json.JsonElement" /> and must be converted back to the
+    ///     member's declared type.
+    /// </summary>
+    private object? ReadValue(DynamicPropertyValue pv, Type targetType)
+        => pv.Value is not null
+            ? FromDynamicValue(pv.Value)
+            : PrimitiveCoercion.Coerce(pv.PrimitiveValue, targetType);
 
     private static bool IsPrimitive(object? value)
         => value is null

@@ -78,40 +78,7 @@ public class NodeToExpressionTranslator
     }
 
     private static object? CoercePrimitive(object? value, Type targetType)
-    {
-        if (value is null)
-        {
-            return null;
-        }
-
-        // After a JSON round-trip, primitives arrive as JsonElement — coerce to the target type.
-        if (value is System.Text.Json.JsonElement element)
-        {
-            Type underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
-            if (underlying.IsEnum)
-            {
-                // GetInt64 (not GetInt32) so enums with long/ulong backing survive; the
-                // client sends the underlying integral value, never the enum name.
-                return Enum.ToObject(underlying, element.GetInt64());
-            }
-
-            if (underlying == typeof(string)) return element.GetString();
-            if (underlying == typeof(bool)) return element.GetBoolean();
-            if (underlying == typeof(int)) return element.GetInt32();
-            if (underlying == typeof(long)) return element.GetInt64();
-            if (underlying == typeof(short)) return (short)element.GetInt32();
-            if (underlying == typeof(byte)) return (byte)element.GetInt32();
-            if (underlying == typeof(double)) return element.GetDouble();
-            if (underlying == typeof(float)) return element.GetSingle();
-            if (underlying == typeof(decimal)) return element.GetDecimal();
-            if (underlying == typeof(Guid)) return element.GetGuid();
-            if (underlying == typeof(DateTime)) return element.GetDateTime();
-            if (underlying == typeof(DateTimeOffset)) return element.GetDateTimeOffset();
-            return System.Text.Json.JsonSerializer.Deserialize(element.GetRawText(), underlying);
-        }
-
-        return Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
-    }
+        => PrimitiveCoercion.Coerce(value, targetType);
 
     private ParameterExpression TranslateParameter(ParameterNode node)
     {

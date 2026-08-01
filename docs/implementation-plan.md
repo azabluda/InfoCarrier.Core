@@ -54,7 +54,21 @@ failure profile is unknowable — anything underneath is masked.
       measured numbers and re-group the surviving failures by root cause. **Do not fix
       anything in this substep** — the point is an accurate picture.
 
-- [ ] **G4.** Tail failures (**~32**, exact set known only after G3). Currently visible:
+- [x] **G4a.** Primitives in the dynamic-value graph. ✅ **289 → 313 passing**
+      (124 → 100 failures). `DynamicValueMapper.MapToNode` had no primitive branch — only
+      entity → collection → object-shape — so a primitive appearing where a dynamic value is
+      required (typically a collection element, e.g. `List<string>` in a `Contains` closure)
+      fell through to object-shape. `string` mapped its `Length` property and then threw
+      `MissingMethodException` on rehydration; **`int` mapped an empty property set and
+      rehydrated silently as `0`** — wrong results with no exception, which is why part of the
+      `Assert.Equal` group was really this bug. Added `DynamicValueNode.PrimitiveValue` (its
+      doc already said "Empty for collection/**scalar** shapes" — the slot was anticipated but
+      never added) plus matching branches on both sides.
+      Extracted `PrimitiveCoercion` from `NodeToExpressionTranslator`: the return path also
+      needed it, since `ReadValue` returned `JsonElement` raw (the
+      `JsonElement cannot be converted to String` group).
+
+- [ ] **G4b.** Remaining tail (**exact set from the G3 re-triage below**).
       `JsonElement` → `String` coercion (6); `Method may only be called on a Type for which
       Type.IsGenericParameter is true` (8); `Assert.Equal` value mismatches (10);
       `Assert.Throws` exception-type mismatches (2) — the last of these likely needs wire
