@@ -50,9 +50,24 @@ failure profile is unknowable — anything underneath is masked.
       a fallback would silently defeat the AOT/trimming goal (requirements §4.5, ADR-008
       constraint 8). If a fallback proves unavoidable, record why in an ADR.
 
-- [ ] **G3.** Re-run, re-triage, record. Full suite; update the baseline table below with
-      measured numbers and re-group the surviving failures by root cause. **Do not fix
-      anything in this substep** — the point is an accurate picture.
+- [x] **G3.** Re-run, re-triage, record. ✅ Measured after G1/G2/G4a — **313 passed / 100
+      failed / 413**.
+
+      | Count | Root cause | Owner |
+      |---|---|---|
+      | **64** | `Entity type 'X' not found in the server model` — anonymous types, DTOs, `String`, `List<T>`, `T[]`, `IEnumerable<T>` | **M2 projection split** |
+      | 16 | `Assert.Equal` values differ | G4b |
+      | 8 | `Method may only be called on a Type for which Type.IsGenericParameter is true` | G4b |
+      | 4 | `The LINQ expression 'DbSet<Order>()' could not be translated` | G4b |
+      | 2 | `'c' could not be translated` | G4b |
+      | 2 | `'NoNameParameter' could not be translated` | G4b |
+      | 2 | `operands for operator 'Convert' do not match … op_Explicit` | G4b |
+      | 2 | `Expression of type 'Customer' cannot be used for return type` | G4b |
+
+      **Key finding: the projection split is far larger than the entry triage showed** — 64 of
+      the 100 remaining failures, not the ~26 estimated on 2026-08-01. Clearing the mechanical
+      causes revealed tests that were previously failing earlier in the pipeline. M2 is
+      correspondingly more valuable and should follow directly after M1.
 
 - [x] **G4a.** Primitives in the dynamic-value graph. ✅ **289 → 313 passing**
       (124 → 100 failures). `DynamicValueMapper.MapToNode` had no primitive branch — only
@@ -144,3 +159,9 @@ code (roadmap M2).
 | Date | Passed | Failed | Total | Note |
 |---|---|---|---|---|
 | 2026-08-01 | 141 | 272 | 413 | M1 entry baseline; 1 of 21 Northwind bases |
+| 2026-08-01 | 207 | 206 | 413 | after G1 (`QueryParameterExpression`) |
+| 2026-08-01 | 289 | 124 | 413 | after G2 (STJ primitives + enum normalization) |
+| 2026-08-01 | 313 | 100 | 413 | after G4a (primitives in dynamic-value graph) |
+
+Of the 100 remaining, **64 are M2 (projection split)** and 36 are G4b tail. If G4b clears
+fully, M1 lands at ≈349/413 — the rest is M2 by construction.
