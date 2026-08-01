@@ -21,33 +21,23 @@ store-limitation overrides now tripping the type boundary first, 32 pre-L1 known
 
 ---
 
-## Phase N — carried from M1
+## Phase N — carried from M1 · **parked**
 
-M1 closed on query correctness but not on infrastructure. These block nothing in M2 except the
-regression guard, which is why N1–N3 come first: a 1,300-test refactor without a ratchet is the
-one change most likely to trade one failure family for another unnoticed.
+M1's infrastructure tail. N1–N4 landed; the rest is **deferred to the end of M2** — the split
+itself is the work that matters, and the local suite already gives the same signal CI would.
 
-- [ ] **N1.** Fix `.github/workflows/build.yml` solution reference: `InfoCarrier.Core.sln` →
-      `InfoCarrier.Core.slnx`. The workflow has never restored, let alone run.
+- [x] **N1–N4.** CI that can actually run: `.slnx` instead of the non-existent `.sln`, two jobs
+      (fast gate + spec ratchet), `eng/ratchet.sh` gating on *direction* against
+      `test/known-failures.txt`, SQL Server container dropped per ADR-009. The ratchet also
+      guards the **total**, because a crashed test host reports fewer failures — the trap step
+      K3c came one measurement from falling into. ✅ `<this commit>`
 
-- [ ] **N2.** Split into two jobs (roadmap §CI strategy): **fast gate** — build +
-      `ExpressionRoundTripTest` + `InMemorySmokeTest`, blocks; **spec ratchet** — full suite,
-      non-blocking on absolute count. Replace the `~InMemory` / `~SqlServer` filters, which match
-      no current test class.
+- [ ] **N5.** *(deferred)* Pin subrepo revisions in `research-infrastructure.md` — all four cells
+      are `_(record tag/SHA)_`, so ADR-005's reproducibility guarantee is void. Capture SHAs from
+      the existing clones **before** anything re-clones them. *(was J3)*
 
-- [ ] **N3.** Failure-count ratchet. Commit `test/known-failures.txt` at **1421**; CI parses the
-      run summary and fails only when failures *exceed* it. Lower it in the same commit as any
-      fix that reduces it.
-
-- [ ] **N4.** Drop the SQL Server service container from the per-commit workflow (ADR-009 — Tier
-      C is nightly, from M7).
-
-- [ ] **N5.** Pin subrepo revisions in `research-infrastructure.md` — all four cells are
-      `_(record tag/SHA)_`, so ADR-005's reproducibility guarantee is void. Capture SHAs from the
-      existing clones **before** anything re-clones them. *(was J3)*
-
-- [ ] **N6.** Reconcile `ci-cd.md` with ADR-009 (Docker demoted to Tier C) and with the two-job
-      ratchet strategy. *(was J4)*
+- [ ] **N6.** *(deferred)* Reconcile `ci-cd.md` with ADR-009 (Docker demoted to Tier C) and with
+      the two-job ratchet strategy. *(was J4)*
 
 ---
 

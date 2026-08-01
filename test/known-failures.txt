@@ -1,0 +1,13 @@
+# Spec-suite ratchet baseline — see eng/ratchet.sh and roadmap.md §CI strategy.
+#
+# The suite is red on purpose: it inherits Microsoft's EFCore.Specification.Tests (ADR-004) and
+# CLAUDE.md forbids skipping a test to force green. CI therefore gates on direction — failures
+# must not rise, and the total must not shrink.
+#
+# Lower `failed` in the same commit as the fix that lowers it. Raise it only with a reason in the
+# commit message; the last deliberate rise was step L1, which turned on the type allowlist and
+# converted ~1,305 illusory passes into real M2 failures.
+#
+# 2026-08-01 — after L1 (type allowlist ON), entering milestone M2.
+failed=1421
+total=4247

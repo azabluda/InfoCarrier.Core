@@ -8,20 +8,15 @@ on:
 
 env:
   DOTNET_VERSION: '10.0.x'
+  SOLUTION: InfoCarrier.Core.slnx
+  TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
 jobs:
-  build-and-test:
+  # Must be green. Build plus the two suites that are expected to pass unconditionally:
+  # serializer round-trip and the end-to-end vertical slice.
+  fast-gate:
+    name: Fast gate
     runs-on: ubuntu-latest
-
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          SA_PASSWORD: InfoCarrier1!
-        ports:
-          - 1433:1433
-        options: --health-cmd="/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P InfoCarrier1! -Q 'SELECT 1'" --health-interval=10s --health-timeout=5s --health-retries=5
 
     steps:
       - uses: actions/checkout@v4
@@ -32,15 +27,51 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore InfoCarrier.Core.sln
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Build
-        run: dotnet build InfoCarrier.Core.sln --no-restore --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
 
-      - name: Test (InMemory)
-        run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --filter "FullyQualifiedName~InMemory" --verbosity normal
+      - name: Test (round-trip + smoke)
+        run: >
+          dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
+          --filter "FullyQualifiedName~ExpressionRoundTripTest|FullyQualifiedName~InMemorySmokeTest"
 
-      - name: Test (SqlServer)
-        run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --filter "FullyQualifiedName~SqlServer" --verbosity normal
-        env:
-          INFOCARRIER_SQL_CONNECTION: Server=localhost,1433;Database=InfoCarrierTest;User=sa;Password=InfoCarrier1!;TrustServerCertificate=true
+  # The inherited EFCore.Specification.Tests suite is legitimately red during build-out
+  # (CLAUDE.md forbids skipping tests to force green), so this job gates on the *direction*
+  # of the failure count, not its value. See roadmap.md §CI strategy.
+  spec-ratchet:
+    name: Spec ratchet
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION }}
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
+
+      # Failures are the expected state here, so a non-zero exit must not end the job —
+      # the ratchet step below is what decides.
+      - name: Test (full suite)
+        continue-on-error: true
+        run: >
+          dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
+          --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
+
+      - name: Ratchet
+        run: ./eng/ratchet.sh artifacts/test-results/results.trx test/known-failures.txt
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results
