@@ -203,6 +203,20 @@ public class DynamicValueMapper : IDynamicValueMapper
             }
 
             object? propertyValue = value is null ? null : property.GetValue(value);
+
+            // The compact `PrimitiveValue` form carries no type of its own, so the reverse path
+            // can only rebuild it from the member's *declared* type. That is enough when the two
+            // agree, and wrong when they do not: a member declared `object` holding a decimal
+            // came back as the raw JsonElement, which prints as the right number and compares
+            // equal to nothing. Such a value goes as a full node instead, which carries its own
+            // TypeNode — but only when it is a primitive. Widening the *node* type to the
+            // runtime type generally would make the mapper walk graphs the declared type used to
+            // truncate (an `object` member holding a DbContext), and that stack-overflows.
+            Type declared = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+            bool isPrimitive = IsPrimitive(propertyValue);
+            bool asPrimitive = isPrimitive
+                && (propertyValue is null || declared == propertyValue.GetType());
+
             properties.Add(new DynamicPropertyValue
             {
                 Name = property.Name,
@@ -211,8 +225,12 @@ public class DynamicValueMapper : IDynamicValueMapper
                 // type, which can never be pre-registered with the source-generated serializer
                 // (ADR-008 constraint 8), so an un-normalized one fails at write time —
                 // AutoTransactionBehavior on a captured DbContext did exactly that.
-                PrimitiveValue = IsPrimitive(propertyValue) ? PrimitiveCoercion.Normalize(propertyValue) : null,
-                Value = IsPrimitive(propertyValue) ? null : ToDynamicValue(propertyValue, property.PropertyType),
+                PrimitiveValue = asPrimitive ? PrimitiveCoercion.Normalize(propertyValue) : null,
+                Value = asPrimitive
+                    ? null
+                    : ToDynamicValue(
+                        propertyValue,
+                        isPrimitive ? propertyValue!.GetType() : property.PropertyType),
             });
         }
 
