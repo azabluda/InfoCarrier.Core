@@ -271,3 +271,11 @@ code (roadmap M2).
 
 Of the 68 remaining, **64 are M2 (projection split)** and 4 are the G4e tail. M1 lands at
 ≈349/413 once G4e clears — the rest is M2 by construction.
+
+Totals jump below because Phase I adopted the 20 remaining `Northwind*QueryTestBase`
+subclasses; the suite is a different, much larger population from here on.
+
+| Date | Passed | Failed | Total | Note |
+|---|---|---|---|---|
+| 2026-08-01 | 3635 | 603 | 4247 | after result wire format + per-message reference scope |
+| 2026-08-01 | 3692 | 546 | 4247 | after G5 (entity-in-projection routing) |

@@ -45,11 +45,14 @@ public class ClientResultMaterializer
     {
         var mapper = (DynamicValueMapper)_serializer.ValueMapper;
 
+        // Entities are built here wherever they appear in the graph — as a whole row, or nested
+        // inside a projection (`Select(c => new { c, o })`). Before this hook the nested case
+        // was reflection-constructed by the mapper: detached, unregistered, no shadow state.
+        mapper.EntityMaterializer = node => MaterializeEntity(node, mapper);
+
         foreach (DynamicValueNode row in DeserializeRows(result))
         {
-            object? value = row.EntityKey is not null
-                ? MaterializeEntity(row, mapper)
-                : mapper.FromDynamicValue(row);
+            object? value = mapper.FromDynamicValue(row);
 
             if (value is null)
             {
@@ -80,7 +83,8 @@ public class ClientResultMaterializer
         IEntityType? entityType = _context.Model.FindEntityType(row.EntityKey!.EntityTypeName);
         if (entityType is null)
         {
-            return mapper.FromDynamicValue(row);
+            // Not FromDynamicValue: that would route straight back into this method.
+            return mapper.FromShape(row);
         }
 
         // Identity resolution via EF's own identity map (v1 pattern): reuse the tracked
@@ -150,7 +154,7 @@ public class ClientResultMaterializer
 
             object? related = navigation.IsCollection
                 ? MaterializeCollection(member.Value, navigation, mapper)
-                : MaterializeRelated(member.Value, mapper);
+                : mapper.FromDynamicValue(member.Value);
 
             if (related is not null && navigation.PropertyInfo is { CanWrite: true } property)
             {
@@ -176,14 +180,9 @@ public class ClientResultMaterializer
 
         foreach (DynamicValueNode item in node.Items ?? [])
         {
-            items.Add(MaterializeRelated(item, mapper));
+            items.Add(mapper.FromDynamicValue(item));
         }
 
         return items;
     }
-
-    private object? MaterializeRelated(DynamicValueNode node, DynamicValueMapper mapper)
-        => node.EntityKey is not null
-            ? MaterializeEntity(node, mapper)
-            : mapper.FromDynamicValue(node);
 }

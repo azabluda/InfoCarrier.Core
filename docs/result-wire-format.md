@@ -1,29 +1,37 @@
 # Result Wire Format — Design
 
-Status: **IMPLEMENTED (2026-08-01), one known gap** · Milestone [M2](roadmap.md) · Implements
+Status: **IMPLEMENTED (2026-08-01)** · Milestone [M2](roadmap.md) · Implements
 [`wire-protocol.md`](wire-protocol.md) §2.1 and [ADR-008](decisions.md) constraints 1 and 5.
 
-**Result: 1,109 → 3,635 passing of 4,238.** Both target error classes eliminated —
-"a possible object cycle was detected" 821 → 0, and "could not be converted to `List<…>`"
-226 → 0.
+**Result: 1,109 → 3,692 passing of 4,247.** All three target error classes eliminated —
+"a possible object cycle was detected" 821 → 0, "could not be converted to `List<…>`" 226 → 0,
+and `Dangling wire reference` 54 → 0.
 
-## Known gap — entity nodes nested in a projection
+## Closed — entity nodes nested in a projection
 
-`DynamicValueMapper.Materialize` dispatches on `IsNull` / `TypeValue` / `PrimitiveValue` /
-`Items` / object-shape. **It has no `EntityKey` branch.** A top-level entity row is handled by
+`DynamicValueMapper.Materialize` dispatched on `IsNull` / `TypeValue` / `PrimitiveValue` /
+`Items` / object-shape and had **no `EntityKey` branch**. A top-level entity row went through
 `ClientResultMaterializer.MaterializeEntity` (identity resolution, shadow state, `SetIsLoaded`),
-but an entity reached *through a projection member* — `Select(c => new { c, o })` — falls to
-`RehydrateObject` instead: reflection-constructed, detached, no identity resolution, shadow
-properties lost.
+but an entity reached *through a projection member* — `Select(c => new { c, o })` — fell to
+`RehydrateObject`: reflection-constructed, detached, shadow properties lost.
 
-This is the lead suspect for the remaining **108 `Dangling wire reference`** failures, and it is
-a correctness problem in its own right regardless of those. The fix is to route entity-keyed
-nodes to the client materializer from inside the mapper, which needs the mapper to hold a
-materialization callback rather than owning entity construction itself.
+The dangling references were a second-order consequence. `RehydrateObject` selects the
+lowest-arity constructor whose parameters all match members, so an entity with a parameterless
+constructor took the **ctor** branch — and that branch never called `RegisterMaterialized`. The
+projected entity's wire id was therefore never registered, and every back-reference to it from
+its own loaded navigations dangled. All 54 failures were `Include`-family tests, which is
+exactly the shape that produces the back-reference.
 
-Two register-before-populate holes (§3.1) were found and closed while chasing this — collection
-node ids, and object rehydration ordering — but neither changed the failure count, so they were
-not the cause.
+Fixed in two parts:
+
+1. `DynamicValueMapper.EntityMaterializer` — an optional hook, set on the client only, that
+   routes any entity-keyed node to `ClientResultMaterializer.MaterializeEntity` wherever it
+   appears in the graph. `FromShape` is the bypass for an entity type the client model does not
+   know, since routing that back through `FromDynamicValue` would re-enter the hook.
+2. `RehydrateObject` now registers the wire id on **every** branch. Only a genuinely
+   parameterized constructor still reads its arguments before the instance exists, which is
+   safe: a type reachable only through its constructor cannot be mutated into a cycle back to
+   itself.
 
 ---
 

@@ -30,6 +30,21 @@ public class DynamicValueMapper : IDynamicValueMapper
     private Func<object, INavigationBase, bool>? _isNavigationLoaded;
 
     /// <summary>
+    ///     Routes an entity-keyed node to the client materializer, wherever in the graph it
+    ///     appears. Set on the client only; <see langword="null" /> on the server.
+    /// </summary>
+    /// <remarks>
+    ///     Entity instances cannot be built here: identity resolution and shadow state both
+    ///     require the change tracker. Without this hook, an entity reached through a projection
+    ///     member — <c>Select(c =&gt; new { c, o })</c> — fell through to
+    ///     <see cref="RehydrateObject" /> and was reflection-constructed: detached, no identity
+    ///     resolution, shadow properties lost, and (because the entity's parameterless
+    ///     constructor took the ctor branch, which registered no wire id) every back-reference
+    ///     from its loaded navigations dangled.
+    /// </remarks>
+    public Func<DynamicValueNode, object?>? EntityMaterializer { get; set; }
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="DynamicValueMapper" /> class.
     /// </summary>
     public DynamicValueMapper(IModel? model, TypeNodeMapper typeMapper, TypeNodeResolver typeResolver)
@@ -276,11 +291,33 @@ public class DynamicValueMapper : IDynamicValueMapper
         }
     }
 
+    /// <summary>
+    ///     Rehydrates a node as a plain object shape, bypassing <see cref="EntityMaterializer" />.
+    /// </summary>
+    /// <remarks>
+    ///     For an entity-keyed node whose entity type the client model does not know. Routing it
+    ///     back through <see cref="FromDynamicValue" /> would re-enter the entity hook that just
+    ///     gave up on it, and recurse forever.
+    /// </remarks>
+    public object? FromShape(DynamicValueNode node)
+    {
+        object? value = RehydrateObject(node, _typeResolver.Resolve(node.Type));
+        RegisterMaterialized(node.Id, value);
+        return value;
+    }
+
     private object? Materialize(DynamicValueNode node)
     {
         if (node.IsNull)
         {
             return null;
+        }
+
+        // Entity, anywhere in the graph — hand it to the client materializer, which owns
+        // identity resolution and shadow state. Must precede the object-shape branch.
+        if (node.EntityKey is not null && EntityMaterializer is { } materializeEntity)
+        {
+            return materializeEntity(node);
         }
 
         Type type = _typeResolver.Resolve(node.Type);
@@ -334,27 +371,31 @@ public class DynamicValueMapper : IDynamicValueMapper
 
         object? instance;
         HashSet<string> ctorBound = new(StringComparer.OrdinalIgnoreCase);
-        if (ctor is not null)
+        if (ctor is { } parameterized && parameterized.GetParameters().Length > 0)
         {
-            object?[] args = ctor.GetParameters()
+            // The only ordering that cannot register first: the arguments have to be read
+            // before the instance exists. Safe, because a type reachable only through its
+            // constructor cannot be mutated into a cycle pointing back at itself.
+            object?[] args = parameterized.GetParameters()
                 .Select(p =>
                 {
                     ctorBound.Add(p.Name!);
                     return ReadValue(byName[p.Name!], p.ParameterType);
                 })
                 .ToArray();
-            instance = ctor.Invoke(args);
+            instance = parameterized.Invoke(args);
         }
         else
         {
-            instance = Activator.CreateInstance(type, nonPublic: true);
-
-            // Register before populating, so a member that points back at this instance
-            // resolves to it instead of dangling (result-wire-format.md §3.1). Only possible on
-            // this branch: the ctor branch must read its arguments before the instance exists,
-            // which is safe because a ctor-only type cannot be mutated into a cycle.
-            RegisterMaterialized(node.Id, instance);
+            instance = ctor is not null
+                ? ctor.Invoke([])
+                : Activator.CreateInstance(type, nonPublic: true);
         }
+
+        // Register before populating members, so one that points back at this instance resolves
+        // to it instead of dangling (result-wire-format.md §3.1). The parameterless-ctor case
+        // used to fall in the branch above and skip this entirely.
+        RegisterMaterialized(node.Id, instance);
 
         // Set remaining settable properties not bound by the ctor.
         foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
