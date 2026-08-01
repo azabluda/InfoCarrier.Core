@@ -288,3 +288,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 4088 | 150 | 4247 | after G10 (mirror EF's own InMemory store-limitation overrides) |
 | 2026-08-01 | 4134 | 104 | 4247 | after G11 (unwrap TargetInvocationException at the server boundary) |
 | 2026-08-01 | 4166 | 72 | 4247 | after G12 (entity references carry their key to the server) |
+| 2026-08-01 | 4171 | 67 | 4247 | after G13 (value-type ctors; a single result that is itself a sequence) |

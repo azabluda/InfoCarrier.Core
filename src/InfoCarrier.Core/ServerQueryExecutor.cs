@@ -54,7 +54,7 @@ public class ServerQueryExecutor
             object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
 
             // Map results to the wire format (entity rows vs columnar projections).
-            return MapResults(result, query);
+            return MapResults(result, request.ReturnsSingleResult);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
@@ -186,23 +186,36 @@ public class ServerQueryExecutor
         return queryable?.GetGenericArguments()[0] ?? queryType;
     }
 
-    private QueryDataResult MapResults(object? result, Expression query)
+    private QueryDataResult MapResults(object? result, bool singleResult)
     {
+        List<object?> rows = ToRows(result, singleResult);
+
         // Entity-typed results → identity-keyed rows; projections → columnar data (E2 refines).
-        object? first = result is IEnumerable enumerable
-            ? enumerable.Cast<object?>().FirstOrDefault()
-            : result;
-        Type? elementType = first?.GetType();
+        Type? elementType = rows.FirstOrDefault(r => r is not null)?.GetType();
         bool isEntityResult = elementType is not null
             && _context.Model.FindEntityType(elementType) is not null;
 
         return new QueryDataResult
         {
-            SerializedResults = SerializeResult(result, elementType),
+            SerializedResults = SerializeResult(rows, elementType),
             IsEntityResult = isEntityResult,
             ElementTypeName = elementType?.FullName,
         };
     }
+
+    /// <summary>
+    ///     Splits an execution result into wire rows.
+    /// </summary>
+    /// <remarks>
+    ///     A single result is <em>one</em> row even when it is itself a sequence:
+    ///     <c>…Select(c =&gt; c.Orders.Select(o =&gt; o.OrderID)).First()</c> must arrive as one
+    ///     list, not as N integer rows. Enumerating unconditionally flattened exactly that away,
+    ///     and the client then failed casting an <c>Int32</c> to <c>IEnumerable&lt;int&gt;</c>.
+    /// </remarks>
+    private static List<object?> ToRows(object? result, bool singleResult)
+        => singleResult || result is not IEnumerable enumerable || result is string
+            ? [result]
+            : enumerable.Cast<object?>().ToList();
 
     /// <summary>
     ///     Serializes result rows as a <see cref="DynamicValueNode" /> graph
@@ -214,7 +227,7 @@ public class ServerQueryExecutor
     ///     public-property walk, and lazy-loading proxies get walked as data
     ///     (ADR-008 constraints 1 and 5).
     /// </remarks>
-    private byte[] SerializeResult(object? result, Type? elementType)
+    private byte[] SerializeResult(List<object?> rows, Type? elementType)
     {
         var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
@@ -248,16 +261,16 @@ public class ServerQueryExecutor
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.GetGetter().GetClrValue(entity) is not null);
 
-        var rows = new List<DynamicValueNode>();
-        foreach (object? item in result is IEnumerable e && result is not string ? e : new[] { result })
+        var nodes = new List<DynamicValueNode>();
+        foreach (object? item in rows)
         {
-            rows.Add(item is null
+            nodes.Add(item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
                 : mapper.ToRowValue(item, item.GetType(), IsLoaded));
         }
 
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-            rows, ExpressionJsonContext.Default.ListDynamicValueNode);
+            nodes, ExpressionJsonContext.Default.ListDynamicValueNode);
     }
 
     private static ExpressionNode DeserializeNode(byte[] payload)

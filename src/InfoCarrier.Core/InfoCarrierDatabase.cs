@@ -73,15 +73,19 @@ public class InfoCarrierDatabase : IDatabase
 
     private static bool QueryReturnsSingleResult(Expression query)
     {
-        // A query returns a single result when its terminal operator is not a sequence.
         Type type = query.Type;
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
         {
             type = type.GetGenericArguments()[0];
         }
 
-        return !typeof(System.Collections.IEnumerable).IsAssignableFrom(type)
-            || type == typeof(string);
+        // A sequence query is typed IQueryable<T>; everything else is one result. Testing
+        // IEnumerable instead conflated the two whenever the single result was itself a
+        // sequence — `…Take(1).Select(c => c.Orders.Select(o => o.OrderID)).First()` is typed
+        // IEnumerable<int> — so the async path handed EF an IAsyncEnumerable where it wanted a
+        // Task<IEnumerable<int>>, and the cast failed. (`string` needed a special case under
+        // the old test and needs none under this one.)
+        return !typeof(IQueryable).IsAssignableFrom(type);
     }
 
     /// <inheritdoc />

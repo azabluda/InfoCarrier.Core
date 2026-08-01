@@ -202,6 +202,14 @@ public class NodeToExpressionTranslator
             modifiers: null);
         if (ctor is null)
         {
+            // A value type declares no parameterless constructor, so `GetConstructor` returns
+            // null for `new DateTime()` or `new MyStruct()` even though the expression is
+            // perfectly legal. `Expression.New(Type)` is the overload for exactly that case.
+            if (arguments.Length == 0 && type.IsValueType)
+            {
+                return Expression.New(type);
+            }
+
             throw new InvalidOperationException($"Constructor not found on '{type}'.");
         }
 

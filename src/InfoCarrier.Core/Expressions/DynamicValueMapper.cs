@@ -194,7 +194,12 @@ public class DynamicValueMapper : IDynamicValueMapper
             properties.Add(new DynamicPropertyValue
             {
                 Name = property.Name,
-                PrimitiveValue = IsPrimitive(propertyValue) ? propertyValue : null,
+
+                // Normalize, as MapRowMembers does. An enum carries its own concrete runtime
+                // type, which can never be pre-registered with the source-generated serializer
+                // (ADR-008 constraint 8), so an un-normalized one fails at write time —
+                // AutoTransactionBehavior on a captured DbContext did exactly that.
+                PrimitiveValue = IsPrimitive(propertyValue) ? PrimitiveCoercion.Normalize(propertyValue) : null,
                 Value = IsPrimitive(propertyValue) ? null : ToDynamicValue(propertyValue, property.PropertyType),
             });
         }
