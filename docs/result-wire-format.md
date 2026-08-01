@@ -1,10 +1,29 @@
 # Result Wire Format — Design
 
-Status: **SPEC — not implemented** · Milestone [M2](roadmap.md) · Implements
+Status: **IMPLEMENTED (2026-08-01), one known gap** · Milestone [M2](roadmap.md) · Implements
 [`wire-protocol.md`](wire-protocol.md) §2.1 and [ADR-008](decisions.md) constraints 1 and 5.
 
-Accounts for **1,047 of 1,440 current test failures (73%)** — the single highest-value change
-in the project. Measured 2026-08-01 across 2,600 tests.
+**Result: 1,109 → 3,635 passing of 4,238.** Both target error classes eliminated —
+"a possible object cycle was detected" 821 → 0, and "could not be converted to `List<…>`"
+226 → 0.
+
+## Known gap — entity nodes nested in a projection
+
+`DynamicValueMapper.Materialize` dispatches on `IsNull` / `TypeValue` / `PrimitiveValue` /
+`Items` / object-shape. **It has no `EntityKey` branch.** A top-level entity row is handled by
+`ClientResultMaterializer.MaterializeEntity` (identity resolution, shadow state, `SetIsLoaded`),
+but an entity reached *through a projection member* — `Select(c => new { c, o })` — falls to
+`RehydrateObject` instead: reflection-constructed, detached, no identity resolution, shadow
+properties lost.
+
+This is the lead suspect for the remaining **108 `Dangling wire reference`** failures, and it is
+a correctness problem in its own right regardless of those. The fix is to route entity-keyed
+nodes to the client materializer from inside the mapper, which needs the mapper to hold a
+materialization callback rather than owning entity construction itself.
+
+Two register-before-populate holes (§3.1) were found and closed while chasing this — collection
+node ids, and object rehydration ordering — but neither changed the failure count, so they were
+not the cause.
 
 ---
 
