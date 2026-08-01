@@ -2,6 +2,8 @@
 
 using System.Collections;
 using System.Linq.Expressions;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
@@ -42,15 +44,31 @@ public class ServerQueryExecutor
         // Start of a message exchange: wire reference ids restart at 1.
         ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
 
-        // Deserialize + rebind the tree against the server model.
-        ExpressionNode node = DeserializeNode(request.SerializedQuery);
-        Expression query = Rebind(node);
+        try
+        {
+            // Deserialize + rebind the tree against the server model.
+            ExpressionNode node = DeserializeNode(request.SerializedQuery);
+            Expression query = Rebind(node);
 
-        // Execute against the server context.
-        object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
+            // Execute against the server context.
+            object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
 
-        // Map results to the wire format (entity rows vs columnar projections).
-        return MapResults(result, query);
+            // Map results to the wire format (entity rows vs columnar projections).
+            return MapResults(result, query);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            // Reflection is the server's own business, never part of the contract. The server
+            // pipeline reflects in several places — and so does EF: its non-generic
+            // `EntityQueryProvider.Execute(Expression)` is `MakeGenericMethod(…).Invoke(…)`, so
+            // every translation failure raised through it arrives wrapped. A caller asserting
+            // `InvalidOperationException` got `TargetInvocationException` instead.
+            //
+            // Rethrow the original with its stack intact rather than `throw ex.InnerException`,
+            // which would reset it to this line.
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw; // Unreachable; the compiler cannot see that Throw() does not return.
+        }
     }
 
     private Expression Rebind(ExpressionNode node)

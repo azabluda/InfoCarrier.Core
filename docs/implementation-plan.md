@@ -286,3 +286,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 3968 | 270 | 4247 | after G8 (server-side defining queries for keyless types) |
 | 2026-08-01 | 3996 | 242 | 4247 | after G9 (declared collection types rebuilt, not widened to List) |
 | 2026-08-01 | 4088 | 150 | 4247 | after G10 (mirror EF's own InMemory store-limitation overrides) |
+| 2026-08-01 | 4134 | 104 | 4247 | after G11 (unwrap TargetInvocationException at the server boundary) |
