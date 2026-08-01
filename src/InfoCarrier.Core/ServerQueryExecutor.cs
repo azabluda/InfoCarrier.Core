@@ -38,6 +38,9 @@ public class ServerQueryExecutor
         // Match the client's tracking behavior on the server context.
         _context.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
 
+        // Start of a message exchange: wire reference ids restart at 1.
+        ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
+
         // Deserialize + rebind the tree against the server model.
         ExpressionNode node = DeserializeNode(request.SerializedQuery);
         Expression query = Rebind(node);

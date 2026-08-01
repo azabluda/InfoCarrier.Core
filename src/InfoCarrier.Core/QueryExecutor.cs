@@ -38,6 +38,10 @@ internal sealed class QueryExecutor<TElement>
     {
         using var cs = _queryContext.ConcurrencyDetector.EnterCriticalSection();
 
+        // Start of a message exchange: wire reference ids restart at 1 on both sides.
+        ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
+            .ResetReferenceScope();
+
         // Serialize the captured tree to the wire DTO.
         Expressions.ExpressionNode node = _expressionSerializer.ToNode(_query);
         var request = new QueryDataRequest

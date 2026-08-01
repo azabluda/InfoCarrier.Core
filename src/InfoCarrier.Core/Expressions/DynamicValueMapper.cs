@@ -40,6 +40,25 @@ public class DynamicValueMapper : IDynamicValueMapper
     }
 
     /// <summary>
+    ///     Clears the per-message reference scope. **Must** be called at every message
+    ///     boundary.
+    /// </summary>
+    /// <remarks>
+    ///     Reference identity is a small integer that restarts at 1 for each message, and this
+    ///     mapper is DI-scoped, so it outlives a single exchange. Without a reset, ids from an
+    ///     earlier query collide with the current one and a lookup returns a stale object from
+    ///     a previous result. (The predecessor maps were keyed by object/node reference, where
+    ///     a collision was impossible and a stale entry was merely a leak — integer keys make
+    ///     the reset load-bearing.)
+    /// </remarks>
+    public void ResetReferenceScope()
+    {
+        _toIds.Clear();
+        _fromIds.Clear();
+        _nextId = 0;
+    }
+
+    /// <summary>
     ///     Maps an entity <em>result row</em>: full scalar state plus loaded navigations, rather
     ///     than the key-only reference used for entities appearing inside a query tree
     ///     (see <c>docs/result-wire-format.md</c> §3.2).
@@ -123,7 +142,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         // Null: distinguishable from an absent value, and never referenceable.
         if (value is null)
         {
-            return new DynamicValueNode { Type = typeNode };
+            return new DynamicValueNode { Type = typeNode, IsNull = true };
         }
 
         // Scalar: a primitive standing where a dynamic value is required (typically a
@@ -259,6 +278,11 @@ public class DynamicValueMapper : IDynamicValueMapper
 
     private object? Materialize(DynamicValueNode node)
     {
+        if (node.IsNull)
+        {
+            return null;
+        }
+
         Type type = _typeResolver.Resolve(node.Type);
 
         // Type value (mirrors the Type branch in MapToNode).

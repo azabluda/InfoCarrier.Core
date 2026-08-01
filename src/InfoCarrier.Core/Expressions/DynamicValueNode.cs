@@ -38,6 +38,13 @@ public sealed record DynamicValueNode
     public int? Ref { get; init; }
 
     /// <summary>
+    ///     Explicit null. Required because "no content" is otherwise indistinguishable from an
+    ///     object shape with no members, which the reverse path would rehydrate into an empty
+    ///     instance — a null result row would come back as <c>new object()</c>.
+    /// </summary>
+    public bool IsNull { get; init; }
+
+    /// <summary>
     ///     For entity values: the EF entity-type name + key property values identifying the
     ///     entity (research-findings §7). Null for non-entity values.
     /// </summary>
