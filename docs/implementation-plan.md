@@ -257,6 +257,73 @@ M1 closes when all of:
 Then rewrite this doc for **M2 — projection split**, which starts with a design session, not
 code (roadmap M2).
 
+## Phase K — the residual 42, classified
+
+Measured 2026-08-01 at **4196 passed / 42 failed / 4247**. 22 distinct tests (most ×2 for
+sync+async). Every one is left failing on purpose; none is an unexplained failure.
+
+### K1 — projection split (M2). 12 tests
+
+The server is asked to construct, or execute against, something only the client has. The
+answer is not to make these serializable — it is to evaluate the client-only part on the
+client, which is what M2 is for.
+
+| Tests | Shape |
+|---|---|
+| `Client_code_using_instance_method_throws`, `_in_static_method`, `_in_anonymous_type` (6) | `Select(c => new { A = this })` — the *test class instance* is projected. Reconstructing it server-side fails at `Activator.CreateInstance`: no parameterless constructor. |
+| `Context_based_client_method` (2) | Closes over the client `DbContext`. |
+| `Entity_passed_to_DTO_constructor_works` (2) | `new CustomerDtoWithEntityInCtor(x)` — the constructor argument is not recoverable from the DTO's public shape (its only property is `Id`), so shape-based rehydration cannot rebuild it. |
+| `Throws_on_concurrent_query_list`, `_first` (4) | Block inside a client-evaluated projection to force overlapping queries. With the projection shipped whole, the blocking never happens on the client, so the concurrency detector never trips. |
+
+> Deliberately **not** worked around. Allocating uninitialized objects and writing backing
+> fields would make the DTO case pass while leaving the design untouched — and it would
+> re-hide the very signal G4e already hid once.
+
+### K2 — client context state does not cross the wire. 6 tests
+
+`Materialized_query_parameter`, `_new_context`, `Projection_query_parameter`.
+
+A query filter captures a **context property** — `HasQueryFilter(c => c.CompanyName.StartsWith(TenantPrefix))`.
+Filters are applied during translation, which happens on the server, against the *server*
+context instance. The test sets `TenantPrefix` on the client, so the server filters on its own
+default and returns 7 rows where 8 are expected.
+
+The harness has a `CopyDbContextParameters` hook for exactly this — **and it is dead code,
+never invoked from anywhere**. Wiring it up is not sufficient either: it presumes the server
+can see the client context object, which is true only in-process.
+
+**Open design question, no ADR yet:** how does client-side context state reach the server?
+The candidate answer is that `QueryDataRequest` carries an application-populated bag, with
+paired client/server callbacks on the provider options — a real feature that multi-tenant
+filters need, not a test concern. It belongs in the wire protocol; do not settle it with a
+harness patch.
+
+### K3 — genuine InfoCarrier gaps, individually small. 15 tests
+
+Each is a real defect with a known symptom and no shared root cause.
+
+| Tests | Symptom |
+|---|---|
+| `Filtered_collection_projection_is_tracked`, `_with_to_list_is_tracked` (4) | `Assert.True` — a filtered collection projection is not tracked. |
+| `AsEnumerable_over_string` (2) | A `string` result declared `IEnumerable<char>` fails JSON conversion. |
+| `Entity_equality_contains_with_list_of_null` (2) | `NullReferenceException` — a null element in an entity list. |
+| `Contains_over_keyless_entity_throws` (2) | Expected `True`, got `False`. |
+| `Odata_groupby_empty_key` (2) | Values print identically; a type or precision difference. |
+| `Projecting_nullable_struct` (2) | Struct rehydrated, values differ. |
+| `Client_OrderBy_GroupBy_Group_ordering_works` (2) | Wrong exception type. |
+| `Contains_with_local_ordered_enumerable_inline` (2) | Query-parameter evaluation throws. |
+| `Compiled_query_when_does_not_end_in_query_operator` (1) | `must be reducible node`. |
+
+### K4 — red by design. 1 test
+
+`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` — the coverage scoreboard
+(Phase I). It stays red until every spec base is adopted; that is its job.
+
+### K5 — upstream, already asserted elsewhere. 2 tests
+
+`SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity`
+throws `NotImplementedException` from the InMemory provider itself.
+
 ## Baseline log
 
 | Date | Passed | Failed | Total | Note |
