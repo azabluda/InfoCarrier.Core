@@ -348,6 +348,12 @@ public class DynamicValueMapper : IDynamicValueMapper
         else
         {
             instance = Activator.CreateInstance(type, nonPublic: true);
+
+            // Register before populating, so a member that points back at this instance
+            // resolves to it instead of dangling (result-wire-format.md §3.1). Only possible on
+            // this branch: the ctor branch must read its arguments before the instance exists,
+            // which is safe because a ctor-only type cannot be mutated into a cycle.
+            RegisterMaterialized(node.Id, instance);
         }
 
         // Set remaining settable properties not bound by the ctor.

@@ -169,6 +169,11 @@ public class ClientResultMaterializer
         var items = (System.Collections.IList)Activator.CreateInstance(
             typeof(List<>).MakeGenericType(navigation.TargetEntityType.ClrType))!;
 
+        // Register before filling: this path bypasses FromDynamicValue, so without it the
+        // collection's own wire id is never registered and a later back-reference to it
+        // dangles.
+        mapper.RegisterMaterialized(node.Id, items);
+
         foreach (DynamicValueNode item in node.Items ?? [])
         {
             items.Add(MaterializeRelated(item, mapper));
