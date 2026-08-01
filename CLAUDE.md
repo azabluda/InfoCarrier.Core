@@ -22,9 +22,16 @@ or infer a count.
 |---|---|
 | `docs/decisions.md` | **ADR log.** LOCKED entries are binding. |
 | `docs/infocarrier-core-requirements.md` | Authoritative requirements spec |
-| `docs/implementation-plan.md` | Live checkbox plan — the working task list |
+| `docs/roadmap.md` | **Stable** milestone plan for the whole project |
+| `docs/implementation-plan.md` | **Rolling** checkbox detail for the *current* milestone only |
 | `docs/architecture.md` | Components, test strategy, open questions |
 | `docs/research-findings.md` | EF Core 10 pipeline findings backing the ADRs |
+
+**Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
+in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
+`implementation-plan.md`, which is rewritten at each milestone boundary (previous ones land in
+`docs/archive/`, never edited again). Putting task detail in the roadmap, or scope changes in
+the plan, is what caused the drift these two docs replaced.
 
 **Reversing a LOCKED ADR requires a dated supersession edit in `docs/decisions.md`** — not a
 code change that quietly contradicts it. ADR-001 (greenfield serializer, no Remote.Linq/Aqua

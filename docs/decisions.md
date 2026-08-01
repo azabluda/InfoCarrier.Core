@@ -3,8 +3,9 @@
 Record of design decisions for InfoCarrier.Core v2. Each entry states context, decision,
 and rationale.
 
-> **Status note.** The project is in a **pre-implementation phase**: we study third-party
-> code extensively before writing our own. Each entry is marked:
+> **Status note.** The pre-implementation research phase closed 2026-07-22
+> ([`research-findings.md`](research-findings.md)); the project is now in **implementation**
+> (see [`roadmap.md`](roadmap.md)). Each entry is marked:
 > - **LOCKED** — decided and binding; reversing requires a dated supersession edit here.
 > - **PROVISIONAL** — current best understanding, **subject to change** as research
 >   continues. Provisional entries shape the specs but are not yet commitments; each links
@@ -151,3 +152,77 @@ one-shot (no file watcher, `CODEGRAPH_NO_DAEMON=1`). Do not use the `codebase-me
 
 **Rationale.** Reproducible, install-free tooling that any contributor (or agent) can run
 identically. See [`research-infrastructure.md`](research-infrastructure.md).
+
+## ADR-008 — Serializer design: rlinq/aqua patterns, EF-metadata-driven — LOCKED (2026-07-22, recorded 2026-08-01)
+
+> **Record note.** [`research-findings.md`](research-findings.md) §"Locked consequences"
+> declared this ADR locked on 2026-07-22, and
+> [`expression-serialization.md`](expression-serialization.md) §3 +
+> [`implementation-plan.md`](implementation-plan.md) both cite it — but the entry was never
+> written into this log. Recorded here retroactively from those sources. No decision changed;
+> this closes a dangling reference.
+
+**Context.** ADR-001 commits to a greenfield serializer using Remote.Linq and Aqua as written
+specification. That leaves the actual design open: which patterns to adopt, and which of their
+properties to deliberately reject.
+
+**Decision.** rlinq-style node DTOs + aqua-style shape-based type identity, with eight binding
+constraints (expression-serialization §3):
+
+1. **EF-metadata-driven mapper** — entities map via `IModel` metadata (entity types, shadow
+   properties, keys, value converters), never blind public-reflection walks.
+2. **Strict allowlists ON by default** — allowed node kinds, allowed `MethodInfo`s (Queryable /
+   Enumerable / `EF.Functions` / model-bound members), and allowed deserializable types (model
+   entities + registered projection types).
+3. **DI everywhere** — no statics (rlinq's `TypeResolver.Instance` is the anti-pattern).
+4. **Versioned envelope** — protocol version in every message from day 1.
+5. **Reference-preserving serializer** — circular navigation references must survive.
+6. **Canonical, deterministic serialization** — enables a compiled-query cache keyed by
+   structural hash.
+7. **Explicit enum maps** — no int-casting across the System↔remote boundary.
+8. **No `FormatterServices`, no IL-emit** — instances via EF materializer paths or matched
+   constructors; values read through properties / EF `IProperty` accessors so lazy-loading
+   proxies forward correctly.
+
+Node set is the minimal one of research-findings §5 (no Block/Loop/Try/Goto/Switch/Label);
+entity identity on the wire is EF entity-type name + key values per §7 — entities must never
+merge by shape, projections may.
+
+**Implementation status (2026-08-01).** Constraints 1, 3, 4, 5, 7, 8 are implemented.
+**Constraint 2 (allowlists) is NOT implemented** — `TypeNodeResolver.ResolveByName` resolves
+arbitrary type names from wire data via `Type.GetType` plus an `AppDomain` assembly scan, and
+method resolution is similarly unconstrained. With only the in-process transport this is not
+exploitable, but it is a remote-code-execution vector and **must land before any network
+transport ships** (roadmap M5). Constraint 6 (canonical form) is not yet exercised — no
+compiled-query cache exists.
+
+## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
+
+**Context.** [`ci-cd.md`](ci-cd.md) mandated Docker SQL Server as *the* realistic backend and
+explicitly rejected LocalDB. Meanwhile EF Core's InMemory provider — the only backend built —
+**cannot test transactions at all**: it registers `TransactionIgnoredWarning` with
+`WarningBehavior.Throw` (`src/EFCore.InMemory/Extensions/InMemoryDbContextOptionsExtensions.cs`).
+Requirements §2.9 (transactions) and §2.2 (SaveChanges, FK enforcement, store-generated values)
+are therefore untestable on the current backend, and the documented alternative costs a
+container on every developer machine and CI run.
+
+**Decision.** Three test backend tiers:
+
+| Tier | Backend | Scope | Cadence |
+|---|---|---|---|
+| **A** | InMemory | Query semantics, fast iteration | Every run |
+| **B** | **SQLite in-memory** | Transactions + savepoints, FK enforcement, constraint violations, store-generated keys, relational type mapping | Every run |
+| **C** | SQL Server (Docker) | `rowversion` concurrency, computed columns, sequences, TPT/TPC, NTS spatial Z/M | Nightly / on-demand |
+
+**Rationale.** A backend store in this architecture is ~30 lines
+(`InMemoryInfoCarrierBackendTestStore`), so Tier B costs roughly 40 lines and runs in
+milliseconds with no container. It unblocks SaveChanges and transaction coverage on every
+commit and defers Docker to the cases that genuinely need SQL Server semantics. Tier C is not
+cancelled — it is demoted from prerequisite to fidelity check.
+
+**Consequences.** `SqliteInfoCarrierBackendTestStore` must hold one `SqliteConnection` open for
+the store's lifetime (an in-memory SQLite database is destroyed when its last connection
+closes). `ci-cd.md`'s "Docker SQL Server, NOT LocalDB" framing is superseded for Tiers A/B and
+retained for Tier C.
+
+**Supersedes.** The Docker-only backend strategy in [`ci-cd.md`](ci-cd.md).

@@ -58,6 +58,8 @@ Not yet implemented: the client/server projection split (requirements §3), `Sav
 | Doc | Contents |
 |---|---|
 | [`docs/decisions.md`](docs/decisions.md) | ADR log — LOCKED vs PROVISIONAL design decisions |
+| [`docs/roadmap.md`](docs/roadmap.md) | Milestone plan M1–M8 + CI strategy |
+| [`docs/implementation-plan.md`](docs/implementation-plan.md) | Current-milestone task detail |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture + test strategy + open questions |
 | [`docs/expression-serialization.md`](docs/expression-serialization.md) | Serializer research & design direction + open questions |
 | [`docs/wire-protocol.md`](docs/wire-protocol.md) | Client↔server contract + open questions |

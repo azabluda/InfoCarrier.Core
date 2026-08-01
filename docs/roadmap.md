@@ -1,0 +1,160 @@
+# Roadmap
+
+Status: **M1 in progress** · Milestone-level plan for the whole project.
+
+This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
+only when scope changes.
+
+The fine-grained checkbox plan for the *current* milestone lives in
+[`implementation-plan.md`](implementation-plan.md), which is **rewritten each milestone**.
+Do not put per-milestone task detail here; do not put roadmap-level scope there.
+
+Authority: [`infocarrier-core-requirements.md`](infocarrier-core-requirements.md) ·
+[`decisions.md`](decisions.md) · [`research-findings.md`](research-findings.md)
+
+---
+
+## Where we are
+
+Phases A–E (query pipeline) and F1–F7 (spec-test fixture) are complete. The vertical slice is
+green end to end: capture → serialize → transport → server rebind → EF execute → client
+materialization with identity resolution.
+
+Measured 2026-08-01: **141 passed / 272 failed / 413 total**, from **1 of 21**
+`Northwind*QueryTestBase` classes. The suite inherits Microsoft's spec tests (ADR-004), so
+coverage scales by adopting bases, not by writing tests.
+
+---
+
+## Milestones
+
+### M1 — Query pipeline correctness + working signal ← **current**
+
+Clear the mechanical failures masking the real state, and get a CI signal that can gate.
+
+**Exit criteria**
+- `QueryParameterExpression` substitution and STJ primitive registration fixed; failure count
+  recorded and reduced (expected ≈ 141 → ≈ 350 of 413).
+- CI builds the correct solution file and runs a **failure-count ratchet** (below) that fails
+  the build when failures increase.
+- `InfoCarrierComplianceTest` (F8) landed and **red on purpose**, publishing the authoritative
+  inventory of unimplemented spec bases.
+- Doc integrity closed: ADR-008/ADR-009 recorded ✅, subrepo revisions pinned.
+
+### M2 — Projection split (requirements §3)
+
+The one genuinely unsolved design problem. The server currently throws on anonymous types,
+client DTOs, and value tuples; this gates the `Select`, `GroupBy`, `Join`, and
+`AggregateOperators` families entirely.
+
+Approach is sketched in research-findings §8 — *the boundary is the last `Select` whose element
+type the server's model knows* — but nothing implements it. **Needs its own design session and
+spec before code.**
+
+**Exit criteria**
+- Boundary detection in the server executor; client applies the residual projection.
+- Minimal-column payload (wire-protocol W1) — the server returns only what the client
+  projection needs, per requirements §3.3.
+- `NorthwindSelectQueryTestBase` and `NorthwindJoinQueryTestBase` adopted and passing.
+
+### M3 — SQLite backend + SaveChanges
+
+**Exit criteria**
+- `SqliteInfoCarrierBackendTestStore` (ADR-009 Tier B) — holds one connection open for the
+  store lifetime.
+- S1 client change-tracker capture; S2 server replay + store-generated values returned by
+  correlation id (research-findings §9).
+- **Many-to-many from day one** (ADR-004) — v1's worst failure mode.
+- SaveChanges/change-tracking spec bases green on Tiers A and B.
+
+### M4 — Transactions
+
+Untestable before M3: EF InMemory raises `TransactionIgnoredWarning` with
+`WarningBehavior.Throw`, so Tier B is a prerequisite, not a nicety.
+
+**Exit criteria**
+- S3 begin/commit/rollback + savepoints; transaction-scope token across stateless transports
+  (wire-protocol W3).
+- Client disposal/rollback cleans up server-side (requirements §2.9).
+
+### M5 — Wire hardening 🔒 **release blocker**
+
+**No network transport may ship before this milestone completes.**
+
+ADR-008 constraint 2 mandates strict allowlists on by default; they were never implemented.
+`TypeNodeResolver.ResolveByName` resolves arbitrary type names from wire data via
+`Type.GetType` plus an `AppDomain` assembly scan, and method resolution is likewise
+unconstrained. Combined with `InvocationNode` this is a remote-code-execution vector in a
+product whose entire purpose is accepting serialized expression trees from remote clients.
+Not exploitable today only because the sole transport is in-process.
+
+**Exit criteria**
+- Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,
+  opt-in registration for model entities and declared projection types.
+- Payload depth/size limits (v1 needed a 10 MB stack for >1 MB payloads).
+- `InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests — currently the
+  backend test store implements `IInfoCarrierClient` directly and bypasses both.
+- Exception fidelity across the wire (W5) and cancellation (W6).
+- Security review of the deserialization path.
+
+### M6 — Coverage expansion
+
+Work the M1 compliance inventory down. Every spec base ends up either implemented or in
+`IgnoredTestBases` **with a stated reason** — nothing silently forgotten.
+
+**Exit criteria**
+- Relationships, owned types, table splitting, TPH/TPT inheritance (requirements §2.7).
+- Compliance inventory fully classified.
+
+### M7 — SQL Server (Tier C) + spatial
+
+**Exit criteria**
+- Docker SQL Server backend store; nightly CI job (ADR-009 Tier C).
+- `rowversion` concurrency, computed columns, sequences, TPT/TPC.
+- NetTopologySuite with **Z/M ordinates preserved** (requirements §2.8) — v1 lost them.
+
+### M8 — Productization
+
+**Exit criteria**
+- HTTP and gRPC transport bindings (only in-process exists today).
+- Streaming results as `IAsyncEnumerable<T>` (requirements §4.4, wire-protocol W4) — the
+  server currently buffers into an `ArrayList`.
+- Compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5).
+- AOT/trimming verification (requirements §4.5).
+- Sample apps, NuGet packaging, `release.yml`.
+
+---
+
+## CI strategy
+
+Two jobs, because the spec suite is legitimately red during build-out and
+[`CLAUDE.md`](../CLAUDE.md) forbids skipping tests to force green.
+
+**Job 1 — fast gate (must be green).** Build + `ExpressionRoundTripTest` + `InMemorySmokeTest`.
+Any failure blocks.
+
+**Job 2 — spec ratchet.** Run the full suite, compare the failure count against a committed
+baseline in `test/known-failures.txt`. **Fail only if failures increase.** Nothing is skipped
+or hidden, progress is monotonic, and the baseline drops as milestones land.
+
+Tier C (Docker SQL Server) runs nightly from M7, never on the per-commit path.
+
+**Known defects to fix in M1:** `build.yml` restores `InfoCarrier.Core.sln` but the repo has
+`InfoCarrier.Core.slnx`; its `~InMemory` / `~SqlServer` filters match no current test class, so
+it would run zero tests even after the restore is fixed.
+
+---
+
+## Deferred, tracked, not forgotten
+
+From wire-protocol §5 and research-findings §10 — resolved in the milestone that needs them:
+
+| Item | Milestone |
+|---|---|
+| W1 minimal column payload | M2 |
+| W2 store-generated value keying (resolved §9, needs implementing) | M3 |
+| W3 transaction token | M4 |
+| W5 exception fidelity · W6 cancellation | M5 |
+| Q5 canonical form + compiled-query cache · Q10 server delegate cache | M8 |
+| Q6/W4 streaming vs identity resolution | M8 |
+| Q7 spatial Z/M via WKT | M7 |
