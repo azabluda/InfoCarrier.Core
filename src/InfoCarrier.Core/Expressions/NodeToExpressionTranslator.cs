@@ -118,15 +118,47 @@ public class NodeToExpressionTranslator
         Type[] parameterTypes = node.ParameterTypes.Select(_typeResolver.Resolve).ToArray();
         const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
+        Type[] genericArguments = node.GenericArguments.Select(_typeResolver.Resolve).ToArray();
+
         IEnumerable<MethodInfo> candidates = declaringType
             .GetMethods(flags)
             .Where(m => m.Name == node.Name && m.GetParameters().Length == parameterTypes.Length);
 
         foreach (MethodInfo candidate in candidates)
         {
-            MethodInfo method = candidate.IsGenericMethodDefinition && node.GenericArguments.Count > 0
-                ? candidate.MakeGenericMethod(node.GenericArguments.Select(_typeResolver.Resolve).ToArray())
-                : candidate;
+            // Parameter count alone does not identify an overload. Overloads routinely differ
+            // only in generic arity — Include<TEntity>(IQueryable<TEntity>, string) vs
+            // Include<TEntity, TProperty>(IQueryable<TEntity>, Expression<…>) both take two
+            // parameters — so arity must be checked before MakeGenericMethod, and a mismatch
+            // must skip the candidate rather than throw past the remaining ones.
+            if (candidate.IsGenericMethodDefinition
+                != (genericArguments.Length > 0))
+            {
+                continue;
+            }
+
+            MethodInfo method;
+            if (candidate.IsGenericMethodDefinition)
+            {
+                if (candidate.GetGenericArguments().Length != genericArguments.Length)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    method = candidate.MakeGenericMethod(genericArguments);
+                }
+                catch (ArgumentException)
+                {
+                    // Generic constraints not satisfied — a different overload is meant.
+                    continue;
+                }
+            }
+            else
+            {
+                method = candidate;
+            }
 
             if (method.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameterTypes))
             {
