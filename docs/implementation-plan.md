@@ -52,8 +52,11 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       not whole-tree: types repeat across a tree, so a whole-tree comparison passed even with
       `Member.DeclaringType` dropped. Six omissions mutation-tested, all caught. ✅ `<this commit>`
 
-- [ ] **A2.** `Query/ServerBoundaryAnalyzer` — bottom-up `ServerOk` over `TypeAllowlist`;
-      frontier extraction; free-parameter check for shippability (§3.1, §3.5).
+- [x] **A2.** `Query/ServerBoundaryAnalyzer` — bottom-up `ServerOk` over `TypeAllowlist`;
+      frontier extraction; free-parameter check for shippability (§3.1, §3.5). Shippable =
+      server-ok **and** contains a query root **and** closed; a subtree that is server-ok but open
+      is a correlated subquery under a client projection, reported separately for phase B rather
+      than cut. ✅ `<this commit>`
 
 - [ ] **A3.** `Query/QuerySplitter` + `SplitQuery` — orchestration returning shipped queries and
       a residual. Residual executes via `EnumerableQuery<T>`; marker calls (`AsNoTracking`,

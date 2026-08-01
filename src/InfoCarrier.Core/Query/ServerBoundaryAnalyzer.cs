@@ -1,0 +1,283 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+using System.Linq.Expressions;
+using InfoCarrier.Core.Expressions;
+
+namespace InfoCarrier.Core.Query;
+
+/// <summary>
+///     Decides which parts of a captured query the server can execute
+///     (<c>docs/projection-split.md</c> §3.1, §3.5).
+/// </summary>
+/// <remarks>
+///     <para>
+///         A node is <em>server-ok</em> when the serializer can express it and every type it puts
+///         on the wire clears <see cref="TypeAllowlist" /> — the same list the server enforces on
+///         deserialization, so the two sides cannot disagree about where the boundary lies
+///         ([ADR-010](../../../docs/decisions.md)).
+///     </para>
+///     <para>
+///         Server-ok alone does not make a subtree shippable. It must also contain a query root
+///         (otherwise there is nothing to execute) and be <em>closed</em> — referencing no
+///         parameter bound outside it. An open subtree is a correlated subquery sitting under a
+///         client-side projection; see <see cref="OpenFragments" />.
+///     </para>
+/// </remarks>
+public sealed class ServerBoundaryAnalyzer
+{
+    private readonly TypeAllowlist _allowlist;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ServerBoundaryAnalyzer" /> class.
+    /// </summary>
+    /// <param name="allowlist">The types the server will accept. Must match the server's.</param>
+    public ServerBoundaryAnalyzer(TypeAllowlist allowlist)
+        => _allowlist = allowlist;
+
+    /// <summary>
+    ///     Analyzes a captured query tree.
+    /// </summary>
+    public BoundaryAnalysis Analyze(Expression root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        var walker = new Walker(_allowlist);
+        walker.Visit(root);
+        return new BoundaryAnalysis(root, walker.Results);
+    }
+
+    /// <summary>
+    ///     Whether the serializer has a node kind for this expression at all. Kinds outside the
+    ///     minimal set of research-findings §5 (block, loop, try, goto, switch, label) have no
+    ///     wire representation, so a subtree containing one can never be shipped.
+    /// </summary>
+    internal static bool IsSerializableKind(Expression node)
+        => node switch
+        {
+            Microsoft.EntityFrameworkCore.Query.QueryRootExpression => true,
+            // Any other extension node — QueryParameterExpression included, though those are
+            // substituted away before the split — has no translation.
+            { NodeType: ExpressionType.Extension } => false,
+            ConstantExpression or ParameterExpression or MemberExpression or MethodCallExpression
+                or LambdaExpression or NewExpression or NewArrayExpression or BinaryExpression
+                or UnaryExpression or TypeBinaryExpression or ConditionalExpression
+                or MemberInitExpression or ListInitExpression or InvocationExpression => true,
+            _ => false,
+        };
+
+    internal static bool IsQueryRoot(Expression node)
+        => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression
+            or ConstantExpression { Value: IQueryable };
+
+    /// <summary>
+    ///     Folds each node's verdict from its direct children, post-order.
+    /// </summary>
+    private sealed class Walker(TypeAllowlist allowlist) : ExpressionVisitor
+    {
+        // One entry per direct child, popped when the parent folds them.
+        private readonly List<NodeFacts> _pending = [];
+
+        public Dictionary<Expression, NodeFacts> Results { get; } = new(ReferenceEqualityComparer.Instance);
+
+        public override Expression? Visit(Expression? node)
+        {
+            if (node is null)
+            {
+                return null;
+            }
+
+            int mark = _pending.Count;
+            base.Visit(node);
+
+            bool serverOk = IsSerializableKind(node);
+            bool hasRoot = IsQueryRoot(node);
+            HashSet<ParameterExpression>? free = null;
+
+            for (int i = mark; i < _pending.Count; i++)
+            {
+                NodeFacts child = _pending[i];
+                serverOk &= child.ServerOk;
+                hasRoot |= child.HasQueryRoot;
+
+                if (child.Free.Count > 0)
+                {
+                    (free ??= new HashSet<ParameterExpression>(ReferenceEqualityComparer.Instance))
+                        .UnionWith(child.Free);
+                }
+            }
+
+            _pending.RemoveRange(mark, _pending.Count - mark);
+
+            if (node is ParameterExpression parameter)
+            {
+                (free ??= new HashSet<ParameterExpression>(ReferenceEqualityComparer.Instance)).Add(parameter);
+            }
+            else if (node is LambdaExpression lambda && free is not null)
+            {
+                // The lambda binds its own parameters; anything left is bound further out.
+                free.ExceptWith(lambda.Parameters);
+            }
+
+            if (serverOk)
+            {
+                foreach (Type type in WireTypeCollector.CollectOwn(node))
+                {
+                    if (!allowlist.IsAllowed(type))
+                    {
+                        serverOk = false;
+                        break;
+                    }
+                }
+            }
+
+            var facts = new NodeFacts(
+                serverOk,
+                hasRoot,
+                free is null || free.Count == 0 ? NodeFacts.NoFreeParameters : free);
+
+            _pending.Add(facts);
+            Results[node] = facts;
+            return node;
+        }
+    }
+}
+
+/// <summary>
+///     What the analysis knows about one node.
+/// </summary>
+/// <param name="ServerOk">The whole subtree is expressible on the wire and type-allowed.</param>
+/// <param name="HasQueryRoot">The subtree contains at least one query root to execute.</param>
+/// <param name="Free">Parameters referenced in the subtree but bound outside it.</param>
+public readonly record struct NodeFacts(
+    bool ServerOk,
+    bool HasQueryRoot,
+    IReadOnlySet<ParameterExpression> Free)
+{
+    /// <summary>
+    ///     Shared empty set for the overwhelmingly common closed node.
+    /// </summary>
+    internal static readonly IReadOnlySet<ParameterExpression> NoFreeParameters
+        = new HashSet<ParameterExpression>();
+
+    /// <summary>
+    ///     Whether the subtree references nothing bound outside it, and so can be executed alone.
+    /// </summary>
+    public bool IsClosed => Free.Count == 0;
+
+    /// <summary>
+    ///     Whether the subtree can be sent to the server as a query in its own right.
+    /// </summary>
+    public bool IsShippable => ServerOk && HasQueryRoot && IsClosed;
+}
+
+/// <summary>
+///     The result of <see cref="ServerBoundaryAnalyzer.Analyze" />.
+/// </summary>
+public sealed class BoundaryAnalysis
+{
+    private readonly Dictionary<Expression, NodeFacts> _facts;
+
+    internal BoundaryAnalysis(Expression root, Dictionary<Expression, NodeFacts> facts)
+    {
+        Root = root;
+        _facts = facts;
+
+        var shippable = new List<Expression>();
+        var open = new List<Expression>();
+        Collect(root, shippable, open);
+        Shippable = shippable;
+        OpenFragments = open;
+    }
+
+    /// <summary>
+    ///     The analyzed tree.
+    /// </summary>
+    public Expression Root { get; }
+
+    /// <summary>
+    ///     The maximal subtrees the server can execute on its own — what the client ships.
+    ///     More than one when a query has independent sources, as a <c>Join</c> does (§3.5).
+    /// </summary>
+    public IReadOnlyList<Expression> Shippable { get; }
+
+    /// <summary>
+    ///     Server-executable subtrees that contain a query root but reference a parameter bound
+    ///     outside them: a correlated subquery under a client-side projection. A plain cut cannot
+    ///     place these — evaluating one on the client would re-query the server once per row —
+    ///     so phase A reports them rather than guessing (§3.2, §6). The projection rewrite of
+    ///     phase B is what resolves them.
+    /// </summary>
+    public IReadOnlyList<Expression> OpenFragments { get; }
+
+    /// <summary>
+    ///     Whether the whole query goes to the server untouched — the common case, and the one
+    ///     that must stay on today's fast path.
+    /// </summary>
+    public bool IsWhollyServerExecutable
+        => Shippable.Count == 1 && ReferenceEquals(Shippable[0], Root);
+
+    /// <summary>
+    ///     The verdict for a node of the analyzed tree.
+    /// </summary>
+    public NodeFacts FactsFor(Expression node)
+        => _facts.TryGetValue(node, out NodeFacts facts)
+            ? facts
+            : throw new InvalidOperationException($"'{node}' is not part of the analyzed tree.");
+
+    private void Collect(Expression node, List<Expression> shippable, List<Expression> open)
+    {
+        NodeFacts facts = _facts[node];
+
+        if (facts.ServerOk)
+        {
+            // Maximal by construction: the caller only descends through nodes that are not
+            // server-ok, so the first server-ok node on any path is the largest one there.
+            if (facts.HasQueryRoot)
+            {
+                (facts.IsClosed ? shippable : open).Add(node);
+            }
+
+            // A server-ok subtree with no query root is ordinary local code (a constant, a
+            // comparison against a captured value); it stays in the residual.
+            return;
+        }
+
+        foreach (Expression child in ChildrenOf(node))
+        {
+            Collect(child, shippable, open);
+        }
+    }
+
+    private static IEnumerable<Expression> ChildrenOf(Expression node)
+    {
+        var children = new List<Expression>();
+        new ChildCollector(children).Visit(node);
+        return children;
+    }
+
+    /// <summary>
+    ///     The direct children of one node — <see cref="ExpressionVisitor" /> knows the shape of
+    ///     every node kind, so borrowing its traversal beats re-deriving one per kind.
+    /// </summary>
+    private sealed class ChildCollector(ICollection<Expression> children) : ExpressionVisitor
+    {
+        private bool _atRoot = true;
+
+        public override Expression? Visit(Expression? node)
+        {
+            if (node is null)
+            {
+                return null;
+            }
+
+            if (_atRoot)
+            {
+                _atRoot = false;
+                return base.Visit(node);
+            }
+
+            children.Add(node);
+            return node;
+        }
+    }
+}
