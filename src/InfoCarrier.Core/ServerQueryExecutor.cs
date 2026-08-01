@@ -257,6 +257,11 @@ public class ServerQueryExecutor
                 && (navigation.IsCollection || HasKey(related, navigation.TargetEntityType));
         }
 
+        // An entity constructed by a projection is not in the change tracker; the client needs
+        // to know so it does not identity-resolve rows that all carry a default key.
+        bool IsTracked(object entity)
+            => stateManager.TryGetEntry(entity) is not null;
+
         static bool HasKey(object entity, IEntityType entityType)
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.GetGetter().GetClrValue(entity) is not null);
@@ -266,7 +271,7 @@ public class ServerQueryExecutor
         {
             nodes.Add(item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
-                : mapper.ToRowValue(item, item.GetType(), IsLoaded));
+                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked));
         }
 
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(

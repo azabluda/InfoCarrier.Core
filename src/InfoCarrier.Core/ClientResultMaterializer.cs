@@ -96,7 +96,12 @@ public class ClientResultMaterializer
         // can never be tracked at all. Attaching regardless was invisible while included
         // navigations were being dropped; once they arrive, attaching a graph the tracker cannot
         // key throws "Unable to track an entity … its primary key property is null".
-        if (pk is null || _trackingBehavior != QueryTrackingBehavior.TrackAll)
+        //
+        // `IsTracked` covers the case neither of those catches: an entity *constructed by a
+        // projection* — `Select(o => new Order { OrderDate = … })` — which EF does not track
+        // even under TrackAll. Those rows all carry a default key, so identity-resolving them
+        // collapsed an entire result onto its first instance.
+        if (pk is null || !row.IsTracked || _trackingBehavior != QueryTrackingBehavior.TrackAll)
         {
             return MaterializeUntracked(row, entityType, mapper);
         }

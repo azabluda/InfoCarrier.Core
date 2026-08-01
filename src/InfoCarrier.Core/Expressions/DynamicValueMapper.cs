@@ -26,8 +26,9 @@ public class DynamicValueMapper : IDynamicValueMapper
     private readonly Dictionary<int, object?> _fromIds = [];
     private int _nextId;
 
-    // Navigation-loaded probe, supplied only in Row mode (the server has the DbContext).
+    // Row-mode probes, supplied only by the server, which alone holds the DbContext.
     private Func<object, INavigationBase, bool>? _isNavigationLoaded;
+    private Func<object, bool>? _isTracked;
 
     /// <summary>
     ///     Routes an entity-keyed node to the client materializer, wherever in the graph it
@@ -84,9 +85,18 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     Probe for whether EF actually loaded a navigation. Only the caller holds the
     ///     <c>DbContext</c> needed to answer this.
     /// </param>
-    public DynamicValueNode ToRowValue(object? value, Type type, Func<object, INavigationBase, bool> isNavigationLoaded)
+    /// <param name="isTracked">
+    ///     Probe for whether the server's change tracker holds the instance. An entity built by
+    ///     a projection is not tracked, and the client must not identity-resolve it.
+    /// </param>
+    public DynamicValueNode ToRowValue(
+        object? value,
+        Type type,
+        Func<object, INavigationBase, bool> isNavigationLoaded,
+        Func<object, bool> isTracked)
     {
         _isNavigationLoaded = isNavigationLoaded;
+        _isTracked = isTracked;
         try
         {
             return ToDynamicValue(value, type);
@@ -94,6 +104,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         finally
         {
             _isNavigationLoaded = null;
+            _isTracked = null;
         }
     }
 
@@ -143,6 +154,7 @@ public class DynamicValueMapper : IDynamicValueMapper
                 Id = id,
                 Type = typeNode,
                 EntityKey = entityKey,
+                IsTracked = _isTracked!(value),
                 Properties = MapRowMembers(value, entityType),
             };
         }

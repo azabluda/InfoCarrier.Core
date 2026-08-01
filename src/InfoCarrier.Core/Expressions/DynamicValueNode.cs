@@ -51,6 +51,19 @@ public sealed record DynamicValueNode
     public EntityKeyNode? EntityKey { get; init; }
 
     /// <summary>
+    ///     For entity result rows: whether the server's change tracker held this instance.
+    /// </summary>
+    /// <remarks>
+    ///     Only the server can answer, and the client cannot infer it. An entity <em>constructed
+    ///     in a projection</em> — <c>Select(o =&gt; new Order { OrderDate = … })</c> — is an
+    ///     entity type EF neither tracks nor identity-resolves, yet on the wire it is
+    ///     indistinguishable from a tracked query-root entity: same type, same shape, and a
+    ///     default key. Identity-resolving those collapsed every row of such a projection onto
+    ///     the first instance, since they all carry key 0.
+    /// </remarks>
+    public bool IsTracked { get; init; }
+
+    /// <summary>
     ///     The value's properties, in MetadataToken order (aqua shape identity). Each entry
     ///     maps a member name to a nested value (primitive, or another <see cref="DynamicValueNode" />
     ///     via <see cref="DynamicPropertyValue.Value" />). Empty for collection/scalar shapes.
