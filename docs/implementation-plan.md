@@ -58,15 +58,12 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       is a correlated subquery under a client projection, reported separately for phase B rather
       than cut. ✅ `<this commit>`
 
-- [ ] **A3.** `Query/QuerySplitter` + `SplitQuery` — orchestration returning shipped queries and
-      a residual. Residual executes via `EnumerableQuery<T>`; marker calls (`AsNoTracking`,
-      `Include`, `AsSplitQuery`) stripped first, `EF.Property` rejected with a named message
-      (§3.4, §6).
-
-- [ ] **A4.** Navigation demand → `Include` augmentation (§3.6). Syntactic and conservative:
-      every navigation any residual operator reads on a server-known entity type is `Include`d on
-      the query that supplies it. Over-fetching is accepted; a wrong answer is not. **Land with
-      A3 or before it** — A3 without A4 answers `c.Orders.Count()` as `0`.
+- [x] **A3+A4.** `Query/QuerySplitter` + `SplitQuery` — shipped queries plus a residual lambda,
+      one parameter per shipped query, applied by `EnumerableQuery<T>` so the residual keeps its
+      `Queryable` shape. Markers stripped, `EF.Property` and open fragments rejected by name
+      (§3.4, §6). Navigation demand → `Include` augmentation (§3.6), rooted paths keyed by entity
+      type; a read no shipped query can carry is an error, never a quiet `0`. Landed together
+      because A3 alone *is* the silent-`0` bug. ✅ `<this commit>`
 
 - [ ] **A5.** Wire the splitter into `QueryExecutor<TElement>`: materialize each shipped query by
       its *boundary* element type, then run the residual to produce `TElement`. Recompute
