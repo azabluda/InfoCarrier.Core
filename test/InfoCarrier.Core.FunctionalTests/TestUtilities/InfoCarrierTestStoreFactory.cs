@@ -47,11 +47,13 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Type contextType,
         Action<ModelBuilder, DbContext>? onModelCreating,
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null,
-        Action<DbContext, DbContext>? copyDbContextParameters = null)
+        Action<DbContext, DbContext>? copyDbContextParameters = null,
+        Type? serverContextType = null)
         => new InfoCarrierTestStoreFactory(
             new SharedTestStoreProperties
             {
                 ContextType = contextType,
+                ServerContextType = serverContextType,
                 OnModelCreating = onModelCreating,
                 OnAddOptions = onAddOptions,
                 CopyDbContextParameters = copyDbContextParameters,

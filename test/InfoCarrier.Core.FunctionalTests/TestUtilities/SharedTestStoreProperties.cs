@@ -13,9 +13,20 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 public struct SharedTestStoreProperties
 {
     /// <summary>
-    ///     The <see cref="DbContext" /> type used on both client and server.
+    ///     The client <see cref="DbContext" /> type, and the server's too unless
+    ///     <see cref="ServerContextType" /> overrides it.
     /// </summary>
     public Type ContextType;
+
+    /// <summary>
+    ///     The server <see cref="DbContext" /> type, when it must differ from the client's.
+    /// </summary>
+    /// <remarks>
+    ///     The two models are shared, but how the backing store <em>produces</em> rows is not
+    ///     part of that contract — a defining query for a keyless entity type is the server's
+    ///     business alone. <see langword="null" /> means "same as <see cref="ContextType" />".
+    /// </remarks>
+    public Type? ServerContextType;
 
     /// <summary>
     ///     The fixture's model customization.

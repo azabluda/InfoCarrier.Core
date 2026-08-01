@@ -43,11 +43,11 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
             .AddSingleton(TestModelSource.GetFactory(_testStoreProperties.OnModelCreating!))
             .AddDbContext(
-                _testStoreProperties.ContextType,
+                ServerContextType,
                 (s, b) => AddProviderOptions(b),
                 ServiceLifetime.Transient,
                 ServiceLifetime.Singleton)
-            .AddScoped<DbContext>(sp => (DbContext)sp.GetRequiredService(_testStoreProperties.ContextType))
+            .AddScoped<DbContext>(sp => (DbContext)sp.GetRequiredService(ServerContextType))
             .BuildServiceProvider(validateScopes: true);
 
         _serializer = ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
@@ -62,7 +62,14 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.
     /// </summary>
     public virtual DbContext CreateDbContext()
-        => (DbContext)ServiceProvider.GetRequiredService(_testStoreProperties.ContextType);
+        => (DbContext)ServiceProvider.GetRequiredService(ServerContextType);
+
+    /// <summary>
+    ///     The context type the server runs, which may add store-specific model configuration
+    ///     the client neither has nor needs (e.g. defining queries for keyless entity types).
+    /// </summary>
+    private Type ServerContextType
+        => _testStoreProperties.ServerContextType ?? _testStoreProperties.ContextType;
 
     /// <summary>
     ///     Adds the backend provider services (e.g. InMemory, SqlServer) to the collection.

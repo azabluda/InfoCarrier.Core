@@ -26,7 +26,10 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
-                CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server));
+                CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
+            // The server adds the InMemory defining queries for the keyless entity types; the
+            // client model has the types but not the store's means of producing their rows.
+            serverContextType: typeof(NorthwindInfoCarrierServerContext));
 
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)
         => server.TenantPrefix = client.TenantPrefix;
