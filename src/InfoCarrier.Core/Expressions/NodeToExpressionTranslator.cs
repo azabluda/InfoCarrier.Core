@@ -20,7 +20,8 @@ public class NodeToExpressionTranslator
     private readonly TypeNodeResolver _typeResolver;
     private readonly IDynamicValueMapper _valueMapper;
     private readonly Func<QueryRootStubNode, Type, Expression> _queryRootFactory;
-    private readonly Dictionary<string, ParameterExpression> _parameters = new(StringComparer.Ordinal);
+    // Keyed by ParameterNode.Id, never by name — see ParameterNode.Id for why.
+    private readonly Dictionary<int, ParameterExpression> _parameters = [];
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="NodeToExpressionTranslator" /> class.
@@ -82,11 +83,10 @@ public class NodeToExpressionTranslator
 
     private ParameterExpression TranslateParameter(ParameterNode node)
     {
-        string key = node.Name ?? string.Empty;
-        if (!_parameters.TryGetValue(key, out ParameterExpression? parameter))
+        if (!_parameters.TryGetValue(node.Id, out ParameterExpression? parameter))
         {
             parameter = Expression.Parameter(_typeResolver.Resolve(node.Type), node.Name);
-            _parameters[key] = parameter;
+            _parameters[node.Id] = parameter;
         }
 
         return parameter;
@@ -139,13 +139,9 @@ public class NodeToExpressionTranslator
 
     private Expression TranslateLambda(LambdaNode node)
     {
-        var parameters = node.Parameters
-            .Select(p => Expression.Parameter(_typeResolver.Resolve(p.Type), p.Name))
-            .ToList();
-        foreach (ParameterExpression p in parameters)
-        {
-            _parameters[p.Name ?? string.Empty] = p;
-        }
+        // Resolve the declared parameters first so body references to them resolve to the very
+        // same ParameterExpression instances (TranslateParameter caches by id).
+        var parameters = node.Parameters.Select(TranslateParameter).ToList();
 
         Expression body = TranslateNode(node.Body);
         Type delegateType = _typeResolver.Resolve(node.Type);

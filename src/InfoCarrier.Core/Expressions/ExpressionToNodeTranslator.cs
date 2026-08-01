@@ -19,6 +19,12 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
 {
     private readonly TypeNodeMapper _typeMapper;
     private readonly IDynamicValueMapper _valueMapper;
+
+    // Parameter identity for the message being translated (requirements §2.3). Expression does
+    // not override Equals/GetHashCode, so this dictionary already keys on reference identity —
+    // exactly what "the same parameter" means here.
+    private readonly Dictionary<ParameterExpression, int> _parameterIds = [];
+    private int _depth;
     private ExpressionNode? _result;
 
     /// <summary>
@@ -35,9 +41,43 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     /// </summary>
     public ExpressionNode Translate(Expression expression)
     {
-        _result = null;
-        Visit(expression);
-        return _result ?? throw new InvalidOperationException("Translation produced no node.");
+        // Translate is both the public entry point and the recursive one, so parameter identity
+        // is reset only at depth 0 — clearing on every call would break identity mid-tree.
+        if (_depth == 0)
+        {
+            _parameterIds.Clear();
+        }
+
+        _depth++;
+        try
+        {
+            _result = null;
+            Visit(expression);
+            return _result ?? throw new InvalidOperationException("Translation produced no node.");
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    /// <summary>
+    ///     Maps a parameter to its node, assigning a message-stable id on first sight.
+    /// </summary>
+    private ParameterNode ToParameterNode(ParameterExpression parameter)
+    {
+        if (!_parameterIds.TryGetValue(parameter, out int id))
+        {
+            id = _parameterIds.Count;
+            _parameterIds[parameter] = id;
+        }
+
+        return new ParameterNode
+        {
+            Id = id,
+            Name = parameter.Name,
+            Type = _typeMapper.ToTypeNode(parameter.Type),
+        };
     }
 
     /// <inheritdoc />
@@ -96,7 +136,7 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     /// <inheritdoc />
     protected override Expression VisitParameter(ParameterExpression node)
     {
-        _result = new ParameterNode { Name = node.Name, Type = _typeMapper.ToTypeNode(node.Type) };
+        _result = ToParameterNode(node);
         return node;
     }
 
@@ -134,7 +174,7 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     protected override Expression VisitLambda<T>(Expression<T> node)
     {
         var parameters = node.Parameters
-            .Select(p => new ParameterNode { Name = p.Name, Type = _typeMapper.ToTypeNode(p.Type) })
+            .Select(ToParameterNode)
             .ToList();
         ExpressionNode body = Translate(node.Body);
         _result = new LambdaNode

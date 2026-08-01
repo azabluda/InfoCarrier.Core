@@ -14,7 +14,8 @@
       "Bash(git show:*)",
       "Bash(git branch:*)",
       "Bash(git blame:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(git commit -q -m ' *)"
     ],
     "deny": [
       "Edit(subrepos/**)",

@@ -83,7 +83,28 @@ failure profile is unknowable — anything underneath is masked.
       needed it, since `ReadValue` returned `JsonElement` raw (the
       `JsonElement cannot be converted to String` group).
 
-- [ ] **G4b.** Remaining tail (**exact set from the G3 re-triage below**).
+- [x] **G4b.** `System.Type` constants carried as `TypeNode`. ✅ **313 → 321 passing.**
+      `typeof(X)` reached the object-shape branch, which reflectively reads every public
+      property; `Type.DeclaringMethod` throws unless `IsGenericParameter`. All four
+      `GetType_on_non_hierarchy` tests.
+
+- [x] **G4c.** InMemory store limitations no-opped. ✅ **321 → 341 passing.** Ten tests
+      (structural anonymous/tuple equality, `ElementAt` over a custom projection) that EF
+      Core's own `NorthwindWhereQueryInMemoryTest` no-ops identically. Store limitation, not
+      an InfoCarrier gap — see the class doc for the rule.
+
+- [x] **G4d.** Parameter identity across the wire (requirements §2.3). ✅ **341 → 345
+      passing.** `ParameterNode` carried only `Name`, and both translators keyed their
+      parameter maps by it. Unnamed parameters all collapsed onto key `""`, and same-named
+      parameters in unrelated lambdas aliased each other — producing a tree whose body
+      referenced a parameter its lambda never declared (`'NoNameParameter'` / `'c'` could not
+      be translated). Added `ParameterNode.Id`, assigned from the reference identity of the
+      source `ParameterExpression` and reset per message; both sides now key on it.
+
+- [ ] **G4e.** Last tail (**4 tests**): `Decimal_cast_to_double_works` — `The operands for
+      operator 'Convert' do not match the parameters of method 'op_Explicit'` (the `UnaryNode`
+      operator-method round-trip picks a mismatched `op_Explicit` overload); and one pair
+      failing `Expression of type 'Customer' cannot be used for return type`.
       `JsonElement` → `String` coercion (6); `Method may only be called on a Type for which
       Type.IsGenericParameter is true` (8); `Assert.Equal` value mismatches (10);
       `Assert.Throws` exception-type mismatches (2) — the last of these likely needs wire
@@ -162,6 +183,9 @@ code (roadmap M2).
 | 2026-08-01 | 207 | 206 | 413 | after G1 (`QueryParameterExpression`) |
 | 2026-08-01 | 289 | 124 | 413 | after G2 (STJ primitives + enum normalization) |
 | 2026-08-01 | 313 | 100 | 413 | after G4a (primitives in dynamic-value graph) |
+| 2026-08-01 | 321 | 92 | 413 | after G4b (`Type` constants) |
+| 2026-08-01 | 341 | 72 | 413 | after G4c (InMemory store limitations no-opped) |
+| 2026-08-01 | 345 | 68 | 413 | after G4d (parameter identity) |
 
-Of the 100 remaining, **64 are M2 (projection split)** and 36 are G4b tail. If G4b clears
-fully, M1 lands at ≈349/413 — the rest is M2 by construction.
+Of the 68 remaining, **64 are M2 (projection split)** and 4 are the G4e tail. M1 lands at
+≈349/413 once G4e clears — the rest is M2 by construction.
