@@ -79,6 +79,14 @@ internal static class PrimitiveCoercion
             if (underlying == typeof(TimeSpan)) return TimeSpan.Parse(element.GetString()!, CultureInfo.InvariantCulture);
             if (underlying == typeof(object)) return element;
 
+            // A JSON string standing where something broader is declared. `AsEnumerable()` over
+            // a string member types it `IEnumerable<char>`, which no branch above matches and
+            // which STJ cannot build from a JSON string — a `string` satisfies it directly.
+            if (element.ValueKind is JsonValueKind.String && underlying.IsAssignableFrom(typeof(string)))
+            {
+                return element.GetString();
+            }
+
             return JsonSerializer.Deserialize(element.GetRawText(), underlying);
         }
 

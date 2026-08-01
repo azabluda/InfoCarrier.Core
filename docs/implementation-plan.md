@@ -360,3 +360,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 4194 | 44 | 4247 | after G15 (cancellation, concurrency section, query logging) |
 | 2026-08-01 | 4196 | 42 | 4247 | after G16 (overload resolution uses the return type) |
 | 2026-08-01 | 4200 | 38 | 4247 | after K3a (a placeholder navigation no longer blocks EF fixup) |
+| 2026-08-01 | 4202 | 36 | 4247 | after K3b (a JSON string satisfies a broader declared type) |
