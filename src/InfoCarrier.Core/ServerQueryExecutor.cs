@@ -71,42 +71,87 @@ public class ServerQueryExecutor
 
     private async Task<object?> ExecuteQueryAsync(Expression query, QueryDataRequest request, CancellationToken cancellationToken)
     {
-        // Build an IQueryable over the rebound tree and let EF compile/execute it.
-        IQueryable queryable = BuildQueryable(query);
+        await Task.CompletedTask.ConfigureAwait(false);
 
+        // A single-result query (Single/First/Count/Any/…) has the *result* as its expression
+        // type, not a sequence. It must go straight through the provider: wrapping it in
+        // EntityQueryable<T> and enumerating is invalid, because EntityQueryable<T> requires
+        // an expression of type IQueryable<T>, and EF then fails compiling a scalar body into
+        // an IEnumerable-returning executor.
         if (request.ReturnsSingleResult)
         {
-            object? single = null;
-            foreach (object? item in queryable)
-            {
-                single = item;
-                break;
-            }
-
-            return single;
+            return GetQueryProvider(query).Execute(query);
         }
 
         var results = new ArrayList();
-        foreach (object? item in queryable)
+        foreach (object? item in BuildQueryable(query))
         {
             results.Add(item);
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
         return results;
     }
 
     private IQueryable BuildQueryable(Expression query)
     {
         // Route the rebound tree through the server context's own query provider so EF
-        // translates it against the real provider (SQL Server / InMemory / …). We obtain the
-        // provider from a DbSet of the query's element entity type, then CreateQuery over the
-        // rebound expression.
+        // translates it against the real provider (SQL Server / InMemory / …).
         Type elementType = GetElementType(query.Type);
-
-        IQueryProvider provider = GetServerQueryProvider(elementType);
         Type queryableType = typeof(Microsoft.EntityFrameworkCore.Query.Internal.EntityQueryable<>).MakeGenericType(elementType);
-        return (IQueryable)Activator.CreateInstance(queryableType, provider, query)!;
+        return (IQueryable)Activator.CreateInstance(queryableType, GetQueryProvider(query), query)!;
+    }
+
+    /// <summary>
+    ///     Resolves the server query provider for a rebound tree, from the entity type of its
+    ///     query <em>root</em>.
+    /// </summary>
+    /// <remarks>
+    ///     Deriving the provider from the query's <em>result</em> type is wrong: a projection
+    ///     (<c>Select(c =&gt; new { … })</c>, <c>Select(c =&gt; c.City)</c>) has a result type
+    ///     the model knows nothing about, so the lookup threw
+    ///     "Entity type '…' not found in the server model" before EF ever saw the query.
+    ///     Every rebound tree is rooted in at least one real entity query root, and any of them
+    ///     yields the same provider.
+    /// </remarks>
+    private IQueryProvider GetQueryProvider(Expression query)
+    {
+        IEntityType entityType = QueryRootFinder.Find(query)
+            ?? throw new InvalidOperationException(
+                "No entity query root found in the rebound query; cannot resolve a server query provider.");
+
+        object set = _context
+            .GetType()
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .First(m => m.Name == nameof(DbContext.Set) && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
+            .MakeGenericMethod(entityType.ClrType)
+            .Invoke(_context, null)!;
+        return ((IQueryable)set).Provider;
+    }
+
+    /// <summary>
+    ///     Finds the first entity query root in a rebound expression tree.
+    /// </summary>
+    private sealed class QueryRootFinder : ExpressionVisitor
+    {
+        private IEntityType? _entityType;
+
+        public static IEntityType? Find(Expression query)
+        {
+            var finder = new QueryRootFinder();
+            finder.Visit(query);
+            return finder._entityType;
+        }
+
+        protected override Expression VisitExtension(Expression node)
+        {
+            if (_entityType is null
+                && node is Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression root)
+            {
+                _entityType = root.EntityType;
+            }
+
+            return _entityType is null ? base.VisitExtension(node) : node;
+        }
     }
 
     private static Type GetElementType(Type queryType)
@@ -117,24 +162,6 @@ public class ServerQueryExecutor
             : queryType.GetInterfaces()
                 .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
         return queryable?.GetGenericArguments()[0] ?? queryType;
-    }
-
-    private IQueryProvider GetServerQueryProvider(Type elementType)
-    {
-        // Resolve the entity type (shared-type by name fallback) and get its DbSet's provider.
-        IEntityType? entityType = _context.Model.FindEntityType(elementType);
-        if (entityType is null)
-        {
-            throw new InvalidOperationException($"Entity type '{elementType}' not found in the server model.");
-        }
-
-        object set = _context
-            .GetType()
-            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .First(m => m.Name == nameof(DbContext.Set) && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
-            .MakeGenericMethod(entityType.ClrType)
-            .Invoke(_context, null)!;
-        return ((IQueryable)set).Provider;
     }
 
     private QueryDataResult MapResults(object? result, Expression query)

@@ -101,10 +101,24 @@ failure profile is unknowable — anything underneath is masked.
       be translated). Added `ParameterNode.Id`, assigned from the reference identity of the
       source `ParameterExpression` and reset per message; both sides now key on it.
 
-- [ ] **G4e.** Last tail (**4 tests**): `Decimal_cast_to_double_works` — `The operands for
-      operator 'Convert' do not match the parameters of method 'op_Explicit'` (the `UnaryNode`
-      operator-method round-trip picks a mismatched `op_Explicit` overload); and one pair
-      failing `Expression of type 'Customer' cannot be used for return type`.
+- [x] **G4e.** Server query provider resolved from the query **root**, and single-result
+      queries executed directly. ✅ **345 → 397 passing** (68 → 16 failures).
+
+      Two defects in `ServerQueryExecutor`:
+      1. `BuildQueryable` wrapped *every* tree in `EntityQueryable<T>`, but a single-result
+         query (`Single`/`First`/`Count`) has the result as its expression type, not a
+         sequence — invalid, since `EntityQueryable<T>` requires an `IQueryable<T>`-typed
+         expression. Now routed through `IQueryProvider.Execute`.
+      2. The provider was resolved from the query's **result** type, so any projection threw
+         `Entity type '…' not found in the server model` *before EF ever saw the query*. The
+         provider now comes from the query root (always a real entity) via `QueryRootFinder`.
+
+      > ⚠️ **This did not solve the projection split (M2), and it hid it.** The 52 tests it
+      > cleared pass because the in-process harness runs client and server in one AppDomain,
+      > so the server can see anonymous types and client-only DTOs and materializes them
+      > directly. Over a real transport the server would not have those types.
+      > **Requirements §3 is untouched**, and the harness can no longer detect it. See
+      > roadmap M2, re-scoped.
       `JsonElement` → `String` coercion (6); `Method may only be called on a Type for which
       Type.IsGenericParameter is true` (8); `Assert.Equal` value mismatches (10);
       `Assert.Throws` exception-type mismatches (2) — the last of these likely needs wire

@@ -43,15 +43,26 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
 
 ### M2 — Projection split (requirements §3)
 
-The one genuinely unsolved design problem. The server currently throws on anonymous types,
-client DTOs, and value tuples; this gates the `Select`, `GroupBy`, `Join`, and
-`AggregateOperators` families entirely.
+The one genuinely unsolved design problem. Approach is sketched in research-findings §8 — *the
+boundary is the last `Select` whose element type the server's model knows* — but nothing
+implements it. **Needs its own design session and spec before code.**
 
-Approach is sketched in research-findings §8 — *the boundary is the last `Select` whose element
-type the server's model knows* — but nothing implements it. **Needs its own design session and
-spec before code.**
+> ⚠️ **Re-scoped 2026-08-01 — the tests no longer detect this problem.** Projection tests used
+> to fail loudly (`Entity type '<>f__AnonymousType…' not found in the server model`). After
+> M1-G4e resolved the server query provider from the query root, they pass — because the
+> in-process harness runs client and server in **one AppDomain**, so the server can see
+> anonymous types and client-only DTOs and materializes them itself. Over a real transport it
+> cannot. The requirement is as unmet as before; only the symptom is gone.
+>
+> **M2 must therefore restore the failing signal first.** The mechanism already exists in the
+> design: ADR-008 constraint 2 mandates an allowlist of *deserializable types* (model entities
+> + registered projection types). Enforcing it makes the server reject client-only types, the
+> type boundary becomes real in-process, and the §3 tests fail honestly again. The allowlist
+> is not only a security control (M5) — it is what makes the boundary testable at all.
 
 **Exit criteria**
+- Server-side type allowlist enforced, so client-only types cannot be materialized server-side
+  even in-process. Projection tests fail again before they are fixed.
 - Boundary detection in the server executor; client applies the residual projection.
 - Minimal-column payload (wire-protocol W1) — the server returns only what the client
   projection needs, per requirements §3.3.
