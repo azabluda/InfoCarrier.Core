@@ -19,7 +19,9 @@ checkbox ticked **in the same commit** (CLAUDE.md).
 The two mechanical causes account for ~214 of 272 failures. Until they clear, the remaining
 failure profile is unknowable — anything underneath is masked.
 
-- [ ] **G1.** `QueryParameterExpression` substitution (**~138 failures**).
+- [x] **G1.** `QueryParameterExpression` substitution (**~138 failures**). ✅ **141 → 207
+      passing** (272 → 206 failures). Fewer than 138 gained because many of those tests then
+      hit G2's serialization failure — the two causes are layered, not disjoint.
       `QueryExecutor.SubstituteParametersExpressionVisitor` overrides only `VisitParameter`,
       matching `__`-prefixed `ParameterExpression`. EF Core 10's `ExpressionTreeFuncletizer`
       emits `Microsoft.EntityFrameworkCore.Query.QueryParameterExpression` instead — an

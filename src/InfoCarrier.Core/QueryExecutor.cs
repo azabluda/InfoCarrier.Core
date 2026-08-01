@@ -87,16 +87,32 @@ internal sealed class QueryExecutor<TElement>
     }
 
     /// <summary>
-    ///     Substitutes EF compiled-query parameters (named with the compiled-query prefix) as
-    ///     plain <see cref="ConstantExpression" />s of their runtime values — never wrapped in
-    ///     custom generic structs (research-findings §6, the v1 <c>ValueWrapper&lt;T&gt;</c> trap).
+    ///     Substitutes EF query parameters as plain <see cref="ConstantExpression" />s of their
+    ///     runtime values — never wrapped in custom generic structs (research-findings §6, the
+    ///     v1 <c>ValueWrapper&lt;T&gt;</c> trap).
     /// </summary>
+    /// <remarks>
+    ///     Two node forms must be handled. EF Core 10's <c>ExpressionTreeFuncletizer</c> lifts
+    ///     closure-captured values into <see cref="QueryParameterExpression" /> — an
+    ///     <see cref="ExpressionType.Extension" /> node, so it arrives at
+    ///     <see cref="VisitExtension" />, not <see cref="VisitParameter" />. Compiled queries
+    ///     additionally produce ordinary <see cref="ParameterExpression" />s named with the
+    ///     <c>__</c> prefix. The funcletizer keys
+    ///     <see cref="QueryContext.Parameters" /> by the same name it gives the node, so a
+    ///     single lookup serves both.
+    /// </remarks>
     private sealed class SubstituteParametersExpressionVisitor : ExpressionVisitor
     {
         private readonly QueryContext _queryContext;
 
         public SubstituteParametersExpressionVisitor(QueryContext queryContext)
             => _queryContext = queryContext;
+
+        protected override Expression VisitExtension(Expression node)
+            => node is QueryParameterExpression queryParameter
+                && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
+                    ? Expression.Constant(value, queryParameter.Type)
+                    : base.VisitExtension(node);
 
         protected override Expression VisitParameter(ParameterExpression node)
         {
