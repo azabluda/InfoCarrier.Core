@@ -3,6 +3,7 @@
 using System.Linq.Expressions;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
@@ -17,10 +18,20 @@ namespace InfoCarrier.Core;
 /// </summary>
 internal sealed class QueryExecutor<TElement>
 {
+    private static readonly System.Reflection.MethodInfo MaterializeMethod
+        = typeof(ClientResultMaterializer).GetMethod(nameof(ClientResultMaterializer.Materialize))!;
+
+    private static readonly System.Reflection.MethodInfo ToListMethod
+        = typeof(Enumerable).GetMethod(nameof(Enumerable.ToList))!;
+
+    private static readonly System.Reflection.MethodInfo AsQueryableMethod
+        = typeof(Queryable).GetMethods()
+            .Single(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethodDefinition);
+
     private readonly QueryContext _queryContext;
     private readonly IInfoCarrierClient _client;
     private readonly IExpressionSerializer _expressionSerializer;
-    private readonly Expression _query;
+    private readonly SplitQuery _split;
     private readonly QueryTrackingBehavior _trackingBehavior;
 
     public QueryExecutor(
@@ -34,7 +45,12 @@ internal sealed class QueryExecutor<TElement>
         _expressionSerializer = expressionSerializer;
 
         // Substitute compiled-query parameters as plain constants (research-findings §6).
-        _query = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
+        Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
+
+        // Then, and only then, decide what the server can execute: a surviving closure field
+        // access names a compiler-generated display class and would push the boundary in for
+        // no reason (ADR-010, docs/projection-split.md).
+        _split = new QuerySplitter(queryContext.Context.Model).Split(substituted);
 
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
@@ -42,81 +58,138 @@ internal sealed class QueryExecutor<TElement>
 
     public object Execute(bool async, bool singleResult)
     {
-        // Start of a message exchange: wire reference ids restart at 1 on both sides.
-        ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
-            .ResetReferenceScope();
-
-        // Serialize the captured tree to the wire DTO.
-        Expressions.ExpressionNode node = _expressionSerializer.ToNode(_query);
-        var request = new QueryDataRequest
-        {
-            SerializedQuery = SerializeNode(node),
-            TrackingBehavior = _trackingBehavior,
-            IsAsync = async,
-            ReturnsSingleResult = singleResult,
-        };
-
         if (async)
         {
             // The critical section belongs *inside*: this method only builds the enumerable,
             // and a `using` here would release before a single row had been fetched. EF holds
             // it across each MoveNext for the same reason.
-            var asyncEnum = ExecuteAsync(request);
+            IAsyncEnumerable<TElement> asyncEnum = ExecuteAsync(singleResult);
             return singleResult ? (object)FirstOrDefaultAsync(asyncEnum) : asyncEnum;
         }
 
         using var criticalSection = _queryContext.ConcurrencyDetector.EnterCriticalSection();
-        QueryDataResult result = _client
-            .QueryDataAsync(request, _queryContext.CancellationToken)
-            .GetAwaiter()
-            .GetResult();
-        var mapped = Materialize(result);
+
+        var results = new List<object?>(_split.ServerQueries.Count);
+        foreach (ServerQuery serverQuery in _split.ServerQueries)
+        {
+            QueryDataResult result = _client
+                .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.CancellationToken)
+                .GetAwaiter()
+                .GetResult();
+            results.Add(Materialize(serverQuery, result));
+        }
+
+        IEnumerable<TElement> mapped = ApplyResidual(results, singleResult);
         return singleResult ? mapped.FirstOrDefault()! : mapped;
     }
 
-    private async IAsyncEnumerable<TElement> ExecuteAsync(QueryDataRequest request)
+    private async IAsyncEnumerable<TElement> ExecuteAsync(bool singleResult)
     {
         CancellationToken cancellationToken = _queryContext.CancellationToken;
 
-        QueryDataResult result;
-        try
+        var results = new List<object?>(_split.ServerQueries.Count);
+        foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
-            using (_queryContext.ConcurrencyDetector.EnterCriticalSection())
+            QueryDataResult result;
+            try
             {
-                // Checked before the round-trip, as EF does in MoveNextAsync: an already-cancelled
-                // token must surface as OperationCanceledException rather than a completed query.
-                cancellationToken.ThrowIfCancellationRequested();
-                result = await _client.QueryDataAsync(request, cancellationToken).ConfigureAwait(false);
+                using (_queryContext.ConcurrencyDetector.EnterCriticalSection())
+                {
+                    // Checked before the round-trip, as EF does in MoveNextAsync: an
+                    // already-cancelled token must surface as OperationCanceledException rather
+                    // than a completed query.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    result = await _client
+                        .QueryDataAsync(BuildRequest(serverQuery, async: true), cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
-        }
-        catch (Exception exception)
-        {
-            // Same reporting EF's own query enumerators do — callers (and the spec tests)
-            // observe cancellation through the CoreEventId.QueryCanceled log event, not only
-            // through the thrown exception.
-            Type contextType = _queryContext.Context.GetType();
-            if (_queryContext.ExceptionDetector.IsCancellation(exception, cancellationToken))
+            catch (Exception exception)
             {
-                _queryContext.QueryLogger.QueryCanceled(contextType);
-            }
-            else
-            {
-                _queryContext.QueryLogger.QueryIterationFailed(contextType, exception);
+                // Same reporting EF's own query enumerators do — callers (and the spec tests)
+                // observe cancellation through the CoreEventId.QueryCanceled log event, not only
+                // through the thrown exception.
+                Type contextType = _queryContext.Context.GetType();
+                if (_queryContext.ExceptionDetector.IsCancellation(exception, cancellationToken))
+                {
+                    _queryContext.QueryLogger.QueryCanceled(contextType);
+                }
+                else
+                {
+                    _queryContext.QueryLogger.QueryIterationFailed(contextType, exception);
+                }
+
+                throw;
             }
 
-            throw;
+            results.Add(Materialize(serverQuery, result));
         }
 
-        foreach (TElement element in Materialize(result))
+        foreach (TElement element in ApplyResidual(results, singleResult))
         {
             yield return element;
         }
     }
 
-    private IEnumerable<TElement> Materialize(QueryDataResult result)
-        // Client materialization + identity resolution (Phase E).
-        => new ClientResultMaterializer(_queryContext.Context, _expressionSerializer, _trackingBehavior)
-            .Materialize<TElement>(result);
+    private QueryDataRequest BuildRequest(ServerQuery serverQuery, bool async)
+    {
+        // Start of a message exchange: wire reference ids restart at 1 on both sides. One scope
+        // per round trip, so a split query's second request does not decode against the first's
+        // reference table.
+        ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
+            .ResetReferenceScope();
+
+        return new QueryDataRequest
+        {
+            SerializedQuery = SerializeNode(_expressionSerializer.ToNode(serverQuery.Query)),
+            TrackingBehavior = _trackingBehavior,
+            IsAsync = async,
+            ReturnsSingleResult = serverQuery.ReturnsSingleResult,
+        };
+    }
+
+    /// <summary>
+    ///     Turns one server result into what the residual expects for that slot.
+    /// </summary>
+    /// <remarks>
+    ///     The boundary element type is not <typeparamref name="TElement" /> whenever a residual
+    ///     exists, so materialization goes through the runtime type. Rows are drained eagerly:
+    ///     the wire reference scope belongs to one round trip, and a lazily materialized sequence
+    ///     would decode against whichever scope the *next* request had reset.
+    /// </remarks>
+    private object? Materialize(ServerQuery serverQuery, QueryDataResult result)
+    {
+        var materializer = new ClientResultMaterializer(
+            _queryContext.Context, _expressionSerializer, _trackingBehavior);
+
+        object rows = MaterializeMethod
+            .MakeGenericMethod(serverQuery.ElementType)
+            .Invoke(materializer, [result])!;
+        object list = ToListMethod.MakeGenericMethod(serverQuery.ElementType).Invoke(null, [rows])!;
+
+        if (serverQuery.ReturnsSingleResult)
+        {
+            return ((System.Collections.IEnumerable)list).Cast<object?>().FirstOrDefault();
+        }
+
+        return AsQueryableMethod.MakeGenericMethod(serverQuery.ElementType).Invoke(null, [list])!;
+    }
+
+    private IEnumerable<TElement> ApplyResidual(IReadOnlyList<object?> results, bool singleResult)
+    {
+        if (_split.IsPassThrough)
+        {
+            // Nothing to apply. Keep the untouched path allocation-for-allocation what it was
+            // before the split existed.
+            return results[0] is IEnumerable<TElement> sequence ? sequence : [(TElement)results[0]!];
+        }
+
+        object? applied = _split.Apply(results);
+
+        return singleResult
+            ? [(TElement)applied!]
+            : ((System.Collections.IEnumerable)applied!).Cast<TElement>();
+    }
 
     /// <summary>
     ///     Finds the tracking behavior a query asks for, falling back to the context default.

@@ -65,10 +65,12 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       type; a read no shipped query can carry is an error, never a quiet `0`. Landed together
       because A3 alone *is* the silent-`0` bug. ✅ `<this commit>`
 
-- [ ] **A5.** Wire the splitter into `QueryExecutor<TElement>`: materialize each shipped query by
+- [x] **A5.** Wire the splitter into `QueryExecutor<TElement>`: materialize each shipped query by
       its *boundary* element type, then run the residual to produce `TElement`. Recompute
       `ReturnsSingleResult` **for the shipped query** — `…Select(c => new {…}).First()` ships a
-      sequence and the residual takes the first (§5).
+      sequence and the residual takes the first (§5). Rows drain eagerly per round trip: the wire
+      reference scope belongs to one exchange, and a lazy sequence would decode against the next
+      request's scope. **1421 → 669.** ✅ `<this commit>`
 
 - [ ] **A6.** Tracking semantics (§4): boundary rows materialize with identity resolution and
       without tracking; entities present in the residual's *result* are attached afterwards per
@@ -134,3 +136,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | Date | Passed | Failed | Total | Note |
 |---|---|---|---|---|
 | 2026-08-01 | 2817 | 1421 | 4247 | M2 entry baseline — after L1 (type allowlist ON) |
+| 2026-08-02 | 3611 | 669 | 4289 | after A5 (splitter wired into the client executor) |
