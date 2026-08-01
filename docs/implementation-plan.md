@@ -147,11 +147,55 @@ failure profile is unknowable — anything underneath is masked.
 - [ ] **H4.** Drop the SQL Server service container from the per-commit workflow (ADR-009 —
       Tier C is nightly, from M7). Removes container startup from every run.
 
+## Failure classification (the standing taxonomy)
+
+Every failing spec test belongs to exactly one category. Only the first two ever earn an
+override, and only with the reason stated at the override site.
+
+| # | Category | Handling | Permanent? |
+|---|---|---|---|
+| **1** | **Conceptually inapplicable to InfoCarrier** — cannot hold for *any* remoting provider: asserts generated SQL / `ToQueryString`, requires a client-side DB connection, or asserts provider-specific translation the client never performs. | Override with reason, or `IgnoredTestBases` | Permanent |
+| **2** | **Backing-store limitation** — the store can't do it; a *local* provider on the same store fails identically. Verify against EF's own test class for that provider before claiming this. | Override with reason, on the store-specific class only | Until Tier B/C |
+| **3** | **Not yet implemented** — a real InfoCarrier gap with a roadmap home. | **Stays red**, tracked here | No |
+| **4** | **Bug** — should already work. | Fix | No |
+
+**Measured 2026-08-01 (2,600 tests): no category-1 failure has been found yet.** The
+client/server type boundary is the one place a conceptual limit was expected, and requirements
+§3.2 resolves it by splitting the query rather than declaring it impossible. Category 2 has 10
+confirmed members (all in `NorthwindWhereQueryInfoCarrierTest`, all matching EF's own InMemory
+class). Everything else measured so far is category 3 or 4.
+
 ## Phase I — Compliance scoreboard
 
-- [ ] **I1.** `InfoCarrierComplianceTest : ComplianceTestBase` — override `TargetAssembly`
-      only. **Expect it to fail**, listing every unimplemented spec base. That failure *is*
-      the deliverable: the authoritative inventory, generated rather than guessed.
+- [x] **I1.** `InfoCarrierComplianceTest : ComplianceTestBase`. ✅ Red by design — reports
+      **151 spec bases with no InfoCarrier subclass**. The inventory is now generated, not
+      guessed.
+
+- [x] **I1b.** Adopted the **20 remaining `Northwind*QueryTestBase` classes**, fixture generics
+      mirroring EF's own `NorthwindQuery*InMemoryTest`. **413 → 2,600 tests; 1,073 passing.**
+      Deliberately no overrides — every failure is information.
+
+      **Triage of all 1,527 failures:**
+
+      | Count | Cause | Category |
+      |---|---|---|
+      | **629** | `JsonException: A possible object cycle was detected` | **4** — result wire format |
+      | **214** | `JsonException: The JSON value could not be converted to List<…>` | **4** — same root |
+      | **260** | `ArgumentException: The type or method has N generic parameter(s), but N generic argument(s) were provided` | **4** — `MethodNode` generic-arity resolution |
+      | 292 | `Assert.Equal` values differ | mixed, needs sub-triage |
+      | 38 | `Assert.Throws` exception type mismatch | **3** — wire exception fidelity (W5, M5) |
+      | 32 | `The LINQ expression 'DbSet<X>()' could not be translated` | needs investigation |
+      | 8 | `NotImplementedException` | **3** — compiled queries / SaveChanges |
+      | ~54 | long tail | mixed |
+
+      **Two causes account for ~72% of all failures.**
+      - **843 (55%)** are the result wire format. `ServerQueryExecutor.SerializeResult` still
+        does `JsonSerializer.SerializeToUtf8Bytes(list, list.GetType())`; entity graphs with
+        circular navigations (`Customer→Orders→Customer`) throw on the way out, and what does
+        serialize will not deserialize back into `List<T>`. Wire-protocol §2.1 already
+        specifies the fix — **identity-keyed rows with per-message reference preservation**,
+        not raw object JSON. This is the single highest-value fix in the project.
+      - **260 (17%)** are one generic-arity bug in method resolution.
 
 - [ ] **I2.** Scope `GetBaseTestClasses()` to the core `Microsoft.EntityFrameworkCore.Specification.Tests`
       assembly. Relational spec bases assert SQL and are inapplicable to a **non-relational
