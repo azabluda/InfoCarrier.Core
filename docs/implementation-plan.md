@@ -282,3 +282,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 3766 | 472 | 4247 | after G6a (server loaded-probe: no-tracking Includes) |
 | 2026-08-01 | 3844 | 394 | 4247 | after G6b (per-query tracking behavior, untracked path) |
 | 2026-08-01 | 3856 | 382 | 4247 | after G6c (loaded-probe key check, EF issue #23851) |
+| 2026-08-01 | 3934 | 304 | 4247 | after G7 (null result rows are data, not absent rows) |

@@ -57,14 +57,12 @@ public class ClientResultMaterializer
 
         foreach (DynamicValueNode row in DeserializeRows(result))
         {
+            // A null row is data, not an absent row. `Select(c => c.Orders.FirstOrDefault())`
+            // over a customer with no orders produces one, and skipping it silently returned
+            // 89 rows where the query defined 91.
             object? value = mapper.FromDynamicValue(row);
 
-            if (value is null)
-            {
-                continue;
-            }
-
-            yield return (TElement)value;
+            yield return value is null ? default! : (TElement)value;
         }
     }
 
