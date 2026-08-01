@@ -46,10 +46,11 @@ itself is the work that matters, and the local suite already gives the same sign
 The split with no projection rewrite: ship server-executable subtrees whole, run the residual
 locally. Correct but coarse; A must never be *silently* wrong, which is what A4 is for.
 
-- [ ] **A1.** `Query/WireTypeCollector` — the types a node would put on the wire
+- [x] **A1.** `Query/WireTypeCollector` — the types a node would put on the wire
       ([`projection-split.md`](projection-split.md) §3.1), enumerated from the same sources
-      `ExpressionToNodeTranslator` writes `TypeNode`s from. Unit-tested against the translator so
-      the two cannot drift.
+      `ExpressionToNodeTranslator` writes `TypeNode`s from. The drift guard compares **per node**,
+      not whole-tree: types repeat across a tree, so a whole-tree comparison passed even with
+      `Member.DeclaringType` dropped. Six omissions mutation-tested, all caught. ✅ `<this commit>`
 
 - [ ] **A2.** `Query/ServerBoundaryAnalyzer` — bottom-up `ServerOk` over `TypeAllowlist`;
       frontier extraction; free-parameter check for shippability (§3.1, §3.5).
