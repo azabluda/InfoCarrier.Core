@@ -290,3 +290,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 4166 | 72 | 4247 | after G12 (entity references carry their key to the server) |
 | 2026-08-01 | 4171 | 67 | 4247 | after G13 (value-type ctors; a single result that is itself a sequence) |
 | 2026-08-01 | 4193 | 45 | 4247 | after G14 (entities built by a projection are not identity-resolved) |
+| 2026-08-01 | 4194 | 44 | 4247 | after G15 (cancellation, concurrency section, query logging) |

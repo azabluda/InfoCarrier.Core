@@ -31,6 +31,19 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
             // client model has the types but not the store's means of producing their rows.
             serverContextType: typeof(NorthwindInfoCarrierServerContext));
 
+    /// <summary>
+    ///     Enables Query-category logging, as EF Core's own <c>NorthwindQueryInMemoryFixture</c>
+    ///     does.
+    /// </summary>
+    /// <remarks>
+    ///     Without this the fixture's <c>ListLoggerFactory.Log</c> is always empty, so every
+    ///     spec test that asserts on a logged event — <c>ToListAsync_with_canceled_token</c>
+    ///     looks for <c>CoreEventId.QueryCanceled</c> — fails against an empty collection no
+    ///     matter what the provider does.
+    /// </remarks>
+    protected override bool ShouldLogCategory(string logCategory)
+        => logCategory == DbLoggerCategory.Query.Name;
+
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)
         => server.TenantPrefix = client.TenantPrefix;
 }

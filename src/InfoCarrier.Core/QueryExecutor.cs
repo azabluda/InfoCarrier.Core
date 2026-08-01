@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 
 namespace InfoCarrier.Core;
@@ -41,8 +42,6 @@ internal sealed class QueryExecutor<TElement>
 
     public object Execute(bool async, bool singleResult)
     {
-        using var cs = _queryContext.ConcurrencyDetector.EnterCriticalSection();
-
         // Start of a message exchange: wire reference ids restart at 1 on both sides.
         ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
             .ResetReferenceScope();
@@ -59,18 +58,55 @@ internal sealed class QueryExecutor<TElement>
 
         if (async)
         {
+            // The critical section belongs *inside*: this method only builds the enumerable,
+            // and a `using` here would release before a single row had been fetched. EF holds
+            // it across each MoveNext for the same reason.
             var asyncEnum = ExecuteAsync(request);
             return singleResult ? (object)FirstOrDefaultAsync(asyncEnum) : asyncEnum;
         }
 
-        QueryDataResult result = _client.QueryDataAsync(request).GetAwaiter().GetResult();
+        using var criticalSection = _queryContext.ConcurrencyDetector.EnterCriticalSection();
+        QueryDataResult result = _client
+            .QueryDataAsync(request, _queryContext.CancellationToken)
+            .GetAwaiter()
+            .GetResult();
         var mapped = Materialize(result);
         return singleResult ? mapped.FirstOrDefault()! : mapped;
     }
 
     private async IAsyncEnumerable<TElement> ExecuteAsync(QueryDataRequest request)
     {
-        QueryDataResult result = await _client.QueryDataAsync(request).ConfigureAwait(false);
+        CancellationToken cancellationToken = _queryContext.CancellationToken;
+
+        QueryDataResult result;
+        try
+        {
+            using (_queryContext.ConcurrencyDetector.EnterCriticalSection())
+            {
+                // Checked before the round-trip, as EF does in MoveNextAsync: an already-cancelled
+                // token must surface as OperationCanceledException rather than a completed query.
+                cancellationToken.ThrowIfCancellationRequested();
+                result = await _client.QueryDataAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception)
+        {
+            // Same reporting EF's own query enumerators do — callers (and the spec tests)
+            // observe cancellation through the CoreEventId.QueryCanceled log event, not only
+            // through the thrown exception.
+            Type contextType = _queryContext.Context.GetType();
+            if (_queryContext.ExceptionDetector.IsCancellation(exception, cancellationToken))
+            {
+                _queryContext.QueryLogger.QueryCanceled(contextType);
+            }
+            else
+            {
+                _queryContext.QueryLogger.QueryIterationFailed(contextType, exception);
+            }
+
+            throw;
+        }
+
         foreach (TElement element in Materialize(result))
         {
             yield return element;
