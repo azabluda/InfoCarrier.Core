@@ -105,6 +105,17 @@ projections may.
 
 ## 8. Q-split (A2) — Projection boundary — RESOLVED (deferred execution, not tree surgery)
 
+> ⚠️ **Corrected 2026-08-01 — placement reversed, mechanism retained ([ADR-010](decisions.md#adr-010)).**
+> The paragraph below says the *server* detects the boundary. Once ADR-008 constraint 2 was
+> implemented (Step L1), that became impossible: rejection happens inside
+> `TypeNodeResolver.Resolve` during *deserialization*, so a tree naming an anonymous type throws
+> before the server has an expression to analyze. The boundary is computed **on the client**,
+> before serialization. Everything else here stands — no tree surgery, no new wire vocabulary,
+> the client applies the residual after materialization + identity resolution. One further
+> refinement: the boundary is not a cut but a *rewrite* of projection lambdas into a `ValueTuple`
+> carrier, because a cut answers `c.Orders.Count()` as `0` silently. See
+> [`projection-split.md`](projection-split.md).
+
 Per ADR-006=B and requirements §3.2: the server receives the full tree. The server detects the
 boundary where server-unknown types (anonymous/DTO/value-tuple) appear and executes only the
 entity-typed prefix, returning identity-keyed row data; the client applies the final projection

@@ -242,3 +242,38 @@ closes). `ci-cd.md`'s "Docker SQL Server, NOT LocalDB" framing is superseded for
 retained for Tier C.
 
 **Supersedes.** The Docker-only backend strategy in [`ci-cd.md`](ci-cd.md).
+
+## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
+
+**Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot
+materialize anonymous types, client-only DTOs, or client-declared value tuples.
+[`research-findings.md`](research-findings.md) §8 resolved this as *server-side* detection — the
+server receives the whole tree, detects where server-unknown types appear, executes the
+entity-typed portion. That was written before ADR-008 constraint 2 was implemented.
+
+Step L1 (2026-08-01) turned the type allowlist on. Failures went **32 → 1,421 of 4,247**;
+~1,305 of them are this milestone. The allowlist also changed what is *possible*: rejection now
+happens inside `TypeNodeResolver.Resolve`, during deserialization.
+
+**Decision.** The **client** computes the boundary, before serialization. It ships only
+server-executable subtrees and evaluates the remainder locally against the materialized results.
+`TypeAllowlist` is the shared definition of "server-known", so the two sides cannot disagree.
+Design: [`projection-split.md`](projection-split.md).
+
+**Rationale.** Server-side detection is not merely inconvenient under the allowlist, it is
+excluded by it: a tree naming an anonymous type throws during deserialization, before the server
+has an expression to analyze. Making the server tolerate unresolvable type names is exactly the
+default-deny violation constraint 2 forbids, and would reopen the RCE surface L1 closed. The
+client, meanwhile, already holds the tree as a live expression over its own `MemberInfo`s and can
+simply evaluate the residual; the server could only describe the residual back, needing a
+round-trip and a second wire vocabulary.
+
+**Consequences.** The wire format does not change. `ServerQueryExecutor` does not change — if it
+needs edits, the boundary was drawn in the wrong place. Projection lambdas are *rewritten* into a
+`ValueTuple` carrier rather than cut, which is simultaneously the fix for correlated subqueries
+and navigation reads (a cut answers `c.Orders.Count()` as `0`, silently) and the minimal-column
+payload of requirements §3.3 (wire-protocol W1).
+
+**Supersedes.** [`research-findings.md`](research-findings.md) §8, in placement only. Its
+mechanism — execute the entity-typed portion, apply the projection locally, no tree surgery, no
+new wire vocabulary — is retained.

@@ -43,9 +43,16 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
 
 ### M2 — Projection split (requirements §3)
 
-The one genuinely unsolved design problem. Approach is sketched in research-findings §8 — *the
-boundary is the last `Select` whose element type the server's model knows* — but nothing
-implements it. **Needs its own design session and spec before code.**
+The one genuinely unsolved design problem. **Spec written 2026-08-01:**
+[`projection-split.md`](projection-split.md), recorded as [ADR-010](decisions.md#adr-010).
+
+Two things changed from the research-findings §8 sketch. The boundary is computed **on the
+client**, not the server — the allowlist rejects during deserialization, so the server never gets
+an expression to analyze. And it is a *rewrite*, not a cut at "the last `Select` whose element
+type the server's model knows": cutting there ships `Customer` entities and then answers
+`c.Orders.Count()` as `0` on the client, silently. Projection lambdas are instead split into a
+server-side `ValueTuple` projection plus a client-side reassembly — which is also the
+minimal-column payload (W1).
 
 > ⚠️ **Re-scoped 2026-08-01 — the tests no longer detect this problem.** Projection tests used
 > to fail loudly (`Entity type '<>f__AnonymousType…' not found in the server model`). After
@@ -76,10 +83,17 @@ implements it. **Needs its own design session and spec before code.**
   it unblocks SaveChanges, and until it lands most other failures are masked behind it.
 - ✅ Server-side type allowlist enforced, so client-only types cannot be materialized
   server-side even in-process. Projection tests fail again before they are fixed.
-- Boundary detection in the server executor; client applies the residual projection.
+- ✅ Design spec + ADR — [`projection-split.md`](projection-split.md), [ADR-010](decisions.md#adr-010).
+- Boundary detection **in the client**; client applies the residual projection. `ServerQueryExecutor`
+  unchanged — if it needs edits, the boundary was drawn in the wrong place.
 - Minimal-column payload (wire-protocol W1) — the server returns only what the client
-  projection needs, per requirements §3.3.
-- `NorthwindSelectQueryTestBase` and `NorthwindJoinQueryTestBase` adopted and passing.
+  projection needs, per requirements §3.3. Same mechanism as the boundary rewrite, not a
+  separate pass.
+- `NorthwindSelectQueryTestBase` (not yet adopted) and `NorthwindJoinQueryTestBase` adopted and
+  passing.
+- The ~84 store-limitation overrides that now trip the type boundary before reaching the
+  translation failure they assert are re-checked: each returns to asserting its original failure,
+  or is deleted.
 
 ### M3 — SQLite backend + SaveChanges
 

@@ -257,6 +257,12 @@ M1 closes when all of:
 Then rewrite this doc for **M2 — projection split**, which starts with a design session, not
 code (roadmap M2).
 
+- [x] **L1.** Type allowlist enforced (ADR-008 constraint 2). Restores the M2 signal:
+      32 → 1,421 failures, ~1,305 of them the projection split. ✅ `731cca2`
+- [x] **M2-0.** M2 design session — [`projection-split.md`](projection-split.md) +
+      [ADR-010](decisions.md#adr-010); research-findings §8 corrected (boundary is computed on
+      the client, and is a rewrite rather than a cut). ✅ `<this commit>`
+
 ## Phase K — the residual 42, classified
 
 Measured 2026-08-01 at **4196 passed / 42 failed / 4247**. 22 distinct tests (most ×2 for
