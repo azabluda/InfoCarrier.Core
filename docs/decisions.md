@@ -188,13 +188,29 @@ Node set is the minimal one of research-findings §5 (no Block/Loop/Try/Goto/Swi
 entity identity on the wire is EF entity-type name + key values per §7 — entities must never
 merge by shape, projections may.
 
-**Implementation status (2026-08-01).** Constraints 1, 3, 4, 5, 7, 8 are implemented.
-**Constraint 2 (allowlists) is NOT implemented** — `TypeNodeResolver.ResolveByName` resolves
-arbitrary type names from wire data via `Type.GetType` plus an `AppDomain` assembly scan, and
-method resolution is similarly unconstrained. With only the in-process transport this is not
-exploitable, but it is a remote-code-execution vector and **must land before any network
-transport ships** (roadmap M5). Constraint 6 (canonical form) is not yet exercised — no
-compiled-query cache exists.
+**Implementation status (2026-08-01, revised).** Constraints 1, 3, 4, 5, 7, 8 are implemented.
+
+**Constraint 2 — type allowlist: implemented.** `TypeAllowlist` is on by default and derived
+from the model (entity CLR types + mapped property types) plus a fixed set of framework types
+and explicitly registered projection types. `TypeNodeResolver` still resolves a name before
+checking it — the name has to be resolved to know what it denotes — but nothing is constructed
+until it clears the list. This closes the remote-code-execution vector: the deserializer can no
+longer be told to instantiate an arbitrary type by name.
+
+The *method* allowlist half of constraint 2 remains open: `ResolveMethod` binds any method on an
+allowed declaring type. Narrower than before (the declaring type must now be allowed) but not
+the "Queryable / Enumerable / `EF.Functions` / model-bound members" restriction this ADR calls
+for. Still required before a network transport ships (roadmap M5).
+
+> **What enabling it revealed.** Failures went 32 → 1,421 of 4,247. **1,197 are anonymous or
+> other compiler-generated projection types, and ~108 more are client-only DTOs** — together
+> ~31% of the suite, all of it the projection split (requirements §3, milestone M2). Those tests
+> were passing only because the in-process transport shares an `AppDomain`, so an assembly scan
+> found types no network server could ever have. The estimate before this landed was ~16 tests.
+> This is the same class of self-deception recorded against G4e, at roughly eighty times the
+> scale.
+
+Constraint 6 (canonical form) is not yet exercised — no compiled-query cache exists.
 
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 

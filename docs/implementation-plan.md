@@ -363,3 +363,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 4202 | 36 | 4247 | after K3b (a JSON string satisfies a broader declared type) |
 | 2026-08-01 | 4204 | 34 | 4247 | after K3c (a primitive in a broader-typed member carries its type) |
 | 2026-08-01 | 4206 | 32 | 4247 | after K3d (public fields are part of an object shape) |
+| 2026-08-01 | 2817 | 1421 | 4247 | after L1 (type allowlist ON — M2 signal restored, see roadmap M2) |

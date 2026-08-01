@@ -59,13 +59,23 @@ implements it. **Needs its own design session and spec before code.**
 > + registered projection types). Enforcing it makes the server reject client-only types, the
 > type boundary becomes real in-process, and the §3 tests fail honestly again. The allowlist
 > is not only a security control (M5) — it is what makes the boundary testable at all.
+>
+> ✅ **Done 2026-08-01 — and the problem is far larger than anyone estimated.** With the
+> allowlist enforced the suite went **32 → 1,421 failures of 4,247**: 1,197 anonymous or other
+> compiler-generated projection types, ~108 client-only DTOs. **~1,305 tests — 31% of the
+> suite — are M2-blocked**, against an estimate of ~16 taken from the passing suite. A further
+> ~84 store-limitation overrides now trip the boundary before reaching the translation failure
+> they assert, and will need re-checking once the split lands.
+>
+> That ratio is the point worth remembering: the harness was concealing roughly eighty times
+> more missing functionality than the visible failures suggested.
 
 **Exit criteria**
 - **Result wire format** — spec written: [`result-wire-format.md`](result-wire-format.md).
   1,047 of 1,440 failures (73%). Do this first: it is independent of the type-boundary work,
   it unblocks SaveChanges, and until it lands most other failures are masked behind it.
-- Server-side type allowlist enforced, so client-only types cannot be materialized server-side
-  even in-process. Projection tests fail again before they are fixed.
+- ✅ Server-side type allowlist enforced, so client-only types cannot be materialized
+  server-side even in-process. Projection tests fail again before they are fixed.
 - Boundary detection in the server executor; client applies the residual projection.
 - Minimal-column payload (wire-protocol W1) — the server returns only what the client
   projection needs, per requirements §3.3.
@@ -117,12 +127,15 @@ Untestable before M3: EF InMemory raises `TransactionIgnoredWarning` with
 
 **No network transport may ship before this milestone completes.**
 
-ADR-008 constraint 2 mandates strict allowlists on by default; they were never implemented.
-`TypeNodeResolver.ResolveByName` resolves arbitrary type names from wire data via
-`Type.GetType` plus an `AppDomain` assembly scan, and method resolution is likewise
-unconstrained. Combined with `InvocationNode` this is a remote-code-execution vector in a
-product whose entire purpose is accepting serialized expression trees from remote clients.
-Not exploitable today only because the sole transport is in-process.
+ADR-008 constraint 2 mandates strict allowlists on by default. Combined with `InvocationNode`,
+an unconstrained resolver is a remote-code-execution vector in a product whose entire purpose is
+accepting serialized expression trees from remote clients.
+
+**Partly closed 2026-08-01.** The *type* allowlist is implemented and on by default
+(`TypeAllowlist`), so a payload can no longer name an arbitrary type for the deserializer to
+construct. **The method allowlist is still open**: `ResolveMethod` binds any method on an
+allowed declaring type, rather than the "Queryable / Enumerable / `EF.Functions` / model-bound
+members" restriction ADR-008 specifies. Narrower than before, not yet sufficient.
 
 **Exit criteria**
 - Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,

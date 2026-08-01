@@ -17,13 +17,22 @@ namespace InfoCarrier.Core.Expressions;
 public class TypeNodeResolver
 {
     private readonly IModel? _model;
+    private readonly TypeAllowlist _allowlist;
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="TypeNodeResolver" /> class.
     /// </summary>
-    public TypeNodeResolver(IModel? model = null)
-        => _model = model;
+    /// <param name="model">The EF model used to resolve entity types by model identity.</param>
+    /// <param name="allowlist">
+    ///     The types a payload may name (ADR-008 constraint 2). Defaults to one derived from
+    ///     <paramref name="model" /> — the allowlist is <em>on by default</em>, never opt-in.
+    /// </param>
+    public TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = null)
+    {
+        _model = model;
+        _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
+    }
 
     /// <summary>
     ///     Resolves a type node to its CLR type.
@@ -37,9 +46,36 @@ public class TypeNodeResolver
         }
 
         Type resolved = ResolveCore(node);
+
+        // Enforced after resolution, not instead of it: the name has to be resolved to know
+        // what it denotes, but nothing is constructed from it until it clears the allowlist.
+        if (!_allowlist.IsAllowed(resolved))
+        {
+            throw new InvalidOperationException(BuildRejection(resolved));
+        }
+
         _cache[cacheKey] = resolved;
         return resolved;
     }
+
+    /// <summary>
+    ///     Explains a rejection in the terms that actually apply, since the two causes need
+    ///     opposite responses: a client-only projection type means the query must be split, an
+    ///     unrelated type means the payload is asking for something it should not have.
+    /// </summary>
+    private static string BuildRejection(Type type)
+        => IsCompilerGenerated(type)
+            ? $"Type '{type}' is a compiler-generated projection type and is not resolvable across "
+                + "the wire: it exists only in the client's assembly, so no server could construct "
+                + "it. The projection must be evaluated on the client (requirements §3, milestone M2)."
+            : $"Type '{type}' is not on the deserialization allowlist (ADR-008 constraint 2). "
+                + "Model entity types and their property types are allowed automatically; register "
+                + "any additional projection type explicitly.";
+
+    private static bool IsCompilerGenerated(Type type)
+        => type.Name.Contains("AnonymousType", StringComparison.Ordinal)
+            || type.Name.StartsWith("<>", StringComparison.Ordinal)
+            || type.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), inherit: false);
 
     private Type ResolveCore(TypeNode node)
     {
