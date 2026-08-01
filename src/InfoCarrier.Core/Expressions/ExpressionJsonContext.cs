@@ -39,6 +39,37 @@ namespace InfoCarrier.Core.Expressions;
 [JsonSerializable(typeof(EntityKeyNode))]
 [JsonSerializable(typeof(NodeKind))]
 [JsonSerializable(typeof(MemberKind))]
+
+// ConstantNode.PrimitiveValue is declared `object?`, so System.Text.Json resolves its
+// JsonTypeInfo by the *runtime* type of each value. Under source generation every such type
+// must be registered here or serialization throws NotSupportedException. The set below is
+// exactly what ExpressionToNodeTranslator.IsPrimitive admits. Enums are not listed: they are
+// normalized to their underlying integral value before serialization (a concrete enum type
+// could never be pre-registered) and rebuilt by NodeToExpressionTranslator.CoercePrimitive
+// from the TypeNode.
+//
+// Deliberately NOT solved with a reflection-based fallback resolver: that would silently
+// defeat the AOT/trimming goal (requirements §4.5, ADR-008 constraint 8).
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(byte))]
+[JsonSerializable(typeof(sbyte))]
+[JsonSerializable(typeof(short))]
+[JsonSerializable(typeof(ushort))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(uint))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(ulong))]
+[JsonSerializable(typeof(float))]
+[JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(decimal))]
+[JsonSerializable(typeof(char))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(DateTimeOffset))]
+[JsonSerializable(typeof(DateOnly))]
+[JsonSerializable(typeof(TimeOnly))]
+[JsonSerializable(typeof(TimeSpan))]
+[JsonSerializable(typeof(Guid))]
 public partial class ExpressionJsonContext : JsonSerializerContext
 {
 }

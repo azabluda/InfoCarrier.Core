@@ -90,7 +90,9 @@ public class NodeToExpressionTranslator
             Type underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
             if (underlying.IsEnum)
             {
-                return Enum.ToObject(underlying, element.GetInt32());
+                // GetInt64 (not GetInt32) so enums with long/ulong backing survive; the
+                // client sends the underlying integral value, never the enum name.
+                return Enum.ToObject(underlying, element.GetInt64());
             }
 
             if (underlying == typeof(string)) return element.GetString();

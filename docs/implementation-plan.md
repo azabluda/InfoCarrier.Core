@@ -32,7 +32,12 @@ failure profile is unknowable — anything underneath is masked.
       the v1 `ValueWrapper<T>` trap).
       **Keep** the existing `VisitParameter` path; both node forms can appear.
 
-- [ ] **G2.** STJ primitive registration (**~76 failures**).
+- [x] **G2.** STJ primitive registration (**~76 failures**). ✅ **207 → 289 passing**
+      (206 → 124 failures). Registration alone was insufficient: enum constants carry their
+      concrete enum runtime type, which can never be pre-registered, so they are now
+      normalized to their underlying integral value at capture and rebuilt from the
+      `TypeNode` on the far side. Explicit registration chosen over a reflection fallback,
+      per the constraint below.
       `ConstantNode.PrimitiveValue` is `object?`, so serializing it through
       `ExpressionJsonContext` needs a `JsonTypeInfo` for each concrete runtime type; the
       context registers the 19 node types and no primitives. Observed missing: `Int32`,

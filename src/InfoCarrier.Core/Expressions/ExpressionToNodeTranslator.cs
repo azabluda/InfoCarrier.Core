@@ -71,7 +71,7 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
         }
 
         _result = IsPrimitive(node.Value)
-            ? new ConstantNode { Type = type, PrimitiveValue = node.Value }
+            ? new ConstantNode { Type = type, PrimitiveValue = NormalizePrimitive(node.Value) }
             : new ConstantNode { Type = type, DynamicValue = _valueMapper.ToDynamicValue(node.Value, node.Type) };
         return node;
     }
@@ -313,4 +313,20 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
             || value.GetType().IsPrimitive
             || value is string or decimal or DateTime or DateTimeOffset or TimeSpan or Guid or DateOnly or TimeOnly
             || value.GetType().IsEnum;
+
+    /// <summary>
+    ///     Converts an enum value to its underlying integral value for the wire. A concrete
+    ///     enum type can never be pre-registered in the source-generated serializer context
+    ///     (see <see cref="ExpressionJsonContext" />), and the enum type is already carried by
+    ///     the node's <see cref="ConstantNode.Type" />, so
+    ///     <c>NodeToExpressionTranslator.CoercePrimitive</c> rebuilds it on the far side.
+    ///     Non-enum values pass through unchanged.
+    /// </summary>
+    private static object? NormalizePrimitive(object? value)
+        => value is not null && value.GetType().IsEnum
+            ? Convert.ChangeType(
+                value,
+                Enum.GetUnderlyingType(value.GetType()),
+                System.Globalization.CultureInfo.InvariantCulture)
+            : value;
 }
