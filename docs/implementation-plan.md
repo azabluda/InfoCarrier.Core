@@ -359,3 +359,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 4193 | 45 | 4247 | after G14 (entities built by a projection are not identity-resolved) |
 | 2026-08-01 | 4194 | 44 | 4247 | after G15 (cancellation, concurrency section, query logging) |
 | 2026-08-01 | 4196 | 42 | 4247 | after G16 (overload resolution uses the return type) |
+| 2026-08-01 | 4200 | 38 | 4247 | after K3a (a placeholder navigation no longer blocks EF fixup) |

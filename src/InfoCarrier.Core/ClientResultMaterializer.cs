@@ -149,9 +149,55 @@ public class ClientResultMaterializer
                 : PrimitiveCoercion.Coerce(member.PrimitiveValue, property.ClrType);
         }
 
+        ClearPlaceholderReferencesBlockingFixup(entry, entityType);
         entry.SetEntityState(EntityState.Unchanged);
         PopulateNavigations(row, instance, entityType, entry, mapper);
         return instance;
+    }
+
+    /// <summary>
+    ///     Nulls a constructor-initialized reference navigation, but only where it would block
+    ///     a fixup that ought to happen — that is, where the principal is already tracked.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF's <c>NavigationFixer</c> overwrites a navigation only when it is null or
+    ///         already points at the principal; tracking <em>from a query</em> additionally
+    ///         overrides a value that is not itself tracked. We attach through
+    ///         <c>SetEntityState</c>, which is not the from-query path, so a constructor-set
+    ///         placeholder blocks fixup outright and an attached order never joined its
+    ///         customer's <c>Orders</c>.
+    ///     </para>
+    ///     <para>
+    ///         Northwind's <c>Order.Customer</c> is initialized to <c>new()</c> deliberately, as
+    ///         the regression test for EF issue #23851 — and that placeholder must
+    ///         <em>survive</em> when the principal is absent, which
+    ///         <c>Include_collection_dependent_already_tracked</c> asserts directly. So the
+    ///         condition is not "was it constructor-initialized" but "is there a real principal
+    ///         for it to be replaced by", which is exactly when EF's own fixup would act.
+    ///     </para>
+    /// </remarks>
+    private void ClearPlaceholderReferencesBlockingFixup(InternalEntityEntry entry, IEntityType entityType)
+    {
+        foreach (IForeignKey foreignKey in entityType.GetForeignKeys())
+        {
+            if (foreignKey.DependentToPrincipal is not { PropertyInfo: { CanWrite: true } clrProperty }
+                || clrProperty.GetValue(entry.Entity) is null)
+            {
+                continue;
+            }
+
+            object?[] keyValues = foreignKey.Properties.Select(p => entry[p]).ToArray();
+            if (Array.Exists(keyValues, v => v is null))
+            {
+                continue;
+            }
+
+            if (_stateManager.TryGetEntry(foreignKey.PrincipalKey, keyValues) is not null)
+            {
+                clrProperty.SetValue(entry.Entity, null);
+            }
+        }
     }
 
     /// <summary>
