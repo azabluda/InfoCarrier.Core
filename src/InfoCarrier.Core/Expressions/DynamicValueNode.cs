@@ -50,6 +50,20 @@ public sealed record DynamicValueNode
     ///     set and rehydrates <em>silently</em> as <c>0</c>.
     /// </remarks>
     public object? PrimitiveValue { get; init; }
+
+    /// <summary>
+    ///     For <see cref="System.Type" /> values: the type this value denotes. Set when the
+    ///     constant *is* a type — <c>typeof(Customer)</c>, the operand of a
+    ///     <c>GetType() ==</c> comparison, and similar. Null for every other shape.
+    /// </summary>
+    /// <remarks>
+    ///     A <see cref="System.Type" /> must never be walked as an object shape: reading its
+    ///     public properties reflectively throws on the first member that is only valid for
+    ///     some types (<c>DeclaringMethod</c> requires <c>IsGenericParameter</c>). It is
+    ///     carried as a <see cref="TypeNode" /> — the same assembly-free identity used
+    ///     everywhere else — and resolved back through the type resolver.
+    /// </remarks>
+    public TypeNode? TypeValue { get; init; }
 }
 
 /// <summary>

@@ -69,6 +69,13 @@ public class DynamicValueMapper : IDynamicValueMapper
             };
         }
 
+        // Type value (typeof(X), the operand of a GetType() comparison, …). Must precede the
+        // object-shape branch: walking a Type's public properties reflectively throws.
+        if (value is Type typeValue)
+        {
+            return new DynamicValueNode { Type = typeNode, TypeValue = _typeMapper.ToTypeNode(typeValue) };
+        }
+
         // Scalar: a primitive standing where a dynamic value is required (typically a
         // collection element). Must precede the collection branch — string is IEnumerable —
         // and the object-shape branch, which cannot represent a primitive.
@@ -131,6 +138,12 @@ public class DynamicValueMapper : IDynamicValueMapper
     private object? Materialize(DynamicValueNode node)
     {
         Type type = _typeResolver.Resolve(node.Type);
+
+        // Type value (mirrors the Type branch in MapToNode).
+        if (node.TypeValue is not null)
+        {
+            return _typeResolver.Resolve(node.TypeValue);
+        }
 
         // Scalar (mirrors the primitive branch in MapToNode).
         if (node.PrimitiveValue is not null)
