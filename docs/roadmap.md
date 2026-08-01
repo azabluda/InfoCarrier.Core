@@ -61,6 +61,9 @@ implements it. **Needs its own design session and spec before code.**
 > is not only a security control (M5) — it is what makes the boundary testable at all.
 
 **Exit criteria**
+- **Result wire format** — spec written: [`result-wire-format.md`](result-wire-format.md).
+  1,047 of 1,440 failures (73%). Do this first: it is independent of the type-boundary work,
+  it unblocks SaveChanges, and until it lands most other failures are masked behind it.
 - Server-side type allowlist enforced, so client-only types cannot be materialized server-side
   even in-process. Projection tests fail again before they are fixed.
 - Boundary detection in the server executor; client applies the residual projection.
