@@ -27,15 +27,20 @@ public class ClientResultMaterializer
     private readonly DbContext _context;
     private readonly IStateManager _stateManager;
     private readonly ExpressionSerializer _serializer;
+    private readonly QueryTrackingBehavior _trackingBehavior;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClientResultMaterializer" /> class.
     /// </summary>
-    public ClientResultMaterializer(DbContext context, IExpressionSerializer serializer)
+    public ClientResultMaterializer(
+        DbContext context,
+        IExpressionSerializer serializer,
+        QueryTrackingBehavior trackingBehavior)
     {
         _context = context;
         _stateManager = context.GetService<IStateManager>();
         _serializer = (ExpressionSerializer)serializer;
+        _trackingBehavior = trackingBehavior;
     }
 
     /// <summary>
@@ -87,10 +92,20 @@ public class ClientResultMaterializer
             return mapper.FromShape(row);
         }
 
+        IKey? pk = entityType.FindPrimaryKey();
+
+        // A no-tracking query must leave the change tracker untouched, and a keyless entity type
+        // can never be tracked at all. Attaching regardless was invisible while included
+        // navigations were being dropped; once they arrive, attaching a graph the tracker cannot
+        // key throws "Unable to track an entity … its primary key property is null".
+        if (pk is null || _trackingBehavior != QueryTrackingBehavior.TrackAll)
+        {
+            return MaterializeUntracked(row, entityType, mapper);
+        }
+
         // Identity resolution via EF's own identity map (v1 pattern): reuse the tracked
         // instance if an entity with the same key is already tracked.
-        IKey? pk = entityType.FindPrimaryKey();
-        if (pk is not null && row.EntityKey.KeyValues.Count == pk.Properties.Count)
+        if (row.EntityKey.KeyValues.Count == pk.Properties.Count)
         {
             object?[] keyValues = pk.Properties
                 .Select((p, i) => PrimitiveCoercion.Coerce(row.EntityKey.KeyValues[i], p.ClrType))
@@ -100,7 +115,7 @@ public class ClientResultMaterializer
             if (tracked is not null)
             {
                 mapper.RegisterMaterialized(row.Id, tracked.Entity);
-                PopulateNavigations(row, tracked, mapper);
+                PopulateNavigations(row, tracked.Entity, entityType, tracked, mapper);
                 return tracked.Entity;
             }
         }
@@ -132,11 +147,59 @@ public class ClientResultMaterializer
         }
 
         entry.SetEntityState(EntityState.Unchanged);
-        PopulateNavigations(row, entry, mapper);
+        PopulateNavigations(row, instance, entityType, entry, mapper);
         return instance;
     }
 
-    private void PopulateNavigations(DynamicValueNode row, InternalEntityEntry entry, DynamicValueMapper mapper)
+    /// <summary>
+    ///     Materializes an entity that must not enter the change tracker: a no-tracking result,
+    ///     or a keyless entity type.
+    /// </summary>
+    /// <remarks>
+    ///     Shadow properties are skipped, because there is nowhere to put them — an untracked
+    ///     instance has no state entry, and EF's own no-tracking results carry no shadow state
+    ///     either. Identity resolution is likewise absent by design: under
+    ///     <see cref="QueryTrackingBehavior.NoTracking" /> EF returns a fresh instance per row,
+    ///     and under <see cref="QueryTrackingBehavior.NoTrackingWithIdentityResolution" /> the
+    ///     server already collapsed duplicates, which the wire preserves as back-references.
+    /// </remarks>
+    private object MaterializeUntracked(DynamicValueNode row, IEntityType entityType, DynamicValueMapper mapper)
+    {
+        object instance = Activator.CreateInstance(entityType.ClrType, nonPublic: true)!;
+        mapper.RegisterMaterialized(row.Id, instance);
+
+        foreach (DynamicPropertyValue member in row.Properties)
+        {
+            if (member.IsLoadedNavigation)
+            {
+                continue;
+            }
+
+            if (entityType.FindProperty(member.Name) is not { } property
+                || property.PropertyInfo is not { CanWrite: true } clrProperty)
+            {
+                continue;
+            }
+
+            clrProperty.SetValue(instance, member.Value is not null
+                ? mapper.FromDynamicValue(member.Value)
+                : PrimitiveCoercion.Coerce(member.PrimitiveValue, property.ClrType));
+        }
+
+        PopulateNavigations(row, instance, entityType, entry: null, mapper);
+        return instance;
+    }
+
+    /// <summary>
+    ///     Wires loaded navigations. <paramref name="entry" /> is <see langword="null" /> for an
+    ///     untracked instance, which simply has no place to record loaded state.
+    /// </summary>
+    private void PopulateNavigations(
+        DynamicValueNode row,
+        object instance,
+        IEntityType entityType,
+        InternalEntityEntry? entry,
+        DynamicValueMapper mapper)
     {
         foreach (DynamicPropertyValue member in row.Properties)
         {
@@ -145,8 +208,8 @@ public class ClientResultMaterializer
                 continue;
             }
 
-            INavigationBase? navigation = entry.EntityType.FindNavigation(member.Name)
-                ?? (INavigationBase?)entry.EntityType.FindSkipNavigation(member.Name);
+            INavigationBase? navigation = entityType.FindNavigation(member.Name)
+                ?? (INavigationBase?)entityType.FindSkipNavigation(member.Name);
             if (navigation is null)
             {
                 continue;
@@ -158,12 +221,12 @@ public class ClientResultMaterializer
 
             if (related is not null && navigation.PropertyInfo is { CanWrite: true } property)
             {
-                property.SetValue(entry.Entity, related);
+                property.SetValue(instance, related);
             }
 
             // Distinguishes a loaded-but-empty navigation from an unloaded one
             // (requirements §2.5 step 5).
-            entry.SetIsLoaded(navigation);
+            entry?.SetIsLoaded(navigation);
         }
     }
 

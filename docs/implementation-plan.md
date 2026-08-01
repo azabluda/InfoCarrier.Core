@@ -279,3 +279,6 @@ subclasses; the suite is a different, much larger population from here on.
 |---|---|---|---|---|
 | 2026-08-01 | 3635 | 603 | 4247 | after result wire format + per-message reference scope |
 | 2026-08-01 | 3692 | 546 | 4247 | after G5 (entity-in-projection routing) |
+| 2026-08-01 | 3766 | 472 | 4247 | after G6a (server loaded-probe: no-tracking Includes) |
+| 2026-08-01 | 3844 | 394 | 4247 | after G6b (per-query tracking behavior, untracked path) |
+| 2026-08-01 | 3856 | 382 | 4247 | after G6c (loaded-probe key check, EF issue #23851) |

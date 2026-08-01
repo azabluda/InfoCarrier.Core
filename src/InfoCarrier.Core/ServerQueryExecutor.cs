@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core;
@@ -198,8 +199,36 @@ public class ServerQueryExecutor
     private byte[] SerializeResult(object? result, Type? elementType)
     {
         var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+        var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
+
+        // A no-tracking result is not in the change tracker, and `DbContext.Entry` on an
+        // untracked entity does not report on it — it creates a fresh Detached entry, which
+        // answers "not loaded" for every navigation (and starts tracking the entity as a side
+        // effect). Every Include on a no-tracking query was therefore dropped from the wire and
+        // arrived null on the client.
+        //
+        // For an untracked entity the navigation value has to answer instead. Non-null alone is
+        // not enough: Northwind's `Order.Customer` is initialized to `new()` in its field
+        // initializer — deliberately, as the regression test for EF issue #23851 — so an Order
+        // that never loaded its principal still hands back a Customer. Requiring a key as well
+        // separates the two: an entity materialized from the store always has one, and the
+        // placeholder never does. A collection needs no such check; EF only ever assigns one
+        // when it populates it, empty included.
         bool IsLoaded(object entity, INavigationBase navigation)
-            => _context.Entry(entity).Navigation(navigation.Name).IsLoaded;
+        {
+            if (stateManager.TryGetEntry(entity) is { } entry)
+            {
+                return entry.IsLoaded(navigation);
+            }
+
+            object? related = navigation.GetGetter().GetClrValue(entity);
+            return related is not null
+                && (navigation.IsCollection || HasKey(related, navigation.TargetEntityType));
+        }
+
+        static bool HasKey(object entity, IEntityType entityType)
+            => entityType.FindPrimaryKey() is not { } key
+                || key.Properties.All(p => p.GetGetter().GetClrValue(entity) is not null);
 
         var rows = new List<DynamicValueNode>();
         foreach (object? item in result is IEnumerable e && result is not string ? e : new[] { result })
