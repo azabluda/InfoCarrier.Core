@@ -75,6 +75,16 @@ public class NodeToExpressionTranslator
         object? value = node.DynamicValue is not null
             ? _valueMapper.FromDynamicValue(node.DynamicValue)
             : CoercePrimitive(node.PrimitiveValue, type);
+
+        // Some declared types cannot be rebuilt exactly — `IOrderedEnumerable<T>` has no public
+        // way in, so the value comes back as a plain list. Widening the constant to what we
+        // actually hold keeps the tree buildable; every operator that reads such a constant
+        // (`Contains` and friends) takes it as `IEnumerable<T>` anyway.
+        if (value is not null && !type.IsInstanceOfType(value))
+        {
+            type = value.GetType();
+        }
+
         return Expression.Constant(value, type);
     }
 

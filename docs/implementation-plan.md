@@ -284,3 +284,4 @@ subclasses; the suite is a different, much larger population from here on.
 | 2026-08-01 | 3856 | 382 | 4247 | after G6c (loaded-probe key check, EF issue #23851) |
 | 2026-08-01 | 3934 | 304 | 4247 | after G7 (null result rows are data, not absent rows) |
 | 2026-08-01 | 3968 | 270 | 4247 | after G8 (server-side defining queries for keyless types) |
+| 2026-08-01 | 3996 | 242 | 4247 | after G9 (declared collection types rebuilt, not widened to List) |

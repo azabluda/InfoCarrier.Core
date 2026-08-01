@@ -351,7 +351,13 @@ public class DynamicValueMapper : IDynamicValueMapper
                 return array;
             }
 
-            return list;
+            // A `List<T>` does not satisfy every declared collection type. `Contains` over a
+            // local `ReadOnlyCollection<T>` puts one in a constant of that exact type, and
+            // `Expression.Constant` rejects the mismatch outright ("Argument types do not
+            // match"). Rebuild the declared type when it can wrap a list.
+            return type.IsAssignableFrom(list.GetType())
+                ? list
+                : ConstructCollection(type, elementType, list) ?? list;
         }
 
         // Object shape: rehydrate via ctor-param matching (aqua §2.3) then settable properties.
@@ -421,6 +427,106 @@ public class DynamicValueMapper : IDynamicValueMapper
         => pv.Value is not null
             ? FromDynamicValue(pv.Value)
             : PrimitiveCoercion.Coerce(pv.PrimitiveValue, targetType);
+
+    /// <summary>
+    ///     Rebuilds <paramref name="items" /> as <paramref name="type" /> via a single-argument
+    ///     constructor that accepts a list — the shape of <see cref="System.Collections.ObjectModel.ReadOnlyCollection{T}" />,
+    ///     <see cref="System.Collections.ObjectModel.Collection{T}" />, <see cref="HashSet{T}" />
+    ///     and friends. Returns <see langword="null" /> when the type offers no such way in,
+    ///     which is the case for interfaces like <c>IOrderedEnumerable&lt;T&gt;</c>; the caller
+    ///     then keeps the list.
+    /// </summary>
+    private static object? ConstructCollection(Type type, Type elementType, IList items)
+    {
+        if (!type.IsInterface && !type.IsAbstract)
+        {
+            foreach (ConstructorInfo ctor in type.GetConstructors())
+            {
+                ParameterInfo[] parameters = ctor.GetParameters();
+                if (parameters.Length != 1 || !parameters[0].ParameterType.IsInstanceOfType(items))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    return ctor.Invoke([items]);
+                }
+                catch (TargetInvocationException)
+                {
+                    break;
+                }
+            }
+        }
+
+        // A set interface — `ISet<T>`, `IReadOnlySet<T>` — is satisfied by a HashSet, without
+        // hunting for a factory. (The sequence interfaces never reach here: a list already
+        // satisfies them.)
+        Type hashSet = typeof(HashSet<>).MakeGenericType(elementType);
+        if (type.IsAssignableFrom(hashSet))
+        {
+            return Activator.CreateInstance(hashSet, items);
+        }
+
+        return CreateRange(type, elementType, items);
+    }
+
+    /// <summary>
+    ///     Builds <paramref name="type" /> through a static <c>CreateRange</c> factory.
+    /// </summary>
+    /// <remarks>
+    ///     The immutable collections have no public constructor at all — an
+    ///     <c>ImmutableHashSet&lt;T&gt;</c> is only reachable through
+    ///     <c>ImmutableHashSet.CreateRange</c> on a companion static class — and neither the
+    ///     concrete types nor <c>IImmutableSet&lt;T&gt;</c> can be produced any other way. Only
+    ///     the declaring assembly is scanned, and never the core library, whose collection
+    ///     interfaces are all handled above.
+    /// </remarks>
+    private static object? CreateRange(Type type, Type elementType, IList items)
+    {
+        if (type.Assembly == typeof(object).Assembly)
+        {
+            return null;
+        }
+
+        Type enumerable = typeof(IEnumerable<>).MakeGenericType(elementType);
+
+        // Ordered by name so the choice between equally-valid factories is deterministic.
+        foreach (Type candidate in type.Assembly.GetExportedTypes()
+                     .Where(t => t is { IsAbstract: true, IsSealed: true, IsGenericTypeDefinition: false })
+                     .OrderBy(t => t.FullName, StringComparer.Ordinal))
+        {
+            foreach (MethodInfo method in candidate.GetMethods(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (method.Name != "CreateRange"
+                    || !method.IsGenericMethodDefinition
+                    || method.GetGenericArguments().Length != 1
+                    || method.GetParameters().Length != 1)
+                {
+                    continue;
+                }
+
+                MethodInfo closed;
+                try
+                {
+                    closed = method.MakeGenericMethod(elementType);
+                }
+                catch (ArgumentException)
+                {
+                    // Generic constraints not satisfied by this element type.
+                    continue;
+                }
+
+                if (closed.GetParameters()[0].ParameterType.IsAssignableFrom(enumerable)
+                    && type.IsAssignableFrom(closed.ReturnType))
+                {
+                    return closed.Invoke(null, [items]);
+                }
+            }
+        }
+
+        return null;
+    }
 
     private static bool IsPrimitive(object? value)
         => value is null
