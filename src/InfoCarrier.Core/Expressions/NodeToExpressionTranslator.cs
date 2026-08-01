@@ -129,6 +129,8 @@ public class NodeToExpressionTranslator
         const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
         Type[] genericArguments = node.GenericArguments.Select(_typeResolver.Resolve).ToArray();
+        Type returnType = _typeResolver.Resolve(node.ReturnType);
+        MethodInfo? signatureMatch = null;
 
         IEnumerable<MethodInfo> candidates = declaringType
             .GetMethods(flags)
@@ -170,13 +172,27 @@ public class NodeToExpressionTranslator
                 method = candidate;
             }
 
-            if (method.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameterTypes))
+            if (!method.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameterTypes))
+            {
+                continue;
+            }
+
+            // Name and parameters do not always identify an overload. Conversion operators are
+            // the case that bites: `decimal` declares op_Explicit(decimal) returning double,
+            // int, long, … — every one identical but for its return type. Picking the wrong one
+            // produced "the operands for operator 'Convert' do not match the parameters of
+            // method 'op_Explicit'". Prefer an exact return-type match, and fall back to the
+            // first signature match so a TypeNode we cannot resolve does not lose the method.
+            if (method.ReturnType == returnType)
             {
                 return method;
             }
+
+            signatureMatch ??= method;
         }
 
-        throw new InvalidOperationException($"Method '{node.Name}' not resolvable on '{declaringType}'.");
+        return signatureMatch
+            ?? throw new InvalidOperationException($"Method '{node.Name}' not resolvable on '{declaringType}'.");
     }
 
     private Expression TranslateLambda(LambdaNode node)
