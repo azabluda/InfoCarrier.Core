@@ -20,6 +20,24 @@ public sealed record DynamicValueNode
     public required TypeNode Type { get; init; }
 
     /// <summary>
+    ///     Identity of this value within the message. Non-zero for referenceable (non-primitive)
+    ///     values; 0 for values that can never be the target of a back-reference.
+    /// </summary>
+    public int Id { get; init; }
+
+    /// <summary>
+    ///     When set, this node is a <em>back-reference</em> to the node with that
+    ///     <see cref="Id" />, and carries no data of its own.
+    /// </summary>
+    /// <remarks>
+    ///     Reference preservation has to exist on the wire, not just in the mapper's in-memory
+    ///     map: returning the same node <em>instance</em> for a repeated object still makes the
+    ///     serializer write that subtree again, so <c>Customer → Orders → Customer</c> fails
+    ///     with "a possible object cycle was detected" (ADR-008 constraint 5).
+    /// </remarks>
+    public int? Ref { get; init; }
+
+    /// <summary>
     ///     For entity values: the EF entity-type name + key property values identifying the
     ///     entity (research-findings §7). Null for non-entity values.
     /// </summary>
@@ -86,6 +104,16 @@ public sealed record DynamicPropertyValue
     ///     The nested dynamic value; null when <see cref="PrimitiveValue" /> carries the value.
     /// </summary>
     public DynamicValueNode? Value { get; init; }
+
+    /// <summary>
+    ///     For entity-row navigations: whether EF had actually loaded this navigation, so the
+    ///     client can call <c>SetIsLoaded</c> (requirements §2.5 step 5).
+    /// </summary>
+    /// <remarks>
+    ///     A loaded-but-empty collection must stay distinguishable from an unloaded one;
+    ///     conflating them makes the client report an unloaded collection as empty.
+    /// </remarks>
+    public bool IsLoadedNavigation { get; init; }
 }
 
 /// <summary>

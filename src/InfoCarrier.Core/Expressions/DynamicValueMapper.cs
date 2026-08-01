@@ -21,8 +21,13 @@ public class DynamicValueMapper : IDynamicValueMapper
     private readonly TypeNodeResolver _typeResolver;
 
     // Per-message reference maps (aqua ToContext/FromContext), ReferenceEqualityComparer-keyed.
-    private readonly Dictionary<object, DynamicValueNode> _toContext = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<DynamicValueNode, object?> _fromContext = new(ReferenceEqualityComparer.Instance);
+    // The forward map holds wire ids, not nodes: identity has to survive serialization.
+    private readonly Dictionary<object, int> _toIds = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<int, object?> _fromIds = [];
+    private int _nextId;
+
+    // Navigation-loaded probe, supplied only in Row mode (the server has the DbContext).
+    private Func<object, INavigationBase, bool>? _isNavigationLoaded;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="DynamicValueMapper" /> class.
@@ -34,38 +39,77 @@ public class DynamicValueMapper : IDynamicValueMapper
         _typeResolver = typeResolver;
     }
 
+    /// <summary>
+    ///     Maps an entity <em>result row</em>: full scalar state plus loaded navigations, rather
+    ///     than the key-only reference used for entities appearing inside a query tree
+    ///     (see <c>docs/result-wire-format.md</c> §3.2).
+    /// </summary>
+    /// <param name="value">The entity instance.</param>
+    /// <param name="type">Its declared type.</param>
+    /// <param name="isNavigationLoaded">
+    ///     Probe for whether EF actually loaded a navigation. Only the caller holds the
+    ///     <c>DbContext</c> needed to answer this.
+    /// </param>
+    public DynamicValueNode ToRowValue(object? value, Type type, Func<object, INavigationBase, bool> isNavigationLoaded)
+    {
+        _isNavigationLoaded = isNavigationLoaded;
+        try
+        {
+            return ToDynamicValue(value, type);
+        }
+        finally
+        {
+            _isNavigationLoaded = null;
+        }
+    }
+
     /// <inheritdoc />
     public DynamicValueNode ToDynamicValue(object? value, Type type)
     {
-        if (value is not null && _toContext.TryGetValue(value, out DynamicValueNode? existing))
+        if (value is not null && _toIds.TryGetValue(value, out int seenId))
         {
-            return existing; // Reference preservation: same instance → same node.
+            // Back-reference on the wire — carries no data, so a cycle terminates.
+            return new DynamicValueNode { Type = _typeMapper.ToTypeNode(type), Ref = seenId };
         }
 
-        DynamicValueNode node = MapToNode(value, type);
-        if (value is not null)
+        // Register BEFORE mapping members. Registering afterwards (the original order) only
+        // survived because entities short-circuited to a key and never recursed; once a row
+        // carries navigations, a cycle would recurse forever.
+        int id = 0;
+        if (value is not null && !IsPrimitive(value) && value is not Type)
         {
-            _toContext[value] = node;
+            id = ++_nextId;
+            _toIds[value] = id;
         }
 
-        return node;
+        return MapToNode(value, type, id);
     }
 
-    private DynamicValueNode MapToNode(object? value, Type type)
+    private DynamicValueNode MapToNode(object? value, Type type, int id)
     {
         TypeNode typeNode = _typeMapper.ToTypeNode(type);
 
-        // Entity: identify by EF entity-type name + key values (research-findings §7).
+        // Entity. Two modes: a query-tree constant travels as identity only (research-findings
+        // §7); a result row travels with its data.
         IEntityType? entityType = _model?.FindEntityType(type);
         if (entityType is not null && value is not null)
         {
             IReadOnlyList<object?> keyValues = entityType.FindPrimaryKey() is { } key
                 ? key.Properties.Select(p => p.GetGetter().GetClrValue(value)).ToList()
                 : [];
+            var entityKey = new EntityKeyNode { EntityTypeName = entityType.Name, KeyValues = keyValues };
+
+            if (_isNavigationLoaded is null)
+            {
+                return new DynamicValueNode { Id = id, Type = typeNode, EntityKey = entityKey };
+            }
+
             return new DynamicValueNode
             {
+                Id = id,
                 Type = typeNode,
-                EntityKey = new EntityKeyNode { EntityTypeName = entityType.Name, KeyValues = keyValues },
+                EntityKey = entityKey,
+                Properties = MapRowMembers(value, entityType),
             };
         }
 
@@ -74,6 +118,12 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (value is Type typeValue)
         {
             return new DynamicValueNode { Type = typeNode, TypeValue = _typeMapper.ToTypeNode(typeValue) };
+        }
+
+        // Null: distinguishable from an absent value, and never referenceable.
+        if (value is null)
+        {
+            return new DynamicValueNode { Type = typeNode };
         }
 
         // Scalar: a primitive standing where a dynamic value is required (typically a
@@ -94,7 +144,7 @@ public class DynamicValueMapper : IDynamicValueMapper
                 items.Add(ToDynamicValue(item, item?.GetType() ?? elementType));
             }
 
-            return new DynamicValueNode { Type = typeNode, Items = items };
+            return new DynamicValueNode { Id = id, Type = typeNode, Items = items };
         }
 
         // Object shape: map public readable properties (records/anonymous/DTOs).
@@ -115,24 +165,96 @@ public class DynamicValueMapper : IDynamicValueMapper
             });
         }
 
-        return new DynamicValueNode { Type = typeNode, Properties = properties };
+        return new DynamicValueNode { Id = id, Type = typeNode, Properties = properties };
+    }
+
+    /// <summary>
+    ///     Maps an entity row's members: every mapped scalar through its
+    ///     <see cref="IProperty" /> accessor — so shadow properties and value converters are
+    ///     honoured, which a public-reflection walk would miss (ADR-008 constraint 1) — plus
+    ///     the navigations EF actually loaded.
+    /// </summary>
+    private List<DynamicPropertyValue> MapRowMembers(object value, IEntityType entityType)
+    {
+        var members = new List<DynamicPropertyValue>();
+
+        foreach (IProperty property in entityType.GetProperties())
+        {
+            object? scalar = property.GetGetter().GetClrValue(value);
+            members.Add(new DynamicPropertyValue
+            {
+                Name = property.Name,
+                PrimitiveValue = IsPrimitive(scalar) ? PrimitiveCoercion.Normalize(scalar) : null,
+                Value = IsPrimitive(scalar) ? null : ToDynamicValue(scalar, property.ClrType),
+            });
+        }
+
+        foreach (INavigationBase navigation in entityType.GetNavigations().Cast<INavigationBase>()
+                     .Concat(entityType.GetSkipNavigations()))
+        {
+            // Unloaded navigations are omitted entirely: shipping them would either force a
+            // lazy load on the server or send a null that the client cannot tell apart from a
+            // genuinely empty one.
+            if (!_isNavigationLoaded!(value, navigation))
+            {
+                continue;
+            }
+
+            object? related = navigation.GetGetter().GetClrValue(value);
+            members.Add(new DynamicPropertyValue
+            {
+                Name = navigation.Name,
+                Value = ToDynamicValue(related, navigation.ClrType),
+                IsLoadedNavigation = true,
+            });
+        }
+
+        return members;
     }
 
     /// <inheritdoc />
     public object? FromDynamicValue(DynamicValueNode node)
     {
-        if (_fromContext.TryGetValue(node, out object? existing))
+        // Back-reference: the target must already be registered. It is, because the forward
+        // side only ever emits a Ref for a value it has already begun mapping, and this side
+        // registers before populating members.
+        if (node.Ref is int backReference)
         {
-            return existing; // Reference preservation on the way back.
+            return _fromIds.TryGetValue(backReference, out object? target)
+                ? target
+                : throw new InvalidOperationException(
+                    $"Dangling wire reference {backReference}: no value with that id has been materialized.");
+        }
+
+        if (node.Id != 0 && _fromIds.TryGetValue(node.Id, out object? already))
+        {
+            return already;
         }
 
         object? value = Materialize(node);
-        if (value is not null)
+        if (node.Id != 0)
         {
-            _fromContext[node] = value;
+            _fromIds[node.Id] = value;
         }
 
         return value;
+    }
+
+    /// <summary>
+    ///     Registers an externally-created instance under its wire id before its members are
+    ///     populated, so a back-reference encountered mid-population resolves to the
+    ///     partially-built instance instead of recursing.
+    /// </summary>
+    /// <remarks>
+    ///     Entity rows are constructed by the client materializer, not here, because setting
+    ///     shadow-state values requires the change tracker.
+    /// </remarks>
+    public void RegisterMaterialized(int id, object? value)
+    {
+        if (id != 0)
+        {
+            _fromIds[id] = value;
+        }
     }
 
     private object? Materialize(DynamicValueNode node)

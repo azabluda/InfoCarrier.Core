@@ -30,6 +30,13 @@ public class ExpressionSerializer : IExpressionSerializer
         _valueMapper = valueMapper;
     }
 
+    /// <summary>
+    ///     The value mapper backing this serializer. Exposed so the server and client result
+    ///     paths map entity rows through the same EF-metadata-driven mapper (and the same
+    ///     per-message reference map) as the query tree.
+    /// </summary>
+    public IDynamicValueMapper ValueMapper => _valueMapper;
+
     /// <inheritdoc />
     public ExpressionNode ToNode(Expression expression)
         => _forward.Translate(expression);

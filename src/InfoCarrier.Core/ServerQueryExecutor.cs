@@ -182,21 +182,32 @@ public class ServerQueryExecutor
         };
     }
 
-    private static byte[] SerializeResult(object? result, Type? elementType)
+    /// <summary>
+    ///     Serializes result rows as a <see cref="DynamicValueNode" /> graph
+    ///     (<c>docs/result-wire-format.md</c>).
+    /// </summary>
+    /// <remarks>
+    ///     Never reflection-serialize the live entity graph: <c>Customer → Orders → Customer</c>
+    ///     throws "a possible object cycle was detected", shadow properties are invisible to a
+    ///     public-property walk, and lazy-loading proxies get walked as data
+    ///     (ADR-008 constraints 1 and 5).
+    /// </remarks>
+    private byte[] SerializeResult(object? result, Type? elementType)
     {
-        // Serialize as a typed List<elementType> so the client reconstructs typed rows.
-        if (result is IEnumerable enumerable && elementType is not null)
-        {
-            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType))!;
-            foreach (object? item in enumerable)
-            {
-                list.Add(item);
-            }
+        var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+        bool IsLoaded(object entity, INavigationBase navigation)
+            => _context.Entry(entity).Navigation(navigation.Name).IsLoaded;
 
-            return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(list, list.GetType());
+        var rows = new List<DynamicValueNode>();
+        foreach (object? item in result is IEnumerable e && result is not string ? e : new[] { result })
+        {
+            rows.Add(item is null
+                ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
+                : mapper.ToRowValue(item, item.GetType(), IsLoaded));
         }
 
-        return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result);
+        return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            rows, ExpressionJsonContext.Default.ListDynamicValueNode);
     }
 
     private static ExpressionNode DeserializeNode(byte[] payload)

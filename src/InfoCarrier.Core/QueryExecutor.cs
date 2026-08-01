@@ -70,7 +70,7 @@ internal sealed class QueryExecutor<TElement>
 
     private IEnumerable<TElement> Materialize(QueryDataResult result)
         // Client materialization + identity resolution (Phase E).
-        => new ClientResultMaterializer(_queryContext.Context).Materialize<TElement>(result);
+        => new ClientResultMaterializer(_queryContext.Context, _expressionSerializer).Materialize<TElement>(result);
 
     private static byte[] SerializeNode(Expressions.ExpressionNode node)
         => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
