@@ -193,16 +193,19 @@ public class DynamicValueMapper : IDynamicValueMapper
             return new DynamicValueNode { Id = id, Type = typeNode, Items = items };
         }
 
-        // Object shape: map public readable properties (records/anonymous/DTOs).
+        // Object shape: public readable properties *and* public fields (records/anonymous/DTOs
+        // and plain structs). Fields are not an edge case — a struct written
+        // `public int X, Y;` has no properties at all, and mapping only properties round-tripped
+        // it as `default`.
         var properties = new List<DynamicPropertyValue>();
-        foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            if (!property.CanRead || property.GetIndexParameters().Length > 0)
-            {
-                continue;
-            }
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-            object? propertyValue = value is null ? null : property.GetValue(value);
+        void AddMember(string name, Type memberType, object? memberValue)
+        {
+            if (!seen.Add(name))
+            {
+                return;
+            }
 
             // The compact `PrimitiveValue` form carries no type of its own, so the reverse path
             // can only rebuild it from the member's *declared* type. That is enough when the two
@@ -212,26 +215,37 @@ public class DynamicValueMapper : IDynamicValueMapper
             // TypeNode — but only when it is a primitive. Widening the *node* type to the
             // runtime type generally would make the mapper walk graphs the declared type used to
             // truncate (an `object` member holding a DbContext), and that stack-overflows.
-            Type declared = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-            bool isPrimitive = IsPrimitive(propertyValue);
+            Type declared = Nullable.GetUnderlyingType(memberType) ?? memberType;
+            bool isPrimitive = IsPrimitive(memberValue);
             bool asPrimitive = isPrimitive
-                && (propertyValue is null || declared == propertyValue.GetType());
+                && (memberValue is null || declared == memberValue.GetType());
 
             properties.Add(new DynamicPropertyValue
             {
-                Name = property.Name,
+                Name = name,
 
                 // Normalize, as MapRowMembers does. An enum carries its own concrete runtime
                 // type, which can never be pre-registered with the source-generated serializer
                 // (ADR-008 constraint 8), so an un-normalized one fails at write time —
                 // AutoTransactionBehavior on a captured DbContext did exactly that.
-                PrimitiveValue = asPrimitive ? PrimitiveCoercion.Normalize(propertyValue) : null,
+                PrimitiveValue = asPrimitive ? PrimitiveCoercion.Normalize(memberValue) : null,
                 Value = asPrimitive
                     ? null
-                    : ToDynamicValue(
-                        propertyValue,
-                        isPrimitive ? propertyValue!.GetType() : property.PropertyType),
+                    : ToDynamicValue(memberValue, isPrimitive ? memberValue!.GetType() : memberType),
             });
+        }
+
+        foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (property.CanRead && property.GetIndexParameters().Length == 0)
+            {
+                AddMember(property.Name, property.PropertyType, value is null ? null : property.GetValue(value));
+            }
+        }
+
+        foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+        {
+            AddMember(field.Name, field.FieldType, value is null ? null : field.GetValue(value));
         }
 
         return new DynamicValueNode { Id = id, Type = typeNode, Properties = properties };
@@ -445,7 +459,10 @@ public class DynamicValueMapper : IDynamicValueMapper
 
     private object? RehydrateObject(DynamicValueNode node, Type type)
     {
+        // Distinct: the forward path emits properties and fields, and a name could in
+        // principle be claimed by both.
         Dictionary<string, DynamicPropertyValue> byName = node.Properties
+            .DistinctBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
 
         // Ctor-param matching: parameterless ctor wins, else match ctor params to properties
@@ -491,6 +508,18 @@ public class DynamicValueMapper : IDynamicValueMapper
             }
 
             property.SetValue(instance, ReadValue(pv, property.PropertyType));
+        }
+
+        // …and public fields, which the forward path also maps. Writing to a boxed struct
+        // through reflection mutates the box, which is the instance about to be returned.
+        foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (field.IsInitOnly || ctorBound.Contains(field.Name) || !byName.TryGetValue(field.Name, out DynamicPropertyValue? fv))
+            {
+                continue;
+            }
+
+            field.SetValue(instance, ReadValue(fv, field.FieldType));
         }
 
         return instance;
