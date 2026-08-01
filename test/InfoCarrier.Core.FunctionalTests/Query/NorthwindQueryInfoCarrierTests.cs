@@ -17,9 +17,6 @@ namespace InfoCarrier.Core.FunctionalTests.Query;
 // Classes grow their own file once they accumulate overrides, as NorthwindWhereQueryInfoCarrierTest
 // already has.
 
-public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindAggregateOperatorsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
 public class NorthwindAsNoTrackingQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindAsNoTrackingQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
 
@@ -35,29 +32,11 @@ public class NorthwindCompiledQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixt
 public class NorthwindDbFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindDbFunctionsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
 
-public class NorthwindEFPropertyIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindEFPropertyIncludeQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
 public class NorthwindFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindFunctionsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
 
-public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindGroupByQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindIncludeNoTrackingQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindIncludeNoTrackingQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindIncludeQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindJoinQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindJoinQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindKeylessEntitiesQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindKeylessEntitiesQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindMiscellaneousQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
+// Classes that assert an InMemory store limitation live in their own files, each mirroring
+// EF Core's own *InMemoryTest override set. See docs/roadmap.md M3 for the inventory.
 
 public class NorthwindNavigationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindNavigationsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
@@ -70,9 +49,3 @@ public class NorthwindQueryTaggingQueryInfoCarrierTest(NorthwindQueryInfoCarrier
 
 public class NorthwindSelectQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindSelectQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindSetOperationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindSetOperationsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
-
-public class NorthwindStringIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindStringIncludeQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);

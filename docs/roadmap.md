@@ -80,6 +80,28 @@ implements it. **Needs its own design session and spec before code.**
   correlation id (research-findings §9).
 - **Many-to-many from day one** (ADR-004) — v1's worst failure mode.
 - SaveChanges/change-tracking spec bases green on Tiers A and B.
+- **Every InMemory-limitation override re-tested against Tier B and deleted where it passes.**
+  These assert a *store* limitation, so on a relational backend most of them assert something
+  that is no longer true — a passing query would fail the override's "this throws" assertion,
+  which is the signal that it must go. They are inventoried below; carrying one over silently
+  would turn a store limitation into permanent hidden coverage loss, which is precisely v1's
+  stated failure mode.
+
+**Inventory — overrides that assert an InMemory limitation** (as of 2026-08-01, M1). Each
+class doc carries the same instruction; this is the index.
+
+| Class | Overrides | Limitation |
+|---|---|---|
+| `NorthwindGroupByQueryInfoCarrierTest` | 13 | non-composed `GroupBy` |
+| `NorthwindMiscellaneousQueryInfoCarrierTest` | 12 | throws on empty sequence; `ElementAtOrDefault` subquery; composite-key entity equality |
+| `NorthwindAggregateOperatorsQueryInfoCarrierTest` | 8 | aggregate over empty subquery; local `IEnumerable` in `Contains` |
+| `NorthwindJoinQueryInfoCarrierTest` | 6 | `RightJoin`; local-collection join; client-eval joins (EF #21200) |
+| `NorthwindKeylessEntitiesQueryInfoCarrierTest` | 3 | no database views; no `Include` from a keyless type |
+| `NorthwindSetOperationsQueryInfoCarrierTest` | 2 | set operation after client-evaluated projection (EF #16243) |
+| `NorthwindIncludeQueryInfoCarrierTest` + `NoTracking` / `String` / `EFProperty` variants | 4 (1 each) | `RightJoin` |
+
+Total **48** tests. Each mirrors EF Core's own `*InMemoryTest` override one for one — the
+objective criterion for "store limitation, not our bug".
 
 ### M4 — Transactions
 
