@@ -279,8 +279,62 @@ internal sealed class QueryExecutor<TElement>
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
                 && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
-                    ? Expression.Constant(value, queryParameter.Type)
+                    ? Substitute(value, queryParameter.Type)
                     : base.VisitExtension(node);
+
+        /// <summary>
+        ///     Substitutes a parameter's value, spelling a collection out element by element.
+        /// </summary>
+        /// <remarks>
+        ///     A scalar becomes a plain constant (research-findings §6). A <em>collection</em>
+        ///     cannot: relational EF recognises an inline collection from the shape of the
+        ///     expression, and a single constant holding a <c>List&lt;T&gt;</c> is not that
+        ///     shape — <c>cities.Contains(c.City)</c> then failed to translate with
+        ///     "Translation of method 'Enumerable.Contains' failed". Writing the elements out as
+        ///     a <see cref="NewArrayExpression" /> is the form
+        ///     <c>QueryRootProcessor</c> turns into an <c>InlineQueryRootExpression</c>.
+        ///     <para>
+        ///         Tier A never noticed: EF's InMemory provider client-evaluates the
+        ///         <c>Contains</c> either way.
+        ///     </para>
+        /// </remarks>
+        private static Expression Substitute(object? value, Type parameterType)
+        {
+            if (value is not System.Collections.IEnumerable sequence
+                || value is string
+                || SequenceElementType(parameterType) is not { } elementType
+                // An `object` element type carries boxed values whose real types differ per
+                // element. Spelling those out as `Constant(x, typeof(object))` tells EF less
+                // than the collection itself did, and cost more than it gained.
+                || elementType == typeof(object))
+            {
+                return Expression.Constant(value, parameterType);
+            }
+
+            var elements = new List<Expression>();
+            foreach (object? element in sequence)
+            {
+                elements.Add(Expression.Constant(element, elementType));
+            }
+
+            NewArrayExpression array = Expression.NewArrayInit(elementType, elements);
+
+            // Only when the array can stand in for the declared type; a parameter typed as a
+            // concrete List<T> cannot be handed one.
+            return parameterType.IsAssignableFrom(array.Type)
+                ? array
+                : Expression.Constant(value, parameterType);
+        }
+
+        private static Type? SequenceElementType(Type type)
+            => type.IsArray
+                ? type.GetElementType()
+                : (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                        ? type
+                        : type.GetInterfaces()
+                            .FirstOrDefault(i => i.IsGenericType
+                                && i.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
+                    ?.GetGenericArguments()[0];
 
         protected override Expression VisitParameter(ParameterExpression node)
         {
@@ -288,7 +342,7 @@ internal sealed class QueryExecutor<TElement>
                 && node.Name.StartsWith("__", StringComparison.Ordinal)
                 && _queryContext.Parameters.TryGetValue(node.Name, out object? value))
             {
-                return Expression.Constant(value, node.Type);
+                return Substitute(value, node.Type);
             }
 
             return base.VisitParameter(node);

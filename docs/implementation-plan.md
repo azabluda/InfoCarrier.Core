@@ -250,9 +250,11 @@ apart. It is an M3 exit criterion regardless, and M4 cannot start without it.
       same silent false — Tier A keeps its no-ops there, Tier B asserts the translation failure
       its server actually reports. Eight Tier A no-ops became real assertions in the process.
 
-- [ ] **T3b.** `Generic_Ilist_contains_translates_to_server` — parameter substitution
-      (research-findings §6) turns a local collection into a `ConstantExpression`, which
-      relational EF cannot translate. Needs a §6 amendment, not a patch.
+- [x] **T3b.** Collection parameters are written out element by element as a `NewArrayExpression`
+      — the shape `QueryRootProcessor` turns into an `InlineQueryRootExpression`. A single
+      constant holding a `List<T>` is not that shape, which is why `cities.Contains(c.City)`
+      failed to translate. research-findings §6 amended: the scalar rule stands, collections are
+      the exception. **110 → 108, nothing broken.** ✅ `<this commit>`
 
 - [ ] **T4.** Extend Tier B to the remaining query bases.
 

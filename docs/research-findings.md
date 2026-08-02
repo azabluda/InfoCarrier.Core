@@ -88,6 +88,24 @@ never produces): Block/Loop/Try/Goto/Switch/Label/DebugInfo/Throw/Dynamic. EF ex
 
 ## 6. Q2 — Parameter substitution (the v1 `ValueWrapper<T>` trap) — RESOLVED
 
+> ⚠️ **Amended 2026-08-02 — collections are the exception.** Substituting a *scalar* parameter as
+> a plain constant is right and stays. Substituting a **collection** parameter as a single
+> constant holding the list is not: relational EF recognises an inline collection from the
+> *shape* of the expression (`QueryRootProcessor` turns a `NewArrayExpression` or a `ListInit`
+> into an `InlineQueryRootExpression`), and one constant holding a `List<T>` is not that shape.
+> `cities.Contains(c.City)` then failed with "Translation of method 'Enumerable.Contains'
+> failed". Collection parameters are now written out element by element as a
+> `NewArrayExpression`.
+>
+> Two limits, both measured. The array is used only when it can stand in for the parameter's
+> declared type — a parameter typed as a concrete `List<T>` cannot be handed one. And an
+> `object` element type is left alone: its elements are boxed values of differing real types, so
+> spelling them out as `Constant(x, typeof(object))` tells EF *less* than the collection did and
+> cost three tests.
+>
+> Tier A could never have found this: EF's InMemory provider client-evaluates `Contains` either
+> way (ADR-009).
+
 v1's bug: wrapping parameter values in a custom generic struct `ValueWrapper<T>` as a tree
 constant broke translation. **Rule:** substitute compiled-query parameters as **plain
 `ConstantExpression` of the runtime value** (typed to the parameter's type), resolved from

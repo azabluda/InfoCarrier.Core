@@ -12,5 +12,5 @@
 # (1421 -> 90 on Tier A), and ADR-009 Tier B (SQLite) is now running the Where base too.
 # The rise from 90 to 115 is the 406 new Tier B tests bringing 24 known failures with them,
 # not a regression: Tier A is unchanged at 90.
-failed=110
+failed=108
 total=4705
