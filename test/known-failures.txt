@@ -8,6 +8,7 @@
 # commit message; the last deliberate rise was step L1, which turned on the type allowlist and
 # converted ~1,305 illusory passes into real M2 failures.
 #
-# 2026-08-01 — after L1 (type allowlist ON), entering milestone M2.
-failed=1421
-total=4247
+# 2026-08-02 — after M2 phases A/B/C/E1: the projection split is implemented and the
+# boundary is enforced. 1421 -> 118.
+failed=118
+total=4295

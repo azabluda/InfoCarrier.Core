@@ -154,6 +154,36 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
 ---
 
+## The residual 118, classified (2026-08-02)
+
+Measured from `artifacts/test-results/c1.trx`. Nothing here is masked; each line is a real
+failure with a named cause.
+
+| Count | Family | Verdict |
+|---|---|---|
+| 28 | Spec tests asserting a throw that no longer happens — `No_orderby_added_for_client_side_GroupJoin_*`, `Include_property_expression_invalid`, `Throws_on_concurrent_query_*`, `Select_GroupBy_SelectMany`, `Where_query_composition6` | E2: re-check one by one, as E1 did |
+| 12 | Navigation read on the client that no shipped query can carry | needs dataflow the syntactic scan does not have |
+| 10 | `NullReferenceException` inside a client-side `SelectMany` over a transparent identifier | real defect, uninvestigated |
+| 10 | `EF.Property` on the client side of the boundary | §7 non-goal — needs shadow state per row |
+| 8 | Client evaluation correctly refused (`translation-failure`) but the test expects success | E2 |
+| 8 | `First/Single/Last_over_custom_projection_compared_to_null` | **known limitation, see below** |
+| 6 | Correlated subquery under a client projection the rewrite cannot reach | C-phase tail |
+| ~36 | Value mismatches, one to four tests each | individually triaged |
+
+### The custom-projection-compared-to-null limitation
+
+`Where(c => c.Orders.Select(o => new { o.OrderID }).First() == null)` constructs an anonymous
+type **inside a predicate**, where the value never crosses the wire — but the server would still
+have to *construct* it, and it has no such type. EF's InMemory provider manages only because it
+shares an `AppDomain`; no network transport could. Rewriting the construction into a
+`ValueTuple` does not save it either, because the predicate compares the result to `null` and a
+tuple is a struct.
+
+This is a genuine limit of the type boundary rather than a gap in the implementation, and it is
+recorded here rather than papered over.
+
+---
+
 ## Exit criteria
 
 M2 closes when all of:
