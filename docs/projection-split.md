@@ -244,6 +244,37 @@ already uses. No shape may fail *silently*:
 
 ---
 
+## 6a. The transparent-identifier ceiling (diagnosed 2026-08-02)
+
+The dominant remaining failure family on **both** tiers, and the thing worth understanding
+before anyone tries the pushdown again.
+
+`from o in os join c in cs on … into g from c in g.DefaultIfEmpty() select …` compiles to a
+`GroupJoin` whose result selector builds a **transparent identifier** — `new { o, g }`. EF
+handles those internally and normalises the whole shape into a LEFT JOIN. This provider must
+treat the anonymous type as a boundary, so the `SelectMany` above it lands on the client, where
+`DefaultIfEmpty`'s `null` is not SQL-propagated and the projection throws
+`NullReferenceException` instead of yielding null.
+
+**Why the obvious fix fails.** Deferring the reassembly — pushing the operator back below the
+projection and rewriting `ti.o` into a tuple-slot read — was implemented and measured at
+**91 → 383**. The reason is specific and worth writing down: a transparent identifier from a
+`GroupJoin` holds a **grouping**, and a grouping is not a projectable value. Once the server
+projects to `ValueTuple<Order, IEnumerable<Customer>>`, `t.Item2.DefaultIfEmpty()` asks SQL to
+navigate out of a projected tuple back into a correlated collection, which no provider can
+translate. 67 `SelectMany` and 40 `Join` translation failures, all of that shape.
+
+**What would need to be true.** Either
+
+- the carrier never holds a sequence — which fixes the translation failures but excludes exactly
+  the `GroupJoin` cases that motivate the work; or
+- the transparent identifier is *eliminated* rather than carried, so the server sees the
+  `GroupJoin`/`SelectMany`/`DefaultIfEmpty` idiom in the shape
+  `QueryableMethodNormalizingExpressionVisitor` recognises and converts to a LEFT JOIN itself.
+
+The second is the real answer and is a design session, not a patch: it means reproducing enough
+of EF's transparent-identifier handling to hand the server a tree its own normaliser accepts.
+
 ## 7. Non-goals
 
 | Item | Why deferred | Where |
