@@ -14,6 +14,23 @@ dotnet test  InfoCarrier.Core.slnx --filter "FullyQualifiedName~NorthwindWhere"
 Report test results as `Passed: N, Failed: M, Total: T` from actual output — never estimate
 or infer a count.
 
+**Measuring a change: `eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which
+wraps the whole loop). It prints the count *and* the exact list of tests fixed and broken,
+because the count alone cannot tell "fixed 4, broke 4" from "changed nothing".
+
+Never state a verdict from partial output. Two specific errors have each cost a wrong revert
+here, and both are cheap to avoid:
+
+- **A count that did not move does not mean the target does not exist.** A matcher that never
+  fired and a rewrite that did not help look identical from outside. Establish that the code
+  *ran* — a probe writing to a file, since xUnit swallows stdout — before concluding anything
+  about the problem.
+- **A newly-red SQLite test is not automatically a regression.** Grep
+  `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
+  with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
+  provider. Adopt EF's override. The reverse also happens — an override of ours that EF does
+  *not* have is a workaround to delete once the limitation goes.
+
 ## Where authority lives
 
 `docs/` is the source of truth. Read before changing design, and keep it current:

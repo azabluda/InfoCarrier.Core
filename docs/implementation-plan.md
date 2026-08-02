@@ -644,6 +644,56 @@ Small families with unrelated causes, taken one at a time. Each is measured on i
 
 ---
 
+## The residual, re-classified (2026-08-02 — measured at 45 of 5232)
+
+Produced by `eng/measure.sh` plus a run that captured every failure's message, then clustered by
+cause rather than by test class. Two clusters below were previously counted as unrelated singles;
+finding them is the whole reason to re-cluster rather than work down the list.
+
+| # | Cause | Where |
+|---|---|---|
+| **14** | Projection inside a **collection selector** — reassembly lands in the wrong place, navigation read from rows never sent | **Z3** |
+| **6** | Query filter closing over context state — parameterized from the *server's* context | **Z2** |
+| **6** | Correlated subquery, hard forms — three-level with `Take`, and unmapped CLR properties | X5 tail |
+| **4** | **Collection-valued fragment shipped as `IQueryable<T>`** — EF requires a materialized collection in a final projection | **Z5 (new)** |
+| **4** | Spec asserts a translation failure this provider does not produce | **Z4** |
+| **11** | Singles and the compliance test | — |
+
+### Z5 — a collection fragment must be materialized before it ships
+
+`AsQueryable_in_query_server_evals` and `Complex_query_with_group_by_in_subquery5` were filed as
+unrelated. They fail with the **same** EF message, `CoreStrings` —
+
+> The query contains a projection '…' of type '…'. Collections in the final projection must be an
+> `IEnumerable<T>` type such as `List<T>`. Consider using `ToList` …
+
+`ProjectionRewriter` picks the largest server-evaluable fragment of a projection body, and for
+`Select(c => c.Orders.…Take(1).Select(o => new { o.OrderDate }).ToList())` that fragment is the
+`Take(1)` subquery — typed `IQueryable<Order>`. It then goes into a tuple slot verbatim, so the
+shipped projection returns an `IQueryable<T>` and EF refuses it before running anything.
+
+The fix is local: a fragment whose type is a queryable must be materialized (`ToList`) on the way
+into the slot, and the client-side reassembly must read it back as a sequence — the slot is then
+a `List<T>` where the body expected an `IQueryable<T>`, so the substitution needs an
+`AsQueryable()` to keep the residual's operators bound.
+
+Worth noting against **E1**, which taught the splitter to descend past `ToList` because shipping a
+query that ends in one asked the server to translate a materialization. That rule is right at the
+*end of a query* and wrong *inside a projection*, where EF requires the `ToList` to be there. Same
+operator, opposite meaning, decided by position.
+
+### Two cheap checks that reclassify a failure
+
+Both are now in CLAUDE.md, because each has cost a wrong verdict:
+
+- A newly-red **SQLite** test — grep `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` first.
+  If EF overrides it, the query now reaches SQL and this is convergence. (`Reverse_without_explicit_ordering`
+  was checked this way and is **not** overridden by EF, so it stays a real failure.)
+- A count that **did not move** — establish that the code ran before concluding the target does
+  not exist.
+
+---
+
 ## Exit criteria
 
 M2 closes when all of:
