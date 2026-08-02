@@ -27,6 +27,12 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </remarks>
 public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 {
+    // Keyed by store name, which is what identifies the shared in-memory database. Both are
+    // concurrent: the gate is per name, so two names initialise at once and a plain HashSet
+    // would be raced.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> Gates = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> Created = new();
+
     private readonly SqliteConnection _connection;
 
     /// <summary>
@@ -38,9 +44,15 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         SharedTestStoreProperties testStoreProperties)
         : base(name, shared, testStoreProperties)
     {
-        // A shared cache plus a held-open connection is what keeps one in-memory database
-        // addressable from every context the store hands out.
-        _connection = new SqliteConnection($"DataSource={name};Mode=Memory;Cache=Shared");
+        // Every context this store hands out uses this one connection object, so a private
+        // in-memory database suffices — and a shared cache is joined only when the store really
+        // is shared. `Cache=Shared` is process-wide and keyed by name, so an unshared store that
+        // opted into it could be reached by anything else running in parallel; that is what made
+        // the smoke tests fail only when other SQLite classes ran alongside them.
+        _connection = new SqliteConnection(
+            shared
+                ? $"DataSource={name};Mode=Memory;Cache=Shared"
+                : "DataSource=:memory:");
         _connection.Open();
     }
 
@@ -59,22 +71,45 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         => base.AddProviderOptions(builder).UseSqlite(_connection);
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     Guarded per store name, which is what identifies the shared in-memory database.
+    ///     Each backend store builds its <em>own</em> service provider, so the
+    ///     <see cref="TestStoreIndex" /> that normally makes shared initialization run once is
+    ///     not actually shared between them — every test class re-entered this method for the
+    ///     same database. On InMemory that is harmless; on a relational store the second
+    ///     <c>EnsureCreated</c> reports <c>table "CustomerQueries" already exists</c>, which is
+    ///     what 534 failures turned out to be.
+    /// </remarks>
     protected override async Task InitializeAsync(
         Func<DbContext> createContext,
         Func<DbContext, Task>? seed,
         Func<DbContext, Task>? clean)
     {
-        using DbContext context = createContext();
-        await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
-
-        if (clean is not null)
+        SemaphoreSlim gate = Gates.GetOrAdd(Name, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            await clean(context).ConfigureAwait(false);
+            if (!Created.TryAdd(Name, true))
+            {
+                return;
+            }
+
+            using DbContext context = createContext();
+            await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
+
+            if (clean is not null)
+            {
+                await clean(context).ConfigureAwait(false);
+            }
+
+            if (seed is not null)
+            {
+                await seed(context).ConfigureAwait(false);
+            }
         }
-
-        if (seed is not null)
+        finally
         {
-            await seed(context).ConfigureAwait(false);
+            gate.Release();
         }
     }
 

@@ -256,7 +256,22 @@ apart. It is an M3 exit criterion regardless, and M4 cannot start without it.
       failed to translate. research-findings §6 amended: the scalar rule stands, collections are
       the exception. **110 → 108, nothing broken.** ✅ `<this commit>`
 
-- [ ] **T4.** Extend Tier B to the remaining query bases.
+- [x] **T4.** `Select` and `Join` adopted on Tier B — the two bases M2's exit criteria name.
+      5,209 tests total: **Tier A 90, Tier B 74**. Tier A is unchanged, so nothing the relational
+      tier surfaced is a regression. ✅ `<this commit>`
+
+      Three bugs in the Tier B harness itself, all invisible with a single class:
+      **534 failures** of `table "CustomerQueries" already exists` — each backend builds its own
+      service provider, so the `TestStoreIndex` that normally makes shared initialisation run
+      once is not shared, and every class re-ran `EnsureCreated`. A **data race** on the
+      per-name guard I added to fix that (a plain `HashSet` under a *per-name* semaphore). And
+      **cross-test contamination**: `Cache=Shared` is process-wide, and both smoke tests shared
+      one `SmokeContext` type, so a model built for one provider reached the other — the
+      *InMemory* smoke test failed with "no such table: Blogs".
+
+- [ ] **T5.** Tier B's 74: 36 are SQLite's lack of `APPLY` (EF's own SQLite classes override
+      these), the rest overlap the Tier A families already classified. Mirror the store-limitation
+      overrides, then extend to the remaining bases.
 
 ---
 

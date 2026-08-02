@@ -24,15 +24,15 @@ public class SqliteSmokeTest
             shared: false,
             new SharedTestStoreProperties
             {
-                ContextType = typeof(SmokeContext),
+                ContextType = typeof(SqliteSmokeContext),
 
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
             });
 
-    private static SmokeContext CreateClient(SqliteInfoCarrierBackendTestStore store)
-        => new(new DbContextOptionsBuilder<SmokeContext>().UseInfoCarrier(store).Options);
+    private static SqliteSmokeContext CreateClient(SqliteInfoCarrierBackendTestStore store)
+        => new(new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options);
 
     [ConditionalFact]
     public async Task Client_query_round_trips_through_a_relational_server()
@@ -49,7 +49,7 @@ public class SqliteSmokeTest
                 await context.SaveChangesAsync();
             });
 
-        await using SmokeContext client = CreateClient(store);
+        await using SqliteSmokeContext client = CreateClient(store);
         List<Blog> blogs = await client.Blogs.OrderBy(b => b.Id).ToListAsync();
 
         Assert.Equal(["alpha", "beta"], blogs.Select(b => b.Title));
@@ -72,7 +72,7 @@ public class SqliteSmokeTest
                 await context.SaveChangesAsync();
             });
 
-        await using SmokeContext client = CreateClient(store);
+        await using SqliteSmokeContext client = CreateClient(store);
         var rows = await client.Blogs
             .Where(b => b.Id > 1)
             .Select(b => new { b.Title, Length = b.Title!.Length })
