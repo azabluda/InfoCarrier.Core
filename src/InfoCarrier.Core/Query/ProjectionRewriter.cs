@@ -55,6 +55,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    ///     A client-side rebuild another pass already produced. Rewriting it would only wrap one
+    ///     carrier in another.
+    /// </summary>
+    private Expression? _preserved;
+
+    /// <summary>
     ///     Rewrites every client-typed projection in <paramref name="query" /> that sits directly
     ///     on a server-executable source.
     /// </summary>
@@ -68,9 +74,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     public static Expression Rewrite(
         Expression query,
         ServerBoundaryAnalyzer analyzer,
-        out IReadOnlySet<Expression> reassemblies)
+        out IReadOnlySet<Expression> reassemblies,
+        Expression? alreadyReassembled = null)
     {
-        var rewriter = new ProjectionRewriter(analyzer);
+        var rewriter = new ProjectionRewriter(analyzer) { _preserved = alreadyReassembled };
         Expression result = rewriter.Visit(query);
         reassemblies = rewriter._reassemblies;
         return result;
@@ -83,6 +90,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         if (base.VisitMethodCall(node) is not MethodCallExpression call)
         {
             return node;
+        }
+
+        if (ReferenceEquals(node, _preserved))
+        {
+            _reassemblies.Add(call);
+            return call;
         }
 
         if (!IsResultSelectorOperator(call, out LambdaExpression? selector))

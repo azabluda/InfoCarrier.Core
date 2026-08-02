@@ -53,6 +53,22 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Reverse_in_SelectMany_with_Take(async))).Message);
 
+    // Reached SQL only once the correlated-subquery rewrite (X5) stopped the split from refusing
+    // it outright. EF's SQLite suite has overridden it all along.
+    public override async Task SelectMany_whose_selector_references_outer_source(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_whose_selector_references_outer_source(async))).Message);
+
+    public override async Task SelectMany_with_collection_being_correlated_subquery_which_references_inner_and_outer_entity(
+        bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_with_collection_being_correlated_subquery_which_references_inner_and_outer_entity(async)))
+            .Message);
+
     // Same story as the join suite's `SelectMany_with_selecting_outer_element`: EF's SQLite tests
     // have always overridden this, and this provider only now translates far enough to hit it.
     public override async Task Select_nested_collection_deep_distinct_no_identifiers(bool async)

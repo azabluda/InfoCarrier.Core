@@ -493,39 +493,50 @@ has to preserve what each operator expects of its source, and a transparent iden
       `ValueTuple`, properties on a `Tuple`. Mutation-tested — forcing the value family back
       costs the new unit test.
 
-- [ ] **X5.** Correlated subquery under a client projection — the last structural gap in the
-      split, and the "operator pushdown" `projection-split.md` §7 deferred. 10 failures:
-      `SelectMany_whose_selector_references_outer_source`,
-      `SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_…`,
-      `SelectMany_correlated_subquery_hard`.
-
-      **One approach tried and reverted (2026-08-02): 67 → 72.**
+- [x] **X5.** Correlated subquery under a client projection — the "operator pushdown"
+      `projection-split.md` §7 deferred. **67 → 63 of 5230, nothing broken**, both tiers.
+      ✅ `<this commit>`
 
       The shape is `from c in cs from g in (from o in os where c.CustomerID == o.CustomerID
       select new { o.OrderDate, c.City }) select g`. `ProjectionRewriter` rewrites the *inner*
-      projection in place, which leaves a server-ok subtree that still references `c` — an open
-      fragment — so `RejectOpenFragments` throws. The fix has to make the enclosing `SelectMany`
-      ship whole instead, with one client projection at the very end.
+      projection in place, which leaves a server-ok subtree still referencing `c` — an open
+      fragment — and `RejectOpenFragments` throws. The fix is to carry the **returned** type as a
+      tuple as well and rebuild it in one `Select` at the root, so the enclosing `SelectMany`
+      ships whole.
 
-      The attempt let X3 re-carry the **result** element type too and rebuilt it in a single
-      `Select` at the root, on the reasoning that a caller who gets its type back cannot tell.
-      That reasoning holds; the measurement did not.
+      > ⚠️ **This was measured at 67 → 72 and reverted first, on a verdict that was wrong twice
+      > over.** Both misreadings are worth more than the fix.
+      >
+      > **"Only Tier A moved."** The Tier B result was `ApplyNotSupported` — the rewrite reached
+      > SQL and *SQLite* declined, which is where EF's own SQLite suite has had an override for
+      > this test all along. Both tiers moved; one of them moved to the reference provider's
+      > behaviour. Reading a store limitation as a non-move is the second time this milestone
+      > that a "regression" was really convergence with EF, and the check is cheap: grep
+      > `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` before believing a SQLite delta.
+      >
+      > **"It decomposes a `GroupBy`."** It does not. The shipped query was
+      > `Select(Select(GroupBy(…)))` rather than `Select(GroupBy(…))` — the aggregate still
+      > travels with its `GroupBy`, one operator further in. The real fault was **redundancy**:
+      > the root rebuild and `ProjectionRewriter` build the same thing, so the second rewrote the
+      > first's output into a pointless tuple-to-tuple hop. Naming that "the failure mode that
+      > cost 136 tests" was alarm, not diagnosis.
+
+      Three things it needed beyond the reverted attempt, each a real defect rather than a
+      tuning knob:
 
       | | |
       |---|---|
-      | fixed | `SelectMany_whose_selector_references_outer_source` — **Tier A only.** The design's own rule is that a fix which moves one tier is not a fix. |
-      | broke | `A_group_by_stays_composed_with_its_aggregate` — the rewrite separates a `GroupBy` from the aggregate that composes it. That is the failure mode which cost 136 tests in phase B and which `ProjectionRewriter` exists to prevent. |
-      | broke | `Select_collection_FirstOrDefault_project_anonymous_type` — *"Nullable object must have a value"*, a real wrong answer. |
-      | broke | two SQLite `ApplyNotSupported` results, which are EF-convergence rather than regressions |
+      | the rebuild is handed to `ProjectionRewriter` as already-reassembled | otherwise both passes rewrite the same projection |
+      | a carrier reached by `FirstOrDefault`/`SingleOrDefault`/`LastOrDefault`/`ElementAtOrDefault`/`DefaultIfEmpty` must be reference-typed | `FirstOrDefault` over a `ValueTuple<string,int>` yields `(null, 0)` — a row that looks real — where the anonymous type yielded `null`. Same rule as X4's null comparison, different trigger. |
+      | the rebuild must pass absence through | reading slots out of that `null` turns the answer it was meant to give into a `NullReferenceException` |
 
-      Even crediting the SQLite pair, the net is 68 against 67, with a correctness regression
-      attached. **The verifier accepted the rewrite** — it was well formed and shipped strictly
-      more — which is the third time now that "ships more" and "is right" have come apart, and
-      the clearest statement yet of the limit recorded in `transparent-identifiers.md` §4.
+      Two SQLite tests reached `ApplyNotSupported` for the first time and took EF's own
+      overrides. All four decisions mutation-tested against unit tests.
 
-      Next attempt should be a design session in the manner of X0, not a fourth guess. The
-      specific question to answer first: what makes an in-place reassembly safe to hoist, given
-      that `GroupBy` composition is the thing that breaks when it is hoisted wrongly.
+      **Still open in this family:** `SelectMany_correlated_subquery_hard` (2) and
+      `SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_…`
+      (4). The first is a three-level correlation with `Take` at each level; the second reads
+      unmapped CLR properties. Both are genuinely harder than the shape fixed here.
 
 ---
 
@@ -560,3 +571,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 5098 | 111 | 5222 | after X2 (rewrite verifier — no movement, by design) |
 | 2026-08-02 | 5113 | 101 | 5227 | after X3 (carriers re-carried as tuples; both tiers moved) |
 | 2026-08-02 | 5147 |  67 | 5227 | after X4 (reference-typed carrier when compared to null) |
+| 2026-08-02 | 5154 |  63 | 5230 | after X5 (returned carrier re-carried, rebuilt once at the root) |

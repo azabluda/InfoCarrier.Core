@@ -321,6 +321,39 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_returned_carrier_is_re_carried_when_that_frees_a_correlated_subquery()
+    {
+        // The projection sits inside a collection selector and reads the *outer* row, so
+        // rewriting it in place leaves a server-side fragment that still references `a`. Carrying
+        // the returned type as a tuple and rebuilding it once at the root instead lets the whole
+        // `SelectMany` ship, which is the only placement that does not either strand the
+        // fragment or issue one query per row.
+        SplitQuery split = Split(
+            from a in _context.Authors
+            from x in a.Books.Select(b => new { b.Title, AuthorName = a.Name })
+            select x);
+
+        Assert.Equal(["Emma"], Rows(Run(split), "Title"));
+        Assert.Equal(["Austen"], Rows(Run(split), "AuthorName"));
+    }
+
+    [Fact]
+    public void A_returned_carrier_that_can_be_absent_stays_absent()
+    {
+        // `FirstOrDefault` over a `ValueTuple` answers `(null)` — a row that looks real — where
+        // the anonymous type answered `null`. The carrier has to be a reference type, and the
+        // rebuild has to pass the absence through rather than read slots out of it.
+        SplitQuery split = Split(
+            _context.Authors.Select(a => a.Books.Select(b => new { b.Title }).FirstOrDefault()));
+
+        List<object?> rows = [.. ((IEnumerable)Run(split)!).Cast<object?>()];
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("Emma", rows[0]!.GetType().GetProperty("Title")!.GetValue(rows[0]));
+        Assert.Null(rows[1]);
+    }
+
+    [Fact]
     public void A_carrier_the_query_returns_is_left_alone()
     {
         // The caller asked for this type, so it is not plumbing. Re-carrying it would hand back

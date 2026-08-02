@@ -44,9 +44,14 @@ internal static class TransparentIdentifierRewriter
     ///     Rewrites the internal carriers of <paramref name="query" />, or returns it unchanged
     ///     when there are none.
     /// </summary>
-    internal static Expression Rewrite(Expression query, TypeAllowlist allowlist)
+    internal static Expression Rewrite(
+        Expression query, TypeAllowlist allowlist, out Expression? rootRebuild)
     {
-        Dictionary<Type, MemberInfo[]> carriers = CarrierFinder.Find(query, allowlist, out IReadOnlySet<Type> nullCompared);
+        rootRebuild = null;
+
+        Dictionary<Type, MemberInfo[]> carriers = CarrierFinder.Find(
+            query, allowlist, out IReadOnlySet<Type> nullCompared, out Type? elementCarrier);
+
         if (carriers.Count == 0)
         {
             return query;
@@ -54,7 +59,20 @@ internal static class TransparentIdentifierRewriter
 
         try
         {
-            return new Rewriter(carriers, nullCompared).Visit(query);
+            var rewriter = new Rewriter(carriers, nullCompared);
+            Expression rewritten = rewriter.Visit(query);
+
+            if (elementCarrier is null)
+            {
+                return rewritten;
+            }
+
+            // Handed back so `ProjectionRewriter` leaves it alone. Both passes build the same
+            // thing — a server-side tuple plus a client-side rebuild — and letting the second
+            // one rewrite the first one's output ships a pointless tuple-to-tuple projection and
+            // buries the `GroupBy` an operator deeper than it belongs.
+            rootRebuild = rewriter.RebuildAtRoot(rewritten, elementCarrier);
+            return rootRebuild;
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException)
         {
@@ -113,17 +131,26 @@ internal static class TransparentIdentifierRewriter
         private readonly HashSet<Type> _nullCompared = [];
 
         public static Dictionary<Type, MemberInfo[]> Find(
-            Expression query, TypeAllowlist allowlist, out IReadOnlySet<Type> nullCompared)
+            Expression query,
+            TypeAllowlist allowlist,
+            out IReadOnlySet<Type> nullCompared,
+            out Type? elementCarrier)
         {
             var finder = new CarrierFinder(allowlist);
             finder.Visit(query);
             nullCompared = finder._nullCompared;
 
-            // A type the query returns is the caller's, not the query's. Rewriting one would
-            // change what the caller receives — and the split has a mechanism for those already:
-            // `ProjectionRewriter` rewrites the projection and rebuilds the type on the client.
+            elementCarrier = query.Type.IsGenericType
+                && query.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)
+                && query.Type.GetGenericArguments()[0] is var element
+                && finder._candidates.ContainsKey(element)
+                && !finder._disqualified.Contains(element)
+                    ? element
+                    : null;
+
             var reachable = new HashSet<Type>();
             CollectTypes(query.Type, reachable);
+            reachable.Remove(elementCarrier!);
 
             foreach (Type type in reachable.Concat(finder._disqualified))
             {
@@ -229,8 +256,30 @@ internal static class TransparentIdentifierRewriter
             _disqualified.UnionWith(types);
         }
 
+        private static readonly HashSet<string> AbsenceProducing =
+        [
+            nameof(Queryable.FirstOrDefault),
+            nameof(Queryable.SingleOrDefault),
+            nameof(Queryable.LastOrDefault),
+            nameof(Queryable.ElementAtOrDefault),
+            nameof(Queryable.DefaultIfEmpty),
+        ];
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
+            // An operator whose whole job is to answer "there was no row" needs a carrier that
+            // can say so. `FirstOrDefault` over a `ValueTuple<string, int>` yields `(null, 0)` —
+            // a row that looks real — where the anonymous type it replaced yielded `null`.
+            // Measured as "Nullable object must have a value" downstream, which names neither
+            // the carrier nor the operator. Same rule as a null comparison, different trigger.
+            if (node.Method.DeclaringType is { } source
+                && (source == typeof(Queryable) || source == typeof(Enumerable))
+                && AbsenceProducing.Contains(node.Method.Name)
+                && node.Arguments.Count > 0)
+            {
+                _nullCompared.Add(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
+            }
+
             // The same escape as a conversion, spelled as an operator.
             if (node.Method.DeclaringType is { } declaring
                 && (declaring == typeof(Queryable) || declaring == typeof(Enumerable))
@@ -308,6 +357,52 @@ internal static class TransparentIdentifierRewriter
             }
 
             return type;
+        }
+
+        public Expression RebuildAtRoot(Expression rewritten, Type elementCarrier)
+            => Expression.Call(
+                typeof(Queryable),
+                nameof(Queryable.Select),
+                [Map(elementCarrier), elementCarrier],
+                rewritten,
+                Rebuilder(elementCarrier));
+
+        private LambdaExpression Rebuilder(Type carrier)
+        {
+            var row = Expression.Parameter(Map(carrier), "row");
+            return Expression.Lambda(Rebuild(row, carrier), row);
+        }
+
+        /// <summary>
+        ///     Rebuilds the original type from a tuple, answering <see langword="null" /> when the
+        ///     tuple itself is absent.
+        /// </summary>
+        /// <remarks>
+        ///     A reference-typed carrier exists precisely so <c>FirstOrDefault</c> can say "no
+        ///     row". Reading slots out of that <see langword="null" /> unconditionally turns the
+        ///     answer it was meant to give into a <see cref="NullReferenceException" />, so the
+        ///     rebuild has to pass the absence through rather than undo it.
+        /// </remarks>
+        private Expression Rebuild(Expression tuple, Type carrier)
+        {
+            MemberInfo[] members = carriers[carrier];
+
+            var arguments = new Expression[members.Length];
+            for (int i = 0; i < members.Length; i++)
+            {
+                Expression slot = TupleCarrier.Read(tuple, i);
+                Type memberType = MemberType(members[i]);
+                arguments[i] = carriers.ContainsKey(memberType) ? Rebuild(slot, memberType) : slot;
+            }
+
+            Expression rebuilt = Expression.New(carrier.GetConstructors()[0], arguments, members);
+
+            return tuple.Type.IsValueType
+                ? rebuilt
+                : Expression.Condition(
+                    Expression.Equal(tuple, Expression.Constant(null, tuple.Type)),
+                    Expression.Constant(null, carrier),
+                    rebuilt);
         }
 
         protected override Expression VisitNew(NewExpression node)

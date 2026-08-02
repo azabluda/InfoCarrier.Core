@@ -51,6 +51,12 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_with_selecting_outer_element(async))).Message);
 
+    public override async Task SelectMany_with_selecting_outer_entity_column_and_inner_column(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_with_selecting_outer_entity_column_and_inner_column(async))).Message);
+
     public override async Task Take_in_collection_projection_with_FirstOrDefault_on_top_level(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
