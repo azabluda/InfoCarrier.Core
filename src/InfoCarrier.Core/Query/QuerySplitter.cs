@@ -58,6 +58,12 @@ public sealed class QuerySplitter
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
+        // identifier between them holds the *grouping*, which the carrier re-carry below must
+        // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …
+        // DefaultIfEmpty()` stays on the client and answers a left join's null rows by throwing.
+        query = GroupJoinFlattener.Flatten(query);
+
         // Replace the carrier types the query creates and consumes internally — transparent
         // identifiers, mostly — with tuples, so the operators above them stay on the server
         // (ADR-011). Guarded: kept only if it demonstrably ships more.

@@ -29,12 +29,6 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
     // These do NOT carry over to Tier C (SQL Server, roadmap M7), which supports APPLY.
     // -------------------------------------------------------------------------------------
 
-    public override async Task Left_join_with_tautology_predicate_doesnt_convert_to_cross_join(bool async)
-        => Assert.Equal(
-            SqliteStrings.ApplyNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Left_join_with_tautology_predicate_doesnt_convert_to_cross_join(async))).Message);
-
     public override async Task SelectMany_with_selecting_outer_entity(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

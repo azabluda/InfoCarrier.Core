@@ -229,6 +229,62 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_group_join_with_default_if_empty_flattens_into_a_left_join()
+    {
+        // The transparent identifier here holds the *grouping* — a sequence, which the carrier
+        // re-carry must refuse to put in a tuple slot. Flattening removes it entirely, which is
+        // the only way this shape reaches the server: left alone, the client applies
+        // `DefaultIfEmpty` with LINQ-to-Objects semantics and dereferences the null row that SQL
+        // would have answered with nulls throughout.
+        SplitQuery split = Split(
+            from a in _context.Authors
+            join b in _context.Books on a.Id equals b.AuthorId into g
+            from b in g.DefaultIfEmpty()
+            select new { a.Name, Title = b == null ? null : b.Title });
+
+        Expression shipped = Assert.Single(split.ServerQueries).Query;
+        Assert.Contains(nameof(Queryable.LeftJoin), Operators(shipped));
+        Assert.DoesNotContain(nameof(Queryable.GroupJoin), Operators(shipped));
+
+        Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
+        Assert.Equal(["Emma", null], Rows(Run(split), "Title"));
+    }
+
+    [Fact]
+    public void A_group_join_whose_identifier_survives_is_left_alone()
+    {
+        // `from b in g` with clauses after it keeps the transparent identifier, so substituting
+        // the group-join result selector reconstructs it — grouping member and all — and the
+        // flattened join would name a parameter it does not bind. EF's pipeline drops that dead
+        // member before anything compiles; this one compiles the residual, so the rewrite has to
+        // decline and the query still has to answer.
+        SplitQuery split = Split(
+            from a in _context.Authors
+            join b in _context.Books on a.Id equals b.AuthorId into g
+            from b in g
+            where b.Title != null
+            select b.Title);
+
+        Assert.Equal(["Emma"], (IEnumerable<string?>)Run(split)!);
+    }
+
+    private static List<string> Operators(Expression expression)
+    {
+        List<string> names = [];
+        new OperatorCollector(names).Visit(expression);
+        return names;
+    }
+
+    private sealed class OperatorCollector(ICollection<string> names) : ExpressionVisitor
+    {
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            names.Add(node.Method.Name);
+            return base.VisitMethodCall(node);
+        }
+    }
+
+    [Fact]
     public void A_group_by_stays_composed_with_its_aggregate()
     {
         // The cut's own doing: separating GroupBy from the aggregate that consumes it leaves a

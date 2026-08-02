@@ -23,15 +23,19 @@ That is not merely slow. The client half then reads a navigation the server neve
 split refuses rather than answer `0` — `Multiple_select_many_with_predicate`, `Navs_query` and
 the rest of that family.
 
-> ⚠️ **Corrected 2026-08-02, after X1 measured the residual directly.** This section originally
-> also claimed a second failure mode — 16 `NullReferenceException`s from a left join's
-> `DefaultIfEmpty()` propagating a null through a client-side projection — and made it X1's
-> target. That attribution was inherited from `implementation-plan.md`, which had recorded it
-> before phases A6 and E1 landed, and it is **no longer true of any failing test**. The surviving
-> `NullReferenceException`s are `Select_GetValueOrDefault_on_DateTime_with_null_values`,
-> `Reverse_in_join_inner`(`_with_skip`) and `Entity_equality_contains_with_list_of_null` — none of
-> them a `join … into … from … DefaultIfEmpty` shape. The refusals below are the whole of this
-> problem as it stands.
+There is a second failure mode, and it is the one §3.1 exists for. A left join's
+`DefaultIfEmpty()` yields a `null` row; SQL propagates nulls through the projection, while
+LINQ-to-Objects dereferences the null and throws. `NullReferenceException`.
+
+> ⚠️ **This paragraph was deleted on 2026-08-02 and restored on the same day.** The deletion
+> claimed the `NullReferenceException` family was misattributed and that "none of them [is] a
+> `join … into … from … DefaultIfEmpty` shape". That was wrong on the facts:
+> `Select_GetValueOrDefault_on_DateTime_with_null_values` and
+> `Reverse_in_join_inner`(`_with_skip`) are **exactly** that shape — read the spec, they are
+> `join … on … into grouping from o in grouping.DefaultIfEmpty()`. The real reason X1 fixed
+> nothing is in §3.1, and it was a bug in the mirror, not an absent target. Concluding "the
+> target does not exist" from "my change did nothing" is the error to avoid here; the same
+> evidence supported "my change did nothing *because it never ran*", which is what had happened.
 
 ## 2. The finding that shapes the design
 
@@ -53,35 +57,33 @@ For those we are on our own.
 
 ## 3. Two transformations, in order
 
-### 3.1 Flatten `GroupJoin` + `SelectMany` — mirror EF · **tried, measured neutral, reverted**
+### 3.1 Flatten `GroupJoin` + `SelectMany` — mirror EF · **done, 63 → 49**
 
-The plan was to run the equivalent of `TryFlattenGroupJoinSelectMany` on the client, before the
-boundary analysis: same match, same substitution, same output — `Join` without a
-`DefaultIfEmpty`, `LeftJoin` with one — on the reasoning that a mirror of EF's own rewrite could
-not be wrong.
+Run the equivalent of `TryFlattenGroupJoinSelectMany` on the client, before the boundary
+analysis: same match, same substitution, same output — `Join` without a `DefaultIfEmpty`,
+`LeftJoin` with one.
 
-**Built, measured `111 → 111`, reverted.** Two findings, both of which outrank the phase itself:
+Two things the mirror must do that EF gets for free. Both were found by measurement, and the
+first cost a wrong revert.
 
-**EF's rewrite is not separable from EF's pipeline.** Substituting the group-join result
-selector's body for the `SelectMany` parameter *reconstructs* the transparent identifier, grouping
-member and all. So `from c … into g from o in g where … select o` produces a join whose result
-selector body names `g` while the join binds only `c` and `o`. EF never notices: its projection
-binding collapses that reconstructed anonymous type and drops the member nothing reads, long
-before anything is compiled. This provider compiles the residual, so the same tree is a hard
-`InvalidOperationException` — *"variable 'orders' … referenced from scope ''"* — and the first
-run of X1 broke 10 previously-passing tests exactly there. Mirroring EF's **match** is not
-mirroring its **pipeline**; the tail of that pipeline was what made the output legal.
+**Match `Enumerable` as well as `Queryable`.** EF normalizes one family into the other
+(`TryConvertEnumerableToQueryable`) *before* its matcher runs, so by then everything is
+`Queryable`. Nothing has done that here: `from o in grouping.DefaultIfEmpty()` binds to
+`Enumerable.DefaultIfEmpty`, because the grouping is an `IEnumerable<T>`. Matching only the
+`Queryable` overloads made the first version **fire on nothing at all** while looking entirely
+correct — and that silence was misread as "the target family does not exist" (§1) rather than
+"the matcher never matched".
 
-Declining the rewrite whenever it leaves a parameter free repaired that, at the cost of declining
-precisely the shapes that keep a grouping in the identifier — which is every case §3.1 claimed to
-help. With the guard the phase is exactly neutral: nothing fixed, nothing broken.
+**Decline a rewrite that strands a parameter.** Substituting the group-join result selector
+reconstructs the identifier including its grouping member, so `… into g from o in g where … select o`
+yields a join naming `g` while binding only the outer and inner elements. EF's projection binding
+drops that dead member before anything compiles; this provider compiles the residual and gets
+*"variable 'g' … referenced from scope ''"*. The first run broke 10 passing tests there.
+Mirroring EF's **match** is not mirroring its **pipeline**.
 
-**Its supporting role for §3.2 is void too.** §3.1 was also justified as removing the grouping
-before it could reach a carrier slot. Under the guard it removes no groupings at all, so §3.2's
-"no sequence in a slot" guard is now load-bearing on its own rather than a backstop.
-
-Recorded here rather than retried. A future attempt would have to bring the dead-member
-elimination with it — which is §3.2's work, not a preliminary to it.
+EF's third guard — declining a *correlated* collection selector — is mirrored too, and is
+**inert on this suite**: disabling it changes no test. It is kept because it is EF's and because
+declining is the safe direction, not because anything here proves it necessary.
 
 ### 3.2 Re-carry the remaining identifiers — ours · **done, 111 → 101**
 
@@ -130,9 +132,9 @@ Two more corrections came out of measurement, each worth more than the line it c
 **No sequence in a slot.** A slot may hold a scalar or an entity, never an `IEnumerable`. This is
 the constraint the first attempt violated: with `ValueTuple<Order, IEnumerable<Customer>>`,
 `t.Item2.DefaultIfEmpty()` asks SQL to navigate out of a projected tuple back into a correlated
-collection, and 107 `SelectMany`/`Join` translation failures followed. §3.1 was to have removed
-the common source of such a slot; since it did not survive measurement, this guard now carries
-that weight alone.
+collection, and 107 `SelectMany`/`Join` translation failures followed. §3.1 removes the common
+source of such a slot — the group-join identifier that holds the grouping — and this guard
+catches the rest.
 
 **Transform, then verify.** After rewriting, re-run the boundary analysis. Keep the rewrite only
 if it **strictly increases** what ships — otherwise discard it and use the original tree. The
@@ -164,7 +166,7 @@ property. That gap is real and is why §6 keeps the phases separately measurable
 
 | Phase | Work | Target | Outcome |
 |---|---|---|---|
-| **X1** | Mirror `TryFlattenGroupJoinSelectMany`, plus the member-access-over-`new` simplification it relies on | *(claimed)* 16 `NullReferenceException` failures | **reverted** — target misattributed, rewrite not separable from EF's pipeline (§3.1) |
+| **X1** | Mirror `TryFlattenGroupJoinSelectMany`, plus the member-access-over-`new` simplification it relies on | the `NullReferenceException` failures from a left join's null row | **done in X6** — the first attempt matched only the `Queryable` overloads and fired on nothing; 63 → 49 once it matched `Enumerable` too (§3.1) |
 | **X2** | Verification harness: rewrite, re-analyze, keep only on strict improvement | no test movement expected — it is the safety net for X3 | **done** — `RewriteVerifier`, 111 → 111 of 5222 |
 | **X3** | `ValueTuple` re-carry for surviving identifiers, under both guards | the navigation-read refusals | **done** — 111 → 101 of 5227, nothing broken; both tiers moved |
 

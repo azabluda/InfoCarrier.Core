@@ -393,21 +393,24 @@ has to preserve what each operator expects of its source, and a transparent iden
       spec, recorded [ADR-011](decisions.md#adr-011). ✅ `db5dcdd`
 
 - [x] **X1.** Mirror `TryFlattenGroupJoinSelectMany` on the client, before the boundary analysis.
-      **Built, measured `111 → 111`, reverted.** ✅ `<this commit>`
+      **First attempt measured `111 → 111` and was reverted. The revert was a mistake** — see X6,
+      which restores it for 63 → 49. ✅ `db5dcdd` (attempt) / `<this commit>` (corrected)
 
-      Two findings, both worth more than the phase. First, **EF's rewrite is not separable from
-      EF's pipeline**: the substitution reconstructs the transparent identifier including its
-      grouping member, so the emitted join names a parameter it does not bind. EF is fine with
-      that — its projection binding drops the dead member before anything compiles — while this
-      provider compiles the residual and gets *"variable 'orders' … referenced from scope ''"*.
-      The first run broke 10 passing tests there (`GroupJoin_Where`, `GroupJoin_Where_OrderBy`,
-      `GroupJoin_complex_GroupBy_Aggregate`). Second, declining the rewrite when it leaves a
-      parameter free fixes that but declines exactly the shapes X1 existed to help, leaving it
-      exactly neutral.
+      The attempt found one real thing: **EF's rewrite is not separable from EF's pipeline.** The
+      substitution reconstructs the transparent identifier including its grouping member, so the
+      emitted join names a parameter it does not bind. EF's projection binding drops the dead
+      member before anything compiles; this provider compiles the residual and gets
+      *"variable 'orders' … referenced from scope ''"*. That broke 10 passing tests, and the
+      free-parameter guard added to fix it is still there and still load-bearing.
 
-      Reverted rather than kept: neutral code that fires only on already-passing queries is a
-      liability, and its claimed support for X3 (removing groupings before they reach a carrier
-      slot) is void under the same guard.
+      It also produced a wrong conclusion, recorded here because it is the more instructive half.
+      With the guard the phase measured exactly neutral, and I read "my change did nothing" as
+      "the target family does not exist" — writing into two documents that no `NullReferenceException`
+      was a `join … into … from … DefaultIfEmpty` shape. **They all were.**
+      `Select_GetValueOrDefault_on_DateTime_with_null_values` and `Reverse_in_join_inner`(`_with_skip`)
+      are that shape verbatim. The same evidence equally supported "my change did nothing
+      *because it never ran*", which is what had happened, and that hypothesis costs one probe to
+      separate from the other. See X6.
 
 - [x] **X2.** Verification harness — `RewriteVerifier` rewrites, re-analyzes, and keeps a
       candidate only when it is well formed *and* ships strictly more.
@@ -538,6 +541,28 @@ has to preserve what each operator expects of its source, and a transparent iden
       (4). The first is a three-level correlation with `Take` at each level; the second reads
       unmapped CLR properties. Both are genuinely harder than the shape fixed here.
 
+- [x] **X6.** Revive X1's flattener, matching `Enumerable` as well as `Queryable`.
+      **63 → 49 of 5232, nothing broken**, both tiers. ✅ `<this commit>`
+
+      X1 fired on nothing because it matched only the `Queryable` overloads. EF normalizes
+      `Enumerable` into `Queryable` (`TryConvertEnumerableToQueryable`) *before* its matcher runs,
+      so by then everything is `Queryable`; nothing does that here, and
+      `from o in grouping.DefaultIfEmpty()` binds to **`Enumerable.DefaultIfEmpty`** because the
+      grouping is an `IEnumerable<T>`. `StripDefaultIfEmpty` therefore never stripped it,
+      `IsCorrelated` then saw a method call it did not recognise on the spine, and the rewrite
+      declined — silently, on every query it was written for.
+
+      Fixed 16: `Select_GetValueOrDefault_on_DateTime_with_null_values`, `Reverse_in_join_inner`,
+      `Reverse_in_join_inner_with_skip` (all both tiers), `Join_GroupBy_Aggregate_with_left_join`,
+      and `Left_join_with_tautology_predicate_doesnt_convert_to_cross_join` — the last by
+      **deleting** our SQLite `ApplyNotSupported` override, which EF's suite does not have and
+      which was papering over the limitation this removes.
+
+      The free-parameter guard from X1 is kept and is load-bearing. EF's correlated-collection
+      guard is mirrored too and is **inert on this suite** — disabling it changes no test. Kept
+      because it is EF's and declining is the safe direction, recorded as untested rather than
+      claimed as covered.
+
 ---
 
 ## Exit criteria
@@ -572,3 +597,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 5113 | 101 | 5227 | after X3 (carriers re-carried as tuples; both tiers moved) |
 | 2026-08-02 | 5147 |  67 | 5227 | after X4 (reference-typed carrier when compared to null) |
 | 2026-08-02 | 5154 |  63 | 5230 | after X5 (returned carrier re-carried, rebuilt once at the root) |
+| 2026-08-02 | 5170 |  49 | 5232 | after X6 (GroupJoin flattening, matching Enumerable too) |
