@@ -354,6 +354,38 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_join_key_the_client_cannot_compare_is_a_translation_failure()
+    {
+        // `BookSummary` is a client-only type with no `Equals`, so the join lands on the client
+        // and compares keys by reference — every row fails to match and the query answers
+        // nothing. An empty result that looks like data is worse than a refusal.
+        var query = _context.Authors.Join(
+            _context.Books,
+            a => new BookSummary { Title = a.Name },
+            b => new BookSummary { Title = b.Title },
+            (a, b) => a.Name);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
+        Assert.Contains("could not be translated", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_anonymous_join_key_is_still_allowed()
+    {
+        // The compiler gives an anonymous type structural `Equals`, so the client comparison
+        // means what the query said. This is the whole distinction — the guard tests the type's
+        // equality, not whether the server can name it.
+        SplitQuery split = Split(
+            _context.Authors.Join(
+                _context.Books,
+                a => new { K = a.Id },
+                b => new { K = b.AuthorId },
+                (a, b) => b.Title));
+
+        Assert.Equal(["Emma"], (IEnumerable<string?>)Run(split)!);
+    }
+
+    [Fact]
     public void A_group_by_stays_composed_with_its_aggregate()
     {
         // The cut's own doing: separating GroupBy from the aggregate that consumes it leaves a

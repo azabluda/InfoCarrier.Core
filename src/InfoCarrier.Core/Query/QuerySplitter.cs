@@ -638,6 +638,56 @@ public sealed class QuerySplitter
             return node is ConstantExpression { Value: null } or DefaultExpression;
         }
 
+        /// <summary>
+        ///     Constructing a client-only type that has no value equality, where the operator is
+        ///     about to compare it.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <c>join o in os on new Foo { Bar = c.CustomerID } equals new Foo { Bar = o.CustomerID }</c>
+        ///         forces the join onto the client, because <c>Foo</c> is a type the server cannot
+        ///         name. There the keys are compared with <c>EqualityComparer&lt;Foo&gt;.Default</c>
+        ///         — and <c>Foo</c> does not override <c>Equals</c>, so that is reference equality
+        ///         between two freshly allocated objects. Every row fails to match and the query
+        ///         answers <b>nothing</b>: no exception, no log line, an empty result that looks
+        ///         like data.
+        ///     </para>
+        ///     <para>
+        ///         An anonymous type in the same position is fine and stays allowed — the compiler
+        ///         gives it structural <c>Equals</c>, so the client comparison means what the query
+        ///         said. That is the whole distinction, and it is why this tests the type's
+        ///         equality rather than its origin: <em>constructing</em> a client-only type is the
+        ///         type boundary, this milestone's subject, and refusing that outright cost 235
+        ///         tests once.
+        ///     </para>
+        /// </remarks>
+        protected override Expression VisitMemberInit(MemberInitExpression node)
+        {
+            if (_found is null && LacksValueEquality(node.Type))
+            {
+                _found = new ClientCodeReason(null);
+                return node;
+            }
+
+            return _found is null ? base.VisitMemberInit(node) : node;
+        }
+
+        protected override Expression VisitNew(NewExpression node)
+        {
+            if (_found is null && LacksValueEquality(node.Type))
+            {
+                _found = new ClientCodeReason(null);
+                return node;
+            }
+
+            return _found is null ? base.VisitNew(node) : node;
+        }
+
+        private bool LacksValueEquality(Type type)
+            => !type.IsValueType
+                && !allowlist.IsAllowed(type)
+                && type.GetMethod(nameof(Equals), [typeof(object)])?.DeclaringType == typeof(object);
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (_found is not null)

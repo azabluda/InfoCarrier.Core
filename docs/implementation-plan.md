@@ -638,6 +638,30 @@ Small families with unrelated causes, taken one at a time. Each is measured on i
       >   a materialized `List<T>` may not have that problem. Untested — the guard cost 107
       >   failures once, so it gets its own experiment.
 
+- [x] **Z6.** A client-only key with no value equality is a translation failure.
+      **33 → 31 of 5237, nothing broken** — `OrderBy_multiple_queries`. ✅ `<this commit>`
+
+      ```csharp
+      join o in os on new Foo { Bar = c.CustomerID } equals new Foo { Bar = o.CustomerID }
+      ```
+
+      `Foo` is a type the server cannot name, so the join lands on the client — where the keys are
+      compared with `EqualityComparer<Foo>.Default`, and `Foo` does not override `Equals`. That is
+      reference equality between two freshly allocated objects: every row fails to match and the
+      query answers **nothing**. No exception, no log line, an empty result that looks like data.
+
+      The guard tests the type's **equality**, not its origin. An anonymous type in the same
+      position stays allowed, because the compiler gives it structural `Equals` and the client
+      comparison then means what the query said. Refusing client-only construction outright is
+      the type boundary — this milestone's whole subject — and cost 235 tests when tried in C5.
+      Both sides unit-tested; the guard and the `Equals` check are each mutation-tested.
+
+      Worth recording what this was *not*. The obvious reading was `c.IsLondon`, the `[NotMapped]`
+      property in the same query, for which EF even has a dedicated
+      `QueryUnableToTranslateMember`. But the spec tests that read it **already pass**: the query
+      ships and the *server's* EF raises that error for us. Fixing the unmapped property would
+      have changed nothing here.
+
 - [ ] **Z4.** Client evaluation *forced by the type boundary*, where EF refuses outright —
       `Select_GroupBy_SelectMany` and `Where_query_composition6`-style tests that assert a
       translation failure this provider does not produce.
@@ -762,3 +786,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 5174 |  45 | 5232 | after Z1 (concurrency section held across the residual) |
 | 2026-08-02 | 5180 |  41 | 5234 | after Z5 (collection fragment materialized before it ships) |
 | 2026-08-02 | 5189 |  33 | 5235 | after Z3 (collection projection reassembled above the SelectMany) |
+| 2026-08-02 | 5193 |  31 | 5237 | after Z6 (client-only key without value equality is refused) |
