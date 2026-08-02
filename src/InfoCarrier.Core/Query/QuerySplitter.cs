@@ -264,6 +264,22 @@ public sealed class QuerySplitter
 
             if (!placed)
             {
+                // The rows are not that entity type — typically because the projection rewrite
+                // put the entity in a tuple slot. The Include still belongs on the query, just
+                // at the root it is read from rather than wrapped around the whole thing.
+                for (int i = 0; i < result.Count && !placed; i++)
+                {
+                    Expression withInclude = IncludeAtRoot(result[i], read.Owner.ClrType, read.Path);
+                    if (!ReferenceEquals(withInclude, result[i]))
+                    {
+                        result[i] = withInclude;
+                        placed = true;
+                    }
+                }
+            }
+
+            if (!placed)
+            {
                 throw new InvalidOperationException(
                     $"The client-side part of the query reads navigation '{read.Owner.DisplayName()}."
                         + $"{read.Path}', but no query sent to the server returns "
@@ -288,6 +304,22 @@ public sealed class QuerySplitter
             .MakeGenericMethod(entityType);
 
         return Expression.Call(include, source, Expression.Constant(path));
+    }
+
+    /// <summary>
+    ///     Wraps the query root of <paramref name="entityType" /> inside <paramref name="query" />
+    ///     with an <c>Include</c>, returning the original when there is no such root.
+    /// </summary>
+    private static Expression IncludeAtRoot(Expression query, Type entityType, string path)
+        => new RootIncludingVisitor(entityType, path).Visit(query)!;
+
+    private sealed class RootIncludingVisitor(Type entityType, string path) : ExpressionVisitor
+    {
+        protected override Expression VisitExtension(Expression node)
+            => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root
+                && root.ElementType == entityType
+                    ? Include(node, entityType, path)
+                    : base.VisitExtension(node);
     }
 
     private sealed record NavigationRead(IEntityType Owner, string Path);

@@ -113,6 +113,11 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       the server cannot run is not — answering it locally means fetching the whole table silently.
       Three tests overridden mirroring EF's relational/SqlServer overrides of the same tests.
       **220 → 194.** ✅ `<this commit>`
+- [x] **C6.** `Include` is placed at the **query root** it is read from, not wrapped around the
+      whole shipped query — the projection rewrite usually leaves the entity in a tuple slot, so
+      the rows are not that entity type and the outer wrap had nowhere to go. **194 → 154.**
+      Suite run time rose 2m36s → 4m43s: the over-fetch is real, and is what B's fragment
+      evaluation removes wherever it can reach. ✅ `<this commit>`
 - [ ] **C1.** Recursive rewrite of nested projections inside a fragment (§3.3).
 
 ## Phase M2-D — adopt and drive green
@@ -159,3 +164,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 4013 | 270 | 4292 | after B1-B3 (projection rewrite — the tuple carrier) |
 | 2026-08-02 | 4063 | 220 | 4292 | after C2-C4 (all result selectors, structurally recognised) |
 | 2026-08-02 | 4092 | 194 | 4295 | after C5 (client evaluation is a translation failure) |
+| 2026-08-02 | 4132 | 154 | 4295 | after C6 (Include placed at the root it is read from) |
