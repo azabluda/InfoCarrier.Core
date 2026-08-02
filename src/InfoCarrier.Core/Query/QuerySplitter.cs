@@ -256,20 +256,19 @@ public sealed class QuerySplitter
             new NodeCollector(serverSide).Visit(subtree);
         }
 
-        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist) is not var (offender, method))
+        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist) is not var (offender, details))
         {
             return;
         }
 
-        // EF's own wording, down to the details clause naming the method — the spec suite asserts
-        // it (`AssertTranslationFailedWithDetails`), and a caller who has seen this message from
-        // any other provider should not have to learn a second one.
+        // EF's own wording, down to the details clause — the spec suite asserts it
+        // (`AssertTranslationFailed` / `WithDetails`), and a caller who has seen this message
+        // from any other provider should not have to learn a second one.
         throw new InvalidOperationException(
-            Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
-                offender.ToString(),
-                Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
-                    DisplayName(method.DeclaringType!),
-                    method.Name)));
+            details is null
+                ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(offender.ToString())
+                : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
+                    offender.ToString(), details));
     }
 
     /// <summary>
@@ -464,9 +463,9 @@ public sealed class QuerySplitter
         IReadOnlySet<Expression> reassemblies,
         TypeAllowlist allowlist) : ExpressionVisitor
     {
-        private (Expression Operator, MethodInfo Method)? _found;
+        private (Expression Operator, string? Details)? _found;
 
-        public static (Expression Operator, MethodInfo Method)? Find(
+        public static (Expression Operator, string? Details)? Find(
             Expression query,
             IReadOnlySet<Expression> serverSide,
             IReadOnlySet<Expression> reassemblies,
@@ -488,9 +487,9 @@ public sealed class QuerySplitter
             {
                 foreach (Expression argument in RowDecidingArguments(node))
                 {
-                    if (ClientCodeFinder.Find(argument, allowlist) is { } method)
+                    if (ClientCodeFinder.Find(argument, allowlist) is { } reason)
                     {
-                        _found = (node, method);
+                        _found = (node, reason.Details);
                         break;
                     }
                 }
@@ -537,15 +536,68 @@ public sealed class QuerySplitter
     ///     member reads condemned every query written in the <c>from … from … select</c> form,
     ///     69 of them.
     /// </remarks>
+    /// <summary>
+    ///     Why an operator argument cannot be answered on the client. <see cref="Details" /> is
+    ///     EF's details clause, or <see langword="null" /> when the bare message says enough.
+    /// </summary>
+    private readonly record struct ClientCodeReason(string? Details);
+
     private sealed class ClientCodeFinder(TypeAllowlist allowlist) : ExpressionVisitor
     {
-        private MethodInfo? _found;
+        private ClientCodeReason? _found;
 
-        public static MethodInfo? Find(Expression expression, TypeAllowlist allowlist)
+        public static ClientCodeReason? Find(Expression expression, TypeAllowlist allowlist)
         {
             var finder = new ClientCodeFinder(allowlist);
             finder.Visit(expression);
             return finder._found;
+        }
+
+        /// <summary>
+        ///     Reference equality between two client-only types.
+        /// </summary>
+        /// <remarks>
+        ///     This is the one shape that would otherwise be answered <em>wrongly</em> rather
+        ///     than refused. An anonymous type overrides <c>Equals</c> structurally but not
+        ///     <c>==</c>, so <c>new { x = c.City } == new { x = "London" }</c> evaluated on the
+        ///     client compares two freshly allocated objects by reference and is always false —
+        ///     zero rows, no error, a plausible answer. EF translates it structurally, or reports
+        ///     a translation failure (issue #14672). Either is better than silently none.
+        /// </remarks>
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            if (_found is null
+                && node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                && node.Method is null
+                && !node.Left.Type.IsValueType
+                && node.Left.Type != typeof(string)
+                && !allowlist.IsAllowed(node.Left.Type)
+                && !allowlist.IsAllowed(node.Right.Type)
+                && !IsNull(node.Left)
+                && !IsNull(node.Right))
+            {
+                _found = new ClientCodeReason(null);
+                return node;
+            }
+
+            return _found is null ? base.VisitBinary(node) : node;
+        }
+
+        // `x == null` is a null test, not structural equality: it means the same thing on either
+        // side of the wire, and refusing it would condemn every `FirstOrDefault() == null`.
+        private static bool IsNull(Expression node)
+        {
+            // A null may arrive boxed — `(object)x == (object)null` — so the conversions have to
+            // come off before the test means anything.
+            while (node is UnaryExpression
+                   {
+                       NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs,
+                   } convert)
+            {
+                node = convert.Operand;
+            }
+
+            return node is ConstantExpression { Value: null } or DefaultExpression;
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -557,7 +609,9 @@ public sealed class QuerySplitter
 
             if (node.Method.DeclaringType is { } declaring && !allowlist.IsAllowed(declaring))
             {
-                _found = node.Method;
+                _found = new ClientCodeReason(
+                    Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
+                        DisplayName(declaring), node.Method.Name));
                 return node;
             }
 

@@ -44,6 +44,16 @@ public class NorthwindWhereQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture
     //
     // (Originally recorded as an InMemory store limitation in G4c. Corrected after checking
     // EF's SQLite class.)
+    //
+    // The three *anonymous-type* cases are now real assertions rather than no-ops: this
+    // provider refuses them, because an anonymous type overrides Equals structurally but not ==,
+    // so evaluating one on the client compares two freshly allocated objects by reference —
+    // always false, no error, a plausible wrong answer.
+    //
+    // The six Tuple cases stay no-ops. Tuple<> is a type the server knows, so the comparison is
+    // shipped rather than refused, and InMemory then client-evaluates it to the same silent
+    // false. On Tier B the server reports the translation failure instead, which is why the
+    // SQLite class asserts where this one no-ops — the same divergence already noted above.
     // ---------------------------------------------------------------------------------
 
     // ---------------------------------------------------------------------------------
@@ -60,11 +70,14 @@ public class NorthwindWhereQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture
     public override Task Where_bool_client_side_negated(bool async)
         => AssertTranslationFailed(() => base.Where_bool_client_side_negated(async));
 
+    public override Task Where_compare_constructed_multi_value_not_equal(bool async)
+        => AssertTranslationFailed(() => base.Where_compare_constructed_multi_value_not_equal(async));
+
     public override Task Where_compare_constructed_equal(bool async)
-        => Task.CompletedTask;
+        => AssertTranslationFailed(() => base.Where_compare_constructed_equal(async));
 
     public override Task Where_compare_constructed_multi_value_equal(bool async)
-        => Task.CompletedTask;
+        => AssertTranslationFailed(() => base.Where_compare_constructed_multi_value_equal(async));
 
     public override Task Where_compare_tuple_constructed_equal(bool async)
         => Task.CompletedTask;

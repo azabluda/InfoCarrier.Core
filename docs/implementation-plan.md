@@ -237,7 +237,24 @@ apart. It is an M3 exit criterion regardless, and M4 cannot start without it.
          (research-findings §6) turns a local collection into a `ConstantExpression`, which
          relational EF cannot translate — InMemory never noticed because it client-evaluates.
 
-- [ ] **T3.** Fix the two Tier B defects above, then extend Tier B to the remaining query bases.
+- [x] **T3a.** The silent wrong answer is gone. Reference equality between two client-only
+      reference types is now a translation failure: an anonymous type overrides `Equals`
+      structurally but **not** `==`, so evaluating `new { x = c.City } == new { x = "London" }`
+      on the client compares two freshly allocated objects by reference — always false, no error,
+      six rows silently becoming zero. **115 → 110, nothing broken.** ✅ `<this commit>`
+
+      Two refinements the measurements forced. `x == null` is a null *test*, not structural
+      equality, and refusing it condemned every `FirstOrDefault() == null` (4 tests). And the six
+      `Tuple` variants are **not** covered: `Tuple<>` is a type the server knows, so the
+      comparison ships rather than being refused, and InMemory then client-evaluates it to the
+      same silent false — Tier A keeps its no-ops there, Tier B asserts the translation failure
+      its server actually reports. Eight Tier A no-ops became real assertions in the process.
+
+- [ ] **T3b.** `Generic_Ilist_contains_translates_to_server` — parameter substitution
+      (research-findings §6) turns a local collection into a `ConstantExpression`, which
+      relational EF cannot translate. Needs a §6 amendment, not a patch.
+
+- [ ] **T4.** Extend Tier B to the remaining query bases.
 
 ---
 

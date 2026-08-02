@@ -30,17 +30,22 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
     // UPSTREAM EF CORE LIMITATION — anonymous-type / tuple structural equality against a
     // constant, EF Core issue #14672. EF's own NorthwindWhereQuerySqliteTest overrides these
     // eight with AssertTranslationFailed; measured here, six of the eight fail the same way for
-    // the same reason. The other two are a defect of ours — see below.
+    // the same reason. Two of them used to return zero rows where six were expected — a
+    // silent wrong answer — which is the defect the reference-equality guard fixed.
     //
     // Tier A no-ops these instead, because InMemory silently matches nothing where a relational
     // provider reports a translation failure. That difference in *shape* was predicted in the
     // Tier A class and is now confirmed rather than assumed.
     // -------------------------------------------------------------------------------------
 
-    // NOT overridden, deliberately: Where_compare_constructed_equal and
-    // Where_compare_constructed_multi_value_equal do *not* fail to translate here. They return
-    // zero rows where six are expected — a silent wrong answer, which is worse than the
-    // translation failure EF reports, and must stay visible as the defect it is.
+    public override Task Where_compare_constructed_equal(bool async)
+        => AssertTranslationFailed(() => base.Where_compare_constructed_equal(async));
+
+    public override Task Where_compare_constructed_multi_value_equal(bool async)
+        => AssertTranslationFailed(() => base.Where_compare_constructed_multi_value_equal(async));
+
+    public override Task Where_compare_constructed_multi_value_not_equal(bool async)
+        => AssertTranslationFailed(() => base.Where_compare_constructed_multi_value_not_equal(async));
 
     public override Task Where_compare_tuple_constructed_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_constructed_equal(async));
