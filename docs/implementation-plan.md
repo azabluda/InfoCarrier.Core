@@ -149,8 +149,16 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `Final_GroupBy_nominal_type_entity` now fails on values (expected 69, got 91) — the
       override was masking a real defect. Left red deliberately; see the open items below.
 
-- [ ] **E2.** Second pass over the remaining override failures once the value defects above are
-      understood.
+- [x] **E2a.** The client-evaluation guard reaches **every** client-side operator, not only one
+      reading straight from a shipped query — a `SelectMany` two links above the boundary was
+      invisible to it. And the projection exemption recurses: client code inside a nested
+      projection is legal (`c.Orders.Select(o => new { ClientMethod(o) })`), client code applied
+      to the sequence itself is not (`ClientDefaultIfEmpty(grouping)` decides which rows exist).
+      **118 → 112.** ✅ `<this commit>`
+
+- [ ] **E2b.** Remaining override failures: `Include_property_expression_invalid` (an `Include`
+      lambda that is not a property path must throw), `Throws_on_concurrent_query_*` (the
+      concurrency detector is released before the caller enumerates), `Select_GroupBy_SelectMany`.
 
 ---
 

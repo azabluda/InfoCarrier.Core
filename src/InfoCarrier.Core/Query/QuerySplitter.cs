@@ -177,8 +177,14 @@ public sealed class QuerySplitter
         IReadOnlySet<Expression> reassemblies,
         TypeAllowlist allowlist)
     {
-        var shipped = new HashSet<Expression>(analysis.Shippable, ReferenceEqualityComparer.Instance);
-        if (ClientEvaluationFinder.Find(query, shipped, reassemblies, allowlist) is not var (offender, method))
+        // Everything inside a shipped subtree runs on the server; everything else runs here.
+        var serverSide = new HashSet<Expression>(ReferenceEqualityComparer.Instance);
+        foreach (Expression subtree in analysis.Shippable)
+        {
+            new NodeCollector(serverSide).Visit(subtree);
+        }
+
+        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist) is not var (offender, method))
         {
             return;
         }
@@ -351,8 +357,21 @@ public sealed class QuerySplitter
                     : base.VisitMethodCall(node);
     }
 
+    private sealed class NodeCollector(ISet<Expression> into) : ExpressionVisitor
+    {
+        public override Expression? Visit(Expression? node)
+        {
+            if (node is not null)
+            {
+                into.Add(node);
+            }
+
+            return base.Visit(node);
+        }
+    }
+
     private sealed class ClientEvaluationFinder(
-        IReadOnlySet<Expression> shipped,
+        IReadOnlySet<Expression> serverSide,
         IReadOnlySet<Expression> reassemblies,
         TypeAllowlist allowlist) : ExpressionVisitor
     {
@@ -360,11 +379,11 @@ public sealed class QuerySplitter
 
         public static (Expression Operator, MethodInfo Method)? Find(
             Expression query,
-            IReadOnlySet<Expression> shipped,
+            IReadOnlySet<Expression> serverSide,
             IReadOnlySet<Expression> reassemblies,
             TypeAllowlist allowlist)
         {
-            var finder = new ClientEvaluationFinder(shipped, reassemblies, allowlist);
+            var finder = new ClientEvaluationFinder(serverSide, reassemblies, allowlist);
             finder.Visit(query);
             return finder._found;
         }
@@ -373,11 +392,10 @@ public sealed class QuerySplitter
         {
             if (_found is null
                 && node.Arguments.Count > 0
-                && shipped.Contains(node.Arguments[0])
+                && !serverSide.Contains(node)
                 && !reassemblies.Contains(node)
                 && node.Method.DeclaringType is { } declaring
-                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable))
-                )
+                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable)))
             {
                 foreach (Expression argument in RowDecidingArguments(node))
                 {
@@ -411,16 +429,6 @@ public sealed class QuerySplitter
             // not, which is why the split has to be per argument rather than per operator.
             int skipLast = ProjectionRewriter.IsResultSelectorOperator(node, out _) ? 1 : 0;
 
-            // A projection whose lambda *is* the collection selector -- the two-argument
-            // SelectMany -- is all projection and nothing else.
-            if (skipLast == 0
-                && typeof(System.Collections.IEnumerable).IsAssignableFrom(node.Type)
-                && ServerBoundaryAnalyzer.ElementTypeOf(node.Type)
-                    != ServerBoundaryAnalyzer.ElementTypeOf(node.Arguments[0].Type))
-            {
-                yield break;
-            }
-
             for (int i = 1; i < node.Arguments.Count - skipLast; i++)
             {
                 yield return node.Arguments[i];
@@ -453,14 +461,34 @@ public sealed class QuerySplitter
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (_found is null
-                && node.Method.DeclaringType is { } declaring
-                && !allowlist.IsAllowed(declaring))
+            if (_found is not null)
             {
-                _found = node.Method;
+                return node;
             }
 
-            return _found is null ? base.VisitMethodCall(node) : node;
+            if (node.Method.DeclaringType is { } declaring && !allowlist.IsAllowed(declaring))
+            {
+                _found = node.Method;
+                return node;
+            }
+
+            // The same exemption, one level down. A collection selector may legitimately contain
+            // a projection -- `c.Orders.Select(o => new { ClientMethod(o), … })` is client code
+            // in a projection, which EF allows and the spec suite asserts. What must not be
+            // exempt is client code applied to the *sequence*: `ClientDefaultIfEmpty(grouping)`
+            // decides which rows there are.
+            int skipLast = ProjectionRewriter.IsResultSelectorOperator(node, out _) ? 1 : 0;
+            for (int i = 0; i < node.Arguments.Count - skipLast && _found is null; i++)
+            {
+                Visit(node.Arguments[i]);
+            }
+
+            if (_found is null && node.Object is not null)
+            {
+                Visit(node.Object);
+            }
+
+            return node;
         }
     }
 
