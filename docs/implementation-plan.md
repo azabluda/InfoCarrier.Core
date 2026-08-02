@@ -493,6 +493,40 @@ has to preserve what each operator expects of its source, and a transparent iden
       `ValueTuple`, properties on a `Tuple`. Mutation-tested — forcing the value family back
       costs the new unit test.
 
+- [ ] **X5.** Correlated subquery under a client projection — the last structural gap in the
+      split, and the "operator pushdown" `projection-split.md` §7 deferred. 10 failures:
+      `SelectMany_whose_selector_references_outer_source`,
+      `SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_…`,
+      `SelectMany_correlated_subquery_hard`.
+
+      **One approach tried and reverted (2026-08-02): 67 → 72.**
+
+      The shape is `from c in cs from g in (from o in os where c.CustomerID == o.CustomerID
+      select new { o.OrderDate, c.City }) select g`. `ProjectionRewriter` rewrites the *inner*
+      projection in place, which leaves a server-ok subtree that still references `c` — an open
+      fragment — so `RejectOpenFragments` throws. The fix has to make the enclosing `SelectMany`
+      ship whole instead, with one client projection at the very end.
+
+      The attempt let X3 re-carry the **result** element type too and rebuilt it in a single
+      `Select` at the root, on the reasoning that a caller who gets its type back cannot tell.
+      That reasoning holds; the measurement did not.
+
+      | | |
+      |---|---|
+      | fixed | `SelectMany_whose_selector_references_outer_source` — **Tier A only.** The design's own rule is that a fix which moves one tier is not a fix. |
+      | broke | `A_group_by_stays_composed_with_its_aggregate` — the rewrite separates a `GroupBy` from the aggregate that composes it. That is the failure mode which cost 136 tests in phase B and which `ProjectionRewriter` exists to prevent. |
+      | broke | `Select_collection_FirstOrDefault_project_anonymous_type` — *"Nullable object must have a value"*, a real wrong answer. |
+      | broke | two SQLite `ApplyNotSupported` results, which are EF-convergence rather than regressions |
+
+      Even crediting the SQLite pair, the net is 68 against 67, with a correctness regression
+      attached. **The verifier accepted the rewrite** — it was well formed and shipped strictly
+      more — which is the third time now that "ships more" and "is right" have come apart, and
+      the clearest statement yet of the limit recorded in `transparent-identifiers.md` §4.
+
+      Next attempt should be a design session in the manner of X0, not a fourth guess. The
+      specific question to answer first: what makes an in-place reassembly safe to hoist, given
+      that `GroupBy` composition is the thing that breaks when it is hoisted wrongly.
+
 ---
 
 ## Exit criteria
