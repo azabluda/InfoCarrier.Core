@@ -379,6 +379,38 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `GetDatabaseValues` uses an `int` key and takes the other branch, so nothing in the suite
       could have caught this. `Constant_boxed_in_object_keeps_the_value_type` now does.
 
+- [x] **S3c-12.** A harness for concurrency tokens, on Tier B. **`Total tests: 7231,
+      Passed: 7135, Failed: 79, Skipped: 17`** — one new failure, which is the point. ✅ `<this commit>`
+
+      `ConcurrencyTokenTest` states the contract in both directions against SQLite, the only
+      tier that can show it (EF's InMemory provider performs no concurrency check at all, which
+      is why EF's own `OptimisticConcurrencyInMemoryTest` skips sixteen tests):
+
+      - **`A_stale_write_is_refused` passes today.** A client that leaves the token alone sends
+        the right value as its original, so the check is made correctly by accident.
+      - **`A_client_that_bumps_the_concurrency_token_is_not_a_conflict` fails today** with a
+        *spurious* `DbUpdateConcurrencyException` — "expected to affect 1 row(s), but actually
+        affected 0". Bumping the token is the whole point of an application-managed one, and the
+        server sends the new value as its own original, so the `WHERE` matches nothing.
+
+      That is the gap `SaveChangesRequest.SerializedOriginalValues` exists to close: the server
+      rebuilds each entity from current values, attaches it and sets `Modified`, and an entry
+      attached that way has `OriginalValues == CurrentValues` by construction.
+
+      **The store had to be fixed first, and the harness is what found it.** S3c-5 made the Tier
+      B database a file so that disposal order would stop being load-bearing — and then deleted
+      that file on disposal, which put the coupling straight back: the test that ran next got
+      "no such table" despite having created and seeded a file of its own. Nothing is deleted on
+      disposal now. Files from previous runs are swept once at startup, where every file present
+      is stale by construction, and each store still deletes and recreates its own at
+      initialization.
+
+      Worth recording how that was diagnosed, because two intermediate readings were wrong: the
+      store probe showed both files created with a `Widgets` table, which looked like it
+      exonerated the store; and when cleanup was disabled the run still reported one failure, so
+      it looked unchanged. It was not — the *reason* had changed from "no such table" to the
+      concurrency exception. Counting failures rather than reading them cost a round trip.
+
 ### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
 No family above 8 now; the long tail below is what is left.

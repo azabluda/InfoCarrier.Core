@@ -82,7 +82,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 7228, Passed: 7133, Failed: 78, Skipped: 17`** (2026-08-02) across the Northwind
+**`Total tests: 7231, Passed: 7135, Failed: 79, Skipped: 17`** (2026-08-02) across the Northwind
 query bases, `GraphUpdatesTestBase` and `PropertyValuesTestBase` on Tier A.
 
 Not yet implemented, in rough priority order:
@@ -104,4 +104,6 @@ Not yet implemented, in rough priority order:
 The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF
 Core's own `SqliteTestStore` is. Do not move it back to `Mode=Memory;Cache=Shared`: that makes
 the database's lifetime a connection's, which makes test-class disposal order load-bearing and
-has already produced a 698-test phantom failure.
+has already produced a 698-test phantom failure. For the same reason **the store must not delete
+its file on disposal** — that reintroduces the coupling and the next test gets "no such table".
+Stale files are swept once at startup instead.

@@ -46,6 +46,13 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new();
     private static readonly ConcurrentDictionary<string, bool> Created = new();
 
+    // Runs before the first store of this process exists, so everything it finds is stale.
+    private static readonly Lazy<bool> Swept = new(() =>
+    {
+        SweepStaleFiles();
+        return true;
+    });
+
     private readonly string _path;
     private readonly string _connectionString;
 
@@ -58,6 +65,8 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         SharedTestStoreProperties testStoreProperties)
         : base(name, shared, testStoreProperties)
     {
+        _ = Swept.Value;
+
         // A shared store is identified by its name, so every fixture asking for that name gets
         // the same file. An unshared one asked for isolation and gets a file of its own — the
         // smoke tests create a store per test and would otherwise trample each other.
@@ -67,6 +76,34 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
             DataSource = _path,
             Cache = SqliteCacheMode.Private,
         }.ToString();
+    }
+
+    /// <summary>
+    ///     Removes the database files a <em>previous</em> run left behind, once per process.
+    /// </summary>
+    /// <remarks>
+    ///     Nothing is deleted when a store is disposed. Doing that made disposal order
+    ///     load-bearing again — the very thing making the store file-backed was meant to end —
+    ///     and the test that ran next got "no such table". Sweeping at startup instead is safe by
+    ///     construction: no store of this run has been created yet, so every file present is
+    ///     stale, and each store deletes and recreates its own file at initialization anyway.
+    /// </remarks>
+    private static void SweepStaleFiles()
+    {
+        foreach (string stale in Directory.EnumerateFiles(Directory.GetCurrentDirectory(), "*.db"))
+        {
+            try
+            {
+                File.Delete(stale);
+            }
+            catch (IOException)
+            {
+                // A file another process holds is not ours to reclaim.
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -129,32 +166,16 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The file is deliberately <em>not</em> deleted. Deleting it here made the store's
+    ///     disposal order load-bearing all over again: the next test to run got "no such table",
+    ///     even though it had created and seeded a database file of its own. Files from previous
+    ///     runs are swept at startup instead, and each store deletes and recreates its own file
+    ///     at initialization — so nothing accumulates and nothing depends on when a store dies.
+    /// </remarks>
     public override async ValueTask DisposeAsync()
     {
-        await base.DisposeAsync().ConfigureAwait(false);
-
-        // A shared file is left alone: another store may still be reading it, and the next run
-        // deletes it before seeding anyway. An unshared one is this store's alone, and the smoke
-        // tests would otherwise leave a file per test per run.
-        if (Shared)
-        {
-            return;
-        }
-
         Created.TryRemove(_path, out _);
-
-        try
-        {
-            SqliteConnection.ClearPool(new SqliteConnection(_connectionString));
-            File.Delete(_path);
-        }
-        catch (IOException)
-        {
-            // A leftover file in the git-ignored output directory is harmless; failing a test
-            // because cleanup could not delete one is not.
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
+        await base.DisposeAsync().ConfigureAwait(false);
     }
 }
