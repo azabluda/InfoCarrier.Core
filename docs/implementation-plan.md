@@ -216,9 +216,28 @@ apart. It is an M3 exit criterion regardless, and M4 cannot start without it.
       the open question of whether the `ValueTuple` carrier translates outside InMemory.
       ✅ `<this commit>`
 
-- [ ] **T2.** Northwind on Tier B: a SQLite server context (the keyless types need `ToSqlQuery`
-      rather than `ToInMemoryQuery`) and a second fixture, then re-run the residual against it to
-      separate our defects from InMemory's limits.
+- [x] **T2.** Northwind on Tier B: `NorthwindInfoCarrierSqliteServerContext` (keyless types via
+      `ToSqlQuery`), `NorthwindQueryInfoCarrierSqliteFixture`, and
+      `NorthwindWhereQuerySqliteInfoCarrierTest` — the same base as Tier A, run against a backend
+      that genuinely translates. 406 tests, **38 → 24** after adding only the overrides the run
+      actually justified. ✅ `<this commit>`
+
+      Three things it measured that Tier A could not:
+
+      1. The `Where_compare_*` family fails as a **translation failure**, exactly as EF's own
+         SQLite class asserts — confirming the prediction recorded in the Tier A class rather
+         than leaving it an assumption. Six of the eight; see (3).
+      2. The `*_over_custom_projection_compared_to_null` family fails on **both** tiers, so it is
+         ours, not InMemory's. That settles the classification of the largest documented
+         limitation by measurement.
+      3. **Two new defects, both invisible on Tier A:**
+         `Where_compare_constructed_equal` and `_multi_value_equal` return **zero rows where six
+         are expected** — a silent wrong answer, worse than the translation failure EF gives.
+         And `Generic_Ilist_contains_translates_to_server` fails because parameter substitution
+         (research-findings §6) turns a local collection into a `ConstantExpression`, which
+         relational EF cannot translate — InMemory never noticed because it client-evaluates.
+
+- [ ] **T3.** Fix the two Tier B defects above, then extend Tier B to the remaining query bases.
 
 ---
 

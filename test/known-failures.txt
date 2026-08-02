@@ -8,8 +8,9 @@
 # commit message; the last deliberate rise was step L1, which turned on the type allowlist and
 # converted ~1,305 illusory passes into real M2 failures.
 #
-# 2026-08-02 — the projection split is implemented and the type boundary is enforced:
-# 1421 -> 90. Measured twice at 90; the earlier 91 was a unit test of mine still failing at
-# the time it was taken, not a test that varies between runs.
-failed=90
-total=4299
+# 2026-08-02 — the projection split is implemented and the type boundary is enforced
+# (1421 -> 90 on Tier A), and ADR-009 Tier B (SQLite) is now running the Where base too.
+# The rise from 90 to 115 is the 406 new Tier B tests bringing 24 known failures with them,
+# not a regression: Tier A is unchanged at 90.
+failed=115
+total=4705
