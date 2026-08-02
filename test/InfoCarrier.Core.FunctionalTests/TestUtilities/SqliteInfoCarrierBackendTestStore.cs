@@ -167,15 +167,31 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 
     /// <inheritdoc />
     /// <remarks>
-    ///     The file is deliberately <em>not</em> deleted. Deleting it here made the store's
-    ///     disposal order load-bearing all over again: the next test to run got "no such table",
-    ///     even though it had created and seeded a database file of its own. Files from previous
-    ///     runs are swept at startup instead, and each store deletes and recreates its own file
-    ///     at initialization — so nothing accumulates and nothing depends on when a store dies.
+    ///     <para>
+    ///         Disposal releases nothing. The file is deliberately not deleted — doing that made
+    ///         the store's disposal order load-bearing all over again, and the next test got "no
+    ///         such table" despite having created and seeded a file of its own.
+    ///     </para>
+    ///     <para>
+    ///         <b>Nor is the <see cref="Created" /> entry removed, for the same reason.</b> That
+    ///         was the surviving half of the coupling and it stayed hidden until the suite grew
+    ///         past ten thousand tests: several classes share the store named "Northwind" and so
+    ///         share one file, each builds its own service provider (so the
+    ///         <see cref="TestStoreIndex" /> that would normally make shared initialization run
+    ///         once is not shared between them), and <see cref="Created" /> was the only thing
+    ///         left stopping a second one from re-initializing. Removing the entry on disposal
+    ///         re-armed it: one class finishing while another still held the file let a third
+    ///         pass the guard and run <c>EnsureDeleted</c> + <c>EnsureCreated</c> + seed,
+    ///         deleting the database out from under the class still using it. It showed up as
+    ///         nine <c>NorthwindWhereQuerySqlite…</c> tests failing in one run of the full suite
+    ///         and passing in the next, with no code change between them.
+    ///     </para>
+    ///     <para>
+    ///         A file initialized once is initialized for the lifetime of the process, which is
+    ///         what "shared" is supposed to mean. An unshared store has a path of its own and is
+    ///         unaffected either way.
+    ///     </para>
     /// </remarks>
-    public override async ValueTask DisposeAsync()
-    {
-        Created.TryRemove(_path, out _);
-        await base.DisposeAsync().ConfigureAwait(false);
-    }
+    public override ValueTask DisposeAsync()
+        => base.DisposeAsync();
 }

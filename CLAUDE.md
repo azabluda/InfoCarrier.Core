@@ -111,5 +111,13 @@ The Tier B store is **file-backed** (`<StoreName>.db` in the test output directo
 Core's own `SqliteTestStore` is. Do not move it back to `Mode=Memory;Cache=Shared`: that makes
 the database's lifetime a connection's, which makes test-class disposal order load-bearing and
 has already produced a 698-test phantom failure. For the same reason **the store must not delete
-its file on disposal** — that reintroduces the coupling and the next test gets "no such table".
-Stale files are swept once at startup instead.
+its file on disposal, and must not release its `Created` entry either** — either one
+reintroduces the coupling. The second half survived S3c-5 and produced a nine-test intermittent
+failure once the suite passed ten thousand tests: a shared store's disposal re-armed the guard
+and let a later class re-seed the file a live one was still using. `DisposeAsync` now releases
+nothing. Stale files are swept once at startup instead.
+
+**Verify a suspected flake before acting on it, and after fixing it.** Re-run the full suite and
+diff `artifacts/measure/<label>.txt`; a run that differs from the previous snapshot with no code
+change between them is the signal. Three consecutive identical runs is the bar for calling it
+fixed.

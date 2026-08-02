@@ -214,8 +214,20 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       foreign keys are temporary — and between two existing ones, where the join entity is the
       only changed entry in the request.
 
-- [ ] **S3c.** Concurrency tokens (`SerializedOriginalValues` is on the wire and unused), and the
-      SaveChanges / change-tracking spec bases.
+- [x] **S3c.** Concurrency tokens (`SerializedOriginalValues` is on the wire and unused), and the
+      SaveChanges / change-tracking spec bases. ✅ `<this commit>`
+
+      Concurrency tokens travel and are checked (S3c-13). Six change-tracking bases are adopted:
+      `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`, `LoadTestBase` and
+      `ManyToManyTrackingTestBase` on Tier A, `OptimisticConcurrencyTestBase` on Tier B. The
+      suite went from `Total tests: 5237, Failed: 29` at the start of Phase S to
+      **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`** — 5787 tests added, and
+      every remaining failure classified in the tables below.
+
+      Two things this milestone found that outgrew it, both of which want their own place in
+      `roadmap.md` rather than another S3c substep: **lazy loading**, unimplemented and
+      accounting for 505 of the 685 failures on its own, and **Tier B beyond the query bases**,
+      where S3c-17 showed the recorded blocker was the wrong one.
 
 - [x] **S3c-1.** Transactions are *ignored*, not refused. ✅ `<this commit>`
 
@@ -548,6 +560,29 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `Saving_unknown_key_value_marks_it_as_unmodified` pairs, which the plan had recorded as an
       unrelated "shadow-state round trip" family and which were the same bug seen from the other
       end.
+
+- [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
+      store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
+      identical runs. ✅ `<this commit>`
+
+      **The flakiness was not gone; it was only quiet.** The final verification run of S3c-17
+      reported 694 failures where the run before it, with no code change between them, reported
+      685 — nine `NorthwindWhereQuerySqliteInfoCarrierTest` tests. Reproduced as nondeterministic
+      immediately: the next run was byte-identical to the earlier snapshot.
+
+      S3c-5 removed one half of the disposal-order coupling (deleting the `.db` file on disposal)
+      and left the other. Several classes share the store named "Northwind" and therefore one
+      file; each backend store builds its own service provider, so the `TestStoreIndex` that
+      normally makes shared initialization run once is not shared between them; and the static
+      `Created` set was the only remaining guard. `DisposeAsync` removed its entry — so one class
+      finishing while another still held the file let a third pass the guard and run
+      `EnsureDeleted` + `EnsureCreated` + seed, deleting the database out from under the class
+      still using it. It needed the suite to pass ten thousand tests before the scheduling
+      exposed it, which is exactly how the 698-test phantom failure behaved in S3c-2.
+
+      `DisposeAsync` now releases nothing at all. A shared file initialized once stays
+      initialized for the lifetime of the process, which is what "shared" was always supposed to
+      mean; an unshared store has a path of its own and is unaffected.
 
 - [ ] **S3c-17.** `GraphUpdatesTestBase` on Tier B — **attempted, measured, reverted.** Not
       committed as code; this is the finding.
