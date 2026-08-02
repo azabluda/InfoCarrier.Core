@@ -112,7 +112,7 @@ public sealed class QuerySplitter
         Expression residualBody = new SubstitutingVisitor(substitutions).Visit(query)!;
         residualBody = new MarkerStrippingVisitor().Visit(residualBody)!;
 
-        RejectClientSideEfProperty(residualBody);
+        residualBody = new EfPropertyRewritingVisitor(_model).Visit(residualBody)!;
 
         IReadOnlyList<Expression> augmented = AugmentWithNavigations(analysis.Shippable, residualBody);
 
@@ -291,18 +291,35 @@ public sealed class QuerySplitter
         return $"{name}<{string.Join(",", type.GetGenericArguments().Select(DisplayName))}>";
     }
 
-    private static void RejectClientSideEfProperty(Expression residual)
+    /// <summary>
+    ///     Turns an <c>EF.Property</c> left on the client side into a metadata read.
+    /// </summary>
+    /// <remarks>
+    ///     <c>EF.Property</c> has no runtime body — EF replaces it during translation. A residual
+    ///     containing one used to be refused, but the value is right there on the materialized
+    ///     entity and the model knows how to read it. Only a shadow property genuinely cannot be
+    ///     answered here, and <see cref="ClientPropertyReader" /> says so by name.
+    /// </remarks>
+    private sealed class EfPropertyRewritingVisitor(IModel model) : ExpressionVisitor
     {
-        MethodCallExpression? found = EfPropertyFinder.Find(residual);
-        if (found is null)
-        {
-            return;
-        }
+        private static readonly MethodInfo ReadMethod =
+            typeof(ClientPropertyReader).GetMethod(nameof(ClientPropertyReader.Read))!;
 
-        throw new InvalidOperationException(
-            $"'{found}' ended up on the client side of the projection boundary, where it cannot be "
-                + "evaluated: EF.Property reads state the client does not hold. Move it into the "
-                + "server-side part of the query (docs/projection-split.md §3.4).");
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType != typeof(EF)
+                || node.Method.Name != nameof(EF.Property)
+                || node.Arguments.Count != 2)
+            {
+                return base.VisitMethodCall(node);
+            }
+
+            return Expression.Call(
+                ReadMethod.MakeGenericMethod(node.Type),
+                Expression.Convert(Visit(node.Arguments[0])!, typeof(object)),
+                Visit(node.Arguments[1])!,
+                Expression.Constant(model, typeof(IModel)));
+        }
     }
 
     /// <summary>
@@ -564,29 +581,6 @@ public sealed class QuerySplitter
         }
     }
 
-    private sealed class EfPropertyFinder : ExpressionVisitor
-    {
-        private MethodCallExpression? _found;
-
-        public static MethodCallExpression? Find(Expression expression)
-        {
-            var finder = new EfPropertyFinder();
-            finder.Visit(expression);
-            return finder._found;
-        }
-
-        protected override Expression VisitMethodCall(MethodCallExpression node)
-        {
-            if (_found is null
-                && node.Method.DeclaringType == typeof(EF)
-                && node.Method.Name == nameof(EF.Property))
-            {
-                _found = node;
-            }
-
-            return _found is null ? base.VisitMethodCall(node) : node;
-        }
-    }
 
     /// <summary>
     ///     Every navigation the residual reads, as a dotted path from the entity type it is

@@ -162,6 +162,12 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       reached the splitter and was quietly read as a projection boundary rather than the mistake
       it is. **112 → 100.** ✅ `<this commit>`
 
+- [x] **E3.** `EF.Property` on the client side is **evaluated**, not refused: the value is on the
+      materialized entity and the model knows how to read it, which is what EF would have
+      compiled the call to anyway. A shadow property still cannot be — its value is in the change
+      tracker — and says so by name. Also fixed `SplitQuery.Apply` swallowing the real exception
+      inside `TargetInvocationException`. **100 → 91.** ✅ `<this commit>`
+
 - [ ] **E2c.** Remaining override failures: `Throws_on_concurrent_query_*` (the concurrency
       detector is released before the caller enumerates), `Select_GroupBy_SelectMany`.
 
@@ -177,7 +183,7 @@ failure with a named cause.
 | 28 | Spec tests asserting a throw that no longer happens — `No_orderby_added_for_client_side_GroupJoin_*`, `Include_property_expression_invalid`, `Throws_on_concurrent_query_*`, `Select_GroupBy_SelectMany`, `Where_query_composition6` | E2: re-check one by one, as E1 did |
 | 12 | Navigation read on the client that no shipped query can carry | needs dataflow the syntactic scan does not have |
 | 10 | `NullReferenceException` inside a client-side `SelectMany` over a transparent identifier | real defect, uninvestigated |
-| 10 | `EF.Property` on the client side of the boundary | §7 non-goal — needs shadow state per row |
+| 10 | `EF.Property` on the client side of the boundary | **done in E3** — mapped properties read through the model; only shadow state remains out of reach |
 | 8 | Client evaluation correctly refused (`translation-failure`) but the test expects success | E2 |
 | 8 | `First/Single/Last_over_custom_projection_compared_to_null` | **known limitation, see below** |
 | 6 | Correlated subquery under a client projection the rewrite cannot reach | C-phase tail |

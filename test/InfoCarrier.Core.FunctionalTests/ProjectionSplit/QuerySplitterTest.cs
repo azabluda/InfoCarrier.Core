@@ -284,14 +284,28 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
-    public void EF_Property_on_the_client_side_is_rejected()
+    public void EF_Property_on_the_client_side_reads_through_the_model()
+    {
+        // EF.Property has no runtime body, but the value is on the materialized entity and the
+        // model knows how to read it.
+        var query = _context.Authors
+            .Select(a => new { a.Name, Self = a })
+            .Select(x => new { x.Name, Id = EF.Property<int>(x.Self, nameof(Author.Id)) });
+
+        Assert.Equal([1, 2], Rows(Run(Split(query)), "Id"));
+    }
+
+    [Fact]
+    public void EF_Property_for_a_shadow_property_says_why_it_cannot()
     {
         var query = _context.Authors
             .Select(a => new { a.Name, Self = a })
             .Select(x => new { x.Name, Shadow = EF.Property<string>(x.Self, "Hidden") });
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
-        Assert.Contains("EF.Property", ex.Message, StringComparison.Ordinal);
+        // The residual is lazy, so the read only happens when the rows are pulled.
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => Rows(Run(Split(query)), "Shadow"));
+        Assert.Contains("Hidden", ex.Message, StringComparison.Ordinal);
     }
 
     private static bool Threshold(int count) => count > 0;

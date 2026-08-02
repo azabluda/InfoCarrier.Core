@@ -10,5 +10,5 @@
 #
 # 2026-08-02 — after M2 phases A/B/C/E1: the projection split is implemented and the
 # boundary is enforced. 1421 -> 118.
-failed=100
+failed=91
 total=4295

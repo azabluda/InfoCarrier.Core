@@ -72,6 +72,19 @@ public sealed class SplitQuery
         }
 
         _compiled ??= _residual.Compile();
-        return _compiled.DynamicInvoke([.. results]);
+
+        try
+        {
+            return _compiled.DynamicInvoke([.. results]);
+        }
+        catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            // Reflection is this class's own business, never part of the contract. A caller
+            // asserting InvalidOperationException from a client-side projection would otherwise
+            // get TargetInvocationException. Rethrow the original with its stack intact rather
+            // than `throw ex.InnerException`, which would reset it to this line.
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw; // Unreachable; the compiler cannot see that Throw() does not return.
+        }
     }
 }
