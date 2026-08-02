@@ -107,12 +107,19 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       rewriting it would replace rows with their sort keys. **270 → 220.** ✅ `<this commit>`
 - [x] **C4.** Falls out of C2: a `Join` with a client result selector stays **one** server query
       instead of two shipped sources re-joined on the client. ✅ `<this commit>`
+- [x] **C5.** Client evaluation outside the final projection is a **translation failure**, in
+      EF's own wording (`CoreStrings.TranslationFailedWithDetails` + `QueryUnableToTranslateMethod`).
+      A residual operator forced by the *type boundary* is fine; one whose lambda calls a method
+      the server cannot run is not — answering it locally means fetching the whole table silently.
+      Three tests overridden mirroring EF's relational/SqlServer overrides of the same tests.
+      **220 → 194.** ✅ `<this commit>`
 - [ ] **C1.** Recursive rewrite of nested projections inside a fragment (§3.3).
 
 ## Phase M2-D — adopt and drive green
 
-- [ ] **D1.** Adopt `NorthwindSelectQueryTestBase` as `NorthwindSelectQueryInfoCarrierTest` (not
-      currently adopted — one of the 21 bases Phase I did not reach).
+- [x] **D1.** `NorthwindSelectQueryTestBase` is adopted as `NorthwindSelectQueryInfoCarrierTest`
+      in `NorthwindQueryInfoCarrierTests.cs` — the plan recorded it as missing because the class
+      has no file of its own. Verified present, not re-added.
 - [ ] **D2.** Drive `NorthwindSelectQueryInfoCarrierTest` and `NorthwindJoinQueryInfoCarrierTest`
       green.
 - [ ] **D3.** Regression guard: `Select(c => new { c.City, Count = c.Orders.Count() })` returns
@@ -151,3 +158,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 3798 | 484 | 4291 | after A5b (residual parameters bind by interface) |
 | 2026-08-02 | 4013 | 270 | 4292 | after B1-B3 (projection rewrite — the tuple carrier) |
 | 2026-08-02 | 4063 | 220 | 4292 | after C2-C4 (all result selectors, structurally recognised) |
+| 2026-08-02 | 4092 | 194 | 4295 | after C5 (client evaluation is a translation failure) |

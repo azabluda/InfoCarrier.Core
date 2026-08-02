@@ -33,6 +33,7 @@ public sealed class QuerySplitter
     ];
 
     private readonly IModel _model;
+    private readonly TypeAllowlist _allowlist;
     private readonly ServerBoundaryAnalyzer _analyzer;
 
     /// <summary>
@@ -46,7 +47,8 @@ public sealed class QuerySplitter
     public QuerySplitter(IModel model, TypeAllowlist? allowlist = null)
     {
         _model = model;
-        _analyzer = new ServerBoundaryAnalyzer(allowlist ?? TypeAllowlist.ForModel(model));
+        _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
+        _analyzer = new ServerBoundaryAnalyzer(_allowlist);
     }
 
     /// <summary>
@@ -60,7 +62,7 @@ public sealed class QuerySplitter
         // reassembly *before* looking for the boundary (§3.2). Cutting above such a projection
         // is not merely coarse — it strands navigation reads and correlated subqueries on the
         // client, and it decomposes a `GroupBy` from the aggregate that makes it translatable.
-        query = ProjectionRewriter.Rewrite(query, _analyzer);
+        query = ProjectionRewriter.Rewrite(query, _analyzer, out IReadOnlySet<Expression> reassemblies);
 
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
 
@@ -83,6 +85,7 @@ public sealed class QuerySplitter
         }
 
         RejectOpenFragments(analysis);
+        RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
 
         // Substitute each shipped subtree with a parameter the caller binds to its results.
         var parameters = new List<ParameterExpression>(analysis.Shippable.Count);
@@ -144,6 +147,70 @@ public sealed class QuerySplitter
                 + "reads a value from the client-side projection that encloses it. Evaluating it on the "
                 + "client would issue one query per row. Correlated subqueries under a client-side "
                 + "projection are not supported yet (docs/projection-split.md §3.2, milestone M2-B).");
+    }
+
+    /// <summary>
+    ///     Refuses to evaluate a query operator on the client unless it is the reassembly of a
+    ///     rewritten projection.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF's contract is that client evaluation is legal only in the final projection —
+    ///         everything else must translate or throw. Without this, a <c>Where</c> whose
+    ///         predicate calls a client method would quietly be answered by fetching the whole
+    ///         table and filtering locally: right answer, catastrophic plan, and a silent
+    ///         departure from what every other provider does. The spec suite asserts the throw
+    ///         (<c>AssertTranslationFailed</c>), which is the clearest statement of the contract.
+    ///     </para>
+    ///     <para>
+    ///         The distinction that matters is <em>why</em> the operator stayed behind. A
+    ///         <c>GroupBy</c> keyed on an anonymous type is perfectly translatable — EF does it
+    ///         every day — and lands on the client only because this provider has a type boundary
+    ///         EF does not. That is not a translation failure, and treating it as one cost 235
+    ///         passing tests when this guard was first written the blunt way. A call to a method
+    ///         the server has no way to run is a translation failure, in EF and here alike.
+    ///     </para>
+    /// </remarks>
+    private static void RejectClientEvaluation(
+        Expression query,
+        BoundaryAnalysis analysis,
+        IReadOnlySet<Expression> reassemblies,
+        TypeAllowlist allowlist)
+    {
+        var shipped = new HashSet<Expression>(analysis.Shippable, ReferenceEqualityComparer.Instance);
+        if (ClientEvaluationFinder.Find(query, shipped, reassemblies, allowlist) is not var (offender, method))
+        {
+            return;
+        }
+
+        // EF's own wording, down to the details clause naming the method — the spec suite asserts
+        // it (`AssertTranslationFailedWithDetails`), and a caller who has seen this message from
+        // any other provider should not have to learn a second one.
+        throw new InvalidOperationException(
+            Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
+                offender.ToString(),
+                Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
+                    DisplayName(method.DeclaringType!),
+                    method.Name)));
+    }
+
+    /// <summary>
+    ///     A type's name in the form EF's own diagnostics use — <c>Namespace.Type&lt;Arg&gt;</c>,
+    ///     never the CLR's <c>Type`1[[…]]</c>.
+    /// </summary>
+    /// <remarks>
+    ///     EF has this as <c>SharedTypeExtensions.DisplayName</c>, but that is a shared source
+    ///     file rather than a referenceable API, so it is reproduced here rather than reached for.
+    /// </remarks>
+    private static string DisplayName(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return type.FullName ?? type.Name;
+        }
+
+        string name = (type.FullName ?? type.Name).Split('`')[0];
+        return $"{name}<{string.Join(",", type.GetGenericArguments().Select(DisplayName))}>";
     }
 
     private static void RejectClientSideEfProperty(Expression residual)
@@ -250,6 +317,83 @@ public sealed class QuerySplitter
                 && QueryMarkers.Contains(node.Method.Name)
                     ? Visit(node.Arguments[0])
                     : base.VisitMethodCall(node);
+    }
+
+    private sealed class ClientEvaluationFinder(
+        IReadOnlySet<Expression> shipped,
+        IReadOnlySet<Expression> reassemblies,
+        TypeAllowlist allowlist) : ExpressionVisitor
+    {
+        private (Expression Operator, MethodInfo Method)? _found;
+
+        public static (Expression Operator, MethodInfo Method)? Find(
+            Expression query,
+            IReadOnlySet<Expression> shipped,
+            IReadOnlySet<Expression> reassemblies,
+            TypeAllowlist allowlist)
+        {
+            var finder = new ClientEvaluationFinder(shipped, reassemblies, allowlist);
+            finder.Visit(query);
+            return finder._found;
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (_found is null
+                && node.Arguments.Count > 0
+                && shipped.Contains(node.Arguments[0])
+                && !reassemblies.Contains(node)
+                && node.Method.DeclaringType is { } declaring
+                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable)))
+            {
+                foreach (Expression argument in node.Arguments.Skip(1))
+                {
+                    if (ClientCodeFinder.Find(argument, allowlist) is { } method)
+                    {
+                        _found = (node, method);
+                        break;
+                    }
+                }
+            }
+
+            return _found is null ? base.VisitMethodCall(node) : node;
+        }
+    }
+
+    /// <summary>
+    ///     Finds a call to behaviour that exists only on the client — a method the server has no
+    ///     way to run.
+    /// </summary>
+    /// <remarks>
+    ///     Constructing a client-only <em>type</em> deliberately does not count: that is the type
+    ///     boundary, this milestone's whole subject, not a failure. Neither does reading a member
+    ///     of one — <c>x.Outer.Name</c> on a transparent identifier declares its member on an
+    ///     anonymous type the server cannot name, but the read is ordinary data access. Counting
+    ///     member reads condemned every query written in the <c>from … from … select</c> form,
+    ///     69 of them.
+    /// </remarks>
+    private sealed class ClientCodeFinder(TypeAllowlist allowlist) : ExpressionVisitor
+    {
+        private MethodInfo? _found;
+
+        public static MethodInfo? Find(Expression expression, TypeAllowlist allowlist)
+        {
+            var finder = new ClientCodeFinder(allowlist);
+            finder.Visit(expression);
+            return finder._found;
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (_found is null
+                && node.Method.DeclaringType is { } declaring
+                && !allowlist.IsAllowed(declaring))
+            {
+                _found = node.Method;
+            }
+
+            return _found is null ? base.VisitMethodCall(node) : node;
+        }
     }
 
     private sealed class EfPropertyFinder : ExpressionVisitor

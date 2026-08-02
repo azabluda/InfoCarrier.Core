@@ -45,12 +45,27 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
             && second.GetGenericArguments()[0].GetGenericArguments().Length == 2);
 
+    private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>
     ///     Rewrites every client-typed projection in <paramref name="query" /> that sits directly
     ///     on a server-executable source.
     /// </summary>
-    public static Expression Rewrite(Expression query, ServerBoundaryAnalyzer analyzer)
-        => new ProjectionRewriter(analyzer).Visit(query);
+    /// <param name="reassemblies">
+    ///     The client-side <c>Select</c> nodes this pass introduced. They are the <em>only</em>
+    ///     client-side operators a split is allowed to produce; see
+    ///     <see cref="QuerySplitter" />'s client-evaluation guard.
+    /// </param>
+    public static Expression Rewrite(
+        Expression query,
+        ServerBoundaryAnalyzer analyzer,
+        out IReadOnlySet<Expression> reassemblies)
+    {
+        var rewriter = new ProjectionRewriter(analyzer);
+        Expression result = rewriter.Visit(query);
+        reassemblies = rewriter._reassemblies;
+        return result;
+    }
 
     protected override Expression VisitMethodCall(MethodCallExpression node)
     {
@@ -124,10 +139,13 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
                 Expression.Quote(Expression.Lambda(tuple, selector.Parameters)),
             ]);
 
-        return Expression.Call(
+        MethodCallExpression reassembly = Expression.Call(
             QueryableSelect.MakeGenericMethod(tuple.Type, selector.ReturnType),
             serverCall,
             Expression.Quote(Expression.Lambda(clientBody, row)));
+
+        _reassemblies.Add(reassembly);
+        return reassembly;
     }
 
     /// <summary>

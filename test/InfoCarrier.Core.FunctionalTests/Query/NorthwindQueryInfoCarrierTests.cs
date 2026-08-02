@@ -39,7 +39,16 @@ public class NorthwindFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFix
 // EF Core's own *InMemoryTest override set. See docs/roadmap.md M3 for the inventory.
 
 public class NorthwindNavigationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindNavigationsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
+    : NorthwindNavigationsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
+{
+    // Category 4 — client evaluation outside the final projection. The base expects this to
+    // succeed because the InMemory provider client-evaluates everything in-process. A remoting
+    // provider cannot: evaluating the predicate here means fetching the whole table first. EF
+    // Core's own NorthwindNavigationsQueryRelationalTestBase overrides this test the same way,
+    // for the same reason.
+    public override Task Where_subquery_on_navigation_client_eval(bool async)
+        => AssertTranslationFailed(() => base.Where_subquery_on_navigation_client_eval(async));
+}
 
 public class NorthwindQueryFiltersQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NorthwindQueryFiltersCustomizer> fixture)
     : NorthwindQueryFiltersQueryTestBase<NorthwindQueryInfoCarrierFixture<NorthwindQueryFiltersCustomizer>>(fixture);

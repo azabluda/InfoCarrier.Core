@@ -27,6 +27,19 @@ namespace InfoCarrier.Core.FunctionalTests.Query;
 public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindMiscellaneousQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
 {
+    // Category 4 — client evaluation outside the final projection. The base expects success
+    // because InMemory client-evaluates everything in-process; a remoting provider would have to
+    // fetch the whole table to do the same. EF Core's own NorthwindMiscellaneousQuerySqlServerTest
+    // overrides this test identically, details clause included.
+    public override Task Client_code_unknown_method(bool async)
+        => AssertTranslationFailedWithDetails(
+            () => base.Client_code_unknown_method(async),
+            CoreStrings.QueryUnableToTranslateMethod(
+                "Microsoft.EntityFrameworkCore.Query.NorthwindMiscellaneousQueryTestBase<"
+                    + "InfoCarrier.Core.FunctionalTests.TestUtilities.NorthwindQueryInfoCarrierFixture<"
+                    + "Microsoft.EntityFrameworkCore.TestUtilities.NoopModelCustomizer>>",
+                nameof(UnknownMethod)));
+
     /// <inheritdoc />
     public override Task Where_query_composition_entity_equality_one_element_Single(bool async)
         // Sequence contains no elements.

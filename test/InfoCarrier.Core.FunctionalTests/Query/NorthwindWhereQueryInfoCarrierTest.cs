@@ -46,6 +46,20 @@ public class NorthwindWhereQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture
     // EF's SQLite class.)
     // ---------------------------------------------------------------------------------
 
+    // ---------------------------------------------------------------------------------
+    // Category 4 — CLIENT EVALUATION OUTSIDE THE FINAL PROJECTION.
+    //
+    // The base expects success because the InMemory provider client-evaluates everything
+    // in-process. A remoting provider cannot: running this predicate on the client means
+    // fetching the whole table first, silently. EF Core's own
+    // NorthwindWhereQueryRelationalTestBase overrides this test with AssertTranslationFailed
+    // for exactly that reason, and Tier B (SQLite) will keep it -- this override does not
+    // disappear when the backend changes, unlike the store limitations above.
+    // ---------------------------------------------------------------------------------
+
+    public override Task Where_bool_client_side_negated(bool async)
+        => AssertTranslationFailed(() => base.Where_bool_client_side_negated(async));
+
     public override Task Where_compare_constructed_equal(bool async)
         => Task.CompletedTask;
 

@@ -257,15 +257,16 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
-    public void A_navigation_read_the_rewrite_cannot_reach_adds_an_include()
+    public void A_client_method_in_a_predicate_is_a_translation_failure()
     {
-        // The predicate is client-side (Threshold is not a type the server knows), so this is a
-        // plain cut, and `a.Books` has to arrive with the entity.
-        SplitQuery split = Split(_context.Authors.Where(a => Threshold(a.Books.Count)));
+        // Not a boundary: the predicate calls a method the server cannot run. Answering it by
+        // fetching every author and filtering locally is what EF's relational providers refuse
+        // to do, and so does this one.
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => Split(_context.Authors.Where(a => Threshold(a.Books.Count))));
 
-        var call = Assert.IsAssignableFrom<MethodCallExpression>(Assert.Single(split.ServerQueries).Query);
-        Assert.Equal(nameof(EntityFrameworkQueryableExtensions.Include), call.Method.Name);
-        Assert.Equal("Books", ((ConstantExpression)call.Arguments[1]).Value);
+        Assert.Contains("could not be translated", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(Threshold), ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
