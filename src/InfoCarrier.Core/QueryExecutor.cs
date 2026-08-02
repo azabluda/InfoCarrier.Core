@@ -388,8 +388,64 @@ internal sealed class QueryExecutor<TElement>
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
                 && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
-                    ? Substitute(value, queryParameter.Type)
+                    ? Substitute(WithoutNullEntities(value, queryParameter.Type), queryParameter.Type)
                     : base.VisitExtension(node);
+
+        /// <summary>
+        ///     Drops <see langword="null" /> elements from a collection of <em>entities</em>.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         EF rewrites <c>customers.Contains(c)</c> into a comparison of primary keys, and
+        ///         it has two ways of getting the key list. From a query <em>parameter</em> it maps
+        ///         each element with <c>e != null ? getter.GetClrValue(e) : null</c>. From a
+        ///         <em>constant</em> — which is what §6 substitution produces — it calls the getter
+        ///         unconditionally and dereferences the null
+        ///         (<c>InMemoryExpressionTranslatingExpressionVisitor.TryRewriteContainsEntity</c>).
+        ///         The failure surfaces as a bare <see cref="NullReferenceException" /> inside EF,
+        ///         with nothing to connect it to this substitution.
+        ///     </para>
+        ///     <para>
+        ///         Dropping the element is what EF's parameter path amounts to: it yields a
+        ///         <see langword="null" /> <em>key</em>, and a null key cannot equal the key of an
+        ///         entity a query root produced. Entity-typed collections only — a
+        ///         <c>null</c> in a scalar collection is a value that can genuinely match, and
+        ///         removing it would change the answer.
+        ///     </para>
+        /// </remarks>
+        private object? WithoutNullEntities(object? value, Type parameterType)
+        {
+            if (value is not System.Collections.IEnumerable sequence
+                || value is string
+                || SequenceElementType(parameterType) is not { } elementType
+                || _queryContext.Context.Model.FindEntityType(elementType) is null)
+            {
+                return value;
+            }
+
+            var kept = (System.Collections.IList)Activator.CreateInstance(
+                typeof(List<>).MakeGenericType(elementType))!;
+
+            bool sawNull = false;
+            foreach (object? element in sequence)
+            {
+                if (element is null)
+                {
+                    sawNull = true;
+                }
+                else
+                {
+                    kept.Add(element);
+                }
+            }
+
+            if (!sawNull)
+            {
+                return value;
+            }
+
+            return parameterType.IsAssignableFrom(kept.GetType()) ? kept : value;
+        }
 
         /// <summary>
         ///     Substitutes a parameter's value, spelling a collection out element by element.
