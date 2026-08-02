@@ -71,6 +71,17 @@ public sealed class ServerBoundaryAnalyzer
             or ConstantExpression { Value: IQueryable };
 
     /// <summary>
+    ///     The element type of a queryable type, or the type itself when it is not one.
+    /// </summary>
+    internal static Type ElementTypeOf(Type type)
+        => (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IQueryable<>)
+                ? type
+                : type.GetInterfaces()
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>)))
+            ?.GetGenericArguments()[0]
+            ?? type;
+
+    /// <summary>
     ///     Whether a subtree is something the server could <em>run</em>, as opposed to merely
     ///     serialize.
     /// </summary>

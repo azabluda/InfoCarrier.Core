@@ -211,6 +211,52 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_join_with_a_client_result_selector_stays_one_server_query()
+    {
+        // Cut, this became two shipped queries joined again on the client. Rewriting the result
+        // selector leaves the join where it belongs and ships one tuple per matched pair.
+        SplitQuery split = Split(
+            _context.Authors.Join(
+                _context.Books,
+                a => a.Id,
+                b => b.AuthorId,
+                (a, b) => new { a.Name, b.Title }));
+
+        ServerQuery server = Assert.Single(split.ServerQueries);
+        Assert.Equal(typeof(ValueTuple<string, string>), server.ElementType);
+        Assert.Equal(["Austen"], Rows(Run(split), "Name"));
+        Assert.Equal(["Emma"], Rows(Run(split), "Title"));
+    }
+
+    [Fact]
+    public void A_group_by_stays_composed_with_its_aggregate()
+    {
+        // The cut's own doing: separating GroupBy from the aggregate that consumes it leaves a
+        // bare non-composed GroupBy, which no provider can translate. The original query is fine.
+        SplitQuery split = Split(
+            _context.Books.GroupBy(b => b.AuthorId).Select(g => new { Id = g.Key, Count = g.Count() }));
+
+        // The aggregate Select travels *with* the GroupBy — that composition is the whole point.
+        var call = Assert.IsAssignableFrom<MethodCallExpression>(Assert.Single(split.ServerQueries).Query);
+        Assert.Equal(nameof(Queryable.Select), call.Method.Name);
+        Assert.Equal(
+            nameof(Queryable.GroupBy),
+            Assert.IsAssignableFrom<MethodCallExpression>(call.Arguments[0]).Method.Name);
+        Assert.Equal([1], Rows(Run(split), "Count"));
+    }
+
+    [Fact]
+    public void An_ordering_key_is_not_mistaken_for_a_projection()
+    {
+        // OrderBy<TSource, TKey> also ends in a lambda returning its last generic argument.
+        // Rewriting it would replace the rows with their sort keys.
+        SplitQuery split = Split(_context.Authors.OrderBy(a => a.Name));
+
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(typeof(Author), Assert.Single(split.ServerQueries).ElementType);
+    }
+
+    [Fact]
     public void A_navigation_read_the_rewrite_cannot_reach_adds_an_include()
     {
         // The predicate is client-side (Threshold is not a type the server knows), so this is a

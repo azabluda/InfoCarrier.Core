@@ -61,21 +61,24 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return node;
         }
 
-        if (call.Method.DeclaringType != typeof(Queryable)
-            || call.Method.Name != nameof(Queryable.Select)
-            || call.Arguments.Count != 2
-            || StripQuotes(call.Arguments[1]) is not LambdaExpression selector
-            || selector.Parameters.Count != 1)
+        if (!IsResultSelectorOperator(call, out LambdaExpression? selector))
         {
             return call;
         }
 
-        Expression source = call.Arguments[0];
-        BoundaryAnalysis sourceAnalysis = analyzer.Analyze(source);
-        if (!sourceAnalysis.FactsFor(source).ServerOk
-            || !ServerBoundaryAnalyzer.IsExecutableQuery(source))
+        // Everything but the selector — sources, key selectors — has to travel, or there is
+        // nothing to hand the server.
+        for (int i = 0; i < call.Arguments.Count - 1; i++)
         {
-            // Nothing to hand the server; the whole projection is client work already.
+            Expression argument = call.Arguments[i];
+            if (!analyzer.Analyze(argument).FactsFor(argument).ServerOk)
+            {
+                return call;
+            }
+        }
+
+        if (!ServerBoundaryAnalyzer.IsExecutableQuery(call.Arguments[0]))
+        {
             return call;
         }
 
@@ -87,7 +90,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         List<Expression> fragments = [];
-        CollectFragments(selector.Body, bodyAnalysis, selector.Parameters[0], fragments);
+        CollectFragments(selector.Body, bodyAnalysis, selector.Parameters, fragments);
         if (fragments.Count == 0)
         {
             // A body that reads nothing from the row — leave it to the plain cut.
@@ -95,12 +98,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         Expression tuple = TupleCarrier.New(fragments);
-        Expression serverSelect = Expression.Call(
-            QueryableSelect.MakeGenericMethod(selector.Parameters[0].Type, tuple.Type),
-            source,
-            Expression.Quote(Expression.Lambda(tuple, selector.Parameters[0])));
-
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
+
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
@@ -108,11 +107,73 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(selector.Body)!;
+        if (selector.Parameters.Any(p => ReferencesParameter(clientBody, p)))
+        {
+            // A row value the server could not carry — a parameter of a type it does not know.
+            // Leaving it would build a lambda with an unbound parameter; the cut handles it.
+            return call;
+        }
+
+        Type[] genericArguments = call.Method.GetGenericArguments();
+        genericArguments[^1] = tuple.Type;
+
+        MethodCallExpression serverCall = Expression.Call(
+            call.Method.GetGenericMethodDefinition().MakeGenericMethod(genericArguments),
+            [
+                .. call.Arguments.Take(call.Arguments.Count - 1),
+                Expression.Quote(Expression.Lambda(tuple, selector.Parameters)),
+            ]);
 
         return Expression.Call(
             QueryableSelect.MakeGenericMethod(tuple.Type, selector.ReturnType),
-            serverSelect,
+            serverCall,
             Expression.Quote(Expression.Lambda(clientBody, row)));
+    }
+
+    /// <summary>
+    ///     Whether a call's last argument is the selector that <em>produces its element type</em> —
+    ///     <c>Select</c>, <c>SelectMany</c>, <c>Join</c>, <c>GroupJoin</c>, <c>GroupBy</c> with a
+    ///     result selector, <c>Zip</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Recognised structurally rather than by name, so no list has to be kept in step with
+    ///     <see cref="Queryable" />: the operator returns <c>IQueryable&lt;TResult&gt;</c> where
+    ///     <c>TResult</c> is its last generic argument and the last argument's return type.
+    ///     <para>
+    ///         The structural test is what keeps <c>OrderBy</c> and <c>Where</c> out.
+    ///         <c>OrderBy&lt;TSource, TKey&gt;</c> also ends in a lambda returning its last
+    ///         generic argument, but it returns a sequence of <c>TSource</c> — rewriting it would
+    ///         silently replace the elements with their sort keys.
+    ///     </para>
+    /// </remarks>
+    private static bool IsResultSelectorOperator(MethodCallExpression call, out LambdaExpression? selector)
+    {
+        selector = null;
+
+        if (call.Method.DeclaringType != typeof(Queryable)
+            || !call.Method.IsGenericMethod
+            || call.Arguments.Count < 2)
+        {
+            return false;
+        }
+
+        Type resultType = call.Method.GetGenericArguments()[^1];
+        if (ServerBoundaryAnalyzer.ElementTypeOf(call.Method.ReturnType) != resultType
+            || StripQuotes(call.Arguments[^1]) is not LambdaExpression lambda
+            || lambda.ReturnType != resultType)
+        {
+            return false;
+        }
+
+        selector = lambda;
+        return true;
+    }
+
+    private static bool ReferencesParameter(Expression expression, ParameterExpression parameter)
+    {
+        bool found = false;
+        new ParameterFinder(parameter, () => found = true).Visit(expression);
+        return found;
     }
 
     /// <summary>
@@ -125,12 +186,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private static void CollectFragments(
         Expression node,
         BoundaryAnalysis analysis,
-        ParameterExpression row,
+        IReadOnlyCollection<ParameterExpression> rowParameters,
         List<Expression> fragments)
     {
         NodeFacts facts = analysis.FactsFor(node);
 
-        if (facts.ServerOk && facts.Free.Count > 0 && facts.Free.All(p => p == row))
+        if (facts.ServerOk && facts.Free.Count > 0 && facts.Free.All(rowParameters.Contains))
         {
             fragments.Add(node);
             return;
@@ -138,7 +199,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         foreach (Expression child in ChildrenOf(node))
         {
-            CollectFragments(child, analysis, row, fragments);
+            CollectFragments(child, analysis, rowParameters, fragments);
         }
     }
 
@@ -166,6 +227,19 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             => node is not null && slots.TryGetValue(node, out Expression? slot)
                 ? slot
                 : base.Visit(node);
+    }
+
+    private sealed class ParameterFinder(ParameterExpression parameter, Action onFound) : ExpressionVisitor
+    {
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (node == parameter)
+            {
+                onFound();
+            }
+
+            return node;
+        }
     }
 
     private sealed class ChildCollector(ICollection<Expression> children) : ExpressionVisitor

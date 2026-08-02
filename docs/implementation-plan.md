@@ -100,11 +100,14 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
 ## Phase M2-C — recursion and multi-source
 
+- [x] **C2+C3.** Result selectors recognised **structurally**, not by name: an operator whose
+      last argument returns its last generic argument *and* whose element type is that argument.
+      Covers `Select` / `SelectMany` / `Join` / `GroupJoin` / `GroupBy` / `Zip` in one rule, and
+      keeps `OrderBy` out — it has the same lambda shape but returns a sequence of `TSource`, so
+      rewriting it would replace rows with their sort keys. **270 → 220.** ✅ `<this commit>`
+- [x] **C4.** Falls out of C2: a `Join` with a client result selector stays **one** server query
+      instead of two shipped sources re-joined on the client. ✅ `<this commit>`
 - [ ] **C1.** Recursive rewrite of nested projections inside a fragment (§3.3).
-- [ ] **C2.** `SelectMany` / `Join` / `GroupJoin` / `Zip` result selectors.
-- [ ] **C3.** `GroupBy` element and result selectors.
-- [ ] **C4.** Multiple shipped queries from one LINQ query (§3.5) — a `Join` with an anonymous
-      result selector has two independent sources.
 
 ## Phase M2-D — adopt and drive green
 
@@ -147,3 +150,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 3756 | 526 | 4291 | after A5a (only executable queries are shipped) |
 | 2026-08-02 | 3798 | 484 | 4291 | after A5b (residual parameters bind by interface) |
 | 2026-08-02 | 4013 | 270 | 4292 | after B1-B3 (projection rewrite — the tuple carrier) |
+| 2026-08-02 | 4063 | 220 | 4292 | after C2-C4 (all result selectors, structurally recognised) |
