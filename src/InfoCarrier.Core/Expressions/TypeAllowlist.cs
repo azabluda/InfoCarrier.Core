@@ -139,6 +139,18 @@ public sealed class TypeAllowlist
             return true;
         }
 
+        // An exact match wins before any decomposition. `ForModel` adds each entity type's CLR
+        // type verbatim, and an entity type can perfectly well *be* a constructed generic — the
+        // EF specification suites nest their models inside generic test bases, so `Root` is
+        // really `GraphUpdatesTestBase<TFixture>+Root`. Decomposing that asks whether the open
+        // definition is listed, which it never is, so every such model type was denied and the
+        // whole query became unshippable. Nothing widens here: the set contains only what the
+        // model declared.
+        if (_allowed.Contains(type))
+        {
+            return true;
+        }
+
         // A delegate is a signature, not a constructible payload — `Func<Customer, bool>` names
         // no behaviour of its own. Checked before the generic branch, which would otherwise
         // demand `Func<,>` itself be listed and deny every lambda in every query.

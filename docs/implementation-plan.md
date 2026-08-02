@@ -241,6 +241,45 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       the behaviour directly: throws by default, returns a stub when opted in, never reports
       itself as `CurrentTransaction`, and never contacts the server. **4 of 4 pass.**
 
+- [x] **S3c-2.** `GraphUpdatesTestBase` adopted on Tier A. ✅ `<this commit>`
+
+      **+1787 tests. `Passed: 6638, Failed: 377, Skipped: 13, Total: 7028`** — the 29 pre-existing
+      failures are the same 29, nothing outside the new class broke, and 1439 of the 1787 new
+      tests pass. The store-limitation overrides are EF Core's own `GraphUpdatesInMemoryTestBase`
+      overrides mirrored one for one; re-test each against Tier B and delete it there where it
+      passes.
+
+      The class opened at **1550 failing of 1787** and three provider defects — none of them in
+      SaveChanges — accounted for almost all of it:
+
+      1. **`TypeAllowlist` denied every model entity type that is a constructed generic.**
+         `ForModel` adds each entity's CLR type verbatim, but `Evaluate` decomposed a constructed
+         generic into definition-plus-arguments and asked whether the *open* definition was
+         listed, which it never is. The EF specification suites nest their models inside a
+         generic test base, so `Root` is really `GraphUpdatesTestBase<TFixture>+Root` and the
+         query root itself was unshippable. An exact match now wins before decomposition.
+         **1550 → 1461.**
+      2. **`TypeNodeResolver` judged each generic argument on its own.** `Root[InfoCarrierFixture]`
+         names the fixture, and the fixture is on no allowlist. A generic argument is part of a
+         name and nothing is ever constructed from one, so it is now judged as part of the type
+         it appears in; the constructed type still has to clear the list.
+      3. **Shadow properties could not be read at all.** `MapRowMembers` went through
+         `property.GetGetter()`, which for a shadow property does not return null — it throws
+         "no backing field could be found ... and the property does not have a getter". Every TPH
+         discriminator in the model hit it. The value lives in the entry, so the server now reads
+         it from the state manager. **1461 → 348.**
+
+      The first two were invisible until something asked: the whole suite's models are
+      non-generic and shadow-property-free. The diagnosis cost a run of its own because the
+      splitter's "no part of the query can be executed" message *guessed* at the cause ("this
+      usually means the query root names a type the server does not know") and guessed wrong;
+      it now names the offending node and type.
+
+      **Recorded, not fixed:** the first full run reported 1075 failures with both SQLite
+      Northwind classes wholly red; rerun unchanged, they pass, and in isolation they are at
+      baseline. The shared-name SQLite backend store is not safe under the parallel load 1787
+      more tests create. Until that is fixed, a single `measure.sh` run can invent 698 failures.
+
 - [x] **E1.** A query that ends in `ToList` / `ToArray` / `AsEnumerable` is no longer shipped.
       Those operators do not translate — they are the point at which a query *stops* being a
       query — and shipping a subtree ending in one asked the server to execute it as a terminal

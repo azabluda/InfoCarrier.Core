@@ -262,6 +262,12 @@ public class ServerQueryExecutor
         bool IsTracked(object entity)
             => stateManager.TryGetEntry(entity) is not null;
 
+        // A shadow property — a TPH discriminator, an unmapped foreign key — has no CLR member,
+        // so its value lives in the entry. `GetGetter()` on one does not return null, it throws.
+        // An untracked entity has no entry and therefore no shadow state to report.
+        object? ReadShadowValue(object entity, Microsoft.EntityFrameworkCore.Metadata.IProperty property)
+            => stateManager.TryGetEntry(entity) is { } entry ? entry.GetCurrentValue(property) : null;
+
         static bool HasKey(object entity, IEntityType entityType)
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.GetGetter().GetClrValue(entity) is not null);
@@ -271,7 +277,7 @@ public class ServerQueryExecutor
         {
             nodes.Add(item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
-                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked));
+                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue));
         }
 
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(

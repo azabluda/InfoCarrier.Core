@@ -91,8 +91,7 @@ public sealed class QuerySplitter
         if (analysis.Shippable.Count == 0)
         {
             throw new InvalidOperationException(
-                $"No part of the query can be executed on the server: '{query}'. This usually means "
-                    + "the query root itself names a type the server does not know.");
+                $"No part of the query can be executed on the server: '{query}'. {Diagnose(query)}");
         }
 
         RejectInvalidIncludes(query);
@@ -131,6 +130,65 @@ public sealed class QuerySplitter
             [.. augmented.Select(ToServerQuery)],
             Expression.Lambda(residualBody, parameters),
             isPassThrough: false);
+    }
+
+    /// <summary>
+    ///     Names the first reason a query is wholly unshippable.
+    /// </summary>
+    /// <remarks>
+    ///     The message used to guess ("this usually means the query root names a type the server
+    ///     does not know"), which was wrong often enough to cost a diagnosis: adopting
+    ///     <c>GraphUpdatesTestBase</c> produced 1,421 of these and the guess pointed at the query
+    ///     root, while the actual rejection was elsewhere in the tree. A verdict this coarse is
+    ///     worth one extra walk when it is already about to throw.
+    /// </remarks>
+    private string Diagnose(Expression query)
+    {
+        var nodes = new List<Expression>();
+        new OrderedNodeCollector(nodes).Visit(query);
+
+        foreach (Expression node in nodes)
+        {
+            if (!ServerBoundaryAnalyzer.IsSerializableKind(node))
+            {
+                return $"'{Abbreviate(node)}' ({node.NodeType}) has no wire representation.";
+            }
+
+            foreach (Type type in WireTypeCollector.CollectOwn(node))
+            {
+                if (!_allowlist.IsAllowed(type))
+                {
+                    return $"'{Abbreviate(node)}' names the type '{type}', which is not on the "
+                        + "type allowlist the server enforces.";
+                }
+            }
+        }
+
+        return "Every node is expressible, so the tree contains no runnable query — the root is "
+            + "reached only through something that is not a query operator.";
+    }
+
+    private static string Abbreviate(Expression node)
+    {
+        string text = node.ToString();
+        return text.Length <= 120 ? text : string.Concat(text.AsSpan(0, 117), "...");
+    }
+
+    /// <summary>
+    ///     Every node of a tree, parents before children.
+    /// </summary>
+    private sealed class OrderedNodeCollector(ICollection<Expression> into) : ExpressionVisitor
+    {
+        public override Expression? Visit(Expression? node)
+        {
+            if (node is null)
+            {
+                return null;
+            }
+
+            into.Add(node);
+            return base.Visit(node);
+        }
     }
 
     /// <summary>

@@ -29,6 +29,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     // Row-mode probes, supplied only by the server, which alone holds the DbContext.
     private Func<object, INavigationBase, bool>? _isNavigationLoaded;
     private Func<object, bool>? _isTracked;
+    private Func<object, IProperty, object?>? _readShadowValue;
 
     /// <summary>
     ///     Routes an entity-keyed node to the client materializer, wherever in the graph it
@@ -94,14 +95,22 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     Probe for whether the server's change tracker holds the instance. An entity built by
     ///     a projection is not tracked, and the client must not identity-resolve it.
     /// </param>
+    /// <param name="readShadowValue">
+    ///     Reads a shadow property, whose value lives in the entry rather than the object. A
+    ///     TPH discriminator is one, and <c>GetGetter()</c> on it throws outright ("no backing
+    ///     field could be found ... and the property does not have a getter") rather than
+    ///     returning anything to skip.
+    /// </param>
     public DynamicValueNode ToRowValue(
         object? value,
         Type type,
         Func<object, INavigationBase, bool> isNavigationLoaded,
-        Func<object, bool> isTracked)
+        Func<object, bool> isTracked,
+        Func<object, IProperty, object?> readShadowValue)
     {
         _isNavigationLoaded = isNavigationLoaded;
         _isTracked = isTracked;
+        _readShadowValue = readShadowValue;
         try
         {
             return ToDynamicValue(value, type);
@@ -110,6 +119,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         {
             _isNavigationLoaded = null;
             _isTracked = null;
+            _readShadowValue = null;
         }
     }
 
@@ -145,7 +155,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (entityType is not null && value is not null)
         {
             IReadOnlyList<object?> keyValues = entityType.FindPrimaryKey() is { } key
-                ? key.Properties.Select(p => p.GetGetter().GetClrValue(value)).ToList()
+                ? key.Properties.Select(p => ReadProperty(value, p)).ToList()
                 : [];
             var entityKey = new EntityKeyNode { EntityTypeName = entityType.Name, KeyValues = keyValues };
 
@@ -257,6 +267,20 @@ public class DynamicValueMapper : IDynamicValueMapper
     }
 
     /// <summary>
+    ///     Reads one mapped scalar off an entity.
+    /// </summary>
+    /// <remarks>
+    ///     A shadow property has no CLR member to read, so its value comes from the entry —
+    ///     which only the server can reach. Where no reader was supplied (the client, and query
+    ///     trees rather than result rows) this falls through to the accessor and lets EF raise
+    ///     its own diagnosis rather than inventing a value.
+    /// </remarks>
+    private object? ReadProperty(object value, IProperty property)
+        => property.IsShadowProperty() && _readShadowValue is not null
+            ? _readShadowValue(value, property)
+            : property.GetGetter().GetClrValue(value);
+
+    /// <summary>
     ///     Maps an entity row's members: every mapped scalar through its
     ///     <see cref="IProperty" /> accessor — so shadow properties and value converters are
     ///     honoured, which a public-reflection walk would miss (ADR-008 constraint 1) — plus
@@ -268,7 +292,7 @@ public class DynamicValueMapper : IDynamicValueMapper
 
         foreach (IProperty property in entityType.GetProperties())
         {
-            object? scalar = property.GetGetter().GetClrValue(value);
+            object? scalar = ReadProperty(value, property);
             members.Add(new DynamicPropertyValue
             {
                 Name = property.Name,

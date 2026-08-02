@@ -47,6 +47,13 @@ public class TypeNodeResolver
 
         Type resolved = ResolveCore(node);
 
+        // A generic argument is part of a name, not a payload of its own — nothing is ever
+        // constructed from one — so it is judged as part of the type it appears in rather than
+        // alone. `GraphUpdatesTestBase<TFixture>+Root` names the *fixture* as its argument, and
+        // demanding the fixture clear the list separately rejected every model type nested in a
+        // generic test base. The constructed type below still has to clear it, and an argument
+        // that is not part of an allowed whole is still denied there.
+
         // Enforced after resolution, not instead of it: the name has to be resolved to know
         // what it denotes, but nothing is constructed from it until it clears the allowlist.
         if (!_allowlist.IsAllowed(resolved))
@@ -84,7 +91,7 @@ public class TypeNodeResolver
         {
             Type definition = ResolveByName(node.Name)
                 ?? throw new InvalidOperationException($"Cannot resolve generic type definition '{node.Name}'.");
-            Type[] arguments = node.GenericArguments.Select(Resolve).ToArray();
+            Type[] arguments = node.GenericArguments.Select(ResolveCore).ToArray();
             return definition.MakeGenericType(arguments);
         }
 
