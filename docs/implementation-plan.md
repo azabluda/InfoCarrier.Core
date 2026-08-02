@@ -328,24 +328,57 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       sets: `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.** `Northwind.db` in the
       output directory and zero leftover per-test files confirm the new path actually ran.
 
-### The `GraphUpdates` residual — 200 of 1787 (2026-08-02, Tier A)
+### The `GraphUpdates` residual — 156 of 1787 (2026-08-02, Tier A)
 
-Concentrated: seven methods carry 138 of the 200. Classified by cause, not by name.
+Concentrated: six methods carry 110 of the 156.
 
 | # | Family | Symptom | Diagnosis |
 |---|---|---|---|
-| 56 | `Save_*_with_alternate_key` | Server-side `entry.State = Added` throws "another instance with the same key value for {'AlternateId'} is already being tracked" | **Open.** The obvious explanation is ruled out: a probe confirmed the client generates *distinct, non-temporary* Guids for the alternate key, so this is not an empty-Guid collision. Needs a dump of the actual `SaveChangesRequest` for one failing case. |
-| 56 | Owned collections (`*_owned_collection*`) | "Cannot create a DbSet for 'Owner.Owned#Owned' because it is configured as an owned entity type" | The query root for an owned type is not reachable through `Set<T>()`. EF's own SQLite suite `[Skip]`s six of these for a composite-key reason; ours fail differently and are not yet understood. |
-| ~40 | `Save_changed_optional_one_to_one`, `Save_required_non_PK_one_to_one_changed_by_reference` | `Assert.Equal` on a key or FK after SaveChanges | Suspected same root cause as the alternate-key family — a key not carried back or not applied. |
-| 24 | `Save_optional_many_to_one_dependents` and siblings | `Assert.Contains` fails against an **empty** collection; the not-found entity still holds its temporary negative key and a null FK | The store-generated key never reached this entity, so no fixup happened. |
+| 56 | `Save_changed_optional_one_to_one`, `…_with_alternate_key` | `Assert.Equal(new1.Id, new2.BackId)` — expected a **temporary** key value, actual `null` | **Diagnosed, unfixed — see S3c-8 below.** The server hands the client's placeholder key straight back. |
+| 30 | `Save_required_non_PK_one_to_one_changed_by_reference`, `Save_required_one_to_one_changed_by_reference_with_alternate_key` | assertion on a key or FK after SaveChanges | Same shape as the row above; not separately confirmed. |
+| 24 | `Save_optional_many_to_one_dependents`, `Save_required_many_to_one_dependents` | `Assert.Contains` against an **empty** collection; the missing entity still holds its temporary negative key and a null FK | Same root cause: the placeholder key was never replaced, so nothing fixed up. |
+| 24 | Owned collections (`*_owned_collection*`) | "The property `Owner.Owned#Owned.OwnerId` is part of a key and so cannot be modified" | An owned dependent's key is its owner's key. The server writes it through a *tracked* entry, which EF refuses. (`Set<T>(name)`, the previous failure here, is fixed by S3c-7.) |
 | 18 | `Mark_explicitly_set_*_stable_*` | `ArgumentException: An item with the same key has already been added` | Stable value generators, where client and server both generate. |
-| 12 | assorted | `NullReferenceException` | Unclassified. |
-| ~4 | `Discriminator_values_are_not_marked_as_unknown`, `Saving_unknown_key_value_marks_it_as_unmodified` | assertion | Shadow-state round trip, adjacent to S3c-2's third fix. |
+| 12 | assorted | `NullReferenceException` in the test body | Unclassified. |
 
-Two things the classification is *not* allowed to claim: that these are InMemory limitations
-(EF's own `GraphUpdatesInMemoryTestBase` overrides are already mirrored, and these are not
-among them), and that any of them is a single root cause. The first two families sharing a
-symptom is a hypothesis, not a finding.
+### S3c-8 — store-generated keys are not generated on Tier A
+
+**The diagnosis is complete; the first fix attempt was measured and reverted.**
+
+A client `Added` entity carries a placeholder key (`int.MinValue + n`) flagged in
+`ChangeEntry.TemporaryProperties`. The server sets that value on the object, tracks it, sets
+`State = Added`, then flags the property temporary — and expects the store to replace it. On
+Tier B it does. **On Tier A nothing ever does**, so the placeholder is stored and returned to
+the client as though it were a real key, which is why `new1.Id` is still negative after
+SaveChanges. Two facts in EF's source settle it:
+
+- `InMemoryIntegerValueGenerator.GeneratesTemporaryValues` is **`false`** — EF's InMemory
+  provider assigns the real key at `Add` time via a *value generator*, not at save time, and
+  `InMemoryTable` only ever `Bump`s that generator from inserted rows. Nothing fills a temporary
+  value at save.
+- `PropertyEntry.IsTemporary`'s setter is `InternalEntry[Metadata] = CurrentValue;
+  MarkAsTemporary(Metadata, value);` — it *keeps* the current value and flags it. It does not
+  ask anyone to replace it.
+
+So S1+S2's "store-generated values returned by correlation id" was only ever proven where the
+store generates at save time. The plan already said so ("proven on Tier B, where a real store
+actually generates them"); what is new is that Tier A silently returns a placeholder rather
+than failing.
+
+**Attempt 1 (reverted).** Leave a temporary *non-foreign-key* property unset so value
+generation actually runs — EF only generates for a property still holding its sentinel — then
+remap every temporary *foreign* key from a `placeholder → server value` map in a second pass.
+The client already flags both (`OptionalSingle2 temp=[Id,BackId]`), so the information is
+there. **Measured 156 → 187**, and the new failures were 264 `NullReferenceException`s *inside
+the test bodies* — navigations coming back null, i.e. the graph reassembled wrong. Reverted.
+
+The idea is not necessarily wrong, but it needs the case the measurement exposed: an entity
+whose primary key *is* its foreign key (`RequiredSingle1.Id`, every owned dependent) has no
+key of its own to generate, and the two-pass remap writes a key property through a tracked
+entry — which is the same refusal the 24 owned-collection failures already show. A fix has to
+distinguish those before it can pay.
+
+---
 
 - [x] **E1.** A query that ends in `ToList` / `ToArray` / `AsEnumerable` is no longer shipped.
       Those operators do not translate — they are the point at which a query *stops* being a
