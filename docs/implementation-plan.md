@@ -280,6 +280,20 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       baseline. The shared-name SQLite backend store is not safe under the parallel load 1787
       more tests create. Until that is fixed, a single `measure.sh` run can invent 698 failures.
 
+- [x] **S3c-3.** A TPH row travels as what it *is*, not as what its navigation declares.
+      ✅ `<this commit>`
+
+      A result row was mapped by `value.GetType()`, but an entity reached through a navigation
+      was mapped by `navigation.ClrType`. In a TPH hierarchy those differ: `Root.OptionalSingle`
+      is declared `OptionalSingle1`, so a loaded `OptionalSingle1Derived` went onto the wire
+      named as its own base, and the client materialized the base — "Unable to cast object of
+      type 'OptionalSingle2' to type 'OptionalSingle2Derived'". `MapToNode` now prefers the
+      instance's own entity type whenever the model knows it and it is assignable to the
+      declared one, which covers rows, references and collection elements by one rule.
+
+      **GraphUpdates 348 → 200. Suite `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.**
+      The 29 pre-existing failures are unchanged and nothing outside the class moved.
+
 - [x] **E1.** A query that ends in `ToList` / `ToArray` / `AsEnumerable` is no longer shipped.
       Those operators do not translate — they are the point at which a query *stops* being a
       query — and shipping a subtree ending in one asked the server to execute it as a terminal

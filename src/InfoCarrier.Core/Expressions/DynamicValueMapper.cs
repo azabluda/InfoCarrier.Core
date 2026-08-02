@@ -147,11 +147,27 @@ public class DynamicValueMapper : IDynamicValueMapper
 
     private DynamicValueNode MapToNode(object? value, Type type, int id)
     {
-        TypeNode typeNode = _typeMapper.ToTypeNode(type);
-
         // Entity. Two modes: a query-tree constant travels as identity only (research-findings
         // §7); a result row travels with its data.
         IEntityType? entityType = _model?.FindEntityType(type);
+
+        // A row is mapped by its runtime type, but a *navigation* is mapped by the type the
+        // navigation declares — and in a TPH hierarchy those differ. `Root.OptionalSingle` is
+        // declared `OptionalSingle1`, so a loaded `OptionalSingle1Derived` travelled named as its
+        // own base and the client dutifully materialized the base: "Unable to cast object of type
+        // 'OptionalSingle2' to type 'OptionalSingle2Derived'". The instance knows what it is.
+        if (entityType is not null
+            && value is not null
+            && value.GetType() != type
+            && _model!.FindEntityType(value.GetType()) is { } runtimeEntityType
+            && entityType.IsAssignableFrom(runtimeEntityType))
+        {
+            entityType = runtimeEntityType;
+            type = runtimeEntityType.ClrType;
+        }
+
+        TypeNode typeNode = _typeMapper.ToTypeNode(type);
+
         if (entityType is not null && value is not null)
         {
             IReadOnlyList<object?> keyValues = entityType.FindPrimaryKey() is { } key
