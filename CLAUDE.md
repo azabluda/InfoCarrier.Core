@@ -82,15 +82,22 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 7276, Passed: 7159, Failed: 88, Skipped: 29`** (2026-08-03) across the Northwind
-query bases, `GraphUpdatesTestBase` and `PropertyValuesTestBase` on Tier A, and
-`OptimisticConcurrencyTestBase` on Tier B.
+**`Total tests: 11024, Passed: 10289, Failed: 706, Skipped: 29`** (2026-08-03) across the
+Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
+`LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
+on Tier B.
+
+**505 of the 706 failures are one feature: lazy loading.** Every `Lazy_load_*` test in
+`LoadInfoCarrierTest` fails and none passes — the navigation is never populated. Do not read the
+failure count as a long tail; subtract that family first.
 
 Not yet implemented, in rough priority order:
 - **The `GraphUpdates` residual** — 45 of 1787, a long tail with no family above 14 (owned
   collections, stable value generators). Classified in `docs/implementation-plan.md` under S3c.
-- **The remaining change-tracking spec bases** — `ManyToManyTrackingTestBase`, `FindTestBase`,
-  `LoadTestBase` and the rest of the 138 the compliance test reports unadopted.
+- **Lazy loading** — 505 failures, the largest single gap. Deserves its own milestone.
+- **The `ManyToManyTracking` residual** — 111 of 200, dominated by a 60-test duplicate-key family
+  that shares a root cause with `GraphUpdates`'s stable-value-generator family.
+- **The remaining spec bases** — the rest of the 138 the compliance test reports unadopted.
 - **Transactions** (roadmap M4) — `InfoCarrierTransactionManager` *ignores* them and raises
   `InfoCarrierEventId.TransactionIgnoredWarning` (warning-as-error by default), as EF's
   InMemory provider does. `InProcessInfoCarrierServer`'s three transaction methods throw.

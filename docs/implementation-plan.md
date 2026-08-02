@@ -498,6 +498,40 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       | 1 | `Nullable_client_side_concurrency_token_can_be_used` | `Assert.IsType<Sponsor.SponsorDoubleProxy>` — the client materializes rows itself and does not run `IMaterializationInterceptor`, so it produces a plain `Sponsor`. Now that the wire strips proxies (above), the client is the only place one could be re-created. |
       | 1 | `Attempting_to_delete_same_relationship_twice_for_many_to_many` | No exception thrown where `DbUpdateConcurrencyException` is expected. Independent-association concurrency on a join row; unclassified. |
 
+- [x] **S3c-15.** `FindTestBase`, `LoadTestBase` and `ManyToManyTrackingTestBase` adopted on
+      Tier A. **`Total tests: 11024, Passed: 10289, Failed: 706, Skipped: 29`** — 3748 new tests,
+      3130 of them passing. BROKEN outside the three new classes: none. ✅ `<this commit>`
+
+      Three thin fixtures, each mirroring EF's own InMemory adoption; all three compiled and ran
+      without a single provider change. One checkbox, one commit: the three are one queue item
+      and no intermediate state between them means anything.
+
+      - **`FindTestBase` — 411 of 411 pass.** Worth having anyway: `Find` is the one read that
+        may never reach the server, since a tracked entity is answered from the client's change
+        tracker and only a miss becomes a query. Both halves work.
+      - **`LoadTestBase` — 2630 of 3137 pass.**
+      - **`ManyToManyTrackingTestBase` — 89 of 200 pass.** Reseeds after each test and sets
+        `SupportsDatabaseDefaults => false`, both exactly as EF's InMemory version does.
+
+      **Lazy loading is not implemented, and that is the whole `Load` residual.** 505 of the 507
+      failures are `Lazy_load_*`, and *no* lazy test passes — the navigation is simply never
+      populated (`Assert.NotNull(parent.Children)` on a null collection). The other two are
+      `Fixup_reference_after_FK_change_without_DetectChanges` and its one-to-one twin. A single
+      named feature, not a long tail: it is the largest unimplemented thing this suite now knows
+      about, and it deserves its own milestone rather than a slot in S3c.
+
+      **The `ManyToManyTracking` residual — 111 of 200**, classified:
+
+      | # | Symptom | Diagnosis |
+      |---|---|---|
+      | 60 | `ArgumentException: An item with the same key has already been added` | The same signature as the 12-test `Mark_explicitly_set_*_stable_*` family in the `GraphUpdates` residual below: client and server both generate, and a stable generator's value is not a placeholder, so S3c-9's machinery does not cover it. The largest single family in the repo now. |
+      | 21 | `Assert.Equal` values differ | Unclassified. |
+      | 6 | "No backing field could be found for property `UnidirectionalEntityTwo.…`" | Unidirectional skip navigations, whose join key lives in shadow state with no CLR member. |
+      | 5 | `JsonException: A possible object cycle was detected` | **A serializer defect, and the only one here that is squarely ours.** A cyclic entity graph reaches `System.Text.Json` without the reference handling the rest of the wire format uses. |
+      | 4 | `Sequence contains no matching element` | Unclassified. |
+      | 2 | "Unable to track an entity of type `EntityCompositeKeyEntityRoot (Dictionary<string, object>)`" | A shared-type join entity with a composite key. |
+      | 2 | `ProxyableSharedType` | Shared-type entity behind a proxy; adjacent to the `FindRuntimeEntityType` fix in S3c-14. |
+
 ### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
 No family above 8 now; the long tail below is what is left.
