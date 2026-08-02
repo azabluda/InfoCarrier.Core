@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **M1 in progress** · Milestone-level plan for the whole project.
+Status: **M2 in progress** · Milestone-level plan for the whole project.
 
 This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
 only when scope changes.
@@ -16,19 +16,22 @@ Authority: [`infocarrier-core-requirements.md`](infocarrier-core-requirements.md
 
 ## Where we are
 
-Phases A–E (query pipeline) and F1–F7 (spec-test fixture) are complete. The vertical slice is
-green end to end: capture → serialize → transport → server rebind → EF execute → client
-materialization with identity resolution.
+The query pipeline is complete end to end — capture → serialize → transport → server rebind →
+EF execute → client materialization with identity resolution — and the **projection split
+(M2) is implemented**, with the type boundary enforced rather than hidden by the in-process
+harness.
 
-Measured 2026-08-01: **141 passed / 272 failed / 413 total**, from **1 of 21**
+Measured 2026-08-02: **4,196 passed / 91 failed / 4,296 total**, across all 21
 `Northwind*QueryTestBase` classes. The suite inherits Microsoft's spec tests (ADR-004), so
 coverage scales by adopting bases, not by writing tests.
+
+The 91 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
 
 ---
 
 ## Milestones
 
-### M1 — Query pipeline correctness + working signal ← **current**
+### M1 — Query pipeline correctness + working signal ✅ *(query work done; N5/N6 doc tail open)*
 
 Clear the mechanical failures masking the real state, and get a CI signal that can gate.
 
@@ -41,7 +44,7 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
   inventory of unimplemented spec bases.
 - Doc integrity closed: ADR-008/ADR-009 recorded ✅, subrepo revisions pinned.
 
-### M2 — Projection split (requirements §3)
+### M2 — Projection split (requirements §3) ← **current**
 
 The one genuinely unsolved design problem. **Spec written 2026-08-01:**
 [`projection-split.md`](projection-split.md), recorded as [ADR-010](decisions.md#adr-010).
