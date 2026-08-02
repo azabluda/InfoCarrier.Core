@@ -8,7 +8,8 @@
 # commit message; the last deliberate rise was step L1, which turned on the type allowlist and
 # converted ~1,305 illusory passes into real M2 failures.
 #
-# 2026-08-02 — after M2 phases A/B/C/E1: the projection split is implemented and the
-# boundary is enforced. 1421 -> 118.
+# 2026-08-02 — the projection split is implemented and the type boundary is enforced:
+# 1421 -> 91. Held at 91 rather than the 90 last measured, because one test still varies
+# between runs; pin that down before trusting the count to a single unit.
 failed=91
-total=4295
+total=4296
