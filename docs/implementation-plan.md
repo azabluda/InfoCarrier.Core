@@ -217,6 +217,30 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 - [ ] **S3c.** Concurrency tokens (`SerializedOriginalValues` is on the wire and unused), and the
       SaveChanges / change-tracking spec bases.
 
+- [x] **S3c-1.** Transactions are *ignored*, not refused. ✅ `<this commit>`
+
+      The plan was to adopt `GraphUpdatesTestBase` first and read the red wave. Counting the
+      dependency first changed the order: **every one** of GraphUpdates' 127 tests, all 46 of
+      `ManyToManyTrackingTestBase`, all 118 of `StoreGeneratedFixupTestBase`, all 60 of
+      `StoreGeneratedTestBase` and all 21 of `UpdatesTestBase` drive their mutations through
+      `TestHelpers.ExecuteWithStrategyInTransactionAsync`, whose first statement is
+      `Database.BeginTransactionAsync()`. Against a manager that threw, adopting GraphUpdates
+      would have produced 127 identical failures measuring one thing, and SaveChanges — which
+      works — would have been hidden behind a feature scheduled for M4.
+
+      So `InfoCarrierTransactionManager` now does what EF Core's own `InMemoryTransactionManager`
+      does: returns a stub and raises `InfoCarrierEventId.TransactionIgnoredWarning`, which
+      `UseInfoCarrier` defaults to `WarningBehavior.Throw`. The default is still a hard failure;
+      what changed is that a caller can *opt into* the no-op. This is not M4 — M4 is remoting
+      begin/commit/rollback with the W3 token — it is the statement that the provider ignores
+      transactions today, which is true.
+
+      **29 → 29, nothing fixed, nothing broken** (`Passed: 5195, Failed: 29, Skipped: 13,
+      Total: 5237`), because nothing in the suite began a transaction yet. A count that does not
+      move cannot tell a working stub from an uncalled one, so `TransactionIgnoredTest` asserts
+      the behaviour directly: throws by default, returns a stub when opted in, never reports
+      itself as `CurrentTransaction`, and never contacts the server. **4 of 4 pass.**
+
 - [x] **E1.** A query that ends in `ToList` / `ToArray` / `AsEnumerable` is no longer shipped.
       Those operators do not translate — they are the point at which a query *stops* being a
       query — and shipping a subtree ending in one asked the server to execute it as a terminal
