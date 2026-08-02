@@ -102,7 +102,25 @@ public class ServerSaveChangesExecutor
             pending.Add((change, entity, entityType, shadow));
         }
 
-        foreach ((ChangeEntry change, object entity, IEntityType entityType, var shadow) in pending)
+        // Attach the entries describing rows that already exist before those describing new
+        // ones. An `Added` and a `Deleted` entry may legitimately carry the same alternate key —
+        // the client deletes a dependent and adds its replacement in one SaveChanges — and EF
+        // permits that, but only in this order.
+        //
+        // `IdentityMap.Add` decides a conflict on
+        // `(entry.State == Deleted) == (existing.State == Deleted)`, and it runs from
+        // `OnStateChanging`, i.e. *before* the new state is applied. An entry we are about to
+        // make `Deleted` is therefore still `Detached` when it is judged: against an already
+        // tracked `Added` entry that reads as "neither is deleted" and throws. Reversed, the
+        // established row is genuinely `Deleted` by the time the new one arrives and EF lets it
+        // through — which is the order the client itself reached the state in, having loaded the
+        // row before adding its replacement.
+        //
+        // Relative order within each group is preserved: an `Added` principal's temporary key
+        // has to be tracked before the dependent that borrows it.
+        foreach ((ChangeEntry change, object entity, IEntityType entityType, var shadow) in
+                 pending.Where(p => p.Change.State != nameof(EntityState.Added))
+                     .Concat(pending.Where(p => p.Change.State == nameof(EntityState.Added))))
         {
             EntityEntry entry = Track(entityType, entity);
             EntityState state = Enum.Parse<EntityState>(change.State);
