@@ -4,6 +4,7 @@ using System.Text.Json;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Update;
 
@@ -37,7 +38,11 @@ public static class ChangeEntryMapper
     ///     store has not generated yet, and sending it would ask the server to insert a row with a
     ///     made-up primary key.
     /// </remarks>
-    public static ChangeEntry ToChangeEntry(IUpdateEntry entry, int correlationId, DynamicValueMapper mapper)
+    public static ChangeEntry ToChangeEntry(
+        IUpdateEntry entry,
+        int correlationId,
+        DynamicValueMapper mapper,
+        IReadOnlyDictionary<object, int>? correlationByEntity = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(mapper);
@@ -66,7 +71,63 @@ public static class ChangeEntryMapper
             ClrTypeName = entityType.ClrType.FullName ?? entityType.ClrType.Name,
             State = entry.EntityState.ToString(),
             SerializedValues = Serialize(entityType, properties, mapper),
+            Navigations = correlationByEntity is null
+                ? null
+                : ReadNavigations(entry, entityType, correlationByEntity),
         };
+    }
+
+    /// <summary>
+    ///     Records which other entries in the same request this one is related to.
+    /// </summary>
+    /// <remarks>
+    ///     Only entries that are themselves part of the request. A navigation to an entity the
+    ///     server already has needs no link: its foreign key is a real value and travelled as an
+    ///     ordinary property.
+    /// </remarks>
+    private static IReadOnlyList<NavigationLink>? ReadNavigations(
+        IUpdateEntry entry,
+        IEntityType entityType,
+        IReadOnlyDictionary<object, int> correlationByEntity)
+    {
+        EntityEntry entityEntry = entry.ToEntityEntry();
+        List<NavigationLink>? links = null;
+
+        foreach (INavigationBase navigation in entityType.GetNavigations().Cast<INavigationBase>()
+                     .Concat(entityType.GetSkipNavigations()))
+        {
+            object? value = navigation.IsCollection
+                ? entityEntry.Collection(navigation.Name).CurrentValue
+                : entityEntry.Reference(navigation.Name).CurrentValue;
+
+            if (value is null)
+            {
+                continue;
+            }
+
+            List<int> targets = [];
+            if (navigation.IsCollection)
+            {
+                foreach (object? related in (System.Collections.IEnumerable)value)
+                {
+                    if (related is not null && correlationByEntity.TryGetValue(related, out int id))
+                    {
+                        targets.Add(id);
+                    }
+                }
+            }
+            else if (correlationByEntity.TryGetValue(value, out int id))
+            {
+                targets.Add(id);
+            }
+
+            if (targets.Count > 0)
+            {
+                (links ??= []).Add(new NavigationLink { Name = navigation.Name, TargetCorrelationIds = targets });
+            }
+        }
+
+        return links;
     }
 
     /// <summary>

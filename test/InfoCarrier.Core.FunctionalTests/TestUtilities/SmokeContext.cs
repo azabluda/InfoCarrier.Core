@@ -13,6 +13,23 @@ public class Blog
     public int Id { get; set; }
 
     public string? Title { get; set; }
+
+    public List<Post> Posts { get; set; } = [];
+}
+
+/// <summary>
+///     A dependent, so SaveChanges can be tested with a principal whose key the store generates
+///     — the case where the client's foreign key is temporary and cannot travel.
+/// </summary>
+public class Post
+{
+    public int Id { get; set; }
+
+    public string? Heading { get; set; }
+
+    public int BlogId { get; set; }
+
+    public Blog? Blog { get; set; }
 }
 
 /// <summary>
@@ -26,6 +43,8 @@ public class SmokeContext : DbContext
     }
 
     public DbSet<Blog> Blogs => Set<Blog>();
+
+    public DbSet<Post> Posts => Set<Post>();
 }
 
 /// <summary>
@@ -40,4 +59,6 @@ public class SmokeContext : DbContext
 public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : DbContext(options)
 {
     public DbSet<Blog> Blogs => Set<Blog>();
+
+    public DbSet<Post> Posts => Set<Post>();
 }

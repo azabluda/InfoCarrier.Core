@@ -186,8 +186,23 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       tracker; and store-generated values must be filtered by **state** — returning an inserted
       row's key for a `Modified` entry made the client try to re-key a tracked row.
 
-- [ ] **S3.** Relationships and many-to-many (ADR-004 requires M2M from day one), navigations,
-      concurrency tokens, and the SaveChanges/change-tracking spec bases.
+- [x] **S3a.** Relationships. A dependent whose principal is *also new* holds a **temporary**
+      foreign key, which must not be sent — it would ask the store to insert a row pointing at an
+      id it never issued. The relationship travels instead, as correlation ids, and EF's own
+      fixup supplies the real key on the server once the principal is inserted. That is exactly
+      what research-findings §9 said the correlation id was for. Mutation-tested: dropping the
+      links fails the test. ✅ `<this commit>`
+
+      A dependent of an *existing* principal needs no link at all — its foreign key is a real
+      value and travels as an ordinary property. Both paths are covered.
+
+- [ ] **S3b.** Many-to-many. A join entity is a **shared-type** entity (`Dictionary<string,
+      object>`), so the server cannot reconstitute it with `Activator.CreateInstance` on the CLR
+      type the way it does the rest — it needs `Set(entityTypeName)`. ADR-004 requires this from
+      day one; it is v1's stated worst failure mode.
+
+- [ ] **S3c.** Concurrency tokens (`SerializedOriginalValues` is on the wire and unused), and the
+      SaveChanges / change-tracking spec bases.
 
 ---
 

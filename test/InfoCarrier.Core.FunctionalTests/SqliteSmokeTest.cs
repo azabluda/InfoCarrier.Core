@@ -171,4 +171,59 @@ public class SqliteSmokeTest
             "alpha",
             (await client.Blogs.SingleAsync(b => b.Id == first.Id)).Title);
     }
+
+    [ConditionalFact]
+    public async Task A_new_dependent_of_a_new_principal_gets_the_generated_foreign_key()
+    {
+        // The case the correlation id exists for. Blog.Id is store-generated, so on the client
+        // Post.BlogId is a *temporary* value; sending it would insert a row pointing at an id
+        // the store never issued. The relationship travels instead, and EF's fixup on the server
+        // supplies the real foreign key once the blog is inserted (research-findings §9).
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            var blog = new Blog { Title = "alpha" };
+            blog.Posts.Add(new Post { Heading = "first" });
+            blog.Posts.Add(new Post { Heading = "second" });
+            client.Add(blog);
+
+            Assert.Equal(3, await client.SaveChangesAsync());
+            Assert.NotEqual(0, blog.Id);
+            Assert.All(blog.Posts, p => Assert.Equal(blog.Id, p.BlogId));
+        }
+
+        using DbContext server = store.CreateDbContext();
+        Blog saved = await server.Set<Blog>().Include(b => b.Posts).SingleAsync();
+        Assert.Equal(["first", "second"], saved.Posts.OrderBy(p => p.Heading).Select(p => p.Heading));
+        Assert.All(saved.Posts, p => Assert.Equal(saved.Id, p.BlogId));
+    }
+
+    [ConditionalFact]
+    public async Task A_dependent_of_an_existing_principal_travels_by_foreign_key()
+    {
+        // No link needed here: the blog already exists, so the foreign key is a real value and
+        // goes across as an ordinary property.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        int blogId;
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            var blog = new Blog { Title = "alpha" };
+            client.Add(blog);
+            await client.SaveChangesAsync();
+            blogId = blog.Id;
+        }
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            client.Add(new Post { Heading = "later", BlogId = blogId });
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        using DbContext server = store.CreateDbContext();
+        Assert.Equal(blogId, (await server.Set<Post>().SingleAsync()).BlogId);
+    }
 }

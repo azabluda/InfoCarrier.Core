@@ -13,4 +13,4 @@
 # The rise from 90 to 115 is the 406 new Tier B tests bringing 24 known failures with them,
 # not a regression: Tier A is unchanged at 90.
 failed=128
-total=5211
+total=5213

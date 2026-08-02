@@ -41,6 +41,35 @@ public sealed record ChangeEntry
     ///     Null when the entity has no concurrency tokens.
     /// </summary>
     public byte[]? SerializedOriginalValues { get; init; }
+
+    /// <summary>
+    ///     Relationships to other entries in the same request, by correlation id.
+    /// </summary>
+    /// <remarks>
+    ///     Foreign keys travel as ordinary property values, but only when they have a value to
+    ///     travel. A dependent whose principal is itself new holds a <em>temporary</em> key,
+    ///     which must not be sent — it would ask the store to insert a row pointing at a
+    ///     made-up id. The relationship is sent instead, and EF's own fixup assigns the real
+    ///     foreign key on the server once the principal is inserted (research-findings §9).
+    /// </remarks>
+    public IReadOnlyList<NavigationLink>? Navigations { get; init; }
+}
+
+/// <summary>
+///     One navigation of a <see cref="ChangeEntry" />, pointing at other entries in the same
+///     request.
+/// </summary>
+public sealed record NavigationLink
+{
+    /// <summary>
+    ///     The navigation's name on the declaring entity type.
+    /// </summary>
+    public required string Name { get; init; }
+
+    /// <summary>
+    ///     Correlation ids of the related entries. A reference navigation has at most one.
+    /// </summary>
+    public required IReadOnlyList<int> TargetCorrelationIds { get; init; }
 }
 
 /// <summary>

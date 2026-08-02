@@ -49,6 +49,8 @@ public class ServerSaveChangesExecutor
         ArgumentNullException.ThrowIfNull(request);
 
         var tracked = new List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)>();
+        var pending = new List<(ChangeEntry Change, object Entity, IEntityType EntityType,
+            List<(IProperty Property, object? Value)> Shadow)>();
 
         foreach (ChangeEntry change in request.Entries)
         {
@@ -91,6 +93,33 @@ public class ServerSaveChangesExecutor
                 }
             }
 
+            pending.Add((change, entity, entityType, shadow));
+        }
+
+        // Wire relationships before anything is tracked. A dependent whose principal is new has
+        // no usable foreign key — the client's was temporary and was not sent — so the link is
+        // what tells the server they belong together, and EF's fixup supplies the real key once
+        // the principal is inserted.
+        var byCorrelationId = pending.ToDictionary(p => p.Change.CorrelationId, p => p.Entity);
+        foreach ((ChangeEntry change, object entity, IEntityType entityType, _) in pending)
+        {
+            foreach (NavigationLink link in change.Navigations ?? [])
+            {
+                if (FindNavigation(entityType, link.Name) is not { } navigation)
+                {
+                    continue;
+                }
+
+                object?[] targets = [.. link.TargetCorrelationIds
+                    .Select(id => byCorrelationId.TryGetValue(id, out object? t) ? t : null)
+                    .Where(t => t is not null)];
+
+                Wire(entity, navigation, targets);
+            }
+        }
+
+        foreach ((ChangeEntry change, object entity, IEntityType entityType, var shadow) in pending)
+        {
             EntityEntry entry = _context.Entry(entity);
             EntityState state = Enum.Parse<EntityState>(change.State);
             entry.State = state;
@@ -113,6 +142,51 @@ public class ServerSaveChangesExecutor
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
+    }
+
+    private static INavigationBase? FindNavigation(IEntityType entityType, string name)
+        => (INavigationBase?)entityType.FindNavigation(name) ?? entityType.FindSkipNavigation(name);
+
+    /// <summary>
+    ///     Assigns a navigation on an untracked instance.
+    /// </summary>
+    /// <remarks>
+    ///     A collection navigation is added to rather than replaced: the instance may have been
+    ///     constructed with one, and replacing it would discard whatever the entity's own
+    ///     constructor put there.
+    /// </remarks>
+    private static void Wire(object entity, INavigationBase navigation, object?[] targets)
+    {
+        if (navigation.PropertyInfo is not { } propertyInfo)
+        {
+            return;
+        }
+
+        if (!navigation.IsCollection)
+        {
+            if (targets.Length > 0 && propertyInfo.CanWrite)
+            {
+                propertyInfo.SetValue(entity, targets[0]);
+            }
+
+            return;
+        }
+
+        object? collection = propertyInfo.GetValue(entity);
+        if (collection is null && propertyInfo.CanWrite)
+        {
+            collection = Activator.CreateInstance(
+                typeof(List<>).MakeGenericType(navigation.TargetEntityType.ClrType));
+            propertyInfo.SetValue(entity, collection);
+        }
+
+        if (collection is System.Collections.IList list)
+        {
+            foreach (object? target in targets)
+            {
+                list.Add(target);
+            }
+        }
     }
 
     /// <summary>
