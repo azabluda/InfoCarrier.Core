@@ -565,6 +565,40 @@ has to preserve what each operator expects of its source, and a transparent iden
 
 ---
 
+## Phase Z — residual sweep
+
+Small families with unrelated causes, taken one at a time. Each is measured on its own.
+
+- [x] **Z1.** Hold the concurrency critical section across the residual, not only the round trip.
+      **49 → 45 of 5232, nothing broken.** ✅ `<this commit>`
+
+      The round trip was already guarded. The residual was not — and the residual is where a
+      client-side projection actually runs, which is precisely what
+      `Throws_on_concurrent_query_first`/`_list` stage: a second use of the context *while a
+      projection is executing*. This provider answered where every other one throws.
+
+      Held per row rather than per query, as EF's own enumerators do (`InMemory`'s
+      `QueryingEnumerable.MoveNext`), so a caller legitimately interleaving two queries is not
+      punished for it. EF's detector is re-entrant per thread, so it nests harmlessly inside the
+      round-trip section.
+
+- [ ] **Z2.** Query filters that close over context state — `Materialized_query_parameter`,
+      `Materialized_query_parameter_new_context`, `Projection_query_parameter` (6).
+
+      **Diagnosed, not a bug in the split.** `HasQueryFilter(c => c.CompanyName.StartsWith(TenantPrefix))`
+      captures a property of the *context*. EF applies query filters during translation, which in
+      this architecture happens on the **server** — so the filter is parameterized from the
+      *server's* context instance. The measured answer is 7 rows in every case, which is the
+      server default `TenantPrefix = "B"`; the client's `"F"` never crosses the wire.
+
+      This is an architectural consequence of [ADR-006](decisions.md)'s capture point, not an
+      oversight, and it needs a decision rather than a patch. The options are for the client to
+      apply filters itself before shipping (duplicating EF's filter machinery, which handles
+      inheritance and navigations) or to ship filter parameter values with the request (which
+      requires knowing them before filters have been applied). Wants an ADR.
+
+---
+
 ## Exit criteria
 
 M2 closes when all of:
@@ -598,3 +632,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 5147 |  67 | 5227 | after X4 (reference-typed carrier when compared to null) |
 | 2026-08-02 | 5154 |  63 | 5230 | after X5 (returned carrier re-carried, rebuilt once at the root) |
 | 2026-08-02 | 5170 |  49 | 5232 | after X6 (GroupJoin flattening, matching Enumerable too) |
+| 2026-08-02 | 5174 |  45 | 5232 | after Z1 (concurrency section held across the residual) |

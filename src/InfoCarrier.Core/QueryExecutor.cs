@@ -89,8 +89,46 @@ internal sealed class QueryExecutor<TElement>
             results.Add(Materialize(serverQuery, result));
         }
 
-        IEnumerable<TElement> mapped = ApplyResidual(results, singleResult);
+        IEnumerable<TElement> mapped = Guarded(ApplyResidual(results, singleResult));
         return singleResult ? mapped.FirstOrDefault()! : mapped;
+    }
+
+    /// <summary>
+    ///     Holds the concurrency critical section across each row the residual produces.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The round trip was already guarded; the residual was not, and the residual is
+    ///         where a client-side projection actually runs. A second use of the same context
+    ///         during one — which is exactly what <c>Throws_on_concurrent_query_*</c> stages —
+    ///         went undetected, so this provider answered where every other one throws.
+    ///     </para>
+    ///     <para>
+    ///         Per row rather than per query, as EF's own enumerators do: the section is held
+    ///         while a row is being produced and released between rows, so a caller interleaving
+    ///         two queries legitimately is not punished for it. The detector is re-entrant on one
+    ///         thread, so this nests harmlessly inside the round-trip section above.
+    ///     </para>
+    /// </remarks>
+    private IEnumerable<TElement> Guarded(IEnumerable<TElement> rows)
+    {
+        using IEnumerator<TElement> enumerator = rows.GetEnumerator();
+
+        while (true)
+        {
+            bool moved;
+            using (_queryContext.ConcurrencyDetector.EnterCriticalSection())
+            {
+                moved = enumerator.MoveNext();
+            }
+
+            if (!moved)
+            {
+                yield break;
+            }
+
+            yield return enumerator.Current;
+        }
     }
 
     private async IAsyncEnumerable<TElement> ExecuteAsync(bool singleResult)
@@ -135,7 +173,7 @@ internal sealed class QueryExecutor<TElement>
             results.Add(Materialize(serverQuery, result));
         }
 
-        foreach (TElement element in ApplyResidual(results, singleResult))
+        foreach (TElement element in Guarded(ApplyResidual(results, singleResult)))
         {
             yield return element;
         }
