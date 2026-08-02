@@ -51,8 +51,12 @@ public class ServerSaveChangesExecutor
         ArgumentNullException.ThrowIfNull(request);
 
         var tracked = new List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)>();
-        var pending = new List<(ChangeEntry Change, object Entity, IEntityType EntityType,
-            List<(IProperty Property, object? Value)> Shadow)>();
+        var pending = new List<Replay>();
+
+        // What each of the client's placeholder key values turned into here. A placeholder is
+        // meaningless to this store, so the server generates its own key and every reference to
+        // the client's has to be redirected at it.
+        var placeholders = new Dictionary<object, (object? Value, bool IsTemporary)>();
 
         foreach (ChangeEntry change in request.Entries)
         {
@@ -70,6 +74,12 @@ public class ServerSaveChangesExecutor
             // key and so cannot be modified" — because EF reads that as re-keying a row rather
             // than as describing one.
             var shadow = new List<(IProperty Property, object? Value)>();
+            var generatedKeys = new List<(IProperty Property, object ClientValue)>();
+            var references = new List<(IProperty Property, object ClientValue)>();
+            var values = new List<(IProperty Property, object? Value)>();
+            var temporaryNames = new HashSet<string>(change.TemporaryProperties ?? [], StringComparer.Ordinal);
+            bool isAdded = change.State == nameof(EntityState.Added);
+
             foreach (DynamicPropertyValue value in ChangeEntryMapper.ReadValues(change.SerializedValues))
             {
                 if (entityType.FindProperty(value.Name) is not { } property)
@@ -79,29 +89,59 @@ public class ServerSaveChangesExecutor
 
                 object? clrValue = _mapper.FromPropertyValue(value, property.ClrType);
 
-                // A shared-type entity — a many-to-many join entity is one — stores its values in
-                // a dictionary, and EF reports its properties as the `Item[string]` indexer.
-                // Handing that to SetValue without an index is a parameter-count mismatch, so it
-                // goes down the entry path with the shadow properties instead.
-                if (property.PropertyInfo is { } propertyInfo
-                    && propertyInfo.CanWrite
-                    && propertyInfo.GetIndexParameters().Length == 0)
+                if (isAdded
+                    && clrValue is not null
+                    && temporaryNames.Contains(property.Name)
+                    && !property.IsForeignKey())
                 {
-                    propertyInfo.SetValue(entity, clrValue);
+                    // The client's own placeholder for a key this store issues. Left unset,
+                    // because EF only runs value generation for a property still holding its
+                    // sentinel — and a backend that generates at `Add` time rather than at save
+                    // (EF's InMemory provider, whose
+                    // `InMemoryIntegerValueGenerator.GeneratesTemporaryValues` is `false`)
+                    // otherwise keeps the client's placeholder and hands it straight back.
+                    generatedKeys.Add((property, clrValue));
+                    continue;
                 }
-                else if (property.FieldInfo is { } fieldInfo)
+
+                values.Add((property, clrValue));
+            }
+
+            pending.Add(new Replay(change, entity, entityType, shadow, generatedKeys, references, isAdded));
+            pending[^1].Values.AddRange(values);
+        }
+
+        // Every placeholder this request expects to resolve, and the types they are.
+        var expected = new HashSet<object>(pending.SelectMany(p => p.GeneratedKeys).Select(g => g.ClientValue));
+        var expectedTypes = new HashSet<Type>(expected.Select(v => v.GetType()));
+
+        // A borrowed placeholder is recognised by its **value**, not by the client's temporary
+        // flag. EF only flags a value it generated as temporary, and a test — or an application —
+        // that reparents a row by assigning the FK itself (`old1.RootId = newRoot.Id`) produces
+        // an ordinary `int` that happens to be a placeholder. Relying on the flag left every
+        // reparent pointing at a key that was about to stop existing. The candidate set is
+        // exactly the placeholders above, so a false positive needs a stored key that equals one
+        // of them in the same request.
+        foreach (Replay replay in pending)
+        {
+            foreach ((IProperty property, object? value) in replay.Values)
+            {
+                // Only a key can be a borrowed placeholder, and only of a type some placeholder
+                // actually is. Both guards earn their keep: `GraphUpdatesTestBase.MyDiscriminator`
+                // throws from `GetHashCode` on purpose, so an unguarded set lookup over every
+                // value in the request fails on a property that could never have been a key.
+                if (value is not null
+                    && (property.IsKey() || property.IsForeignKey())
+                    && expectedTypes.Contains(value.GetType())
+                    && expected.Contains(value))
                 {
-                    fieldInfo.SetValue(entity, clrValue);
+                    replay.References.Add((property, value));
                 }
                 else
                 {
-                    // A shadow property has no CLR member; its value lives in the entry, so it
-                    // has to wait until there is one.
-                    shadow.Add((property, clrValue));
+                    SetOnEntity(replay.Entity, property, value, replay.Shadow);
                 }
             }
-
-            pending.Add((change, entity, entityType, shadow));
         }
 
         // Attach the entries describing rows that already exist before those describing new
@@ -120,31 +160,105 @@ public class ServerSaveChangesExecutor
         //
         // Relative order within each group is preserved: an `Added` principal's temporary key
         // has to be tracked before the dependent that borrows it.
-        foreach ((ChangeEntry change, object entity, IEntityType entityType, var shadow) in
-                 pending.Where(p => p.Change.State != nameof(EntityState.Added))
-                     .Concat(pending.Where(p => p.Change.State == nameof(EntityState.Added))))
+        foreach (Replay replay in pending.Where(p => p.Change.State == nameof(EntityState.Deleted)))
         {
-            EntityEntry entry = Track(entityType, entity);
-            EntityState state = Enum.Parse<EntityState>(change.State);
+            TrackOne(replay);
+        }
+
+        // Everything else waits on whatever it borrows: a principal has to be tracked before the
+        // row that holds its placeholder, because the borrower's own key may *be* that borrowed
+        // value (a one-to-one sharing its principal's primary key, or any owned dependent) and by
+        // then EF will not let it be changed. Repeatedly take whatever is resolvable; if a pass
+        // makes no progress the remainder refers to itself, and replaying it as sent is no worse
+        // than not replaying it at all.
+        var waiting = pending.Where(p => p.Change.State != nameof(EntityState.Deleted)).ToList();
+        while (waiting.Count > 0)
+        {
+            int remaining = waiting.Count;
+
+            for (int i = 0; i < waiting.Count; i++)
+            {
+                Replay replay = waiting[i];
+                if (replay.References.Any(r => expected.Contains(r.ClientValue)
+                        && !placeholders.ContainsKey(r.ClientValue)))
+                {
+                    continue;
+                }
+
+                TrackOne(replay);
+                waiting.RemoveAt(i--);
+            }
+
+            if (waiting.Count == remaining)
+            {
+                foreach (Replay replay in waiting)
+                {
+                    TrackOne(replay);
+                }
+
+                break;
+            }
+        }
+
+        void TrackOne(Replay replay)
+        {
+            EntityState state = Enum.Parse<EntityState>(replay.Change.State);
+
+            // Redirect borrowed placeholders *before* tracking, while the key is still an
+            // ordinary field on a detached object.
+            foreach ((IProperty property, object clientValue) in replay.References)
+            {
+                if (placeholders.TryGetValue(clientValue, out var principal))
+                {
+                    SetOnEntity(replay.Entity, property, principal.Value, replay.Shadow);
+                }
+            }
+
+            EntityEntry entry = Track(replay.EntityType, replay.Entity);
             entry.State = state;
 
-            foreach ((IProperty property, object? value) in shadow)
+            foreach ((IProperty property, object? value) in replay.Shadow)
             {
                 entry.Property(property.Name).CurrentValue = value;
             }
 
-            // Mark the client's placeholders as placeholders here too. EF then treats them the
-            // way it treats its own: shared between a principal and its dependents, replaced
-            // everywhere by the real key once the store issues it.
-            foreach (string name in change.TemporaryProperties ?? [])
+            // What the store will call this row, so references to the client's placeholder can
+            // find it. On a backend that generates at save time the value is itself temporary,
+            // and that travels with it — every reference stays temporary too and EF replaces the
+            // lot when the store answers.
+            foreach ((IProperty property, object clientValue) in replay.GeneratedKeys)
             {
-                if (entityType.FindProperty(name) is not null && state == EntityState.Added)
+                PropertyEntry generated = entry.Property(property.Name);
+
+                // No *real* value appeared, so this store issues the key during `SaveChanges`
+                // rather than at `Add` — every relational one does. There the client's
+                // placeholder is exactly what the original design wants: put it back, flag it,
+                // and let the store replace it and propagate to everything sharing it. Adopting
+                // EF's own temporary value instead would be a second placeholder doing the first
+                // one's job, and the join row of a many-to-many between two new entities came out
+                // pointing at neither.
+                //
+                // Only when the value is real — EF's InMemory provider assigns one from a value
+                // generator at `Add` — is there anything better to redirect references to.
+                if (generated.IsTemporary || Equals(generated.CurrentValue, property.Sentinel))
                 {
-                    entry.Property(name).IsTemporary = true;
+                    generated.CurrentValue = clientValue;
+                    generated.IsTemporary = true;
                 }
+
+                placeholders[clientValue] = (generated.CurrentValue, generated.IsTemporary);
             }
 
-            tracked.Add((change.CorrelationId, entry, entityType, state));
+            // A reference is a placeholder exactly as long as what it points at is one. An
+            // unresolved reference keeps the client's flagging, which is what it had before any
+            // of this existed.
+            foreach ((IProperty property, object clientValue) in replay.References)
+            {
+                entry.Property(property.Name).IsTemporary =
+                    !placeholders.TryGetValue(clientValue, out var principal) || principal.IsTemporary;
+            }
+
+            tracked.Add((replay.Change.CorrelationId, entry, replay.EntityType, state));
         }
 
         int count = await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -157,6 +271,68 @@ public class ServerSaveChangesExecutor
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
+    }
+
+    /// <summary>
+    ///     One entry of the request, unpacked and waiting to be tracked.
+    /// </summary>
+    /// <param name="GeneratedKeys">
+    ///     Temporary keys the client made up that this store issues itself, deliberately left
+    ///     unset on <paramref name="Entity" />. The client's value is kept only so references to
+    ///     it can be redirected.
+    /// </param>
+    /// <param name="References">
+    ///     Temporary foreign keys — placeholders belonging to some other entry.
+    /// </param>
+    private sealed record Replay(
+        ChangeEntry Change,
+        object Entity,
+        IEntityType EntityType,
+        List<(IProperty Property, object? Value)> Shadow,
+        List<(IProperty Property, object ClientValue)> GeneratedKeys,
+        List<(IProperty Property, object ClientValue)> References,
+        bool IsAdded)
+    {
+        /// <summary>
+        ///     Every value the entry carried, held until the full set of placeholders is known
+        ///     and each can be classified as a borrowed one or an ordinary value.
+        /// </summary>
+        public List<(IProperty Property, object? Value)> Values { get; } = [];
+    }
+
+    /// <summary>
+    ///     Writes one mapped value onto the object, or queues it as shadow state.
+    /// </summary>
+    /// <remarks>
+    ///     A shared-type entity — a many-to-many join entity is one — stores its values in a
+    ///     dictionary, and EF reports its properties as the <c>Item[string]</c> indexer. Handing
+    ///     that to <c>SetValue</c> without an index is a parameter-count mismatch, so it goes
+    ///     down the entry path with the shadow properties instead.
+    /// </remarks>
+    private static void SetOnEntity(
+        object entity,
+        IProperty property,
+        object? value,
+        List<(IProperty Property, object? Value)> shadow)
+    {
+        if (property.PropertyInfo is { } propertyInfo
+            && propertyInfo.CanWrite
+            && propertyInfo.GetIndexParameters().Length == 0)
+        {
+            propertyInfo.SetValue(entity, value);
+        }
+        else if (property.FieldInfo is { } fieldInfo)
+        {
+            fieldInfo.SetValue(entity, value);
+        }
+        else
+        {
+            // A shadow property has no CLR member; its value lives in the entry, so it has to
+            // wait until there is one. Replacing an earlier queued value rather than appending
+            // keeps a redirected reference from being overwritten by the value it replaced.
+            shadow.RemoveAll(s => s.Property == property);
+            shadow.Add((property, value));
+        }
     }
 
     /// <summary>

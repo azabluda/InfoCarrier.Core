@@ -328,22 +328,53 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       sets: `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.** `Northwind.db` in the
       output directory and zero leftover per-test files confirm the new path actually ran.
 
-### The `GraphUpdates` residual — 156 of 1787 (2026-08-02, Tier A)
+### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
-Concentrated: six methods carry 110 of the 156.
+No family above 8 now; the long tail below is what is left.
 
 | # | Family | Symptom | Diagnosis |
 |---|---|---|---|
-| 56 | `Save_changed_optional_one_to_one`, `…_with_alternate_key` | `Assert.Equal(new1.Id, new2.BackId)` — expected a **temporary** key value, actual `null` | **Diagnosed, unfixed — see S3c-8 below.** The server hands the client's placeholder key straight back. |
-| 30 | `Save_required_non_PK_one_to_one_changed_by_reference`, `Save_required_one_to_one_changed_by_reference_with_alternate_key` | assertion on a key or FK after SaveChanges | Same shape as the row above; not separately confirmed. |
-| 24 | `Save_optional_many_to_one_dependents`, `Save_required_many_to_one_dependents` | `Assert.Contains` against an **empty** collection; the missing entity still holds its temporary negative key and a null FK | Same root cause: the placeholder key was never replaced, so nothing fixed up. |
-| 24 | Owned collections (`*_owned_collection*`) | "The property `Owner.Owned#Owned.OwnerId` is part of a key and so cannot be modified" | An owned dependent's key is its owner's key. The server writes it through a *tracked* entry, which EF refuses. (`Set<T>(name)`, the previous failure here, is fixed by S3c-7.) |
-| 18 | `Mark_explicitly_set_*_stable_*` | `ArgumentException: An item with the same key has already been added` | Stable value generators, where client and server both generate. |
-| 12 | assorted | `NullReferenceException` in the test body | Unclassified. |
+| 14 | Owned collections (`*_owned_collection*`, `Save_changed_owned_*`) | "The property `Owner.Owned#Owned.OwnerId` is part of a key and so cannot be modified" | An owned dependent's key *is* its owner's key, and the server writes it through a tracked entry. S3c-9 moved the equivalent write for ordinary dependents to before tracking; owned types need the same, but their key arrives as shadow state applied after the entry exists. |
+| 12 | `Mark_explicitly_set_*_stable_*` | `ArgumentException: An item with the same key has already been added` | Stable value generators, where client and server both generate. Untouched by S3c-9: a stable generator's value is not a placeholder. |
+| 10 | `Update_root_by_collection_replacement_of_*` | assertion | Unclassified. |
+| 4 | `Discriminator_values_are_not_marked_as_unknown`, `Saving_unknown_key_value_marks_it_as_unmodified` | assertion | Shadow-state round trip, adjacent to S3c-2's third fix. |
+| 3 | `Can_add_*_dependent_when_multiple_possible_principal_sides` | assertion | Unclassified. |
+| 2 | `Save_optional_many_to_one_dependents` | tracked-entry count off by one (26 vs 27) | **Introduced by S3c-9**, in 2 of that method's 12 parameterizations. |
+
+The remaining **29** failures outside this class are M2's query residual, unchanged since Z7.
+- [x] **S3c-9.** Generate the key on a store that generates at `Add` time. **GraphUpdates
+      156 → 45; suite `Passed: 6941, Failed: 74, Skipped: 13, Total: 7028`** — 113 fixed, 2
+      broken, identical across two consecutive full runs. ✅ `<this commit>`
+
+      The server now leaves an `Added` entity's placeholder key unset so value generation runs,
+      then redirects every reference to whatever the key became. Three things the measurements
+      forced, each of which had broken an earlier attempt — the diagnosis under S3c-8 below was
+      right about the cause and wrong about all three:
+
+      1. **A borrowed placeholder is recognised by its value, not by the client's temporary
+         flag.** EF only flags what it generated; a reparent that assigns the FK itself
+         (`old1.RootId = newRoot.Id`) produces an ordinary `int`. Flag-based detection left all
+         112 `Reparent_*` tests pointing at a key that was about to stop existing — which is why
+         attempts 1 and 2 measured *worse* than doing nothing.
+      2. **Only a key, and only of a type some placeholder actually is, is a candidate.**
+         `GraphUpdatesTestBase.MyDiscriminator` throws from `GetHashCode` on purpose, so an
+         unguarded set lookup over every value in the request fails on a property that could
+         never have been a key.
+      3. **If no *real* value appears, put the client's placeholder back and behave exactly as
+         before.** Adopting EF's own temporary value instead is a second placeholder doing the
+         first one's job, and the join row of a many-to-many between two new entities came out
+         pointing at neither. Deciding this by asking the value generator — the obvious way —
+         got it wrong on SQLite and wrote a foreign key of `0`.
+
+      Ordering changed with it: `Deleted` first (S3c-6's rule only ever concerned `Deleted` vs
+      `Added`), then everything else in availability order, so a principal is tracked before
+      whoever borrows its key — the borrower's own key may *be* that value, and by then EF will
+      not let it change.
 
 ### S3c-8 — store-generated keys are not generated on Tier A
 
-**The diagnosis is complete; the first fix attempt was measured and reverted.**
+**Diagnosis; superseded by S3c-9 above.** Kept because the two reverted attempts below are the
+reason S3c-9 looks the way it does.
 
 A client `Added` entity carries a placeholder key (`int.MinValue + n`) flagged in
 `ChangeEntry.TemporaryProperties`. The server sets that value on the object, tracks it, sets

@@ -49,11 +49,16 @@ public static class ChangeEntryMapper
 
         foreach (IProperty property in entityType.GetProperties())
         {
-            if (entry.EntityState == EntityState.Added && entry.HasTemporaryValue(property))
+            if (entry.HasTemporaryValue(property))
             {
                 // Sent, and flagged. The value is meaningless to the store, but a principal and
                 // its dependents share it, so it is what identifies the relationship; the server
                 // marks it temporary too and EF replaces every occurrence with the real key.
+                //
+                // Flagged whatever the state. A placeholder reaches an *existing* row whenever
+                // one is reparented onto a new principal — `old1.RootId = newRoot.Id` — and that
+                // entry is `Modified`. Restricting this to `Added` left the server unable to tell
+                // that FK from a real one, so it stored a placeholder as though it were a key.
                 (temporary ??= []).Add(property.Name);
             }
 
