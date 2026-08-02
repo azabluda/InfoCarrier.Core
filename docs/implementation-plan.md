@@ -156,9 +156,14 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       to the sequence itself is not (`ClientDefaultIfEmpty(grouping)` decides which rows exist).
       **118 → 112.** ✅ `<this commit>`
 
-- [ ] **E2b.** Remaining override failures: `Include_property_expression_invalid` (an `Include`
-      lambda that is not a property path must throw), `Throws_on_concurrent_query_*` (the
-      concurrency detector is released before the caller enumerates), `Select_GroupBy_SelectMany`.
+- [x] **E2b.** `Include` validates its lambda is a property path (allowing a derived-type cast
+      and a composed `Where`/`OrderBy`/`Skip`/`Take` filter, as EF does). EF checks this during
+      translation, which this provider replaces — so `Include(o => new { o.Customer, o.OrderDetails })`
+      reached the splitter and was quietly read as a projection boundary rather than the mistake
+      it is. **112 → 100.** ✅ `<this commit>`
+
+- [ ] **E2c.** Remaining override failures: `Throws_on_concurrent_query_*` (the concurrency
+      detector is released before the caller enumerates), `Select_GroupBy_SelectMany`.
 
 ---
 

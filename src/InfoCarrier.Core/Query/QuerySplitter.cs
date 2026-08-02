@@ -84,6 +84,7 @@ public sealed class QuerySplitter
                     + "the query root itself names a type the server does not know.");
         }
 
+        RejectInvalidIncludes(query);
         RejectOpenFragments(analysis);
         RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
 
@@ -134,6 +135,77 @@ public sealed class QuerySplitter
                     .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>)))
             ?.GetGenericArguments()[0]
             ?? queryableType;
+
+    /// <summary>
+    ///     Rejects an <c>Include</c> whose lambda is not a property path.
+    /// </summary>
+    /// <remarks>
+    ///     EF validates this during translation, which this provider replaces — so without the
+    ///     check <c>Include(o =&gt; new { o.Customer, o.OrderDetails })</c> reached the splitter,
+    ///     was found to name an anonymous type, and was quietly treated as a projection boundary
+    ///     instead of the mistake it is.
+    /// </remarks>
+    private static void RejectInvalidIncludes(Expression query)
+    {
+        if (InvalidIncludeFinder.Find(query) is not { } invalid)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.InvalidIncludeExpression(invalid));
+    }
+
+    private sealed class InvalidIncludeFinder : ExpressionVisitor
+    {
+        private Expression? _found;
+
+        public static Expression? Find(Expression query)
+        {
+            var finder = new InvalidIncludeFinder();
+            finder.Visit(query);
+            return finder._found;
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (_found is null
+                && node.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
+                && node.Method.Name is nameof(EntityFrameworkQueryableExtensions.Include)
+                    or nameof(EntityFrameworkQueryableExtensions.ThenInclude)
+                && node.Arguments.Count == 2
+                && StripQuotes(node.Arguments[1]) is LambdaExpression lambda
+                && !IsPropertyPath(lambda.Body))
+            {
+                _found = lambda.Body;
+            }
+
+            return _found is null ? base.VisitMethodCall(node) : node;
+        }
+
+        private static bool IsPropertyPath(Expression body)
+            => body switch
+            {
+                ParameterExpression => true,
+                MemberExpression member => member.Expression is not null && IsPropertyPath(member.Expression),
+                // A cast targets a navigation declared on a derived type, which EF allows.
+                UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.TypeAs } convert
+                    => IsPropertyPath(convert.Operand),
+                // Collection navigations may be filtered by composing Where/OrderBy/Skip/Take.
+                MethodCallExpression { Arguments.Count: > 0 } call => IsPropertyPath(call.Arguments[0]),
+                _ => false,
+            };
+
+        private static Expression StripQuotes(Expression node)
+        {
+            while (node is UnaryExpression { NodeType: ExpressionType.Quote } quote)
+            {
+                node = quote.Operand;
+            }
+
+            return node;
+        }
+    }
 
     private static void RejectOpenFragments(BoundaryAnalysis analysis)
     {
