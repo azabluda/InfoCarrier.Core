@@ -217,6 +217,18 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 - [ ] **S3c.** Concurrency tokens (`SerializedOriginalValues` is on the wire and unused), and the
       SaveChanges / change-tracking spec bases.
 
+- [x] **E1.** A query that ends in `ToList` / `ToArray` / `AsEnumerable` is no longer shipped.
+      Those operators do not translate — they are the point at which a query *stops* being a
+      query — and shipping a subtree ending in one asked the server to execute it as a terminal
+      operator, which answered "could not be translated" for a query it would have run happily
+      one call earlier. Descending past them ships the query and leaves the materialization on
+      the client. **119 → 111, nothing broken.** ✅ `<this commit>`
+
+      Worth recording that the family was **misdiagnosed** in the classification as the
+      client-evaluation guard being over-broad. It was not the guard at all: the messages with no
+      "Additional information" clause came from the *server*, and reading them properly is what
+      pointed at the terminal operator.
+
 ---
 
 ## The residual, classified (2026-08-02 — measured at 118, now 90)

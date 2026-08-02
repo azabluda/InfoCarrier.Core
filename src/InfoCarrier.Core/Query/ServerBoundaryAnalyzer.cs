@@ -120,13 +120,34 @@ public sealed class ServerBoundaryAnalyzer
     ///     Descending into it instead finds the root inside, which is what actually executes.
     /// </remarks>
     internal static bool IsExecutableQuery(Expression node)
-        => typeof(IQueryable).IsAssignableFrom(node.Type)
-            // A terminal operator (Count, Any, First, …) yields a scalar, not a queryable.
-            || (node is MethodCallExpression call
-                && call.Method.DeclaringType is { } declaring
-                && (declaring == typeof(Queryable)
-                    || declaring == typeof(Enumerable)
-                    || declaring == typeof(EntityFrameworkQueryableExtensions)));
+        => !IsClientMaterialization(node)
+            && (typeof(IQueryable).IsAssignableFrom(node.Type)
+                // A terminal operator (Count, Any, First, …) yields a scalar, not a queryable.
+                || (node is MethodCallExpression call
+                    && call.Method.DeclaringType is { } declaring
+                    && (declaring == typeof(Queryable)
+                        || declaring == typeof(Enumerable)
+                        || declaring == typeof(EntityFrameworkQueryableExtensions))));
+
+    /// <summary>
+    ///     Operators that <em>materialize</em> rather than query.
+    /// </summary>
+    /// <remarks>
+    ///     <c>ToList</c> is not something a provider translates — it is the point at which a
+    ///     query stops being a query. Shipping a subtree that ends in one asked the server to
+    ///     execute it as a terminal operator, and EF answered "could not be translated" for a
+    ///     query it would happily have run one call earlier. Descending past it ships the query
+    ///     and leaves the materialization on the client, where it belongs.
+    /// </remarks>
+    internal static bool IsClientMaterialization(Expression node)
+        => node is MethodCallExpression { Method: { } method }
+            && (method.DeclaringType == typeof(Enumerable) || method.DeclaringType == typeof(Queryable))
+            && method.Name is nameof(Enumerable.ToList)
+                or nameof(Enumerable.ToArray)
+                or nameof(Enumerable.ToHashSet)
+                or nameof(Enumerable.ToDictionary)
+                or nameof(Enumerable.ToLookup)
+                or nameof(Enumerable.AsEnumerable);
 
     /// <summary>
     ///     Folds each node's verdict from its direct children, post-order.
