@@ -52,4 +52,17 @@ public class NorthwindJoinQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<
                   join id in ids on e.EmployeeID equals id
                   select e.EmployeeID));
     }
+
+    // EF's own InMemory suite has these three (issue #21200) — its provider throws
+    // NotImplementedException for a join between sources with client evaluation. This provider
+    // only reaches that point now that the collection projection is hoisted above the
+    // SelectMany instead of stranding it inside the collection selector; before, the split
+    // refused the query itself and never got as far as InMemory's limitation.
+    public override Task SelectMany_with_client_eval_with_collection_shaper(bool async)
+        => Assert.ThrowsAsync<NotImplementedException>(
+            () => base.SelectMany_with_client_eval_with_collection_shaper(async));
+
+    public override Task SelectMany_with_client_eval_with_collection_shaper_ignored(bool async)
+        => Assert.ThrowsAsync<NotImplementedException>(
+            () => base.SelectMany_with_client_eval_with_collection_shaper_ignored(async));
 }

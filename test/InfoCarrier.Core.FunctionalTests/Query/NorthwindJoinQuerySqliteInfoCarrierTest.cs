@@ -56,4 +56,24 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Take_in_collection_projection_with_FirstOrDefault_on_top_level(async))).Message);
+
+    // The same three EF's SQLite suite has: hoisting the collection projection lets the query
+    // reach SQL, and SQLite declines the APPLY it needs.
+    public override async Task SelectMany_with_client_eval(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_with_client_eval(async))).Message);
+
+    public override async Task SelectMany_with_client_eval_with_collection_shaper(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_with_client_eval_with_collection_shaper(async))).Message);
+
+    public override async Task SelectMany_with_client_eval_with_collection_shaper_ignored(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_with_client_eval_with_collection_shaper_ignored(async))).Message);
 }

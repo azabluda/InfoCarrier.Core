@@ -597,34 +597,46 @@ Small families with unrelated causes, taken one at a time. Each is measured on i
       inheritance and navigations) or to ship filter parameter values with the request (which
       requires knowing them before filters have been applied). Wants an ADR.
 
-- [ ] **Z3.** A projection inside a *collection selector* — the largest single-cause family left
-      (14). `SelectMany_with_client_eval_with_collection_shaper`, `…_ignored`, `…_with_constructor`
-      on both tiers, plus `GroupBy_Count_in_projection`.
-
-      All fail with the same navigation refusal (`Order.OrderDetails`, `OrderDetail.Product`) and
-      all have the same shape:
+- [x] **Z3.** A projection inside a *collection selector* — reassembly hoisted above the
+      `SelectMany`. **41 → 33 of 5235, nothing broken**, both tiers. ✅ `<this commit>`
 
       ```csharp
       Customers.SelectMany(c => c.Orders.Select(o => new {
           OrderProperty = ClientMethod(o), o.OrderDetails, CustomerProperty = c.ContactName }))
       ```
 
-      `ProjectionRewriter` rewrites the inner `Select` **in place**, so the client reassembly ends
-      up inside the collection selector; that makes the enclosing `SelectMany` client-side, and
-      the navigation is then read from rows the server never sent. This is the same fault X5
-      fixed — and X5's fix does not reach it, for a specific reason: X5 re-carries an existing
-      *result* type, while here the carrier must be one `ProjectionRewriter` invents, because the
-      projection contains a genuinely client-only method that cannot go in a tuple slot at all.
+      Rewritten in place, the client reassembly sits *inside* the collection selector, which makes
+      the whole `SelectMany` client-side: the source ships alone and the residual reads
+      `Order.OrderDetails` off rows the server never sent. Hoisting it above the `SelectMany`
+      lets the join ship.
 
-      So the fix needs the two passes combined: `ProjectionRewriter`'s fragment split (what can be
-      evaluated per row) with X5's placement (rebuild once at the root), and the enclosing
-      operator's element type mapped from the anonymous type to the tuple. Each part exists; none
-      of them composes yet. This is the "operator pushdown" `projection-split.md` §7 deferred, in
-      its last remaining form.
+      One thing beyond a move: the fragments must be collected against the **outer** parameter as
+      well as the inner one. After the hoist `c` is out of scope, so `c.ContactName` has to travel
+      in a slot of its own — the in-place rewrite never needed to carry it, because `c` was still
+      in scope where it landed. Mutation-tested: dropping the outer parameter costs the test.
 
-      Note that the two-argument `SelectMany` is not a result-selector operator by the structural
-      test (`IsResultSelectorOperator`), because its lambda returns `IEnumerable<TResult>` rather
-      than `TResult` — so the existing machinery does not even consider it.
+      Matched narrowly, at the two-argument `SelectMany` — which `IsResultSelectorOperator` does
+      not consider at all, since its lambda returns `IEnumerable<TResult>` rather than `TResult`.
+      That is why this family never entered the rewrite path.
+
+      **All eight fixes are convergence with the reference providers, not new answers.** EF's
+      InMemory suite has had `Assert.ThrowsAsync<NotImplementedException>` on these tests all
+      along (issue #21200 — joins between sources with client evaluation), and EF's SQLite suite
+      has `ApplyNotSupported`. This provider previously refused the query *itself* and never
+      reached either limitation; now it reaches both, and the overrides are EF's, copied.
+
+      > ⚠️ **The plan previously said all four tests in this family "have the same shape". They do
+      > not — they share a *message*.** Two are the `SelectMany` shape fixed here; the other two
+      > are not, and are unaffected:
+      >
+      > - `SelectMany_with_client_eval_with_constructor` — a nested `SelectMany(…).ToArray()`
+      >   inside a DTO **constructor argument**, not a collection selector.
+      > - `GroupBy_Count_in_projection` — a *filtered collection* carried in an anonymous carrier
+      >   and read by the next projection. That is an X3 carrier case the "no sequence in a slot"
+      >   guard declines. Worth revisiting now that Z5 materializes collections: the guard exists
+      >   because a **queryable** in a slot asks SQL to navigate back out of a projected tuple, and
+      >   a materialized `List<T>` may not have that problem. Untested — the guard cost 107
+      >   failures once, so it gets its own experiment.
 
 - [ ] **Z4.** Client evaluation *forced by the type boundary*, where EF refuses outright —
       `Select_GroupBy_SelectMany` and `Where_query_composition6`-style tests that assert a
@@ -748,3 +760,5 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 5154 |  63 | 5230 | after X5 (returned carrier re-carried, rebuilt once at the root) |
 | 2026-08-02 | 5170 |  49 | 5232 | after X6 (GroupJoin flattening, matching Enumerable too) |
 | 2026-08-02 | 5174 |  45 | 5232 | after Z1 (concurrency section held across the residual) |
+| 2026-08-02 | 5180 |  41 | 5234 | after Z5 (collection fragment materialized before it ships) |
+| 2026-08-02 | 5189 |  33 | 5235 | after Z3 (collection projection reassembled above the SelectMany) |

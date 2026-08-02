@@ -327,6 +327,33 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_collection_projection_reassembles_above_the_SelectMany()
+    {
+        // Rewritten in place, the client-side reassembly would sit inside the collection
+        // selector, which makes the whole SelectMany client-side — so the source ships alone and
+        // the residual reads Books off authors that never carried them. Hoisting it above the
+        // SelectMany is what lets the join ship.
+        //
+        // `a.Name` is the part that makes this more than a move: after the hoist the outer row
+        // is out of scope, so it has to travel in a slot of its own.
+        SplitQuery split = Split(
+            _context.Authors.SelectMany(a => a.Books.Select(b => new
+            {
+                Client = Threshold(b.Id),
+                b.Title,
+                AuthorName = a.Name,
+            })));
+
+        Assert.Equal(
+            typeof(ValueTuple<int, string, string>),
+            Assert.Single(split.ServerQueries).ElementType);
+
+        Assert.Equal([true], Rows(Run(split), "Client"));
+        Assert.Equal(["Emma"], Rows(Run(split), "Title"));
+        Assert.Equal(["Austen"], Rows(Run(split), "AuthorName"));
+    }
+
+    [Fact]
     public void A_group_by_stays_composed_with_its_aggregate()
     {
         // The cut's own doing: separating GroupBy from the aggregate that consumes it leaves a

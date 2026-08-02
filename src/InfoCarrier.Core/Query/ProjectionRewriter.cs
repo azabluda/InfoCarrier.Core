@@ -93,6 +93,13 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
     protected override Expression VisitMethodCall(MethodCallExpression node)
     {
+        // Checked before descending, because this shape has to *replace* the in-place rewrite
+        // rather than tidy up after it — see TryHoistCollectionProjection.
+        if (TryHoistCollectionProjection(node) is { } hoisted)
+        {
+            return hoisted;
+        }
+
         // Innermost first: rewriting an inner projection can turn its result into something the
         // outer one can then be measured against.
         if (base.VisitMethodCall(node) is not MethodCallExpression call)
@@ -220,6 +227,122 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         selector = lambda;
         return true;
+    }
+
+    /// <summary>
+    ///     Rewrites <c>SelectMany(source, c =&gt; inner.Select(o =&gt; clientType))</c> so the
+    ///     reassembly sits <em>above</em> the <c>SelectMany</c> instead of inside its collection
+    ///     selector.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Rewritten in place, the reassembly is a client-typed <c>Select</c> nested inside the
+    ///         collection selector — which makes the whole <c>SelectMany</c> client-side, so the
+    ///         source ships alone and the residual reads navigations off rows the server never
+    ///         sent. That is the refusal
+    ///         <c>SelectMany_with_client_eval_with_collection_shaper</c> and <c>…_ignored</c> hit.
+    ///     </para>
+    ///     <para>
+    ///         Hoisting works only if the client half needs nothing but the row, so the fragments
+    ///         are collected against the <em>outer</em> parameter as well as the inner one:
+    ///         <c>c.ContactName</c> has to travel in a slot, because after the hoist <c>c</c> is no
+    ///         longer in scope. That is the one thing the in-place rewrite cannot do, since there
+    ///         the outer parameter is still available and there was never a reason to carry it.
+    ///     </para>
+    ///     <para>
+    ///         Deliberately narrow. It matches one shape — the two-argument <c>SelectMany</c>,
+    ///         which <see cref="IsResultSelectorOperator" /> does not even consider, because its
+    ///         lambda returns <c>IEnumerable&lt;TResult&gt;</c> rather than <c>TResult</c>.
+    ///     </para>
+    /// </remarks>
+    private Expression? TryHoistCollectionProjection(MethodCallExpression node)
+    {
+        if (node.Method.DeclaringType != typeof(Queryable)
+            || node.Method.Name != nameof(Queryable.SelectMany)
+            || node.Arguments.Count != 2
+            || !node.Method.IsGenericMethod
+            || StripQuotes(node.Arguments[1]) is not LambdaExpression { Parameters: [var outer] } collectionSelector
+            || collectionSelector.Body is not MethodCallExpression inner
+            || !IsResultSelectorOperator(inner, out LambdaExpression? innerSelector))
+        {
+            return null;
+        }
+
+        Expression source = Visit(node.Arguments[0]);
+        if (!analyzer.Analyze(source).FactsFor(source).ServerOk)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < inner.Arguments.Count - 1; i++)
+        {
+            Expression argument = inner.Arguments[i];
+            if (!analyzer.Analyze(argument).FactsFor(argument).ServerOk)
+            {
+                return null;
+            }
+        }
+
+        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(innerSelector!);
+        if (bodyAnalysis.FactsFor(innerSelector.Body).ServerOk)
+        {
+            // Nothing client-typed here; the ordinary path ships it whole.
+            return null;
+        }
+
+        ParameterExpression[] rowParameters = [.. innerSelector.Parameters, outer];
+
+        List<Expression> fragments = [];
+        CollectFragments(innerSelector.Body, bodyAnalysis, rowParameters, fragments);
+        if (fragments.Count == 0)
+        {
+            return null;
+        }
+
+        IReadOnlySet<Expression> consumed = OperatorSourceCollector.Find(innerSelector.Body);
+
+        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Materialized(f, consumed))]);
+        ParameterExpression row = Expression.Parameter(tuple.Type, "row");
+
+        var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < fragments.Count; i++)
+        {
+            slots[fragments[i]] = Requeryable(TupleCarrier.Read(row, i), fragments[i], consumed);
+        }
+
+        Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(innerSelector.Body)!;
+        if (rowParameters.Any(p => ReferencesParameter(clientBody, p)))
+        {
+            // Something the server could not carry. Hoisting would strand it, and the in-place
+            // rewrite at least still answers.
+            return null;
+        }
+
+        Type[] innerGenerics = inner.Method.GetGenericArguments();
+        innerGenerics[^1] = tuple.Type;
+
+        bool quoted = inner.Arguments[^1] is UnaryExpression { NodeType: ExpressionType.Quote };
+        Expression Wrap(LambdaExpression lambda) => quoted ? Expression.Quote(lambda) : lambda;
+
+        MethodCallExpression serverInner = Expression.Call(
+            inner.Method.GetGenericMethodDefinition().MakeGenericMethod(innerGenerics),
+            [.. inner.Arguments.Take(inner.Arguments.Count - 1), Wrap(Expression.Lambda(tuple, innerSelector.Parameters))]);
+
+        Type[] outerGenerics = node.Method.GetGenericArguments();
+        outerGenerics[^1] = tuple.Type;
+
+        MethodCallExpression serverCall = Expression.Call(
+            node.Method.GetGenericMethodDefinition().MakeGenericMethod(outerGenerics),
+            source,
+            Expression.Quote(Expression.Lambda(serverInner, outer)));
+
+        MethodCallExpression reassembly = Expression.Call(
+            QueryableSelect.MakeGenericMethod(tuple.Type, innerSelector.ReturnType),
+            serverCall,
+            Expression.Quote(Expression.Lambda(clientBody, row)));
+
+        _reassemblies.Add(reassembly);
+        return reassembly;
     }
 
     /// <summary>
