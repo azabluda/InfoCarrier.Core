@@ -597,6 +597,51 @@ Small families with unrelated causes, taken one at a time. Each is measured on i
       inheritance and navigations) or to ship filter parameter values with the request (which
       requires knowing them before filters have been applied). Wants an ADR.
 
+- [ ] **Z3.** A projection inside a *collection selector* — the largest single-cause family left
+      (14). `SelectMany_with_client_eval_with_collection_shaper`, `…_ignored`, `…_with_constructor`
+      on both tiers, plus `GroupBy_Count_in_projection`.
+
+      All fail with the same navigation refusal (`Order.OrderDetails`, `OrderDetail.Product`) and
+      all have the same shape:
+
+      ```csharp
+      Customers.SelectMany(c => c.Orders.Select(o => new {
+          OrderProperty = ClientMethod(o), o.OrderDetails, CustomerProperty = c.ContactName }))
+      ```
+
+      `ProjectionRewriter` rewrites the inner `Select` **in place**, so the client reassembly ends
+      up inside the collection selector; that makes the enclosing `SelectMany` client-side, and
+      the navigation is then read from rows the server never sent. This is the same fault X5
+      fixed — and X5's fix does not reach it, for a specific reason: X5 re-carries an existing
+      *result* type, while here the carrier must be one `ProjectionRewriter` invents, because the
+      projection contains a genuinely client-only method that cannot go in a tuple slot at all.
+
+      So the fix needs the two passes combined: `ProjectionRewriter`'s fragment split (what can be
+      evaluated per row) with X5's placement (rebuild once at the root), and the enclosing
+      operator's element type mapped from the anonymous type to the tuple. Each part exists; none
+      of them composes yet. This is the "operator pushdown" `projection-split.md` §7 deferred, in
+      its last remaining form.
+
+      Note that the two-argument `SelectMany` is not a result-selector operator by the structural
+      test (`IsResultSelectorOperator`), because its lambda returns `IEnumerable<TResult>` rather
+      than `TResult` — so the existing machinery does not even consider it.
+
+- [ ] **Z4.** Client evaluation *forced by the type boundary*, where EF refuses outright —
+      `Select_GroupBy_SelectMany` and `Where_query_composition6`-style tests that assert a
+      translation failure this provider does not produce.
+
+      Not a bug so much as an unmade decision. The client-evaluation guard (phase C5) fires on
+      client **code** — a method the server cannot run. It deliberately does not fire when an
+      operator lands on the client because its type crossed the boundary, since that is this
+      milestone's whole subject and treating it as a failure cost 235 tests. But EF's contract is
+      that anything outside the final projection must translate or throw, and where EF throws and
+      this provider quietly answers, the two have diverged in a way a caller can observe.
+
+      Deciding this needs a policy, not a patch: either the boundary-forced residual is legitimate
+      (and these spec tests are permanently red, recorded in an ADR), or it is not (and the guard
+      widens, at a cost that has to be measured). Both were measured once — see C5 — and the
+      current line was chosen with evidence; what is missing is the ADR saying so.
+
 ---
 
 ## Exit criteria
