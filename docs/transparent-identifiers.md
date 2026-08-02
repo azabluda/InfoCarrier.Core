@@ -118,6 +118,13 @@ first attempt committed to its rewrite blindly and could only be assessed by run
 A transformation that has to justify itself before it is kept cannot regress the split, only fail
 to improve it.
 
+Implemented as `RewriteVerifier` (phase X2). The measure is **query operators left on the
+client**, which is the quantity being moved and the one that stays comparable across a rewrite —
+node counts do not, since swapping an anonymous type for a `ValueTuple` changes a tree's size
+without moving anything. Three well-formedness refusals come before the measure: a changed root
+type, a parameter nothing binds (X1's failure, kept as its regression test), and a shippable
+subtree turned into a correlated fragment.
+
 Neither guard makes translation *certain* — server-ok is a type property, not a translatability
 property. That gap is real and is why §6 keeps the phases separately measurable.
 
@@ -134,7 +141,7 @@ property. That gap is real and is why §6 keeps the phases separately measurable
 | Phase | Work | Target | Outcome |
 |---|---|---|---|
 | **X1** | Mirror `TryFlattenGroupJoinSelectMany`, plus the member-access-over-`new` simplification it relies on | *(claimed)* 16 `NullReferenceException` failures | **reverted** — target misattributed, rewrite not separable from EF's pipeline (§3.1) |
-| **X2** | Verification harness: rewrite, re-analyze, keep only on strict improvement | no test movement expected — it is the safety net for X3 | |
+| **X2** | Verification harness: rewrite, re-analyze, keep only on strict improvement | no test movement expected — it is the safety net for X3 | **done** — `RewriteVerifier`, 111 → 111 of 5222 |
 | **X3** | `ValueTuple` re-carry for surviving identifiers, under both guards | the navigation-read refusals | |
 
 X2 lands **before** the rewrite, so X3 is never measured without its guard. X1 is the argument

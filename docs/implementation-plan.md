@@ -394,10 +394,26 @@ has to preserve what each operator expects of its source, and a transparent iden
       liability, and its claimed support for X3 (removing groupings before they reach a carrier
       slot) is void under the same guard.
 
-- [ ] **X2.** Verification harness — rewrite, re-analyze, keep only on strict improvement.
-      Now ordered *before* X3 rather than between the two rewrites, since there is no X1 to sit
+- [x] **X2.** Verification harness — `RewriteVerifier` rewrites, re-analyzes, and keeps a
+      candidate only when it is well formed *and* ships strictly more.
+      **111 → 111 of 5222, as designed**: it guards a rewrite that does not exist yet, so any
+      test movement would have meant it was doing something it should not. ✅ `<this commit>`
+
+      Ordered *before* X3 rather than between the two rewrites, since there is no X1 to sit
       between. X1 is the argument for it: it grew an ad-hoc free-parameter check mid-flight,
-      which is this step arriving late and in the wrong shape.
+      which is this step arriving late and in the wrong shape. That check is now
+      `RewriteRejection.OpenTree`, with X1's actual broken tree as its regression test —
+      a `Join` whose result selector reconstructs the transparent identifier while the join
+      binds only the outer and inner elements.
+
+      The measure is **query operators left on the client**, not node count: replacing an
+      anonymous type with a `ValueTuple` changes a tree's size without moving anything across
+      the boundary, whereas operators only ever change sides under these rewrites.
+
+      Four rejection reasons, each mutation-tested by disabling it — `TypeChanged`, `OpenTree`,
+      `CorrelatedFragment`, and the strictness of the comparison itself (`<` weakened to `<=`).
+      Every one costs at least one test, as does the counter's skip over already-shipped
+      subtrees.
 
 - [ ] **X3.** `ValueTuple` re-carry for transparent identifiers, under both guards of
       `transparent-identifiers.md` §4. Target: the navigation-read refusals — plain
