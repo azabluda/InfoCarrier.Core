@@ -243,21 +243,36 @@ failure with a named cause.
 | 10 | `NullReferenceException` inside a client-side `SelectMany` over a transparent identifier | real defect, uninvestigated |
 | 10 | `EF.Property` on the client side of the boundary | **done in E3** — mapped properties read through the model; only shadow state remains out of reach |
 | 8 | Client evaluation correctly refused (`translation-failure`) but the test expects success | E2 |
-| 8 | `First/Single/Last_over_custom_projection_compared_to_null` | **known limitation, see below** |
+| 8 | `First/Single/Last_over_custom_projection_compared_to_null` | ~~known limitation~~ — **overturned in X4** |
 | 6 | Correlated subquery under a client projection the rewrite cannot reach | C-phase tail |
 | ~36 | Value mismatches, one to four tests each | individually triaged |
 
-### The custom-projection-compared-to-null limitation
+### ~~The custom-projection-compared-to-null limitation~~ — **not a limitation (X4)**
 
-`Where(c => c.Orders.Select(o => new { o.OrderID }).First() == null)` constructs an anonymous
-type **inside a predicate**, where the value never crosses the wire — but the server would still
-have to *construct* it, and it has no such type. EF's InMemory provider manages only because it
-shares an `AppDomain`; no network transport could. Rewriting the construction into a
-`ValueTuple` does not save it either, because the predicate compares the result to `null` and a
-tuple is a struct.
+> ⚠️ **Overturned 2026-08-02.** Kept here in full because it was wrong in an instructive way,
+> and because "genuine limit, not a gap" is the sort of claim that stops anyone looking again.
 
-This is a genuine limit of the type boundary rather than a gap in the implementation, and it is
-recorded here rather than papered over.
+The original entry read:
+
+> `Where(c => c.Orders.Select(o => new { o.OrderID }).First() == null)` constructs an anonymous
+> type **inside a predicate**, where the value never crosses the wire — but the server would
+> still have to *construct* it, and it has no such type. EF's InMemory provider manages only
+> because it shares an `AppDomain`; no network transport could. Rewriting the construction into
+> a `ValueTuple` does not save it either, because the predicate compares the result to `null`
+> and a tuple is a struct.
+
+Two things were wrong.
+
+**The diagnosis named the wrong symptom.** These queries were not failing because the server
+could not construct the type. They were failing with *"Sequence contains no elements"* — the
+predicate ran on the client, where LINQ-to-Objects applies `First` strictly, while SQL answers
+an empty subquery with `null`. The tell was there all along: the `*OrDefault` variants
+**passed**, and only the throwing operators — `First`, `Single`, `SingleOrDefault`, `ElementAt`
+— failed. A limitation of the type boundary would not have cared which operator was used.
+
+**The dismissal was half an argument.** "A tuple is a struct" is true, and it is a reason not to
+use `ValueTuple`, not a reason the problem is unsolvable. `Tuple<>` is a reference type, is
+already on the allowlist, and makes `== null` mean what it says.
 
 ---
 
@@ -457,6 +472,27 @@ has to preserve what each operator expects of its source, and a transparent iden
       116 → 323 respectively — which is recorded here rather than papered over with a test that
       would not have caught them.
 
+- [x] **X4.** A carrier compared to `null` is carried by a **reference-typed** `Tuple<>` rather
+      than a `ValueTuple`. **101 → 67 of 5227, nothing broken** — the whole
+      `First/Single/SingleOrDefault/Last/ElementAt_over_custom_projection_compared_to_null`
+      family, on both tiers. ✅ `<this commit>`
+
+      This overturns the "genuine limit of the type boundary" recorded above; see that section
+      for what the original diagnosis got wrong.
+
+      One implementation trap, and it cost a full suite run of zero movement: the null has to be
+      recognised **through the comparison**, not through its own type. The C# compiler emits
+      `anonymous == null` with the null constant typed `object`, so keying off the constant marks
+      `object` as null-compared and never the carrier. The rewrite then produced
+      `ValueTuple<int> == object`, `Expression.Equal` refused it — *"Reference equality is not
+      defined for the types …"* — and the catch in `Rewrite` discarded the whole thing in
+      silence. That silence is the cost of the catch, and is why the probe went in rather than
+      another guess.
+
+      `TupleCarrier` now has both families and picks members accordingly: fields on a
+      `ValueTuple`, properties on a `Tuple`. Mutation-tested — forcing the value family back
+      costs the new unit test.
+
 ---
 
 ## Exit criteria
@@ -489,3 +525,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 4168 | 118 | 4295 | after C1 (nested projections rewrite too) |
 | 2026-08-02 | 5098 | 111 | 5222 | after X2 (rewrite verifier — no movement, by design) |
 | 2026-08-02 | 5113 | 101 | 5227 | after X3 (carriers re-carried as tuples; both tiers moved) |
+| 2026-08-02 | 5147 |  67 | 5227 | after X4 (reference-typed carrier when compared to null) |

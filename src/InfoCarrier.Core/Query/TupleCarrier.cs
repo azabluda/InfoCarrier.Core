@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace InfoCarrier.Core.Query;
 
@@ -25,7 +26,7 @@ internal static class TupleCarrier
 {
     private const int MaxFlatArity = 7;
 
-    private static readonly Type[] Definitions =
+    private static readonly Type[] ValueDefinitions =
     [
         typeof(ValueTuple<>),
         typeof(ValueTuple<,>),
@@ -38,34 +39,51 @@ internal static class TupleCarrier
     ];
 
     /// <summary>
+    ///     The reference-typed family, used when the carrier is compared to <see langword="null" />.
+    /// </summary>
+    private static readonly Type[] ReferenceDefinitions =
+    [
+        typeof(Tuple<>),
+        typeof(Tuple<,>),
+        typeof(Tuple<,,>),
+        typeof(Tuple<,,,>),
+        typeof(Tuple<,,,,>),
+        typeof(Tuple<,,,,,>),
+        typeof(Tuple<,,,,,,>),
+        typeof(Tuple<,,,,,,,>),
+    ];
+
+    /// <summary>
     ///     The tuple type carrying <paramref name="types" />, nesting beyond seven.
     /// </summary>
-    public static Type MakeType(IReadOnlyList<Type> types)
+    public static Type MakeType(IReadOnlyList<Type> types, bool nullable = false)
     {
         ArgumentOutOfRangeException.ThrowIfZero(types.Count);
 
+        Type[] definitions = nullable ? ReferenceDefinitions : ValueDefinitions;
+
         if (types.Count <= MaxFlatArity)
         {
-            return Definitions[types.Count - 1].MakeGenericType([.. types]);
+            return definitions[types.Count - 1].MakeGenericType([.. types]);
         }
 
-        Type rest = MakeType([.. types.Skip(MaxFlatArity)]);
-        return Definitions[MaxFlatArity].MakeGenericType([.. types.Take(MaxFlatArity), rest]);
+        Type rest = MakeType([.. types.Skip(MaxFlatArity)], nullable);
+        return definitions[MaxFlatArity].MakeGenericType([.. types.Take(MaxFlatArity), rest]);
     }
 
     /// <summary>
     ///     Constructs the tuple from <paramref name="values" />.
     /// </summary>
-    public static Expression New(IReadOnlyList<Expression> values)
+    public static Expression New(IReadOnlyList<Expression> values, bool nullable = false)
     {
-        Type type = MakeType([.. values.Select(v => v.Type)]);
+        Type type = MakeType([.. values.Select(v => v.Type)], nullable);
 
         if (values.Count <= MaxFlatArity)
         {
             return Construct(type, values);
         }
 
-        Expression rest = New([.. values.Skip(MaxFlatArity)]);
+        Expression rest = New([.. values.Skip(MaxFlatArity)], nullable);
         return Construct(type, [.. values.Take(MaxFlatArity), rest]);
     }
 
@@ -87,14 +105,26 @@ internal static class TupleCarrier
         => Expression.New(
             type.GetConstructors()[0],
             values,
-            [.. Enumerable.Range(0, values.Count)
-                .Select(i => type.GetField(i < MaxFlatArity ? $"Item{i + 1}" : "Rest")!)]);
+            [.. Enumerable.Range(0, values.Count).Select(i => Member(type, i))]);
+
+    /// <summary>
+    ///     The member holding slot <paramref name="index" />: a field on a
+    ///     <see cref="ValueTuple" />, a property on a <see cref="Tuple" />.
+    /// </summary>
+    private static MemberInfo Member(Type type, int index)
+    {
+        string name = index < MaxFlatArity ? $"Item{index + 1}" : "Rest";
+
+        return type.IsValueType
+            ? type.GetField(name)!
+            : type.GetProperty(name)!;
+    }
 
     /// <summary>
     ///     Reads the value at <paramref name="index" /> back out.
     /// </summary>
     public static Expression Read(Expression tuple, int index)
         => index < MaxFlatArity
-            ? Expression.Field(tuple, $"Item{index + 1}")
-            : Read(Expression.Field(tuple, "Rest"), index - MaxFlatArity);
+            ? Expression.MakeMemberAccess(tuple, Member(tuple.Type, index))
+            : Read(Expression.MakeMemberAccess(tuple, Member(tuple.Type, MaxFlatArity)), index - MaxFlatArity);
 }

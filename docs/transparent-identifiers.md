@@ -155,8 +155,10 @@ property. That gap is real and is why §6 keeps the phases separately measurable
 - **Correlated collection selectors.** §3.1 declines them exactly where EF declines them.
 - **A transparent identifier consumed by genuinely client-side code.** If the chain does not
   become server-ok, verification discards the rewrite and today's behaviour stands.
-- **`ElementAt`/`First` over a client projection compared to `null`** — a different problem
-  (`projection-split.md` §6a tail), unaffected by any of this.
+- ~~**`ElementAt`/`First` over a client projection compared to `null`**~~ — recorded here as "a
+  different problem, unaffected by any of this", and **wrong**: §3.2's rule covers it exactly
+  (the carrier is built in a predicate and never reaches the result). All 34 were fixed in X4 by
+  giving a null-compared carrier a reference-typed `Tuple<>` instead of a `ValueTuple`.
 
 ## 6. Phases, each measured on its own
 

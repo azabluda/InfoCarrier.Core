@@ -46,7 +46,7 @@ internal static class TransparentIdentifierRewriter
     /// </summary>
     internal static Expression Rewrite(Expression query, TypeAllowlist allowlist)
     {
-        Dictionary<Type, MemberInfo[]> carriers = CarrierFinder.Find(query, allowlist);
+        Dictionary<Type, MemberInfo[]> carriers = CarrierFinder.Find(query, allowlist, out IReadOnlySet<Type> nullCompared);
         if (carriers.Count == 0)
         {
             return query;
@@ -54,7 +54,7 @@ internal static class TransparentIdentifierRewriter
 
         try
         {
-            return new Rewriter(carriers).Visit(query);
+            return new Rewriter(carriers, nullCompared).Visit(query);
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException)
         {
@@ -110,11 +110,14 @@ internal static class TransparentIdentifierRewriter
     {
         private readonly Dictionary<Type, MemberInfo[]> _candidates = [];
         private readonly HashSet<Type> _disqualified = [];
+        private readonly HashSet<Type> _nullCompared = [];
 
-        public static Dictionary<Type, MemberInfo[]> Find(Expression query, TypeAllowlist allowlist)
+        public static Dictionary<Type, MemberInfo[]> Find(
+            Expression query, TypeAllowlist allowlist, out IReadOnlySet<Type> nullCompared)
         {
             var finder = new CarrierFinder(allowlist);
             finder.Visit(query);
+            nullCompared = finder._nullCompared;
 
             // A type the query returns is the caller's, not the query's. Rewriting one would
             // change what the caller receives — and the split has a mechanism for those already:
@@ -130,12 +133,70 @@ internal static class TransparentIdentifierRewriter
             return finder._candidates;
         }
 
+        /// <summary>
+        ///     A constant of the carrier type is either a value that already exists — which no
+        ///     rewrite can turn into a tuple — or the <see langword="null" /> half of a comparison,
+        ///     which is a different thing entirely.
+        /// </summary>
+        /// <remarks>
+        ///     <c>Where(c =&gt; c.Orders.Select(o =&gt; new { o.OrderID }).First() == null)</c> builds
+        ///     the carrier inside a <em>predicate</em>, so it never crosses the wire — but the
+        ///     server still has to construct it, and treating the <see langword="null" /> as an
+        ///     existing value disqualified the type and left the whole predicate on the client.
+        ///     There LINQ-to-Objects applies <c>First</c> strictly and throws "Sequence contains no
+        ///     elements", where SQL yields <see langword="null" /> and EF's own expected result is
+        ///     the <c>FirstOrDefault</c> one.
+        /// </remarks>
         protected override Expression VisitConstant(ConstantExpression node)
         {
-            // A value of the carrier type already exists, so the type cannot be replaced: there
-            // is no rewrite of a constant that turns one into a tuple.
-            Disqualify(node.Type);
+            if (node.Value is not null)
+            {
+                Disqualify(node.Type);
+            }
+
             return node;
+        }
+
+        /// <summary>
+        ///     Records a carrier that is compared to <see langword="null" />, so it can be given a
+        ///     reference-typed tuple instead of a <see cref="ValueTuple" />.
+        /// </summary>
+        /// <remarks>
+        ///     The null has to be found through the comparison rather than through its own type:
+        ///     the C# compiler emits <c>anonymous == null</c> with the null constant typed
+        ///     <see cref="object" />, so keying off the constant marks <see cref="object" /> and
+        ///     the carrier is never recognised — measured as no movement at all before the check
+        ///     moved here.
+        /// </remarks>
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                if (IsNull(node.Right))
+                {
+                    _nullCompared.Add(node.Left.Type);
+                }
+
+                if (IsNull(node.Left))
+                {
+                    _nullCompared.Add(node.Right.Type);
+                }
+            }
+
+            return base.VisitBinary(node);
+        }
+
+        private static bool IsNull(Expression node)
+        {
+            while (node is UnaryExpression
+                   {
+                       NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs,
+                   } convert)
+            {
+                node = convert.Operand;
+            }
+
+            return node is ConstantExpression { Value: null } or DefaultExpression;
         }
 
         /// <summary>
@@ -206,7 +267,9 @@ internal static class TransparentIdentifierRewriter
     ///     Retypes the tree: carrier constructions become tuple constructions, member reads
     ///     through one become slot reads, and every type mentioning a carrier is mapped through.
     /// </summary>
-    private sealed class Rewriter(IReadOnlyDictionary<Type, MemberInfo[]> carriers) : ExpressionVisitor
+    private sealed class Rewriter(
+        IReadOnlyDictionary<Type, MemberInfo[]> carriers,
+        IReadOnlySet<Type> nullCompared) : ExpressionVisitor
     {
         private readonly Dictionary<Type, Type> _mapped = [];
         private readonly Dictionary<ParameterExpression, ParameterExpression> _parameters
@@ -228,7 +291,10 @@ internal static class TransparentIdentifierRewriter
         {
             if (carriers.TryGetValue(type, out MemberInfo[]? members))
             {
-                return TupleCarrier.MakeType([.. members.Select(m => Map(MemberType(m)))]);
+                // A carrier compared to null has to stay a reference type, or the comparison it
+                // exists to serve stops being expressible at all.
+                return TupleCarrier.MakeType(
+                    [.. members.Select(m => Map(MemberType(m)))], nullCompared.Contains(type));
             }
 
             if (type.IsGenericType)
@@ -246,8 +312,17 @@ internal static class TransparentIdentifierRewriter
 
         protected override Expression VisitNew(NewExpression node)
             => carriers.ContainsKey(node.Type)
-                ? TupleCarrier.New([.. node.Arguments.Select(a => Visit(a))])
+                ? TupleCarrier.New(
+                    [.. node.Arguments.Select(a => Visit(a))], nullCompared.Contains(node.Type))
                 : base.VisitNew(node);
+
+        protected override Expression VisitConstant(ConstantExpression node)
+        {
+            // The other half of the comparison: a typed null has to be retyped with it.
+            Type mapped = Map(node.Type);
+
+            return mapped == node.Type ? node : Expression.Constant(node.Value, mapped);
+        }
 
         protected override Expression VisitMember(MemberExpression node)
         {

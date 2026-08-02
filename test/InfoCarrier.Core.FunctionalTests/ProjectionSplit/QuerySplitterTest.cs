@@ -305,6 +305,22 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_carrier_compared_to_null_is_carried_by_a_reference_tuple()
+    {
+        // The carrier is built inside a *predicate*, so it never crosses the wire — but the
+        // server still has to construct it, which makes it a boundary like any other. A
+        // `ValueTuple` cannot serve here: comparing a struct to null is not an expression that
+        // can be built at all, so the rewrite throws, is discarded, and the predicate stays on
+        // the client — where LINQ-to-Objects applies `First` strictly and throws on an empty
+        // sequence that SQL would answer with null.
+        SplitQuery split = Split(
+            _context.Authors.Where(a => a.Books.Select(b => new { b.Title }).FirstOrDefault() == null));
+
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(["Woolf"], ((IEnumerable<Author>)Run(split)!).Select(a => a.Name));
+    }
+
+    [Fact]
     public void A_carrier_the_query_returns_is_left_alone()
     {
         // The caller asked for this type, so it is not plumbing. Re-carrying it would hand back
