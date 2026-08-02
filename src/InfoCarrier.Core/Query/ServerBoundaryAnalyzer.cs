@@ -82,6 +82,32 @@ public sealed class ServerBoundaryAnalyzer
             ?? type;
 
     /// <summary>
+    ///     The element type of any sequence type — <see cref="IQueryable{T}" /> preferred, then
+    ///     <see cref="IEnumerable{T}" />. A collection navigation read inside a projection is an
+    ///     <c>IEnumerable</c>, not an <c>IQueryable</c>, so the queryable-only form above cannot
+    ///     see nested projections at all.
+    /// </summary>
+    internal static Type SequenceElementType(Type type)
+    {
+        if (type == typeof(string))
+        {
+            return type;
+        }
+
+        Type queryable = ElementTypeOf(type);
+        if (queryable != type)
+        {
+            return queryable;
+        }
+
+        Type? enumerable = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+            ? type
+            : type.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+        return enumerable?.GetGenericArguments()[0] ?? type;
+    }
+
+    /// <summary>
     ///     Whether a subtree is something the server could <em>run</em>, as opposed to merely
     ///     serialize.
     /// </summary>

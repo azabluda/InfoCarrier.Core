@@ -118,7 +118,13 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       the rows are not that entity type and the outer wrap had nowhere to go. **194 → 154.**
       Suite run time rose 2m36s → 4m43s: the over-fetch is real, and is what B's fragment
       evaluation removes wherever it can reach. ✅ `<this commit>`
-- [ ] **C1.** Recursive rewrite of nested projections inside a fragment (§3.3).
+- [x] **C1.** Nested projections rewrite too. A collection navigation read inside a projection
+      (`c.Orders.Select(o => new { … })`) is an **`Enumerable`** call over an `ICollection`, not a
+      `Queryable` call over a root — so neither the declaring-type test nor the queryable-only
+      element-type helper could see it, and the whole nested projection fell to the client with
+      its navigations unloaded. Recognising `Enumerable` too, and rebuilding lambdas unquoted
+      when the original was, makes the rewrite recursive by construction. **134 → 118.**
+      ✅ `<this commit>`
 
 ## Phase M2-D — adopt and drive green
 
@@ -175,3 +181,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 4092 | 194 | 4295 | after C5 (client evaluation is a translation failure) |
 | 2026-08-02 | 4132 | 154 | 4295 | after C6 (Include placed at the root it is read from) |
 | 2026-08-02 | 4152 | 134 | 4295 | after E1 (stale overrides deleted; guard made per-argument) |
+| 2026-08-02 | 4168 | 118 | 4295 | after C1 (nested projections rewrite too) |

@@ -45,6 +45,13 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
             && second.GetGenericArguments()[0].GetGenericArguments().Length == 2);
 
+    private static readonly MethodInfo EnumerableSelect = typeof(Enumerable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Enumerable.Select)
+            && m.GetGenericArguments().Length == 2
+            && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
+            && second.GetGenericArguments().Length == 2);
+
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
@@ -94,11 +101,6 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             }
         }
 
-        if (!ServerBoundaryAnalyzer.IsExecutableQuery(call.Arguments[0]))
-        {
-            return call;
-        }
-
         BoundaryAnalysis bodyAnalysis = analyzer.Analyze(selector!);
         if (bodyAnalysis.FactsFor(selector.Body).ServerOk)
         {
@@ -134,17 +136,24 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         Type[] genericArguments = call.Method.GetGenericArguments();
         genericArguments[^1] = tuple.Type;
 
+        // A nested projection over a collection navigation is an Enumerable call whose lambdas
+        // are plain Funcs, not quoted expression trees. Rebuilding it in the Queryable flavour
+        // makes Expression.Call reject the argument.
+        bool quoted = call.Arguments[^1] is UnaryExpression { NodeType: ExpressionType.Quote };
+        Expression Wrap(LambdaExpression lambda) => quoted ? Expression.Quote(lambda) : lambda;
+
         MethodCallExpression serverCall = Expression.Call(
             call.Method.GetGenericMethodDefinition().MakeGenericMethod(genericArguments),
             [
                 .. call.Arguments.Take(call.Arguments.Count - 1),
-                Expression.Quote(Expression.Lambda(tuple, selector.Parameters)),
+                Wrap(Expression.Lambda(tuple, selector.Parameters)),
             ]);
 
         MethodCallExpression reassembly = Expression.Call(
-            QueryableSelect.MakeGenericMethod(tuple.Type, selector.ReturnType),
+            (quoted ? QueryableSelect : EnumerableSelect)
+                .MakeGenericMethod(tuple.Type, selector.ReturnType),
             serverCall,
-            Expression.Quote(Expression.Lambda(clientBody, row)));
+            Wrap(Expression.Lambda(clientBody, row)));
 
         _reassemblies.Add(reassembly);
         return reassembly;
@@ -170,7 +179,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     {
         selector = null;
 
-        if (call.Method.DeclaringType != typeof(Queryable)
+        if (call.Method.DeclaringType is not { } declaring
+            || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
             || !call.Method.IsGenericMethod
             || call.Arguments.Count < 2)
         {
@@ -178,7 +188,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         Type resultType = call.Method.GetGenericArguments()[^1];
-        if (ServerBoundaryAnalyzer.ElementTypeOf(call.Method.ReturnType) != resultType
+        if (ServerBoundaryAnalyzer.SequenceElementType(call.Method.ReturnType) != resultType
             || StripQuotes(call.Arguments[^1]) is not LambdaExpression lambda
             || lambda.ReturnType != resultType)
         {
