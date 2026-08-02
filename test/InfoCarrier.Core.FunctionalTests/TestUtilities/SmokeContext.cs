@@ -30,6 +30,22 @@ public class Post
     public int BlogId { get; set; }
 
     public Blog? Blog { get; set; }
+
+    public List<Tag> Tags { get; set; } = [];
+}
+
+/// <summary>
+///     The other end of a many-to-many. ADR-004 requires M2M from day one — it is v1's stated
+///     worst failure mode — and its join entity is what makes SaveChanges hard: a shared-type
+///     entity with two foreign keys and no navigations of its own.
+/// </summary>
+public class Tag
+{
+    public int Id { get; set; }
+
+    public string? Label { get; set; }
+
+    public List<Post> Posts { get; set; } = [];
 }
 
 /// <summary>
@@ -45,6 +61,8 @@ public class SmokeContext : DbContext
     public DbSet<Blog> Blogs => Set<Blog>();
 
     public DbSet<Post> Posts => Set<Post>();
+
+    public DbSet<Tag> Tags => Set<Tag>();
 }
 
 /// <summary>
@@ -61,4 +79,6 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     public DbSet<Blog> Blogs => Set<Blog>();
 
     public DbSet<Post> Posts => Set<Post>();
+
+    public DbSet<Tag> Tags => Set<Tag>();
 }

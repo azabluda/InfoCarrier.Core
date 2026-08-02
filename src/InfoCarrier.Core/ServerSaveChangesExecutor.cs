@@ -77,7 +77,13 @@ public class ServerSaveChangesExecutor
 
                 object? clrValue = _mapper.FromPropertyValue(value, property.ClrType);
 
-                if (property.PropertyInfo is { } propertyInfo && propertyInfo.CanWrite)
+                // A shared-type entity — a many-to-many join entity is one — stores its values in
+                // a dictionary, and EF reports its properties as the `Item[string]` indexer.
+                // Handing that to SetValue without an index is a parameter-count mismatch, so it
+                // goes down the entry path with the shadow properties instead.
+                if (property.PropertyInfo is { } propertyInfo
+                    && propertyInfo.CanWrite
+                    && propertyInfo.GetIndexParameters().Length == 0)
                 {
                     propertyInfo.SetValue(entity, clrValue);
                 }
@@ -96,37 +102,26 @@ public class ServerSaveChangesExecutor
             pending.Add((change, entity, entityType, shadow));
         }
 
-        // Wire relationships before anything is tracked. A dependent whose principal is new has
-        // no usable foreign key — the client's was temporary and was not sent — so the link is
-        // what tells the server they belong together, and EF's fixup supplies the real key once
-        // the principal is inserted.
-        var byCorrelationId = pending.ToDictionary(p => p.Change.CorrelationId, p => p.Entity);
-        foreach ((ChangeEntry change, object entity, IEntityType entityType, _) in pending)
-        {
-            foreach (NavigationLink link in change.Navigations ?? [])
-            {
-                if (FindNavigation(entityType, link.Name) is not { } navigation)
-                {
-                    continue;
-                }
-
-                object?[] targets = [.. link.TargetCorrelationIds
-                    .Select(id => byCorrelationId.TryGetValue(id, out object? t) ? t : null)
-                    .Where(t => t is not null)];
-
-                Wire(entity, navigation, targets);
-            }
-        }
-
         foreach ((ChangeEntry change, object entity, IEntityType entityType, var shadow) in pending)
         {
-            EntityEntry entry = _context.Entry(entity);
+            EntityEntry entry = Track(entityType, entity);
             EntityState state = Enum.Parse<EntityState>(change.State);
             entry.State = state;
 
             foreach ((IProperty property, object? value) in shadow)
             {
                 entry.Property(property.Name).CurrentValue = value;
+            }
+
+            // Mark the client's placeholders as placeholders here too. EF then treats them the
+            // way it treats its own: shared between a principal and its dependents, replaced
+            // everywhere by the real key once the store issues it.
+            foreach (string name in change.TemporaryProperties ?? [])
+            {
+                if (entityType.FindProperty(name) is not null && state == EntityState.Added)
+                {
+                    entry.Property(name).IsTemporary = true;
+                }
             }
 
             tracked.Add((change.CorrelationId, entry, entityType, state));
@@ -144,49 +139,32 @@ public class ServerSaveChangesExecutor
         };
     }
 
-    private static INavigationBase? FindNavigation(IEntityType entityType, string name)
-        => (INavigationBase?)entityType.FindNavigation(name) ?? entityType.FindSkipNavigation(name);
-
     /// <summary>
-    ///     Assigns a navigation on an untracked instance.
+    ///     Gets the entry for an instance, by entity type rather than by CLR type.
     /// </summary>
     /// <remarks>
-    ///     A collection navigation is added to rather than replaced: the instance may have been
-    ///     constructed with one, and replacing it would discard whatever the entity's own
-    ///     constructor put there.
+    ///     <c>DbContext.Entry</c> resolves by CLR type, which cannot identify a shared-type
+    ///     entity: several of them have the same <c>Dictionary&lt;string, object&gt;</c> CLR type
+    ///     and are told apart only by name. A many-to-many join entity is exactly that.
     /// </remarks>
-    private static void Wire(object entity, INavigationBase navigation, object?[] targets)
+    private EntityEntry Track(IEntityType entityType, object entity)
     {
-        if (navigation.PropertyInfo is not { } propertyInfo)
+        if (!entityType.HasSharedClrType)
         {
-            return;
+            return _context.Entry(entity);
         }
 
-        if (!navigation.IsCollection)
-        {
-            if (targets.Length > 0 && propertyInfo.CanWrite)
-            {
-                propertyInfo.SetValue(entity, targets[0]);
-            }
+        object set = typeof(DbContext)
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Single(m => m.Name == nameof(DbContext.Set)
+                && m.IsGenericMethodDefinition
+                && m.GetParameters() is [{ ParameterType: var p }] && p == typeof(string))
+            .MakeGenericMethod(entityType.ClrType)
+            .Invoke(_context, [entityType.Name])!;
 
-            return;
-        }
-
-        object? collection = propertyInfo.GetValue(entity);
-        if (collection is null && propertyInfo.CanWrite)
-        {
-            collection = Activator.CreateInstance(
-                typeof(List<>).MakeGenericType(navigation.TargetEntityType.ClrType));
-            propertyInfo.SetValue(entity, collection);
-        }
-
-        if (collection is System.Collections.IList list)
-        {
-            foreach (object? target in targets)
-            {
-                list.Add(target);
-            }
-        }
+        return (EntityEntry)set.GetType()
+            .GetMethod(nameof(DbSet<object>.Entry))!
+            .Invoke(set, [entity])!;
     }
 
     /// <summary>

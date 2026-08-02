@@ -42,35 +42,21 @@ public sealed record ChangeEntry
     /// </summary>
     public byte[]? SerializedOriginalValues { get; init; }
 
+
     /// <summary>
-    ///     Relationships to other entries in the same request, by correlation id.
+    ///     Names of properties whose value is <em>temporary</em> — the client's placeholder for a
+    ///     key the store has not generated yet.
     /// </summary>
     /// <remarks>
-    ///     Foreign keys travel as ordinary property values, but only when they have a value to
-    ///     travel. A dependent whose principal is itself new holds a <em>temporary</em> key,
-    ///     which must not be sent — it would ask the store to insert a row pointing at a
-    ///     made-up id. The relationship is sent instead, and EF's own fixup assigns the real
-    ///     foreign key on the server once the principal is inserted (research-findings §9).
+    ///     These values do travel, and the server marks them temporary on its own entries. That
+    ///     is what makes EF's ordinary machinery connect the graph: a principal and its dependents
+    ///     share the same temporary key value, and EF replaces every occurrence with the real one
+    ///     during <c>SaveChanges</c>. It is also the only thing that works for a many-to-many join
+    ///     entity, which has foreign keys but no navigations to link through.
     /// </remarks>
-    public IReadOnlyList<NavigationLink>? Navigations { get; init; }
+    public IReadOnlyList<string>? TemporaryProperties { get; init; }
 }
 
-/// <summary>
-///     One navigation of a <see cref="ChangeEntry" />, pointing at other entries in the same
-///     request.
-/// </summary>
-public sealed record NavigationLink
-{
-    /// <summary>
-    ///     The navigation's name on the declaring entity type.
-    /// </summary>
-    public required string Name { get; init; }
-
-    /// <summary>
-    ///     Correlation ids of the related entries. A reference navigation has at most one.
-    /// </summary>
-    public required IReadOnlyList<int> TargetCorrelationIds { get; init; }
-}
 
 /// <summary>
 ///     A SaveChanges request: the serialized change-tracker entries (wire-protocol §2.2).

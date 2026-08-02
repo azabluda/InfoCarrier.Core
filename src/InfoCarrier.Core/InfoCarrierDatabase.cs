@@ -106,17 +106,9 @@ public class InfoCarrierDatabase : IDatabase
         var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         mapper.ResetReferenceScope();
 
-        // Relationships travel by correlation id, so every entry has to be identifiable before
-        // any of them is written.
-        var correlationByEntity = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
-        for (int i = 0; i < entries.Count; i++)
-        {
-            correlationByEntity[entries[i].ToEntityEntry().Entity] = i;
-        }
-
         var request = new Common.SaveChangesRequest
         {
-            Entries = [.. entries.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper, correlationByEntity))],
+            Entries = [.. entries.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
         };
 
         Common.SaveChangesResult result = await _client

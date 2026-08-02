@@ -226,4 +226,56 @@ public class SqliteSmokeTest
         using DbContext server = store.CreateDbContext();
         Assert.Equal(blogId, (await server.Set<Post>().SingleAsync()).BlogId);
     }
+
+    [ConditionalFact]
+    public async Task A_many_to_many_link_between_two_new_entities_is_persisted()
+    {
+        // The hardest SaveChanges shape, and the one ADR-004 calls v1's worst failure mode. The
+        // join entity is a shared-type entity with two foreign keys and no navigations, and both
+        // of those keys are temporary because both principals are new. Nothing but the shared
+        // temporary value connects the three rows.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            var post = new Post { Heading = "first", Blog = new Blog { Title = "alpha" } };
+            post.Tags.Add(new Tag { Label = "ef" });
+            post.Tags.Add(new Tag { Label = "linq" });
+            client.Add(post);
+
+            await client.SaveChangesAsync();
+        }
+
+        using DbContext server = store.CreateDbContext();
+        Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync();
+        Assert.Equal(["ef", "linq"], saved.Tags.OrderBy(t => t.Label).Select(t => t.Label));
+    }
+
+    [ConditionalFact]
+    public async Task A_many_to_many_link_between_existing_entities_is_persisted()
+    {
+        // Here the join entity is the *only* changed entry: both principals already exist, so
+        // neither appears in the request and the link has to stand on its own.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        await using (SqliteSmokeContext seed = CreateClient(store))
+        {
+            seed.Add(new Post { Heading = "first", Blog = new Blog { Title = "alpha" } });
+            seed.Add(new Tag { Label = "ef" });
+            await seed.SaveChangesAsync();
+        }
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            Post post = await client.Posts.Include(p => p.Tags).SingleAsync();
+            post.Tags.Add(await client.Tags.SingleAsync());
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        using DbContext server = store.CreateDbContext();
+        Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync();
+        Assert.Equal("ef", Assert.Single(saved.Tags).Label);
+    }
 }
