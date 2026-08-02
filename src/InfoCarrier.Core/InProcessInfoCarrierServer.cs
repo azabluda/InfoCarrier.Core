@@ -52,13 +52,22 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
 
     /// <inheritdoc />
     public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("Transaction support lands with SaveChanges (Step 10).");
+        => throw new NotImplementedException(
+            "Remoted transactions land in milestone M4, which needs the wire-protocol W3 "
+                + "transaction token. Until then the client-side manager ignores transactions "
+                + "and raises InfoCarrierEventId.TransactionIgnoredWarning.");
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("Transaction support lands with SaveChanges (Step 10).");
+        => throw new NotImplementedException(
+            "Remoted transactions land in milestone M4, which needs the wire-protocol W3 "
+                + "transaction token. Until then the client-side manager ignores transactions "
+                + "and raises InfoCarrierEventId.TransactionIgnoredWarning.");
 
     /// <inheritdoc />
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("Transaction support lands with SaveChanges (Step 10).");
+        => throw new NotImplementedException(
+            "Remoted transactions land in milestone M4, which needs the wire-protocol W3 "
+                + "transaction token. Until then the client-side manager ignores transactions "
+                + "and raises InfoCarrierEventId.TransactionIgnoredWarning.");
 }

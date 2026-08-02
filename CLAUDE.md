@@ -81,15 +81,25 @@ material only.
 
 ## Current state
 
-Vertical slice is green end-to-end (capture → serialize → transport → rebind → execute →
-materialize). `NorthwindWhereQueryInfoCarrierTest` discovers 413 inherited spec tests.
+Query, projection split and SaveChanges all work end-to-end. The suite stands at
+**`Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`** (2026-08-02) across the Northwind
+query bases and `GraphUpdatesTestBase` on Tier A.
 
 Not yet implemented, in rough priority order:
-- **Projection split** (requirements §3) — the server throws on anonymous types / client
-  DTOs. `ServerQueryExecutor` has no boundary detection. This is the main unsolved design
-  problem, not a bug.
-- **SaveChanges** (plan S1–S3) — `InfoCarrierDatabase.SaveChanges` throws. M2M from day one.
-- **Result serialization** — `ServerQueryExecutor.SerializeResult` reflection-serializes
-  entities; will not survive circular navigations or shadow properties.
+- **The `GraphUpdates` residual** — 200 of 1787, concentrated in seven `Save_*` methods
+  (alternate keys, one-to-one changed by reference, owned collections). Classified in
+  `docs/implementation-plan.md` under S3c.
+- **Concurrency tokens** — `SaveChangesRequest.SerializedOriginalValues` is on the wire and
+  never written or read, so the server cannot make an optimistic-concurrency check. Plan S3c.
+- **The remaining change-tracking spec bases** — `ManyToManyTrackingTestBase`,
+  `PropertyValuesTestBase`, `OptimisticConcurrencyTestBase`, `FindTestBase`, `LoadTestBase`
+  and the rest of the 138 the compliance test reports unadopted.
+- **Transactions** (roadmap M4) — `InfoCarrierTransactionManager` *ignores* them and raises
+  `InfoCarrierEventId.TransactionIgnoredWarning` (warning-as-error by default), as EF's
+  InMemory provider does. `InProcessInfoCarrierServer`'s three transaction methods throw.
+  Needs the wire-protocol W3 transaction token.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
+- **The SQLite backend store is not parallel-safe** — a single full run has produced 698
+  phantom failures in the two SQLite Northwind classes that pass on rerun and in isolation.
+  Confirm any SQLite regression with a second run before believing it.

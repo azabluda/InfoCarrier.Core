@@ -294,6 +294,25 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       **GraphUpdates 348 → 200. Suite `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.**
       The 29 pre-existing failures are unchanged and nothing outside the class moved.
 
+### The `GraphUpdates` residual — 200 of 1787 (2026-08-02, Tier A)
+
+Concentrated: seven methods carry 138 of the 200. Classified by cause, not by name.
+
+| # | Family | Symptom | Diagnosis |
+|---|---|---|---|
+| 56 | `Save_*_with_alternate_key` | Server-side `entry.State = Added` throws "another instance with the same key value for {'AlternateId'} is already being tracked" | **Open.** The obvious explanation is ruled out: a probe confirmed the client generates *distinct, non-temporary* Guids for the alternate key, so this is not an empty-Guid collision. Needs a dump of the actual `SaveChangesRequest` for one failing case. |
+| 56 | Owned collections (`*_owned_collection*`) | "Cannot create a DbSet for 'Owner.Owned#Owned' because it is configured as an owned entity type" | The query root for an owned type is not reachable through `Set<T>()`. EF's own SQLite suite `[Skip]`s six of these for a composite-key reason; ours fail differently and are not yet understood. |
+| ~40 | `Save_changed_optional_one_to_one`, `Save_required_non_PK_one_to_one_changed_by_reference` | `Assert.Equal` on a key or FK after SaveChanges | Suspected same root cause as the alternate-key family — a key not carried back or not applied. |
+| 24 | `Save_optional_many_to_one_dependents` and siblings | `Assert.Contains` fails against an **empty** collection; the not-found entity still holds its temporary negative key and a null FK | The store-generated key never reached this entity, so no fixup happened. |
+| 18 | `Mark_explicitly_set_*_stable_*` | `ArgumentException: An item with the same key has already been added` | Stable value generators, where client and server both generate. |
+| 12 | assorted | `NullReferenceException` | Unclassified. |
+| ~4 | `Discriminator_values_are_not_marked_as_unknown`, `Saving_unknown_key_value_marks_it_as_unmodified` | assertion | Shadow-state round trip, adjacent to S3c-2's third fix. |
+
+Two things the classification is *not* allowed to claim: that these are InMemory limitations
+(EF's own `GraphUpdatesInMemoryTestBase` overrides are already mirrored, and these are not
+among them), and that any of them is a single root cause. The first two families sharing a
+symptom is a hypothesis, not a finding.
+
 - [x] **E1.** A query that ends in `ToList` / `ToArray` / `AsEnumerable` is no longer shipped.
       Those operators do not translate — they are the point at which a query *stops* being a
       query — and shipping a subtree ending in one asked the server to execute it as a terminal
