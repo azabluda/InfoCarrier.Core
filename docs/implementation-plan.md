@@ -203,6 +203,30 @@ recorded here rather than papered over.
 
 ---
 
+## Attempted and reverted: deferring the reassembly (2026-08-02)
+
+The largest remaining group of failures traces to one cause. `from c in cs join o in os … from o
+in grouping.DefaultIfEmpty() select …` compiles to a `GroupJoin` whose result selector builds a
+**transparent identifier** — an anonymous type. EF handles those internally; this provider must
+treat one as a type boundary, so every operator above the join runs on the client. That is not
+just slow: `DefaultIfEmpty` yields `null`, SQL propagates nulls through a projection, and
+LINQ-to-Objects throws `NullReferenceException` instead. All ten of the NRE failures are this.
+
+The fix in principle is to push the reassembly outward past operators that only read members of
+it, rewriting `p.Member` into the tuple slot the member came from — the "operator pushdown" the
+spec deferred (§7).
+
+**Tried, measured 91 → 383, reverted.** The substitution builds trees that are type-correct
+enough for `Expression.Call` to accept and then untranslatable, or subtly wrong: 67 `SelectMany`
+and 40 `Join` translation failures, plus arity mismatches where a `ValueTuple<int>` was
+substituted for a sequence. Suite time dropped from 4m37s to 1m29s, which is the tell — the
+queries were failing before doing any work.
+
+It is the right next step and it needs its own design pass, not an afternoon: the substitution
+has to preserve what each operator expects of its source, and a transparent identifier can nest.
+
+---
+
 ## Exit criteria
 
 M2 closes when all of:
