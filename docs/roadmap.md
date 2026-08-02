@@ -77,6 +77,26 @@ minimal-column payload (W1).
 > That ratio is the point worth remembering: the harness was concealing roughly eighty times
 > more missing functionality than the visible failures suggested.
 
+> ✅ **Implemented 2026-08-02 — 1,421 → 91 failures of 4,296.** The split is in
+> `src/InfoCarrier.Core/Query/`: `WireTypeCollector` → `ServerBoundaryAnalyzer` →
+> `ProjectionRewriter` → `QuerySplitter`, applied by `QueryExecutor` and consumed by nothing on
+> the server, which is unchanged as the design required.
+>
+> Three things the spec did not anticipate, all found by measurement:
+>
+> - **The cut broke `GroupBy`.** Separating a `GroupBy` from the aggregate `Select` that composes
+>   it leaves a bare non-composed `GroupBy` no provider can translate — 136 failures the split
+>   itself created. The rewrite keeps them together.
+> - **Client evaluation needed a rule of its own.** A residual operator forced by the type
+>   boundary is legitimate; one whose lambda calls a method the server cannot run is a
+>   translation failure, because answering it locally means fetching the whole table. Getting the
+>   line in the right place took three attempts, costing 235 and then 69 tests respectively when
+>   drawn too widely.
+> - **Transparent identifiers are the remaining ceiling.** `from … join … select new { a, b }`
+>   makes an anonymous type EF handles internally and we must treat as a boundary, so everything
+>   downstream lands on the client. Deferring the reassembly and threading tuple slots through
+>   downstream operators is the next real gain, and is the "operator pushdown" the spec deferred.
+
 **Exit criteria**
 - **Result wire format** — spec written: [`result-wire-format.md`](result-wire-format.md).
   1,047 of 1,440 failures (73%). Do this first: it is independent of the type-boundary work,
@@ -84,13 +104,12 @@ minimal-column payload (W1).
 - ✅ Server-side type allowlist enforced, so client-only types cannot be materialized
   server-side even in-process. Projection tests fail again before they are fixed.
 - ✅ Design spec + ADR — [`projection-split.md`](projection-split.md), [ADR-010](decisions.md#adr-010).
-- Boundary detection **in the client**; client applies the residual projection. `ServerQueryExecutor`
-  unchanged — if it needs edits, the boundary was drawn in the wrong place.
-- Minimal-column payload (wire-protocol W1) — the server returns only what the client
-  projection needs, per requirements §3.3. Same mechanism as the boundary rewrite, not a
-  separate pass.
-- `NorthwindSelectQueryTestBase` (not yet adopted) and `NorthwindJoinQueryTestBase` adopted and
-  passing.
+- ✅ Boundary detection **in the client**; client applies the residual projection.
+  `ServerQueryExecutor` unchanged, as the design's own test required.
+- ✅ Minimal-column payload (wire-protocol W1) — the same mechanism as the boundary rewrite, not
+  a separate pass: `Select(a => new { a.Name })` ships one `string` per row, not an entity.
+- `NorthwindSelectQueryTestBase` and `NorthwindJoinQueryTestBase` — both adopted; residual
+  failures tracked in [`implementation-plan.md`](implementation-plan.md).
 - The ~84 store-limitation overrides that now trip the type boundary before reaching the
   translation failure they assert are re-checked: each returns to asserting its original failure,
   or is deleted.
