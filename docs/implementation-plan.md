@@ -360,6 +360,50 @@ queries were failing before doing any work.
 It is the right next step and it needs its own design pass, not an afternoon: the substitution
 has to preserve what each operator expects of its source, and a transparent identifier can nest.
 
+> ⚠️ **Corrected 2026-08-02 (X1).** "All ten of the NRE failures are this" was true when written
+> and is not true now — A6 and E1 changed the residual underneath it. Measured against the
+> current 111, the `NullReferenceException`s are
+> `Select_GetValueOrDefault_on_DateTime_with_null_values`, `Reverse_in_join_inner`(`_with_skip`)
+> and `Entity_equality_contains_with_list_of_null`; **none** is a `GroupJoin` transparent
+> identifier. The transparent-identifier family shows up as *navigation-read refusals*
+> (`Multiple_select_many_with_predicate`, `Navs_query`) instead. The stale count was carried into
+> `transparent-identifiers.md` §1 and became X1's stated target, which is how a phase came to be
+> aimed at a family that no longer existed.
+
+---
+
+## Phase X — transparent identifiers ([`transparent-identifiers.md`](transparent-identifiers.md), ADR-011)
+
+- [x] **X0.** Design session: read EF's `TryFlattenGroupJoinSelectMany` at source, wrote the
+      spec, recorded [ADR-011](decisions.md#adr-011). ✅ `db5dcdd`
+
+- [x] **X1.** Mirror `TryFlattenGroupJoinSelectMany` on the client, before the boundary analysis.
+      **Built, measured `111 → 111`, reverted.** ✅ `<this commit>`
+
+      Two findings, both worth more than the phase. First, **EF's rewrite is not separable from
+      EF's pipeline**: the substitution reconstructs the transparent identifier including its
+      grouping member, so the emitted join names a parameter it does not bind. EF is fine with
+      that — its projection binding drops the dead member before anything compiles — while this
+      provider compiles the residual and gets *"variable 'orders' … referenced from scope ''"*.
+      The first run broke 10 passing tests there (`GroupJoin_Where`, `GroupJoin_Where_OrderBy`,
+      `GroupJoin_complex_GroupBy_Aggregate`). Second, declining the rewrite when it leaves a
+      parameter free fixes that but declines exactly the shapes X1 existed to help, leaving it
+      exactly neutral.
+
+      Reverted rather than kept: neutral code that fires only on already-passing queries is a
+      liability, and its claimed support for X3 (removing groupings before they reach a carrier
+      slot) is void under the same guard.
+
+- [ ] **X2.** Verification harness — rewrite, re-analyze, keep only on strict improvement.
+      Now ordered *before* X3 rather than between the two rewrites, since there is no X1 to sit
+      between. X1 is the argument for it: it grew an ad-hoc free-parameter check mid-flight,
+      which is this step arriving late and in the wrong shape.
+
+- [ ] **X3.** `ValueTuple` re-carry for transparent identifiers, under both guards of
+      `transparent-identifiers.md` §4. Target: the navigation-read refusals — plain
+      `SelectMany` chains, which §2 of the spec already identified as ours alone because EF has
+      no equivalent rewrite for them.
+
 ---
 
 ## Exit criteria
