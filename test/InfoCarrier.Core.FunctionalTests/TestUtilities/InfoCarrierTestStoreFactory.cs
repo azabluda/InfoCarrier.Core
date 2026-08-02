@@ -27,6 +27,12 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     public static InfoCarrierBackendTestStoreFactory InMemory
         => (name, shared, props) => new InMemoryInfoCarrierBackendTestStore(name, shared, props);
 
+    /// <summary>
+    ///     The SQLite backend store factory (ADR-009 Tier B, the relational tier).
+    /// </summary>
+    public static InfoCarrierBackendTestStoreFactory Sqlite
+        => (name, shared, props) => new SqliteInfoCarrierBackendTestStore(name, shared, props);
+
     private readonly SharedTestStoreProperties _props;
     private readonly InfoCarrierBackendTestStoreFactory _backendFactory;
 

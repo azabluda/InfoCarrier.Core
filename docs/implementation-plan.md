@@ -203,6 +203,25 @@ recorded here rather than papered over.
 
 ---
 
+## Phase T — SQLite Tier B (ADR-009)
+
+Landed out of milestone order, deliberately: several of the residual failures are InMemory's
+limits rather than this provider's, and only a backend that actually translates can tell them
+apart. It is an M3 exit criterion regardless, and M4 cannot start without it.
+
+- [x] **T1.** `SqliteInfoCarrierBackendTestStore` + `InfoCarrierTestStoreFactory.Sqlite`, and
+      `SqliteSmokeTest` proving the slice end to end on a relational backend. The held-open
+      connection is asserted, not assumed — mutation-tested by removing `Open()`, which fails all
+      three tests. The projection split answers correctly against real SQL, which also settles
+      the open question of whether the `ValueTuple` carrier translates outside InMemory.
+      ✅ `<this commit>`
+
+- [ ] **T2.** Northwind on Tier B: a SQLite server context (the keyless types need `ToSqlQuery`
+      rather than `ToInMemoryQuery`) and a second fixture, then re-run the residual against it to
+      separate our defects from InMemory's limits.
+
+---
+
 ## Attempted and reverted: deferring the reassembly (2026-08-02)
 
 The largest remaining group of failures traces to one cause. `from c in cs join o in os … from o

@@ -12,4 +12,4 @@
 # 1421 -> 90. Measured twice at 90; the earlier 91 was a unit test of mine still failing at
 # the time it was taken, not a test that varies between runs.
 failed=90
-total=4296
+total=4299
