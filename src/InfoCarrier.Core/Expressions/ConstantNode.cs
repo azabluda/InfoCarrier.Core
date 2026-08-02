@@ -20,6 +20,21 @@ public sealed record ConstantNode : ExpressionNode
     public required TypeNode Type { get; init; }
 
     /// <summary>
+    ///     The runtime type of <see cref="PrimitiveValue" />, when it is more specific than
+    ///     <see cref="Type" />. Null when the two agree, which is the usual case.
+    /// </summary>
+    /// <remarks>
+    ///     A constant declared as <c>object</c> says nothing about what it holds, and the
+    ///     compact primitive form carries no type of its own — so a boxed <c>Guid</c> came back
+    ///     as a string and every comparison against it was quietly false. EF builds exactly that
+    ///     for <c>GetDatabaseValues</c> on a non-numeric key: <c>Equals(EF.Property&lt;object&gt;(e,
+    ///     "Id"), keyValues[0])</c>, where the index expression is typed <c>object</c>. The
+    ///     declared type still governs how the constant is rebuilt, because the surrounding tree
+    ///     expects it.
+    /// </remarks>
+    public TypeNode? ValueType { get; init; }
+
+    /// <summary>
     ///     The primitive value (string, number, bool, enum-underlying, null). Null when the
     ///     value is non-primitive — see <see cref="DynamicValue" />.
     /// </summary>

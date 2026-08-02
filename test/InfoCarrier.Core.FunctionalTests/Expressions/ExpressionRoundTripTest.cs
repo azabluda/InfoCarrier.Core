@@ -38,6 +38,39 @@ public class ExpressionRoundTripTest
         Assert.Equal(42, ((JsonElement)constant.PrimitiveValue!).GetInt32());
     }
 
+    /// <summary>
+    ///     A constant declared as <c>object</c> keeps the type of what it actually holds.
+    /// </summary>
+    /// <remarks>
+    ///     EF builds exactly this for <c>GetDatabaseValues</c> on a non-numeric key —
+    ///     <c>Equals(EF.Property&lt;object&gt;(e, "Id"), keyValues[0])</c>, where the index
+    ///     expression is typed <c>object</c>. Without the value's own type the boxed
+    ///     <see cref="Guid" /> came back a string and the comparison was quietly false, so the
+    ///     query matched nothing and 49 tests failed on a <see langword="null" /> result rather
+    ///     than on an error.
+    /// </remarks>
+    [Fact]
+    public void Constant_boxed_in_object_keeps_the_value_type()
+    {
+        var guid = Guid.NewGuid();
+        ExpressionNode node = ToNode(Expression.Constant(guid, typeof(object)));
+
+        var constant = Assert.IsType<ConstantNode>(RoundTripNode(node));
+
+        var reverse = new NodeToExpressionTranslator(
+            new TypeNodeResolver(),
+            new DynamicValueMapper(null, new TypeNodeMapper(), new TypeNodeResolver()),
+            (stub, type) => throw new NotSupportedException("No query roots here."));
+
+        var rebuilt = (ConstantExpression)reverse.Translate(constant);
+
+        Assert.Equal(guid, rebuilt.Value);
+
+        // Still declared as `object`: the surrounding tree — `object.Equals(object, object)` —
+        // is built against that type and rejects a `Guid`-typed operand.
+        Assert.Equal(typeof(object), rebuilt.Type);
+    }
+
     [Fact]
     public void Binary_comparison_round_trips()
     {

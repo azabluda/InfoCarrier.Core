@@ -111,7 +111,14 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
         }
 
         _result = IsPrimitive(node.Value)
-            ? new ConstantNode { Type = type, PrimitiveValue = NormalizePrimitive(node.Value) }
+            ? new ConstantNode
+            {
+                Type = type,
+                ValueType = node.Value is not null && node.Value.GetType() != node.Type
+                    ? _typeMapper.ToTypeNode(node.Value.GetType())
+                    : null,
+                PrimitiveValue = NormalizePrimitive(node.Value),
+            }
             : new ConstantNode { Type = type, DynamicValue = _valueMapper.ToDynamicValue(node.Value, node.Type) };
         return node;
     }

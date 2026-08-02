@@ -354,6 +354,31 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `Values_can_be_reloaded_from_database_*` — `GetDatabaseValues()` and `Reload()`, which
       read the row as the store currently holds it. Nothing in the provider answers that yet.
 
+- [x] **S3c-11.** A constant declared as `object` keeps the type of what it holds.
+      **127 → 78 failures; 49 fixed, 0 broken.** ✅ `<this commit>`
+
+      `GetDatabaseValues()` and `Reload()` returned `null` for every entity whose key is a
+      **non-numeric value type**, which is the whole `Store_values_*` /
+      `Values_can_be_reloaded_from_database_*` family left by S3c-10.
+
+      `EntityFinder.GetDatabaseValuesQuery` is an ordinary LINQ query, and
+      `ExpressionExtensions.BuildPredicate` builds its `Where` two different ways. A numeric or
+      `bool` or enum key compares typed. Anything else — a `Guid` here — becomes
+      `Equals(EF.Property<object>(e, "BuildingId"), keyValues[0])`, where the index expression
+      into the `ValueBuffer` is typed **`object`**. Parameter extraction turns that into
+      `Expression.Constant(guid, typeof(object))`.
+
+      `ConstantNode` recorded only the declared type, and the compact primitive form carries no
+      type of its own, so the server rebuilt a `string` and the comparison was **quietly false**:
+      no row, `FirstOrDefault` → `null`, and the tests failed on a `NullReferenceException` far
+      from the cause rather than on an error. The node now carries the value's own type
+      alongside the declared one; the declared type still governs the constant, because
+      `object.Equals(object, object)` rejects a `Guid`-typed operand.
+
+      Found by dumping the shipped query — the smoke test that already covered
+      `GetDatabaseValues` uses an `int` key and takes the other branch, so nothing in the suite
+      could have caught this. `Constant_boxed_in_object_keeps_the_value_type` now does.
+
 ### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
 No family above 8 now; the long tail below is what is left.

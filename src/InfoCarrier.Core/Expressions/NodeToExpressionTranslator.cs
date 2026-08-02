@@ -72,9 +72,15 @@ public class NodeToExpressionTranslator
     private Expression TranslateConstant(ConstantNode node)
     {
         Type type = _typeResolver.Resolve(node.Type);
+
+        // Coerce to what the value *is*, not to what the constant is declared as: a constant
+        // typed `object` tells the primitive form nothing, and a boxed Guid would come back a
+        // string. The declared type still governs the constant itself, below.
+        Type valueType = node.ValueType is { } specific ? _typeResolver.Resolve(specific) : type;
+
         object? value = node.DynamicValue is not null
             ? _valueMapper.FromDynamicValue(node.DynamicValue)
-            : CoercePrimitive(node.PrimitiveValue, type);
+            : CoercePrimitive(node.PrimitiveValue, valueType);
 
         // Some declared types cannot be rebuilt exactly — `IOrderedEnumerable<T>` has no public
         // way in, so the value comes back as a plain list. Widening the constant to what we

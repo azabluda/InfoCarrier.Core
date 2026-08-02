@@ -82,7 +82,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 7228, Passed: 7084, Failed: 127, Skipped: 17`** (2026-08-02) across the Northwind
+**`Total tests: 7228, Passed: 7133, Failed: 78, Skipped: 17`** (2026-08-02) across the Northwind
 query bases, `GraphUpdatesTestBase` and `PropertyValuesTestBase` on Tier A.
 
 Not yet implemented, in rough priority order:
@@ -90,8 +90,6 @@ Not yet implemented, in rough priority order:
   collections, stable value generators). Classified in `docs/implementation-plan.md` under S3c.
 - **Concurrency tokens** — `SaveChangesRequest.SerializedOriginalValues` is on the wire and
   never written or read, so the server cannot make an optimistic-concurrency check. Plan S3c.
-- **`GetDatabaseValues` / `Reload`** — 53 of `PropertyValuesTestBase`'s 196 fail because nothing
-  answers "the row as the store holds it now". Needed by concurrency-conflict resolution.
 - **The remaining change-tracking spec bases** — `ManyToManyTrackingTestBase`,
   `OptimisticConcurrencyTestBase` (Tier B only — EF's own InMemory suite skips 16 of its tests
   because that store cannot detect a conflict), `FindTestBase`, `LoadTestBase` and the rest of
