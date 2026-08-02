@@ -549,6 +549,31 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       unrelated "shadow-state round trip" family and which were the same bug seen from the other
       end.
 
+- [ ] **S3c-17.** `GraphUpdatesTestBase` on Tier B — **attempted, measured, reverted.** Not
+      committed as code; this is the finding.
+
+      **The recorded blocker was wrong.** It said Tier B was blocked because EF's
+      `GraphUpdatesSqliteFixtureBase` uses relational-only `HasDefaultValue` and `UseTransaction`
+      on a model the non-relational client must also build. That is not an obstacle: the *core*
+      `GraphUpdatesFixtureBase` model is relational-agnostic, SQLite creates a schema from it
+      directly, and a fixture that changes nothing but the store factory compiles and runs. EF's
+      SQLite variant is an optimisation of that model, not a precondition for it.
+
+      **What actually happens: `Failed: 1787, Passed: 0, Total: 1787` in 6 m 31 s.** Not a long
+      tail — nothing passes. 897 `NullReferenceException` thrown from the first line of the test
+      body, 134 "sequence contains no elements", 426 `DbUpdateException`: the store comes up
+      **empty**. The same shape S3c-14 hit on the F1 fixture, where the cause was that the
+      fixture seeds through the *client* options and the server never sees them.
+
+      Reverted rather than committed. 1787 red tests and six and a half minutes of run time for
+      no signal is worse than not having the class, and the guardrail against suppressing spec
+      tests is about tests that *tell* you something.
+
+      **The next step is a one-hour question, not a redesign:** find out why
+      `GraphUpdatesFixtureBase.SeedAsync` — which does populate the InMemory backend on Tier A
+      through the same `TestStore.InitializeAsync` path — leaves the SQLite one empty. Fix that
+      first and re-measure before reading any other failure in this class.
+
 ### The `GraphUpdates` residual — 16 of 1787 (2026-08-03, Tier A)
 
 **The table this replaces was wrong, and worth saying how.** It claimed 45 failures split
