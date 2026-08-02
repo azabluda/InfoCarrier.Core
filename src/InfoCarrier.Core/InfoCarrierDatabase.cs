@@ -94,9 +94,62 @@ public class InfoCarrierDatabase : IDatabase
 
     /// <inheritdoc />
     public virtual int SaveChanges(IList<IUpdateEntry> entries)
-        => throw new NotImplementedException("SaveChanges lands in Step 10.");
+        => SaveChangesAsync(entries).GetAwaiter().GetResult();
 
     /// <inheritdoc />
-    public virtual Task<int> SaveChangesAsync(IList<IUpdateEntry> entries, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("SaveChanges lands in Step 10.");
+    public virtual async Task<int> SaveChangesAsync(
+        IList<IUpdateEntry> entries,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+        mapper.ResetReferenceScope();
+
+        var request = new Common.SaveChangesRequest
+        {
+            Entries = [.. entries.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
+        };
+
+        Common.SaveChangesResult result = await _client
+            .SaveChangesAsync(request, cancellationToken)
+            .ConfigureAwait(false);
+
+        ApplyGeneratedValues(entries, result, mapper);
+        return result.Count;
+    }
+
+    /// <summary>
+    ///     Writes store-generated values back onto the client's entries.
+    /// </summary>
+    /// <remarks>
+    ///     Keyed by correlation id rather than by key value, because the whole point is that the
+    ///     client's key was temporary and the server's is not (research-findings §9). Setting the
+    ///     current value is what lets EF's own <c>AcceptAllChanges</c> replace the temporary key
+    ///     and fix up everything that referenced it.
+    /// </remarks>
+    private static void ApplyGeneratedValues(
+        IList<IUpdateEntry> entries,
+        Common.SaveChangesResult result,
+        Expressions.DynamicValueMapper mapper)
+    {
+        foreach (Common.GeneratedValues generated in result.GeneratedValues)
+        {
+            if (generated.CorrelationId < 0 || generated.CorrelationId >= entries.Count)
+            {
+                continue;
+            }
+
+            IUpdateEntry entry = entries[generated.CorrelationId];
+            var entityType = (Microsoft.EntityFrameworkCore.Metadata.IEntityType)entry.EntityType;
+
+            foreach (Expressions.DynamicPropertyValue value in ChangeEntryMapper.ReadValues(generated.SerializedValues))
+            {
+                if (entityType.FindProperty(value.Name) is { } property)
+                {
+                    entry.SetStoreGeneratedValue(property, mapper.FromPropertyValue(value, property.ClrType));
+                }
+            }
+        }
+    }
 }

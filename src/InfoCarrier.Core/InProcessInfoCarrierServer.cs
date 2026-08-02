@@ -12,9 +12,9 @@ namespace InfoCarrier.Core;
 ///     This is the server half of the in-process test transport.
 /// </summary>
 /// <remarks>
-///     Query rebinding and execution run through <see cref="ServerQueryExecutor" /> (Step 5);
-///     SaveChanges replay lands in Step 10. The server resolves the context and serializer
-///     per-request from DI (DI-first, requirements §4.2).
+///     Query rebinding and execution run through <see cref="ServerQueryExecutor" />, and
+///     SaveChanges replay through <see cref="ServerSaveChangesExecutor" />. The server resolves
+///     the context and serializer per request from DI (DI-first, requirements §4.2).
 /// </remarks>
 public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
 {
@@ -40,8 +40,15 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
     }
 
     /// <inheritdoc />
-    public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException("SaveChanges replay lands in Step 10.");
+    public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
+    {
+        await using var scope = _serviceProvider.CreateAsyncScope();
+        DbContext context = scope.ServiceProvider.GetRequiredService<DbContext>();
+        ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(context.Model);
+        var executor = new ServerSaveChangesExecutor(
+            context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
+        return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)

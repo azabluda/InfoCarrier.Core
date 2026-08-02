@@ -56,6 +56,11 @@ public class DynamicValueMapper : IDynamicValueMapper
     }
 
     /// <summary>
+    ///     The type mapper this value mapper writes wire type identities with.
+    /// </summary>
+    public TypeNodeMapper TypeMapper => _typeMapper;
+
+    /// <summary>
     ///     Clears the per-message reference scope. **Must** be called at every message
     ///     boundary.
     /// </summary>
@@ -296,6 +301,22 @@ public class DynamicValueMapper : IDynamicValueMapper
     }
 
     /// <inheritdoc />
+    /// <summary>
+    ///     Reads one wire property value back, whichever of the two forms it took.
+    /// </summary>
+    /// <remarks>
+    ///     A <see cref="DynamicPropertyValue" /> carries either a primitive directly or a nested
+    ///     node; callers that only ever see one of the two would silently read null for the other.
+    /// </remarks>
+    public object? FromPropertyValue(DynamicPropertyValue property, Type declaredType)
+    {
+        ArgumentNullException.ThrowIfNull(property);
+
+        return property.Value is { } nested
+            ? FromDynamicValue(nested)
+            : PrimitiveCoercion.Coerce(property.PrimitiveValue, declaredType);
+    }
+
     public object? FromDynamicValue(DynamicValueNode node)
     {
         // Back-reference: the target must already be registered. It is, because the forward

@@ -102,4 +102,73 @@ public class SqliteSmokeTest
         using DbContext second = store.CreateDbContext();
         Assert.Equal(1, await second.Set<Blog>().CountAsync());
     }
+
+    [ConditionalFact]
+    public async Task Insert_update_and_delete_round_trip_through_the_server()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        // Insert. Id is store-generated, so the client holds a temporary key until the server
+        // reports the real one back by correlation id (research-findings §9).
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            var blog = new Blog { Title = "alpha" };
+            client.Add(blog);
+            Assert.Equal(1, await client.SaveChangesAsync());
+            Assert.NotEqual(0, blog.Id);
+        }
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            Assert.Equal("alpha", (await server.Set<Blog>().SingleAsync()).Title);
+        }
+
+        // Update.
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            Blog blog = await client.Blogs.SingleAsync();
+            blog.Title = "beta";
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            Assert.Equal("beta", (await server.Set<Blog>().SingleAsync()).Title);
+        }
+
+        // Delete.
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            client.Remove(await client.Blogs.SingleAsync());
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            Assert.Empty(await server.Set<Blog>().ToListAsync());
+        }
+    }
+
+    [ConditionalFact]
+    public async Task A_store_generated_key_comes_back_on_the_client_entity()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        await using SqliteSmokeContext client = CreateClient(store);
+        var first = new Blog { Title = "alpha" };
+        var second = new Blog { Title = "beta" };
+        client.AddRange(first, second);
+
+        Assert.Equal(2, await client.SaveChangesAsync());
+
+        // Distinct, non-temporary, and matched to the right entity — the correlation id is what
+        // keeps the second row's key off the first entity.
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.All([first.Id, second.Id], id => Assert.NotEqual(0, id));
+        Assert.Equal(
+            "alpha",
+            (await client.Blogs.SingleAsync(b => b.Id == first.Id)).Title);
+    }
 }

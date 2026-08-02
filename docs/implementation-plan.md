@@ -173,6 +173,24 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
 ---
 
+## Phase S — SaveChanges (M3)
+
+- [x] **S1+S2.** The provider can **write**. Client capture (`ChangeEntryMapper`), server replay
+      (`ServerSaveChangesExecutor`), store-generated values returned by correlation id
+      (research-findings §9). Insert / update / delete round-trip and store-generated keys are
+      proven on Tier B, where a real store actually generates them. ✅ `<this commit>`
+
+      Two things EF refuses that the design had to accommodate:
+      a key cannot be assigned through a *tracked* entry ("the property 'Blog.Id' is part of a
+      key and so cannot be modified"), so the object is populated before it reaches the change
+      tracker; and store-generated values must be filtered by **state** — returning an inserted
+      row's key for a `Modified` entry made the client try to re-key a tracked row.
+
+- [ ] **S3.** Relationships and many-to-many (ADR-004 requires M2M from day one), navigations,
+      concurrency tokens, and the SaveChanges/change-tracking spec bases.
+
+---
+
 ## The residual, classified (2026-08-02 — measured at 118, now 90)
 
 Measured from `artifacts/test-results/c1.trx`. Nothing here is masked; each line is a real
