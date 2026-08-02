@@ -411,6 +411,40 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       it looked unchanged. It was not — the *reason* had changed from "no such table" to the
       concurrency exception. Counting failures rather than reading them cost a round trip.
 
+- [x] **S3c-13.** Concurrency tokens travel. **`Total tests: 7231, Passed: 7136, Failed: 78,
+      Skipped: 17`** — FIXED 1 (`A_client_that_bumps_the_concurrency_token_is_not_a_conflict`),
+      BROKEN none. ✅ `<this commit>`
+
+      `SaveChangesRequest.SerializedOriginalValues` is now written and read, which is the named
+      S3c deliverable. The client sends the original value of every concurrency token on a
+      `Modified` or `Deleted` entry — an `Added` one has nothing to conflict with, and EF answers
+      `GetOriginalValue` with the current value there anyway. The server applies them through
+      `entry.Property(name).OriginalValue` as the *last* thing it does to an entry, because
+      setting the state re-snapshots originals from the entity and would undo an earlier write.
+
+      Only concurrency tokens travel. Every other original is either unused by the store or
+      equal to the current value by construction, and sending the lot would cost a second full
+      copy of every entry on the wire.
+
+      **A second defect had to be fixed first, and it is the more serious of the two.**
+      `InfoCarrierDatabase.CompileQuery` captured `_client` in the delegate it returned, and EF
+      caches that delegate in `ICompiledQueryCache` — a singleton of the *internal* service
+      provider, which is shared by every context with the same options shape. Ours has
+      `GetServiceProviderHashCode() => 0`, but so does `RelationalOptionsExtension`, and EF's
+      InMemory extension hashes only a nullability flag: no EF provider distinguishes its service
+      provider by which store it talks to, because no EF provider bakes the connection into the
+      cached delegate. Ours did. The consequence is that the first context to compile a given
+      query pins it to *its* server, and every later context running that query ships it there
+      while its own SaveChanges goes elsewhere — two clients against two servers being the
+      ordinary case this provider exists for. The client is now resolved from
+      `queryContext.Context` at execution time.
+
+      It surfaced as the two concurrency tests passing alone and failing together, which read
+      like the store flakiness of S3c-5 and was not. The probe settled it in one run: the bump
+      test was sending `Version.orig=99` — the *other* test's data — while its server held
+      `Version=1`. A client reading one database and writing another is not a store problem, and
+      no amount of staring at the store would have found it.
+
 ### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
 No family above 8 now; the long tail below is what is left.

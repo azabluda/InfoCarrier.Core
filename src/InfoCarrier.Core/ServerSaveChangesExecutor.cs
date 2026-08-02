@@ -258,6 +258,21 @@ public class ServerSaveChangesExecutor
                     !placeholders.TryGetValue(clientValue, out var principal) || principal.IsTemporary;
             }
 
+            // The concurrency check's left-hand side, and the one thing here that cannot be
+            // derived from the current values. Last, because setting the state re-snapshots
+            // originals from whatever the entity holds — doing this any earlier is undone.
+            if (replay.Change.SerializedOriginalValues is { } serializedOriginals)
+            {
+                foreach (DynamicPropertyValue value in ChangeEntryMapper.ReadValues(serializedOriginals))
+                {
+                    if (replay.EntityType.FindProperty(value.Name) is { } property)
+                    {
+                        entry.Property(property.Name).OriginalValue =
+                            _mapper.FromPropertyValue(value, property.ClrType);
+                    }
+                }
+            }
+
             tracked.Add((replay.Change.CorrelationId, entry, replay.EntityType, state));
         }
 

@@ -47,8 +47,27 @@ public static class ChangeEntryMapper
 
         List<string>? temporary = null;
 
+        // An `Added` entry has no original — nothing existed to conflict with — and EF answers
+        // `GetOriginalValue` with the current one there anyway.
+        bool carriesOriginals = entry.EntityState is EntityState.Modified or EntityState.Deleted;
+        List<DynamicPropertyValue>? originals = null;
+
         foreach (IProperty property in entityType.GetProperties())
         {
+            if (carriesOriginals && property.IsConcurrencyToken)
+            {
+                // The value the check is made against. Only the token's original matters: the
+                // server rebuilds the entity from the *current* values, attaches it and sets
+                // `Modified`, so every original it has equals its current one by construction —
+                // and a client that bumps its own token would then be checked against the value
+                // it had just written, refusing a write nobody conflicted with.
+                (originals ??= []).Add(new DynamicPropertyValue
+                {
+                    Name = property.Name,
+                    Value = mapper.ToDynamicValue(entry.GetOriginalValue(property), property.ClrType),
+                });
+            }
+
             if (entry.HasTemporaryValue(property))
             {
                 // Sent, and flagged. The value is meaningless to the store, but a principal and
@@ -76,6 +95,7 @@ public static class ChangeEntryMapper
             ClrTypeName = entityType.ClrType.FullName ?? entityType.ClrType.Name,
             State = entry.EntityState.ToString(),
             SerializedValues = Serialize(entityType, properties, mapper),
+            SerializedOriginalValues = originals is null ? null : Serialize(entityType, originals, mapper),
             TemporaryProperties = temporary,
         };
     }

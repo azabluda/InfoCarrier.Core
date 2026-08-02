@@ -58,8 +58,29 @@ public class InfoCarrierDatabase : IDatabase
             .MakeGenericMethod(elementType)
             .CreateDelegate<Func<QueryContext, Expression, IInfoCarrierClient, IExpressionSerializer, bool, bool, object>>();
 
-        return queryContext => (TResult)executeQuery(queryContext, query, _client, _expressionSerializer, async, singleResult);
+        // The client comes from the context being queried, not from this instance. EF caches
+        // what `CompileQuery` returns in `ICompiledQueryCache`, a singleton of the *internal*
+        // service provider — and that provider is shared by every context with the same options
+        // shape, exactly as it is for EF's own providers, whose `GetServiceProviderHashCode` is
+        // likewise blind to which store they talk to. Capturing `_client` here therefore pinned
+        // the cached delegate to whichever context compiled the query first, and every later
+        // context running the same query shipped it to *that* server while its SaveChanges went
+        // to its own. Two contexts against two servers is the ordinary case this provider exists
+        // for; it showed up as one concurrency test reading another's data.
+        return queryContext => (TResult)executeQuery(
+            queryContext, query, ClientFor(queryContext), _expressionSerializer, async, singleResult);
     }
+
+    /// <summary>
+    ///     The <see cref="IInfoCarrierClient" /> configured on the context a query is running
+    ///     against.
+    /// </summary>
+    private static IInfoCarrierClient ClientFor(QueryContext queryContext)
+        => queryContext.Context.GetService<IDbContextOptions>()
+            .Extensions
+            .OfType<InfoCarrierOptionsExtension>()
+            .First()
+            .InfoCarrierClient!;
 
     private static object ExecuteQuery<TElement>(
         QueryContext queryContext,
