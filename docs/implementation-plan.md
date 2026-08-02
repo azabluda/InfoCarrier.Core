@@ -269,9 +269,14 @@ apart. It is an M3 exit criterion regardless, and M4 cannot start without it.
       one `SmokeContext` type, so a model built for one provider reached the other — the
       *InMemory* smoke test failed with "no such table: Blogs".
 
-- [ ] **T5.** Tier B's 74: 36 are SQLite's lack of `APPLY` (EF's own SQLite classes override
-      these), the rest overlap the Tier A families already classified. Mirror the store-limitation
-      overrides, then extend to the remaining bases.
+- [x] **T5.** SQLite's lack of `APPLY` mirrored from EF's own `Northwind*QuerySqliteTest`
+      (18 tests × 2), asserting the provider's own `SqliteStrings.ApplyNotSupported`. Tier B
+      **74 → 38**, suite **164 → 128**. ✅ `<this commit>`
+
+      Tier B's residual has now converged onto the *same taxonomy as Tier A* — 16
+      custom-projection-compared-to-null, 8 navigation reads, 6 null-reference, 2 correlated
+      subquery. That agreement is the finding: the relational tier confirms the residual is this
+      provider's, not InMemory's.
 
 ---
 
