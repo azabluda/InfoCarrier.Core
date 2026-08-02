@@ -2,6 +2,7 @@
 
 using System.Linq.Expressions;
 using InfoCarrier.Core.Expressions;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core.Query;
 
@@ -68,6 +69,27 @@ public sealed class ServerBoundaryAnalyzer
     internal static bool IsQueryRoot(Expression node)
         => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression
             or ConstantExpression { Value: IQueryable };
+
+    /// <summary>
+    ///     Whether a subtree is something the server could <em>run</em>, as opposed to merely
+    ///     serialize.
+    /// </summary>
+    /// <remarks>
+    ///     Containing a query root is not enough. A quoted lambda such as
+    ///     <c>o =&gt; ctx.Orders</c> is server-ok, closed, and contains a root — but it is a
+    ///     function, not a query. Shipping one made the server hand the lambda object back as a
+    ///     result row, and the client then failed resolving the internal
+    ///     <c>Expression1&lt;TDelegate&gt;</c> that a compiled lambda reports as its runtime type.
+    ///     Descending into it instead finds the root inside, which is what actually executes.
+    /// </remarks>
+    internal static bool IsExecutableQuery(Expression node)
+        => typeof(IQueryable).IsAssignableFrom(node.Type)
+            // A terminal operator (Count, Any, First, …) yields a scalar, not a queryable.
+            || (node is MethodCallExpression call
+                && call.Method.DeclaringType is { } declaring
+                && (declaring == typeof(Queryable)
+                    || declaring == typeof(Enumerable)
+                    || declaring == typeof(EntityFrameworkQueryableExtensions)));
 
     /// <summary>
     ///     Folds each node's verdict from its direct children, post-order.
@@ -228,17 +250,18 @@ public sealed class BoundaryAnalysis
     {
         NodeFacts facts = _facts[node];
 
-        if (facts.ServerOk)
+        // Ordinary local code — a constant, a comparison against a captured value. Nothing in
+        // here executes anywhere, so it stays in the residual whole.
+        if (!facts.HasQueryRoot)
         {
-            // Maximal by construction: the caller only descends through nodes that are not
-            // server-ok, so the first server-ok node on any path is the largest one there.
-            if (facts.HasQueryRoot)
-            {
-                (facts.IsClosed ? shippable : open).Add(node);
-            }
+            return;
+        }
 
-            // A server-ok subtree with no query root is ordinary local code (a constant, a
-            // comparison against a captured value); it stays in the residual.
+        if (facts.ServerOk && ServerBoundaryAnalyzer.IsExecutableQuery(node))
+        {
+            // Maximal by construction: descent stops here, so the first node on any path that is
+            // both server-ok and runnable is the largest one there.
+            (facts.IsClosed ? shippable : open).Add(node);
             return;
         }
 
