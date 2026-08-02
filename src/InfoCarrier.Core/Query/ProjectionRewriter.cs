@@ -52,6 +52,14 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
             && second.GetGenericArguments().Length == 2);
 
+    private static readonly MethodInfo EnumerableToList = typeof(Enumerable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Enumerable.ToList) && m.GetParameters().Length == 1);
+
+    private static readonly MethodInfo QueryableAsQueryable = typeof(Queryable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethodDefinition);
+
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
@@ -129,13 +137,15 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return call;
         }
 
-        Expression tuple = TupleCarrier.New(fragments);
+        IReadOnlySet<Expression> consumed = OperatorSourceCollector.Find(selector.Body);
+
+        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Materialized(f, consumed))]);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = TupleCarrier.Read(row, i);
+            slots[fragments[i]] = Requeryable(TupleCarrier.Read(row, i), fragments[i], consumed);
         }
 
         Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(selector.Body)!;
@@ -210,6 +220,95 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         selector = lambda;
         return true;
+    }
+
+    /// <summary>
+    ///     Whether a fragment is a queryable collection, which cannot travel as one.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately the exact <see cref="IQueryable{T}" /> and nothing derived from it. An
+    ///     <c>IOrderedQueryable&lt;T&gt;</c> fragment may have a <c>ThenBy</c> above it, and handing
+    ///     that an <see cref="IQueryable{T}" /> back would fail to rebuild the enclosing call.
+    /// </remarks>
+    private static bool IsQueryableCollection(Expression fragment, IReadOnlySet<Expression> consumed)
+        => fragment.Type.IsGenericType
+            && fragment.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)
+            // Only when the projection *composes over* it. A queryable handed straight to the
+            // result is what the caller asked for, and EF is right to refuse it — two spec tests
+            // assert exactly that error (`AssertInvalidMaterializationType`), and materializing
+            // here suppressed it. The projection's own operators are the signal: `frag.Select(…)`
+            // is an intermediate, `new Dto { Orders = frag }` is the answer.
+            && consumed.Contains(fragment);
+
+    /// <summary>
+    ///     Materializes a collection-valued fragment on its way into a tuple slot.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF refuses a final projection that returns an <see cref="IQueryable{T}" /> —
+    ///         <c>CoreStrings</c>: "Collections in the final projection must be an
+    ///         <c>IEnumerable&lt;T&gt;</c> type such as <c>List&lt;T&gt;</c>". The largest
+    ///         server-evaluable fragment of
+    ///         <c>Select(c =&gt; c.Orders.…Take(1).Select(…).ToList())</c> is the <c>Take(1)</c>
+    ///         subquery, and putting it in a slot verbatim shipped exactly the projection EF
+    ///         rejects — before running anything, so the failure named the projection and not this
+    ///         rewrite.
+    ///     </para>
+    ///     <para>
+    ///         This is the boundary on the rule phase E1 established. Descending past a
+    ///         <c>ToList</c> is right at the <em>end of a query</em>, where it asks the server to
+    ///         translate a materialization; it is wrong <em>inside a projection</em>, where EF
+    ///         requires one. Same operator, opposite meaning, decided by position.
+    ///     </para>
+    /// </remarks>
+    private static Expression Materialized(Expression fragment, IReadOnlySet<Expression> consumed)
+        => IsQueryableCollection(fragment, consumed)
+            ? Expression.Call(
+                EnumerableToList.MakeGenericMethod(fragment.Type.GetGenericArguments()[0]),
+                fragment)
+            : fragment;
+
+    /// <summary>
+    ///     Reads a materialized slot back as the queryable the client-side body was built against.
+    /// </summary>
+    /// <remarks>
+    ///     The reassembly still holds the operators the projection wrote — <c>Select</c>,
+    ///     <c>ToList</c> — bound to <see cref="IQueryable{T}" />. Substituting a
+    ///     <see cref="List{T}" /> under them would not rebuild.
+    /// </remarks>
+    private static Expression Requeryable(
+        Expression slot, Expression fragment, IReadOnlySet<Expression> consumed)
+        => IsQueryableCollection(fragment, consumed)
+            ? Expression.Call(
+                QueryableAsQueryable.MakeGenericMethod(fragment.Type.GetGenericArguments()[0]),
+                slot)
+            : slot;
+
+    /// <summary>
+    ///     Every expression the projection body feeds to a query operator as its source.
+    /// </summary>
+    private sealed class OperatorSourceCollector : ExpressionVisitor
+    {
+        private readonly HashSet<Expression> _sources = new(ReferenceEqualityComparer.Instance);
+
+        public static IReadOnlySet<Expression> Find(Expression body)
+        {
+            var collector = new OperatorSourceCollector();
+            collector.Visit(body);
+            return collector._sources;
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType is { } declaring
+                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable))
+                && node.Arguments.Count > 0)
+            {
+                _sources.Add(node.Arguments[0]);
+            }
+
+            return base.VisitMethodCall(node);
+        }
     }
 
     private static bool ReferencesParameter(Expression expression, ParameterExpression parameter)

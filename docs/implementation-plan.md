@@ -659,7 +659,7 @@ finding them is the whole reason to re-cluster rather than work down the list.
 | **4** | Spec asserts a translation failure this provider does not produce | **Z4** |
 | **11** | Singles and the compliance test | — |
 
-### Z5 — a collection fragment must be materialized before it ships
+### Z5 — a collection fragment must be materialized before it ships ✅ **done, 45 → 41**
 
 `AsQueryable_in_query_server_evals` and `Complex_query_with_group_by_in_subquery5` were filed as
 unrelated. They fail with the **same** EF message, `CoreStrings` —
@@ -681,6 +681,26 @@ Worth noting against **E1**, which taught the splitter to descend past `ToList` 
 query that ends in one asked the server to translate a materialization. That rule is right at the
 *end of a query* and wrong *inside a projection*, where EF requires the `ToList` to be there. Same
 operator, opposite meaning, decided by position.
+
+**Implemented, 45 → 41 of 5234, nothing broken** — `Complex_query_with_group_by_in_subquery5` and
+`AsQueryable_in_query_server_evals`, both tiers.
+
+The first attempt materialized every queryable fragment and **broke three tests that assert this
+exact error**: `Select_correlated_subquery_ordered_returning_queryable_in_DTO_throws` calls
+`AssertInvalidMaterializationType`, and `Mixed_sync_async_query` expects the same
+`InvalidOperationException`. Their projections declare an `IQueryable<T>` *member* — the queryable
+is the answer the caller asked for, and EF is right to refuse it. Materializing suppressed an
+error this provider is supposed to raise.
+
+The discriminator is whether the projection **composes over** the fragment: `frag.Select(…)` is an
+intermediate and gets materialized, `new Dto { Orders = frag }` is the answer and is left for EF
+to reject. Read off the body's own operators, so no type analysis is needed.
+
+Both sides are unit-tested, and all three decisions — materialize, re-queryable, and the
+discriminator — are mutation-tested. The shipped shape turned out to be
+`ValueTuple<List<ValueTuple<string>>>` rather than `ValueTuple<List<Book>>`: the inner projection
+is rewritten first, so only the projected column travels, not whole rows. That is W1 holding
+through a nested collection, and the test asserts it.
 
 ### Two cheap checks that reclassify a failure
 

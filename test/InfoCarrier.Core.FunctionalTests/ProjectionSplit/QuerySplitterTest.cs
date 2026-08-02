@@ -285,6 +285,48 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_collection_the_projection_composes_over_ships_materialized()
+    {
+        // EF refuses a final projection that returns an IQueryable: "Collections in the final
+        // projection must be an IEnumerable<T> type such as List<T>". The largest
+        // server-evaluable fragment here is the queryable `Where`, so putting it in a slot
+        // verbatim ships exactly the projection EF rejects — and the failure names the
+        // projection, not this rewrite.
+        // The inner projection has to be client-typed, or the whole body is server-ok and there
+        // is nothing to rewrite — `Select(b => b.Title)` returns a `List<string>`, which the
+        // server can name perfectly well.
+        SplitQuery split = Split(
+            _context.Authors.Select(a =>
+                a.Books.AsQueryable().Where(b => b.Title != null).Select(b => new { b.Title }).ToList()));
+
+        // Nested, because the inner projection was rewritten first: only the Title travels, not
+        // whole Book rows (wire-protocol W1), and the materialization wraps that.
+        Assert.Equal(
+            typeof(ValueTuple<List<ValueTuple<string>>>),
+            Assert.Single(split.ServerQueries).ElementType);
+
+        List<object?> rows = [.. ((IEnumerable)Run(split)!).Cast<object?>()];
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(["Emma"], ((IEnumerable)rows[0]!).Cast<object>()
+            .Select(x => x.GetType().GetProperty("Title")!.GetValue(x)));
+        Assert.Empty((IEnumerable)rows[1]!);
+    }
+
+    [Fact]
+    public void A_collection_the_projection_returns_is_left_for_EF_to_refuse()
+    {
+        // The caller declared the member `IQueryable<Book>`, so the queryable *is* the answer
+        // rather than an intermediate. Materializing it here would suppress an error EF is
+        // supposed to raise — two spec tests assert exactly that error.
+        SplitQuery split = Split(
+            _context.Authors.Select(a => new QueryableRow { Books = a.Books.AsQueryable() }));
+
+        Assert.Equal(
+            typeof(ValueTuple<IQueryable<Book>>),
+            Assert.Single(split.ServerQueries).ElementType);
+    }
+
+    [Fact]
     public void A_group_by_stays_composed_with_its_aggregate()
     {
         // The cut's own doing: separating GroupBy from the aggregate that consumes it leaves a

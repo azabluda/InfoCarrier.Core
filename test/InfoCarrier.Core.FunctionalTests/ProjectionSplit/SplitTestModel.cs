@@ -59,6 +59,17 @@ public class ClientRow(string? text, Author author)
 }
 
 /// <summary>
+///     A client-only type with an <see cref="IQueryable{T}" /> member — EF's <c>QueryableDto</c>,
+///     reproduced. A projection into one of these is what EF refuses outright ("Collections in
+///     the final projection must be an <c>IEnumerable&lt;T&gt;</c> type"), so the split must not
+///     quietly make it work by materializing on the way past.
+/// </summary>
+public class QueryableRow
+{
+    public IQueryable<Book>? Books { get; set; }
+}
+
+/// <summary>
 ///     A second client-only type, carrying a computed value rather than a copied one.
 /// </summary>
 public class AuthorSummary
