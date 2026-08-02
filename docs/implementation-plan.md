@@ -76,6 +76,10 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       containing a root. A quoted lambda is server-ok and closed but is a function; shipping one
       made the server return the lambda object as a result row. **669 → 526.** ✅ `<this commit>`
 
+- [x] **A5b.** Residual parameters bind by interface (`IQueryable<T>`), not by the shipped
+      expression's exact type — a subtree ending in `Include(…)` is typed `IIncludableQueryable`,
+      which the materialized `EnumerableQuery` does not implement. **526 → 484.** ✅ `<this commit>`
+
 - [ ] **A6.** Tracking semantics (§4): boundary rows materialize with identity resolution and
       without tracking; entities present in the residual's *result* are attached afterwards per
       `QueryTrackingBehavior`.
@@ -142,3 +146,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-01 | 2817 | 1421 | 4247 | M2 entry baseline — after L1 (type allowlist ON) |
 | 2026-08-02 | 3611 | 669 | 4289 | after A5 (splitter wired into the client executor) |
 | 2026-08-02 | 3756 | 526 | 4291 | after A5a (only executable queries are shipped) |
+| 2026-08-02 | 3798 | 484 | 4291 | after A5b (residual parameters bind by interface) |

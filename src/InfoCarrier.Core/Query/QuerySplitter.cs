@@ -84,7 +84,17 @@ public sealed class QuerySplitter
         for (int i = 0; i < analysis.Shippable.Count; i++)
         {
             Expression shipped = analysis.Shippable[i];
-            var parameter = Expression.Parameter(shipped.Type, $"server{i}");
+
+            // Bind by the interface, not by the shipped expression's exact type. A subtree ending
+            // in `Include(c => c.Orders)` is typed IIncludableQueryable, which the materialized
+            // EnumerableQuery does not implement — the residual then failed at invocation time
+            // with a cast complaint far from the cause. Every operator the residual can apply
+            // takes IQueryable<T> anyway.
+            var parameter = Expression.Parameter(
+                typeof(IQueryable).IsAssignableFrom(shipped.Type)
+                    ? typeof(IQueryable<>).MakeGenericType(ElementTypeOf(shipped.Type))
+                    : shipped.Type,
+                $"server{i}");
             parameters.Add(parameter);
             substitutions[shipped] = parameter;
         }
