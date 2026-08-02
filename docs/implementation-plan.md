@@ -532,20 +532,49 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       | 2 | "Unable to track an entity of type `EntityCompositeKeyEntityRoot (Dictionary<string, object>)`" | A shared-type join entity with a composite key. |
       | 2 | `ProxyableSharedType` | Shared-type entity behind a proxy; adjacent to the `FindRuntimeEntityType` fix in S3c-14. |
 
-### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
+- [x] **S3c-16.** Shadow state goes on before the state does. **`Total tests: 11024,
+      Passed: 10310, Failed: 685, Skipped: 29`** — FIXED 21, BROKEN none. ✅ `<this commit>`
 
-No family above 8 now; the long tail below is what is left.
+      One reorder in `ServerSaveChangesExecutor.TrackOne`: apply the entry's shadow values while
+      it is still `Detached`, then set the state. S3c-9 had already established that a key must
+      be written before EF can call it a key — "the property `SponsorDetails.TitleSponsorId` is
+      part of a key and so cannot be modified" — and moved every write that goes onto the CLR
+      object ahead of tracking. Shadow state had no CLR member to receive, so it stayed behind,
+      and an *owned* dependent's key is exactly that: its owner's key, in shadow.
+
+      It paid three times over. The 17 `GraphUpdates` owned tests it was aimed at, the 4
+      `OptimisticConcurrency` owned tests S3c-14 had classified as the same root cause — one fix
+      serving both, as predicted — and the two `Discriminator_values_are_not_marked_as_unknown` /
+      `Saving_unknown_key_value_marks_it_as_unmodified` pairs, which the plan had recorded as an
+      unrelated "shadow-state round trip" family and which were the same bug seen from the other
+      end.
+
+### The `GraphUpdates` residual — 16 of 1787 (2026-08-03, Tier A)
+
+**The table this replaces was wrong, and worth saying how.** It claimed 45 failures split
+14 / 12 / 10 / 4 / 3 / 2, and the decomposition of the suite total that went with it read
+"45 GraphUpdates + 29 query + 4 PropertyValues". The measured split at that same commit was
+**33 GraphUpdates + 16 PropertyValues + 28 query + 1 compliance**, and the 12-test
+`Mark_explicitly_set_*_stable_*` family did not exist at all — it had been fixed and the table
+never updated. Both numbers had been carried forward by hand across several steps. Anything
+below is now read out of `artifacts/measure/<label>.txt`, which is the actual run.
 
 | # | Family | Symptom | Diagnosis |
 |---|---|---|---|
-| 14 | Owned collections (`*_owned_collection*`, `Save_changed_owned_*`) | "The property `Owner.Owned#Owned.OwnerId` is part of a key and so cannot be modified" | An owned dependent's key *is* its owner's key, and the server writes it through a tracked entry. S3c-9 moved the equivalent write for ordinary dependents to before tracking; owned types need the same, but their key arrives as shadow state applied after the entry exists. |
-| 12 | `Mark_explicitly_set_*_stable_*` | `ArgumentException: An item with the same key has already been added` | Stable value generators, where client and server both generate. Untouched by S3c-9: a stable generator's value is not a placeholder. |
-| 10 | `Update_root_by_collection_replacement_of_*` | assertion | Unclassified. |
-| 4 | `Discriminator_values_are_not_marked_as_unknown`, `Saving_unknown_key_value_marks_it_as_unmodified` | assertion | Shadow-state round trip, adjacent to S3c-2's third fix. |
+| 10 | `Update_root_by_collection_replacement_of_*` | assertion | Unclassified. The largest family left here. |
 | 3 | `Can_add_*_dependent_when_multiple_possible_principal_sides` | assertion | Unclassified. |
 | 2 | `Save_optional_many_to_one_dependents` | tracked-entry count off by one (26 vs 27) | **Introduced by S3c-9**, in 2 of that method's 12 parameterizations. |
+| 1 | `Save_changed_owned_one_to_one` | assertion | The one survivor of the owned family S3c-16 fixed. |
 
-The remaining **29** failures outside this class are M2's query residual, unchanged since Z7.
+### The `PropertyValues` residual — 16 of 196 (2026-08-03, Tier A)
+
+Entirely one shape: `Scalar_store_values_*` and `Scalar_original_values_*` read through a
+property dictionary. Store values require a round trip the client cannot make from its own
+tracked state, and original values require what S3c-13 only sends for concurrency tokens.
+
+The remaining **28** failures outside these classes are M2's query residual, unchanged since Z7,
+plus 1 in `InfoCarrierComplianceTest` — which is the compliance report itself, and moves as
+bases are adopted.
 - [x] **S3c-9.** Generate the key on a store that generates at `Add` time. **GraphUpdates
       156 → 45; suite `Passed: 6941, Failed: 74, Skipped: 13, Total: 7028`** — 113 fixed, 2
       broken, identical across two consecutive full runs. ✅ `<this commit>`

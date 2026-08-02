@@ -215,12 +215,22 @@ public class ServerSaveChangesExecutor
             }
 
             EntityEntry entry = Track(replay.EntityType, replay.Entity);
-            entry.State = state;
 
+            // Shadow state goes on while the entry is still `Detached`, for the same reason the
+            // values written directly onto the object go on before it is tracked at all: a key
+            // assigned through a tracked entry is refused — "the property
+            // `SponsorDetails.TitleSponsorId` is part of a key and so cannot be modified" —
+            // because EF reads that as re-keying a row. An *owned* dependent's key is its
+            // owner's, and it has no CLR member to receive it, so it arrives here rather than in
+            // the pre-tracking pass; setting it after the state was what S3c-9 had already fixed
+            // everywhere else. Detached is also the right moment: the identity map is not
+            // written until the state is, so the entry lands under the key it actually has.
             foreach ((IProperty property, object? value) in replay.Shadow)
             {
                 entry.Property(property.Name).CurrentValue = value;
             }
+
+            entry.State = state;
 
             // What the store will call this row, so references to the client's placeholder can
             // find it. On a backend that generates at save time the value is itself temporary,

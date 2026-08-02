@@ -82,18 +82,20 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11024, Passed: 10289, Failed: 706, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
 
-**505 of the 706 failures are one feature: lazy loading.** Every `Lazy_load_*` test in
+**505 of the 685 failures are one feature: lazy loading.** Every `Lazy_load_*` test in
 `LoadInfoCarrierTest` fails and none passes — the navigation is never populated. Do not read the
 failure count as a long tail; subtract that family first.
 
 Not yet implemented, in rough priority order:
-- **The `GraphUpdates` residual** — 45 of 1787, a long tail with no family above 14 (owned
-  collections, stable value generators). Classified in `docs/implementation-plan.md` under S3c.
+- **The `GraphUpdates` residual** — 16 of 1787, led by a 10-test
+  `Update_root_by_collection_replacement_of_*` family. Classified in
+  `docs/implementation-plan.md` under S3c, which is read out of `artifacts/measure/` rather than
+  tallied by hand — the table it replaced had drifted badly.
 - **Lazy loading** — 505 failures, the largest single gap. Deserves its own milestone.
 - **The `ManyToManyTracking` residual** — 111 of 200, dominated by a 60-test duplicate-key family
   that shares a root cause with `GraphUpdates`'s stable-value-generator family.
