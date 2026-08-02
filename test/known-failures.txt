@@ -9,7 +9,7 @@
 # converted ~1,305 illusory passes into real M2 failures.
 #
 # 2026-08-02 — the projection split is implemented and the type boundary is enforced:
-# 1421 -> 91. Held at 91 rather than the 90 last measured, because one test still varies
-# between runs; pin that down before trusting the count to a single unit.
-failed=91
+# 1421 -> 90. Measured twice at 90; the earlier 91 was a unit test of mine still failing at
+# the time it was taken, not a test that varies between runs.
+failed=90
 total=4296

@@ -173,7 +173,7 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
 ---
 
-## The residual 118, classified (2026-08-02)
+## The residual, classified (2026-08-02 — measured at 118, now 90)
 
 Measured from `artifacts/test-results/c1.trx`. Nothing here is masked; each line is a real
 failure with a named cause.
