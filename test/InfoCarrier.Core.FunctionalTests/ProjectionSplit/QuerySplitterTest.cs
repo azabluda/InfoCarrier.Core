@@ -275,12 +275,82 @@ public class QuerySplitterTest : IDisposable
         // The entity escapes into a client type, and the navigation is read a step later — past
         // the point the projection rewrite can reach. Answering 0 here is what must not happen.
         var query = _context.Books
-            .Select(b => new { b.Title, Author = b.Author })
-            .Select(x => new { x.Title, Count = x.Author!.Books.Count });
+            .Select(b => new ClientRow(b.Title, b.Author!))
+            .Select(x => new { x.Text, Count = x.Author.Books.Count });
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
         Assert.Contains("Books", ex.Message, StringComparison.Ordinal);
         Assert.Contains("silently", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_carrier_the_query_creates_and_consumes_is_re_carried_as_a_tuple()
+    {
+        // The transparent identifier the compiler puts between the two `from` clauses. Nothing
+        // observes it, so replacing it with a tuple leaves the whole query on the server —
+        // which is the entire point of ADR-011.
+        //
+        // Also the regression test for the delegate type: `SelectMany`'s collection selector is
+        // declared `Func<T, IEnumerable<Book>>` while `a.Books` is a `List<Book>`. Re-inferring
+        // the delegate from the body narrows it, the rebuilt call stops matching the operator,
+        // and the rewrite is silently discarded — this query goes back to being split.
+        SplitQuery split = Split(
+            from a in _context.Authors
+            from b in a.Books
+            where b.Title != null
+            select a);
+
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(["Austen"], ((IEnumerable<Author>)Run(split)!).Select(a => a.Name));
+    }
+
+    [Fact]
+    public void A_carrier_the_query_returns_is_left_alone()
+    {
+        // The caller asked for this type, so it is not plumbing. Re-carrying it would hand back
+        // a tuple where an anonymous type was requested — the projection rewrite is what handles
+        // these, by rebuilding the type on the client.
+        SplitQuery split = Split(_context.Authors.Select(a => new { a.Name }).Where(x => x.Name != null));
+
+        Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
+    }
+
+    [Fact]
+    public void A_carrier_holding_a_sequence_is_left_alone()
+    {
+        // The guard the reassembly deferral violated: a slot holding a sequence asks SQL to
+        // navigate out of a projected tuple back into a correlated collection.
+        SplitQuery split = Split(
+            _context.Authors.Select(a => new { a.Name, Books = a.Books }).Select(x => x.Name));
+
+        Assert.False(split.IsPassThrough);
+        Assert.Equal(["Austen", "Woolf"], (IEnumerable<string?>)Run(split)!);
+    }
+
+    [Fact]
+    public void A_carrier_that_escapes_through_a_cast_is_left_alone()
+    {
+        // `Cast<object>` hides the carrier from the query's result type while the value still
+        // reaches the caller, so "does it reach the result type" is not on its own enough.
+        SplitQuery split = Split(
+            _context.Authors.Select(a => new { a.Name, Self = a }).Cast<object>());
+
+        Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
+    }
+
+    [Fact]
+    public void The_same_query_through_an_anonymous_carrier_is_answered_on_the_server()
+    {
+        // The shape above, written the way the C# compiler writes a transparent identifier. The
+        // carrier is created and consumed inside the query, so ADR-011 re-carries it as a tuple,
+        // the navigation read goes to the server with everything else, and the refusal is never
+        // needed. This is the improvement the refusal above is the fallback for — asserted on the
+        // value, because the failure it replaced was a plausible wrong number rather than a throw.
+        var query = _context.Books
+            .Select(b => new { b.Title, Author = b.Author })
+            .Select(x => new { x.Title, Count = x.Author!.Books.Count });
+
+        Assert.Equal([1], Rows(Run(Split(query)), "Count"));
     }
 
     [Fact]
@@ -289,8 +359,8 @@ public class QuerySplitterTest : IDisposable
         // EF.Property has no runtime body, but the value is on the materialized entity and the
         // model knows how to read it.
         var query = _context.Authors
-            .Select(a => new { a.Name, Self = a })
-            .Select(x => new { x.Name, Id = EF.Property<int>(x.Self, nameof(Author.Id)) });
+            .Select(a => new ClientRow(a.Name, a))
+            .Select(x => new { x.Text, Id = EF.Property<int>(x.Author, nameof(Author.Id)) });
 
         Assert.Equal([1, 2], Rows(Run(Split(query)), "Id"));
     }
@@ -299,8 +369,8 @@ public class QuerySplitterTest : IDisposable
     public void EF_Property_for_a_shadow_property_says_why_it_cannot()
     {
         var query = _context.Authors
-            .Select(a => new { a.Name, Self = a })
-            .Select(x => new { x.Name, Shadow = EF.Property<string>(x.Self, "Hidden") });
+            .Select(a => new ClientRow(a.Name, a))
+            .Select(x => new { x.Text, Shadow = EF.Property<string>(x.Author, "Hidden") });
 
         // The residual is lazy, so the read only happens when the rows are pulled.
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(

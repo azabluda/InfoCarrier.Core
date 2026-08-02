@@ -62,12 +62,33 @@ internal static class TupleCarrier
 
         if (values.Count <= MaxFlatArity)
         {
-            return Expression.New(type.GetConstructors()[0], values);
+            return Construct(type, values);
         }
 
         Expression rest = New([.. values.Skip(MaxFlatArity)]);
-        return Expression.New(type.GetConstructors()[0], [.. values.Take(MaxFlatArity), rest]);
+        return Construct(type, [.. values.Take(MaxFlatArity), rest]);
     }
+
+    /// <summary>
+    ///     Builds the construction with its <see cref="NewExpression.Members" /> filled in.
+    /// </summary>
+    /// <remarks>
+    ///     The members are the whole difference between a tuple EF can see through and one it
+    ///     cannot. EF collapses <c>new { c, o }.c</c> back to <c>c</c> by looking the member up in
+    ///     <see cref="NewExpression.Members" /> (<c>ReplacingExpressionVisitor.VisitMember</c>),
+    ///     which is how an anonymous-type carrier survives navigation expansion at all. A tuple
+    ///     built with the plain <c>Expression.New(ctor, args)</c> overload has none, so
+    ///     <c>t.Item1</c> is an opaque field read, the entity behind it is lost, and the query
+    ///     stops translating the moment anything navigates out of a slot — measured as
+    ///     <b>214 extra failures</b>, all "could not be translated", before the members were
+    ///     supplied.
+    /// </remarks>
+    private static Expression Construct(Type type, IReadOnlyList<Expression> values)
+        => Expression.New(
+            type.GetConstructors()[0],
+            values,
+            [.. Enumerable.Range(0, values.Count)
+                .Select(i => type.GetField(i < MaxFlatArity ? $"Item{i + 1}" : "Rest")!)]);
 
     /// <summary>
     ///     Reads the value at <paramref name="index" /> back out.

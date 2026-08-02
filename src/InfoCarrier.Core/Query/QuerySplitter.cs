@@ -58,6 +58,11 @@ public sealed class QuerySplitter
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        // Replace the carrier types the query creates and consumes internally — transparent
+        // identifiers, mostly — with tuples, so the operators above them stay on the server
+        // (ADR-011). Guarded: kept only if it demonstrably ships more.
+        query = ReCarryInternalTypes(query);
+
         // Rewrite client-typed projections into a server-side tuple plus a client-side
         // reassembly *before* looking for the boundary (§3.2). Cutting above such a projection
         // is not merely coarse — it strands navigation reads and correlated subqueries on the
@@ -120,6 +125,24 @@ public sealed class QuerySplitter
             [.. augmented.Select(ToServerQuery)],
             Expression.Lambda(residualBody, parameters),
             isPassThrough: false);
+    }
+
+    /// <summary>
+    ///     Applies <see cref="TransparentIdentifierRewriter" />, keeping the result only if
+    ///     <see cref="RewriteVerifier" /> agrees it is an improvement.
+    /// </summary>
+    /// <remarks>
+    ///     The rewrite is a guess about a tree the server has not seen, and the last unguarded
+    ///     one of those cost a 91 → 383 regression. Verifying first means the worst it can do is
+    ///     nothing.
+    /// </remarks>
+    private Expression ReCarryInternalTypes(Expression query)
+    {
+        Expression candidate = TransparentIdentifierRewriter.Rewrite(query, _allowlist);
+
+        return ReferenceEquals(candidate, query)
+            ? query
+            : new RewriteVerifier(_analyzer).Verify(query, candidate).Kept;
     }
 
     private static ServerQuery ToServerQuery(Expression query)

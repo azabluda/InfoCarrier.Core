@@ -53,6 +53,14 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Reverse_in_SelectMany_with_Take(async))).Message);
 
+    // Same story as the join suite's `SelectMany_with_selecting_outer_element`: EF's SQLite tests
+    // have always overridden this, and this provider only now translates far enough to hit it.
+    public override async Task Select_nested_collection_deep_distinct_no_identifiers(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Select_nested_collection_deep_distinct_no_identifiers(async))).Message);
+
     public override async Task Select_nested_collection_deep(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

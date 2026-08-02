@@ -41,6 +41,16 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_with_selecting_outer_entity(async))).Message);
 
+    // Reached SQL only once ADR-011's carrier re-carry stopped the split from client-evaluating
+    // it. EF's own SQLite suite has had this override all along
+    // (`NorthwindJoinQuerySqliteTest.SelectMany_with_selecting_outer_element`); this provider
+    // simply was not getting far enough to need it.
+    public override async Task SelectMany_with_selecting_outer_element(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.SelectMany_with_selecting_outer_element(async))).Message);
+
     public override async Task Take_in_collection_projection_with_FirstOrDefault_on_top_level(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

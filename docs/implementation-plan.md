@@ -415,10 +415,47 @@ has to preserve what each operator expects of its source, and a transparent iden
       Every one costs at least one test, as does the counter's skip over already-shipped
       subtrees.
 
-- [ ] **X3.** `ValueTuple` re-carry for transparent identifiers, under both guards of
-      `transparent-identifiers.md` §4. Target: the navigation-read refusals — plain
-      `SelectMany` chains, which §2 of the spec already identified as ours alone because EF has
-      no equivalent rewrite for them.
+- [x] **X3.** `ValueTuple` re-carry for transparent identifiers, under both guards of
+      `transparent-identifiers.md` §4. **111 → 101 of 5227, nothing broken**, and the target
+      family moved in *both* tiers (`Multiple_select_many_with_predicate` on InMemory and on
+      SQLite), which §7 required. ✅ `<this commit>`
+
+      The condition implemented is not "is it a transparent identifier" — that is a fact about
+      the C# compiler, not about the tree — but the property that matters: **the type is created
+      inside the query and never reaches its result.** No caller can observe it, so nothing is
+      owed a reassembly.
+
+      Three corrections, each found only by running the suite:
+
+      | | |
+      |---|---|
+      | `Expression.New(ctor, args)` builds a tuple EF cannot see through | **111 → 323.** EF collapses `new { c, o }.c` via `NewExpression.Members`; without members `t.Item1` is an opaque field read and every navigation out of a slot stops translating. Supplying the fields as members: 323 → 116. |
+      | `.Cast<object>()` hides the carrier from the result type while the value still escapes | `Take_with_single_select_many` returned a boxed tuple. The conversion has to be caught where it happens. |
+      | `Expression.Lambda` re-inferring the delegate type | `SelectMany`'s collection selector is `Func<T, IEnumerable<X>>` but its body is an `ICollection<X>`; inference narrows it, the rebuilt call stops matching, and the rewrite is discarded **silently**. 107 → 101, and until it was fixed the target family did not move at all. |
+
+      Four SQLite results moved from passing to `ApplyNotSupported` —
+      `SelectMany_with_selecting_outer_element` and
+      `Select_nested_collection_deep_distinct_no_identifiers`. **EF's own SQLite suite has
+      overridden both all along**; this provider was passing them only because the split
+      client-evaluated them instead of translating. Adopting EF's overrides verbatim is
+      convergence with the reference provider, not suppression — and it is worth noticing that
+      the previous "pass" was the weaker result.
+
+      Three `QuerySplitterTest` cases changed shape rather than expectation. The two `EF.Property`
+      ones now ship to the server, which is right — a real server translates `EF.Property`, and
+      the spec suite's `NorthwindEFPropertyIncludeQuery*` tests confirm it — but the unit tests'
+      LINQ-to-Objects stand-in cannot. They were rewritten against `ClientRow`, a
+      constructor-built carrier the re-carry deliberately does not touch (the compiler fills
+      `NewExpression.Members` only for anonymous types), so the client-side path they exist to
+      cover stays reachable. The navigation-refusal test kept its guard the same way, and gained
+      a sibling asserting that the anonymous-carrier version of the same query now answers
+      **1** on the server rather than needing the refusal at all.
+
+      Guards mutation-tested: the sequence-in-a-slot check, the `Cast` escape and the
+      result-type exclusion each cost a unit test when disabled. The delegate mapping and the
+      tuple members are covered by the suite rather than by unit tests — 107 → 101 and
+      116 → 323 respectively — which is recorded here rather than papered over with a test that
+      would not have caught them.
 
 ---
 
@@ -450,3 +487,5 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 4132 | 154 | 4295 | after C6 (Include placed at the root it is read from) |
 | 2026-08-02 | 4152 | 134 | 4295 | after E1 (stale overrides deleted; guard made per-argument) |
 | 2026-08-02 | 4168 | 118 | 4295 | after C1 (nested projections rewrite too) |
+| 2026-08-02 | 5098 | 111 | 5222 | after X2 (rewrite verifier — no movement, by design) |
+| 2026-08-02 | 5113 | 101 | 5227 | after X3 (carriers re-carried as tuples; both tiers moved) |

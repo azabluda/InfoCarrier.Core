@@ -40,6 +40,25 @@ public class BookSummary
 }
 
 /// <summary>
+///     A client-only carrier built by a constructor rather than an object initializer, holding an
+///     entity alongside a scalar.
+/// </summary>
+/// <remarks>
+///     The C# compiler fills in <see cref="System.Linq.Expressions.NewExpression.Members" /> only
+///     for anonymous types, so this shape is one the carrier re-carry
+///     ([ADR-011](../../../docs/decisions.md#adr-011)) deliberately leaves alone. That is what
+///     makes it useful here: it keeps an entity on the client side of the boundary, which is the
+///     situation the client-side halves of the split exist for and would otherwise be untestable
+///     now that the anonymous-type version of the same query ships whole.
+/// </remarks>
+public class ClientRow(string? text, Author author)
+{
+    public string? Text { get; } = text;
+
+    public Author Author { get; } = author;
+}
+
+/// <summary>
 ///     A second client-only type, carrying a computed value rather than a copied one.
 /// </summary>
 public class AuthorSummary

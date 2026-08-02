@@ -1,6 +1,6 @@
 # Transparent identifiers — design spec
 
-Status: **design**, implementation not started.
+Status: **X2 and X3 implemented; X1 tried and reverted.** Measured 111 → 101.
 Extends [`projection-split.md`](projection-split.md) §6a. Recorded as [ADR-011](decisions.md#adr-011).
 
 Measured 2026-08-02: **36 of 111 remaining failures** are this problem, across both test tiers.
@@ -83,7 +83,7 @@ before it could reach a carrier slot. Under the guard it removes no groupings at
 Recorded here rather than retried. A future attempt would have to bring the dead-member
 elimination with it — which is §3.2's work, not a preliminary to it.
 
-### 3.2 Re-carry the remaining identifiers — ours
+### 3.2 Re-carry the remaining identifiers — ours · **done, 111 → 101**
 
 For a transparent identifier that survives §3.1, **replace the anonymous type with a
 `ValueTuple` and do not reassemble it on the client.** Member reads through it become tuple-slot
@@ -99,9 +99,31 @@ projection that already existed, and had to prove each move safe. This never cre
 client-side reassembly in the first place — the identifier is compiler plumbing that no caller
 ever sees, so there is nothing to rebuild.
 
-**A tuple is structurally what the anonymous type was**, which is why navigating out of a slot
-(`t.Item2.OrderDetails`) is expected to translate: it is the same shape EF already translates for
-`Select(c => new { c, o }).SelectMany(x => x.o.OrderDetails)`.
+**A tuple is structurally what the anonymous type was** — but only if it is built the same way,
+and that turned out to be the whole phase.
+
+> ⚠️ **Measured.** A tuple built with `Expression.New(ctor, args)` is *not* what an anonymous type
+> is. EF collapses `new { c, o }.c` back to `c` by looking the member up in
+> `NewExpression.Members` (`ReplacingExpressionVisitor.VisitMember`); that is how an
+> anonymous-type carrier survives navigation expansion at all. Without members, `t.Item1` is an
+> opaque field read, the entity behind it is lost, and every query that navigates out of a slot
+> stops translating — **214 extra failures, 111 → 323**. Supplying the `Item1…Item7`/`Rest` fields
+> as members took it to 116 in one change. The claim above is true of the shape and false of the
+> construction, which is not a distinction the design anticipated.
+
+Two more corrections came out of measurement, each worth more than the line it changed:
+
+- **The result type is not the only way a carrier escapes.** The rule "rewrite it only if it never
+  reaches the query's result" is defeated by `.Cast<object>()`: the carrier vanishes from the
+  signature while the value still reaches the caller, which turned
+  `Take_with_single_select_many` into a boxed tuple where an anonymous type was asked for. The
+  conversion has to be caught where it happens, not inferred from the declared result type.
+- **The delegate type must be mapped, not re-inferred.** `SelectMany`'s collection selector is
+  declared `Func<TSource, IEnumerable<TCollection>>` while its body — a collection navigation — is
+  an `ICollection<TCollection>`. Letting `Expression.Lambda` infer from the body narrows the
+  delegate, the rebuilt call no longer matches the operator, and the rewrite is discarded whole.
+  This alone was the difference between 107 and 101, and it was silent: the target family simply
+  did not move.
 
 ## 4. The two guards, and why each exists
 
@@ -142,7 +164,7 @@ property. That gap is real and is why §6 keeps the phases separately measurable
 |---|---|---|---|
 | **X1** | Mirror `TryFlattenGroupJoinSelectMany`, plus the member-access-over-`new` simplification it relies on | *(claimed)* 16 `NullReferenceException` failures | **reverted** — target misattributed, rewrite not separable from EF's pipeline (§3.1) |
 | **X2** | Verification harness: rewrite, re-analyze, keep only on strict improvement | no test movement expected — it is the safety net for X3 | **done** — `RewriteVerifier`, 111 → 111 of 5222 |
-| **X3** | `ValueTuple` re-carry for surviving identifiers, under both guards | the navigation-read refusals | |
+| **X3** | `ValueTuple` re-carry for surviving identifiers, under both guards | the navigation-read refusals | **done** — 111 → 101 of 5227, nothing broken; both tiers moved |
 
 X2 lands **before** the rewrite, so X3 is never measured without its guard. X1 is the argument
 for that ordering rather than an exception to it: it had to grow an ad-hoc free-parameter check
