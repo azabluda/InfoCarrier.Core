@@ -26,25 +26,9 @@ namespace InfoCarrier.Core.FunctionalTests.Query;
 public class NorthwindJoinQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindJoinQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
 {
-    /// <inheritdoc />
-    public override Task SelectMany_with_client_eval(bool async)
-        // Joins between sources with client eval. Issue #21200.
-        => Assert.ThrowsAsync<NotImplementedException>(() => base.SelectMany_with_client_eval(async));
 
-    /// <inheritdoc />
-    public override Task SelectMany_with_client_eval_with_collection_shaper(bool async)
-        // Joins between sources with client eval. Issue #21200.
-        => Assert.ThrowsAsync<NotImplementedException>(() => base.SelectMany_with_client_eval_with_collection_shaper(async));
 
-    /// <inheritdoc />
-    public override Task SelectMany_with_client_eval_with_collection_shaper_ignored(bool async)
-        // Joins between sources with client eval. Issue #21200.
-        => Assert.ThrowsAsync<NotImplementedException>(() => base.SelectMany_with_client_eval_with_collection_shaper_ignored(async));
 
-    /// <inheritdoc />
-    public override Task SelectMany_with_client_eval_with_constructor(bool async)
-        // Joins between sources with client eval. Issue #21200.
-        => Assert.ThrowsAsync<NotImplementedException>(() => base.SelectMany_with_client_eval_with_constructor(async));
 
     /// <inheritdoc />
     public override Task RightJoin(bool async)

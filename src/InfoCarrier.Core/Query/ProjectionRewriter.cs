@@ -51,6 +51,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     Rewrites every client-typed projection in <paramref name="query" /> that sits directly
     ///     on a server-executable source.
     /// </summary>
+    /// <param name="query">The captured query, after parameter substitution.</param>
+    /// <param name="analyzer">Decides what the server can express.</param>
     /// <param name="reassemblies">
     ///     The client-side <c>Select</c> nodes this pass introduced. They are the <em>only</em>
     ///     client-side operators a split is allowed to produce; see
@@ -97,7 +99,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return call;
         }
 
-        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(selector);
+        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(selector!);
         if (bodyAnalysis.FactsFor(selector.Body).ServerOk)
         {
             // The projection is server-executable as written.
@@ -105,7 +107,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         List<Expression> fragments = [];
-        CollectFragments(selector.Body, bodyAnalysis, selector.Parameters, fragments);
+        CollectFragments(selector!.Body, bodyAnalysis, selector.Parameters, fragments);
         if (fragments.Count == 0)
         {
             // A body that reads nothing from the row — leave it to the plain cut.
@@ -164,7 +166,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         silently replace the elements with their sort keys.
     ///     </para>
     /// </remarks>
-    private static bool IsResultSelectorOperator(MethodCallExpression call, out LambdaExpression? selector)
+    internal static bool IsResultSelectorOperator(MethodCallExpression call, out LambdaExpression? selector)
     {
         selector = null;
 

@@ -26,18 +26,5 @@ namespace InfoCarrier.Core.FunctionalTests.Query;
 public class NorthwindSetOperationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindSetOperationsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
 {
-    /// <inheritdoc />
-    public override async Task Collection_projection_before_set_operation_fails(bool async)
-        // Client evaluation in projection. Issue #16243.
-        => Assert.Equal(
-            InMemoryStrings.SetOperationsNotAllowedAfterClientEvaluation,
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Collection_projection_before_set_operation_fails(async)))
-            .Message);
 
-    /// <inheritdoc />
-    public override async Task Client_eval_Union_FirstOrDefault(bool async)
-        // Client evaluation in projection. Issue #16243.
-        => Assert.Equal(
-            InMemoryStrings.SetOperationsNotAllowedAfterClientEvaluation,
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Client_eval_Union_FirstOrDefault(async))).Message);
 }

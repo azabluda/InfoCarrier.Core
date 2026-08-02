@@ -132,10 +132,19 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
 ## Phase M2-E — re-check the store-limitation overrides
 
-- [ ] **E1.** The ~84 overrides that now trip the type boundary before reaching the translation
-      failure they assert: each either returns to asserting its original failure, or is deleted.
-      Mirroring EF's own `*InMemoryTest` override remains the objective criterion (roadmap M3
-      inventory).
+- [x] **E1.** First pass: 14 overrides deleted because the split genuinely handles what they
+      assert is unsupported — 8 `Final_GroupBy_*` (their source is a client-typed projection, so
+      the `GroupBy` runs on the client and never reaches InMemory's non-composed-GroupBy limit),
+      2 set-operation, 4 `SelectMany_with_client_eval`. Plus the client-evaluation guard made
+      per-*argument*: a result selector runs after the rows are chosen, so client code there is
+      legal, but a `Join` key selector decides which rows match and is not. **154 → 134.**
+      ✅ `<this commit>`
+
+      `Final_GroupBy_nominal_type_entity` now fails on values (expected 69, got 91) — the
+      override was masking a real defect. Left red deliberately; see the open items below.
+
+- [ ] **E2.** Second pass over the remaining override failures once the value defects above are
+      understood.
 
 ---
 
@@ -165,3 +174,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 4063 | 220 | 4292 | after C2-C4 (all result selectors, structurally recognised) |
 | 2026-08-02 | 4092 | 194 | 4295 | after C5 (client evaluation is a translation failure) |
 | 2026-08-02 | 4132 | 154 | 4295 | after C6 (Include placed at the root it is read from) |
+| 2026-08-02 | 4152 | 134 | 4295 | after E1 (stale overrides deleted; guard made per-argument) |

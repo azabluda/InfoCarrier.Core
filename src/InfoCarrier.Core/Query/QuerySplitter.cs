@@ -376,9 +376,10 @@ public sealed class QuerySplitter
                 && shipped.Contains(node.Arguments[0])
                 && !reassemblies.Contains(node)
                 && node.Method.DeclaringType is { } declaring
-                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable)))
+                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable))
+                )
             {
-                foreach (Expression argument in node.Arguments.Skip(1))
+                foreach (Expression argument in RowDecidingArguments(node))
                 {
                     if (ClientCodeFinder.Find(argument, allowlist) is { } method)
                     {
@@ -389,6 +390,41 @@ public sealed class QuerySplitter
             }
 
             return _found is null ? base.VisitMethodCall(node) : node;
+        }
+
+        /// <summary>
+        ///     Whether an operator produces a different element type than it consumed — that is,
+        ///     whether it is a projection.
+        /// </summary>
+        /// <remarks>
+        ///     EF's line is drawn here, and it is the right one. Client code in a projection is
+        ///     legal everywhere: the rows have already been chosen, and evaluating it locally
+        ///     costs nothing extra. Client code in a <c>Where</c> or an <c>OrderBy</c> decides
+        ///     <em>which</em> rows, so evaluating it locally means fetching all of them first.
+        /// </remarks>
+        private static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
+        {
+            // A result selector runs after the rows are chosen, so client code in it costs
+            // nothing extra and EF allows it. Everything else -- predicates, join keys, ordering
+            // keys -- decides *which* rows, and running that locally means fetching them all.
+            // `Join` is both at once: its result selector is a projection, its key selectors are
+            // not, which is why the split has to be per argument rather than per operator.
+            int skipLast = ProjectionRewriter.IsResultSelectorOperator(node, out _) ? 1 : 0;
+
+            // A projection whose lambda *is* the collection selector -- the two-argument
+            // SelectMany -- is all projection and nothing else.
+            if (skipLast == 0
+                && typeof(System.Collections.IEnumerable).IsAssignableFrom(node.Type)
+                && ServerBoundaryAnalyzer.ElementTypeOf(node.Type)
+                    != ServerBoundaryAnalyzer.ElementTypeOf(node.Arguments[0].Type))
+            {
+                yield break;
+            }
+
+            for (int i = 1; i < node.Arguments.Count - skipLast; i++)
+            {
+                yield return node.Arguments[i];
+            }
         }
     }
 
@@ -486,7 +522,7 @@ public sealed class QuerySplitter
             if (TryDescribe(node, out IEntityType? owner, out string? path)
                 && !_reads.Any(r => r.Owner == owner && r.Path == path))
             {
-                _reads.Add(new NavigationRead(owner, path));
+                _reads.Add(new NavigationRead(owner!, path!));
             }
 
             return base.VisitMember(node);
