@@ -445,6 +445,59 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `Version=1`. A client reading one database and writing another is not a store problem, and
       no amount of staring at the store would have found it.
 
+- [x] **S3c-14.** `OptimisticConcurrencyTestBase` adopted on Tier B. **`Total tests: 7276,
+      Passed: 7159, Failed: 88, Skipped: 29`** — 45 new tests, of which 23 pass, 12 are EF's own
+      skips and 10 fail. BROKEN outside the new class: none. ✅ `<this commit>`
+
+      Tier B only, and deliberately: EF's own `OptimisticConcurrencyInMemoryTest` skips sixteen
+      of these because InMemory performs no concurrency check, so running them on Tier A would
+      assert InMemory's limits rather than this provider's. The eleven skips adopted here are
+      EF's `OptimisticConcurrencySqliteTestBase` skips, mirrored one for one, because the backend
+      *is* SQLite.
+
+      Three pieces of infrastructure were needed, each worth naming:
+
+      - **`InfoCarrierTestHelpers`.** `F1FixtureBase` builds its model *externally* — on purpose,
+        as EF's regression coverage for building a model away from a context — via
+        `TestHelpers.CreateConventionBuilder()`. Every provider supplies its own; this is ours.
+      - **The server gets its own copy of the model.** `F1Context` has no `OnModelCreating` at
+        all, so the usual route would have left the server with a bare convention model and none
+        of the concurrency tokens. The server model is built over SQLite's convention set so it
+        carries the relational annotations the client's must not have. The relational
+        configuration is EF's `F1RelationalFixture.BuildModelExternal`, duplicated rather than
+        inherited because that class ships in `Relational.Specification.Tests`, which a
+        non-relational provider has no business referencing.
+      - **The server gets its own seed.** `F1FixtureBase` seeds through `UseSeeding` on the
+        *client* options, which the server never sees. Without it every row was missing.
+
+      **The seed fix is the clearest case yet for reading reasons and not counts.** Adding it
+      left the failure count at exactly 21 — and changed every single failure. Before: 19 ×
+      "sequence contains no elements", an empty database. After: 21 × "type
+      `Driver+DriverProxy` is not on the deserialization allowlist", which is a different defect
+      entirely and the one that mattered.
+
+      That defect: `DynamicValueMapper.MapToNode` asked the model for `FindEntityType(type)`, and
+      the CLR type in hand may be a **proxy**. A materialization interceptor produces one, and
+      the collection branch maps each item by `item.GetType()`, so `Driver+DriverProxy` travelled
+      as the declared type and was refused by the allowlist (ADR-008). It now asks
+      `FindRuntimeEntityType`, which walks base types — EF's own helper, for exactly this reason
+      — and the entity's own CLR type is what goes on the wire. 21 → 10 in the class, nothing
+      broken anywhere else.
+
+      A per-test reseed (xUnit's `IAsyncLifetime`) stands in for the rollback this provider
+      cannot do: every test here wraps its work in a transaction, transactions are ignored
+      (roadmap M4), so without it the first test to delete a row left it deleted.
+      `GraphUpdatesInfoCarrierTest` reseeds for the same reason.
+
+      **The 10 remaining, classified:**
+
+      | # | Family | Diagnosis |
+      |---|---|---|
+      | 4 | `Calling_Reload_on_owned_entity_works`, `Calling_GetDatabaseValues_on_owned_entity_works` | "The property `SponsorDetails.TitleSponsorId` is part of a key and so cannot be modified" — the **owned-type key family**, the same root cause as the 14-test family in the `GraphUpdates` residual below. One fix serves both. |
+      | 4 | `Deleting_the_same_entity_twice`, `Deleting_then_updating_the_same_entity` (×2), `Concurrency_issue_where_the_FK_is_the_concurrency_token_can_be_handled` | The behaviour is right — the `DbUpdateConcurrencyException` is thrown and caught. What fails is `Fixture.ListLoggerFactory.Log.Single(l => l.Id == CoreEventId.OptimisticConcurrencyException)`: the exception is raised inside the *server's* `SaveChanges`, so the **server's** logger records the event and the client's never does. The client would have to log it on receiving a transported concurrency failure. |
+      | 1 | `Nullable_client_side_concurrency_token_can_be_used` | `Assert.IsType<Sponsor.SponsorDoubleProxy>` — the client materializes rows itself and does not run `IMaterializationInterceptor`, so it produces a plain `Sponsor`. Now that the wire strips proxies (above), the client is the only place one could be re-created. |
+      | 1 | `Attempting_to_delete_same_relationship_twice_for_many_to_many` | No exception thrown where `DbUpdateConcurrencyException` is expected. Independent-association concurrency on a join row; unclassified. |
+
 ### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
 No family above 8 now; the long tail below is what is left.

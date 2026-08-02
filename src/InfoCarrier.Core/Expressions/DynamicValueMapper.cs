@@ -149,7 +149,13 @@ public class DynamicValueMapper : IDynamicValueMapper
     {
         // Entity. Two modes: a query-tree constant travels as identity only (research-findings
         // §7); a result row travels with its data.
-        IEntityType? entityType = _model?.FindEntityType(type);
+        // `FindRuntimeEntityType`, not `FindEntityType`: the CLR type in hand may be a *proxy*,
+        // which is not in the model and is not a name the client could resolve even if it were.
+        // A materialization interceptor produces one — EF's own `F1MaterializationInterceptor`
+        // returns `Driver+DriverProxy` — and a collection maps each item by `item.GetType()`, so
+        // the proxy arrived as the declared type and every row of the F1 model was refused by the
+        // deserialization allowlist (ADR-008). EF walks base types for the same reason.
+        IEntityType? entityType = _model?.FindRuntimeEntityType(type);
 
         // A row is mapped by its runtime type, but a *navigation* is mapped by the type the
         // navigation declares — and in a TPH hierarchy those differ. `Root.OptionalSingle` is
@@ -159,11 +165,18 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (entityType is not null
             && value is not null
             && value.GetType() != type
-            && _model!.FindEntityType(value.GetType()) is { } runtimeEntityType
+            && _model!.FindRuntimeEntityType(value.GetType()) is { } runtimeEntityType
             && entityType.IsAssignableFrom(runtimeEntityType))
         {
             entityType = runtimeEntityType;
-            type = runtimeEntityType.ClrType;
+        }
+
+        if (entityType is not null)
+        {
+            // What the entity *is* in the model, which is what the client can name. This is what
+            // strips a proxy back to the type it stands for, and what carries a TPH row as its
+            // own derived type rather than the one its navigation declares.
+            type = entityType.ClrType;
         }
 
         TypeNode typeNode = _typeMapper.ToTypeNode(type);

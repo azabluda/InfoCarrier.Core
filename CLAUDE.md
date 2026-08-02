@@ -82,16 +82,15 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 7231, Passed: 7136, Failed: 78, Skipped: 17`** (2026-08-02) across the Northwind
-query bases, `GraphUpdatesTestBase` and `PropertyValuesTestBase` on Tier A.
+**`Total tests: 7276, Passed: 7159, Failed: 88, Skipped: 29`** (2026-08-03) across the Northwind
+query bases, `GraphUpdatesTestBase` and `PropertyValuesTestBase` on Tier A, and
+`OptimisticConcurrencyTestBase` on Tier B.
 
 Not yet implemented, in rough priority order:
 - **The `GraphUpdates` residual** — 45 of 1787, a long tail with no family above 14 (owned
   collections, stable value generators). Classified in `docs/implementation-plan.md` under S3c.
-- **The remaining change-tracking spec bases** — `ManyToManyTrackingTestBase`,
-  `OptimisticConcurrencyTestBase` (Tier B only — EF's own InMemory suite skips 16 of its tests
-  because that store cannot detect a conflict), `FindTestBase`, `LoadTestBase` and the rest of
-  the 138 the compliance test reports unadopted.
+- **The remaining change-tracking spec bases** — `ManyToManyTrackingTestBase`, `FindTestBase`,
+  `LoadTestBase` and the rest of the 138 the compliance test reports unadopted.
 - **Transactions** (roadmap M4) — `InfoCarrierTransactionManager` *ignores* them and raises
   `InfoCarrierEventId.TransactionIgnoredWarning` (warning-as-error by default), as EF's
   InMemory provider does. `InProcessInfoCarrierServer`'s three transaction methods throw.
