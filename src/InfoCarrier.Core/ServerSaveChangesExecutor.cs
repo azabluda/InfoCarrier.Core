@@ -4,6 +4,8 @@ using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core;
@@ -161,29 +163,22 @@ public class ServerSaveChangesExecutor
     ///     Gets the entry for an instance, by entity type rather than by CLR type.
     /// </summary>
     /// <remarks>
-    ///     <c>DbContext.Entry</c> resolves by CLR type, which cannot identify a shared-type
-    ///     entity: several of them have the same <c>Dictionary&lt;string, object&gt;</c> CLR type
-    ///     and are told apart only by name. A many-to-many join entity is exactly that.
+    ///     <para>
+    ///         <c>DbContext.Entry</c> resolves by CLR type, which cannot identify a shared-type
+    ///         entity: several of them have the same <c>Dictionary&lt;string, object&gt;</c> CLR
+    ///         type and are told apart only by name. A many-to-many join entity is exactly that.
+    ///     </para>
+    ///     <para>
+    ///         This used to reach for <c>DbContext.Set&lt;T&gt;(name)</c> by reflection whenever
+    ///         the type was shared. An <em>owned</em> type is also shared — <c>Owner.Owned#Owned</c>
+    ///         — and <c>Set&lt;T&gt;(name)</c> refuses it outright: "must be accessed through its
+    ///         owning entity type". Asking the state manager for the entry names the entity type
+    ///         directly, which is the identity the request carries, and covers ordinary, shared
+    ///         and owned types by one call with no reflection.
+    ///     </para>
     /// </remarks>
     private EntityEntry Track(IEntityType entityType, object entity)
-    {
-        if (!entityType.HasSharedClrType)
-        {
-            return _context.Entry(entity);
-        }
-
-        object set = typeof(DbContext)
-            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .Single(m => m.Name == nameof(DbContext.Set)
-                && m.IsGenericMethodDefinition
-                && m.GetParameters() is [{ ParameterType: var p }] && p == typeof(string))
-            .MakeGenericMethod(entityType.ClrType)
-            .Invoke(_context, [entityType.Name])!;
-
-        return (EntityEntry)set.GetType()
-            .GetMethod(nameof(DbSet<object>.Entry))!
-            .Invoke(set, [entity])!;
-    }
+        => new(_context.GetService<IStateManager>().GetOrCreateEntry(entity, entityType));
 
     /// <summary>
     ///     Collects the values the store produced for one entry.
