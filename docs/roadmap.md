@@ -95,7 +95,8 @@ minimal-column payload (W1).
 >   translation failure, because answering it locally means fetching the whole table. Getting the
 >   line in the right place took three attempts, costing 235 and then 69 tests respectively when
 >   drawn too widely.
-> - **Transparent identifiers are the remaining ceiling.** `from … join … select new { a, b }`
+> - **Transparent identifiers are the remaining ceiling** — now specified in
+>   [`transparent-identifiers.md`](transparent-identifiers.md) / [ADR-011](decisions.md#adr-011). `from … join … select new { a, b }`
 >   makes an anonymous type EF handles internally and we must treat as a boundary, so everything
 >   downstream lands on the client. Deferring the reassembly and threading tuple slots through
 >   downstream operators is the next real gain, and is the "operator pushdown" the spec deferred.

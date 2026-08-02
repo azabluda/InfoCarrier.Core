@@ -277,3 +277,41 @@ payload of requirements §3.3 (wire-protocol W1).
 **Supersedes.** [`research-findings.md`](research-findings.md) §8, in placement only. Its
 mechanism — execute the entity-typed portion, apply the projection locally, no tree surgery, no
 new wire vocabulary — is retained.
+
+## ADR-011 — Transparent identifiers are re-carried, not reassembled — LOCKED (2026-08-02)
+
+**Context.** `from c in cs from o in c.Orders … select c` contains no anonymous type that the
+caller wrote; the C# compiler inserts a *transparent identifier* so later clauses can still see
+`c`. [ADR-010](#adr-010) treats an anonymous type as a type boundary, which is right for a
+projection the caller asked for and wrong for compiler plumbing: every operator above the
+identifier falls to the client, taking 36 of the 111 remaining failures with it — 16 of them
+wrong answers rather than refusals, because a left join's `DefaultIfEmpty()` yields `null` and
+LINQ-to-Objects throws where SQL propagates.
+
+An earlier attempt to defer the client-side reassembly and push operators back below it measured
+**91 → 383** and was reverted.
+
+**Decision.** Two transformations on the client, before the boundary analysis
+([`transparent-identifiers.md`](transparent-identifiers.md)):
+
+1. **Mirror EF's `TryFlattenGroupJoinSelectMany`** — `SelectMany` over `GroupJoin` becomes a
+   single `Join`/`LeftJoin` with no identifier at all, including EF's own guard against
+   correlated collection selectors.
+2. **Re-carry surviving identifiers in a `ValueTuple`, with no client reassembly.** The
+   identifier is plumbing no caller observes, so there is nothing to rebuild; member reads
+   become slot reads and the chain stays server-side.
+
+Two guards are binding: **no slot may hold a sequence**, and a rewrite is **kept only if
+re-analysis shows it strictly increases what ships**.
+
+**Rationale.** The flattening is EF's own, at `QueryableMethodNormalizingExpressionVisitor.cs:566`
+— proven, and positioned where we cannot reach it (inside `CompileQuery`, which on the server
+follows a deserialization that cannot happen). Mirroring it beats inventing one. The sequence
+guard is the precise cause of the reverted attempt's failure: a grouping in a slot makes
+`t.Item2.DefaultIfEmpty()` ask SQL to navigate out of a projected tuple into a correlated
+collection. The verification guard is what makes a wrong rewrite cost nothing.
+
+**Consequences.** This refines ADR-010 rather than reversing it: an anonymous type the *caller*
+wrote is still a boundary. Only compiler-generated identifiers are re-carried. Server-ok remains
+a type property and not a translatability property, so the guards reduce risk without removing
+it — which is why each phase is measured separately and reverted if it does not pay.
