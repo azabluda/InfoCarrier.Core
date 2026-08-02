@@ -33,6 +33,7 @@ internal sealed class QueryExecutor<TElement>
     private readonly IExpressionSerializer _expressionSerializer;
     private readonly SplitQuery _split;
     private readonly QueryTrackingBehavior _trackingBehavior;
+    private readonly ClientResultMaterializer _materializer;
 
     public QueryExecutor(
         QueryContext queryContext,
@@ -54,6 +55,15 @@ internal sealed class QueryExecutor<TElement>
 
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
+
+        // A split query materializes every row the server sent, but only the entities the
+        // residual yields belong in the change tracker (docs/projection-split.md §4). One
+        // materializer for the whole execution, so identity is resolved across its parts.
+        _materializer = new ClientResultMaterializer(
+            queryContext.Context,
+            expressionSerializer,
+            _trackingBehavior,
+            deferTracking: !_split.IsPassThrough && _trackingBehavior == QueryTrackingBehavior.TrackAll);
     }
 
     public object Execute(bool async, bool singleResult)
@@ -159,8 +169,7 @@ internal sealed class QueryExecutor<TElement>
     /// </remarks>
     private object? Materialize(ServerQuery serverQuery, QueryDataResult result)
     {
-        var materializer = new ClientResultMaterializer(
-            _queryContext.Context, _expressionSerializer, _trackingBehavior);
+        ClientResultMaterializer materializer = _materializer;
 
         object rows = MaterializeMethod
             .MakeGenericMethod(serverQuery.ElementType)
@@ -186,9 +195,71 @@ internal sealed class QueryExecutor<TElement>
 
         object? applied = _split.Apply(results);
 
-        return singleResult
+        IEnumerable<TElement> produced = singleResult
             ? [(TElement)applied!]
             : ((System.Collections.IEnumerable)applied!).Cast<TElement>();
+
+        return _materializer.Deferred.Count == 0 ? produced : Attaching(produced);
+    }
+
+    /// <summary>
+    ///     Attaches the entities the residual actually yields, as they are yielded.
+    /// </summary>
+    /// <remarks>
+    ///     The counterpart to deferred materialization (docs/projection-split.md §4). Walking each
+    ///     element rather than the whole result keeps the sequence lazy, and anything the residual
+    ///     filtered out simply stays detached — which is the point: a join that ships 919 rows to
+    ///     answer a projection over 7 entities must track 7.
+    /// </remarks>
+    private IEnumerable<TElement> Attaching(IEnumerable<TElement> produced)
+    {
+        foreach (TElement element in produced)
+        {
+            AttachEntitiesIn(element, []);
+            yield return element;
+        }
+    }
+
+    private void AttachEntitiesIn(object? value, HashSet<object> seen)
+    {
+        if (value is null || value is string || value.GetType().IsPrimitive)
+        {
+            return;
+        }
+
+        if (!seen.Add(value))
+        {
+            return;
+        }
+
+        _materializer.AttachIfDeferred(value);
+
+        if (value is System.Collections.IEnumerable sequence)
+        {
+            foreach (object? item in sequence)
+            {
+                AttachEntitiesIn(item, seen);
+            }
+
+            return;
+        }
+
+        // A client-only projection type carries its entities in its members, so the walk has to
+        // go through it. Entities themselves are not descended into: their navigations lead back
+        // into rows the residual may well have discarded.
+        if (_queryContext.Context.Model.FindEntityType(value.GetType()) is not null)
+        {
+            return;
+        }
+
+        foreach (System.Reflection.PropertyInfo property in value.GetType()
+                     .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (property.GetIndexParameters().Length == 0 && property.CanRead)
+            {
+                AttachEntitiesIn(property.GetValue(value), seen);
+            }
+        }
     }
 
     /// <summary>

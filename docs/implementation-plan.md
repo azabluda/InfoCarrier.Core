@@ -80,9 +80,19 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       expression's exact type — a subtree ending in `Include(…)` is typed `IIncludableQueryable`,
       which the materialized `EnumerableQuery` does not implement. **526 → 484.** ✅ `<this commit>`
 
-- [ ] **A6.** Tracking semantics (§4): boundary rows materialize with identity resolution and
-      without tracking; entities present in the residual's *result* are attached afterwards per
-      `QueryTrackingBehavior`.
+- [x] **A6.** Tracking semantics (§4). A split query materializes every row the server sent, but
+      only the entities the **residual yields** belong in the change tracker. A join shipping 919
+      rows to answer a projection over 7 entities tracked all 919; a query projecting no entities
+      at all still filled the tracker. Entries are now left `Detached` — invisible to
+      `ChangeTracker.Entries()` — and attached as the residual yields them. **128 → 119, nothing
+      broken**, and the 9 fixed are exactly the tracking-count assertions predicted from the
+      classification. ✅ `<this commit>`
+
+      Applied only to split queries under `TrackAll`, so the pass-through path is untouched.
+      Two consequences the implementation had to answer: the state manager's identity map only
+      holds *tracked* entries, so deferring needs a local one; and an identity hit must still
+      walk the row, because its nested nodes carry wire ids later rows reference — returning
+      early stranded them as "dangling wire reference".
 
 - [ ] **A7.** Verification pass (§3.1): serializing a chosen shipped query must clear the server
       allowlist; on failure move the boundary one operator inward and retry, bounded. Assert in a

@@ -28,6 +28,12 @@ public class ClientResultMaterializer
     private readonly IStateManager _stateManager;
     private readonly ExpressionSerializer _serializer;
     private readonly QueryTrackingBehavior _trackingBehavior;
+    private readonly bool _deferTracking;
+
+    // Identity map for entities materialized but not yet attached. The state manager's own map
+    // only holds tracked entries, so while tracking is deferred it cannot answer "have I already
+    // built this one?" — and two rows naming the same customer would become two instances.
+    private readonly Dictionary<(IEntityType Type, string Key), (object Instance, InternalEntityEntry Entry)> _deferredIdentity = [];
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClientResultMaterializer" /> class.
@@ -35,12 +41,40 @@ public class ClientResultMaterializer
     public ClientResultMaterializer(
         DbContext context,
         IExpressionSerializer serializer,
-        QueryTrackingBehavior trackingBehavior)
+        QueryTrackingBehavior trackingBehavior,
+        bool deferTracking = false)
     {
         _context = context;
         _stateManager = context.GetService<IStateManager>();
         _serializer = (ExpressionSerializer)serializer;
         _trackingBehavior = trackingBehavior;
+        _deferTracking = deferTracking;
+    }
+
+    /// <summary>
+    ///     Entities materialized but not yet attached, when tracking is deferred
+    ///     (<c>docs/projection-split.md</c> §4).
+    /// </summary>
+    /// <remarks>
+    ///     A split query materializes every row the server sent, but only the entities the
+    ///     <em>residual</em> yields belong in the change tracker. Attaching at materialization
+    ///     time tracked all 919 rows of a join whose projection returned 7 entities, and a query
+    ///     projecting no entities at all still filled the tracker.
+    /// </remarks>
+    public IReadOnlyDictionary<object, InternalEntityEntry> Deferred => _deferred;
+
+    private readonly Dictionary<object, InternalEntityEntry> _deferred = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    ///     Attaches one deferred entity, if it is one this materializer built.
+    /// </summary>
+    public void AttachIfDeferred(object entity)
+    {
+        if (_deferred.Remove(entity, out InternalEntityEntry? entry)
+            && entry.EntityState == EntityState.Detached)
+        {
+            entry.SetEntityState(EntityState.Unchanged);
+        }
     }
 
     /// <summary>
@@ -123,11 +157,33 @@ public class ClientResultMaterializer
             }
         }
 
+        // While tracking is deferred the state manager cannot answer identity, so a local map
+        // does. Same rule, same keys — only the place the answer is kept differs.
+        string? deferredKey = _deferTracking && row.EntityKey.KeyValues.Count == pk.Properties.Count
+            ? string.Join('', row.EntityKey.KeyValues)
+            : null;
+
+        if (deferredKey is not null && _deferredIdentity.TryGetValue((entityType, deferredKey), out var already))
+        {
+            mapper.RegisterMaterialized(row.Id, already.Instance);
+
+            // Still walk the row. Its nested nodes carry wire ids that later rows may reference,
+            // and returning early stranded them — "dangling wire reference 2: no value with that
+            // id has been materialized".
+            PopulateNavigations(row, already.Instance, entityType, already.Entry, mapper);
+            return already.Instance;
+        }
+
         object instance = Activator.CreateInstance(entityType.ClrType, nonPublic: true)!;
 
         // Attach as Unchanged via the internal state manager — bypasses public-API value
         // generation for store-generated keys (the server owns key generation).
         InternalEntityEntry entry = _stateManager.GetOrCreateEntry(instance, entityType);
+
+        if (deferredKey is not null)
+        {
+            _deferredIdentity[(entityType, deferredKey)] = (instance, entry);
+        }
         mapper.RegisterMaterialized(row.Id, instance);
 
         foreach (DynamicPropertyValue member in row.Properties)
@@ -150,7 +206,18 @@ public class ClientResultMaterializer
         }
 
         ClearPlaceholderReferencesBlockingFixup(entry, entityType);
-        entry.SetEntityState(EntityState.Unchanged);
+
+        if (_deferTracking)
+        {
+            // Left Detached, so it is invisible to ChangeTracker.Entries() until the residual
+            // shows it actually reached the result.
+            _deferred[instance] = entry;
+        }
+        else
+        {
+            entry.SetEntityState(EntityState.Unchanged);
+        }
+
         PopulateNavigations(row, instance, entityType, entry, mapper);
         return instance;
     }
