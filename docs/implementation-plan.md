@@ -294,6 +294,40 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       **GraphUpdates 348 → 200. Suite `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.**
       The 29 pre-existing failures are unchanged and nothing outside the class moved.
 
+- [x] **S3c-5.** The Tier B store is file-backed, as EF Core's own is. ✅ `<this commit>`
+
+      S3c-2 recorded a full run that reported 1075 failures with both SQLite Northwind classes
+      wholly red, passing on rerun and in isolation. The mechanism, once EF's `SqliteTestStore`
+      was read rather than guessed at:
+
+      `NorthwindWhereQuerySqliteInfoCarrierTest` and `NorthwindSelectQuerySqliteInfoCarrierTest`
+      take the same fixture **type**, so xUnit builds one fixture **instance per class** and both
+      ask for the store named `Northwind`. Ours opened `Mode=Memory;Cache=Shared` and held one
+      connection open for the store's lifetime, because an in-memory SQLite database is destroyed
+      when its last connection closes. The first store created and seeded it; the second skipped
+      creation (the `Created` guard) and then queried a database the first had already destroyed
+      by disposing. Adding 1787 GraphUpdates tests changed the scheduling enough to expose it.
+
+      EF avoids all of this three ways, and none of them is a parallelism setting — its SQLite
+      suites run fully parallel with no `xunit.runner.json`:
+
+      1. `SqliteTestStore` uses `DataSource = name + ".db"` with `Cache=Private`. A file's
+         lifetime is its own; closing a connection destroys nothing.
+      2. `SqliteNorthwindTestStoreFactory.GetOrCreate` **ignores the requested name** and returns
+         `SqliteTestStore.GetExisting("northwind")`, whose `seed: false` makes `InitializeAsync`
+         return on its first line. `northwind.db` is a 946 KB file checked into the repo.
+      3. The query suites never write, and concurrent readers on a private-cache file are safe.
+
+      Adopted (1) and, by consequence, (3). Not (2) — a checked-in binary would have to be
+      rebuilt whenever the model changes, and the once-per-file guard already gives us
+      seed-once. The held connection is gone with the reason for it, so contexts no longer share
+      a single `SqliteConnection` either; unshared stores get a file of their own and delete it
+      on disposal, which the smoke tests need.
+
+      **Verified by three consecutive full runs with identical counts and identical failure
+      sets: `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.** `Northwind.db` in the
+      output directory and zero leftover per-test files confirm the new path actually ran.
+
 ### The `GraphUpdates` residual — 200 of 1787 (2026-08-02, Tier A)
 
 Concentrated: seven methods carry 138 of the 200. Classified by cause, not by name.

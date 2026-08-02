@@ -100,6 +100,8 @@ Not yet implemented, in rough priority order:
   Needs the wire-protocol W3 transaction token.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
-- **The SQLite backend store is not parallel-safe** — a single full run has produced 698
-  phantom failures in the two SQLite Northwind classes that pass on rerun and in isolation.
-  Confirm any SQLite regression with a second run before believing it.
+
+The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF
+Core's own `SqliteTestStore` is. Do not move it back to `Mode=Memory;Cache=Shared`: that makes
+the database's lifetime a connection's, which makes test-class disposal order load-bearing and
+has already produced a 698-test phantom failure.

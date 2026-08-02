@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Collections.Concurrent;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -13,27 +14,40 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Tier A (InMemory) cannot test transactions at all: EF's InMemory provider registers
-///         <c>TransactionIgnoredWarning</c> with <c>WarningBehavior.Throw</c>. It also client-
-///         evaluates almost everything, which makes it a poor judge of what a real provider can
-///         translate — several failures against Tier A are InMemory's limits rather than this
-///         provider's, and only a relational backend can tell them apart.
+///         Tier A (InMemory) cannot test transactions at all, and it client-evaluates almost
+///         everything, which makes it a poor judge of what a real provider can translate —
+///         several failures against Tier A are InMemory's limits rather than this provider's, and
+///         only a relational backend can tell them apart.
 ///     </para>
 ///     <para>
-///         <b>The connection is held open for the store's lifetime.</b> An in-memory SQLite
-///         database is destroyed when its last connection closes, so letting EF open and close
-///         per context would discard the schema and the seed between operations.
+///         <b>The database is a file, as EF Core's own <c>SqliteTestStore</c> makes it.</b> This
+///         store used to open <c>Mode=Memory;Cache=Shared</c> and hold one connection open for
+///         its lifetime, because an in-memory SQLite database is destroyed when its last
+///         connection closes. That made <em>disposal order</em> load-bearing across test classes,
+///         and it produced a 698-test phantom failure: <c>NorthwindWhereQuerySqlite…</c> and
+///         <c>NorthwindSelectQuerySqlite…</c> take the same fixture <em>type</em>, so xUnit builds
+///         one fixture instance per class and both ask for the store named "Northwind". The first
+///         created and seeded it; the second skipped creation (see the guard below) and then
+///         queried a database the first had already destroyed by disposing. Adding 1787
+///         GraphUpdates tests changed the scheduling enough to expose it.
+///     </para>
+///     <para>
+///         A file's lifetime is its own. No connection has to be held, nothing is destroyed by
+///         closing one, and every context opens its own — so the store no longer shares a single
+///         <see cref="SqliteConnection" /> across concurrent contexts either. The files land in
+///         the test output directory, which is git-ignored, exactly as EF's <c>northwind.db</c>
+///         does.
 ///     </para>
 /// </remarks>
 public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 {
-    // Keyed by store name, which is what identifies the shared in-memory database. Both are
-    // concurrent: the gate is per name, so two names initialise at once and a plain HashSet
-    // would be raced.
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> Gates = new();
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> Created = new();
+    // Keyed by file, which is what identifies the database. Both are concurrent: the gate is
+    // per file, so two files initialise at once and a plain HashSet would be raced.
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new();
+    private static readonly ConcurrentDictionary<string, bool> Created = new();
 
-    private readonly SqliteConnection _connection;
+    private readonly string _path;
+    private readonly string _connectionString;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SqliteInfoCarrierBackendTestStore" /> class.
@@ -44,16 +58,15 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         SharedTestStoreProperties testStoreProperties)
         : base(name, shared, testStoreProperties)
     {
-        // Every context this store hands out uses this one connection object, so a private
-        // in-memory database suffices — and a shared cache is joined only when the store really
-        // is shared. `Cache=Shared` is process-wide and keyed by name, so an unshared store that
-        // opted into it could be reached by anything else running in parallel; that is what made
-        // the smoke tests fail only when other SQLite classes ran alongside them.
-        _connection = new SqliteConnection(
-            shared
-                ? $"DataSource={name};Mode=Memory;Cache=Shared"
-                : "DataSource=:memory:");
-        _connection.Open();
+        // A shared store is identified by its name, so every fixture asking for that name gets
+        // the same file. An unshared one asked for isolation and gets a file of its own — the
+        // smoke tests create a store per test and would otherwise trample each other.
+        _path = Path.GetFullPath(shared ? $"{name}.db" : $"{name}.{Guid.NewGuid():N}.db");
+        _connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = _path,
+            Cache = SqliteCacheMode.Private,
+        }.ToString();
     }
 
     /// <inheritdoc />
@@ -68,33 +81,35 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 
     /// <inheritdoc />
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => base.AddProviderOptions(builder).UseSqlite(_connection);
+        => base.AddProviderOptions(builder).UseSqlite(_connectionString);
 
     /// <inheritdoc />
     /// <remarks>
-    ///     Guarded per store name, which is what identifies the shared in-memory database.
-    ///     Each backend store builds its <em>own</em> service provider, so the
-    ///     <see cref="TestStoreIndex" /> that normally makes shared initialization run once is
-    ///     not actually shared between them — every test class re-entered this method for the
-    ///     same database. On InMemory that is harmless; on a relational store the second
-    ///     <c>EnsureCreated</c> reports <c>table "CustomerQueries" already exists</c>, which is
-    ///     what 534 failures turned out to be.
+    ///     Guarded per file, and the guard is still needed even though the database now outlives
+    ///     every connection: each backend store builds its <em>own</em> service provider, so the
+    ///     <see cref="TestStoreIndex" /> that normally makes shared initialization run once is not
+    ///     actually shared between them, and a second store re-seeding the same file mid-run
+    ///     would destroy the first one's data.
     /// </remarks>
     protected override async Task InitializeAsync(
         Func<DbContext> createContext,
         Func<DbContext, Task>? seed,
         Func<DbContext, Task>? clean)
     {
-        SemaphoreSlim gate = Gates.GetOrAdd(Name, _ => new SemaphoreSlim(1, 1));
+        SemaphoreSlim gate = Gates.GetOrAdd(_path, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!Created.TryAdd(Name, true))
+            if (!Created.TryAdd(_path, true))
             {
                 return;
             }
 
             using DbContext context = createContext();
+
+            // A file survives the process that made it, so a previous run's database would
+            // otherwise be seeded a second time. `EnsureDeleted` on SQLite deletes the file.
+            await context.Database.EnsureDeletedAsync().ConfigureAwait(false);
             await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
 
             if (clean is not null)
@@ -116,7 +131,30 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     /// <inheritdoc />
     public override async ValueTask DisposeAsync()
     {
-        await _connection.DisposeAsync().ConfigureAwait(false);
         await base.DisposeAsync().ConfigureAwait(false);
+
+        // A shared file is left alone: another store may still be reading it, and the next run
+        // deletes it before seeding anyway. An unshared one is this store's alone, and the smoke
+        // tests would otherwise leave a file per test per run.
+        if (Shared)
+        {
+            return;
+        }
+
+        Created.TryRemove(_path, out _);
+
+        try
+        {
+            SqliteConnection.ClearPool(new SqliteConnection(_connectionString));
+            File.Delete(_path);
+        }
+        catch (IOException)
+        {
+            // A leftover file in the git-ignored output directory is harmless; failing a test
+            // because cleanup could not delete one is not.
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 }
