@@ -328,6 +328,32 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       sets: `Passed: 6786, Failed: 229, Skipped: 13, Total: 7028`.** `Northwind.db` in the
       output directory and zero leftover per-test files confirm the new path actually ran.
 
+- [x] **S3c-10.** `PropertyValuesTestBase` adopted on Tier A. ✅ `<this commit>`
+
+      **+196 tests, 143 of them passing immediately. `Total tests: 7228, Passed: 7084,
+      Failed: 127, Skipped: 17`** — nothing outside the new class moved. The store-limitation
+      overrides are EF Core's own `PropertyValuesInMemoryTest` overrides, mirrored one for one
+      (complex types and complex collections, which the InMemory backend does not support).
+
+      Chosen ahead of `OptimisticConcurrencyTestBase` even though the latter is the obvious
+      harness for concurrency tokens: **EF's own InMemory suite `[Skip]`s 16 of that base's
+      tests** — "Optimistic Offline Lock #2195", "#23569" — because the InMemory store cannot
+      detect a concurrency conflict at all. Adopting it on Tier A would prove nothing about
+      tokens; it needs Tier B, and its F1 fixture needs lazy-loading proxies, an externally
+      built model and interceptors. `PropertyValuesTestBase` reads exactly what
+      `SerializedOriginalValues` has to carry, needs no transactions, and cost one afternoon.
+
+      One infrastructure gap surfaced immediately and is fixed here: a fixture's `AddServices`
+      configures the **client** provider, and `PropertyValuesFixtureBase` registers a
+      materialization interceptor and then asserts *in its seed* that the interceptor ran — but
+      the seed executes against the **server**. All 196 tests failed on
+      `KeyNotFoundException: 'CreatedCalled'` before the server provider could be given the same
+      services (`SharedTestStoreProperties.OnAddServices`).
+
+      **The 53 remaining are one family**: `Store_values_*` and
+      `Values_can_be_reloaded_from_database_*` — `GetDatabaseValues()` and `Reload()`, which
+      read the row as the store currently holds it. Nothing in the provider answers that yet.
+
 ### The `GraphUpdates` residual — 45 of 1787 (2026-08-02, Tier A)
 
 No family above 8 now; the long tail below is what is left.

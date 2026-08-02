@@ -38,7 +38,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     {
         _testStoreProperties = testStoreProperties;
 
-        ServiceProvider = AddServices(new ServiceCollection().AddLogging())
+        IServiceCollection services = AddServices(new ServiceCollection().AddLogging());
+        if (testStoreProperties.OnAddServices is { } onAddServices)
+        {
+            services = onAddServices(services);
+        }
+
+        ServiceProvider = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
             .AddSingleton(TestModelSource.GetFactory(_testStoreProperties.OnModelCreating!))

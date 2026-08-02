@@ -2,6 +2,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -43,4 +44,15 @@ public struct SharedTestStoreProperties
     ///     (e.g. tenant prefix), invoked server-side per request.
     /// </summary>
     public Action<DbContext, DbContext>? CopyDbContextParameters;
+
+    /// <summary>
+    ///     Extra services the <em>server</em> provider needs.
+    /// </summary>
+    /// <remarks>
+    ///     A fixture's <c>AddServices</c> configures the client provider, which is usually all
+    ///     that matters. It is not enough when the fixture's own seed depends on those services:
+    ///     <c>PropertyValuesFixtureBase</c> registers a materialization interceptor and then
+    ///     asserts in <c>SeedAsync</c> that it ran, and the seed executes against the server.
+    /// </remarks>
+    public Func<IServiceCollection, IServiceCollection>? OnAddServices;
 }

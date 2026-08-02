@@ -54,7 +54,8 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Action<ModelBuilder, DbContext>? onModelCreating,
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null,
         Action<DbContext, DbContext>? copyDbContextParameters = null,
-        Type? serverContextType = null)
+        Type? serverContextType = null,
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
         => new InfoCarrierTestStoreFactory(
             new SharedTestStoreProperties
             {
@@ -63,6 +64,7 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
                 OnModelCreating = onModelCreating,
                 OnAddOptions = onAddOptions,
                 CopyDbContextParameters = copyDbContextParameters,
+                OnAddServices = onAddServices,
             },
             backendFactory);
 
