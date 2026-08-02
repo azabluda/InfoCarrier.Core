@@ -56,6 +56,12 @@ public sealed class QuerySplitter
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        // Rewrite client-typed projections into a server-side tuple plus a client-side
+        // reassembly *before* looking for the boundary (§3.2). Cutting above such a projection
+        // is not merely coarse — it strands navigation reads and correlated subqueries on the
+        // client, and it decomposes a `GroupBy` from the aggregate that makes it translatable.
+        query = ProjectionRewriter.Rewrite(query, _analyzer);
+
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
 
         if (analysis.IsWhollyServerExecutable)

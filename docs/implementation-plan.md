@@ -90,14 +90,13 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
 ## Phase M2-B — projection rewrite (this is W1)
 
-- [ ] **B1.** `Query/ProjectionRewriter` — maximal `ServerOk` fragments of a projection lambda
-      body; `ValueTuple` carrier synthesis (nesting above arity 7); reassembly lambda (§3.2).
-
-- [ ] **B2.** Apply to top-level `Select`. Removes the A4 over-fetch for the shapes it covers and
-      closes correlated subqueries under a client projection.
-
-- [ ] **B3.** Minimal-column payload confirmed (wire-protocol W1): assert the shipped query for
-      `Select(c => new { c.City })` carries one column, not a `Customer`.
+- [x] **B1+B2+B3.** `Query/ProjectionRewriter` + `TupleCarrier` — maximal server-evaluable
+      fragments of a projection body travel as a `ValueTuple` (nesting above arity 7) and the
+      client rebuilds its own types from the slots (§3.2). Applied to `Queryable.Select` sitting
+      on a server-executable source, innermost first. Closes correlated subqueries, navigation
+      reads **and** the `GroupBy` decomposition the cut itself caused. W1 asserted: the shipped
+      query for `Select(a => new { a.Name })` carries one `string`, not an `Author`.
+      **484 → 270.** ✅ `<this commit>`
 
 ## Phase M2-C — recursion and multi-source
 
@@ -147,3 +146,4 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 3611 | 669 | 4289 | after A5 (splitter wired into the client executor) |
 | 2026-08-02 | 3756 | 526 | 4291 | after A5a (only executable queries are shipped) |
 | 2026-08-02 | 3798 | 484 | 4291 | after A5b (residual parameters bind by interface) |
+| 2026-08-02 | 4013 | 270 | 4292 | after B1-B3 (projection rewrite — the tuple carrier) |

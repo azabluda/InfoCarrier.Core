@@ -67,7 +67,11 @@ public sealed class TypeAllowlist
         typeof(Expression<>), typeof(EqualityComparer<>), typeof(Comparer<>),
         typeof(Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<,>),
         typeof(Tuple<>), typeof(Tuple<,>), typeof(Tuple<,,>), typeof(Tuple<,,,>),
+        // Up to the full nesting arity: the projection rewrite carries a row's server-evaluated
+        // values in a tuple, and beyond seven values that tuple nests in its eighth argument.
         typeof(ValueTuple<>), typeof(ValueTuple<,>), typeof(ValueTuple<,,>), typeof(ValueTuple<,,,>),
+        typeof(ValueTuple<,,,,>), typeof(ValueTuple<,,,,,>), typeof(ValueTuple<,,,,,,>),
+        typeof(ValueTuple<,,,,,,,>),
     ];
 
     private readonly HashSet<Type> _allowed;

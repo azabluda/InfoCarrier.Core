@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Collections;
 using System.Linq.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
@@ -8,23 +9,33 @@ using Xunit;
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 
 /// <summary>
-///     How a captured query divides, and what the client does with the results
-///     (<c>docs/projection-split.md</c> §3.4–§3.6, §6).
+///     How a captured query divides, and whether both halves produce the right answer
+///     (<c>docs/projection-split.md</c> §3.2–§3.6, §6).
 /// </summary>
+/// <remarks>
+///     The shipped query is executed here against in-memory rows rather than asserted
+///     structurally. Structural assertions were what let the first version of these tests pass
+///     while the split answered <c>0</c>: the shape looked right and the value was wrong.
+/// </remarks>
 public class QuerySplitterTest : IDisposable
 {
     private readonly SplitTestContext _context = SplitTestContext.Create();
     private readonly QuerySplitter _splitter;
 
-    private static readonly Author Austen = new() { Id = 1, Name = "Austen" };
-    private static readonly Author Woolf = new() { Id = 2, Name = "Woolf" };
+    private readonly Author _austen = new() { Id = 1, Name = "Austen" };
+    private readonly Author _woolf = new() { Id = 2, Name = "Woolf" };
+    private readonly List<Author> _authors = [];
+    private readonly List<Book> _books = [];
 
     public QuerySplitterTest()
     {
         _splitter = new QuerySplitter(_context.Model);
 
-        Austen.Books = [new Book { Id = 1, Title = "Emma", AuthorId = 1 }];
-        Woolf.Books = [];
+        var emma = new Book { Id = 1, Title = "Emma", AuthorId = 1, Author = _austen };
+        _austen.Books = [emma];
+        _woolf.Books = [];
+        _authors.AddRange([_austen, _woolf]);
+        _books.Add(emma);
     }
 
     public void Dispose()
@@ -35,16 +46,38 @@ public class QuerySplitterTest : IDisposable
 
     private SplitQuery Split(IQueryable query) => _splitter.Split(query.Expression);
 
-    /// <summary>Stands in for the server: hands the residual the rows it would have returned.</summary>
-    private static object? Run(SplitQuery split, params IEnumerable<object>[] rows)
-        => split.Apply([.. rows.Select((r, i) => AsQueryable(r, split.ServerQueries[i].ElementType))]);
+    /// <summary>
+    ///     Runs the whole split: each shipped query against the in-memory rows, then the residual.
+    /// </summary>
+    private object? Run(SplitQuery split)
+        => split.Apply([.. split.ServerQueries.Select(RunOnServer)]);
 
-    private static object AsQueryable(IEnumerable<object> rows, Type elementType)
+    private object? RunOnServer(ServerQuery serverQuery)
     {
-        object typed = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast))!
-            .MakeGenericMethod(elementType).Invoke(null, [rows])!;
-        return typeof(Queryable).GetMethod(nameof(Queryable.AsQueryable), 1, [typeof(IEnumerable<>).MakeGenericType(Type.MakeGenericMethodParameter(0))])!
-            .MakeGenericMethod(elementType).Invoke(null, [typed])!;
+        Expression bound = new ServerStandIn(_authors, _books).Visit(serverQuery.Query)!;
+        return Expression.Lambda(bound).Compile().DynamicInvoke();
+    }
+
+    private static List<object?> Rows(object? result, string member)
+        => [.. ((IEnumerable)result!).Cast<object>().Select(x => x.GetType().GetProperty(member)!.GetValue(x))];
+
+    /// <summary>
+    ///     Stands in for the server: binds query roots to local lists, and drops <c>Include</c>,
+    ///     which LINQ-to-Objects has no counterpart for (the navigations are already populated).
+    /// </summary>
+    private sealed class ServerStandIn(List<Author> authors, List<Book> books) : ExpressionVisitor
+    {
+        protected override Expression VisitExtension(Expression node)
+            => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root
+                ? Expression.Constant(
+                    root.ElementType == typeof(Author) ? authors.AsQueryable() : books.AsQueryable())
+                : base.VisitExtension(node);
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+            => node.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
+                && node.Method.Name == nameof(EntityFrameworkQueryableExtensions.Include)
+                    ? Visit(node.Arguments[0])
+                    : base.VisitMethodCall(node);
     }
 
     [Fact]
@@ -69,18 +102,18 @@ public class QuerySplitterTest : IDisposable
                 ((IQueryable<Author>)_context.Authors).Expression));
 
         Assert.True(Assert.Single(split.ServerQueries).ReturnsSingleResult);
+        Assert.Equal(2, Run(split));
     }
 
     [Fact]
-    public void An_anonymous_projection_ships_entities_and_projects_on_the_client()
+    public void A_projection_ships_only_the_values_it_needs()
     {
+        // Wire-protocol W1: one string per row, not a Customer. The projection rewrite and the
+        // minimal-column payload are the same mechanism (§3.2).
         SplitQuery split = Split(_context.Authors.Select(a => new { a.Name }));
 
-        Assert.False(split.IsPassThrough);
-        Assert.Equal(typeof(Author), Assert.Single(split.ServerQueries).ElementType);
-
-        object? result = Run(split, [Austen, Woolf]);
-        Assert.Equal(["Austen", "Woolf"], ((IEnumerable<object>)result!).Select(x => x.GetType().GetProperty("Name")!.GetValue(x)));
+        Assert.Equal(typeof(ValueTuple<string>), Assert.Single(split.ServerQueries).ElementType);
+        Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
     }
 
     [Fact]
@@ -88,7 +121,7 @@ public class QuerySplitterTest : IDisposable
     {
         SplitQuery split = Split(_context.Authors.Select(a => new BookSummary { AuthorName = a.Name }));
 
-        var result = (IEnumerable<BookSummary>)Run(split, [Austen, Woolf])!;
+        var result = (IEnumerable<BookSummary>)Run(split)!;
         Assert.Equal(["Austen", "Woolf"], result.Select(s => s.AuthorName));
     }
 
@@ -101,7 +134,7 @@ public class QuerySplitterTest : IDisposable
             _context.Authors.Select(a => new { a.Name }).Take(1).Expression);
 
         Assert.False(Assert.Single(split.ServerQueries).ReturnsSingleResult);
-        Assert.Single((IEnumerable<object>)Run(split, [Austen, Woolf])!);
+        Assert.Single((IEnumerable)Run(split)!);
     }
 
     [Fact]
@@ -110,63 +143,44 @@ public class QuerySplitterTest : IDisposable
         SplitQuery split = Split(
             _context.Authors.Select(a => new { a.Name }).Where(x => x.Name == "Woolf"));
 
-        Assert.Single((IEnumerable<object>)Run(split, [Austen, Woolf])!);
+        Assert.Equal(["Woolf"], Rows(Run(split), "Name"));
     }
 
     [Fact]
     public void A_tracking_marker_is_stripped_from_the_residual()
     {
         // AsNoTracking has no Enumerable counterpart; leaving it in fails the rewriter.
-        SplitQuery split = Split(
-            _context.Authors.Select(a => new { a.Name }).AsNoTracking());
+        SplitQuery split = Split(_context.Authors.Select(a => new { a.Name }).AsNoTracking());
 
-        Assert.Equal(2, ((IEnumerable<object>)Run(split, [Austen, Woolf])!).Count());
+        Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
     }
 
     [Fact]
-    public void A_navigation_read_on_the_client_adds_an_include_to_the_shipped_query()
+    public void A_navigation_read_is_evaluated_on_the_server()
     {
-        // The silent-wrongness case: without the Include the server never loads Books and the
-        // client answers 0 for every author.
+        // The silent-wrongness case. Cut at the projection, the client reads Books on an entity
+        // whose collection was never loaded and answers 0 for every author.
         SplitQuery split = Split(
             _context.Authors.Select(a => new { a.Name, Count = a.Books.Count }));
 
-        Expression shipped = Assert.Single(split.ServerQueries).Query;
-        var call = Assert.IsAssignableFrom<MethodCallExpression>(shipped);
-        Assert.Equal(nameof(EntityFrameworkQueryableExtensions.Include), call.Method.Name);
-        Assert.Equal("Books", ((ConstantExpression)call.Arguments[1]).Value);
-
-        object? result = Run(split, [Austen, Woolf]);
-        Assert.Equal([1, 0], ((IEnumerable<object>)result!).Select(x => x.GetType().GetProperty("Count")!.GetValue(x)));
+        Assert.Equal(typeof(ValueTuple<string, int>), Assert.Single(split.ServerQueries).ElementType);
+        Assert.Equal([1, 0], Rows(Run(split), "Count"));
     }
 
     [Fact]
-    public void A_chained_navigation_read_includes_the_whole_path()
+    public void A_chained_navigation_read_is_evaluated_on_the_server()
     {
         SplitQuery split = Split(
             _context.Books.Select(b => new { b.Title, AuthorBooks = b.Author!.Books.Count }));
 
-        var call = Assert.IsAssignableFrom<MethodCallExpression>(Assert.Single(split.ServerQueries).Query);
-        Assert.Equal("Author.Books", ((ConstantExpression)call.Arguments[1]).Value);
+        Assert.Equal([1], Rows(Run(split), "AuthorBooks"));
     }
 
     [Fact]
-    public void A_navigation_no_shipped_query_can_carry_is_rejected()
+    public void A_correlated_subquery_under_a_client_projection_is_evaluated_on_the_server()
     {
-        // Author rows are never shipped, so `.Books` would read an empty collection. Answering
-        // 0 here is exactly what must not happen quietly.
-        var query = _context.Books
-            .Select(b => new { b.Title, Author = b.Author })
-            .Select(x => new { x.Title, Count = x.Author!.Books.Count });
-
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
-        Assert.Contains("Author.Books", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("silently", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_correlated_subquery_under_a_client_projection_is_rejected()
-    {
+        // Built by hand because the C# compiler emits `_context.Books` as a closure field read,
+        // not a query root; EF's funcletizer rewrites it before the ADR-006 capture point.
         ParameterExpression a = Expression.Parameter(typeof(Author), "a");
         ParameterExpression b = Expression.Parameter(typeof(Book), "b");
         MethodCallExpression count = Expression.Call(
@@ -183,12 +197,43 @@ public class QuerySplitterTest : IDisposable
         var selector = Expression.Lambda<Func<Author, AuthorSummary>>(
             Expression.MemberInit(
                 Expression.New(typeof(AuthorSummary)),
+                Expression.Bind(typeof(AuthorSummary).GetProperty(nameof(AuthorSummary.Name))!,
+                    Expression.Property(a, nameof(Author.Name))),
                 Expression.Bind(typeof(AuthorSummary).GetProperty(nameof(AuthorSummary.BookCount))!, count)),
             a);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
-            () => Split(_context.Authors.Select(selector)));
-        Assert.Contains("one query per row", ex.Message, StringComparison.Ordinal);
+        SplitQuery split = Split(_context.Authors.Select(selector));
+
+        // One query, not one per row: the subquery travels inside the row projection.
+        Assert.Single(split.ServerQueries);
+        var result = (IEnumerable<AuthorSummary>)Run(split)!;
+        Assert.Equal([1, 0], result.Select(s => s.BookCount));
+    }
+
+    [Fact]
+    public void A_navigation_read_the_rewrite_cannot_reach_adds_an_include()
+    {
+        // The predicate is client-side (Threshold is not a type the server knows), so this is a
+        // plain cut, and `a.Books` has to arrive with the entity.
+        SplitQuery split = Split(_context.Authors.Where(a => Threshold(a.Books.Count)));
+
+        var call = Assert.IsAssignableFrom<MethodCallExpression>(Assert.Single(split.ServerQueries).Query);
+        Assert.Equal(nameof(EntityFrameworkQueryableExtensions.Include), call.Method.Name);
+        Assert.Equal("Books", ((ConstantExpression)call.Arguments[1]).Value);
+    }
+
+    [Fact]
+    public void A_navigation_no_shipped_query_can_carry_is_rejected()
+    {
+        // The entity escapes into a client type, and the navigation is read a step later — past
+        // the point the projection rewrite can reach. Answering 0 here is what must not happen.
+        var query = _context.Books
+            .Select(b => new { b.Title, Author = b.Author })
+            .Select(x => new { x.Title, Count = x.Author!.Books.Count });
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
+        Assert.Contains("Books", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("silently", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -201,4 +246,6 @@ public class QuerySplitterTest : IDisposable
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
         Assert.Contains("EF.Property", ex.Message, StringComparison.Ordinal);
     }
+
+    private static bool Threshold(int count) => count > 0;
 }
