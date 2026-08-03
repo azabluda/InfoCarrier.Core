@@ -89,17 +89,39 @@ public class ClientResultMaterializer
         // Entities are built here wherever they appear in the graph — as a whole row, or nested
         // inside a projection (`Select(c => new { c, o })`). Before this hook the nested case
         // was reflection-constructed by the mapper: detached, unregistered, no shadow state.
+        //
+        // Saved and restored, because a query can now nest inside another one: a lazy load
+        // issued while an outer result is still being decoded runs a whole exchange of its own,
+        // and the mapper is DI-scoped and shared. Without this the inner materializer — with its
+        // own tracking behaviour, deferred-identity map and reference scope — replaced the
+        // outer's for the rest of the outer decode and was never put back.
+        Func<DynamicValueNode, object?>? outer = mapper.EntityMaterializer;
         mapper.EntityMaterializer = node => MaterializeEntity(node, mapper);
 
-        foreach (DynamicValueNode row in DeserializeRows(result))
-        {
-            // A null row is data, not an absent row. `Select(c => c.Orders.FirstOrDefault())`
-            // over a customer with no orders produces one, and skipping it silently returned
-            // 89 rows where the query defined 91.
-            object? value = mapper.FromDynamicValue(row);
+        // Decoded to completion before anything is handed out, for the same reason: yielding
+        // lazily lets the caller start a nested exchange part-way through this one, and this
+        // method's own hook would then already have been replaced. The payload is deserialized
+        // into a list of nodes up front regardless, so nothing extra is held.
+        var rows = new List<TElement>();
 
-            yield return value is null ? default! : (TElement)value;
+        try
+        {
+            foreach (DynamicValueNode row in DeserializeRows(result))
+            {
+                // A null row is data, not an absent row. `Select(c => c.Orders.FirstOrDefault())`
+                // over a customer with no orders produces one, and skipping it silently returned
+                // 89 rows where the query defined 91.
+                object? value = mapper.FromDynamicValue(row);
+
+                rows.Add(value is null ? default! : (TElement)value);
+            }
         }
+        finally
+        {
+            mapper.EntityMaterializer = outer;
+        }
+
+        return rows;
     }
 
     private static List<DynamicValueNode> DeserializeRows(QueryDataResult result)

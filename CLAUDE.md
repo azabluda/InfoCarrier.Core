@@ -82,13 +82,13 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11024, Passed: 10406, Failed: 589, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11024, Passed: 10509, Failed: 486, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
 
-**424 of the 589 failures are one feature: lazy loading**, which now partly works (Phase L1;
-it was 505 of 505 failing). Do not read the failure count as a long tail; subtract that family
+**323 of the 486 failures are one feature: lazy loading**, which now partly works (Phase L; it
+was 505 of 505 failing). Do not read the failure count as a long tail; subtract that family
 first.
 
 Not yet implemented, in rough priority order:
@@ -96,10 +96,8 @@ Not yet implemented, in rough priority order:
   `Update_root_by_collection_replacement_of_*` family. Classified in
   `docs/implementation-plan.md` under S3c, which is read out of `artifacts/measure/` rather than
   tallied by hand — the table it replaced had drifted badly.
-- **Lazy loading** — 424 failures, the largest single gap, now partly working. Phase L in
-  `docs/implementation-plan.md`. The largest identified piece is 80 "Object of type `Parent`
-  cannot be converted to type `SinglePkToPk`" — a PK-to-PK one-to-one whose two ends share key
-  value 707 and resolve to the wrong instance.
+- **Lazy loading** — 323 failures, the largest single gap, now partly working. Phase L in
+  `docs/implementation-plan.md`.
 - **The `ManyToManyTracking` residual** — 111 of 200, dominated by a 60-test duplicate-key family
   that shares a root cause with `GraphUpdates`'s stable-value-generator family.
 - **The remaining spec bases** — the rest of the 138 the compliance test reports unadopted.

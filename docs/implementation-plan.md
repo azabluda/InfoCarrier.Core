@@ -617,9 +617,8 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       goal: those tests read current, original and store values through a property dictionary,
       and an entry built by EF's materializer simply has them.
 
-      **The largest identified piece of the residual: 80 failures of the form "Object of type
-      `Parent` cannot be converted to type `SinglePkToPk`".** Probed, so start from this rather
-      than from the symptom:
+      **The 80 "Object of type `Parent` cannot be converted to type `SinglePkToPk`" failures are
+      fixed by L2 below.** The trail is kept because the wrong turns in it are instructive:
 
           MISMATCH owner=Parent nav=Single       wants=Single       got=Parent nodeRef=1
           MISMATCH owner=Parent nav=SinglePkToPk wants=SinglePkToPk got=Parent nodeRef=1
@@ -638,6 +637,32 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       hypothesis that a lazy load resets the reference scope mid-decode — it does not apply,
       because `Set<Parent>().Single()` is fully enumerated before the test touches a
       navigation).
+
+- [x] **L2.** A query can nest inside another one. **`Total tests: 11024, Passed: 10509,
+      Failed: 486, Skipped: 29`** — FIXED 103, BROKEN none. ✅ `<this commit>`
+
+      `ClientResultMaterializer.Materialize` assigned `mapper.EntityMaterializer` and never put
+      it back, and the mapper is DI-scoped and shared. That was harmless while a query was the
+      only kind of exchange — but a lazy load is a whole exchange issued *while an outer result
+      is still being decoded*, and it replaced the outer materializer with its own for the rest
+      of the outer decode. The inner one carries a different tracking behaviour, a different
+      deferred-identity map and a different reference scope, which is how a `Parent` ended up
+      assigned to `Parent.Single`.
+
+      The hook is now saved and restored, and rows are decoded to completion before any is
+      handed out — with `yield return`, the caller could start a nested exchange part-way
+      through this one, and by then the hook had already been swapped. Nothing extra is
+      buffered: the payload is deserialized into a list of nodes up front regardless.
+
+      This removed **all 80** of the type-mismatch failures.
+
+      **How it was found, since three earlier attempts on the same symptom were neutral.** The
+      wire was dumped and searched: across 4664 payloads, *zero* had a navigation encoded as a
+      top-level back-reference — so the serializer was exonerated outright and the fault had to
+      be in decoding. Probing the failing assignment then gave `rowId=2 rowType=Parent
+      nav=Single memberRef=1`, a nested `Parent` inside a response rooted elsewhere whose
+      back-reference to wire id 1 resolved to the wrong object. Only a decode running against
+      another exchange's state can do that.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
