@@ -82,7 +82,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11142, Failed: 173, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11186, Failed: 129, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
@@ -98,8 +98,8 @@ Not yet implemented, in rough priority order:
   tallied by hand — the table it replaced had drifted badly.
 - **Lazy loading** — 27 failures left across `Load` and `LazyLoadProxy`. Phase L in
   `docs/implementation-plan.md`.
-- **The `ManyToManyTracking` residual** — 96 of 200. Join rows *are* persisted; what remains
-  after L7 is that a join entity with a **payload** cannot be reconstructed on the client and
+- **The `ManyToManyTracking` residual** — 52 of 200. Join rows are persisted and tracked; what
+  remains is that a join entity with a **CLR payload** cannot be reconstructed on the client and
   would have to travel on the wire.
 - **The remaining spec bases** — the rest of the 138 the compliance test reports unadopted.
 - **Transactions** (roadmap M4) — `InfoCarrierTransactionManager` *ignores* them and raises

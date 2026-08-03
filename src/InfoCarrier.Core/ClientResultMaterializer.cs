@@ -376,10 +376,11 @@ public class ClientResultMaterializer
             skip.ForeignKey.Properties.Concat(skip.Inverse.ForeignKey.Properties).Select(p => p.Name),
             StringComparer.Ordinal);
 
-        if (joinType.GetProperties().Any(p => !keyProperties.Contains(p.Name)))
+        if (joinType.GetProperties().Any(p => !keyProperties.Contains(p.Name) && !p.IsShadowProperty()))
         {
             return;
         }
+
         var values = new Dictionary<string, object?>(StringComparer.Ordinal);
 
         if (!ReadJoinKey(skip.ForeignKey, owner, values)
@@ -391,8 +392,12 @@ public class ClientResultMaterializer
         if (joinType.FindPrimaryKey() is { } joinKey)
         {
             object?[] keyValues = [.. joinKey.Properties.Select(p => values.GetValueOrDefault(p.Name))];
-            if (Array.Exists(keyValues, v => v is null)
-                || _stateManager.TryGetEntry(joinKey, keyValues) is not null)
+            if (Array.Exists(keyValues, v => v is null))
+            {
+                return;
+            }
+
+            if (_stateManager.TryGetEntry(joinKey, keyValues) is not null)
             {
                 return;
             }
@@ -631,6 +636,29 @@ public class ClientResultMaterializer
                 foreach (object? target in targets)
                 {
                     TrackJoinEntity(skip, instance, target);
+                }
+            }
+
+            // The relationship snapshot is EF's record of what a navigation held when it was
+            // last known-good, and it is what `DetectChanges` compares against. Assigning the
+            // navigation through its CLR property — which is how a materialized graph is wired
+            // here — leaves the snapshot empty, so EF sees every loaded relationship as newly
+            // added. `VerifyRelationshipSnapshots` in the many-to-many spec asserts exactly this.
+            if (entry is not null && related is not null && navigation.GetRelationshipIndex() >= 0)
+            {
+                if (navigation.IsCollection)
+                {
+                    foreach (object? item in (System.Collections.IEnumerable)related)
+                    {
+                        if (item is not null)
+                        {
+                            entry.AddToCollectionSnapshot(navigation, item);
+                        }
+                    }
+                }
+                else
+                {
+                    entry.SetRelationshipSnapshotValue(navigation, related);
                 }
             }
 

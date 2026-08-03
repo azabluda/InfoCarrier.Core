@@ -762,25 +762,35 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       "no entry" to "an entry whose `Payload` is null". Worse than having none. Those need the
       join row on the wire, which is a change to the result format and is not this step.
 
-- [ ] **L8.** The rest of the `ManyToMany` join-row residual — **two attempts measured, both
-      neutral, both reverted.** Recorded so they are not repeated.
+- [x] **L8 (superseded by L9).** Two guard relaxations were recorded here as "measured neutral,
+      both reverted". **That conclusion was wrong**, and how it was reached matters more than the
+      finding: the failing-test *names* were byte-identical before and after, so I compared only
+      the names and called the change neutral. The *reasons* had changed completely —
+      `Assert.Equal: Expected 11, Actual 6` had become `Assert.True` in
+      `VerifyRelationshipSnapshots`. The relaxation had fixed what it was aimed at and exposed
+      the next problem behind it. This is the same trap recorded twice already in this file, and
+      comparing snapshots of test names is not enough to avoid it — the reasons have to be
+      diffed too.
 
-      L7 reconstructs a join row only when the join type is nothing but its two foreign keys.
-      `EntityOne.TwoSkip` fails that test on a third property, `JoinOneToTwoExtraId`, and a probe
-      confirmed the guard rejecting exactly there — 40 hits, all `SKIP payload`. `JoinOneToTwo`
-      itself declares only `OneId`/`TwoId`, so that property is a convention-created shadow
-      foreign key, not a user payload.
+- [x] **L9.** Join rows are tracked, and a materialized navigation updates its relationship
+      snapshot. **`Total tests: 11344, Passed: 11186, Failed: 129, Skipped: 29`** — FIXED 44,
+      BROKEN none. ✅ `<this commit>`
 
-      Two relaxations of the guard were tried and **both changed nothing at all** — same count,
-      byte-identical failing set:
+      Two halves of one thing:
 
-      1. allow a non-key property that is shadow *and nullable*;
-      2. allow any non-key property that is shadow (no CLR member for anyone to have set).
+      - **The join-row guard now refuses only a payload with a CLR member.** L7 refused any
+        property outside the two foreign keys, which caught `JoinOneToTwoExtraId` — a
+        convention-created *shadow* foreign key on the join table, not something a user set.
+        `JoinOneToTwo` declares only `OneId`/`TwoId`. A shadow property has no CLR member for
+        anyone to have assigned, so leaving it at its sentinel is right; a payload with a CLR
+        member still cannot be invented and is still refused.
+      - **A navigation populated here now updates the relationship snapshot.** That snapshot is
+        what `DetectChanges` compares against, and assigning a navigation through its CLR
+        property — which is how a materialized graph is wired — left it empty, so EF saw every
+        loaded relationship as newly added. `AddToCollectionSnapshot` per item for a collection,
+        `SetRelationshipSnapshotValue` for a reference.
 
-      So the guard is **not** what blocks these 32 `*dangling_join*` tests. Something earlier in
-      `TrackJoinEntity` bails, or the verification query never reports the skip navigation as
-      loaded in the first place. Probe `ReadJoinKey` and the `IsLoadedNavigation` members of the
-      verification response before touching the guard again.
+      `ManyToManyTracking` 96 → 52.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
