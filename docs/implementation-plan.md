@@ -2233,6 +2233,33 @@ failures are left red and classified rather than worked immediately.
       | 2 | `Argument type 'List<string>' does not match` | |
       | 2 | `Queryable in subquery` / `Distinct` shapes | |
 
+- [x] **A34.** A value EF knows how to write as JSON travels as its JSON.
+      **`Total tests: 16099, Passed: 15925, Failed: 82, Skipped: 92`** — FIXED 28, BROKEN none.
+      **The `SocketException` family is gone, 30 → 0.** ✅ `<this commit>`
+
+      A19 established that a value behind a converter travels as its *provider* value, and named
+      the exact signature of getting it wrong: the mapper's reflective member walk reads every
+      public getter, and `IPAddress.ScopeId` throws `SocketException` for an IPv4 address. A33's
+      corpus produced 30 of them — from a property with **no converter at all**.
+      `Faction.ServerAddress` is an `IPAddress`, and the InMemory store keeps it as one.
+
+      A converter is not the only way a mapped value can be an arbitrary CLR type. The model
+      already answers what to do with such a value: EF gives the property a
+      `JsonValueReaderWriter` precisely because it knows how to write it. So a property with no
+      converter, whose CLR type is none of the wire primitives, now travels as its JSON string and
+      is rebuilt by the same reader on the far side.
+
+      **The first attempt measured byte-identical**, and the reason is worth keeping:
+      `IReadOnlyProperty.GetJsonValueReaderWriter()` answers only what the model was *explicitly
+      annotated* with — `CreateFromType(this[CoreAnnotationNames.JsonValueReaderWriterType])` — which
+      is null in the ordinary case. The one that exists is on the **type mapping**:
+      `property.FindTypeMapping()?.JsonValueReaderWriter`. The code ran; the condition was never
+      true. Exactly the failure mode CLAUDE.md warns about, and the second reading is what found it.
+
+      Of the 30, **28 now pass and 2 fail on a value comparison** — past the crash and into an
+      ordinary disagreement, which is a different problem and is left classified rather than
+      guessed at.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

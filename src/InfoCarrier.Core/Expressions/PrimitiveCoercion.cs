@@ -56,21 +56,85 @@ internal static class PrimitiveCoercion
     ///     </para>
     /// </remarks>
     public static object? ToWireValue(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
-        => Normalize(property.GetValueConverter() is { } converter ? converter.ConvertToProvider(value) : value);
+    {
+        if (property.GetValueConverter() is { } converter)
+        {
+            return Normalize(converter.ConvertToProvider(value));
+        }
+
+        return value is not null && JsonForm(property) is { } writer
+            ? writer.ToJsonString(value)
+            : Normalize(value);
+    }
 
     /// <summary>
     ///     The type a value of <paramref name="property" /> travels as.
     /// </summary>
     public static Type WireType(Microsoft.EntityFrameworkCore.Metadata.IProperty property)
-        => property.GetValueConverter()?.ProviderClrType ?? property.ClrType;
+        => property.GetValueConverter()?.ProviderClrType
+            ?? (JsonForm(property) is not null ? typeof(string) : property.ClrType);
 
     /// <summary>
     ///     The inverse of <see cref="ToWireValue" />: a wire value as its CLR type.
     /// </summary>
     public static object? FromWireValue(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
-        => property.GetValueConverter() is { } converter
-            ? converter.ConvertFromProvider(Coerce(value, converter.ProviderClrType))
+    {
+        if (property.GetValueConverter() is { } converter)
+        {
+            return converter.ConvertFromProvider(Coerce(value, converter.ProviderClrType));
+        }
+
+        return JsonForm(property) is { } reader && Coerce(value, typeof(string)) is string json
+            ? reader.FromJsonString(json)
             : Coerce(value, property.ClrType);
+    }
+
+    /// <summary>
+    ///     Whether a property with no value converter still holds something the wire has no
+    ///     primitive form for — in which case EF's own JSON form is what travels.
+    /// </summary>
+    /// <remarks>
+    ///     A converter is not the only way a mapped value can be an arbitrary CLR type. The
+    ///     InMemory store keeps <c>Faction.ServerAddress</c> as a live
+    ///     <see cref="System.Net.IPAddress" /> with no conversion at all, and that fell through to
+    ///     the mapper's reflective member walk — where <c>ScopeId</c> throws
+    ///     <c>SocketException</c> for an IPv4 address, the same signature this file's converter
+    ///     rule was written for, 30 times over <c>GearsOfWarQueryTestBase</c>.
+    ///     <para>
+    ///         The model already answers what to do with such a value: EF gives the property a
+    ///         <c>JsonValueReaderWriter</c> precisely because it knows how to write it. Using that
+    ///         is not a guess, and it is symmetric — the same reader rebuilds it on the far side.
+    ///     </para>
+    ///     <para>
+    ///         Read off the <em>type mapping</em>, not off
+    ///         <c>IReadOnlyProperty.GetJsonValueReaderWriter()</c>: that one answers only what the
+    ///         model was explicitly annotated with, which is nothing in the ordinary case. Using it
+    ///         made this rule measure byte-identical — the code ran and the condition was simply
+    ///         never true.
+    ///     </para>
+    /// </remarks>
+    private static Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? JsonForm(
+        Microsoft.EntityFrameworkCore.Metadata.IProperty property)
+        => IsWirePrimitive(property.ClrType)
+            ? null
+            : property.GetJsonValueReaderWriter() ?? property.FindTypeMapping()?.JsonValueReaderWriter;
+
+    private static bool IsWirePrimitive(Type type)
+    {
+        Type underlying = Nullable.GetUnderlyingType(type) ?? type;
+
+        return underlying.IsPrimitive
+            || underlying.IsEnum
+            || underlying == typeof(string)
+            || underlying == typeof(decimal)
+            || underlying == typeof(DateTime)
+            || underlying == typeof(DateTimeOffset)
+            || underlying == typeof(TimeSpan)
+            || underlying == typeof(Guid)
+            || underlying == typeof(DateOnly)
+            || underlying == typeof(TimeOnly)
+            || underlying == typeof(byte[]);
+    }
 
     /// <summary>
     ///     Converts a wire-side primitive back to <paramref name="targetType" />.
