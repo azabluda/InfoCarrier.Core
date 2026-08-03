@@ -162,7 +162,20 @@ internal static class TransparentIdentifierRewriter
 
             var reachable = new HashSet<Type>();
             CollectTypes(query.Type, reachable);
-            reachable.Remove(elementCarrier!);
+
+            if (elementCarrier is not null)
+            {
+                // Everything reachable only *through* the element carrier is rebuilt with it:
+                // `RebuildAtRoot` recurses through nested carriers. Excluding those for being
+                // "reachable from the result type" is what kept `new { Note, Nullable = cond ?
+                // new { … } : null }` half-rewritten — the outer carrier became a tuple, the
+                // inner one stayed anonymous because it is a *generic argument* of the outer,
+                // and a tuple with an anonymous type in it ships no further than the anonymous
+                // type did.
+                var throughCarrier = new HashSet<Type>();
+                CollectTypes(elementCarrier, throughCarrier);
+                reachable.ExceptWith(throughCarrier);
+            }
 
             foreach (Type type in reachable.Concat(finder._disqualified))
             {
@@ -238,6 +251,30 @@ internal static class TransparentIdentifierRewriter
             }
 
             return base.VisitBinary(node);
+        }
+
+        /// <summary>
+        ///     Records a carrier that is a <em>branch</em> of a conditional with
+        ///     <see langword="null" /> opposite it.
+        /// </summary>
+        /// <remarks>
+        ///     The same situation as a carrier compared to null, reached differently:
+        ///     <c>cond ? new { … } : null</c> has no <see cref="ValueTuple" /> form, because a
+        ///     <see cref="ValueTuple" /> cannot be null and <see cref="Expression.Condition(Expression, Expression, Expression)" />
+        ///     refuses the mismatch — which the catch in <see cref="Rewrite" /> then turns into
+        ///     "no rewrite at all". Fourth trigger, after the null comparison, the
+        ///     absence-producing operator and the <c>class</c> constraint.
+        /// </remarks>
+        protected override Expression VisitConditional(ConditionalExpression node)
+        {
+            if (IsNull(node.IfTrue) || IsNull(node.IfFalse))
+            {
+                _referenceTyped.Add(node.Type);
+                _referenceTyped.Add(node.IfTrue.Type);
+                _referenceTyped.Add(node.IfFalse.Type);
+            }
+
+            return base.VisitConditional(node);
         }
 
         private static bool IsNull(Expression node)
@@ -390,6 +427,17 @@ internal static class TransparentIdentifierRewriter
         /// </remarks>
         private void Register(Expression node, Type? parent)
         {
+            // A carrier can be built inside a conditional *branch* — `Nullable = x.GearNickName
+            // != null ? new { x.Gear.Nickname, … } : null` — where it is the argument of no
+            // construction and the body of no result selector. Left unregistered it stayed an
+            // anonymous type inside the tuple, which made the enclosing carrier unusable too.
+            if (node is ConditionalExpression branches)
+            {
+                Register(branches.IfTrue, parent);
+                Register(branches.IfFalse, parent);
+                return;
+            }
+
             if (node is not NewExpression { Members: { } members } construction
                 || members.Count == 0
                 || allowlist.IsAllowed(construction.Type))
@@ -528,6 +576,26 @@ internal static class TransparentIdentifierRewriter
             Type mapped = Map(node.Type);
 
             return mapped == node.Type ? node : Expression.Constant(node.Value, mapped);
+        }
+
+        /// <summary>
+        ///     Retypes a conditional whose branches are carriers.
+        /// </summary>
+        /// <remarks>
+        ///     <see cref="ExpressionVisitor.VisitConditional" /> rebuilds through
+        ///     <c>node.Update</c>, which keeps the <em>original</em> node type — so
+        ///     <c>cond ? new { … } : null</c> with both branches retyped went to
+        ///     <see cref="Expression.Condition(Expression, Expression, Expression, Type)" /> still
+        ///     declaring the anonymous type, and "Argument types do not match" discarded the whole
+        ///     pass through the catch in <see cref="Rewrite" />.
+        /// </remarks>
+        protected override Expression VisitConditional(ConditionalExpression node)
+        {
+            Type mapped = Map(node.Type);
+
+            return mapped == node.Type
+                ? base.VisitConditional(node)
+                : Expression.Condition(Visit(node.Test), Visit(node.IfTrue), Visit(node.IfFalse), mapped);
         }
 
         protected override Expression VisitMember(MemberExpression node)

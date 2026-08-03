@@ -2410,6 +2410,45 @@ failures are left red and classified rather than worked immediately.
       `Join_with_nav_projected_in_subquery_when_client_eval`. All three build the query inline in a
       `protected static` assert helper, so the expectation cannot be inverted from a derived class.
 
+- [x] **A40.** A carrier can live in a conditional branch.
+      **`Total tests: 16099, Passed: 15961, Failed: 46, Skipped: 92`** — FIXED 22, BROKEN none.
+      **68 → 46, the largest single step of this phase**, and it closes
+      `SelectMany_correlated_subquery_hard` — the gap A28 called the only real one left, which
+      milestone M2-B existed for. ✅ `<this commit>`
+
+      A36 shipped A35's rule and left 24 of the 26 failing one step further on, as a
+      `NullReferenceException` in the *client residual*. A36's note said that needed
+      null-propagating semantics on the residual — a feature. It does not. **It needs the residual
+      not to exist**: hand EF the whole query and EF's own null semantics apply, which is why these
+      tests pass on EF's InMemory provider unmodified.
+
+      What stopped the whole query shipping was `new { Note, Nullable = cond ? new { … } : null }`,
+      and it took **four** defects, each hiding the next — a good argument for the probe over
+      reading:
+
+      1. `CarrierFinder.Register` never descended into a `ConditionalExpression`, so the inner
+         carrier was the argument of no construction and the body of no result selector, and was
+         never a candidate at all.
+      2. Nothing marked it **reference-typed**. `cond ? new { … } : null` has no `ValueTuple` form,
+         and `Expression.Condition` refusing the mismatch discards the entire pass through
+         `Rewrite`'s catch. Fourth trigger, after the null comparison, the absence-producing
+         operator (`FirstOrDefault`) and the `class` constraint (A25).
+      3. `Find` excluded it for being **reachable from the result type** — true, but reachable only
+         *through* the element carrier, which `RebuildAtRoot` rebuilds recursively. The probe
+         showed this one exactly: the outer carrier became a `ValueTuple` and the inner stayed
+         anonymous, because it is a *generic argument* of the outer. A tuple with an anonymous type
+         in it ships no further than the anonymous type did.
+      4. `ExpressionVisitor.VisitConditional` rebuilds through `node.Update`, which keeps the
+         **original** node type — so both branches retyped and the conditional still declaring the
+         anonymous type gave `Argument types do not match`, and the catch threw the pass away.
+
+      Each of 1–3 alone measures as nothing (the first attempt was FIXED 0 / BROKEN 2), and the
+      shape of "nothing" was identical to "the target does not exist". The probe named all four in
+      three runs of one test.
+
+      **The `NullReferenceException` bucket is 34 → 14** and the residual `Nullable object must
+      have a value` family is fully closed.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
