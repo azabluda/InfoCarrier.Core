@@ -2474,6 +2474,30 @@ failures are left red and classified rather than worked immediately.
       verifier threw it away — and the probe distinguished those in one run. Two identical-looking
       nothings in two consecutive steps; the probe is the only thing that tells them apart.
 
+- [x] **A42.** A `GroupBy` key is a carrier too.
+      **`Total tests: 16099, Passed: 15971, Failed: 36, Skipped: 92`** — FIXED 8, BROKEN none.
+      ✅ `<this commit>`
+
+      A37's rule, applied where it also holds. `GroupBy(t => new { t.Gear.HasSoulPatch,
+      t.Gear.Squad.Name })` builds an anonymous type for the key; so does
+      `GroupBy(l1 => …, l1 => new { Id = (int?)l1.OneToOne_Required_PK1.Id ?? 0 })` for the element.
+      Neither is the body of a result selector, so neither was a candidate, so the whole grouping
+      stayed on the client — where the key selector dereferenced the optional navigation it is made
+      of, four `NullReferenceException`s deep in `Enumerable.Lookup.Create`. Every lambda argument
+      of a `GroupBy` is registered, because the 3rd and 4th are overloaded between an element
+      selector and a result selector.
+
+      One consequence had to come with it: `g.Key` is a member whose **declaring** type merely
+      mentions a carrier (`IGrouping<TKey, …>`), and `ExpressionVisitor` rebuilds a
+      `MemberExpression` through `node.Update`, which keeps the original `MemberInfo` — not
+      declared on the mapped type, so `Expression` refuses it and the catch discards the pass.
+      Re-resolved by name, which is exact because the mapped type is the same generic definition.
+
+      **The `NullReferenceException` bucket is 12 → 4**, and the remaining four are two shapes:
+      `Member_over_null_check_ternary_and_nested_dto_type` (a `MemberInitExpression` carrier — the
+      anonymous-type sibling passes since A40, and `Register` handles only `NewExpression`) and
+      `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method`.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

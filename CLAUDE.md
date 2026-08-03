@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 16099, Passed: 15963, Failed: 44, Skipped: 92`** (2026-08-03) across the
+**`Total tests: 16099, Passed: 15971, Failed: 36, Skipped: 92`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -108,9 +108,9 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 44, read out of `artifacts/measure/a41b.txt`: **34** of them are the three query bases A33
+The 36, read out of `artifacts/measure/a42.txt`: **26** of them are the three query bases A33
 adopted, classified by cause in `docs/implementation-plan.md` (A33's table, less what A34
-and A36–A41 closed); the other 10 are 4 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`,
+and A36–A42 closed); the other 10 are 4 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`,
 1 `Update`, 1 `OptimisticConcurrency` and the compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across

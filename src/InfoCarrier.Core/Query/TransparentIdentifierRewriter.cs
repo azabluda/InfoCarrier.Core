@@ -403,6 +403,22 @@ internal static class TransparentIdentifierRewriter
                 RegisterKeySelector(node.Arguments[3]);
             }
 
+            // And so is a `GroupBy` key or element selector, for the same reason.
+            // `GroupBy(t => new { t.Gear.HasSoulPatch, t.Gear.Squad.Name })` left the whole
+            // grouping on the client, where the key selector dereferenced the optional navigation
+            // it is made of. Every lambda argument, because `GroupBy` overloads its 3rd and 4th
+            // between an element selector and a result selector — and the result selector is
+            // already registered above, harmlessly twice.
+            if (node.Method.DeclaringType is { } grouper
+                && (grouper == typeof(Queryable) || grouper == typeof(Enumerable))
+                && node.Method.Name == nameof(Queryable.GroupBy))
+            {
+                for (int i = 1; i < node.Arguments.Count; i++)
+                {
+                    RegisterKeySelector(node.Arguments[i]);
+                }
+            }
+
             return base.VisitMethodCall(node);
         }
 
@@ -610,6 +626,15 @@ internal static class TransparentIdentifierRewriter
                 && Array.FindIndex(members, m => m.Name == node.Member.Name) is >= 0 and int slot)
             {
                 return TupleCarrier.Read(Visit(inner), slot);
+            }
+
+            // A member whose *declaring* type merely mentions a carrier — `g.Key`, where `g` is an
+            // `IGrouping<TKey, …>` and `TKey` is one. `node.Update` keeps the original
+            // `MemberInfo`, which is not declared on the mapped type, and `Expression` refuses it.
+            // Re-resolving by name is exact here: the mapped type is the same generic definition.
+            if (node.Expression is { } target && Map(target.Type) != target.Type)
+            {
+                return Expression.PropertyOrField(Visit(target), node.Member.Name);
             }
 
             return base.VisitMember(node);
