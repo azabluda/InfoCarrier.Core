@@ -253,7 +253,13 @@ internal sealed class QueryExecutor<TElement>
     {
         foreach (TElement element in produced)
         {
-            AttachEntitiesIn(element, []);
+            // Reference equality, because this set exists to stop the walk revisiting an
+            // *instance*, and an entity's own `Equals`/`GetHashCode` is not usable for that:
+            // Northwind's `Customer.GetHashCode` throws on a null key, and
+            // `GraphUpdatesTestBase.MyDiscriminator` throws from `GetHashCode` deliberately.
+            // Harmless while the walk stopped at entities; once it descends into their
+            // navigations it reaches every one of them.
+            AttachEntitiesIn(element, new HashSet<object>(ReferenceEqualityComparer.Instance));
             yield return element;
         }
     }
@@ -261,6 +267,20 @@ internal sealed class QueryExecutor<TElement>
     private void AttachEntitiesIn(object? value, HashSet<object> seen)
     {
         if (value is null || value is string || value.GetType().IsPrimitive)
+        {
+            return;
+        }
+
+        // A struct is a dead end unless it is one of the two the query pipeline uses to *hold*
+        // results. Stopping here is what makes `seen` sufficient: a boxed struct is a new object
+        // every time it is read, so reference identity can never catch a repeat, and a property
+        // returning a fresh one — `DateTime.Date` returns a `DateTime` that has a `Date` — walks
+        // forever. It overflowed the test host's stack, and the run reported *fewer* failures
+        // for it, which is the shape `eng/measure.sh` guards the total against.
+        if (value.GetType() is { IsValueType: true } valueType
+            && !(valueType.IsGenericType
+                && valueType.GetGenericTypeDefinition() is var definition
+                && (definition == typeof(KeyValuePair<,>) || definition.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true)))
         {
             return;
         }
@@ -282,13 +302,58 @@ internal sealed class QueryExecutor<TElement>
             return;
         }
 
-        // A client-only projection type carries its entities in its members, so the walk has to
-        // go through it. Entities themselves are not descended into: their navigations lead back
-        // into rows the residual may well have discarded.
-        if (_queryContext.Context.Model.FindEntityType(value.GetType()) is not null)
+        // An entity is descended into through its *navigations*, which is how an `Include`d
+        // dependent gets attached: the residual yields the principal, and the dependent exists
+        // only inside it. Left out, `Set<QuizTask>().Include(e => e.Choices)` tracked the
+        // `QuizTask` and left its `TaskChoice` detached, so the next query in the same context
+        // built a second instance of a row it was already holding.
+        //
+        // The worry this replaces — that navigations lead back into rows the residual discarded —
+        // does not survive the walk starting from what the residual *kept*: anything reachable
+        // from a yielded entity travelled as part of that entity's graph. And nothing here
+        // attaches on its own account; `AttachIfDeferred` ignores whatever this materializer did
+        // not defer.
+        //
+        // Backing fields, never property getters: on a lazy-loading entity the getter *is* the
+        // load, so walking properties would query the server for every navigation of every
+        // result. `FindRuntimeEntityType` for the same reason it is used in the value mapper — a
+        // proxy's CLR type is not in the model, and only this overload walks up to the type that
+        // is.
+        //
+        // The descent goes only where the model says an entity is, never back through the
+        // member walk below. Letting it fall through there overflowed the stack: a member walk
+        // recurses on whatever a property returns, and a property returning a fresh value each
+        // call — `DateTime.Date` is one — never repeats an instance for `seen` to catch. Entity
+        // instances are finite and `seen` does catch those.
+        if (_queryContext.Context.Model.FindRuntimeEntityType(value.GetType()) is { } entityType)
         {
+            foreach (Microsoft.EntityFrameworkCore.Metadata.INavigationBase navigation
+                     in entityType.GetNavigations().Concat<Microsoft.EntityFrameworkCore.Metadata.INavigationBase>(
+                         entityType.GetSkipNavigations()))
+            {
+                if (navigation.FieldInfo?.GetValue(value) is not { } target)
+                {
+                    continue;
+                }
+
+                if (navigation.IsCollection)
+                {
+                    foreach (object? item in (System.Collections.IEnumerable)target)
+                    {
+                        AttachRelated(item, seen);
+                    }
+                }
+                else
+                {
+                    AttachRelated(target, seen);
+                }
+            }
+
             return;
         }
+
+        // A client-only projection type carries its entities in its members, so the walk has to
+        // go through it.
 
         foreach (System.Reflection.PropertyInfo property in value.GetType()
                      .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
@@ -297,6 +362,25 @@ internal sealed class QueryExecutor<TElement>
             {
                 AttachEntitiesIn(property.GetValue(value), seen);
             }
+        }
+    }
+
+    /// <summary>
+    ///     Continues the walk into a navigation's target, but only if the model calls it an
+    ///     entity.
+    /// </summary>
+    /// <remarks>
+    ///     A navigation can also point at something this walk has no business descending into —
+    ///     a shared-type join entity is a <see cref="Dictionary{TKey,TValue}" />, which is both
+    ///     unrecognizable to <c>FindRuntimeEntityType</c> and enumerable, so the untyped walk
+    ///     would take it apart pair by pair.
+    /// </remarks>
+    private void AttachRelated(object? candidate, HashSet<object> seen)
+    {
+        if (candidate is not null
+            && _queryContext.Context.Model.FindRuntimeEntityType(candidate.GetType()) is not null)
+        {
+            AttachEntitiesIn(candidate, seen);
         }
     }
 

@@ -942,6 +942,51 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       before its dependents arrive. That is the same direction the placeholder rule already
       required, so it constrains nothing that was not already constrained.
 
+- [x] **L16.** An `Include`d dependent is attached with the principal that carried it.
+      **`Total tests: 11344, Passed: 11234, Failed: 81, Skipped: 29`** — FIXED 5, BROKEN 3,
+      and the 3 are convergence rather than regression (below). ✅ `<this commit>`
+
+      `Set<QuizTask>().Include(e => e.Choices)` tracked the `QuizTask` and left its `TaskChoice`
+      **detached**, so `Set<TaskChoice>()` in the same context built a second instance of a row
+      already in hand and `Assert.Same` failed. A probe showed it exactly:
+
+          QuizTask   key=1 defer=True  tracked=MISS | sm:
+          TaskChoice key=1 defer=True  tracked=MISS | sm:
+          TaskChoice key=1 defer=False tracked=MISS | sm: QuizTask#39021180:Unchanged
+
+      The residual walk that attaches deferred entities (projection-split §4) stopped at every
+      entity, on the reasoning that navigations lead back into rows the residual discarded. That
+      does not hold for a walk starting from what the residual *kept*: anything reachable from a
+      yielded entity travelled as part of that entity's graph. It now descends through
+      navigations, read through backing fields so a lazy-loading getter does not turn the walk
+      into a query per navigation.
+
+      **Two aborted runs before the clean one, both from the same walk, and both worth keeping.**
+      Each reported *fewer* failures than the baseline while doing so — the exact shape
+      `eng/measure.sh` guards the total against, and the reason the guard exists:
+
+      1. `seen` compared with default equality, so it called `GetHashCode` on everything it
+         reached. `Northwind.Customer.GetHashCode` throws on a null key — 138 new
+         `NullReferenceException`s, `FAILING: 219`. Reference identity is what that set wants.
+      2. Reference identity then removed the *other* thing default equality had been doing:
+         deduplicating boxed structs. A struct is a new object every read, so
+         `DateTime.Date` — a `DateTime` that has a `Date` — recursed until the host's stack
+         overflowed. `FAILING: 11, TOTAL: <empty>`, from a run that executed 1117 of 11344 tests.
+
+      The walk now stops at any value type that is not a `ValueTuple` or `KeyValuePair`, and
+      descends from an entity only into what the model also calls an entity.
+
+      **The 3 newly-red tests were passing vacuously.**
+      `PropertyValues*_for_join_entity_can_be_copied_into_an_object` iterates
+      `ChangeTracker.Entries<Dictionary<string, object>>()`, which returned **nothing** while the
+      join rows behind an `Include` went untracked — a zero-iteration loop asserts nothing. The
+      body now runs and reaches the shared-type join entity limitation this plan already tracks:
+      "Entity type 'System.Collections.Generic.Dictionary`2<System.String,System.Object>' not
+      found in the server model", from `ServerQueryExecutor.RebindQueryRoot`. Confirmed by
+      running the class against both trees in isolation: 0 failures before, 3 after, no exception
+      possible outside the loop body. Left failing, per the guardrail — they belong to the
+      `ManyToManyTracking` residual below, not here.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -990,7 +1035,7 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       through the same `TestStore.InitializeAsync` path — leaves the SQLite one empty. Fix that
       first and re-measure before reading any other failure in this class.
 
-### The `GraphUpdates` residual — 4 of 1787 (2026-08-03, Tier A)
+### The `GraphUpdates` residual — 1 of 1787 (2026-08-03, Tier A)
 
 **The table this replaces was wrong, and worth saying how.** It claimed 45 failures split
 14 / 12 / 10 / 4 / 3 / 2, and the decomposition of the suite total that went with it read
@@ -1002,20 +1047,24 @@ below is now read out of `artifacts/measure/<label>.txt`, which is the actual ru
 
 | # | Family | Symptom | Diagnosis |
 |---|---|---|---|
-| 3 | `Can_add_*_dependent_when_multiple_possible_principal_sides` | assertion | Unclassified. The largest family left here. |
 | 1 | `Save_optional_many_to_one_dependents` | tracked-entry count off by one (26 vs 27) | **Introduced by S3c-9**, now in 1 of that method's 12 parameterizations. |
 
-`Update_root_by_collection_replacement_of_*` (was 10, then 6) is **fixed** — L13 sent the
-replaced row and L15 stopped its replacement being fixed up to it. `Save_changed_owned_one_to_one`
-is likewise gone.
+Three families have left this table. `Update_root_by_collection_replacement_of_*` (was 10, then
+6): L13 sent the replaced row, L15 stopped its replacement being fixed up to it.
+`Can_add_*_dependent_when_multiple_possible_principal_sides` (3) was never a `SaveChanges`
+failure at all — L16 fixed it in the *query* path. `Save_changed_owned_one_to_one` is likewise
+gone.
 
-### The `PropertyValues` residual — 16 of 196 (2026-08-03, Tier A)
+### The `PropertyValues` residual — 3 of 196 (2026-08-03, Tier A)
 
-Entirely one shape: `Scalar_store_values_*` and `Scalar_original_values_*` read through a
-property dictionary. Store values require a round trip the client cannot make from its own
-tracked state, and original values require what S3c-13 only sends for concurrency tokens.
+The 16-test `Scalar_store_values_*` / `Scalar_original_values_*` shape this section used to
+describe is **fixed**. What is left is the 3
+`*_for_join_entity_can_be_copied_into_an_object` tests L16 un-hid: they iterate
+`ChangeTracker.Entries<Dictionary<string, object>>()`, which was empty while `Include`d join
+rows went untracked, so the loop asserted nothing and the tests passed. They now reach the
+shared-type join entity limitation and belong to the `ManyToManyTracking` residual, not here.
 
-The remaining **28** failures outside these classes are M2's query residual, unchanged since Z7,
+The remaining **22** failures outside these classes are M2's query residual, unchanged since Z7,
 plus 1 in `InfoCarrierComplianceTest` — which is the compliance report itself, and moves as
 bases are adopted.
 - [x] **S3c-9.** Generate the key on a store that generates at `Add` time. **GraphUpdates
