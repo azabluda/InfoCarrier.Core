@@ -1419,7 +1419,7 @@ failures are left red and classified rather than worked immediately.
       ignores transactions, a shared store has to be emptied by the test class.** `finally`,
       because a failing test dirties the store the same way a passing one does.
 
-- [ ] **A5.** The `ManyToMany*Load` residual — **240 of 482, one cause, located but not fixed.**
+- [x] **A5 (cause; fixed in A6).** The `ManyToMany*Load` residual — **240 of 482, one cause.**
       Suite unchanged at **`Total tests: 12878, Passed: 12561, Failed: 288, Skipped: 29`**.
 
       `ManyToManyLoad` 176 of 358 and `ManyToManyFieldsLoad` 56 of 124 — together **83% of every
@@ -1449,6 +1449,34 @@ failures are left red and classified rather than worked immediately.
 
       Left failing rather than half-fixed. Recorded here because the count alone
       (`Failed: 288`) reads as a long tail and is nothing of the sort.
+
+- [x] **A6.** A skip navigation's join rows travel whether or not it is loaded.
+      **`Total tests: 12878, Passed: 12737, Failed: 112, Skipped: 29`** — FIXED 194, BROKEN 18.
+      ✅ `<this commit>`
+
+      The last probe A5 asked for: `ReadJoinEntities` is called for `OneSkip` **only** under
+      `NoTracking`, never under `TrackAll`. It was never reached, because `MapRowMembers` gated
+      the join-row block behind `if (!_isNavigationLoaded(…)) continue;` — and **EF deliberately
+      leaves a filtered include unloaded.** `ManyToManyLoadTestBase.Load_collection` asserts
+      exactly that (`Assert.False(context.Entry(entityTwo).Collection(e => e.OneSkip).IsLoaded)`),
+      and `ManyToManyLoader.Query` builds precisely that shape:
+      `…SelectMany(e => e.TwoSkip).NotQuiteInclude(e => e.OneSkip.Where(…))`.
+
+      So the rows arrived and nothing joined them. The *value* of an unloaded navigation still
+      must not be sent — that was never the question — but its join rows are what connect the two
+      sides and the client cannot rebuild them. They now travel on their own merit.
+
+      **18 broken, and they are a real ordering defect, not convergence.** All 18 are
+      `Load_collection_using_Query_already_loaded[_untyped]` on `ManyToManyFieldsLoad`, whose
+      navigation is a `List` — so order is observable, and `Assert.Equal(children,
+      left.TwoSkip.ToList())` compares it. The count is right (the preceding
+      `Assert.Equal(7, …)` passes); one entity moves to the front once join rows arrive for a
+      navigation the client had already loaded. `ManyToManyLoad`, whose collections are unordered,
+      does not see it.
+
+      Kept rather than reverted: 194 fixed against 18, the 18 are one narrower defect in one model
+      shape, and reverting would restore a gap that made explicit skip loading useless. Recorded
+      as the next thing to look at in this family, not as acceptable.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

@@ -357,13 +357,12 @@ public class DynamicValueMapper : IDynamicValueMapper
         foreach (INavigationBase navigation in entityType.GetNavigations().Cast<INavigationBase>()
                      .Concat(entityType.GetSkipNavigations()))
         {
-            // Unloaded navigations are omitted entirely: shipping them would either force a
-            // lazy load on the server or send a null that the client cannot tell apart from a
-            // genuinely empty one.
-            if (!_isNavigationLoaded!(value, navigation))
-            {
-                continue;
-            }
+            // Unloaded navigations send no *value*: shipping one would either force a lazy load
+            // on the server or send a null the client cannot tell apart from a genuinely empty
+            // collection. Its join rows are a separate question, handled below — this used to
+            // `continue` here and that is what made explicit skip-navigation loading return
+            // nothing (plan A5/A6).
+            bool loaded = _isNavigationLoaded!(value, navigation);
 
             // A shadow navigation has no CLR member to read, and `GetGetter` on one does not
             // return null — it throws: "No backing field could be found for property
@@ -373,7 +372,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             // There is nothing to send and nowhere on the client to put it, but the join rows
             // below are still the payload the navigation exists to carry, so the walk continues
             // rather than skipping the navigation outright.
-            if (!navigation.IsShadowProperty())
+            if (loaded && !navigation.IsShadowProperty())
             {
                 object? related = navigation.GetGetter().GetClrValue(value);
                 members.Add(new DynamicPropertyValue
@@ -384,16 +383,23 @@ public class DynamicValueMapper : IDynamicValueMapper
                 });
             }
 
-            // A skip navigation's join rows travel with it. EF expects them in the change
-            // tracker, and they are the one part of a many-to-many the client cannot rebuild
-            // from what it already has: a payload and a join table's extra foreign keys exist
-            // only here. Loading the skip collection materialized them, so they are tracked and
-            // free to read.
+            // A skip navigation's join rows travel whether or not the navigation itself is
+            // *loaded*, which is the whole point: they are what connects the two sides, and the
+            // client cannot rebuild them — a payload and a join table's extra foreign keys exist
+            // only here.
+            //
+            // Not gated on `loaded`, because EF deliberately leaves a **filtered** include
+            // unloaded and that is exactly the shape explicit skip loading uses:
+            // `ManyToManyLoader.Query` builds
+            // `…SelectMany(e => e.TwoSkip).NotQuiteInclude(e => e.OneSkip.Where(…))`, and
+            // `ManyToManyLoadTestBase.Load_collection` asserts that `OneSkip` comes back *not*
+            // loaded. While this sat behind the loaded check the join rows were never sent, so
+            // the rows arrived and nothing joined them: `left.TwoSkip` was empty in all 24
+            // parameterizations (plan A5).
+            //
             // Shared-type join entities travel too, since L20: they are named by the change
             // tracker rather than by their `Dictionary<string, object>` CLR type, so they decode
-            // as rows like any other. The client's own reconstruction stays only as the fallback
-            // for a navigation no rows were sent for, and the two remain mutually exclusive by
-            // navigation name (L11).
+            // as rows like any other.
             if (navigation is ISkipNavigation skip && _readJoinEntities is not null)
             {
                 List<object> joinRows = [.. _readJoinEntities(value, skip)];
