@@ -29,6 +29,7 @@ mkdir -p "$out"
 
 log="$out/$label.log"
 snapshot="$out/$label.txt"
+reasons="$out/$label.reasons.txt"
 
 dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.log" 2>&1 || {
     echo "measure: build failed — see $out/$label.build.log" >&2
@@ -49,6 +50,12 @@ if [ -z "$summary" ]; then
 fi
 
 sed -n 's/^\[xUnit\.net [^]]*\] *\(.*\) \[FAIL\]$/\1/p' "$log" | sort -u > "$snapshot"
+
+# The *reasons*, tallied. A snapshot of test names alone cannot tell "this change did nothing"
+# from "this change fixed what it aimed at and uncovered the next problem in the same tests" --
+# both leave the name list byte-identical. That mistake was made twice in one session and once
+# produced a wrong revert (plan L8), so the reasons are now recorded alongside the names.
+grep -A 3 "Error Message:" "$log"     | grep -E "^[[:space:]]+(System|Microsoft|Assert)"     | sed 's/^ *//' | cut -c1-120 | sort | uniq -c | sort -rn > "$reasons"
 
 failed=$(sed -n 's/.*Failed: *\([0-9]*\).*/\1/p' <<< "$summary")
 total=$(sed -n 's/.*Total: *\([0-9]*\).*/\1/p' <<< "$summary")
@@ -72,3 +79,16 @@ echo "FIXED  (in $baseline, not in $label):"
 comm -23 "$before" "$snapshot" | sed 's/^/  /' || true
 echo "BROKEN (in $label, not in $baseline):"
 comm -13 "$before" "$snapshot" | sed 's/^/  /' || true
+
+# Always shown, even when both lists above are empty -- that is exactly the case where the
+# reasons are the only evidence that anything happened.
+beforeReasons="$out/$baseline.reasons.txt"
+if [ -f "$beforeReasons" ]; then
+    echo
+    if diff -q "$beforeReasons" "$reasons" > /dev/null; then
+        echo "REASONS: unchanged."
+    else
+        echo "REASONS changed (-$baseline / +$label):"
+        diff "$beforeReasons" "$reasons" | sed 's/^/  /' || true
+    fi
+fi

@@ -792,6 +792,32 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
       `ManyToManyTracking` 96 → 52.
 
+- [x] **L10.** `eng/measure.sh` diffs the failure *reasons*, not just the test names.
+      ✅ `<this commit>`
+
+      Tooling for the mistake L8 recorded: a change can fix exactly what it targeted and expose
+      the next problem in the *same* tests, leaving the name list byte-identical. Two runs were
+      read as neutral on that basis and reverted; the reasons had gone from
+      `Assert.Equal: Expected 11, Actual 6` to `Assert.True` in `VerifyRelationshipSnapshots`.
+      A tallied reason list is now written beside each snapshot and diffed against the baseline,
+      and it is printed **even when the fixed and broken lists are both empty** — which is
+      precisely the case where it is the only evidence anything happened.
+
+### The `ManyToMany` boundary — what client-side reconstruction cannot reach
+
+L7/L9 rebuild a join row from the two entities it links. That works for a join type which is
+its two foreign keys plus convention-created shadow ones, and it cannot go further:
+
+- **`*_with_payload`, `shared_with_payload`, `self_with_payload`** — the payload has a CLR
+  member and exists only in the store.
+- **`*_suspected_dangling_join` (16)** — the join rows carry `JoinOneToTwoExtraId`, pointing at
+  a `JoinOneToTwoExtra` entity. The test asserts twelve tracked entries including that one and
+  reads `extra.JoinEntities`, which is empty because the reconstructed rows leave that shadow
+  foreign key at its sentinel. Reconstruction cannot invent it.
+
+Both need the join row itself on the wire, which is a change to `docs/result-wire-format.md` and
+not a change to the materializer.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

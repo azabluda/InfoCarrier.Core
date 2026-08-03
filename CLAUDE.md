@@ -15,8 +15,14 @@ Report test results as `Passed: N, Failed: M, Total: T` from actual output — n
 or infer a count.
 
 **Measuring a change: `eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which
-wraps the whole loop). It prints the count *and* the exact list of tests fixed and broken,
-because the count alone cannot tell "fixed 4, broke 4" from "changed nothing".
+wraps the whole loop). It prints the count, the exact list of tests fixed and broken, *and* a
+diff of the failure **reasons** — three levels, because each one hides a mistake the level below
+it catches:
+
+- the count alone cannot tell "fixed 4, broke 4" from "changed nothing";
+- the fixed/broken lists alone cannot tell "changed nothing" from "fixed what it aimed at and
+  uncovered the next problem in the same tests" — both leave the name list byte-identical. That
+  one produced a wrong revert (plan L8) after two runs were read as neutral.
 
 Never state a verdict from partial output. Two specific errors have each cost a wrong revert
 here, and both are cheap to avoid:
