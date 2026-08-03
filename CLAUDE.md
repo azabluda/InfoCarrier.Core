@@ -103,8 +103,9 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad` and
-`OverzealousInitialization` are clear. The 61 are 22 query, 16 `ManyToMany*Load`, 3 `FieldMapping`,
-9 lazy loading and 9 singletons.
+`OverzealousInitialization` are clear. The 61, read out of `artifacts/measure/m28.txt`: 22
+query, 16 `ManyToMany*Load`, 9 `LazyLoadProxy`, 5 `FieldMapping`, 3 `WithConstructors`, 2
+`Load`, 2 `Update`, 1 `OptimisticConcurrency`, 1 compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is now 11 of 825 across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`. Do not read the failure count as a long tail; subtract that family
