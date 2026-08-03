@@ -1305,6 +1305,49 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       commit, rollback, savepoints, the W3 token across a stateless transport, and client disposal
       cleaning up the server side.
 
+## Phase A — adopting the remaining spec bases
+
+The compliance test reports **131** unadopted bases. That is a far larger unknown than the
+failure count, which is the argument for working it before the query long tail: every base
+adopted turns guesswork into a number. Adopted in batches, measured per batch, and a base's
+failures are left red and classified rather than worked immediately.
+
+- [x] **A1.** First batch: four bases, 213 tests. **`Total tests: 11564, Passed: 11479,
+      Failed: 56, Skipped: 29`** — 19 new failures, **none of them a regression**: every
+      previously passing test still passes. ✅ `<this commit>`
+
+      | Base | Tests | Failing |
+      |---|---|---|
+      | `FieldMappingTestBase` | 167 | 16 |
+      | `WithConstructorsTestBase` | 41 | 3 |
+      | `CompositeKeyEndToEndTestBase` | 3 | 0 |
+      | `NotificationEntitiesTestBase` | 2 | 0 |
+
+      Chosen because each aims directly at something this provider learned indirectly:
+      field-backed state (L6, L18), constructor binding and service injection (L1), multi-property
+      keys (used by every identity path but exercised almost nowhere), and a notification model —
+      the one case where nothing re-derives a change the tracker was not told about.
+
+      **`CompositeKeyEndToEnd` and `NotificationEntities` are green on adoption**, which is the
+      more useful half of the result: composite keys and change-notification tracking work, and
+      neither needed a line of provider code.
+
+      The 19 failures, classified:
+
+      | # | Symptom | Reading |
+      |---|---|---|
+      | 4 | `Assert.NotSame` — values are the same instance | A no-tracking query returning shared instances; identity resolution applied where it must not be. |
+      | 4 | `ArgumentNullException (source)` | A collection navigation left null where the test expects an empty one. |
+      | 4 | `Operation is not valid due to the current state of the object` | Unclassified. |
+      | 4 | `AmbiguousMatchException` inside `FieldMappingTestBase` | Raised by the *test base's* own reflection over hidden properties (`Include_*_hiding_props`), before it reaches the provider. Suspect ours only after establishing that. |
+      | 2 | `MissingMethodException` — cannot dynamically create an immutable record | The client builds entities through EF's materializer since L1, but something on this path still reflects a parameterless constructor. |
+      | 1 | `Assert.Single` — collection empty | `Query_with_keyless_type`: the keyless type's defining query is `ToInMemoryQuery`, which the *client* model cannot carry. Needs the `serverContextType` split the Northwind fixtures use. |
+
+      **`StoreGeneratedTestBase` was considered and not adopted**: EF's own
+      `StoreGeneratedInMemoryTest` does not derive from it — it is a standalone class — so the
+      base is relational-only in practice and adopting it would assert relational behaviour, not
+      ours.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
