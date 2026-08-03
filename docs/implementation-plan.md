@@ -1930,6 +1930,23 @@ failures are left red and classified rather than worked immediately.
       rather than kept, because half of it measures neutral and a `null` in a carrier slot is not
       worth carrying on unmeasured merit. Redo both together and measure once.
 
+- [x] **A22.** An augmenting `Include` never walks back the way it came.
+      **`Total tests: 13744, Passed: 13658, Failed: 38, Skipped: 48`** — FIXED 2, BROKEN none.
+      **`Ef6GroupByTestBase` is 110 of 110.** ✅ `<this commit>`
+
+      `Whats_new_2021_sample_7` has **no `Include` in it at all** — the one EF complained about was
+      ours. `AugmentWithNavigations` exists because a navigation the residual reads must actually
+      be on the wire (§3.6), and the residual here reads `p.Feet.Person.LastName`, so the path
+      `Feet.Person` became `Include("Feet.Person")`. `Feet.Person` is the **inverse** of
+      `Person.Feet`, and EF refuses that outright: *"The navigation 'Feet.Person' was ignored from
+      'Include' … Walking back include tree is not allowed"* — raised as an error by the spec
+      fixtures' warning configuration.
+
+      The rest of that message is the reason it is also unnecessary: *"since the fix-up will
+      automatically populate it"*. So a path is now cut at the first step that is the inverse of
+      the step before it, and a path that cuts to nothing is dropped. That asks for exactly the
+      rows the residual needs and nothing EF will reject.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

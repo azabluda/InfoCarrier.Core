@@ -801,15 +801,70 @@ public sealed class QuerySplitter
             var finder = new NavigationReadFinder(model);
             finder.Visit(expression);
 
+            var reads = new List<NavigationRead>();
+            foreach (NavigationRead read in finder._reads)
+            {
+                if (TruncateAtInverse(read) is { } kept
+                    && !reads.Any(r => r.Owner == kept.Owner && r.Path == kept.Path))
+                {
+                    reads.Add(kept);
+                }
+            }
+
             // `b.Author.Books` records both "Author.Books" and, on the way down, "Author".
             // Including a path loads every step of it, so the prefix is dead weight on the wire.
             return
             [
-                .. finder._reads.Where(read => !finder._reads.Any(
+                .. reads.Where(read => !reads.Any(
                     other => other.Owner == read.Owner
                         && other.Path.StartsWith(read.Path + ".", StringComparison.Ordinal))),
             ];
         }
+
+        /// <summary>
+        ///     Cuts a navigation path at the first step that walks straight back the way it came.
+        /// </summary>
+        /// <remarks>
+        ///     A residual reading <c>p.Feet.Person.LastName</c> describes the path
+        ///     <c>Feet.Person</c>, and <c>Feet.Person</c> is the inverse of <c>Person.Feet</c> — so
+        ///     the `Include` this becomes is one EF refuses outright: "The navigation 'Feet.Person'
+        ///     was ignored from 'Include' … Walking back include tree is not allowed", raised as an
+        ///     error by the spec fixtures. It is also unnecessary, which is what the rest of that
+        ///     message says: fixup wires the inverse as soon as the near side is loaded. Cutting
+        ///     the path at that step asks for exactly the rows that are needed and nothing EF will
+        ///     reject.
+        /// </remarks>
+        private static NavigationRead? TruncateAtInverse(NavigationRead read)
+        {
+            var kept = new List<string>();
+            IEntityType current = read.Owner;
+            INavigationBase? previous = null;
+
+            foreach (string step in read.Path.Split('.'))
+            {
+                INavigationBase? navigation = current.FindNavigation(step)
+                    ?? (INavigationBase?)current.FindSkipNavigation(step);
+
+                if (navigation is null || (previous is not null && IsInverseOf(navigation, previous)))
+                {
+                    break;
+                }
+
+                kept.Add(step);
+                previous = navigation;
+                current = navigation.TargetEntityType;
+            }
+
+            return kept.Count == 0 ? null : read with { Path = string.Join('.', kept) };
+        }
+
+        private static bool IsInverseOf(INavigationBase navigation, INavigationBase previous)
+            => navigation switch
+            {
+                INavigation reference => ReferenceEquals(reference.Inverse, previous),
+                ISkipNavigation skip => ReferenceEquals(skip.Inverse, previous),
+                _ => false,
+            };
 
         protected override Expression VisitMember(MemberExpression node)
         {
