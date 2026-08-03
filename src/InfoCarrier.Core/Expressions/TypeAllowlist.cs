@@ -82,8 +82,18 @@ public sealed class TypeAllowlist
 
     /// <summary>
     ///     Builds the allowlist for a model: every entity CLR type, every mapped property type,
-    ///     and any types the application registers explicitly.
+    ///     every type <em>declaring</em> a mapped member, and any types the application registers
+    ///     explicitly.
     /// </summary>
+    /// <remarks>
+    ///     The declaring type is not always the entity type. A mapped member may be inherited from
+    ///     a class the model does not know — <c>PrincipalEntity : NonEntityBase</c>, where
+    ///     <c>Reference</c> is declared on the base — and a member read names the type that
+    ///     declares it, so refusing that type refuses a read of a perfectly ordinary mapped
+    ///     navigation. It is not a widening of what the payload can reach either: the type is a
+    ///     base of an entity type the list already admits, and the member it is named for is one
+    ///     the model maps.
+    /// </remarks>
     /// <param name="model">The EF model, or <see langword="null" /> when none is available.</param>
     /// <param name="registeredTypes">
     ///     Projection types the application declares — DTOs a query projects into, which are not
@@ -102,6 +112,19 @@ public sealed class TypeAllowlist
                 foreach (IProperty property in entityType.GetProperties())
                 {
                     allowed.Add(property.ClrType);
+                }
+
+                foreach (IPropertyBase member in entityType.GetMembers())
+                {
+                    if (member.PropertyInfo?.DeclaringType is { } fromProperty)
+                    {
+                        allowed.Add(fromProperty);
+                    }
+
+                    if (member.FieldInfo?.DeclaringType is { } fromField)
+                    {
+                        allowed.Add(fromField);
+                    }
                 }
             }
         }

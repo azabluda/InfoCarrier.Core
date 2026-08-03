@@ -2027,6 +2027,29 @@ failures are left red and classified rather than worked immediately.
       `TrackingBehaviorFinder` and travels in the request, and `IgnoreQueryFilters` and friends
       stay in the shipped subtree where the server honours them.
 
+- [x] **A26.** A mapped member is named by the type that declares it.
+      **`Total tests: 13745, Passed: 13675, Failed: 22, Skipped: 48`** — FIXED 2, BROKEN none.
+      ✅ `<this commit>`
+
+      `Nested_include_collection_reference_on_non_entity_base` failed with `Expression of type
+      'IQueryable<ReferencedEntity>' cannot be used for parameter of type
+      'IIncludableQueryable<ReferencedEntity, IEnumerable<PrincipalEntity>>'` — the boundary cut
+      **inside** an `Include`/`ThenInclude` chain, replacing the `Include` with the deliberately
+      widened `serverN` parameter and leaving the `ThenInclude` above it in the residual, where it
+      no longer type-checks.
+
+      Not an `Include` problem. The query is
+      `Set<ReferencedEntity>().Include(e => e.Principals).ThenInclude(e => e.Reference)`, and
+      `Reference` is declared on `NonEntityBase`, which `PrincipalEntity` derives from and the
+      model does not know. `WireTypeCollector` reports a member read's **declaring** type; the
+      allowlist is built from entity CLR types and mapped property types only; so the read was not
+      server-ok, the `ThenInclude` was not shippable, and the cut fell exactly where it did. The
+      test's own name says this — *on non entity base*.
+
+      The allowlist now also admits the declaring type of every mapped member. That is not a
+      widening of reach: the type is a base of an entity type the list already admits, named only
+      for a member the model maps. Nothing else in the suite moved.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

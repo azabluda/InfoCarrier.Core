@@ -97,14 +97,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13745, Passed: 13673, Failed: 24, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13745, Passed: 13675, Failed: 22, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 24, read out of `artifacts/measure/a26.txt`: **19 query**, 1 `LazyLoadProxy`, 1
+The 22, read out of `artifacts/measure/a27.txt`: **17 query**, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report. Everything
 outside the query residual is now a single test.
 
@@ -118,10 +118,9 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **The query residual** — 19, and the largest family left. A true long tail: 11 distinct
+- **The query residual** — 17, and the largest family left. A true long tail: 10 distinct
   methods, each with its own cause (client-eval navigation reads, untranslatable subqueries,
-  Northwind GroupBy shapes, an `Include` chain the boundary cuts through). No shared root cause,
-  so it is individual work.
+  Northwind GroupBy shapes). No shared root cause, so it is individual work.
   A17 adopted a second, independent GroupBy corpus (`Ef6GroupBy`, 108 of 110) which says the
   GroupBy half of this residual is Northwind-specific.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
