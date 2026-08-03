@@ -1890,6 +1890,46 @@ failures are left red and classified rather than worked immediately.
       deliberate truncation one level down — a *member* declared `object` holding a `DbContext`,
       which `MapToNode`'s member walk must keep truncating or it stack-overflows — is untouched.
 
+- [x] **A21.** `Left_join_with_skip_navigation` (8) — **attempted, measured neutral, reverted.**
+      Suite unchanged at **`Total tests: 13744, Passed: 13656, Failed: 40, Skipped: 48`** — FIXED
+      none, BROKEN none, **reasons unchanged**. Not committed as code; this is the finding.
+      ✅ `<this commit>`
+
+      The 8 fail with `NullReferenceException` from `EnumerableSorter` inside
+      `QueryExecutor.Attaching`: the query is
+      `… from s in grouping.DefaultIfEmpty() orderby t.Key1, s.Key1, … select new { t, s }`, so
+      `s` is null for an unmatched row and the `orderby` dereferences it **client-side**. On the
+      reference provider the ordering reaches the store, where null simply sorts.
+
+      **`GroupJoinFlattener` was the obvious suspect and is only half the cause.** It declines this
+      shape by design — substituting the group-join result selector reconstructs the transparent
+      identifier *including* its grouping member, and `select new { t, s }` keeps the identifier
+      whole, so `flattened` strands `g`. The attempt taught the flattener to replace a stranded
+      grouping with `null` when nothing outside the pair reads that member (counted over the whole
+      tree against the collection selector that consumes it, which is sound because only this
+      `GroupJoin` can name that identifier type).
+
+      **It worked, and it was still not enough.** A probe on the decision (`open=True dead=True`,
+      four times) and on the split showed the shipped query change from
+
+          GroupJoin(…, (t, grouping) => ValueTuple(t, grouping))
+
+      to
+
+          LeftJoin(…, (t, s) => ValueTuple(Item1 = t, Item2 = s))
+
+      — the join now runs whole on the server. But `PASSTHROUGH=False` still, and the residual
+      still holds the `OrderBy`, still typed over the anonymous identifier
+      (`lambda_method(Closure, <>f__AnonymousType576`2)` in the stack). `ProjectionRewriter`
+      rewrote the join's client-typed result selector into a tuple and cut the boundary right
+      there; `ReCarryInternalTypes`, which exists to keep the operators *above* a carrier on the
+      server, did not carry the two nested identifiers through the `OrderBy` chain.
+
+      So the fix is two halves and only pays as one: the flattener rewrite above, **plus** a
+      re-carry that survives a nested transparent identifier so the `orderby` ships. Reverted
+      rather than kept, because half of it measures neutral and a `null` in a carrier slot is not
+      worth carrying on unmeasured merit. Redo both together and measure once.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
