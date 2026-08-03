@@ -1038,6 +1038,30 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
       This reason is now absent from the whole suite, and `ManyToManyTracking` is 23 → 16.
 
+- [x] **L19.** An entity graph is deeper than 64 JSON levels. **`Total tests: 11344,
+      Passed: 11248, Failed: 67, Skipped: 29`** — FIXED 5, BROKEN none. ✅ `<this commit>`
+
+      Five `ManyToManyTracking` tests failed with "a possible object cycle was detected … or if
+      the object depth is larger than the maximum allowed depth of 64".
+
+      **Depth, not a cycle**, despite what the message offers as the likelier of the two:
+      `SystemTextJsonInfoCarrierSerializer` has set `ReferenceHandler.Preserve` — exactly the fix
+      the message suggests — since it was written, so a repeated instance already becomes a
+      `$ref` rather than recursion. What is left is the longest path of *distinct* entities, and
+      the node model spends roughly four JSON levels on every hop between them: the value node,
+      its member list, the member, and that member's own value node. Sixty-four levels is about
+      sixteen hops, which a many-to-many exhausts.
+
+      **It was set in the wrong place first, and the error said so.** `MaxDepth = 256` on
+      `SystemTextJsonInfoCarrierSerializer` changed nothing: the count held at 16 *and* the
+      message still read "depth of 64". These nodes serialize through the source-generated
+      `ExpressionJsonContext`, and a `JsonSerializerContext` carries its own options —
+      `JsonSourceGenerationOptionsAttribute.MaxDepth` is where it belongs.
+
+      The inert setting was then removed and the suite re-measured rather than left in: the
+      transport envelope carries `byte[]` payloads and never a node graph, so it could not have
+      mattered, and 256 on it was config that did nothing. Both runs report 67.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

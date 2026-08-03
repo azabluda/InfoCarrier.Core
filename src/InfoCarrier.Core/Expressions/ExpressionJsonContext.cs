@@ -13,7 +13,24 @@ namespace InfoCarrier.Core.Expressions;
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    UseStringEnumConverter = true)]
+    UseStringEnumConverter = true,
+
+    // The node model spends roughly four JSON levels on every hop between entities — the value
+    // node, its member list, the member, and that member's own value node — so the default of
+    // 64 caps an entity graph at about sixteen hops. A many-to-many reaches that easily: five
+    // `ManyToManyTracking` tests failed with "a possible object cycle was detected … or if the
+    // object depth is larger than the maximum allowed depth of 64".
+    //
+    // Depth, not a cycle, despite what the message offers: the transport serializer already
+    // sets `ReferenceHandler.Preserve`, which is exactly the fix it suggests, so a repeated
+    // instance becomes a `$ref` rather than recursion. What is left is the longest path of
+    // *distinct* entities, which is a property of the caller's graph.
+    //
+    // It belongs here rather than on `SystemTextJsonInfoCarrierSerializer`, which is where it
+    // was tried first and did nothing: these nodes serialize through this source-generated
+    // context, and a context carries its own options. The unchanged "depth of 64" in the error
+    // is what showed the setting had not taken.
+    MaxDepth = 256)]
 [JsonSerializable(typeof(ExpressionNode))]
 [JsonSerializable(typeof(ConstantNode))]
 [JsonSerializable(typeof(ParameterNode))]
