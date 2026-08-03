@@ -88,7 +88,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11221, Failed: 94, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11226, Failed: 89, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
@@ -98,8 +98,8 @@ Lazy loading works (Phase L): it began at 505 of 505 failing and is now 27 of 82
 first.
 
 Not yet implemented, in rough priority order:
-- **The `GraphUpdates` residual** — 16 of 1787, led by a 10-test
-  `Update_root_by_collection_replacement_of_*` family. Classified in
+- **The `GraphUpdates` residual** — 10 of 1787, led by a 6-test
+  `Update_root_by_collection_replacement_of_*` remainder. Classified in
   `docs/implementation-plan.md` under S3c, which is read out of `artifacts/measure/` rather than
   tallied by hand — the table it replaced had drifted badly.
 - **Lazy loading** — 27 failures left across `Load` and `LazyLoadProxy`. Phase L in

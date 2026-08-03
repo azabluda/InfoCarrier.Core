@@ -132,17 +132,60 @@ public class InfoCarrierDatabase : IDatabase
         var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         mapper.ResetReferenceScope();
 
+        // Correlation ids are positions in *this* list, so the expansion has to be materialized
+        // once and reused when the generated values come back.
+        List<IUpdateEntry> sent = [.. Expand(entries)];
+
         var request = new Common.SaveChangesRequest
         {
-            Entries = [.. entries.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
+            Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
         };
+
 
         Common.SaveChangesResult result = await _client
             .SaveChangesAsync(request, _currentContext.Context, cancellationToken)
             .ConfigureAwait(false);
 
-        ApplyGeneratedValues(entries, result, mapper);
+        ApplyGeneratedValues(sent, result, mapper);
         return result.Count;
+    }
+
+    /// <summary>
+    ///     The entries to send: what EF asked to save, plus the <em>deleted</em> half of any row
+    ///     being replaced in place.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         When an `Added` entry and a `Deleted` one share a key — a collection replaced by
+    ///         instances carrying the keys it already held — EF pairs them through
+    ///         <see cref="IUpdateEntry.SharedIdentityEntry" /> and hands `IDatabase` only the
+    ///         `Added` half. The store is expected to notice the pair and turn it into a replace:
+    ///         EF's InMemory provider deletes `SharedIdentityEntry`'s row before creating.
+    ///     </para>
+    ///     <para>
+    ///         That pairing is change-tracker state, and none of it reaches the wire — the server
+    ///         saw a bare `Added` for a key the store already had and threw "an item with the same
+    ///         key has already been added". Sending the deleted half restores it *without* a wire
+    ///         concept for it: the server tracks `Deleted` before `Added` (its replay is ordered
+    ///         that way already), and its own state manager re-pairs them on the key.
+    ///     </para>
+    /// </remarks>
+    private static IEnumerable<IUpdateEntry> Expand(IList<IUpdateEntry> entries)
+    {
+        var seen = new HashSet<IUpdateEntry>();
+
+        foreach (IUpdateEntry entry in entries)
+        {
+            if (entry.SharedIdentityEntry is { } replaced && seen.Add(replaced))
+            {
+                yield return replaced;
+            }
+        }
+
+        foreach (IUpdateEntry entry in entries)
+        {
+            yield return entry;
+        }
     }
 
     /// <summary>
@@ -155,7 +198,7 @@ public class InfoCarrierDatabase : IDatabase
     ///     and fix up everything that referenced it.
     /// </remarks>
     private static void ApplyGeneratedValues(
-        IList<IUpdateEntry> entries,
+        List<IUpdateEntry> entries,
         Common.SaveChangesResult result,
         Expressions.DynamicValueMapper mapper)
     {

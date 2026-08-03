@@ -851,6 +851,29 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       for anything the wire format does not carry but the server must know; the test store uses
       it to copy per-request parameters onto the server context as that context is resolved.
 
+- [x] **L13.** A row replaced in place travels with the row it replaces. **`Total tests: 11344,
+      Passed: 11226, Failed: 89, Skipped: 29`** — FIXED 5, BROKEN none. ✅ `<this commit>`
+
+      `Update_root_by_collection_replacement_of_*` failed with "an item with the same key has
+      already been added" from `InMemoryTable.Create`. The tests replace a root's collection with
+      instances carrying the keys it already held, so an `Added` entry and a `Deleted` one share
+      a key.
+
+      EF pairs those through `IUpdateEntry.SharedIdentityEntry` and hands `IDatabase` **only the
+      `Added` half** — confirmed by probe: the client's tracker held eight entries including
+      `FirstLaw:Deleted[11]`, and `SaveChanges` was given four, all `Added`. The store is
+      expected to notice the pair and replace rather than insert; EF's InMemory provider deletes
+      `SharedIdentityEntry`'s row first (`InMemoryStore.ExecuteTransaction`).
+
+      None of that pairing reaches the wire, so the server saw a bare `Added` for a key the store
+      already had. The deleted half is now sent alongside, which restores the behaviour with **no
+      new wire concept**: the server already replays `Deleted` before `Added` (S3c-6), and its own
+      state manager re-pairs them on the key.
+
+      Correlation ids index the sent list, so the expansion is materialized once and the same
+      list is used to apply the generated values back — indexing the original would have written
+      each store-generated key onto the wrong entry.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
