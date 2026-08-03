@@ -263,6 +263,18 @@ public class ServerQueryExecutor
         // of the join type for the ones whose foreign key points at this entity: there is no
         // navigation from a principal to its join rows to read instead — `EntityOne` declares
         // only `TwoSkip` — and EF materialized them to build that collection, so they are here.
+        // The entity a join row points at through <paramref name="inverse" /> — the other end of
+        // the many-to-many — or null if it is not tracked here.
+        object? FarSide(IUpdateEntry joinRow, ISkipNavigation inverse)
+        {
+            IForeignKey foreignKey = inverse.ForeignKey;
+            object?[] keyValues = [.. foreignKey.Properties.Select(joinRow.GetCurrentValue)];
+
+            return Array.Exists(keyValues, v => v is null)
+                ? null
+                : stateManager.TryGetEntry(foreignKey.PrincipalKey, keyValues)?.Entity;
+        }
+
         IEnumerable<object> ReadJoinEntities(object entity, ISkipNavigation skip)
         {
             if (stateManager.TryGetEntry(entity) is not { } ownerEntry)
@@ -290,10 +302,29 @@ public class ServerQueryExecutor
                     }
                 }
 
-                if (matches)
+                if (!matches)
                 {
-                    yield return candidate.ToEntityEntry().Entity;
+                    continue;
                 }
+
+                // Both ends of a many-to-many name the same join rows, and exactly one of them
+                // should send each. The side whose navigation EF actually *loaded* owns them: it
+                // sends the whole set in one run, which is the order the client then rebuilds the
+                // navigation in. Letting the other end send them too interleaved them one per
+                // entity, and a `List`-backed navigation came out in a different order — the 18
+                // tests A6 broke, all `Load_collection_using_Query_already_loaded*`.
+                //
+                // When *neither* side is loaded — which is the case A6 exists for, an explicit
+                // load whose include EF deliberately leaves unloaded — this yields, and the join
+                // rows travel from here.
+                if (skip.Inverse is { } inverse
+                    && FarSide(candidate, inverse) is { } far
+                    && IsLoaded(far, inverse))
+                {
+                    continue;
+                }
+
+                yield return candidate.ToEntityEntry().Entity;
             }
         }
 

@@ -1475,8 +1475,43 @@ failures are left red and classified rather than worked immediately.
       does not see it.
 
       Kept rather than reverted: 194 fixed against 18, the 18 are one narrower defect in one model
-      shape, and reverting would restore a gap that made explicit skip loading useless. Recorded
-      as the next thing to look at in this family, not as acceptable.
+      shape, and reverting would restore a gap that made explicit skip loading useless. Fixed in
+      A7.
+
+- [x] **A7.** One side owns a join row: whichever loaded the navigation.
+      **`Total tests: 12878, Passed: 12753, Failed: 96, Skipped: 29`** — FIXED 18, BROKEN 2.
+      ✅ `<this commit>`
+
+      A6's 18, diagnosed by capturing the *same* test's payload with and without A6's line:
+
+          pre-A6   EntityOne[3] TwoSkip:nav TwoSkip:JOIN
+                   EntityTwo[19] · EntityTwo[1] · … · JoinOneToTwo[3,1] · JoinOneToTwo[3,4] · …
+          post-A6  EntityOne[3] TwoSkip:nav TwoSkip:JOIN
+                   EntityTwo[19] OneSkip:JOIN · JoinOneToTwo[3,19] · EntityTwo[1] OneSkip:JOIN · …
+
+      Both ends of a many-to-many name the same join rows. Before A6 they arrived as **one batch**
+      from the loaded side, and that batch order is the order the client rebuilds the navigation
+      in. A6 let the other end send them too, so they arrived **interleaved, one per entity** —
+      `JoinOneToTwo[3,19]` first instead of in set order — and a `List`-backed navigation came out
+      reordered. The count was never wrong; only the order was, which is why only
+      `ManyToManyFieldsLoad` saw it.
+
+      So exactly one side sends each join row, and the owner is **whichever side EF actually
+      loaded the navigation on**: it sends the whole set in one run. When neither side is loaded —
+      the case A6 exists for — the near side sends them, which is what makes explicit loading work.
+      Implemented server-side in `ReadJoinEntities`, where the far side's entity and its loaded
+      state are both reachable.
+
+      **A first attempt was wrong and measured inert.** Deduplicating against the mapper's
+      `_toIds` assumed the loaded side is serialized first; the probe showed the opposite — in the
+      query that matters the `EntityTwo` rows precede `EntityOne[3]`. Reverted rather than kept as
+      a no-op.
+
+      **2 broken**, both `Load_collection_using_Query_with_Include_for_same_collection`
+      (`Expected: 7, Actual: 4`): the query includes the far side, so the far side counts as
+      loaded and declines to send — but not every far-side row reaches the client, so some join
+      rows are now sent by nobody. Narrower than what it replaces, and left red rather than
+      papered over.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
