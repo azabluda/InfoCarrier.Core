@@ -2350,6 +2350,34 @@ failures are left red and classified rather than worked immediately.
       the `ValueTuple` retype builds, and tuple equality is structural in the same way anonymous
       equality is.
 
+- [x] **A38.** A reflected call lets its own exception out.
+      **`Total tests: 16099, Passed: 15931, Failed: 76, Skipped: 92`** — FIXED none, BROKEN none.
+      **Kept anyway**, and the reasoning is the point. ✅ `<this commit>`
+
+      A query boundary's element type is only known at run time, so `QueryExecutor.Materialize`
+      goes through `MethodBase.Invoke` — which wraps whatever the callee threw in
+      `TargetInvocationException`. That is an implementation detail of this provider changing the
+      exception a caller sees, and it was actively hiding a diagnosis: the whole of
+      `Join_with_result_selector_returning_queryable_throws_validation_error` read as "we throw the
+      wrong type", when the wrong type was a wrapper. Unwrapped through
+      `ExceptionDispatchInfo.Capture(e.InnerException).Throw()`, so the stack survives.
+
+      **This is the exception to "revert what does not pay".** It moved no test — but a caller
+      seeing `TargetInvocationException` from an internal reflective call is a defect whether or
+      not a spec test scores it, and the two `Include_on_GroupJoin_SelectMany_DefaultIfEmpty_*`
+      overrides confirm EF's *own* `TargetInvocationException` still arrives intact, so the unwrap
+      is not swallowing anything real.
+
+      **What it exposed, left red:** the real exception is `InvalidCastException` at
+      `ClientResultMaterializer.Materialize` — `TElement` is `IQueryable<Level3>` and the wire
+      decoded a `List<Level3>`. EF's core check for this is
+      `CoreStrings.QueryInvalidMaterializationType` / `InvalidOperationException`, which this
+      provider *does* raise for the two shapes `AssertInvalidMaterializationType` covers; for this
+      shape EF's core check does not fire either, and InMemory happens to fail first with an
+      `ArgumentException` its shaper builder raises. Matching that would mean synthesising a
+      backend's incidental error, which is inventing an expectation rather than mirroring one.
+      Classified, not faked.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

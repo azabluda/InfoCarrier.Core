@@ -210,17 +210,40 @@ internal sealed class QueryExecutor<TElement>
     {
         ClientResultMaterializer materializer = _materializer;
 
-        object rows = MaterializeMethod
-            .MakeGenericMethod(serverQuery.ElementType)
-            .Invoke(materializer, [result])!;
-        object list = ToListMethod.MakeGenericMethod(serverQuery.ElementType).Invoke(null, [rows])!;
+        object rows = Invoke(MaterializeMethod.MakeGenericMethod(serverQuery.ElementType), materializer, [result])!;
+        object list = Invoke(ToListMethod.MakeGenericMethod(serverQuery.ElementType), null, [rows])!;
 
         if (serverQuery.ReturnsSingleResult)
         {
             return ((System.Collections.IEnumerable)list).Cast<object?>().FirstOrDefault();
         }
 
-        return AsQueryableMethod.MakeGenericMethod(serverQuery.ElementType).Invoke(null, [list])!;
+        return Invoke(AsQueryableMethod.MakeGenericMethod(serverQuery.ElementType), null, [list])!;
+    }
+
+    /// <summary>
+    ///     Calls a reflected method and lets what it threw out, rather than
+    ///     <see cref="System.Reflection.TargetInvocationException" />.
+    /// </summary>
+    /// <remarks>
+    ///     The element type of a query boundary is only known at run time, so materialization goes
+    ///     through <see cref="System.Reflection.MethodBase.Invoke(object, object[])" /> — an
+    ///     implementation detail of this provider, which has no business changing the exception a
+    ///     caller sees. `Join_with_result_selector_returning_queryable_throws_validation_error`
+    ///     asserts the <see cref="ArgumentException" /> EF raises for a projection returning
+    ///     <see cref="IQueryable{T}" /> and got the wrapper instead.
+    /// </remarks>
+    private static object? Invoke(System.Reflection.MethodInfo method, object? target, object?[] arguments)
+    {
+        try
+        {
+            return method.Invoke(target, arguments);
+        }
+        catch (System.Reflection.TargetInvocationException e) when (e.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.InnerException).Throw();
+            throw;
+        }
     }
 
     private IEnumerable<TElement> ApplyResidual(IReadOnlyList<object?> results, bool singleResult)
