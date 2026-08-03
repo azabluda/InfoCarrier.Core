@@ -561,6 +561,70 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       unrelated "shadow-state round trip" family and which were the same bug seen from the other
       end.
 
+## Phase L — lazy loading
+
+- [x] **L1.** Entities are built by EF's materializer, so they have an `ILazyLoader`.
+      **`Total tests: 11024, Passed: 10406, Failed: 589, Skipped: 29`** — FIXED 347, BROKEN 251,
+      of which 250 are other parameterizations of the `Lazy_load_*` family that was entirely red
+      before. ✅ `<this commit>`
+
+      `ClientResultMaterializer` built every entity with
+      `Activator.CreateInstance(entityType.ClrType, nonPublic: true)`, which bypasses EF's entity
+      materializer — so constructor binding and service-property injection never ran and **every
+      service property on every entity was null**. A probe over the `Load` model, before any
+      change:
+
+          Parent                             count=1 Loader:ILazyLoader=NULL
+          ParentFullLoaderByConstructor      count=1 _loader:ILazyLoader=NULL
+          ParentDelegateLoaderByProperty     count=1 LazyLoader:Action`2=NULL
+
+      With no loader, `parent.Children` returns null and nothing ever loads. That is why *zero*
+      lazy tests passed rather than some fraction.
+
+      Both paths now go through the materializer, differently and deliberately:
+
+      - **Tracked**: `IStateManager.CreateEntry(values, entityType)`, which is
+        `entityType.GetOrCreateMaterializer(...)` plus an entry. This is what v1 did; see
+        `InfoCarrierQueryResultMapper.TryMapEntity`.
+      - **Untracked**: the materializer *without* an entry, reproducing EF's own no-tracking
+        path. Using `CreateEntry` here instead was measured and is wrong: it registers the entry
+        in the state manager's reference map, and a second untracked instance then collided with
+        the first the moment anything attached one — 109 identity conflicts.
+
+      **One further fix was needed and it was not obvious.** Assigning a navigation on a tracked
+      entity wakes EF's `NavigationFixer`, which attaches the whole graph reachable from what was
+      assigned; hand it a second instance of an already-tracked row and it throws. That path had
+      never been reachable, because lazy loading had never worked. `ResolveAgainstTracker` now
+      swaps a freshly materialized navigation target for the tracked instance with the same key.
+      That single change took the suite from 720 to 589.
+
+      **The measurement sequence, because the count was misleading at every step but the last:**
+
+      | Attempt | Failed | What it showed |
+      |---|---|---|
+      | tracked path only | 1040 | Worse than baseline — but lazy loading was now *attempting* to load, which it never had |
+      | + untracked via `CreateEntry` | 736 | Better, and revealed the identity-map collision |
+      | + untracked without an entry | 720 | Collision from untracked entries gone |
+      | + `ResolveAgainstTracker` | 589 | Below the 685 baseline |
+
+      Judged on the count alone, the first attempt would have been reverted and the whole line of
+      work abandoned.
+
+      **Residual: 424 `Lazy_load_*` still fail** (from 505), and there is exactly **one genuine
+      regression outside the family** — `OptimisticConcurrencyInfoCarrierTest.Attempting_to_add_
+      same_relationship_twice_for_many_to_many_results_in_independent_association_exception`.
+      Non-lazy `Load` failures are unchanged at 2. `PropertyValues` went 16 → 0, which was not a
+      goal: those tests read current, original and store values through a property dictionary,
+      and an entry built by EF's materializer simply has them.
+
+      **The largest identified piece of the residual: 80 failures of the form "Object of type
+      `Parent` cannot be converted to type `SinglePkToPk`".** `Parent` and `SinglePkToPk` are a
+      PK-to-PK one-to-one and *share key value 707*, and a navigation resolves to the wrong one
+      of them. Two candidate causes were measured and neither is it — reading node-valued
+      properties before the wire id is registered (neutral), and a type guard on
+      `ResolveAgainstTracker` (never fires). It is upstream of both, in how the mapper resolves a
+      node id to an already-materialized instance. Start there.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
