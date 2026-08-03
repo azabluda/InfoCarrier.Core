@@ -459,6 +459,38 @@ internal static class TransparentIdentifierRewriter
                 return;
             }
 
+            // A DTO written as an object initializer is the same thing spelled differently:
+            // `new Level1Dto { Id = l1.Id, Level2 = cond ? null : new Level2Dto { … } }` creates a
+            // type inside the query and never lets it reach the result, which is the whole test.
+            // It arrives as a `MemberInitExpression`, and handling only `NewExpression` left the
+            // anonymous-type sibling of this test passing (A40) and the DTO one on the client.
+            if (node is MemberInitExpression { NewExpression.Arguments.Count: 0 } initializer
+                && initializer.Bindings.Count > 0
+                && !allowlist.IsAllowed(initializer.Type)
+                && initializer.Bindings.All(b => b.BindingType == MemberBindingType.Assignment))
+            {
+                MemberAssignment[] assignments = [.. initializer.Bindings.Cast<MemberAssignment>()];
+
+                if (assignments.Any(a => IsSequence(a.Expression.Type) && !IsNull(a.Expression)))
+                {
+                    _disqualified.Add(initializer.Type);
+                    return;
+                }
+
+                _candidates[initializer.Type] = [.. assignments.Select(a => a.Member)];
+                if (parent is not null)
+                {
+                    _nestedIn[initializer.Type] = parent;
+                }
+
+                foreach (MemberAssignment assignment in assignments)
+                {
+                    Register(assignment.Expression, initializer.Type);
+                }
+
+                return;
+            }
+
             if (node is not NewExpression { Members: { } members } construction
                 || members.Count == 0
                 || allowlist.IsAllowed(construction.Type))
@@ -575,7 +607,7 @@ internal static class TransparentIdentifierRewriter
                 arguments[i] = carriers.ContainsKey(memberType) ? Rebuild(slot, memberType) : slot;
             }
 
-            Expression rebuilt = Expression.New(carrier.GetConstructors()[0], arguments, members);
+            Expression rebuilt = Construct(carrier, members, arguments);
 
             return tuple.Type.IsValueType
                 ? rebuilt
@@ -585,11 +617,55 @@ internal static class TransparentIdentifierRewriter
                     rebuilt);
         }
 
+        /// <summary>
+        ///     Rebuilds a carrier from its slots, the way the query built it.
+        /// </summary>
+        /// <remarks>
+        ///     An anonymous type has no parameterless constructor and is built by the constructor
+        ///     that takes every member; a DTO written as an object initializer has one and is built
+        ///     by assignment. The absence of a parameterless constructor is the discriminator,
+        ///     because a <c>NewExpression.Members</c> is only ever populated for the former.
+        /// </remarks>
+        private static Expression Construct(Type carrier, MemberInfo[] members, Expression[] arguments)
+            => carrier.GetConstructor(Type.EmptyTypes) is { } parameterless
+                ? Expression.MemberInit(
+                    Expression.New(parameterless),
+                    [.. members.Select((m, i) => (MemberBinding)Expression.Bind(m, arguments[i]))])
+                : Expression.New(carrier.GetConstructors()[0], arguments, members);
+
         protected override Expression VisitNew(NewExpression node)
             => carriers.ContainsKey(node.Type)
                 ? TupleCarrier.New(
                     [.. node.Arguments.Select(a => Visit(a))], referenceTyped.Contains(node.Type))
                 : base.VisitNew(node);
+
+        protected override Expression VisitMemberInit(MemberInitExpression node)
+        {
+            if (!carriers.TryGetValue(node.Type, out MemberInfo[]? members))
+            {
+                return base.VisitMemberInit(node);
+            }
+
+            // Slot order is the order recorded in `carriers`, not this initializer's binding
+            // order: two sites can initialize the same DTO's members in different orders, and a
+            // tuple whose slots disagree would be a wrong answer rather than a refused rewrite.
+            Dictionary<string, Expression> bound = node.Bindings
+                .Cast<MemberAssignment>()
+                .ToDictionary(b => b.Member.Name, b => b.Expression);
+
+            var arguments = new Expression[members.Length];
+            for (int i = 0; i < members.Length; i++)
+            {
+                arguments[i] = bound.TryGetValue(members[i].Name, out Expression? value)
+                    ? Visit(value)
+                    // Caught by `Rewrite`, which keeps the original tree. A carrier initialized
+                    // with a different member set at two sites is not one this pass can retype.
+                    : throw new InvalidOperationException(
+                        $"'{node.Type}' is initialized without '{members[i].Name}' here.");
+            }
+
+            return TupleCarrier.New(arguments, referenceTyped.Contains(node.Type));
+        }
 
         protected override Expression VisitConstant(ConstantExpression node)
         {

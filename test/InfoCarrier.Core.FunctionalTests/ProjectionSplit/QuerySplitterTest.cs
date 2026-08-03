@@ -356,17 +356,36 @@ public class QuerySplitterTest : IDisposable
     [Fact]
     public void A_join_key_the_client_cannot_compare_is_a_translation_failure()
     {
-        // `BookSummary` is a client-only type with no `Equals`, so the join lands on the client
-        // and compares keys by reference — every row fails to match and the query answers
-        // nothing. An empty result that looks like data is worse than a refusal.
+        // `ClientRow` is a client-only type with no `Equals`, built by a *constructor* — which is
+        // the shape the carrier re-carry deliberately leaves alone (ADR-011), so the join really
+        // does land on the client and compare keys by reference. Every row fails to match and the
+        // query answers nothing; an empty result that looks like data is worse than a refusal.
         var query = _context.Authors.Join(
             _context.Books,
-            a => new BookSummary { Title = a.Name },
-            b => new BookSummary { Title = b.Title },
+            a => new ClientRow(a.Name, a),
+            b => new ClientRow(b.Title, b.Author),
             (a, b) => a.Name);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
         Assert.Contains("could not be translated", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_dto_join_key_is_re_carried_and_ships()
+    {
+        // This query used to be the case above: a `BookSummary` key has no `Equals` either, so
+        // the guard refused it. A43 made an object initializer a carrier like any other, so the
+        // key becomes a tuple, the join ships, and the server compares it structurally — which is
+        // what the query said. The guard is not weaker; the situation it guards against no longer
+        // arises here, and the test above holds the shape where it still does.
+        SplitQuery split = Split(
+            _context.Authors.Join(
+                _context.Books,
+                a => new BookSummary { Title = a.Name },
+                b => new BookSummary { Title = b.Author!.Name },
+                (a, b) => b.Title));
+
+        Assert.Equal(["Emma"], (IEnumerable<string?>)Run(split)!);
     }
 
     [Fact]

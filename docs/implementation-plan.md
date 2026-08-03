@@ -2498,6 +2498,35 @@ failures are left red and classified rather than worked immediately.
       anonymous-type sibling passes since A40, and `Register` handles only `NewExpression`) and
       `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method`.
 
+- [x] **A43.** An object initializer is a carrier like any other.
+      **`Total tests: 16100, Passed: 15976, Failed: 32, Skipped: 92`** — FIXED 4, BROKEN none.
+      ✅ `<this commit>`
+
+      `new Level1Dto { Id = l1.Id, Level2 = cond ? null : new Level2Dto { … } }` creates a type
+      inside the query and never lets it reach the result — the whole structural test this pass
+      applies — but it arrives as a `MemberInitExpression`, and `Register` handled only
+      `NewExpression`. That is why `Member_over_null_check_ternary_and_nested_anonymous_type`
+      passed from A40 and its `_dto_type` sibling did not. It also closed
+      `Select_GroupBy_SelectMany`, one of the four A28 had classified as unreachable.
+
+      Slot order comes from the recorded member list, not from each initializer's binding order:
+      two sites can initialize the same DTO's members in different orders, and a tuple whose slots
+      disagree would be a **wrong answer** rather than a refused rewrite. A site missing a member
+      throws into `Rewrite`'s catch, which keeps the original tree.
+
+      The rebuild has to construct what the query constructed: an anonymous type through the
+      constructor that takes every member, a DTO through a parameterless constructor and
+      assignments. The absence of a parameterless constructor is the discriminator, because
+      `NewExpression.Members` is only ever populated for the former.
+
+      **One of our own unit tests changed meaning, and was rewritten rather than deleted (A23).**
+      `A_join_key_the_client_cannot_compare_is_a_translation_failure` used a `BookSummary` object
+      initializer as a join key; that key is now a tuple, the join ships, and the server compares
+      it structurally — which is what the query said. The guard is not weaker, so the test keeps
+      its name and its assertion and moves to `ClientRow`, a **constructor**-built carrier the
+      re-carry deliberately leaves alone, where the client really does compare by reference. A new
+      `A_dto_join_key_is_re_carried_and_ships` asserts the new behaviour on the old query.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

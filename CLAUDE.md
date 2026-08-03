@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 16099, Passed: 15971, Failed: 36, Skipped: 92`** (2026-08-03) across the
+**`Total tests: 16100, Passed: 15976, Failed: 32, Skipped: 92`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -108,9 +108,9 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 36, read out of `artifacts/measure/a42.txt`: **26** of them are the three query bases A33
+The 32, read out of `artifacts/measure/a43b.txt`: **24** of them are the three query bases A33
 adopted, classified by cause in `docs/implementation-plan.md` (A33's table, less what A34
-and A36–A42 closed); the other 10 are 4 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`,
+and A36–A43 closed); the other 8 are 2 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`,
 1 `Update`, 1 `OptimisticConcurrency` and the compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
@@ -124,11 +124,12 @@ Not yet implemented, in rough priority order:
   name-keyed and complex leaves collide (`Culture.Species` and `Milk.Species` are both
   `"Species"`) — so both sides set it through its CLR member instead. The
   `Query.Associations.ComplexProperties` family is now adoptable and is not adopted.
-- **The query residual** — 4, and **none of them is a gap**. A40 closed
+- **The query residual** — 2, and **neither is a gap**. A40 closed
   `SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
-  that milestone M2-B existed for. The 4 left are spec tests asserting a limitation this provider
-  does not have — they run and return the right answer, and the query bodies are `private` to the
-  spec base, so the assertion cannot be inverted from a derived class.
+  that milestone M2-B existed for, and A43 closed `Select_GroupBy_SelectMany`. The 2 left are spec
+  tests asserting a limitation this provider does not have — they run and return the right answer,
+  and the query bodies are `private` to the spec base, so the assertion cannot be inverted from a
+  derived class.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
