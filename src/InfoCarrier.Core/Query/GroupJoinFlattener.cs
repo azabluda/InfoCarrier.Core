@@ -43,14 +43,25 @@ namespace InfoCarrier.Core.Query;
 ///         <c>variable 'g' … referenced from scope ''</c>. Where the tail of EF's pipeline is what
 ///         made the output legal, the honest move is to leave the tree alone.
 ///     </para>
+///     <para>
+///         <b>Unless the stranded member is dead.</b> <c>… into g from o in g.DefaultIfEmpty()
+///         select new { t, o }</c> keeps the identifier whole, so the reconstruction names
+///         <c>g</c> while binding nothing to it — but <c>g</c> is read exactly once in the whole
+///         query, by the collection selector this rewrite consumes. A member nobody reads can
+///         hold <see langword="null" />, and then the join flattens after all. The count is taken
+///         over the whole tree rather than the pair, which is sound because the identifier is an
+///         anonymous type only this <c>GroupJoin</c> can construct.
+///     </para>
 /// </remarks>
 internal sealed class GroupJoinFlattener : ExpressionVisitor
 {
+    private Expression _root = Expression.Empty();
+
     /// <summary>
     ///     Flattens every <c>GroupJoin</c> + <c>SelectMany</c> pair in a captured query.
     /// </summary>
     internal static Expression Flatten(Expression query)
-        => new GroupJoinFlattener().Visit(query);
+        => new GroupJoinFlattener { _root = query }.Visit(query);
 
     /// <inheritdoc />
     protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -120,7 +131,21 @@ internal sealed class GroupJoinFlattener : ExpressionVisitor
 
         if (IsOpen(flattened))
         {
-            return node;
+            if (!IsDeadEverywhereElse(groupJoinResultSelector, grouping))
+            {
+                return node;
+            }
+
+            flattened = Expression.Lambda(
+                ReplacingExpressionVisitor.Replace(
+                    grouping, Expression.Constant(null, grouping.Type), resultBody),
+                groupJoinResultSelector.Parameters[0],
+                resultSelector.Parameters[1]);
+
+            if (IsOpen(flattened))
+            {
+                return node;
+            }
         }
 
         genericArguments[^1] = flattened.ReturnType;
@@ -129,6 +154,30 @@ internal sealed class GroupJoinFlattener : ExpressionVisitor
             .MakeGenericMethod(genericArguments);
 
         return Expression.Call(join, outer, inner, outerKeySelector, innerKeySelector, flattened);
+    }
+
+    /// <summary>
+    ///     Whether the transparent identifier's grouping member is read nowhere but the collection
+    ///     selector this rewrite is about to consume.
+    /// </summary>
+    private bool IsDeadEverywhereElse(LambdaExpression groupJoinResultSelector, ParameterExpression grouping)
+    {
+        if (groupJoinResultSelector.Body is not NewExpression { Members: { } members } identifier)
+        {
+            return false;
+        }
+
+        int slot = identifier.Arguments.IndexOf(grouping);
+        if (slot < 0 || slot >= members.Count)
+        {
+            // The grouping is not held by a member at all, so there is no member to call dead.
+            return false;
+        }
+
+        var counter = new MemberReadCounter(identifier.Type, members[slot].Name);
+        counter.Visit(_root);
+
+        return counter.Count == 1;
     }
 
     private static bool IsQueryOperator(MethodInfo method)
@@ -296,6 +345,24 @@ internal sealed class GroupJoinFlattener : ExpressionVisitor
 
             _correlated = true;
             return base.VisitParameter(node);
+        }
+    }
+
+    /// <summary>
+    ///     Counts reads of one member of one type across a whole tree.
+    /// </summary>
+    private sealed class MemberReadCounter(Type declaring, string name) : ExpressionVisitor
+    {
+        public int Count { get; private set; }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            if (node.Member.DeclaringType == declaring && node.Member.Name == name)
+            {
+                Count++;
+            }
+
+            return base.VisitMember(node);
         }
     }
 

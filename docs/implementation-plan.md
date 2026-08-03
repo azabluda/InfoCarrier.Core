@@ -1973,6 +1973,35 @@ failures are left red and classified rather than worked immediately.
       as this file's own preamble argues for — and the rejection moved to a small second model
       with two collections of the same type.
 
+- [x] **A24.** A dead grouping is nulled, and a nested transparent identifier is re-carried.
+      **`Total tests: 13745, Passed: 13669, Failed: 28, Skipped: 48`** — FIXED 4, BROKEN none.
+      ✅ `<this commit>`
+
+      A21's two halves, done together, as it said they had to be. Half one is A21's rewrite
+      unchanged in substance: when substituting the group-join result selector strands the
+      grouping parameter, and that member is read **exactly once in the whole query** — by the
+      collection selector this rewrite is about to consume — it is replaced with `null` and the
+      pair flattens into a `LeftJoin`. Counting over the whole tree is sound because the
+      identifier is an anonymous type only this one `GroupJoin` can construct.
+
+      Half two is what A21 was missing, and it is one line of principle in `CarrierFinder`:
+      **a transparent identifier can hold another one**. `from … join … into g from … select`
+      produces `new { new { t, g }, s }`, and the inner construction is not the body of any result
+      selector, so registering only the outermost left an anonymous type sitting inside the tuple
+      — the whole chain still client-typed, which is exactly the "PASSTHROUGH=False, the `OrderBy`
+      is still in the residual" A21 measured. Carriers are now registered recursively, and the
+      sequence-slot guard makes an exception for a **literal null**, which asks SQL to navigate out
+      of nothing and is precisely what half one leaves behind.
+
+      A nested carrier may only be retyped together with its parent — half a rewrite hands
+      `Expression.New` a tuple where the constructor declares the original type, which throws and
+      discards the pass for a query that was doing nothing wrong. So removal cascades: whatever
+      drops a parent drops its children, to a fixed point.
+
+      **The four `ManyToManyNoTracking` parameterizations still fail**, with the same
+      `NullReferenceException`. Same query, same split; the difference is on the reading side, so
+      it is a separate defect and is A25.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

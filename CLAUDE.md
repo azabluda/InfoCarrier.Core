@@ -97,14 +97,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13745, Passed: 13665, Failed: 32, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13745, Passed: 13669, Failed: 28, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 32, read out of `artifacts/measure/a24.txt`: **27 query**, 1 `LazyLoadProxy`, 1
+The 28, read out of `artifacts/measure/a25.txt`: **23 query**, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report. Everything
 outside the query residual is now a single test.
 
@@ -118,10 +118,10 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **The query residual** — 27, and the largest family left. A true long tail: 14 distinct
+- **The query residual** — 23, and the largest family left. A true long tail: 12 distinct
   methods, each with its own cause (client-eval navigation reads, untranslatable subqueries,
-  Northwind GroupBy shapes, and — from A16 — an `OrderBy` the splitter leaves on the client where
-  a `DefaultIfEmpty` null then dereferences). No shared root cause, so it is individual work.
+  Northwind GroupBy shapes, and — from A24 — a `Left_join_with_skip_navigation` that now passes
+  tracked and still fails no-tracking). No shared root cause, so it is individual work.
   A17 adopted a second, independent GroupBy corpus (`Ef6GroupBy`, 108 of 110) which says the
   GroupBy half of this residual is Northwind-specific.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of

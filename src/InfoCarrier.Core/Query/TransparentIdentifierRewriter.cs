@@ -130,6 +130,18 @@ internal static class TransparentIdentifierRewriter
         private readonly HashSet<Type> _disqualified = [];
         private readonly HashSet<Type> _nullCompared = [];
 
+        /// <summary>
+        ///     Carriers found inside another carrier's construction, and the carrier they sit in.
+        /// </summary>
+        /// <remarks>
+        ///     A nested carrier may only be retyped together with the one holding it. Rewriting the
+        ///     inner half alone hands <see cref="Expression.New(ConstructorInfo, IEnumerable{Expression}, IEnumerable{MemberInfo})" />
+        ///     a tuple where the outer constructor declares the original type, which throws — and
+        ///     the catch in <see cref="Rewrite" /> would then discard the whole pass for a query
+        ///     that was doing nothing wrong. So whatever removes a parent removes its children.
+        /// </remarks>
+        private readonly Dictionary<Type, Type> _nestedIn = [];
+
         public static Dictionary<Type, MemberInfo[]> Find(
             Expression query,
             TypeAllowlist allowlist,
@@ -155,6 +167,21 @@ internal static class TransparentIdentifierRewriter
             foreach (Type type in reachable.Concat(finder._disqualified))
             {
                 finder._candidates.Remove(type);
+            }
+
+            // A carrier whose enclosing carrier is gone has to go with it — and so does anything
+            // nested inside *that*, hence the fixed point rather than one pass.
+            bool removed = true;
+            while (removed)
+            {
+                removed = false;
+                foreach ((Type child, Type parent) in finder._nestedIn)
+                {
+                    if (!finder._candidates.ContainsKey(parent) && finder._candidates.Remove(child))
+                    {
+                        removed = true;
+                    }
+                }
             }
 
             return finder._candidates;
@@ -289,26 +316,56 @@ internal static class TransparentIdentifierRewriter
                 Disqualify(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
             }
 
-            if (ProjectionRewriter.IsResultSelectorOperator(node, out LambdaExpression? selector)
-                && selector!.Body is NewExpression { Members: { } members } construction
-                && members.Count > 0
-                && !allowlist.IsAllowed(construction.Type))
+            if (ProjectionRewriter.IsResultSelectorOperator(node, out LambdaExpression? selector))
             {
-                if (construction.Arguments.Any(a => IsSequence(a.Type)))
-                {
-                    // The guard the reassembly deferral violated. A slot holding a sequence asks
-                    // SQL to navigate out of a projected tuple back into a correlated collection
-                    // -- `t.Item2.DefaultIfEmpty()` -- and 107 translation failures followed
-                    // (spec §4).
-                    _disqualified.Add(construction.Type);
-                }
-                else
-                {
-                    _candidates[construction.Type] = [.. members];
-                }
+                Register(selector!.Body, parent: null);
             }
 
             return base.VisitMethodCall(node);
+        }
+
+        /// <summary>
+        ///     Records <paramref name="node" /> as a carrier if it is one, then does the same for
+        ///     the carriers it holds.
+        /// </summary>
+        /// <remarks>
+        ///     The nesting matters because the C# compiler builds one transparent identifier out of
+        ///     another — <c>from … join … into g from … select</c> produces
+        ///     <c>new { new { t, g }, s }</c> — and the inner one is not the body of any result
+        ///     selector, so registering only the outermost construction left an anonymous type
+        ///     inside the tuple and the whole chain on the client anyway.
+        /// </remarks>
+        private void Register(Expression node, Type? parent)
+        {
+            if (node is not NewExpression { Members: { } members } construction
+                || members.Count == 0
+                || allowlist.IsAllowed(construction.Type))
+            {
+                return;
+            }
+
+            // The guard the reassembly deferral violated. A slot holding a sequence asks SQL to
+            // navigate out of a projected tuple back into a correlated collection --
+            // `t.Item2.DefaultIfEmpty()` -- and 107 translation failures followed (spec §4). A
+            // slot holding a *literal null* asks for none of that: it is what the group-join
+            // flattener leaves behind for a grouping nothing reads, and refusing it there costs
+            // the whole flattening.
+            if (construction.Arguments.Any(a => IsSequence(a.Type) && !IsNull(a)))
+            {
+                _disqualified.Add(construction.Type);
+                return;
+            }
+
+            _candidates[construction.Type] = [.. members];
+            if (parent is not null)
+            {
+                _nestedIn[construction.Type] = parent;
+            }
+
+            foreach (Expression argument in construction.Arguments)
+            {
+                Register(argument, construction.Type);
+            }
         }
     }
 
