@@ -2224,7 +2224,7 @@ failures are left red and classified rather than worked immediately.
       | Count | Reason | Reading |
       |---:|---|---|
       | 30 | `SocketException : The attempted operation is not supported for the type of object referenced` | **The `IPAddress.ScopeId` signature.** A19 named this exactly: a value with a converter reached the mapper's *reflective member walk* instead of travelling as its provider value. A19 fixed the edges it could see; this corpus has found another. Highest-value single fix left. |
-      | 26 | `Nullable object must have a value` | The absence-producing carrier rule (`FirstOrDefault` over a `ValueTuple` yields a row that looks real). `TransparentIdentifierRewriter` has the rule; something here is outside its trigger set. |
+      | 26 | `Nullable object must have a value` | Diagnosed in **A35**: `CollectFragments` lifts a fragment out of the conditional branch that guards it. Not the carrier rule this row first guessed at. |
       | 14 | `Assert.Throws(): No exception was thrown` | Same shape as A28's four: the base asserts a limitation, and the query runs. Each needs reading before it is called anything. |
       | 10 | `Assert.Throws(): Exception type was not an exact match` | We throw, but not what EF throws. |
       | 10 | `NullReferenceException` | Undiagnosed. |
@@ -2259,6 +2259,39 @@ failures are left red and classified rather than worked immediately.
       Of the 30, **28 now pass and 2 fail on a value comparison** — past the crash and into an
       ordinary disagreement, which is a different problem and is left classified rather than
       guessed at.
+
+- [x] **A35.** The `Nullable object must have a value` family, diagnosed. No code change.
+      ✅ `<this commit>`
+
+      26 of A33's remaining failures, one cause, and it is **not** the carrier rule A33's table
+      guessed at. Every one is a `Projecting_property_converted_to_nullable_*` variant of
+
+      ```csharp
+      ss.Set<CogTag>().Select(x => new
+      {
+          x.Note,
+          Nullable = x.GearNickName != null
+              ? new { x.Gear.Nickname, x.Gear.SquadId, x.Gear.HasSoulPatch }
+              : null,
+      })
+      ```
+
+      and every one throws **on the server**, inside the InMemory shaper.
+
+      `ProjectionRewriter.CollectFragments` walks a client-typed projection body for its maximal
+      server-evaluable subexpressions and puts each in a tuple slot. Here the body's client-typed
+      part is the whole `cond ? new { … } : null`, so the walk descends *through the conditional*
+      and collects `x.Gear.Nickname`, `x.Gear.SquadId` and `x.Gear.HasSoulPatch` as three
+      independent fragments — **outside the test that was guarding them**. `x.Gear` is null for a
+      tag with no gear, and `x.Gear.SquadId` is exactly the dereference the `!= null` existed to
+      prevent.
+
+      So the rule the splitter is missing is: **a fragment may not be lifted out of the branch of a
+      conditional whose test guards it.** Either the conditional travels whole, or each fragment
+      taken from a branch travels wrapped in the same test. The test itself
+      (`x.GearNickName != null`) is server-ok and already becomes a fragment, so the material for
+      the second option is there. Not attempted here — it is a change to the shape of what ships,
+      and this plan's rule is one experiment per measurement.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
