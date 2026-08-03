@@ -1596,6 +1596,44 @@ failures are left red and classified rather than worked immediately.
       `ManyToManyLoad` is 4 of 358 and `ManyToManyFieldsLoad` 4 of 124; across A5–A12 the pair
       went from 240 failures to 8.
 
+- [x] **A13.** A join row is tracked in *result* order, not in walk order.
+      **`Total tests: 12878, Passed: 12805, Failed: 44, Skipped: 29`** — FIXED 8, BROKEN none.
+      **`ManyToManyLoad` and `ManyToManyFieldsLoad` are 482 of 482.** ✅ `<this commit>`
+
+      A7 and A11 settled *which side* sends a join row. This is the third question in the same
+      family and the last one: **when** the client tracks it. EF's fixup appends to the navigation
+      as each join row is tracked, so tracking order is a `List`-backed navigation's order, which
+      is what `Assert.Equal(children, left.TwoSkipShared.ToList())` compares.
+
+      A probe on both ends of the wire gave the cause outright — the serialization order is not
+      the result order:
+
+          SEND owner=EntityTwo[10] skip=OneSkipShared  join=[3,10]
+          SEND owner=EntityTwo[16] skip=OneSkipShared  join=[3,16]     ← row 3, sent inside row 1
+          SEND owner=EntityTwo[11] skip=OneSkipShared  join=[3,11]
+
+      `Load_collection_using_Query_with_Include` returns EntityTwo 10, 11, 16, and EntityTwo 16 is
+      reachable from row 10's *own* include — `10 → ThreeSkipFull → EntityThree 3 → TwoSkipFull →
+      16`. The serializer's walk is depth-first and an entity travels whole at its **first**
+      occurrence, so 16's join rows were emitted inside row 10 and the navigation came out
+      10, 16, 11.
+
+      So a join row is now held back and tracked once the result is known: a result element's join
+      rows are tracked at the element's position, and rows sent for an entity that is not a result
+      element — the loaded far side of A7, which sends the whole set in one run — keep the order
+      they arrived in, which is the run order that matters there.
+
+      **Two wrong shapes measured first, and each named the constraint it broke:**
+
+      | Attempt | `ManyToMany*Load` | What it hit |
+      |---|---|---|
+      | hold the *node*, materialize at flush | 218 of 482 | `Dangling wire reference 10` — a wire id is only resolvable inside its own message, and a lazy load fired mid-decode resets that scope |
+      | hold the entity, flag left set for the subtree | 150 of 482 | A join row carries navigations to **both** its sides; the far entity was deferred with it and nothing ever attached that |
+
+      Hence the shape that works: the row is *built* where it arrives, so references resolve, and
+      only tracking is held; and the hold is consumed at the top of `MaterializeEntity`, so it
+      applies to that row and nothing nested under it.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

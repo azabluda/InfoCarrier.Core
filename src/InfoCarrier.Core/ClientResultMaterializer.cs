@@ -115,6 +115,8 @@ public class ClientResultMaterializer
 
                 rows.Add(value is null ? default! : (TElement)value);
             }
+
+            AttachJoinRows(rows);
         }
         finally
         {
@@ -122,6 +124,78 @@ public class ClientResultMaterializer
         }
 
         return rows;
+    }
+
+    /// <summary>
+    ///     Join rows built but not yet tracked, with the entity each was sent for, in the order
+    ///     the serializer's walk produced them.
+    /// </summary>
+    private readonly List<(object Owner, object JoinEntity)> _pendingJoinRows = [];
+
+    /// <summary>
+    ///     Set while a join row is being built, so that it goes to <see cref="_deferred" />
+    ///     whether or not this query defers tracking generally.
+    /// </summary>
+    private bool _holdJoinRow;
+
+    /// <summary>
+    ///     Tracks the held-back join rows in <em>result</em> order.
+    /// </summary>
+    /// <remarks>
+    ///     A skip navigation is rebuilt by EF's fixup as the join rows behind it are tracked, so
+    ///     the order they are tracked in is the order a <c>List</c>-backed navigation comes out
+    ///     in — which is why <c>Assert.Equal(children, left.TwoSkipShared.ToList())</c> can see
+    ///     it. Attaching them where they arrive gave the serializer's depth-first walk instead:
+    ///     <c>Load_collection_using_Query_with_Include</c> returns EntityTwo 10, 11, 16, and
+    ///     EntityTwo 16 is reachable from row 10's own include
+    ///     (<c>10 → ThreeSkipFull → EntityThree 3 → TwoSkipFull → 16</c>), so it is serialized —
+    ///     join rows and all — inside row 10 and the navigation came out 10, 16, 11.
+    ///     <para>
+    ///         So a result element's join rows attach at the element's position. Rows sent for an
+    ///         entity that is <em>not</em> a result element — the loaded far side of A7, which
+    ///         sends the whole set in one run — keep the order they arrived in, which is the run
+    ///         order that matters there.
+    ///     </para>
+    /// </remarks>
+    private void AttachJoinRows<TElement>(List<TElement> rows)
+    {
+        if (_pendingJoinRows.Count == 0)
+        {
+            return;
+        }
+
+        List<(object Owner, object JoinEntity)> pending = [.. _pendingJoinRows];
+        _pendingJoinRows.Clear();
+
+        var byOwner = new Dictionary<object, List<object>>(ReferenceEqualityComparer.Instance);
+        foreach ((object owner, object joinEntity) in pending)
+        {
+            if (!byOwner.TryGetValue(owner, out List<object>? joinEntities))
+            {
+                byOwner[owner] = joinEntities = [];
+            }
+
+            joinEntities.Add(joinEntity);
+        }
+
+        var flushed = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        foreach (TElement element in rows)
+        {
+            if (element is not null
+                && byOwner.TryGetValue(element, out List<object>? joinEntities)
+                && flushed.Add(element))
+            {
+                joinEntities.ForEach(AttachIfDeferred);
+            }
+        }
+
+        foreach ((object owner, object joinEntity) in pending)
+        {
+            if (!flushed.Contains(owner))
+            {
+                AttachIfDeferred(joinEntity);
+            }
+        }
     }
 
     private static List<DynamicValueNode> DeserializeRows(QueryDataResult result)
@@ -141,6 +215,12 @@ public class ClientResultMaterializer
     /// </remarks>
     private object? MaterializeEntity(DynamicValueNode row, DynamicValueMapper mapper)
     {
+        // Consumed here, before anything nested is built: the hold belongs to *this* row, and a
+        // join row carries navigations to both of its sides. Leaving it set deferred those too,
+        // and nothing ever attached them — 150 of the 482 `ManyToMany*Load` tests.
+        bool holdThisRow = _holdJoinRow;
+        _holdJoinRow = false;
+
         IEntityType? entityType = _context.Model.FindEntityType(row.EntityKey!.EntityTypeName);
         if (entityType is null)
         {
@@ -229,10 +309,11 @@ public class ClientResultMaterializer
 
         ClearPlaceholderReferencesBlockingFixup(entry, entityType);
 
-        if (_deferTracking)
+        if (_deferTracking || holdThisRow)
         {
             // Left Detached, so it is invisible to ChangeTracker.Entries() until the residual
-            // shows it actually reached the result.
+            // shows it actually reached the result — or, for a join row, until the result order
+            // is known (`AttachJoinRows`).
             _deferred[instance] = entry;
         }
         else
@@ -587,18 +668,30 @@ public class ClientResultMaterializer
             // fixup wires the graph once the rows are tracked.
             if (member.IsJoinRows)
             {
+                // Recorded against the entity they were sent for, and materialized once the whole
+                // result is decoded (<see cref="AttachJoinRows" />). Tracking a join row is what
+                // makes EF append to the navigation it rebuilds, so the order they are tracked in
+                // *is* the navigation's order — and the order they arrive in is the serializer's
+                // depth-first walk, not the result's.
                 foreach (DynamicValueNode joinRow in member.Value?.Items ?? [])
                 {
-                    // Attached outright, never deferred. Deferral exists so that a split query
-                    // tracks only the entities its *residual* yields — a join over 919 rows
-                    // answering a projection over 7. A join row is not one of those: it is
-                    // relationship state for an entity that is in the result, and no residual
-                    // ever yields one, so deferring it means never attaching it.
-                    // `Load_collection_using_Query_with_join` counts the tracker and found 4
-                    // where 7 belong.
-                    if (mapper.FromDynamicValue(joinRow) is { } joinEntity)
+                    // Built here — a wire reference id is only resolvable while its own message
+                    // is being decoded, and a lazy load fired mid-decode resets that scope — but
+                    // held back from the change tracker until the result order is known.
+                    _holdJoinRow = true;
+                    try
                     {
-                        AttachIfDeferred(joinEntity);
+                        if (mapper.FromDynamicValue(joinRow) is { } joinEntity)
+                        {
+                            _pendingJoinRows.Add((instance, joinEntity));
+                        }
+                    }
+                    finally
+                    {
+                        // Cleared unconditionally: a join row already materialized under another
+                        // owner comes back as a wire back-reference and never reaches
+                        // `MaterializeEntity` to consume the flag.
+                        _holdJoinRow = false;
                     }
                 }
 
