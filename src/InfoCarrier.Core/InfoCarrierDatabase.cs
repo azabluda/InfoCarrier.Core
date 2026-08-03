@@ -1,6 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -23,6 +25,7 @@ public class InfoCarrierDatabase : IDatabase
     private readonly IInfoCarrierClient _client;
     private readonly IExpressionSerializer _expressionSerializer;
     private readonly ICurrentDbContext _currentContext;
+    private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierDatabase" /> class.
@@ -30,9 +33,11 @@ public class InfoCarrierDatabase : IDatabase
     public InfoCarrierDatabase(
         IDbContextOptions options,
         IExpressionSerializer expressionSerializer,
-        ICurrentDbContext currentContext)
+        ICurrentDbContext currentContext,
+        IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger)
     {
         _currentContext = currentContext;
+        _updateLogger = updateLogger;
         _client = options.Extensions
             .OfType<InfoCarrierOptionsExtension>()
             .First()
@@ -142,9 +147,43 @@ public class InfoCarrierDatabase : IDatabase
         };
 
 
-        Common.SaveChangesResult result = await _client
-            .SaveChangesAsync(request, _currentContext.Context, cancellationToken)
-            .ConfigureAwait(false);
+        Common.SaveChangesResult result;
+        try
+        {
+            result = await _client
+                .SaveChangesAsync(request, _currentContext.Context, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            // A concurrency conflict is detected by the *store*, which is on the far side, so the
+            // server's logger recorded it and this context's never did — and
+            // `OptimisticConcurrencyTestBase` asserts on the client's:
+            // `Fixture.ListLoggerFactory.Log.Single(l => l.Id == CoreEventId.OptimisticConcurrencyException)`.
+            //
+            // Logging it here is what every other provider does from the same position: EF's
+            // InMemory provider from `InMemoryTable`, the relational ones from
+            // `AffectedCountModificationCommandBatch`. This provider *is* the store as far as the
+            // client context is concerned.
+            IReadOnlyList<IUpdateEntry> conflicting = Translate(exception.Entries, sent);
+
+            if ((await _updateLogger.OptimisticConcurrencyExceptionAsync(
+                    _currentContext.Context, conflicting, exception, null, cancellationToken)
+                .ConfigureAwait(false)).IsSuppressed)
+            {
+                // An interceptor asked us not to throw. EF's own providers answer that by
+                // completing the write anyway; there is nothing to complete here, because the
+                // server has already refused the batch. Zero rows is what actually happened.
+                return 0;
+            }
+
+            // Re-raised rather than rethrown, because `Entries` is the part callers use and the
+            // server's entries are useless here: they belong to the server's context, which is
+            // disposed with the request scope. Rethrowing gave "cannot access a disposed context
+            // instance" the moment `OptimisticConcurrencyTestBase`'s resolver touched
+            // `ex.Entries` — `GetDatabaseValues`, `SetValues`, `Reload` all do.
+            throw new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
+        }
 
         ApplyGeneratedValues(sent, result, mapper);
         return result.Count;
@@ -186,6 +225,71 @@ public class InfoCarrierDatabase : IDatabase
         {
             yield return entry;
         }
+    }
+
+    /// <summary>
+    ///     The client's entries for the rows the server reported in conflict.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Matched on entity type name and primary key, which is all the two sides share — the
+    ///         server's entries are different objects in a different change tracker. A server entry
+    ///         with no counterpart is dropped rather than guessed at; if that leaves nothing, the
+    ///         whole batch stands in, which is what EF's own providers report when they cannot
+    ///         narrow it either.
+    ///     </para>
+    ///     <para>
+    ///         The server's key values are read off the <em>entity instance</em>, never through its
+    ///         entry. By the time this runs the exception has unwound the request scope, so the
+    ///         server's context is disposed and every entry API on it throws — which is the very
+    ///         failure this method exists to stop reaching the caller. A shadow key has no
+    ///         instance to read and simply does not match.
+    ///     </para>
+    /// </remarks>
+    private static IReadOnlyList<IUpdateEntry> Translate(
+        IReadOnlyList<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry> serverEntries,
+        List<IUpdateEntry> sent)
+    {
+        var matched = new List<IUpdateEntry>();
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry serverEntry in serverEntries)
+        {
+            foreach (IUpdateEntry candidate in sent)
+            {
+                if (candidate.EntityType.Name == serverEntry.Metadata.Name
+                    && !matched.Contains(candidate)
+                    && KeysMatch(candidate, serverEntry))
+                {
+                    matched.Add(candidate);
+                    break;
+                }
+            }
+        }
+
+        return matched.Count > 0 ? matched : sent;
+    }
+
+    private static bool KeysMatch(
+        IUpdateEntry candidate,
+        Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry serverEntry)
+    {
+        if (candidate.EntityType.FindPrimaryKey() is not { } key)
+        {
+            return false;
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.Metadata.IProperty property in key.Properties)
+        {
+            if (property.IsShadowProperty()
+                || !Equals(
+                    candidate.GetCurrentValue(property),
+                    property.GetGetter().GetClrValue(serverEntry.Entity)))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

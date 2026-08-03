@@ -97,10 +97,11 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11262, Failed: 53, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11267, Failed: 48, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
-on Tier B.
+on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking` and `OptimisticConcurrency` are
+effectively clear; the remaining 48 are 22 query, 22 lazy loading, and 4 singletons.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is now 22 of 825 across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`. Do not read the failure count as a long tail; subtract that family

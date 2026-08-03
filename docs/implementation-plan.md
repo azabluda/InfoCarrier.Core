@@ -1112,6 +1112,40 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       This closes queue item 2. The `ManyToMany` residual went 111 → 23 (L7–L11) → 0 (L18–L21),
       and `PropertyValues` is back to 0 with it.
 
+- [x] **L22.** A concurrency failure is translated at the client boundary. **`Total tests: 11344,
+      Passed: 11267, Failed: 48, Skipped: 29`** — FIXED 5, BROKEN none.
+      `OptimisticConcurrency` is 6 → 1. ✅ `<this commit>`
+
+      The conflict is detected by the *store*, which is on the far side, so the server's
+      `DbUpdateConcurrencyException` simply propagated through the client untouched. Two things
+      were wrong with that, and they are halves of one defect — nothing translates the failure
+      where it crosses.
+
+      1. **Nobody logged it here.** `OptimisticConcurrencyTestBase` asserts
+         `Fixture.ListLoggerFactory.Log.Single(l => l.Id == CoreEventId.OptimisticConcurrencyException)`
+         on the *client's* logger, and the server's had recorded it instead. Every EF provider
+         logs this from exactly this position — InMemory from `InMemoryTable`, the relational
+         ones from `AffectedCountModificationCommandBatch` — and this provider is the store as
+         far as the client context is concerned.
+      2. **`Entries` pointed at a dead context.** They are the server's entries, and the request
+         scope is disposed as the exception unwinds, so the resolver's first touch gave "cannot
+         access a disposed context instance". The exception is now re-raised carrying the
+         client's own entries, matched on entity type name and primary key.
+
+      **Part 1 alone moved the count by one and fixed four tests' worth of assertion.** The four
+      got past the log check and failed in the resolver instead — visible only in the reasons,
+      which is the third time in this phase that reading the count alone would have been wrong.
+
+      The server's key values are read off the **entity instance**, never through its entry: the
+      entry APIs are exactly what throws on a disposed context, which is the failure being fixed.
+      A shadow key has no instance to read and does not match; an unmatched server entry is
+      dropped rather than guessed at, and if that leaves nothing the whole batch stands in.
+
+      One left in the class: `Nullable_client_side_concurrency_token_can_be_used`, which is
+      unrelated — the client materializes rows itself and so never runs
+      `IMaterializationInterceptor`, producing a plain `Sponsor` where the test wants a
+      `SponsorDoubleProxy`.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
