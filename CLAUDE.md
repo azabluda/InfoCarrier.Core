@@ -97,13 +97,15 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11564, Passed: 11479, Failed: 56, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 12878, Passed: 12455, Failed: 394, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
-`CompositeKeyEndToEnd` and `NotificationEntities` are clear; the 56 are 22 query, 19 newly
-adopted (phase A1), 11 lazy loading and 4 singletons.
+`CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad` and
+`OverzealousInitialization` are clear. **Read the 394 by cause, not as a tail** — phase A2
+adopted 1314 tests at once and 338 of them are red under three causes; the table in
+`docs/implementation-plan.md` under A2 is the decomposition.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is now 11 of 825 across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`. Do not read the failure count as a long tail; subtract that family
@@ -119,7 +121,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 127 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 122 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.

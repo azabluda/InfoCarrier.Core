@@ -1348,6 +1348,50 @@ failures are left red and classified rather than worked immediately.
       base is relational-only in practice and adopting it would assert relational behaviour, not
       ours.
 
+- [x] **A2.** Second batch: five loading and fixup bases, 1314 tests. **`Total tests: 12878,
+      Passed: 12455, Failed: 394, Skipped: 29`** — 338 new failures, **all of them inside the
+      five new classes**; no previously passing test moved. ✅ `<this commit>`
+
+      | Base | Tests | Failing |
+      |---|---|---|
+      | `FieldsOnlyLoadTestBase` | 713 | **0** |
+      | `ManyToManyLoadTestBase` | 358 | 184 |
+      | `ManyToManyFieldsLoadTestBase` | 124 | 56 |
+      | `StoreGeneratedFixupTestBase` | 118 | 98 |
+      | `OverzealousInitializationTestBase` | 1 | **0** |
+
+      **`FieldsOnlyLoadTestBase` passing 713 of 713 on adoption is the result of this batch.** It
+      is explicit and lazy loading over a model with no properties at all — every scalar and every
+      navigation is a field — which is precisely what phase L rebuilt, and it needed no provider
+      code. `OverzealousInitialization` is likewise green: a model whose constructors eagerly
+      populate their own navigations, which is what `ClearPlaceholderReferencesBlockingFixup`
+      (L6) exists for.
+
+      **The 338 are three causes, not 338 problems**, and the count should be read that way:
+
+      | # | Cause | Where |
+      |---|---|---|
+      | 96 | `An item with the same key has already been added` from `InMemoryTable.Create` | Server-side. Almost all of `StoreGeneratedFixup`: rows whose keys the store generates collide on insert. One defect. |
+      | 20 | `No backing field could be found for property 'UnidirectionalEntity…'` | `ServerQueryExecutor.IsLoaded` line 227 — **the same defect L18 fixed in `MapRowMembers`, at a second site.** Fixed in A3. |
+      | ~220 | `Assert.Equal`/`Assert.True` on loaded skip navigations | The `ManyToMany*Load` residual proper: these bases *load* skip navigations, where `ManyToManyTracking` saves and re-reads them. |
+
+      Adopting a base that comes up 98 of 118 red is deliberate, not an accident of batching. A
+      red spec test is information and the guardrail against suppressing them is the whole reason
+      this repo inherits the bases at all; selecting only the ones that pass would be the same
+      mistake in a politer form. What the count needs is the table above, not a smaller number.
+
+- [x] **A3.** A shadow navigation cannot report itself loaded either. **`Total tests: 12878,
+      Passed: 12475, Failed: 374, Skipped: 29`** — FIXED 20, BROKEN none. ✅ `<this commit>`
+
+      L18 fixed `DynamicValueMapper.MapRowMembers`, which read a loaded navigation's value through
+      `GetGetter()` and threw on one with no CLR member. `ServerQueryExecutor.IsLoaded` has the
+      same call on its *untracked* fallback path and was missed, because nothing adopted at the
+      time reached it — `ManyToManyLoadTestBase` does.
+
+      An untracked entity with a shadow navigation has nowhere for the value to be, so the answer
+      is "not loaded" rather than an exception. The tracked path above it is unaffected: an entry
+      knows what it loaded without reading the entity.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
