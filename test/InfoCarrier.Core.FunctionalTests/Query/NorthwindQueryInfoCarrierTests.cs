@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Query;
 
@@ -57,4 +58,17 @@ public class NorthwindQueryTaggingQueryInfoCarrierTest(NorthwindQueryInfoCarrier
     : NorthwindQueryTaggingQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
 
 public class NorthwindSelectQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindSelectQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
+    : NorthwindSelectQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
+{
+    // BACKING-STORE LIMITATION — `InMemoryQueryExpression.AddJoin` is literally unimplemented for
+    // this shape. EF Core's own NorthwindSelectQueryInMemoryTest overrides it with exactly this
+    // assertion, so reaching the store's own `NotImplementedException` is convergence with the
+    // reference provider: the split now ships the whole query, and what fails is the store.
+    public override Task
+        SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
+            bool async)
+        => Assert.ThrowsAsync<NotImplementedException>(
+            () => base
+                .SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
+                    async));
+}

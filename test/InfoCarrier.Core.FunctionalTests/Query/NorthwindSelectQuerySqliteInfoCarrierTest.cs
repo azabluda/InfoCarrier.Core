@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -142,4 +143,27 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Take_on_top_level_and_on_collection_projection_with_outer_apply(async))).Message);
+
+    // -------------------------------------------------------------------------------------
+    // BACKING-STORE LIMITATION — not APPLY this time, and each is EF Core's own override for
+    // the same backend, adopted verbatim now that the split ships the whole query.
+    // -------------------------------------------------------------------------------------
+
+    // `Reverse` with nothing to reverse: SQL has no row order to invert. Every relational
+    // provider fails this, so EF puts the override on NorthwindSelectQueryRelationalTestBase --
+    // a base this class cannot derive from, because it also swaps in a RelationalQueryAsserter
+    // that needs relational test infrastructure. The assertion is the one that base makes.
+    public override Task Reverse_without_explicit_ordering(bool async)
+        => AssertTranslationFailedWithDetails(
+            () => base.Reverse_without_explicit_ordering(async),
+            RelationalStrings.MissingOrderingInSelectExpression);
+
+    // EF's NorthwindSelectQuerySqliteTest asserts exactly this failure for exactly this test.
+    public override Task
+        SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
+            bool async)
+        => AssertUnableToTranslateEFProperty(
+            () => base
+                .SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
+                    async));
 }

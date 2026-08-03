@@ -43,8 +43,11 @@ here, and both are cheap to avoid:
 - **A newly-red SQLite test is not automatically a regression.** Grep
   `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
   with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
-  provider. Adopt EF's override. The reverse also happens — an override of ours that EF does
-  *not* have is a workaround to delete once the limitation goes.
+  provider. Adopt EF's override. **Grep `EFCore.Relational.Specification.Tests` too** — a limit
+  every relational provider has is overridden on the relational *base*, not in SQLite's own
+  suite, and reading only the latter had `Reverse_without_explicit_ordering` classified as a real
+  failure for two sessions. The reverse also happens — an override of ours that EF does *not*
+  have is a workaround to delete once the limitation goes.
 
 ## Where authority lives
 
@@ -97,14 +100,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13745, Passed: 13675, Failed: 22, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13745, Passed: 13683, Failed: 14, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 22, read out of `artifacts/measure/a27.txt`: **17 query**, 1 `LazyLoadProxy`, 1
+The 14, read out of `artifacts/measure/a28.txt`: **9 query**, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report. Everything
 outside the query residual is now a single test.
 
@@ -118,11 +121,11 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **The query residual** — 17, and the largest family left. A true long tail: 10 distinct
-  methods, each with its own cause (client-eval navigation reads, untranslatable subqueries,
-  Northwind GroupBy shapes). No shared root cause, so it is individual work.
-  A17 adopted a second, independent GroupBy corpus (`Ef6GroupBy`, 108 of 110) which says the
-  GroupBy half of this residual is Northwind-specific.
+- **The query residual** — 9, classified in full under A28. Only **2** are a real gap
+  (`SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
+  that milestone M2-B is for). **4** are spec tests asserting a limitation this provider does not
+  have — they run and return the right answer, and the query bodies are `private` to the spec
+  base, so the assertion cannot be inverted from a derived class. **3** are still undiagnosed.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced

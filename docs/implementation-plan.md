@@ -2050,6 +2050,57 @@ failures are left red and classified rather than worked immediately.
       widening of reach: the type is a base of an entity type the list already admits, named only
       for a member the model maps. Nothing else in the suite moved.
 
+- [x] **A27.** The store's own limits, asserted as EF asserts them.
+      **`Total tests: 13745, Passed: 13683, Failed: 14, Skipped: 48`** — FIXED 8, BROKEN none.
+      ✅ `<this commit>`
+
+      Four residual methods turned out to be **backing-store limitations that EF Core overrides in
+      its own suites**, reached only because the split now ships the whole query. Each override is
+      EF's, adopted with the reason stated:
+
+      | Test | Tier | EF's own override |
+      |---|---|---|
+      | `SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_…` | A | `NorthwindSelectQueryInMemoryTest` — `Assert.ThrowsAsync<NotImplementedException>`; `InMemoryQueryExpression.AddJoin` is literally unimplemented for this shape |
+      | the same | B | `NorthwindSelectQuerySqliteTest` — `AssertUnableToTranslateEFProperty` |
+      | `Reverse_without_explicit_ordering` | B | `NorthwindSelectQueryRelationalTestBase` — `MissingOrderingInSelectExpression`; **every** relational provider fails it, which is why the override lives on the relational base rather than SQLite's |
+      | `Final_GroupBy_nominal_type_entity` | A | `NorthwindGroupByQueryInMemoryTest` — translation failure |
+
+      `Reverse_without_explicit_ordering` was previously classified as a real failure on the
+      grounds that `EFCore.Sqlite.FunctionalTests` does not override it. It does not — its
+      *relational base* does, and that base cannot be derived from here because it also swaps in a
+      `RelationalQueryAsserter` that needs relational test infrastructure. **Grepping the SQLite
+      suite alone is not enough; the relational specification base is part of the answer.**
+
+      `Final_GroupBy_nominal_type_entity` gets the store-independent half of EF's assertion.
+      EF fails it with `NonComposedGroupByNotSupported`; this provider refuses one step earlier,
+      because `GroupBy(c => new RandomClass { … })` keys the grouping on a type the server cannot
+      name, so the query never reaches the store to be told the store's reason. Both say the
+      query does not translate, which is what the test is for.
+
+- [x] **A28.** What is left of the query residual, and why each one stays.
+      No code change; classification only, read out of `artifacts/measure/a28.txt`. ✅ `<this commit>`
+
+      Nine query failures remain, and they fall into two kinds.
+
+      **A real gap (2).** `SelectMany_correlated_subquery_hard` — a correlated subquery under a
+      client-side projection, refused by `RejectOpenFragments` with the message that names
+      milestone M2-B. This is the one remaining *designed* hole in the split.
+
+      **The base asserts a limitation this provider does not have (4).**
+      `Select_GroupBy_SelectMany` and `Join_with_nav_projected_in_subquery_when_client_eval` are
+      both written as `AssertTranslationFailed(() => AssertQuery(…))`, and both now run and
+      **return the right answer** — "no exception was thrown" is the whole failure. That is not a
+      defect to fix. It is also not one that can be overridden away: the query bodies name
+      `ProjectedType` and `ClientProjection`, both `private` to the spec base, so a derived class
+      cannot restate the query to assert success instead. EF's own SqlServer suite overrides both
+      by calling `base` — i.e. it fails there too. Left red deliberately.
+
+      **Still to diagnose (3).** `Contains_over_keyless_entity_throws` (2) answers `False` where
+      every provider answers `True`, which is about identity for a type that has none, and
+      `QueryFilterFuncletization.Local_variable_from_OnModelCreating_can_throw_exception` (1),
+      where the exception is right and raised from a different EF path, so the message differs by
+      two words.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

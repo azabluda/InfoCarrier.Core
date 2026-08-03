@@ -59,4 +59,19 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixtu
         => AssertTranslationFailedWithDetails(
             () => base.Final_GroupBy_TagWith(async),
             InMemoryStrings.NonComposedGroupByNotSupported);
+
+    /// <summary>
+    ///     The one member of the <c>Final_GroupBy</c> family whose key is a client-only type.
+    /// </summary>
+    /// <remarks>
+    ///     EF's own <c>NorthwindGroupByQueryInMemoryTest</c> asserts the same failure as its
+    ///     siblings above, with <see cref="InMemoryStrings.NonComposedGroupByNotSupported" /> as
+    ///     the detail. This provider refuses one step earlier and for its own reason —
+    ///     <c>GroupBy(c =&gt; new RandomClass { … })</c> keys the grouping on a type the server
+    ///     cannot name (ADR-010), so the query never reaches the store to be told that a
+    ///     non-composed <c>GroupBy</c> is unsupported. The assertion is therefore the
+    ///     store-independent half of EF's: this query does not translate.
+    /// </remarks>
+    public override Task Final_GroupBy_nominal_type_entity(bool async)
+        => AssertTranslationFailed(() => base.Final_GroupBy_nominal_type_entity(async));
 }
