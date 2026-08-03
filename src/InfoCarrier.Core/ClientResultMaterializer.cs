@@ -348,88 +348,6 @@ public class ClientResultMaterializer
 
 
     /// <summary>
-    ///     Tracks the join row implied by one end of a loaded skip navigation.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         Only when the join entity is nothing *but* its two foreign keys, because both of
-    ///         those are readable from the entities it links and so can be reconstructed here
-    ///         rather than shipped. A join type with a **payload** carries data that exists only
-    ///         in the store, and inventing an entry for it is worse than having none: the
-    ///         payload came back null and `Original_values_for_join_entity_can_be_copied_into_an_object`
-    ///         went from failing on a missing entry to failing on a wrong one. Those need the
-    ///         join row on the wire, which is a change to the result format.
-    ///     </para>
-    ///     <para>
-    ///         Already tracked is the normal case once the other side of the same many-to-many
-    ///         is loaded, and is left alone.
-    ///     </para>
-    /// </remarks>
-    private void TrackJoinEntity(ISkipNavigation skip, object owner, object? target)
-    {
-        if (target is null)
-        {
-            return;
-        }
-
-        IEntityType joinType = skip.JoinEntityType;
-
-        var keyProperties = new HashSet<string>(
-            skip.ForeignKey.Properties.Concat(skip.Inverse.ForeignKey.Properties).Select(p => p.Name),
-            StringComparer.Ordinal);
-
-        if (joinType.GetProperties().Any(p => !keyProperties.Contains(p.Name) && !p.IsShadowProperty()))
-        {
-            return;
-        }
-
-        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
-
-        if (!ReadJoinKey(skip.ForeignKey, owner, values)
-            || !ReadJoinKey(skip.Inverse.ForeignKey, target, values))
-        {
-            return;
-        }
-
-        if (joinType.FindPrimaryKey() is { } joinKey)
-        {
-            object?[] keyValues = [.. joinKey.Properties.Select(p => values.GetValueOrDefault(p.Name))];
-            if (Array.Exists(keyValues, v => v is null))
-            {
-                return;
-            }
-
-            if (_stateManager.TryGetEntry(joinKey, keyValues) is not null)
-            {
-                return;
-            }
-        }
-
-        _stateManager.CreateEntry(values, joinType).SetEntityState(EntityState.Unchanged);
-    }
-
-    /// <summary>
-    ///     Copies one side of a join row's foreign key out of the entity it points at.
-    /// </summary>
-    private static bool ReadJoinKey(IForeignKey foreignKey, object principal, Dictionary<string, object?> values)
-    {
-        for (int i = 0; i < foreignKey.Properties.Count; i++)
-        {
-            IProperty principalProperty = foreignKey.PrincipalKey.Properties[i];
-            if (principalProperty.IsShadowProperty())
-            {
-                // Nothing to read it from without an entry for the principal, and a join row
-                // built from a missing key would be worse than none.
-                return false;
-            }
-
-            values[foreignKey.Properties[i].Name] = principalProperty.GetGetter().GetClrValue(principal);
-        }
-
-        return true;
-    }
-
-    /// <summary>
     ///     Records a navigation as loaded on an entity that has no entry, through its own lazy
     ///     loader.
     /// </summary>
@@ -661,14 +579,6 @@ public class ClientResultMaterializer
         InternalEntityEntry? entry,
         DynamicValueMapper mapper)
     {
-        // Which skip navigations arrived with their join rows attached. Those must *not* also be
-        // reconstructed: reconstruction would run first — the navigation member precedes the
-        // join-row member — and create a stub without the payload, which identity resolution
-        // would then keep in preference to the real row that follows.
-        var sentJoinRows = new HashSet<string>(
-            row.Properties.Where(p => p.IsJoinRows).Select(p => p.Name),
-            StringComparer.Ordinal);
-
         foreach (DynamicPropertyValue member in row.Properties)
         {
             // Join rows behind a skip navigation. Materializing them is the whole job — each is
@@ -704,24 +614,6 @@ public class ClientResultMaterializer
             if (related is not null && navigation.PropertyInfo is { CanWrite: true } property)
             {
                 property.SetValue(instance, related);
-            }
-
-            // A shared-type join entity is a `Dictionary<string, object>`, and one of those
-            // cannot travel as a row -- it decodes as a shape and the wire's key/value pairs are
-            // rejected by the dictionary itself ("the value [LeftsId, 1] is not of type
-            // System.String"). The server therefore sends join rows only for join types with a
-            // CLR class, and shared ones are still rebuilt here from the two entities they link.
-            // `TrackJoinEntity` no-ops when the row is already tracked, so this stays correct
-            // whichever way the row arrived.
-            if (entry is not null
-                && navigation is ISkipNavigation skip
-                && !sentJoinRows.Contains(member.Name)
-                && related is System.Collections.IEnumerable targets)
-            {
-                foreach (object? target in targets)
-                {
-                    TrackJoinEntity(skip, instance, target);
-                }
             }
 
             // The relationship snapshot is EF's record of what a navigation held when it was

@@ -1210,6 +1210,21 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `StartTracking(entry)` alone cannot help: it does not set `EntityState`, so the load would
       still see `Detached`.
 
+- [x] **L25.** The client-side join reconstruction is dead; deleted. **`Total tests: 11344,
+      Passed: 11278, Failed: 37, Skipped: 29`** — FIXED none, BROKEN none, **reasons byte-identical**.
+      ✅ `<this commit>`
+
+      L21 left this as an open question rather than a claim: `TrackJoinEntity` was written for the
+      shared-type join entities that could not travel as rows, and L20/L21 made them travel. It
+      was documented as the remaining fallback for "a navigation no rows were sent for", which
+      was inspection, not evidence.
+
+      A probe on the full suite settles it: **it never ran once across 11344 tests.** So the
+      method, its `ReadJoinKey` helper, and the `sentJoinRows` set that existed only to stop the
+      two paths colliding are all gone — 108 lines. The measurement is the point of the entry: a
+      deletion that changes no test and no failure reason is the only kind worth making without
+      further argument.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
