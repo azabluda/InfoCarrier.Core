@@ -589,7 +589,17 @@ public class ClientResultMaterializer
             {
                 foreach (DynamicValueNode joinRow in member.Value?.Items ?? [])
                 {
-                    mapper.FromDynamicValue(joinRow);
+                    // Attached outright, never deferred. Deferral exists so that a split query
+                    // tracks only the entities its *residual* yields — a join over 919 rows
+                    // answering a projection over 7. A join row is not one of those: it is
+                    // relationship state for an entity that is in the result, and no residual
+                    // ever yields one, so deferring it means never attaching it.
+                    // `Load_collection_using_Query_with_join` counts the tracker and found 4
+                    // where 7 belong.
+                    if (mapper.FromDynamicValue(joinRow) is { } joinEntity)
+                    {
+                        AttachIfDeferred(joinEntity);
+                    }
                 }
 
                 continue;

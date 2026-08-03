@@ -1583,6 +1583,19 @@ failures are left red and classified rather than worked immediately.
       unloaded side sends only when the far side is not loaded either. `ReadJoinEntities` takes
       the near side's loaded flag to say so, rather than inferring it.
 
+- [x] **A12.** A join row is attached outright, never deferred.
+      **`Total tests: 12878, Passed: 12797, Failed: 52, Skipped: 29`** — FIXED 7, BROKEN none.
+      ✅ `<this commit>`
+
+      Deferred tracking exists so a split query tracks only the entities its *residual* yields —
+      a join over 919 rows answering a projection over 7 (projection-split §4). A join row is not
+      one of those. It is relationship state for an entity that is already in the result, and no
+      residual ever yields one, so deferring it meant never attaching it at all:
+      `Load_collection_using_Query_with_join` counts the tracker and found 4 where 7 belong.
+
+      `ManyToManyLoad` is 4 of 358 and `ManyToManyFieldsLoad` 4 of 124; across A5–A12 the pair
+      went from 240 failures to 8.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
