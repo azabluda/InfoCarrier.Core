@@ -1508,10 +1508,7 @@ failures are left red and classified rather than worked immediately.
       a no-op.
 
       **2 broken**, both `Load_collection_using_Query_with_Include_for_same_collection`
-      (`Expected: 7, Actual: 4`): the query includes the far side, so the far side counts as
-      loaded and declines to send — but not every far-side row reaches the client, so some join
-      rows are now sent by nobody. Narrower than what it replaces, and left red rather than
-      papered over.
+      (`Expected: 7, Actual: 4`) — corrected in A11.
 
 - [x] **A8.** A `new`-hidden member resolves to the most derived declaration.
       **`Total tests: 12878, Passed: 12757, Failed: 92, Skipped: 29`** — FIXED 4, BROKEN none.
@@ -1573,6 +1570,18 @@ failures are left red and classified rather than worked immediately.
 
       An absent member still means "not loaded", so the flag stays unambiguous — nothing else had
       to change to tell the two apart.
+
+- [x] **A11.** Only an *unloaded* side defers to the other.
+      **`Total tests: 12878, Passed: 12790, Failed: 59, Skipped: 29`** — FIXED 2, BROKEN none.
+      ✅ `<this commit>`
+
+      A7 made the loaded side own a join row, but applied the far-side check unconditionally. When
+      **both** sides are loaded — a query that `Include`s the very collection it is loading — each
+      deferred to the other and nobody sent: `Expected: 7, Actual: 4`.
+
+      The rule is now stated the way it was always meant: a **loaded side always sends**; an
+      unloaded side sends only when the far side is not loaded either. `ReadJoinEntities` takes
+      the near side's loaded flag to say so, rather than inferring it.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

@@ -97,14 +97,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 12878, Passed: 12788, Failed: 61, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 12878, Passed: 12790, Failed: 59, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad` and
-`OverzealousInitialization` are clear. The 61, read out of `artifacts/measure/m28.txt`: 22
-query, 16 `ManyToMany*Load`, 9 `LazyLoadProxy`, 5 `FieldMapping`, 3 `WithConstructors`, 2
+`OverzealousInitialization` are clear. The 59, read out of `artifacts/measure/m29.txt`: 22
+query, 14 `ManyToMany*Load`, 9 `LazyLoadProxy`, 5 `FieldMapping`, 3 `WithConstructors`, 2
 `Load`, 2 `Update`, 1 `OptimisticConcurrency`, 1 compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is now 11 of 825 across

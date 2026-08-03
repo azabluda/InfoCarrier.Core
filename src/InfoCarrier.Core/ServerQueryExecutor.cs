@@ -275,7 +275,7 @@ public class ServerQueryExecutor
                 : stateManager.TryGetEntry(foreignKey.PrincipalKey, keyValues)?.Entity;
         }
 
-        IEnumerable<object> ReadJoinEntities(object entity, ISkipNavigation skip)
+        IEnumerable<object> ReadJoinEntities(object entity, ISkipNavigation skip, bool loaded)
         {
             if (stateManager.TryGetEntry(entity) is not { } ownerEntry)
             {
@@ -317,7 +317,8 @@ public class ServerQueryExecutor
                 // When *neither* side is loaded — which is the case A6 exists for, an explicit
                 // load whose include EF deliberately leaves unloaded — this yields, and the join
                 // rows travel from here.
-                if (skip.Inverse is { } inverse
+                if (!loaded
+                    && skip.Inverse is { } inverse
                     && FarSide(candidate, inverse) is { } far
                     && IsLoaded(far, inverse))
                 {

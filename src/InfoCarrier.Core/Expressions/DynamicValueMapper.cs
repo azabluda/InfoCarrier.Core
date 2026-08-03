@@ -30,7 +30,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     private Func<object, INavigationBase, bool>? _isNavigationLoaded;
     private Func<object, bool>? _isTracked;
     private Func<object, IProperty, object?>? _readShadowValue;
-    private Func<object, ISkipNavigation, IEnumerable<object>>? _readJoinEntities;
+    private Func<object, ISkipNavigation, bool, IEnumerable<object>>? _readJoinEntities;
     private Func<object, IEntityType?>? _findEntityType;
 
     /// <summary>
@@ -114,7 +114,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         Func<object, INavigationBase, bool> isNavigationLoaded,
         Func<object, bool> isTracked,
         Func<object, IProperty, object?> readShadowValue,
-        Func<object, ISkipNavigation, IEnumerable<object>> readJoinEntities,
+        Func<object, ISkipNavigation, bool, IEnumerable<object>> readJoinEntities,
         Func<object, IEntityType?> findEntityType)
     {
         _isNavigationLoaded = isNavigationLoaded;
@@ -408,7 +408,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             // as rows like any other.
             if (navigation is ISkipNavigation skip && _readJoinEntities is not null)
             {
-                List<object> joinRows = [.. _readJoinEntities(value, skip)];
+                List<object> joinRows = [.. _readJoinEntities(value, skip, loaded)];
                 if (joinRows.Count > 0)
                 {
                     members.Add(new DynamicPropertyValue
