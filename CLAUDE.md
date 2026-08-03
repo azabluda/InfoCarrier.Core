@@ -100,16 +100,18 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13996, Passed: 13896, Failed: 12, Skipped: 88`** (2026-08-03) across the
+**`Total tests: 16099, Passed: 15897, Failed: 110, Skipped: 92`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
-`CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase` and
-`ComplexTypesTrackingTestBase` on Tier A, plus
+`CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
+`ComplexNavigationsQueryTestBase` and `GearsOfWarQueryTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 12, read out of `artifacts/measure/a32.txt`: **6 query**, 2 `ComplexTypesTracking`,
-1 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report.
+The 110, read out of `artifacts/measure/a33.txt`: **98** of them are the three query bases A33
+has just adopted and are classified by cause in `docs/implementation-plan.md`; the other 12 are
+6 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`
+and the compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
@@ -131,7 +133,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 109 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 106 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.

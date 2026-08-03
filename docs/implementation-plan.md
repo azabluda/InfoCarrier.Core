@@ -2208,6 +2208,31 @@ failures are left red and classified rather than worked immediately.
       while building a materializer for a property-bag complex collection. That is one shape of
       one feature, and the diagnosis belongs with the materializer rather than with the wire.
 
+- [x] **A33.** Three more query bases: complex navigations, their collections, and Gears of War.
+      **`Total tests: 16099, Passed: 15897, Failed: 110, Skipped: 92`** — **2103 tests added, 2005
+      of them passing**; FIXED none, BROKEN 98, **every one of them inside the three new classes**.
+      Unadopted bases **109 → 106**. ✅ `<this commit>`
+
+      `ComplexNavigationsQueryTestBase` and `ComplexNavigationsCollectionsQueryTestBase` share one
+      fixture, as EF's do. `GearsOfWarQueryTestBase` is EF's largest single corpus and leans on
+      optional navigations, TPH inheritance and null semantics at once. Every override in all three
+      is EF's own `*InMemoryTest`, adopted as a **set** (A31) rather than picked from.
+
+      The 98, by cause — this is the classification, not a to-do list, and it is read out of
+      `artifacts/measure/a33.reasons.txt`:
+
+      | Count | Reason | Reading |
+      |---:|---|---|
+      | 30 | `SocketException : The attempted operation is not supported for the type of object referenced` | **The `IPAddress.ScopeId` signature.** A19 named this exactly: a value with a converter reached the mapper's *reflective member walk* instead of travelling as its provider value. A19 fixed the edges it could see; this corpus has found another. Highest-value single fix left. |
+      | 26 | `Nullable object must have a value` | The absence-producing carrier rule (`FirstOrDefault` over a `ValueTuple` yields a row that looks real). `TransparentIdentifierRewriter` has the rule; something here is outside its trigger set. |
+      | 14 | `Assert.Throws(): No exception was thrown` | Same shape as A28's four: the base asserts a limitation, and the query runs. Each needs reading before it is called anything. |
+      | 10 | `Assert.Throws(): Exception type was not an exact match` | We throw, but not what EF throws. |
+      | 10 | `NullReferenceException` | Undiagnosed. |
+      | 6 | `The LINQ expression '…' could not be translated` | Our own `RejectClientEvaluation`. |
+      | 4 | `'Level*.OneToMany_Optional_Self_Inverse*Id' is a shadow property, so its value is held…` | **The fifth shadow-property site**, predicted in the handoff and now found. `GetGetter()` on a shadow property throws rather than returning null; L18, A3, A10 and A18 are the first four. |
+      | 2 | `Argument type 'List<string>' does not match` | |
+      | 2 | `Queryable in subquery` / `Distinct` shapes | |
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
