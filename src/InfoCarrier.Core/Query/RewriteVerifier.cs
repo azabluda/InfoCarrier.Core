@@ -74,7 +74,7 @@ public sealed class RewriteVerifier
         // Whatever the rewrite does inside the tree, the tree still has to be the same query as
         // far as its caller is concerned. A changed root type means the residual lambda and the
         // caller's expectations no longer agree, and that shows up far from the cause.
-        if (candidate.Type != original.Type)
+        if (candidate.Type != original.Type && !IsSameSequence(original.Type, candidate.Type))
         {
             return RewriteRejection.TypeChanged;
         }
@@ -99,6 +99,25 @@ public sealed class RewriteVerifier
 
         return afterCount < beforeCount ? RewriteRejection.None : RewriteRejection.NoGain;
     }
+
+    /// <summary>
+    ///     Whether two root types are the same sequence for a caller's purposes: both queryable,
+    ///     same element type.
+    /// </summary>
+    /// <remarks>
+    ///     The only difference this admits is the queryable *interface*. A root rebuild appends a
+    ///     <c>Select</c>, which answers <see cref="IQueryable{T}" /> where a query ending in
+    ///     <c>OrderBy(…).ThenBy(…)</c> was an <see cref="IOrderedQueryable{T}" /> — and the strict
+    ///     type check then rejected an otherwise good rewrite as <see cref="RewriteRejection.TypeChanged" />.
+    ///     Nothing composes above the root of a captured query, so the one thing
+    ///     <see cref="IOrderedQueryable{T}" /> buys there — a <c>ThenBy</c> on top — has no caller;
+    ///     the *element* type is what the residual lambda and <c>ExecuteQuery&lt;TElement&gt;</c>
+    ///     agree on, and that must still match exactly.
+    /// </remarks>
+    private static bool IsSameSequence(Type original, Type candidate)
+        => typeof(IQueryable).IsAssignableFrom(original)
+            && typeof(IQueryable).IsAssignableFrom(candidate)
+            && ServerBoundaryAnalyzer.ElementTypeOf(original) == ServerBoundaryAnalyzer.ElementTypeOf(candidate);
 
     /// <summary>
     ///     How many query operators the client would still have to run.

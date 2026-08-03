@@ -152,9 +152,14 @@ internal static class TransparentIdentifierRewriter
             finder.Visit(query);
             referenceTyped = finder._referenceTyped;
 
-            elementCarrier = query.Type.IsGenericType
-                && query.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)
-                && query.Type.GetGenericArguments()[0] is var element
+            // Any queryable, not the exact `IQueryable<>`. A query ending in `OrderBy(…).ThenBy(…)`
+            // is an `IOrderedQueryable<>`, and testing the generic definition said "no element
+            // carrier" — so the carrier was then struck out for being reachable from the result
+            // type, and `Projecting_property_converted_to_nullable_and_use_it_in_order_by` stayed
+            // on the client where its siblings had moved to the server (A40).
+            elementCarrier = typeof(IQueryable).IsAssignableFrom(query.Type)
+                && ServerBoundaryAnalyzer.ElementTypeOf(query.Type) is var element
+                && element != query.Type
                 && finder._candidates.ContainsKey(element)
                 && !finder._disqualified.Contains(element)
                     ? element

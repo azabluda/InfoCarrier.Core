@@ -2449,6 +2449,31 @@ failures are left red and classified rather than worked immediately.
       **The `NullReferenceException` bucket is 34 → 14** and the residual `Nullable object must
       have a value` family is fully closed.
 
+- [x] **A41.** A query that ends in `OrderBy` still has an element carrier.
+      **`Total tests: 16099, Passed: 15963, Failed: 44, Skipped: 92`** — FIXED 2, BROKEN none.
+      ✅ `<this commit>`
+
+      `Projecting_property_converted_to_nullable_and_use_it_in_order_by` is A40's query with
+      `.OrderBy(x => x.Nullable.SquadId).ThenBy(x => x.Note)` on the end, and it stayed on the
+      client where every sibling had moved to the server. Two places assume the exact
+      `IQueryable<T>`:
+
+      - `CarrierFinder.Find` tested `query.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)`
+        for the element carrier. A query ending in `OrderBy` is an `IOrderedQueryable<T>`, so it
+        found none — and the carrier was then struck out for being *reachable from the result
+        type*, which is the very exclusion A40 had to qualify. Now any queryable, through
+        `ServerBoundaryAnalyzer.ElementTypeOf`.
+      - `RewriteVerifier` rejected the result as `TypeChanged`, because `RebuildAtRoot` appends a
+        `Select` and that answers `IQueryable<T>`. The guard now compares the **element** type when
+        both roots are queryable. Nothing composes above the root of a captured query, so the one
+        thing `IOrderedQueryable<T>` buys there — a `ThenBy` on top — has no caller.
+        `A_rewrite_that_changes_the_result_type_is_discarded` still covers the guard: it changes
+        the element type, which is still refused.
+
+      **The first half alone measured byte-identical** — the re-carry built the right tree and the
+      verifier threw it away — and the probe distinguished those in one run. Two identical-looking
+      nothings in two consecutive steps; the probe is the only thing that tells them apart.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
