@@ -721,6 +721,29 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       family ("relationships using shadow values can only be loaded for tracked entities") which
       is EF's own designed refusal.
 
+- [x] **L6.** A navigation is read through its backing field, never its property.
+      **`Total tests: 11344, Passed: 11127, Failed: 188, Skipped: 29`** — FIXED 236,
+      BROKEN none. ✅ `<this commit>`
+
+      `ClearPlaceholderReferencesBlockingFixup` read each reference navigation with
+      `PropertyInfo.GetValue` to decide whether a constructor-set placeholder was blocking fixup.
+      On a lazy-loading entity **that read is the lazy load**: it fired a query during
+      materialization and left the navigation marked loaded, so a test that had queried only the
+      dependent was told its principal reference was already loaded. It then nulled the value it
+      had just caused to be fetched.
+
+      Harmless until L1, because a reflection-constructed entity has no loader and its getter is
+      an ordinary property read. Once entities are built by EF's materializer every lazy-loading
+      shape reaches this code, and only a backing-field read is free of side effects.
+
+      This was the whole of the `Assert.False(IsLoaded)` family and most of what surrounded it:
+      **`LoadInfoCarrierTest` 183 → 12, `LazyLoadProxyInfoCarrierTest` 79 → 15.** Lazy loading
+      began this session at 505 of 505 failing and is now 27 of 825.
+
+      Found by bisecting the materialization stages with a probe — `beforeClear=[]`,
+      `afterClear=[Parent]` — which named the exact statement. Guessing had already cost three
+      neutral attempts on the same symptom.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

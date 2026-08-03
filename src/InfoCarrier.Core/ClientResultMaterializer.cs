@@ -241,6 +241,8 @@ public class ClientResultMaterializer
         }
 
         PopulateNavigations(row, instance, entityType, entry, mapper);
+
+
         return instance;
     }
 
@@ -270,8 +272,22 @@ public class ClientResultMaterializer
     {
         foreach (IForeignKey foreignKey in entityType.GetForeignKeys())
         {
-            if (foreignKey.DependentToPrincipal is not { PropertyInfo: { CanWrite: true } clrProperty }
-                || clrProperty.GetValue(entry.Entity) is null)
+            if (foreignKey.DependentToPrincipal is not { PropertyInfo: { CanWrite: true } clrProperty } navigation)
+            {
+                continue;
+            }
+
+            // Read through the backing field, never the property. The property getter on a
+            // lazy-loading entity *is* the lazy load: reading it here fired a query during
+            // materialization and left the navigation marked loaded, so a test that had only
+            // queried the dependent was told its principal reference was already loaded. Since
+            // L1 builds entities with EF's materializer, every lazy-loading shape reaches this
+            // code, and only the field read is free of side effects.
+            object? current = navigation.FieldInfo is { } field
+                ? field.GetValue(entry.Entity)
+                : clrProperty.GetValue(entry.Entity);
+
+            if (current is null)
             {
                 continue;
             }
