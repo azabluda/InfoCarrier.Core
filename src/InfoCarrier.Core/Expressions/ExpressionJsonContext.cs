@@ -88,6 +88,11 @@ namespace InfoCarrier.Core.Expressions;
 [JsonSerializable(typeof(TimeOnly))]
 [JsonSerializable(typeof(TimeSpan))]
 [JsonSerializable(typeof(Guid))]
+
+// A byte array is not in `IsPrimitive`'s set, but it *is* what a value converter over a binary
+// key produces (`ComparableBytesStructKey` -> `byte[]`), and a key value travels as its provider
+// value (`PrimitiveCoercion.ToWireKey`).
+[JsonSerializable(typeof(byte[]))]
 public partial class ExpressionJsonContext : JsonSerializerContext
 {
 }

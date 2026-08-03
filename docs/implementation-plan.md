@@ -1809,6 +1809,42 @@ failures are left red and classified rather than worked immediately.
       | 2 | `Ef6GroupBy.Whats_new_2021_sample_7` | `NavigationBaseIncludeIgnored` raised as an error from EF's own `NavigationExpandingExpressionVisitor` — an `Include` walking back up the tree. Unclassified; it is EF's expansion, on the server. |
       | 1 | `QueryFilterFuncletization.Local_variable_from_OnModelCreating_can_throw_exception` | The message differs by two words: "evaluate the LINQ query parameter" vs "evaluate a LINQ query parameter". The exception is raised where it should be; only its wording is EF's rather than ours. |
 
+- [x] **A18.** Fifth batch: three bases, 168 tests — and two provider defects each worth more
+      than the batch. **`Total tests: 13744, Passed: 13646, Failed: 50, Skipped: 48`** — 12 new
+      failures, **none of them a regression**. ✅ `<this commit>`
+
+      | Base | Tests | On adoption | After the two fixes |
+      |---|---|---|---|
+      | `Query.InheritanceRelationshipsQueryTestBase` | 94 | 90 | **2** |
+      | `KeysWithConvertersTestBase` | 47 (7 skipped) | 40 | **7** |
+      | `ValueConvertersEndToEndTestBase` | 27 | 3 | 3 |
+
+      **A shadow key property cannot be read either — the third site.** 88 of
+      `InheritanceRelationships`'s 90 were one exception: "No backing field could be found for
+      property `BaseInheritanceRelationshipEntity.OwnedReferenceOnBase#OwnedEntity.…Id`", from
+      `ServerQueryExecutor.HasKey`. That is the same defect L18 fixed in `MapRowMembers` and A3
+      fixed in `IsLoaded`, at a third call site, reached first by an **owned** entity type — whose
+      key *is* its owner's foreign key and has no CLR member at all. `HasKey` exists to tell a row
+      that came from the store from a constructor-set placeholder, and only a CLR-visible key can
+      distinguish those, so a shadow key property is skipped rather than read.
+
+      **A converted key travels as its provider value.** All 40 of `KeysWithConverters` failed
+      before any assertion: `EntityKeyNode.KeyValues` is declared `object`, the source-generated
+      serializer resolves `JsonTypeInfo` by runtime type, and a key like `ComparableBytesStructKey`
+      has none — "JsonTypeInfo metadata for type … was not provided". The converter's provider
+      value is what the store keys on, is by construction one of the registered primitives, and
+      both sides compute it from the model, so that is what `KeyValues` now carries
+      (`PrimitiveCoercion.ToWireKey`/`FromWireKey`). `byte[]` joins the serializer context for the
+      binary keys, and `Coerce` learned to read one back from base64.
+
+      The 12 left, all in the new classes:
+
+      | # | Test | Reading |
+      |---|---|---|
+      | 7 | `KeysWithConverters.Can_query_and_update_owned_entity_with_*` | `NullReferenceException` in the test body — an owned entity behind a converted key comes back unpopulated. |
+      | 3 | `ValueConvertersEndToEnd.Can_insert_and_read_back_with_conversions` | `IPAddress.get_ScopeId` throws `SocketException` for an IPv4 address, from the mapper's reflective member walk. The general form of the key fix would avoid it: a property with a converter should travel as its **provider** value, not as an object shape. |
+      | 2 | `InheritanceRelationships.Nested_include_collection_reference_on_non_entity_base` | `ArgumentException: Expression of type 'IQueryable<…>'` — a residual shape, so it belongs with the query residual. |
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

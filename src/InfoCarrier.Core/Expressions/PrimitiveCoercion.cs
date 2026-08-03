@@ -33,6 +33,30 @@ internal static class PrimitiveCoercion
             : value;
 
     /// <summary>
+    ///     Converts a key value to the form it travels in: the <em>provider</em> value, when the
+    ///     property has a value converter.
+    /// </summary>
+    /// <remarks>
+    ///     A key behind a converter is an arbitrary CLR type — <c>ComparableBytesStructKey</c>,
+    ///     <c>IntClassKey</c> — and <see cref="EntityKeyNode.KeyValues" /> is declared
+    ///     <see cref="object" />, so the source-generated serializer resolves its
+    ///     <c>JsonTypeInfo</c> by runtime type and has none: every one of
+    ///     `KeysWithConvertersTestBase`'s 40 tests failed on that alone. The converter's provider
+    ///     value is what the store keys on, is by construction one of the registered primitives,
+    ///     and both sides of the wire can compute it from the model.
+    /// </remarks>
+    public static object? ToWireKey(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
+        => Normalize(property.GetValueConverter() is { } converter ? converter.ConvertToProvider(value) : value);
+
+    /// <summary>
+    ///     The inverse of <see cref="ToWireKey" />: a wire key value as its CLR type.
+    /// </summary>
+    public static object? FromWireKey(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
+        => property.GetValueConverter() is { } converter
+            ? converter.ConvertFromProvider(Coerce(value, converter.ProviderClrType))
+            : Coerce(value, property.ClrType);
+
+    /// <summary>
     ///     Converts a wire-side primitive back to <paramref name="targetType" />.
     /// </summary>
     public static object? Coerce(object? value, Type targetType)
@@ -78,6 +102,7 @@ internal static class PrimitiveCoercion
             if (underlying == typeof(TimeOnly)) return TimeOnly.Parse(element.GetString()!, CultureInfo.InvariantCulture);
             if (underlying == typeof(TimeSpan)) return TimeSpan.Parse(element.GetString()!, CultureInfo.InvariantCulture);
             if (underlying == typeof(object)) return element;
+            if (underlying == typeof(byte[])) return element.GetBytesFromBase64();
 
             // A JSON string standing where something broader is declared. `AsEnumerable()` over
             // a string member types it `IEnumerable<char>`, which no branch above matches and

@@ -329,9 +329,17 @@ public class ServerQueryExecutor
             }
         }
 
+        // A *shadow* key property is skipped rather than read. `GetGetter` on one throws — the
+        // third site of the defect L18 and A3 fixed, reached first by an **owned** entity type,
+        // whose key is its owner's foreign key and has no CLR member at all
+        // ("No backing field could be found for property
+        // 'BaseInheritanceRelationshipEntity.OwnedReferenceOnBase#OwnedEntity.…Id'"). The question
+        // this answers is whether the instance came from the store or is a constructor-set
+        // placeholder, and only a CLR-visible key can distinguish those; a key that is entirely
+        // shadow leaves nothing to check, which reads as "from the store".
         static bool HasKey(object entity, IEntityType entityType)
             => entityType.FindPrimaryKey() is not { } key
-                || key.Properties.All(p => p.GetGetter().GetClrValue(entity) is not null);
+                || key.Properties.All(p => p.IsShadowProperty() || p.GetGetter().GetClrValue(entity) is not null);
 
         var nodes = new List<DynamicValueNode>();
         foreach (object? item in rows)

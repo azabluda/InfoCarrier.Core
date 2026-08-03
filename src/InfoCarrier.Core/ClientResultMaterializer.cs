@@ -249,7 +249,7 @@ public class ClientResultMaterializer
         if (row.EntityKey.KeyValues.Count == pk.Properties.Count)
         {
             object?[] keyValues = pk.Properties
-                .Select((p, i) => PrimitiveCoercion.Coerce(row.EntityKey.KeyValues[i], p.ClrType))
+                .Select((p, i) => PrimitiveCoercion.FromWireKey(p, row.EntityKey.KeyValues[i]))
                 .ToArray();
 
             InternalEntityEntry? tracked = _stateManager.TryGetEntry(pk, keyValues);

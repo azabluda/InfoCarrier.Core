@@ -208,7 +208,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (entityType is not null && value is not null)
         {
             IReadOnlyList<object?> keyValues = entityType.FindPrimaryKey() is { } key
-                ? key.Properties.Select(p => ReadProperty(value, p)).ToList()
+                ? key.Properties.Select(p => PrimitiveCoercion.ToWireKey(p, ReadProperty(value, p))).ToList()
                 : [];
             var entityKey = new EntityKeyNode { EntityTypeName = entityType.Name, KeyValues = keyValues };
 
@@ -595,7 +595,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             if (property.PropertyInfo is { CanWrite: true } clrProperty)
             {
                 clrProperty.SetValue(
-                    instance, PrimitiveCoercion.Coerce(node.EntityKey.KeyValues[i], property.ClrType));
+                    instance, PrimitiveCoercion.FromWireKey(property, node.EntityKey.KeyValues[i]));
             }
         }
 
