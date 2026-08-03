@@ -1634,6 +1634,29 @@ failures are left red and classified rather than worked immediately.
       only tracking is held; and the hold is consumed at the top of `MaterializeEntity`, so it
       applies to that row and nothing nested under it.
 
+- [x] **A14.** A collection navigation is *filled*, through the model's own accessor.
+      **`Total tests: 12878, Passed: 12810, Failed: 39, Skipped: 29`** — FIXED 5, BROKEN none.
+      **`FieldMappingTestBase` is 167 of 167.** ✅ `<this commit>`
+
+      A9 built a `List<T>` and assigned it, guarded by "unless the collection already exists".
+      Both halves of that were wrong, and `FieldMappingTestBase` names each one:
+
+      | Entity | Member | What assigning a list does |
+      |---|---|---|
+      | `BlogReadOnly` | `ObservableCollection<PostReadOnly> _posts` | `ArgumentException` — a `List<T>` is not one |
+      | `BlogReadOnlyExplicit` | `Collection<PostReadOnlyExplicit> _myposts` | the same |
+      | `BlogFull` | `List<PostFull> _posts`, setter throws unless seeding | A9's guard sent a non-empty field to the *property*, and the setter refused |
+
+      `INavigationBase.GetCollectionAccessor()` answers all three at once, because it is what EF's
+      own materializer uses: it knows the concrete type to instantiate, the member to reach it
+      through — field or property, per the navigation's `PropertyAccessMode` — and that an
+      existing collection is to be **filled** rather than replaced. `GetOrCreate(instance,
+      forMaterialization: true)` then `Add(instance, item, forMaterialization: true)` per item,
+      and nothing is assigned to the navigation at all.
+
+      A9's three-variant table is superseded: the question it was answering — replace the
+      collection or leave it alone — does not arise once the items go in one at a time.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

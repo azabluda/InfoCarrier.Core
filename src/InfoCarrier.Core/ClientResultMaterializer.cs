@@ -730,11 +730,13 @@ public class ClientResultMaterializer
                 continue;
             }
 
+            // A collection is *filled*, never assigned — `MaterializeCollection` goes through the
+            // model's own accessor and has already written whatever needed writing.
             object? related = navigation.IsCollection
-                ? MaterializeCollection(member.Value, navigation, mapper)
+                ? MaterializeCollection(member.Value, navigation, instance, mapper)
                 : ResolveAgainstTracker(mapper.FromDynamicValue(member.Value), navigation, entry);
 
-            if (related is not null)
+            if (related is not null && !navigation.IsCollection)
             {
                 // The backing field first, and the property only when there is no field. L6
                 // established this for *reads* — a property getter on a lazy-loading entity is
@@ -743,13 +745,7 @@ public class ClientResultMaterializer
                 // `InvalidOperationException` outright unless the model is seeding, which is how
                 // that base states "materialize through the field". EF's own materializer obeys
                 // the navigation's `PropertyAccessMode`, whose default prefers the field.
-                // A collection the entity already constructed is left alone: EF's fixup fills it,
-                // and replacing it with a fresh list is a different thing from filling it —
-                // `Include_collection_read_only_props` exposes no setter at all and was being
-                // populated perfectly well. An empty *field* is the case with nothing to fill,
-                // and there the field is the only way in.
-                if (navigation.FieldInfo is { } field
-                    && (!navigation.IsCollection || field.GetValue(instance) is null))
+                if (navigation.FieldInfo is { } field)
                 {
                     field.SetValue(instance, related);
                 }
@@ -795,22 +791,41 @@ public class ClientResultMaterializer
         }
     }
 
-    private object MaterializeCollection(DynamicValueNode node, INavigationBase navigation, DynamicValueMapper mapper)
+    /// <summary>
+    ///     Fills a collection navigation, through the model's own collection accessor.
+    /// </summary>
+    /// <remarks>
+    ///     Building a <c>List&lt;T&gt;</c> and assigning it works only where the navigation is
+    ///     willing to take one, and `FieldMappingTestBase` is a catalogue of the ones that are
+    ///     not: `BlogReadOnly._posts` is an `ObservableCollection<T>` and
+    ///     `BlogReadOnlyExplicit._myposts` a `Collection<T>` — neither of which a list can be
+    ///     assigned to — while `BlogFull.Posts` has a setter that throws outright unless the model
+    ///     is seeding. The accessor answers all three, because it is what EF's own materializer
+    ///     uses: it knows the concrete type to instantiate, the member to reach it through, and
+    ///     that an existing collection is to be *filled* rather than replaced.
+    /// </remarks>
+    private static object MaterializeCollection(
+        DynamicValueNode node,
+        INavigationBase navigation,
+        object instance,
+        DynamicValueMapper mapper)
     {
-        // Typed to the target entity, so assigning to ICollection<T> works.
-        var items = (System.Collections.IList)Activator.CreateInstance(
-            typeof(List<>).MakeGenericType(navigation.TargetEntityType.ClrType))!;
+        IClrCollectionAccessor accessor = navigation.GetCollectionAccessor()!;
+        object collection = accessor.GetOrCreate(instance, forMaterialization: true);
 
         // Register before filling: this path bypasses FromDynamicValue, so without it the
         // collection's own wire id is never registered and a later back-reference to it
         // dangles.
-        mapper.RegisterMaterialized(node.Id, items);
+        mapper.RegisterMaterialized(node.Id, collection);
 
         foreach (DynamicValueNode item in node.Items ?? [])
         {
-            items.Add(mapper.FromDynamicValue(item));
+            if (mapper.FromDynamicValue(item) is { } related)
+            {
+                accessor.Add(instance, related, forMaterialization: true);
+            }
         }
 
-        return items;
+        return collection;
     }
 }
