@@ -171,7 +171,21 @@ public class ServerSaveChangesExecutor
         // then EF will not let it be changed. Repeatedly take whatever is resolvable; if a pass
         // makes no progress the remainder refers to itself, and replaying it as sent is no worse
         // than not replaying it at all.
-        var waiting = pending.Where(p => p.Change.State != nameof(EntityState.Deleted)).ToList();
+        //
+        // Seeded principal-first, which the placeholder rule above wants anyway and which the
+        // *replace* case needs even when no placeholder is involved. Tracking a dependent runs
+        // EF's fixup, and fixup finds its principal by key in the identity map. While the
+        // `Deleted` half of a replaced row is the only entry under that key — which the ordering
+        // above guarantees until its `Added` half is tracked — the new dependent is wired onto
+        // the row being *deleted*, and `StateManager.CascadeDelete` reads exactly that navigation:
+        // `FirstLaw:Deleted[11].SecondLaw` came out holding the replacement, which was then
+        // detached as a cascade target and never saved. Ranking by depth in the model's foreign
+        // key graph puts `FirstLaw:Added[11]` in the map first, so fixup finds the surviving row.
+        var depth = new Dictionary<IEntityType, int>();
+        var waiting = pending
+            .Where(p => p.Change.State != nameof(EntityState.Deleted))
+            .OrderBy(p => PrincipalDepth(p.EntityType, depth, []))
+            .ToList();
         while (waiting.Count > 0)
         {
             int remaining = waiting.Count;
@@ -296,6 +310,49 @@ public class ServerSaveChangesExecutor
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
+    }
+
+    /// <summary>
+    ///     How far an entity type sits from a principal in the model's foreign key graph — the
+    ///     longest chain of foreign keys leading to it.
+    /// </summary>
+    /// <remarks>
+    ///     Purely an ordering, so a cycle needs no resolution, only termination: a type already on
+    ///     the current path contributes nothing and the walk unwinds. <paramref name="path" />
+    ///     is that path, and <paramref name="cache" /> is memoization — a wide model would
+    ///     otherwise re-walk the same principals once per dependent.
+    /// </remarks>
+    private static int PrincipalDepth(
+        IEntityType entityType,
+        Dictionary<IEntityType, int> cache,
+        HashSet<IEntityType> path)
+    {
+        if (cache.TryGetValue(entityType, out int cached))
+        {
+            return cached;
+        }
+
+        if (!path.Add(entityType))
+        {
+            return 0;
+        }
+
+        int depth = 0;
+        foreach (IForeignKey foreignKey in entityType.GetForeignKeys())
+        {
+            depth = Math.Max(depth, 1 + PrincipalDepth(foreignKey.PrincipalEntityType, cache, path));
+        }
+
+        path.Remove(entityType);
+
+        // Only a depth reached without truncating a cycle is worth keeping: one computed while
+        // this type was already on the path is a lower bound, not the answer.
+        if (path.Count == 0)
+        {
+            cache[entityType] = depth;
+        }
+
+        return depth;
     }
 
     /// <summary>

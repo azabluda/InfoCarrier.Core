@@ -874,8 +874,8 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       list is used to apply the generated values back — indexing the original would have written
       each store-generated key onto the wrong entry.
 
-- [ ] **L14.** The last six `Update_root_by_collection_replacement_of_*` — **two attempts
-      measured, both negative, both reverted.** Recorded so they are not repeated.
+- [x] **L14 (cause found in L15).** The last six `Update_root_by_collection_replacement_of_*` —
+      **two attempts measured, both negative, both reverted.** Recorded so they are not repeated.
 
       After L13 these no longer throw a duplicate key; they assert
       `Expected: 2, Actual: 0` — the replacement rows are gone from the store. **The reasons
@@ -906,6 +906,41 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       So the cascade is not the cause either. What is left to check is the *order* the server
       hands its entries to the store, and whether `SecondLaw:Added[112]` — the only unpaired new
       row — survives the save at all.
+
+      **Both readings above were wrong, and in the same way.** The cascade *is* what deletes the
+      replacements — but suppressing it is the wrong lever, and "this side has no navigations" was
+      an assumption never checked. L15 checked it.
+
+- [x] **L15.** A replaced row's new dependents are fixed up to the row that survives.
+      **`Total tests: 11344, Passed: 11232, Failed: 83, Skipped: 29`** — FIXED 6, BROKEN none.
+      ✅ `<this commit>`
+
+      The server tracks every `Deleted` entry before any other, which `IdentityMap.Add` requires
+      (L13). Tracking a dependent runs EF's fixup, and fixup finds the principal **by key in the
+      identity map** — so for the window in which the `Deleted` half of a replaced row is the only
+      entry under that key, a new dependent is wired onto the row about to be *deleted*.
+      `StateManager.CascadeDelete` reads exactly that navigation, and an `Added` cascade target is
+      `Detached` rather than deleted, so the replacement was silently dropped before the store ever
+      saw it.
+
+      A probe of the deleted principal's navigation is what settled it, and it contradicted the
+      assumption L14 reasoned from:
+
+          BEFORE | SecondLaw:Added[111]*paired FirstLaw:Added[11]*paired
+                 | SecondLaw:Deleted[111]*paired FirstLaw:Deleted[11]*paired ThirdLaw:Deleted[1111]
+            fk FirstLaw -> SecondLaw nav=SecondLaw value=count 1 behavior=Cascade
+            -> SecondLaw[111] Added => Detached   (StateManager.CascadeDelete)
+          AFTER  | FirstLaw:Unchanged[11]
+
+      `count 1` is the whole finding: the deleted principal *did* have a navigation, holding the
+      replacement. Reading `GetDependentsFromNavigation` and concluding from the model that the
+      collection was empty — these entities initialize theirs to an `ObservableHashSet` — was a
+      third wrong reading, avoided only because the probe ran first.
+
+      The fix is an ordering, not a suppression: the non-deleted group is now seeded principal-first
+      by depth in the model's foreign key graph, so the `Added` principal is in the identity map
+      before its dependents arrive. That is the same direction the placeholder rule already
+      required, so it constrains nothing that was not already constrained.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
@@ -955,7 +990,7 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       through the same `TestStore.InitializeAsync` path — leaves the SQLite one empty. Fix that
       first and re-measure before reading any other failure in this class.
 
-### The `GraphUpdates` residual — 16 of 1787 (2026-08-03, Tier A)
+### The `GraphUpdates` residual — 4 of 1787 (2026-08-03, Tier A)
 
 **The table this replaces was wrong, and worth saying how.** It claimed 45 failures split
 14 / 12 / 10 / 4 / 3 / 2, and the decomposition of the suite total that went with it read
@@ -967,10 +1002,12 @@ below is now read out of `artifacts/measure/<label>.txt`, which is the actual ru
 
 | # | Family | Symptom | Diagnosis |
 |---|---|---|---|
-| 10 | `Update_root_by_collection_replacement_of_*` | assertion | Unclassified. The largest family left here. |
-| 3 | `Can_add_*_dependent_when_multiple_possible_principal_sides` | assertion | Unclassified. |
-| 2 | `Save_optional_many_to_one_dependents` | tracked-entry count off by one (26 vs 27) | **Introduced by S3c-9**, in 2 of that method's 12 parameterizations. |
-| 1 | `Save_changed_owned_one_to_one` | assertion | The one survivor of the owned family S3c-16 fixed. |
+| 3 | `Can_add_*_dependent_when_multiple_possible_principal_sides` | assertion | Unclassified. The largest family left here. |
+| 1 | `Save_optional_many_to_one_dependents` | tracked-entry count off by one (26 vs 27) | **Introduced by S3c-9**, now in 1 of that method's 12 parameterizations. |
+
+`Update_root_by_collection_replacement_of_*` (was 10, then 6) is **fixed** — L13 sent the
+replaced row and L15 stopped its replacement being fixed up to it. `Save_changed_owned_one_to_one`
+is likewise gone.
 
 ### The `PropertyValues` residual — 16 of 196 (2026-08-03, Tier A)
 
