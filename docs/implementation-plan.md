@@ -1740,6 +1740,37 @@ failures are left red and classified rather than worked immediately.
       *client* model cannot carry, so it needs the `serverContextType` split the Northwind
       fixtures use.
 
+- [x] **A16.** Third batch: five query bases, 441 tests. **`Total tests: 13319, Passed: 13247,
+      Failed: 35, Skipped: 37`** — 8 new failures, **none of them a regression**: every previously
+      passing test still passes. ✅ `<this commit>`
+
+      | Base | Tests | Failing |
+      |---|---|---|
+      | `Query.CompositeKeysQueryTestBase` | 14 | **0** |
+      | `Query.NullKeysTestBase` | 5 | **0** |
+      | `Query.IncludeOneToOneTestBase` | 12 | **0** |
+      | `Query.ManyToManyQueryTestBase` | 204 | 4 |
+      | `Query.ManyToManyNoTrackingQueryTestBase` | 206 | 4 |
+
+      Chosen as the query-side counterparts of what the tracking and loading bases already cover:
+      A5–A13 spent nine steps on many-to-many *loading* and nothing had exercised the same model
+      through `Include` and projection; `CompositeKeyEndToEnd` is green on the tracking side and
+      the query side was untested; `IncludeOneToOne` is the shape L27 changed most.
+
+      **Three of the five are green on adoption**, and the fourth and fifth fail on **one method,
+      in two parameterizations each**: `Left_join_with_skip_navigation[_unidirectional]`, all 8
+      with the same `NullReferenceException` from the same place —
+
+          at lambda_method(Closure, <>f__AnonymousType`2)
+          at System.Linq.Enumerable.EnumerableSorter`2.ComputeKeys
+          at InfoCarrier.Core.QueryExecutor`1.Attaching(…)
+
+      The query is `… from s in grouping.DefaultIfEmpty() orderby t.Key1, s.Key1, …`, so `s` is
+      null for an unmatched row, and the `orderby` is running **in the residual** — client-side,
+      in process — where a null dereferences. On the reference provider the ordering reaches the
+      store and null simply sorts. So this is the splitter placing an `OrderBy` on the client that
+      belongs on the server, which puts it with the query residual rather than with many-to-many.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

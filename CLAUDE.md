@@ -97,14 +97,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 12878, Passed: 12822, Failed: 27, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 13319, Passed: 13247, Failed: 35, Skipped: 37`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 27, read out of `artifacts/measure/l27.txt`: 22 query, 1 `LazyLoadProxy`, 1
+The 35, read out of `artifacts/measure/a16.txt`: 30 query, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is now **1 of 825** across
@@ -117,14 +117,15 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **The query residual** — 22, unchanged since Z7 and the largest family left. A true long tail:
-  11 distinct methods, each with its own cause (client-eval navigation reads, untranslatable
-  subqueries, GroupBy shapes). No shared root cause, so it is individual work.
+- **The query residual** — 30, and the largest family left. A true long tail: 12 distinct
+  methods, each with its own cause (client-eval navigation reads, untranslatable subqueries,
+  GroupBy shapes, and — from A16 — an `OrderBy` the splitter leaves on the client where a
+  `DefaultIfEmpty` null then dereferences). No shared root cause, so it is individual work.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 122 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 117 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
