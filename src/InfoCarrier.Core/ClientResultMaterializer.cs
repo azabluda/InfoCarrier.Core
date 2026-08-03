@@ -346,6 +346,83 @@ public class ClientResultMaterializer
     }
 
     /// <summary>
+    ///     Tracks the join row implied by one end of a loaded skip navigation.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Only when the join entity is nothing *but* its two foreign keys, because both of
+    ///         those are readable from the entities it links and so can be reconstructed here
+    ///         rather than shipped. A join type with a **payload** carries data that exists only
+    ///         in the store, and inventing an entry for it is worse than having none: the
+    ///         payload came back null and `Original_values_for_join_entity_can_be_copied_into_an_object`
+    ///         went from failing on a missing entry to failing on a wrong one. Those need the
+    ///         join row on the wire, which is a change to the result format.
+    ///     </para>
+    ///     <para>
+    ///         Already tracked is the normal case once the other side of the same many-to-many
+    ///         is loaded, and is left alone.
+    ///     </para>
+    /// </remarks>
+    private void TrackJoinEntity(ISkipNavigation skip, object owner, object? target)
+    {
+        if (target is null)
+        {
+            return;
+        }
+
+        IEntityType joinType = skip.JoinEntityType;
+
+        var keyProperties = new HashSet<string>(
+            skip.ForeignKey.Properties.Concat(skip.Inverse.ForeignKey.Properties).Select(p => p.Name),
+            StringComparer.Ordinal);
+
+        if (joinType.GetProperties().Any(p => !keyProperties.Contains(p.Name)))
+        {
+            return;
+        }
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        if (!ReadJoinKey(skip.ForeignKey, owner, values)
+            || !ReadJoinKey(skip.Inverse.ForeignKey, target, values))
+        {
+            return;
+        }
+
+        if (joinType.FindPrimaryKey() is { } joinKey)
+        {
+            object?[] keyValues = [.. joinKey.Properties.Select(p => values.GetValueOrDefault(p.Name))];
+            if (Array.Exists(keyValues, v => v is null)
+                || _stateManager.TryGetEntry(joinKey, keyValues) is not null)
+            {
+                return;
+            }
+        }
+
+        _stateManager.CreateEntry(values, joinType).SetEntityState(EntityState.Unchanged);
+    }
+
+    /// <summary>
+    ///     Copies one side of a join row's foreign key out of the entity it points at.
+    /// </summary>
+    private static bool ReadJoinKey(IForeignKey foreignKey, object principal, Dictionary<string, object?> values)
+    {
+        for (int i = 0; i < foreignKey.Properties.Count; i++)
+        {
+            IProperty principalProperty = foreignKey.PrincipalKey.Properties[i];
+            if (principalProperty.IsShadowProperty())
+            {
+                // Nothing to read it from without an entry for the principal, and a join row
+                // built from a missing key would be worse than none.
+                return false;
+            }
+
+            values[foreignKey.Properties[i].Name] = principalProperty.GetGetter().GetClrValue(principal);
+        }
+
+        return true;
+    }
+
+    /// <summary>
     ///     Records a navigation as loaded on an entity that has no entry, through its own lazy
     ///     loader.
     /// </summary>
@@ -542,6 +619,19 @@ public class ClientResultMaterializer
             if (related is not null && navigation.PropertyInfo is { CanWrite: true } property)
             {
                 property.SetValue(instance, related);
+            }
+
+            // A skip navigation's join rows are entities in their own right, and EF expects them
+            // in the change tracker: loading `EntityTwo.ThreeSkipFull` leaves five `JoinTwoToThree`
+            // entries beside the six endpoints, which is why the spec asserts eleven. Nothing
+            // else creates them here — the join row is not part of the projection and never
+            // reaches the wire — so a re-query saw six.
+            if (entry is not null && navigation is ISkipNavigation skip && related is System.Collections.IEnumerable targets)
+            {
+                foreach (object? target in targets)
+                {
+                    TrackJoinEntity(skip, instance, target);
+                }
             }
 
             // Distinguishes a loaded-but-empty navigation from an unloaded one

@@ -744,6 +744,24 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `afterClear=[Parent]` — which named the exact statement. Guessing had already cost three
       neutral attempts on the same symptom.
 
+- [x] **L7.** A loaded skip navigation tracks its join rows. **`Total tests: 11344,
+      Passed: 11142, Failed: 173, Skipped: 29`** — FIXED 15, BROKEN none. ✅ `<this commit>`
+
+      **This corrects the diagnosis L4 recorded, which was wrong.** L4 said skip-navigation join
+      rows were not being persisted. They are: a probe on both sides of the wire shows the client
+      sending 11 entries — 6 endpoints and 5 `JoinTwoToThree` — and the server saving 11. What
+      fails is the *re-query*: EF expects a loaded skip navigation to leave its join rows in the
+      change tracker, and nothing here created them, because a join row is not part of the
+      projection and never reaches the wire. Hence eleven expected, six found.
+
+      They are now reconstructed on the client, from the two entities the row links.
+
+      **Only for a join type that is nothing but its two foreign keys.** A join entity with a
+      **payload** carries data that exists only in the store, and the first attempt invented an
+      entry for those too — which broke three `PropertyValues` tests that had been passing, from
+      "no entry" to "an entry whose `Payload` is null". Worse than having none. Those need the
+      join row on the wire, which is a change to the result format and is not this step.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
