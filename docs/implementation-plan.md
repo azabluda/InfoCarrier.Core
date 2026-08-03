@@ -1225,7 +1225,7 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       deletion that changes no test and no failure reason is the only kind worth making without
       further argument.
 
-- [x] **L25.** An untracked row's lazy loader is found on the type the row *is*.
+- [x] **L26.** An untracked row's lazy loader is found on the type the row *is*.
       **`Total tests: 12878, Passed: 12816, Failed: 33, Skipped: 29`** — FIXED 4, BROKEN none.
       ✅ `<this commit>`
 
@@ -1248,6 +1248,41 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       Lazy is 7 of 825: 4 `Lazy_load_one_to_one_reference_with_recursive_property` (cause settled
       in L24, the naive fix measured 1126 and was reverted), 1 `Can_serialize_proxies_to_JSON`,
       and 2 `Fixup_*_reference_after_FK_change_without_DetectChanges`.
+
+- [x] **L27.** A query result is tracked *as coming from a query*.
+      **`Total tests: 12878, Passed: 12822, Failed: 27, Skipped: 29`** — FIXED 6, BROKEN none.
+      **`LoadTestBase` is 0 of 715 failing; lazy is 1 of 825.** ✅ `<this commit>`
+
+      This is the work L24 asked for and measured the naive version of. `SetEntityState(Unchanged)`
+      is the *attach* path, and it differs from EF's shaper in two ways that each cost tests:
+
+      - it **snapshots by reading the entity's properties**, so a mapped property whose getter
+        touches a navigation issues a lazy load while the entry is still `Detached` —
+        `EntityFinder.Query` then takes its `Detached` branch, picks `AsNoTracking()`, and the
+        principal is never tracked. That is L24's four
+        `Lazy_load_one_to_one_reference_with_recursive_property`.
+      - `NavigationFixer.InitialFixup` guards its dependent-side writes with
+        `!fromQuery || CanOverrideCurrentValue(…)`. Only the from-query path leaves a navigation
+        the caller has already pointed at another **tracked** entity alone, which is exactly what
+        `Fixup_reference_after_FK_change_without_DetectChanges` (EF issue #27497) asserts.
+
+      **Why L24's attempt measured 1126 and this does not.** L24 kept the entry
+      `StateManager.CreateEntry(values, …)` had built and called `MarkUnchangedFromQuery()` on it.
+      That is half of `StartTrackingFromQuery`: the other half constructs a *fresh*
+      `InternalEntityEntry` around the entity and a shadow snapshot, and registers it in every
+      identity map. So the entity is now built directly — `Materialize(entityType, values)`, the
+      helper that was already there — and handed to
+      `IStateManager.StartTrackingFromQuery(entityType, instance, ShadowValuesFactory(values))`,
+      which is the call EF's own `ShapedQueryCompilingExpressionVisitor` emits.
+
+      One consequence worth stating: the scalars that travel as nodes rather than primitives now
+      join the value dictionary *before* the entity is built, instead of being written onto the
+      entry afterwards. On a from-query entry the later write is a modification to a row that had
+      only just been read.
+
+      `ClearPlaceholderReferencesBlockingFixup` takes the instance and the values rather than an
+      entry, since there is no entry until tracking. It may well be obsolete now — from-query
+      fixup overrides an untracked value on its own — but that is a separate measurement.
 
 ## Phase T — transactions (roadmap M4)
 

@@ -292,37 +292,65 @@ public class ClientResultMaterializer
         // Detached, as `GetOrCreateEntry` left it: the state below is set deliberately, and
         // going through the internal state manager still bypasses the public-API value
         // generation that would otherwise fire for store-generated keys.
-        InternalEntityEntry entry = _stateManager.CreateEntry(ReadPrimitives(row, entityType), entityType);
-        object instance = entry.Entity;
+        Dictionary<string, object?> values = ReadPrimitives(row, entityType);
 
-        if (deferredKey is not null)
-        {
-            _deferredIdentity[(entityType, deferredKey)] = (instance, entry);
-        }
-        mapper.RegisterMaterialized(row.Id, instance);
-
-        // Through the entry, so shadow properties land too.
+        // The scalars whose value travels as a node rather than as a primitive join the same
+        // dictionary, so the entity is built from *all* of its values at once. They used to be
+        // written onto the entry afterwards, which the from-query path below would read as
+        // modifications to a row that had only just been read.
         foreach ((IProperty property, DynamicValueNode node) in ComplexScalars(row, entityType))
         {
-            entry[property] = mapper.FromDynamicValue(node);
+            values[property.Name] = mapper.FromDynamicValue(node);
         }
 
-        ClearPlaceholderReferencesBlockingFixup(entry, entityType);
+        InternalEntityEntry entry;
+        object instance;
 
         if (_deferTracking || holdThisRow)
         {
             // Left Detached, so it is invisible to ChangeTracker.Entries() until the residual
             // shows it actually reached the result — or, for a join row, until the result order
             // is known (`AttachJoinRows`).
+            entry = _stateManager.CreateEntry(values, entityType);
+            instance = entry.Entity;
+
+            if (deferredKey is not null)
+            {
+                _deferredIdentity[(entityType, deferredKey)] = (instance, entry);
+            }
+
+            mapper.RegisterMaterialized(row.Id, instance);
+            ClearPlaceholderReferencesBlockingFixup(instance, entityType, values);
             _deferred[instance] = entry;
         }
         else
         {
-            entry.SetEntityState(EntityState.Unchanged);
+            instance = Materialize(entityType, values);
+            mapper.RegisterMaterialized(row.Id, instance);
+            ClearPlaceholderReferencesBlockingFixup(instance, entityType, values);
+
+            // Tracked *as coming from a query*, which is what these rows are, and which EF's own
+            // shaper does through exactly this call. `SetEntityState(Unchanged)` is the attach
+            // path and differs in two ways that both cost tests:
+            //
+            //  - it snapshots by reading the entity's properties, so a mapped property whose
+            //    getter touches a navigation issues a lazy load *while the entry is still
+            //    Detached* — `EntityFinder.Query` then picks `AsNoTracking()` and the principal
+            //    is never tracked (L24, `Lazy_load_one_to_one_reference_with_recursive_property`);
+            //  - `NavigationFixer.InitialFixup` guards its dependent-side writes with
+            //    `!fromQuery || CanOverrideCurrentValue(…)`, so only the from-query path leaves a
+            //    navigation the caller has already pointed at another *tracked* entity alone —
+            //    which is what `Fixup_reference_after_FK_change_without_DetectChanges` asserts.
+            //
+            // The snapshot argument carries shadow state, exactly as
+            // `InternalEntityEntry`'s values constructor builds it.
+            entry = _stateManager.StartTrackingFromQuery(
+                entityType,
+                instance,
+                ((IRuntimeEntityType)entityType).ShadowValuesFactory(values));
         }
 
         PopulateNavigations(row, instance, entityType, entry, mapper);
-
 
         return instance;
     }
@@ -349,7 +377,10 @@ public class ClientResultMaterializer
     ///         for it to be replaced by", which is exactly when EF's own fixup would act.
     ///     </para>
     /// </remarks>
-    private void ClearPlaceholderReferencesBlockingFixup(InternalEntityEntry entry, IEntityType entityType)
+    private void ClearPlaceholderReferencesBlockingFixup(
+        object instance,
+        IEntityType entityType,
+        Dictionary<string, object?> values)
     {
         foreach (IForeignKey foreignKey in entityType.GetForeignKeys())
         {
@@ -365,15 +396,17 @@ public class ClientResultMaterializer
             // L1 builds entities with EF's materializer, every lazy-loading shape reaches this
             // code, and only the field read is free of side effects.
             object? current = navigation.FieldInfo is { } field
-                ? field.GetValue(entry.Entity)
-                : clrProperty.GetValue(entry.Entity);
+                ? field.GetValue(instance)
+                : clrProperty.GetValue(instance);
 
             if (current is null)
             {
                 continue;
             }
 
-            object?[] keyValues = foreignKey.Properties.Select(p => entry[p]).ToArray();
+            object?[] keyValues = foreignKey.Properties
+                .Select(p => values.TryGetValue(p.Name, out object? v) ? v : null)
+                .ToArray();
             if (Array.Exists(keyValues, v => v is null))
             {
                 continue;
@@ -381,7 +414,7 @@ public class ClientResultMaterializer
 
             if (_stateManager.TryGetEntry(foreignKey.PrincipalKey, keyValues) is not null)
             {
-                clrProperty.SetValue(entry.Entity, null);
+                clrProperty.SetValue(instance, null);
             }
         }
     }

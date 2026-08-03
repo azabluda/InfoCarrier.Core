@@ -97,23 +97,26 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 12878, Passed: 12816, Failed: 33, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 12878, Passed: 12822, Failed: 27, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
-`OverzealousInitialization`, `FieldMapping` and both `ManyToMany*Load` bases are clear. The 33,
-read out of `artifacts/measure/l25.txt`: 22 query, 5 `LazyLoadProxy`, 2 `Load`, 1
+`OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
+The 27, read out of `artifacts/measure/l27.txt`: 22 query, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report.
 
-Lazy loading works (Phase L): it began at 505 of 505 failing and is now 7 of 825 across
-`LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`. Do not read the failure count as a long tail; subtract that family
-first.
+Lazy loading works (Phase L): it began at 505 of 505 failing and is now **1 of 825** across
+`LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest` — `Can_serialize_proxies_to_JSON`, which
+is a **complex-type** gap (`Culture.Species` arrives null) and not a lazy-loading one:
+`DynamicValueMapper.MapRowMembers` walks `entityType.GetProperties()`, which does not include
+complex properties, so they never travel.
 
 Not yet implemented, in rough priority order:
-- **Lazy loading** — 7 failures left across `Load` and `LazyLoadProxy`. Phase L in
-  `docs/implementation-plan.md`.
+- **Complex types** — nothing carries them over the wire. One failure today
+  (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
+  be adopted until this exists.
 - **The query residual** — 22, unchanged since Z7 and the largest family left. A true long tail:
   11 distinct methods, each with its own cause (client-eval navigation reads, untranslatable
   subqueries, GroupBy shapes). No shared root cause, so it is individual work.
