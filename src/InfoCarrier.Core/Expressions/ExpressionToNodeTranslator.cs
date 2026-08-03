@@ -121,7 +121,23 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
                     : null,
                 PrimitiveValue = NormalizePrimitive(node.Value),
             }
-            : new ConstantNode { Type = type, DynamicValue = _valueMapper.ToDynamicValue(node.Value, node.Type) };
+            // Mapped by what the value *is*, not by what the expression declares it as. The two
+            // differ whenever a comparison is made through `object`, which is exactly what
+            // `EntityFinder` builds for `Find`: `Equals(EF.Property(e, "Id"), <object constant>)`.
+            // Mapping a `Microsoft.EntityFrameworkCore.…IntStructKey` as `object` walked `object`'s
+            // members — there are none — so the server rebuilt a bare `new object()` and every
+            // `Find` on a value-converted key matched nothing.
+            //
+            // Only the *node* widens; `ConstantNode.Type` still carries the declared type, so the
+            // rebuilt `Expression.Constant` keeps the type its parent expects. The truncation this
+            // used to give is deliberate one level down, in `MapToNode`'s member walk, where a
+            // member declared `object` holding a `DbContext` must stay truncated — and that is
+            // untouched.
+            : new ConstantNode
+            {
+                Type = type,
+                DynamicValue = _valueMapper.ToDynamicValue(node.Value, node.Value?.GetType() ?? node.Type),
+            };
         return node;
     }
 

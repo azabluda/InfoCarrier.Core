@@ -1867,6 +1867,29 @@ failures are left red and classified rather than worked immediately.
       through `InfoCarrierDatabase`. It is what ADR-008 constraint 1 means by reading a scalar
       through its `IProperty`: honouring the converter, not merely going through the accessor.
 
+- [x] **A20.** A constant is mapped by what it *is*, not by what the expression declares.
+      **`Total tests: 13744, Passed: 13656, Failed: 40, Skipped: 48`** — FIXED 7, BROKEN none.
+      **`KeysWithConvertersTestBase` is 40 of 40 (7 skipped, EF's own).** ✅ `<this commit>`
+
+      The seven `Can_query_and_update_owned_entity_with_*` failures were not about owned entities
+      at all. Each ends with `FindAsync(new IntStructKey(1))`, and `EntityFinder` builds
+      `Equals(EF.Property(e, "Id"), <constant declared object>)`. `VisitConstant` mapped that
+      constant with `node.Type` — `object` — so the mapper walked `object`'s members, of which
+      there are none, and the server rebuilt a bare `new object()`. The predicate matched nothing,
+      `Find` returned null, and the test dereferenced it.
+
+      Four probes to get there, and the useful one was the last: the *first* round trip's rows,
+      navigations and change entries were all correct, so the interesting question was what the
+      **third** query actually was. Printing the rebound tree on the server gave it in one line —
+      `FirstOrDefault(e => Equals(Property(e, "Id"), value(System.Object)))`, and
+      `ConstantExpression.ToString` renders `value(T)` only when the value's `ToString()` *is* its
+      type name, i.e. when it is a plain `object`.
+
+      Only the **value node** widens to the runtime type; `ConstantNode.Type` still carries the
+      declared type, so the rebuilt `Expression.Constant` keeps the type its parent expects. The
+      deliberate truncation one level down — a *member* declared `object` holding a `DbContext`,
+      which `MapToNode`'s member walk must keep truncating or it stack-overflows — is untouched.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
