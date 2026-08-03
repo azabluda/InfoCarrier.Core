@@ -14,6 +14,15 @@ dotnet test  InfoCarrier.Core.slnx --filter "FullyQualifiedName~NorthwindWhere"
 Report test results as `Passed: N, Failed: M, Total: T` from actual output — never estimate
 or infer a count.
 
+Everything in `eng/` — there is nothing else, and no script does anything a comment in it does
+not explain:
+
+| Script | What it is for |
+|---|---|
+| `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
+| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only.** The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count. It guards the **total** as well: a crashed host reports fewer failures because fewer tests ran, which once came within one measurement of looking like an improvement. Nothing invokes it today — CI is broken (see *Current state*), and fixing CI means wiring this up. |
+| `eng/gate.sh` | A detached delay used to schedule an unattended session. Sleeps 7200s, then writes `artifacts/gate-open.txt`. Not part of the build; delete it if it stops being useful. |
+
 **Measuring a change: `eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which
 wraps the whole loop). It prints the count, the exact list of tests fixed and broken, *and* a
 diff of the failure **reasons** — three levels, because each one hides a mistake the level below
