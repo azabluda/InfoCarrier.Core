@@ -1419,6 +1419,37 @@ failures are left red and classified rather than worked immediately.
       ignores transactions, a shared store has to be emptied by the test class.** `finally`,
       because a failing test dirties the store the same way a passing one does.
 
+- [ ] **A5.** The `ManyToMany*Load` residual — **240 of 482, one cause, located but not fixed.**
+      Suite unchanged at **`Total tests: 12878, Passed: 12561, Failed: 288, Skipped: 29`**.
+
+      `ManyToManyLoad` 176 of 358 and `ManyToManyFieldsLoad` 56 of 124 — together **83% of every
+      failure left in the suite**. Explicitly loading a skip navigation
+      (`context.Entry(left).Collection(e => e.TwoSkip).Load()`) leaves the collection **empty**.
+      All 24 parameterizations of `Load_collection` fail, across every state and tracking
+      behaviour, so this is one gap and not a set of edge cases.
+
+      **Not a store-isolation problem** — unlike A4, a failing test still fails on its own.
+
+      Two probes narrowed it to the client, and the second is the one that matters:
+
+      1. The query ships **whole** (`IsPassThrough=true`) and reaches the server. EF builds
+         `Set<EntityOne>().Where(e => e.Id == 1).SelectMany(e => e.TwoSkip).NotQuiteInclude(e =>
+         e.OneSkip.Where(...))` — see `ManyToManyLoader.Query` — and the serializer carries it,
+         `NotQuiteInclude` and all.
+      2. **The server returns the right rows.** Logging the materialized count per round trip
+         gave `ROWS=7` for the dominant case, which is exactly what the test then asserts it
+         cannot find.
+
+      So the rows arrive and the navigation stays empty: **the failure is fixup on the client, not
+      translation or transport.** A skip navigation is wired through its *join* rows, and the
+      `NotQuiteInclude` half of that query exists precisely to bring the inverse navigation — and
+      with it, since L21, the join rows — back. What has not been established is whether those
+      join rows reach the client at all, or arrive and fail to connect. That is the next probe,
+      and it is a small one.
+
+      Left failing rather than half-fixed. Recorded here because the count alone
+      (`Failed: 288`) reads as a long tail and is nothing of the sort.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
