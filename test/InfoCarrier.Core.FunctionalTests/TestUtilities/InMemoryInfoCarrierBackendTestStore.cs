@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.InMemory.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -37,8 +38,19 @@ public class InMemoryInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         => serviceProvider?.GetService<TestStoreIndex>() ?? base.GetTestStoreIndex(serviceProvider);
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The ignored-transaction warning is logged rather than thrown, because since M4 the
+    ///     client no longer decides that for itself: it asks the *store* to begin a transaction,
+    ///     and this store is one that does not do them. EF's InMemory provider defaults that
+    ///     warning to <c>WarningBehavior.Throw</c>, so without this every Tier A test that runs
+    ///     inside <c>ExecuteWithStrategyInTransactionAsync</c> — most of the change-tracking
+    ///     bases — would fail on `BeginTransaction` rather than on anything it was testing. The
+    ///     client fixtures already opt in the same way, for the same reason.
+    /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => base.AddProviderOptions(builder).UseInMemoryDatabase(Name);
+        => base.AddProviderOptions(builder)
+            .UseInMemoryDatabase(Name)
+            .ConfigureWarnings(w => w.Log(InMemoryEventId.TransactionIgnoredWarning));
 
     /// <inheritdoc />
     /// <remarks>

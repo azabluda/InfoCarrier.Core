@@ -1,7 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Collections.Concurrent;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core;
@@ -14,11 +16,18 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Query rebinding and execution run through <see cref="ServerQueryExecutor" />, and
 ///     SaveChanges replay through <see cref="ServerSaveChangesExecutor" />. The server resolves
-///     the context and serializer per request from DI (DI-first, requirements §4.2).
+///     the context and serializer per request from DI (DI-first, requirements §4.2) — except
+///     inside a transaction, which pins one context across several requests; see
+///     <see cref="BeginTransactionAsync" />.
 /// </remarks>
 public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
 {
     private readonly IServiceProvider _serviceProvider;
+
+    /// <summary>
+    ///     The transactions this server is holding open, by token (wire-protocol W3).
+    /// </summary>
+    private readonly ConcurrentDictionary<string, OpenTransaction> _transactions = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InProcessInfoCarrierServer" /> class.
@@ -29,45 +38,163 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
-        // Resolve the server context within a per-request scope (the server is a singleton;
-        // the context is scoped). Build the model-aware serializer from the context's model —
-        // IModel is scoped to the context and must not be resolved from DI directly.
-        await using var scope = _serviceProvider.CreateAsyncScope();
-        DbContext context = scope.ServiceProvider.GetRequiredService<DbContext>();
-        ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(context.Model);
-        var executor = new ServerQueryExecutor(context, serializer);
-        return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(request);
+
+        Lease lease = Acquire(request.TransactionId);
+        try
+        {
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model);
+            var executor = new ServerQueryExecutor(lease.Context, serializer);
+            return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            await lease.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
     public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
     {
-        await using var scope = _serviceProvider.CreateAsyncScope();
-        DbContext context = scope.ServiceProvider.GetRequiredService<DbContext>();
-        ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(context.Model);
-        var executor = new ServerSaveChangesExecutor(
-            context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
-        return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(request);
+
+        Lease lease = Acquire(request.TransactionId);
+        try
+        {
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model);
+            var executor = new ServerSaveChangesExecutor(
+                lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
+            return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            await lease.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
-    public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => throw new NotImplementedException(
-            "Remoted transactions land in milestone M4, which needs the wire-protocol W3 "
-                + "transaction token. Until then the client-side manager ignores transactions "
-                + "and raises InfoCarrierEventId.TransactionIgnoredWarning.");
+    /// <remarks>
+    ///     <para>
+    ///         A transaction spans requests, so the scope it lives in has to outlive the request
+    ///         that opened it — the ordinary path creates a scope per request and disposes it on
+    ///         the way out. The scope, its context and the store transaction are held here under
+    ///         a token, and every later request naming that token runs on that same context
+    ///         instead of a fresh one. That token *is* the wire-protocol W3 answer: an open
+    ///         transaction cannot be implied by a connection when the transport may be stateless.
+    ///     </para>
+    ///     <para>
+    ///         Whether the transaction is <em>real</em> is the store's business, not this
+    ///         server's. A provider that does not do transactions — EF's InMemory one — raises
+    ///         its own `TransactionIgnoredWarning` and hands back a stub, and relaying that is
+    ///         the honest answer: the client asked the store for a transaction and the store
+    ///         said no. The alternative, which this replaces, was the *client* pretending on the
+    ///         store's behalf.
+    ///     </para>
+    /// </remarks>
+    public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+            IDbContextTransaction transaction = await context.Database
+                .BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            string token = Guid.NewGuid().ToString("N");
+            _transactions[token] = new OpenTransaction(scope, context, transaction);
+            return new TransactionResult { TransactionId = token };
+        }
+        catch
+        {
+            await scope.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException(
-            "Remoted transactions land in milestone M4, which needs the wire-protocol W3 "
-                + "transaction token. Until then the client-side manager ignores transactions "
-                + "and raises InfoCarrierEventId.TransactionIgnoredWarning.");
+        => EndAsync(transactionId, commit: true, cancellationToken);
 
     /// <inheritdoc />
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException(
-            "Remoted transactions land in milestone M4, which needs the wire-protocol W3 "
-                + "transaction token. Until then the client-side manager ignores transactions "
-                + "and raises InfoCarrierEventId.TransactionIgnoredWarning.");
+        => EndAsync(transactionId, commit: false, cancellationToken);
+
+    private async Task EndAsync(string transactionId, bool commit, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transactionId);
+
+        if (!_transactions.TryRemove(transactionId, out OpenTransaction? open))
+        {
+            // Already ended, or never this server's. Not an error: a client that rolls back on
+            // disposal after an explicit commit is following the ordinary `using` pattern, and
+            // EF's own transaction objects tolerate exactly that.
+            return;
+        }
+
+        try
+        {
+            if (commit)
+            {
+                await open.Transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await open.Transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            await open.Transaction.DisposeAsync().ConfigureAwait(false);
+            await open.Scope.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     The context to run one request on: the transaction's, if the request names one,
+    ///     otherwise a fresh per-request scope.
+    /// </summary>
+    /// <remarks>
+    ///     An unknown token is refused rather than quietly run outside the transaction. Falling
+    ///     back would commit work the caller believes is provisional, which is the one failure
+    ///     mode a transaction exists to prevent.
+    /// </remarks>
+    private Lease Acquire(string? transactionId)
+    {
+        if (transactionId is null)
+        {
+            AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
+            return new Lease(scope.ServiceProvider.GetRequiredService<DbContext>(), scope);
+        }
+
+        if (!_transactions.TryGetValue(transactionId, out OpenTransaction? open))
+        {
+            throw new InvalidOperationException(
+                $"Transaction '{transactionId}' is not open on this server. It was committed, "
+                    + "rolled back, or belongs to a different server.");
+        }
+
+        // A transaction pins the *connection*, not the change tracker. Every request is
+        // self-contained — the client sends the state it needs — and the ordinary path gets a
+        // fresh context precisely so nothing carries over. Reusing this one without clearing let
+        // one request's tracked entities meet the next request's copy of the same rows: "the
+        // instance of entity type 'Driver' cannot be tracked because another instance with the
+        // same key value is already being tracked."
+        open.Context.ChangeTracker.Clear();
+        return new Lease(open.Context, ownedScope: null);
+    }
+
+    private sealed record OpenTransaction(AsyncServiceScope Scope, DbContext Context, IDbContextTransaction Transaction);
+
+    /// <summary>
+    ///     One request's context, plus the scope to dispose afterwards — but only if this request
+    ///     is what created it. A transaction's scope outlives every request that uses it.
+    /// </summary>
+    private readonly struct Lease(DbContext context, AsyncServiceScope? ownedScope)
+    {
+        public DbContext Context { get; } = context;
+
+        public ValueTask DisposeAsync()
+            => ownedScope?.DisposeAsync() ?? ValueTask.CompletedTask;
+    }
 }

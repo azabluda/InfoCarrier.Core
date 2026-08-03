@@ -67,6 +67,17 @@ public sealed record SaveChangesRequest
     ///     The change entries, in submission order. The server replays them in order.
     /// </summary>
     public required IReadOnlyList<ChangeEntry> Entries { get; init; }
+
+    /// <summary>
+    ///     The open server transaction this save belongs to, or <see langword="null" /> to run
+    ///     on its own (wire-protocol W3).
+    /// </summary>
+    /// <remarks>
+    ///     The token from <see cref="TransactionResult.TransactionId" />. A transport may be
+    ///     stateless and a server may serve many clients, so an open transaction cannot be
+    ///     implied by the connection: it has to be named on every request that belongs to it.
+    /// </remarks>
+    public string? TransactionId { get; init; }
 }
 
 /// <summary>

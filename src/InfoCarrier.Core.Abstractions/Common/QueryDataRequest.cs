@@ -33,4 +33,15 @@ public sealed record QueryDataRequest
     ///     Whether the query returns a single result (vs a sequence).
     /// </summary>
     public required bool ReturnsSingleResult { get; init; }
+
+    /// <summary>
+    ///     The open server transaction this query belongs to, or <see langword="null" /> to run
+    ///     on its own (wire-protocol W3).
+    /// </summary>
+    /// <remarks>
+    ///     The token from <see cref="TransactionResult.TransactionId" />. A transport may be
+    ///     stateless and a server may serve many clients, so an open transaction cannot be
+    ///     implied by the connection: it has to be named on every request that belongs to it.
+    /// </remarks>
+    public string? TransactionId { get; init; }
 }

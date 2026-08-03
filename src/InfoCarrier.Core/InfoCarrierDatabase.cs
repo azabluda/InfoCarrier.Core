@@ -82,6 +82,20 @@ public class InfoCarrierDatabase : IDatabase
     }
 
     /// <summary>
+    ///     The server's token for the transaction open on a context, or <see langword="null" />
+    ///     if none is (wire-protocol W3).
+    /// </summary>
+    /// <remarks>
+    ///     Read from the context rather than held here for the same reason
+    ///     <see cref="ClientFor" /> is: what <see cref="CompileQuery{TResult}" /> returns is
+    ///     cached across every context sharing an options shape, so anything per-context has to
+    ///     be resolved per execution.
+    /// </remarks>
+    internal static string? ServerTransactionId(DbContext context)
+        => (context.GetService<IDbContextTransactionManager>().CurrentTransaction
+                as InfoCarrierTransaction)?.ServerTransactionId;
+
+    /// <summary>
     ///     The <see cref="IInfoCarrierClient" /> configured on the context a query is running
     ///     against.
     /// </summary>
@@ -144,6 +158,7 @@ public class InfoCarrierDatabase : IDatabase
         var request = new Common.SaveChangesRequest
         {
             Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
+            TransactionId = ServerTransactionId(_currentContext.Context),
         };
 
 

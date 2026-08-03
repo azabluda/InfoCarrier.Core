@@ -193,6 +193,7 @@ internal sealed class QueryExecutor<TElement>
             TrackingBehavior = _trackingBehavior,
             IsAsync = async,
             ReturnsSingleResult = serverQuery.ReturnsSingleResult,
+            TransactionId = InfoCarrierDatabase.ServerTransactionId(_queryContext.Context),
         };
     }
 

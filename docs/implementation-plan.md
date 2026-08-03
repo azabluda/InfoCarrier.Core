@@ -1225,6 +1225,55 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       deletion that changes no test and no failure reason is the only kind worth making without
       further argument.
 
+## Phase T — transactions (roadmap M4)
+
+- [x] **T1.** Transactions are remoted; the W3 token is the scope. **`Total tests: 11347,
+      Passed: 11281, Failed: 37, Skipped: 29`** — FIXED none, BROKEN none, **reasons unchanged**,
+      3 net new tests. ✅ `<this commit>`
+
+      The client no longer decides on the store's behalf. `InfoCarrierTransactionManager` used to
+      return a stub and raise `InfoCarrierEventId.TransactionIgnoredWarning` itself; it now asks
+      the server, and whatever the server's store does is what happens.
+
+      **W3 is answered by a server-held scope.** `InProcessInfoCarrierServer.BeginTransactionAsync`
+      creates a DI scope, resolves a context, begins a store transaction and keeps all three under
+      a token. `QueryDataRequest` and `SaveChangesRequest` gained `TransactionId`, and a request
+      naming one runs on that context instead of a fresh scope. An *unknown* token is refused
+      rather than run outside the transaction — falling back would commit work the caller believes
+      is provisional, which is the one thing a transaction exists to prevent.
+
+      Three things this turned up, none of them guessable from the design:
+
+      1. **The InMemory backend had to opt into its own ignored-transaction warning.** EF defaults
+         it to `WarningBehavior.Throw`, and now that the *client* asks the store, Tier A would have
+         failed at `BeginTransaction` in every base that runs inside
+         `ExecuteWithStrategyInTransactionAsync`. The client fixtures already opted in the same
+         way; the backend store now does too. The outcome on Tier A is unchanged — a transaction
+         that does nothing — but the refusal comes from the component that actually refuses.
+      2. **A second context must be able to join.** `OptimisticConcurrencyTestBase` opens a
+         transaction on one context and has another observe the same uncommitted state; that is
+         the shape of a concurrency test. With a real transaction on Tier B the unenlisted second
+         context ran on its own SQLite connection and got "database is locked" — 11 tests.
+         `UseInfoCarrierTransaction` enlists it by token, and the enlisted transaction is **not
+         owned**: ending it detaches that context and leaves the transaction to whoever began it,
+         because two contexts able to commit one transaction makes the outcome depend on disposal
+         order.
+      3. **A pinned context must still clear its change tracker.** A transaction pins the
+         *connection*, not the tracker, and every request is self-contained. Reusing the context
+         without clearing let one request's tracked entities meet the next request's copy of the
+         same rows — "the instance of entity type 'Driver' cannot be tracked because another
+         instance with the same key value is already being tracked", 6 more tests.
+
+      `TransactionIgnoredTest` is replaced by `TransactionRemotingTest`, which asserts the token
+      flows, that a save inside a transaction carries it and one outside does not, that commit and
+      rollback round-trip, that disposal rolls back an uncommitted transaction (requirements §2.9)
+      and that a second `BeginTransaction` on one context is refused. Direct assertions for the
+      reason the replaced file gave: on Tier A the remoted transaction still does nothing, so no
+      suite count distinguishes "the token flows" from "the token is never sent".
+
+      **Still open for M4:** savepoints, and `Database.UseTransaction` as a public client API
+      rather than the test-only extension.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

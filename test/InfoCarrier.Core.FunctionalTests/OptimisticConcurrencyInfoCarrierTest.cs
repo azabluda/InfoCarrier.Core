@@ -3,8 +3,10 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +35,19 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
     : OptimisticConcurrencyTestBase<OptimisticConcurrencyInfoCarrierTest.InfoCarrierFixture, byte[]>(fixture),
         IAsyncLifetime
 {
+    /// <summary>
+    ///     Joins the second context of a concurrency test to the transaction the first began.
+    /// </summary>
+    /// <remarks>
+    ///     The base opens a transaction on one context and then makes a *second* one observe the
+    ///     same uncommitted state — that is the whole shape of a concurrency test. While
+    ///     transactions were ignored (pre-M4) this hook could stay empty, because nothing was
+    ///     isolated from anything. Now that the server holds a real one on Tier B, an unenlisted
+    ///     second context runs on its own SQLite connection and gets "database is locked".
+    /// </remarks>
+    protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        => facade.UseInfoCarrierTransaction(transaction);
+
     /// <summary>
     ///     Restores the store before every test.
     /// </summary>
