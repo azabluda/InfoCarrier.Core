@@ -50,7 +50,7 @@ internal static class TransparentIdentifierRewriter
         rootRebuild = null;
 
         Dictionary<Type, MemberInfo[]> carriers = CarrierFinder.Find(
-            query, allowlist, out IReadOnlySet<Type> nullCompared, out Type? elementCarrier);
+            query, allowlist, out IReadOnlySet<Type> referenceTyped, out Type? elementCarrier);
 
         if (carriers.Count == 0)
         {
@@ -59,7 +59,7 @@ internal static class TransparentIdentifierRewriter
 
         try
         {
-            var rewriter = new Rewriter(carriers, nullCompared);
+            var rewriter = new Rewriter(carriers, referenceTyped);
             Expression rewritten = rewriter.Visit(query);
 
             if (elementCarrier is null)
@@ -128,7 +128,7 @@ internal static class TransparentIdentifierRewriter
     {
         private readonly Dictionary<Type, MemberInfo[]> _candidates = [];
         private readonly HashSet<Type> _disqualified = [];
-        private readonly HashSet<Type> _nullCompared = [];
+        private readonly HashSet<Type> _referenceTyped = [];
 
         /// <summary>
         ///     Carriers found inside another carrier's construction, and the carrier they sit in.
@@ -145,12 +145,12 @@ internal static class TransparentIdentifierRewriter
         public static Dictionary<Type, MemberInfo[]> Find(
             Expression query,
             TypeAllowlist allowlist,
-            out IReadOnlySet<Type> nullCompared,
+            out IReadOnlySet<Type> referenceTyped,
             out Type? elementCarrier)
         {
             var finder = new CarrierFinder(allowlist);
             finder.Visit(query);
-            nullCompared = finder._nullCompared;
+            referenceTyped = finder._referenceTyped;
 
             elementCarrier = query.Type.IsGenericType
                 && query.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)
@@ -228,12 +228,12 @@ internal static class TransparentIdentifierRewriter
             {
                 if (IsNull(node.Right))
                 {
-                    _nullCompared.Add(node.Left.Type);
+                    _referenceTyped.Add(node.Left.Type);
                 }
 
                 if (IsNull(node.Left))
                 {
-                    _nullCompared.Add(node.Right.Type);
+                    _referenceTyped.Add(node.Right.Type);
                 }
             }
 
@@ -304,7 +304,7 @@ internal static class TransparentIdentifierRewriter
                 && AbsenceProducing.Contains(node.Method.Name)
                 && node.Arguments.Count > 0)
             {
-                _nullCompared.Add(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
+                _referenceTyped.Add(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
             }
 
             // The same escape as a conversion, spelled as an operator.
@@ -314,6 +314,29 @@ internal static class TransparentIdentifierRewriter
                 && node.Arguments.Count > 0)
             {
                 Disqualify(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
+            }
+
+            // A type argument to a `where TEntity : class` method has to stay a reference type.
+            // Every one of EF's queryable markers -- `AsNoTracking`, `IgnoreQueryFilters`,
+            // `AsSplitQuery` -- carries that constraint, so an element carrier under one of them
+            // cannot become a `ValueTuple`: `MakeGenericMethod` throws, the catch in `Rewrite`
+            // discards the whole pass, and the query loses a re-carry the marker has nothing to do
+            // with. Measured as the four `ManyToManyNoTracking` parameterizations of
+            // `Left_join_with_skip_navigation` failing where the tracking four passed, on the same
+            // query. Same rule as a null comparison, third trigger.
+            if (node.Method.IsGenericMethod)
+            {
+                Type[] arguments = node.Method.GetGenericArguments();
+                Type[] parameters = node.Method.GetGenericMethodDefinition().GetGenericArguments();
+
+                for (int i = 0; i < arguments.Length; i++)
+                {
+                    if (parameters[i].GenericParameterAttributes
+                        .HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
+                    {
+                        _referenceTyped.Add(arguments[i]);
+                    }
+                }
             }
 
             if (ProjectionRewriter.IsResultSelectorOperator(node, out LambdaExpression? selector))
@@ -375,7 +398,7 @@ internal static class TransparentIdentifierRewriter
     /// </summary>
     private sealed class Rewriter(
         IReadOnlyDictionary<Type, MemberInfo[]> carriers,
-        IReadOnlySet<Type> nullCompared) : ExpressionVisitor
+        IReadOnlySet<Type> referenceTyped) : ExpressionVisitor
     {
         private readonly Dictionary<Type, Type> _mapped = [];
         private readonly Dictionary<ParameterExpression, ParameterExpression> _parameters
@@ -397,10 +420,11 @@ internal static class TransparentIdentifierRewriter
         {
             if (carriers.TryGetValue(type, out MemberInfo[]? members))
             {
-                // A carrier compared to null has to stay a reference type, or the comparison it
-                // exists to serve stops being expressible at all.
+                // A carrier compared to null -- or handed to a `where TEntity : class` method --
+                // has to stay a reference type, or the thing it is used for stops being
+                // expressible at all.
                 return TupleCarrier.MakeType(
-                    [.. members.Select(m => Map(MemberType(m)))], nullCompared.Contains(type));
+                    [.. members.Select(m => Map(MemberType(m)))], referenceTyped.Contains(type));
             }
 
             if (type.IsGenericType)
@@ -465,7 +489,7 @@ internal static class TransparentIdentifierRewriter
         protected override Expression VisitNew(NewExpression node)
             => carriers.ContainsKey(node.Type)
                 ? TupleCarrier.New(
-                    [.. node.Arguments.Select(a => Visit(a))], nullCompared.Contains(node.Type))
+                    [.. node.Arguments.Select(a => Visit(a))], referenceTyped.Contains(node.Type))
                 : base.VisitNew(node);
 
         protected override Expression VisitConstant(ConstantExpression node)

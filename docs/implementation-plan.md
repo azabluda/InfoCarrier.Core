@@ -2002,6 +2002,31 @@ failures are left red and classified rather than worked immediately.
       `NullReferenceException`. Same query, same split; the difference is on the reading side, so
       it is a separate defect and is A25.
 
+- [x] **A25.** A marker does not get to constrain the query it marks.
+      **`Total tests: 13745, Passed: 13673, Failed: 24, Skipped: 48`** — FIXED 4, BROKEN none.
+      **`Left_join_with_skip_navigation` is clear, all eight.** ✅ `<this commit>`
+
+      A24 fixed the tracking four and left the no-tracking four failing on the same query with the
+      same stack. A probe on the split named the difference immediately: the tracking query shipped
+      the whole `LeftJoin` + `OrderBy` chain as tuples, and the no-tracking one shipped only the
+      `LeftJoin` and rebuilt the anonymous identifiers on the client — **the re-carry had been
+      discarded outright**, not merely declined.
+
+      `ManyToManyNoTrackingQueryTestBase.RewriteServerQueryExpression` wraps the query in
+      `AsNoTracking()`, and every one of EF's queryable markers is declared
+      `where TEntity : class` — `AsTracking`, `AsNoTracking`, `AsNoTrackingWithIdentityResolution`,
+      `IgnoreQueryFilters`, `IgnoreAutoIncludes`, `AsSplitQuery`, `AsSingleQuery`. Retyping the
+      element carrier to a `ValueTuple` therefore made `MakeGenericMethod` throw, and the
+      `ArgumentException` catch in `Rewrite` — which exists for nodes the pass cannot retype —
+      swallowed the entire rewrite.
+
+      A carrier handed to a `class`-constrained method now gets the reference-typed `Tuple<>`
+      family, exactly as one compared to `null` already did. `_nullCompared` is renamed
+      `_referenceTyped`, because it now has three triggers and only one of them is about null.
+      The marker keeps its meaning: tracking behaviour is read off the *original* tree by
+      `TrackingBehaviorFinder` and travels in the request, and `IgnoreQueryFilters` and friends
+      stay in the shipped subtree where the server honours them.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
