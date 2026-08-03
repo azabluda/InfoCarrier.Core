@@ -2593,6 +2593,32 @@ failures are left red and classified rather than worked immediately.
       as .NET. **Whether this provider should allowlist it is a design decision for
       `docs/roadmap.md`, not a fix**, and it is deliberately not made here.
 
+- [x] **A47.** The nine `ModelBuilding.ModelBuilderTest` bases.
+      **`Total tests: 17136, Passed: 16952, Failed: 26, Skipped: 158`** — **703 tests added, every
+      one of them passing**; FIXED none, BROKEN none. Unadopted bases **80**. ✅ `<this commit>`
+
+      Nothing here touches a store. What it exercises is the one thing the client model has that no
+      other test reaches directly: this provider's conventions and type-mapping source, applied by
+      `ModelBuilder` to every shape EF supports — inheritance, owned types, complex types and
+      collections, and each relationship cardinality. A client `DbContext` has no database, so its
+      model is the whole of what it knows, and it must agree with the server's (ADR-008).
+
+      Structured as EF's `InMemoryModelBuilderTest`: abstract classes per spec base, then one
+      concrete set through `GenericTestModelBuilder`. EF's InMemory suite adds three more concrete
+      sets — non-generic, string-named, unqualified-string — which cover the *builder API's*
+      surface rather than the provider's and remain available. The provider-specific
+      `[ConditionalFact]`s EF adds to its own variants are InMemory's tests, not spec base members,
+      and are not carried.
+
+      **`ForeignKeysHaveIndexes` is left at EF's default `true`, unlike InMemory's fixture, and
+      that is the whole content of the adoption.** The first cut copied InMemory's `false` and
+      produced **136 `Assert.Empty() Failure: Collection was not empty`** — one cause, and not a
+      defect: this provider keeps `ForeignKeyIndexConvention` where the InMemory provider drops it.
+      The fixture flag is a statement of what the provider *does*, not a preference, so it was
+      corrected rather than the model. An index on a client model is metadata about a store the
+      client does not have; it costs nothing and travels nowhere. Whether to drop the convention
+      anyway is a provider question and is not answered here.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

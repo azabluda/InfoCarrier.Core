@@ -100,16 +100,16 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 16433, Passed: 16315, Failed: 26, Skipped: 92`** (2026-08-03) across the
+**`Total tests: 17136, Passed: 16952, Failed: 26, Skipped: 158`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
 `ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase` and all sixteen
-`Query.Translations` bases on Tier A, plus
+`Query.Translations` and the nine `ModelBuilding.ModelBuilderTest` bases on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 26, read out of `artifacts/measure/a46b.txt`: **16** of them are the three query bases A33
+The 26, read out of `artifacts/measure/a47b.txt`: **16** of them are the three query bases A33
 adopted, classified by cause in `docs/implementation-plan.md` (A33's table, less what A34
 and A36–A45 closed); **2** are `Regex_IsMatch`, which the allowlist deliberately refuses (A46);
 the other 8 are 2 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`, 1 `Update`,
@@ -136,7 +136,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 90 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 80 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
