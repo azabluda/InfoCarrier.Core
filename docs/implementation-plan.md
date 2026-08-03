@@ -2378,6 +2378,38 @@ failures are left red and classified rather than worked immediately.
       backend's incidental error, which is inventing an expectation rather than mirroring one.
       Classified, not faked.
 
+- [x] **A39.** Four `Distinct` overrides for a limitation this provider does not have.
+      **`Total tests: 16099, Passed: 15939, Failed: 68, Skipped: 92`** — FIXED 8, BROKEN none.
+      ✅ `<this commit>`
+
+      A33 adopted EF's `GearsOfWarQueryInMemoryTest` overrides as a set (A31), which was right:
+      most of them are limitations of the store this provider runs on. Four are not.
+      `Projecting_entity_as_well_as_correlated_collection_followed_by_Distinct`, its `complex_` and
+      `of_scalars_` siblings, and `Projecting_some_properties_as_well_as_…` each wrap the base in
+      `Assert.ThrowsAsync<InvalidOperationException>` expecting
+      `InMemoryStrings.DistinctOnSubqueryNotSupported` (EF issue #24325) — and the base ran to
+      completion, which means the base's own `AssertQuery` **passed**. The `Distinct` in those
+      shapes lands in the residual, so the store never sees the subquery it refuses.
+
+      **This is the reverse case CLAUDE.md names**: an override of *ours* for a limitation the
+      provider does not have is a workaround, and deleting it restores spec coverage rather than
+      suppressing it (ADR-004). Adopting a set is about not cherry-picking a model configuration
+      away from the expectations it implies; it is not a reason to keep asserting a failure that
+      does not happen. The comment left in its place says which four and why, so the next reader
+      does not "restore" them.
+
+      **Not deleted, deliberately:** `Projecting_correlated_collection_followed_by_Distinct` still
+      reaches the store and still throws, so its override is real; and
+      `Correlated_collection_with_distinct_3_levels` runs but answers **wrong** (`EqualException`
+      through the `Assert.Throws`), which is a defect of ours and stays red.
+
+      **The `No exception was thrown` bucket is 14 → 6**, and the remaining six are all the A28
+      shape: `Select_projecting_queryable_in_anonymous_projection_followed_by_Join` (asserts
+      `CoreStrings.QueryInvalidMaterializationType`; the `Subquery` member never reaches the result
+      past the `Join`, so nothing invalid is materialized), plus `Select_GroupBy_SelectMany` and
+      `Join_with_nav_projected_in_subquery_when_client_eval`. All three build the query inline in a
+      `protected static` assert helper, so the expectation cannot be inverted from a derived class.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

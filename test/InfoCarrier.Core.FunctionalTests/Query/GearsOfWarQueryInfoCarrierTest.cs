@@ -60,26 +60,12 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
             "Value cannot be null. (Parameter 'value')",
             (await Assert.ThrowsAsync<ArgumentNullException>(() => base.Select_StartsWith_with_null_parameter_as_argument(async))).Message);
 
-    public override async Task Projecting_entity_as_well_as_correlated_collection_followed_by_Distinct(bool async)
-        // Distinct. Issue #24325.
-        => Assert.Equal(
-            InMemoryStrings.DistinctOnSubqueryNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(()
-                => base.Projecting_entity_as_well_as_correlated_collection_followed_by_Distinct(async))).Message);
-
-    public override async Task Projecting_entity_as_well_as_complex_correlated_collection_followed_by_Distinct(bool async)
-        // Distinct. Issue #24325.
-        => Assert.Equal(
-            InMemoryStrings.DistinctOnSubqueryNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(()
-                => base.Projecting_entity_as_well_as_complex_correlated_collection_followed_by_Distinct(async))).Message);
-
-    public override async Task Projecting_entity_as_well_as_correlated_collection_of_scalars_followed_by_Distinct(bool async)
-        // Distinct. Issue #24325.
-        => Assert.Equal(
-            InMemoryStrings.DistinctOnSubqueryNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(()
-                => base.Projecting_entity_as_well_as_correlated_collection_of_scalars_followed_by_Distinct(async))).Message);
+    // `Projecting_entity_as_well_as_correlated_collection_followed_by_Distinct`, its `complex_`
+    // and `of_scalars_` siblings, and `Projecting_some_properties_as_well_as_…` are EF's InMemory
+    // overrides for issue #24325 and are deliberately **not** carried here (A39). The `Distinct`
+    // in those shapes lands in the residual, so the store never sees the subquery it refuses, and
+    // the spec test runs and passes. An override of ours for a limitation this provider does not
+    // have is a workaround, and the coverage is the point (ADR-004).
 
     public override async Task Correlated_collection_with_distinct_3_levels(bool async)
         // Distinct. Issue #24325.
@@ -93,13 +79,6 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
             InMemoryStrings.DistinctOnSubqueryNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Projecting_correlated_collection_followed_by_Distinct(async)))
             .Message);
-
-    public override async Task Projecting_some_properties_as_well_as_correlated_collection_followed_by_Distinct(bool async)
-        // Distinct. Issue #24325.
-        => Assert.Equal(
-            InMemoryStrings.DistinctOnSubqueryNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(()
-                => base.Projecting_some_properties_as_well_as_correlated_collection_followed_by_Distinct(async))).Message);
 
     public override Task Include_after_SelectMany_throws(bool async)
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Include_after_SelectMany_throws(async));
