@@ -1771,6 +1771,44 @@ failures are left red and classified rather than worked immediately.
       store and null simply sorts. So this is the splitter placing an `OrderBy` on the client that
       belongs on the server, which puts it with the query residual rather than with many-to-many.
 
+- [x] **A17.** Fourth batch: four query bases, 257 tests. **`Total tests: 13576, Passed: 13497,
+      Failed: 38, Skipped: 41`** — 3 new failures, **none of them a regression**.
+      ✅ `<this commit>`
+
+      | Base | Tests | Failing |
+      |---|---|---|
+      | `Query.InheritanceQueryTestBase` | 97 | **0** |
+      | `Query.FiltersInheritanceQueryTestBase` | 22 | **0** |
+      | `Query.Ef6GroupByTestBase` | 110 | 2 |
+      | `Query.QueryFilterFuncletizationTestBase` | 28 | 1 |
+
+      **`QueryFilterFuncletization` came up 18 of 28 red and is now 1**, and the diagnosis is the
+      general statement of something this repo already had one instance of. A query filter is part
+      of the **model**, so *both* sides build it and both sides apply it: the client funcletizes
+      its own value into the shipped tree, and the server then applies its own filter again with
+      whatever `Field`, `Property` or `Tenant` its instance happens to hold. Every test in that
+      base mutates exactly those members between two queries, so the server kept filtering on the
+      initial value and the second query answered like the first. `CopyDbContextParameters` —
+      which existed for Northwind's `TenantPrefix` — is the mechanism, and this is the general
+      case of it. Worth stating as a rule: **context state a query filter closes over is part of
+      the request, not part of the client.**
+
+      `Ef6GroupBy` at 108 of 110 is the useful negative result of the batch: GroupBy is named in
+      the query residual as one of its three causes, and a second, independent corpus over a
+      different model says that residual is **Northwind-specific**, not a GroupBy gap.
+
+      `Can_query_all_animal_views` takes EF's own `InheritanceQueryInMemoryTest` override: the
+      keyless view's defining query calls a CLR method no provider can translate, the query
+      reaches the server whole, and the server's InMemory provider refuses it in the same words.
+      Convergence with the reference provider, adopted as such.
+
+      The 3 left:
+
+      | # | Test | Reading |
+      |---|---|---|
+      | 2 | `Ef6GroupBy.Whats_new_2021_sample_7` | `NavigationBaseIncludeIgnored` raised as an error from EF's own `NavigationExpandingExpressionVisitor` — an `Include` walking back up the tree. Unclassified; it is EF's expansion, on the server. |
+      | 1 | `QueryFilterFuncletization.Local_variable_from_OnModelCreating_can_throw_exception` | The message differs by two words: "evaluate the LINQ query parameter" vs "evaluate a LINQ query parameter". The exception is raised where it should be; only its wording is EF's rather than ours. |
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
