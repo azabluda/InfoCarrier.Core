@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.InMemory.Internal;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -29,6 +30,30 @@ public class ComplexNavigationsQueryInfoCarrierTest(ComplexNavigationsQueryInfoC
     /// <inheritdoc />
     public override Task Correlated_projection_with_first(bool async)
         => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Client code in a <c>Where</c> decides *which* rows, so running it here means fetching
+    ///     all of them — which is the line ADR-010 draws and `RejectClientEvaluation` enforces,
+    ///     the same line every relational provider draws. EF overrides this on
+    ///     `ComplexNavigationsQueryRelationalTestBase`, not in any one provider's suite (A27).
+    /// </remarks>
+    public override Task Complex_query_with_optional_navigations_and_client_side_evaluation(bool async)
+        => AssertTranslationFailed(
+            () => base.Complex_query_with_optional_navigations_and_client_side_evaluation(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The same rule for an <c>OrderBy</c> key. EF's SQLite suite asserts the details clause
+    ///     too, naming the client method; adopted with it.
+    /// </remarks>
+    public override Task GroupJoin_client_method_in_OrderBy(bool async)
+        => AssertTranslationFailedWithDetails(
+            () => base.GroupJoin_client_method_in_OrderBy(async),
+            CoreStrings.QueryUnableToTranslateMethod(
+                "Microsoft.EntityFrameworkCore.Query.ComplexNavigationsQueryTestBase<"
+                    + typeof(ComplexNavigationsQueryInfoCarrierFixture).FullName + ">",
+                "ClientMethodNullableInt"));
 }
 
 /// <summary>

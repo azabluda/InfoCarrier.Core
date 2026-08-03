@@ -24,6 +24,16 @@ namespace InfoCarrier.Core.FunctionalTests.Query;
 public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fixture)
     : GearsOfWarQueryTestBase<GearsOfWarQueryInfoCarrierFixture>(fixture)
 {
+    /// <remarks>
+    ///     Client code in a <c>Where</c> decides *which* rows, so running it here means fetching
+    ///     all of them — the line ADR-010 draws and `RejectClientEvaluation` enforces, which is
+    ///     also every relational provider's. EF overrides this on
+    ///     `GearsOfWarQueryRelationalTestBase` (A27).
+    /// </remarks>
+    public override Task Client_side_equality_with_parameter_works_with_optional_navigations(bool async)
+        => AssertTranslationFailed(
+            () => base.Client_side_equality_with_parameter_works_with_optional_navigations(async));
+
     public override Task Client_member_and_unsupported_string_Equals_in_the_same_query(bool async)
         => AssertTranslationFailedWithDetails(
             () => base.Client_member_and_unsupported_string_Equals_in_the_same_query(async),

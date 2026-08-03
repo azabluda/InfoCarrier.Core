@@ -2527,6 +2527,25 @@ failures are left red and classified rather than worked immediately.
       re-carry deliberately leaves alone, where the client really does compare by reference. A new
       `A_dto_join_key_is_re_carried_and_ships` asserts the new behaviour on the old query.
 
+- [x] **A44.** Client code in a row-deciding argument, mirrored from EF's relational base.
+      **`Total tests: 16100, Passed: 15982, Failed: 26, Skipped: 92`** — FIXED 6, BROKEN none.
+      **The `could not be translated` bucket is gone, 6 → 0.** ✅ `<this commit>`
+
+      The six were `RejectClientEvaluation` refusing `ClientMethod(...)` in a `Where` predicate or
+      an `OrderBy` key — the line ADR-010 draws, which is EF's own line and every relational
+      provider's. **A27 exactly:** all three tests are overridden with `AssertTranslationFailed` on
+      `ComplexNavigationsQueryRelationalTestBase` / `GearsOfWarQueryRelationalTestBase`, and
+      `GroupJoin_client_method_in_OrderBy` with `AssertTranslationFailedWithDetails` in EF's SQLite
+      suite. This provider has the same limit for the same reason — running a predicate here means
+      fetching every row first — so the overrides are mirrored, not invented, and the reason is
+      stated at each.
+
+      The details clause needed EF's *display* name for the declaring type
+      (`ComplexNavigationsQueryTestBase<…Fixture>`) and not `Type.FullName`, which is the CLR's
+      backtick form. `QuerySplitter.DisplayName` produces the former; the first version of the
+      override compared against the latter and failed on a substring that looked like a missing
+      details clause.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
