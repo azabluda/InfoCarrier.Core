@@ -108,10 +108,25 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     /// </summary>
     protected abstract IServiceCollection AddServices(IServiceCollection serviceCollection);
 
-    /// <inheritdoc />
+    /// <summary>
+    ///     Builds the server context's options.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="EnableSensitiveDataLogging" /> because the spec fixtures set it on the
+    ///     client (<c>FixtureBase.AddOptions</c>) and an exception raised while the *server*
+    ///     compiles the same query should read the same way. Without it,
+    ///     <c>Local_variable_from_OnModelCreating_can_throw_exception</c> got EF's message minus
+    ///     the expression that caused it — right exception, right place, two words different.
+    ///     Deliberately not the rest of <c>AddOptions</c>: its
+    ///     <c>ConfigureWarnings(Default(Throw))</c> is a statement about what the test author
+    ///     wrote, and the server runs a tree this provider generated.
+    /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => _testStoreProperties.OnAddOptions?.Invoke(builder.UseInternalServiceProvider(ServiceProvider))
-            ?? builder.UseInternalServiceProvider(ServiceProvider);
+    {
+        builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
+
+        return _testStoreProperties.OnAddOptions?.Invoke(builder) ?? builder;
+    }
 
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(

@@ -2101,6 +2101,27 @@ failures are left red and classified rather than worked immediately.
       where the exception is right and raised from a different EF path, so the message differs by
       two words.
 
+- [x] **A29.** The server reports an error the way the client would.
+      **`Total tests: 13745, Passed: 13684, Failed: 13, Skipped: 48`** — FIXED 1, BROKEN none.
+      **`QueryFilterFuncletizationTestBase` is 28 of 28.** ✅ `<this commit>`
+
+      `Local_variable_from_OnModelCreating_can_throw_exception` differed from EF's expected message
+      by two words — `CoreStrings.ExpressionParameterization**Exception**` where EF expects
+      `…ExceptionSensitive`, which also names the expression that failed. Right exception, right
+      place; the sensitive variant is simply what EF emits when
+      `EnableSensitiveDataLogging` is on.
+
+      **Which told us where it was raised.** The spec fixtures set that option on the *client*
+      (`FixtureBase.AddOptions`), so a client-side throw would already have had the sensitive
+      wording. It did not, so the query filter's closure was being evaluated on the **server**,
+      whose options this test store builds itself and which had no such setting. The store now
+      sets it, and the message matches.
+
+      Deliberately only that one option, not the rest of `AddOptions`: its
+      `ConfigureWarnings(Default(Throw))` is a statement about the query the *test author* wrote,
+      and the server runs a tree this provider generated from it — A22 is what that distinction
+      costs when it is missed.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
