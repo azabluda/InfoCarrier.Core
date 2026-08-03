@@ -1381,7 +1381,8 @@ failures are left red and classified rather than worked immediately.
       mistake in a politer form. What the count needs is the table above, not a smaller number.
 
 - [x] **A3.** A shadow navigation cannot report itself loaded either. **`Total tests: 12878,
-      Passed: 12475, Failed: 374, Skipped: 29`** — FIXED 20, BROKEN none. ✅ `<this commit>`
+      Passed: 12463, Failed: 386, Skipped: 29`** — FIXED 8, BROKEN none, and the reason is gone
+      from the whole suite. ✅ `<this commit>`
 
       L18 fixed `DynamicValueMapper.MapRowMembers`, which read a loaded navigation's value through
       `GetGetter()` and threw on one with no CLR member. `ServerQueryExecutor.IsLoaded` has the
@@ -1391,6 +1392,11 @@ failures are left red and classified rather than worked immediately.
       An untracked entity with a shadow navigation has nowhere for the value to be, so the answer
       is "not loaded" rather than an exception. The tracked path above it is unaffected: an entry
       knows what it loaded without reading the entity.
+
+      **Twenty tests stopped throwing and eight of them pass.** The other twelve now fail on
+      `Assert.Equal` — they got past the exception and into the `ManyToMany*Load` residual, which
+      is where they belonged all along. Worth stating plainly because the count moved by 8 while
+      the fix did what it was aimed at for all 20.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

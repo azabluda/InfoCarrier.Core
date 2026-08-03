@@ -224,6 +224,18 @@ public class ServerQueryExecutor
                 return entry.IsLoaded(navigation);
             }
 
+            // A shadow navigation has no CLR member, and `GetGetter` on one throws rather than
+            // returning null: "no backing field could be found ... and the property does not have
+            // a getter". A *unidirectional* many-to-many is where they come from — EF declares
+            // the inverse skip navigation with no property behind it. This is the same defect
+            // L18 fixed in `DynamicValueMapper.MapRowMembers`, at the second site; nothing
+            // adopted at the time reached this one. An untracked entity has nowhere for the value
+            // to be, so the answer is "not loaded" rather than an exception.
+            if (navigation.IsShadowProperty())
+            {
+                return false;
+            }
+
             object? related = navigation.GetGetter().GetClrValue(entity);
             return related is not null
                 && (navigation.IsCollection || HasKey(related, navigation.TargetEntityType));
