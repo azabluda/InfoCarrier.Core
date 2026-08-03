@@ -762,6 +762,26 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       "no entry" to "an entry whose `Payload` is null". Worse than having none. Those need the
       join row on the wire, which is a change to the result format and is not this step.
 
+- [ ] **L8.** The rest of the `ManyToMany` join-row residual — **two attempts measured, both
+      neutral, both reverted.** Recorded so they are not repeated.
+
+      L7 reconstructs a join row only when the join type is nothing but its two foreign keys.
+      `EntityOne.TwoSkip` fails that test on a third property, `JoinOneToTwoExtraId`, and a probe
+      confirmed the guard rejecting exactly there — 40 hits, all `SKIP payload`. `JoinOneToTwo`
+      itself declares only `OneId`/`TwoId`, so that property is a convention-created shadow
+      foreign key, not a user payload.
+
+      Two relaxations of the guard were tried and **both changed nothing at all** — same count,
+      byte-identical failing set:
+
+      1. allow a non-key property that is shadow *and nullable*;
+      2. allow any non-key property that is shadow (no CLR member for anyone to have set).
+
+      So the guard is **not** what blocks these 32 `*dangling_join*` tests. Something earlier in
+      `TrackJoinEntity` bails, or the verification query never reports the skip navigation as
+      loaded in the first place. Probe `ReadJoinKey` and the `IsLoadedNavigation` members of the
+      verification response before touching the guard again.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
