@@ -97,23 +97,22 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11248, Failed: 67, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11254, Failed: 61, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
 
-Lazy loading works (Phase L): it began at 505 of 505 failing and is now 25 of 825 across
+Lazy loading works (Phase L): it began at 505 of 505 failing and is now 22 of 825 across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`. Do not read the failure count as a long tail; subtract that family
 first.
 
 Not yet implemented, in rough priority order:
-- **The `ManyToManyTracking` residual** — 11 of 200, plus 1 `PropertyValues` join-entity test.
-  Join rows are persisted, tracked, travel on the wire for CLR-typed join entities, and since
-  L17 a shared-type (`Dictionary<string, object>`) join entity can be a query root. What is left
-  is the payload: a shared-type join entity is still rebuilt client-side and decodes as a shape,
-  so the wire's pairs are rejected — "the value [OneId, 20] is not of type System.String". The
-  largest family left.
-- **Lazy loading** — 25 failures left across `Load` and `LazyLoadProxy`. Phase L in
+- **The `ManyToManyTracking` residual** — 8 of 200. Join rows are persisted, tracked, and travel
+  on the wire; since L17 a shared-type (`Dictionary<string, object>`) join entity can be a query
+  root, and since L20 it is named by the change tracker rather than by its CLR type. What is left
+  is the payload: `MapRowMembers` still gates shared-type join rows off the wire
+  (`!skip.JoinEntityType.HasSharedClrType`) and the client rebuilds them, which cannot carry one.
+- **Lazy loading** — 22 failures left across `Load` and `LazyLoadProxy`. Phase L in
   `docs/implementation-plan.md`.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,

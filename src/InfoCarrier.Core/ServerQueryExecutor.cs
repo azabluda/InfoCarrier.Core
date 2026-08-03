@@ -234,6 +234,13 @@ public class ServerQueryExecutor
         bool IsTracked(object entity)
             => stateManager.TryGetEntry(entity) is not null;
 
+        // The entity type of an instance whose CLR type cannot name one — a shared-type entity,
+        // where several entity types are the same `Dictionary<string, object>`. The tracker is
+        // the only thing that knows which, and it answers null for anything that is not an
+        // entity at all, which is most of what passes through here.
+        IEntityType? FindEntityType(object entity)
+            => stateManager.TryGetEntry(entity)?.EntityType;
+
         // A shadow property — a TPH discriminator, an unmapped foreign key — has no CLR member,
         // so its value lives in the entry. `GetGetter()` on one does not return null, it throws.
         // An untracked entity has no entry and therefore no shadow state to report.
@@ -287,7 +294,7 @@ public class ServerQueryExecutor
         {
             nodes.Add(item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
-                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities));
+                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType));
         }
 
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(

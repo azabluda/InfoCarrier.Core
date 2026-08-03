@@ -31,6 +31,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     private Func<object, bool>? _isTracked;
     private Func<object, IProperty, object?>? _readShadowValue;
     private Func<object, ISkipNavigation, IEnumerable<object>>? _readJoinEntities;
+    private Func<object, IEntityType?>? _findEntityType;
 
     /// <summary>
     ///     Routes an entity-keyed node to the client materializer, wherever in the graph it
@@ -102,18 +103,25 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     field could be found ... and the property does not have a getter") rather than
     ///     returning anything to skip.
     /// </param>
+    /// <param name="findEntityType">
+    ///     Names the entity type of an instance the CLR type cannot identify. A shared-type
+    ///     entity is exactly that case: every many-to-many join entity is a
+    ///     <c>Dictionary&lt;string, object&gt;</c>, and several of them are that same type.
+    /// </param>
     public DynamicValueNode ToRowValue(
         object? value,
         Type type,
         Func<object, INavigationBase, bool> isNavigationLoaded,
         Func<object, bool> isTracked,
         Func<object, IProperty, object?> readShadowValue,
-        Func<object, ISkipNavigation, IEnumerable<object>> readJoinEntities)
+        Func<object, ISkipNavigation, IEnumerable<object>> readJoinEntities,
+        Func<object, IEntityType?> findEntityType)
     {
         _isNavigationLoaded = isNavigationLoaded;
         _isTracked = isTracked;
         _readShadowValue = readShadowValue;
         _readJoinEntities = readJoinEntities;
+        _findEntityType = findEntityType;
         try
         {
             return ToDynamicValue(value, type);
@@ -124,6 +132,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             _isTracked = null;
             _readShadowValue = null;
             _readJoinEntities = null;
+            _findEntityType = null;
         }
     }
 
@@ -160,6 +169,17 @@ public class DynamicValueMapper : IDynamicValueMapper
         // the proxy arrived as the declared type and every row of the F1 model was refused by the
         // deserialization allowlist (ADR-008). EF walks base types for the same reason.
         IEntityType? entityType = _model?.FindRuntimeEntityType(type);
+
+        // No CLR type can identify a *shared-type* entity: every many-to-many join entity is a
+        // `Dictionary<string, object>` and several of them are that same type, told apart only
+        // by name. So the lookup above returns null and the value used to fall through to the
+        // collection branch — a `Dictionary` is enumerable, and rebuilding it as one produced
+        // "the value [OneId, 1] is not of type System.String". Ask what actually holds the
+        // instance instead: on the server every value mapped here came out of the change
+        // tracker, and the tracker knows which shared type this one is.
+        entityType ??= value is not null && _findEntityType is not null
+            ? _findEntityType(value)
+            : null;
 
         // A row is mapped by its runtime type, but a *navigation* is mapped by the type the
         // navigation declares — and in a TPH hierarchy those differ. `Root.OptionalSingle` is

@@ -1062,6 +1062,36 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       transport envelope carries `byte[]` payloads and never a node graph, so it could not have
       mattered, and 256 on it was config that did nothing. Both runs report 67.
 
+- [x] **L20.** A shared-type entity is named by what holds it, not by its CLR type.
+      **`Total tests: 11344, Passed: 11254, Failed: 61, Skipped: 29`** — FIXED 6, BROKEN none.
+      ✅ `<this commit>`
+
+      `MapToNode` decided "is this an entity" with `IModel.FindRuntimeEntityType(Type)`, and no
+      CLR type can identify a **shared-type** entity: every many-to-many join entity is a
+      `Dictionary<string, object>` and several of them are that same type, told apart only by
+      name. So the lookup returned null, the value fell through to the *collection* branch — a
+      dictionary is enumerable — and rebuilding it as one produced "the value [OneId, 1] is not
+      of type System.String and cannot be used in this generic collection".
+
+      On the server every value mapped here came out of the change tracker, and the tracker knows
+      which shared type an instance is. `ToRowValue` therefore takes a `findEntityType` hook
+      alongside the existing `isTracked` / `readShadowValue` / `readJoinEntities` ones, backed by
+      `stateManager.TryGetEntry(entity)?.EntityType`, and `MapToNode` falls back to it. It
+      answers null for everything that is not a tracked entity, which is most of what passes
+      through, and its lookup is reference-keyed — so a value whose `GetHashCode` throws is safe,
+      which `GraphUpdatesTestBase.MyDiscriminator` requires.
+
+      **Three of the six fixed are not many-to-many at all.** An *owned* type is shared-typed too,
+      so `Lazy_loading_finds_correct_entity_type_with_*` had the same defect, reported as "Type
+      'LazyLoadProxyTestBase+Culture' …" rather than as a dictionary. That reason is now gone from
+      the suite, along with both `[OneId, …] is not of type System.String` ones.
+
+      `ManyToManyTracking` is 23 → 8 across L18–L20. What remains is the *payload*: join rows for
+      a shared-type join entity are still gated out of the wire in `MapRowMembers`
+      (`!skip.JoinEntityType.HasSharedClrType`, L11) and rebuilt client-side, which cannot carry
+      one. That gate is now the only thing left in the way, and this step removed the reason it
+      was put there.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
