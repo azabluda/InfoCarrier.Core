@@ -2293,6 +2293,42 @@ failures are left red and classified rather than worked immediately.
       the second option is there. Not attempted here — it is a change to the shape of what ships,
       and this plan's rule is one experiment per measurement.
 
+- [x] **A36.** A fragment lifted out of a conditional branch travels wrapped in its test.
+      **`Total tests: 16099, Passed: 15927, Failed: 80, Skipped: 92`** — FIXED 2, BROKEN none.
+      **The `Nullable object must have a value` family is gone, 26 → 0.** ✅ `<this commit>`
+
+      A35's rule, implemented. `CollectFragments` now recognises `ConditionalExpression` instead of
+      descending into it blindly: a fragment taken from a branch records the test that guarded it
+      (negated for the false branch, `AndAlso`-chained through nested conditionals), and `Guarded`
+      wraps the slot as `test ? fragment : default` on its way into the tuple. The client body is
+      untouched — it still holds the conditional and only reads the slot down the branch it belongs
+      to, so the default is never observed.
+
+      **Two things this cost, both found by measuring rather than by reading:**
+
+      1. `Expression.Default(type)` for the else-arm made it **worse**: 82 → 86. A
+         `DefaultExpression` is not one of `IsSerializableKind`'s node kinds (research-findings §5),
+         so every guarded fragment became unshippable and its enclosing call fell to the residual —
+         where the navigation it read had no shipped query to carry it. Six tests that pass today
+         broke on `The client-side part of the query reads navigation …`. An
+         `Expression.Constant(default, type)` is the same value and *is* a serializable kind.
+      2. The first cut also **refused to lift** from a branch whose test was not server-ok, on the
+         principle that an unreproducible guard means no lift. Measured byte-identical to the
+         `Default` version — the six were never that arm — and it is a needless risk, so the
+         unguardable case keeps the prior unguarded descent. Every conditional in this corpus whose
+         test the analyzer will not ship compares an **entity** to null.
+
+      **Left red: 24 of the 26, now failing as `NullReferenceException`** — and somewhere else
+      entirely. The stack is `Enumerable.IEnumerableWhereIterator.MoveNext` inside
+      `QueryExecutor.Guarded`: the server now returns the right rows, and the *client residual*
+      dereferences them. `Select(x => new { …, Nullable = cond ? new { … } : null }).Where(x =>
+      x.Nullable.SquadId == 1)` leaves the `Where` on the client, where `x.Nullable` is null for a
+      tag with no gear and C# throws. EF expects SQL null semantics, under which the row is simply
+      filtered out — for two of these variants EF even supplies a second expected lambda
+      (`x.Nullable != null && …`) acknowledging the difference. **The client residual would need
+      null-propagating semantics**, which is a feature and not a fix; classified here, not
+      attempted.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

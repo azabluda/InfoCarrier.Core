@@ -137,7 +137,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         List<Expression> fragments = [];
-        CollectFragments(selector!.Body, bodyAnalysis, selector.Parameters, fragments);
+        var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        CollectFragments(selector!.Body, bodyAnalysis, selector.Parameters, fragments, guards);
         if (fragments.Count == 0)
         {
             // A body that reads nothing from the row — leave it to the plain cut.
@@ -146,7 +147,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         IReadOnlySet<Expression> consumed = OperatorSourceCollector.Find(selector.Body);
 
-        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Materialized(f, consumed))]);
+        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))]);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
@@ -293,7 +294,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         ParameterExpression[] rowParameters = [.. innerSelector.Parameters, outer];
 
         List<Expression> fragments = [];
-        CollectFragments(innerSelector.Body, bodyAnalysis, rowParameters, fragments);
+        var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        CollectFragments(innerSelector.Body, bodyAnalysis, rowParameters, fragments, guards);
         if (fragments.Count == 0)
         {
             return null;
@@ -301,7 +303,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         IReadOnlySet<Expression> consumed = OperatorSourceCollector.Find(innerSelector.Body);
 
-        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Materialized(f, consumed))]);
+        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))]);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
@@ -445,28 +447,101 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     The maximal subexpressions of a projection body that the server can evaluate for a row.
     /// </summary>
     /// <remarks>
-    ///     A fragment must read the row: a body constant needs no round trip and stays on the
-    ///     client, where it costs nothing.
+    ///     <para>
+    ///         A fragment must read the row: a body constant needs no round trip and stays on the
+    ///         client, where it costs nothing.
+    ///     </para>
+    ///     <para>
+    ///         A fragment taken from the branch of a conditional carries that conditional's test in
+    ///         <paramref name="guards" />. See <see cref="Guarded" /> for why.
+    ///     </para>
     /// </remarks>
     private static void CollectFragments(
         Expression node,
         BoundaryAnalysis analysis,
         IReadOnlyCollection<ParameterExpression> rowParameters,
-        List<Expression> fragments)
+        List<Expression> fragments,
+        IDictionary<Expression, Expression> guards,
+        Expression? guard = null)
     {
         NodeFacts facts = analysis.FactsFor(node);
 
         if (facts.ServerOk && facts.Free.Count > 0 && facts.Free.All(rowParameters.Contains))
         {
             fragments.Add(node);
+            if (guard is not null)
+            {
+                guards[node] = guard;
+            }
+
+            return;
+        }
+
+        if (node is ConditionalExpression conditional)
+        {
+            CollectFragments(conditional.Test, analysis, rowParameters, fragments, guards, guard);
+
+            // A test the server cannot evaluate cannot guard anything, and refusing to lift the
+            // branches under one is worse than lifting them unguarded: it costs six tests that
+            // pass today — every one of them guarded by an *entity* compared to null, which this
+            // analyzer will not ship — and fixes none. Measured, A36.
+            NodeFacts test = analysis.FactsFor(conditional.Test);
+            bool guardable = test.ServerOk && test.Free.All(rowParameters.Contains);
+
+            CollectFragments(
+                conditional.IfTrue, analysis, rowParameters, fragments, guards,
+                guardable ? And(guard, conditional.Test) : guard);
+            CollectFragments(
+                conditional.IfFalse, analysis, rowParameters, fragments, guards,
+                guardable ? And(guard, Expression.Not(conditional.Test)) : guard);
             return;
         }
 
         foreach (Expression child in ChildrenOf(node))
         {
-            CollectFragments(child, analysis, rowParameters, fragments);
+            CollectFragments(child, analysis, rowParameters, fragments, guards, guard);
         }
     }
+
+    private static Expression And(Expression? guard, Expression test)
+        => guard is null ? test : Expression.AndAlso(guard, test);
+
+    /// <summary>
+    ///     Wraps a fragment lifted out of a conditional branch in the test that guarded it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Select(x =&gt; new { x.Note, Nullable = x.GearNickName != null ? new { x.Gear.Nickname,
+    ///         x.Gear.SquadId } : null })</c> is client-typed at the conditional, so
+    ///         <see cref="CollectFragments" /> descends through it and takes <c>x.Gear.Nickname</c>
+    ///         and <c>x.Gear.SquadId</c> as fragments of their own — <em>outside the test that was
+    ///         guarding them</em>. The server then evaluates <c>x.Gear.SquadId</c> for a tag with no
+    ///         gear, which is exactly the dereference the <c>!= null</c> existed to prevent:
+    ///         <c>Nullable object must have a value</c>, 26 times over
+    ///         <c>GearsOfWarQueryTestBase</c>.
+    ///     </para>
+    ///     <para>
+    ///         The slot travels as <c>test ? fragment : default</c>, so the server evaluates it only
+    ///         where the projection would have. The client body still holds the conditional and only
+    ///         reads the slot down the branch it belongs to, so the default is never observed.
+    ///     </para>
+    ///     <para>
+    ///         The default is a <see cref="ConstantExpression" /> and not
+    ///         <see cref="Expression.Default(Type)" />: a <c>DefaultExpression</c> is not one of the
+    ///         serializable kinds (research-findings §5), so a guard built from one made the whole
+    ///         rewritten call unshippable — six tests fell back to the residual, where the
+    ///         navigation they read had no query to carry it.
+    ///     </para>
+    /// </remarks>
+    private static Expression Guarded(
+        Expression shipped, Expression fragment, IReadOnlyDictionary<Expression, Expression> guards)
+        => guards.TryGetValue(fragment, out Expression? guard)
+            ? Expression.Condition(
+                guard,
+                shipped,
+                Expression.Constant(
+                    shipped.Type.IsValueType ? Activator.CreateInstance(shipped.Type) : null, shipped.Type))
+            : shipped;
 
     private static IEnumerable<Expression> ChildrenOf(Expression node)
     {
