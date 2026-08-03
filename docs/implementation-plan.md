@@ -536,7 +536,7 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
 
       | # | Symptom | Diagnosis |
       |---|---|---|
-      | 60 | `ArgumentException: An item with the same key has already been added` | The same signature as the 12-test `Mark_explicitly_set_*_stable_*` family in the `GraphUpdates` residual below: client and server both generate, and a stable generator's value is not a placeholder, so S3c-9's machinery does not cover it. The largest single family in the repo now. |
+| 60 | `ArgumentException: An item with the same key has already been added`, thrown from `InMemoryTable.Create` | The server inserts a row whose key already exists. Every one is a `Can_insert_many_to_many*` test, and those tests deliberately add **the same relationship from both ends** — EF's own source marks the second one `// 21 - 11 (Dupe)` — which EF is expected to collapse into a single join row. The keys are the tests' own explicit sentinels (7711/7721), not generated, so this is not the stable-value-generator story an earlier version of this table guessed at. Start by counting the entries the client sends for one of these saves against the rows the server inserts. |
       | 21 | `Assert.Equal` values differ | Unclassified. |
       | 6 | "No backing field could be found for property `UnidirectionalEntityTwo.…`" | Unidirectional skip navigations, whose join key lives in shadow state with no CLR member. |
       | 5 | `JsonException: A possible object cycle was detected` | **A serializer defect, and the only one here that is squarely ours.** A cyclic entity graph reaches `System.Text.Json` without the reference handling the rest of the wire format uses. |
