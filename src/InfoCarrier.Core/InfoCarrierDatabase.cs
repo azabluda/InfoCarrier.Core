@@ -22,12 +22,17 @@ public class InfoCarrierDatabase : IDatabase
 
     private readonly IInfoCarrierClient _client;
     private readonly IExpressionSerializer _expressionSerializer;
+    private readonly ICurrentDbContext _currentContext;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierDatabase" /> class.
     /// </summary>
-    public InfoCarrierDatabase(IDbContextOptions options, IExpressionSerializer expressionSerializer)
+    public InfoCarrierDatabase(
+        IDbContextOptions options,
+        IExpressionSerializer expressionSerializer,
+        ICurrentDbContext currentContext)
     {
+        _currentContext = currentContext;
         _client = options.Extensions
             .OfType<InfoCarrierOptionsExtension>()
             .First()
@@ -133,7 +138,7 @@ public class InfoCarrierDatabase : IDatabase
         };
 
         Common.SaveChangesResult result = await _client
-            .SaveChangesAsync(request, cancellationToken)
+            .SaveChangesAsync(request, _currentContext.Context, cancellationToken)
             .ConfigureAwait(false);
 
         ApplyGeneratedValues(entries, result, mapper);

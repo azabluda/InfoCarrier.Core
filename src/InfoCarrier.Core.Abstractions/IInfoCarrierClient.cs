@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core;
 
@@ -19,17 +20,31 @@ public interface IInfoCarrierClient
     ///     Executes a query on the server and returns the materialized wire result.
     /// </summary>
     /// <param name="request">The serialized query request.</param>
+    /// <param name="clientContext">
+    ///     The context the query is running against. A transport needs it for anything the wire
+    ///     format does not carry but the server must know: EF applies a context-dependent query
+    ///     filter — <c>HasQueryFilter(c =&gt; c.Name.StartsWith(context.TenantPrefix))</c> — on
+    ///     the *server's* model, using the *server's* context, and the client's value has to get
+    ///     there somehow. v1 passed the context for the same reason.
+    /// </param>
     /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>
     /// <returns>The query result rows and metadata.</returns>
-    Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default);
+    Task<QueryDataResult> QueryDataAsync(
+        QueryDataRequest request,
+        DbContext clientContext,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Persists change-tracker entries on the server and returns store-generated values.
     /// </summary>
     /// <param name="request">The serialized change entries.</param>
+    /// <param name="clientContext">The context the save is running against.</param>
     /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>
     /// <returns>Store-generated values keyed back to the submitted entries.</returns>
-    Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default);
+    Task<SaveChangesResult> SaveChangesAsync(
+        SaveChangesRequest request,
+        DbContext clientContext,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Begins a server-side transaction and returns a token identifying it.

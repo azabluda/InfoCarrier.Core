@@ -833,6 +833,24 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       absent from the FIXED list rather than present in BROKEN. The two paths are now mutually
       exclusive by name.
 
+- [x] **L12.** A request carries the context it is running against. **`Total tests: 11344,
+      Passed: 11221, Failed: 94, Skipped: 29`** — FIXED 6, BROKEN none. ✅ `<this commit>`
+
+      `NorthwindQueryFiltersQueryTestBase` sets `context.TenantPrefix = "F"` and expects eight
+      customers; we returned seven. A query filter closes over a **context property**, and
+      nothing carried it across: ADR-006 captures the client's tree *before* EF applies query
+      filters, so the filter is applied on the far side, by the server's model, reading the
+      server's context. The client's value never left the client.
+
+      `SharedTestStoreProperties.CopyDbContextParameters` was written for exactly this and had
+      **never been invoked** — declared, assigned by both Northwind fixtures, and dead. Nothing
+      read it. The three tests had been failing since the fixture was written.
+
+      `IInfoCarrierClient.QueryDataAsync` and `SaveChangesAsync` now take the client
+      `DbContext`, which is what v1's interface did and for the same reason. A transport needs it
+      for anything the wire format does not carry but the server must know; the test store uses
+      it to copy per-request parameters onto the server context as that context is resolved.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

@@ -83,7 +83,7 @@ internal sealed class QueryExecutor<TElement>
         foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
             QueryDataResult result = _client
-                .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.CancellationToken)
+                .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.Context, _queryContext.CancellationToken)
                 .GetAwaiter()
                 .GetResult();
             results.Add(Materialize(serverQuery, result));
@@ -148,7 +148,7 @@ internal sealed class QueryExecutor<TElement>
                     // than a completed query.
                     cancellationToken.ThrowIfCancellationRequested();
                     result = await _client
-                        .QueryDataAsync(BuildRequest(serverQuery, async: true), cancellationToken)
+                        .QueryDataAsync(BuildRequest(serverQuery, async: true), _queryContext.Context, cancellationToken)
                         .ConfigureAwait(false);
                 }
             }

@@ -51,10 +51,10 @@ public class InfoCarrierTestHelpers : TestHelpers
 
         public string ServerUrl => nameof(InfoCarrierTestHelpers);
 
-        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
+        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
             => throw new NotSupportedException(Message);
 
-        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
+        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
             => throw new NotSupportedException(Message);
 
         public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)

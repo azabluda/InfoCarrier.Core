@@ -24,12 +24,18 @@ public sealed class TransportInfoCarrierClient : IInfoCarrierClient
     }
 
     /// <inheritdoc />
-    public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
+    public async Task<QueryDataResult> QueryDataAsync(
+        QueryDataRequest request,
+        Microsoft.EntityFrameworkCore.DbContext clientContext,
+        CancellationToken cancellationToken = default)
         => await RoundTripAsync<QueryDataRequest, QueryDataResult>(
             InfoCarrierOperation.Query, request, cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
+    public async Task<SaveChangesResult> SaveChangesAsync(
+        SaveChangesRequest request,
+        Microsoft.EntityFrameworkCore.DbContext clientContext,
+        CancellationToken cancellationToken = default)
         => await RoundTripAsync<SaveChangesRequest, SaveChangesResult>(
             InfoCarrierOperation.SaveChanges, request, cancellationToken).ConfigureAwait(false);
 

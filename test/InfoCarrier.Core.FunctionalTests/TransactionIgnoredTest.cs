@@ -86,10 +86,10 @@ public class TransactionIgnoredTest
     /// </summary>
     private sealed class UnreachableClient : IInfoCarrierClient
     {
-        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
+        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The server was contacted.");
 
-        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
+        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The server was contacted.");
 
         public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)

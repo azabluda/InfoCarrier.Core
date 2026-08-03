@@ -62,7 +62,22 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // class failing identically before any of them ran.
         if (ServerContextType != typeof(DbContext))
         {
-            services = services.AddScoped<DbContext>(sp => (DbContext)sp.GetRequiredService(ServerContextType));
+            SharedTestStoreProperties props = _testStoreProperties;
+            services = services.AddScoped<DbContext>(sp =>
+            {
+                var serverContext = (DbContext)sp.GetRequiredService(ServerContextType);
+
+                // The one place a request's client context and its server context are both in
+                // hand. `CopyDbContextParameters` had been declared and assigned since the
+                // factory was written and never invoked, which is why three query-filter tests
+                // read the server's default tenant instead of the client's.
+                if (CurrentClientContext.Value is { } clientContext)
+                {
+                    props.CopyDbContextParameters?.Invoke(clientContext, serverContext);
+                }
+
+                return serverContext;
+            });
         }
 
         ServiceProvider = services.BuildServiceProvider(validateScopes: true);
@@ -99,18 +114,55 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             ?? builder.UseInternalServiceProvider(ServiceProvider);
 
     /// <inheritdoc />
-    public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
-        => await RoundTripAsync(
+    public async Task<QueryDataResult> QueryDataAsync(
+        QueryDataRequest request,
+        DbContext clientContext,
+        CancellationToken cancellationToken = default)
+    {
+        using var _ = WithClientContext(clientContext);
+        return await RoundTripAsync(
             request,
             (r, ct) => CreateServer().QueryDataAsync(r, ct),
             cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
-    public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
-        => await RoundTripAsync(
+    public async Task<SaveChangesResult> SaveChangesAsync(
+        SaveChangesRequest request,
+        DbContext clientContext,
+        CancellationToken cancellationToken = default)
+    {
+        using var _ = WithClientContext(clientContext);
+        return await RoundTripAsync(
             request,
             (r, ct) => CreateServer().SaveChangesAsync(r, ct),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     The client context of the request currently in flight, for the server context factory
+    ///     below to copy per-request parameters from.
+    /// </summary>
+    /// <remarks>
+    ///     A context property the model reads — <c>NorthwindContext.TenantPrefix</c>, which a
+    ///     query filter closes over — never reaches the wire: the client captures its tree before
+    ///     EF applies query filters, and the *server* applies its own model's filter using its
+    ///     own context. So the value has to be carried out of band. `AsyncLocal` because the
+    ///     server is a singleton serving concurrent requests, and the scope is one request.
+    /// </remarks>
+    private static readonly AsyncLocal<DbContext?> CurrentClientContext = new();
+
+    private static IDisposable WithClientContext(DbContext clientContext)
+    {
+        DbContext? previous = CurrentClientContext.Value;
+        CurrentClientContext.Value = clientContext;
+        return new Restore(() => CurrentClientContext.Value = previous);
+    }
+
+    private sealed class Restore(Action onDispose) : IDisposable
+    {
+        public void Dispose() => onDispose();
+    }
 
     /// <inheritdoc />
     public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
