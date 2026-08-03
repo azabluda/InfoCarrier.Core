@@ -97,7 +97,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11254, Failed: 61, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11262, Failed: 53, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
@@ -107,13 +107,11 @@ Lazy loading works (Phase L): it began at 505 of 505 failing and is now 22 of 82
 first.
 
 Not yet implemented, in rough priority order:
-- **The `ManyToManyTracking` residual** — 8 of 200. Join rows are persisted, tracked, and travel
-  on the wire; since L17 a shared-type (`Dictionary<string, object>`) join entity can be a query
-  root, and since L20 it is named by the change tracker rather than by its CLR type. What is left
-  is the payload: `MapRowMembers` still gates shared-type join rows off the wire
-  (`!skip.JoinEntityType.HasSharedClrType`) and the client rebuilds them, which cannot carry one.
 - **Lazy loading** — 22 failures left across `Load` and `LazyLoadProxy`. Phase L in
   `docs/implementation-plan.md`.
+- **The query residual** — 22, unchanged since Z7 and the largest family left. A true long tail:
+  11 distinct methods, each with its own cause (client-eval navigation reads, untranslatable
+  subqueries, GroupBy shapes). No shared root cause, so it is individual work.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced

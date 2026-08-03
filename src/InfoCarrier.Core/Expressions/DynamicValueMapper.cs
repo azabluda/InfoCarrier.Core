@@ -389,11 +389,12 @@ public class DynamicValueMapper : IDynamicValueMapper
             // from what it already has: a payload and a join table's extra foreign keys exist
             // only here. Loading the skip collection materialized them, so they are tracked and
             // free to read.
-            // Not a shared-type join entity: those are `Dictionary<string, object>` and cannot
-            // be decoded as a row on the far side, so the client rebuilds them instead.
-            if (navigation is ISkipNavigation skip
-                && !skip.JoinEntityType.HasSharedClrType
-                && _readJoinEntities is not null)
+            // Shared-type join entities travel too, since L20: they are named by the change
+            // tracker rather than by their `Dictionary<string, object>` CLR type, so they decode
+            // as rows like any other. The client's own reconstruction stays only as the fallback
+            // for a navigation no rows were sent for, and the two remain mutually exclusive by
+            // navigation name (L11).
+            if (navigation is ISkipNavigation skip && _readJoinEntities is not null)
             {
                 List<object> joinRows = [.. _readJoinEntities(value, skip)];
                 if (joinRows.Count > 0)

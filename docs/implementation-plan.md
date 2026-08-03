@@ -1092,6 +1092,26 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       one. That gate is now the only thing left in the way, and this step removed the reason it
       was put there.
 
+- [x] **L21.** A shared-type join entity's rows travel on the wire. **`Total tests: 11344,
+      Passed: 11262, Failed: 53, Skipped: 29`** — FIXED 8, BROKEN none.
+      **`ManyToManyTracking` is 0 of 200.** ✅ `<this commit>`
+
+      L11 gated shared-type join rows off the wire (`!skip.JoinEntityType.HasSharedClrType`)
+      because they could not be decoded on the far side — sending every join type then measured
+      29 fixed against 27 broken. L20 removed that reason, so the gate came out and the payload
+      travels: eight `*_with_payload` and `*_self_shared_*` tests, which the client's own
+      reconstruction could never have satisfied because a rebuilt join row has only the two
+      foreign keys.
+
+      The client-side reconstruction (`TrackJoinEntity` / `ReadJoinKey`) stays as the fallback for
+      a navigation no rows were sent for; L11's `sentJoinRows` keeps the two paths mutually
+      exclusive by navigation name. **Whether anything still reaches it is now an open question**
+      — it was written for exactly the case this step removed. It is not dead code by
+      inspection, and proving it either way needs a probe, so it stays until measured.
+
+      This closes queue item 2. The `ManyToMany` residual went 111 → 23 (L7–L11) → 0 (L18–L21),
+      and `PropertyValues` is back to 0 with it.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -1160,14 +1180,13 @@ Three families have left this table. `Update_root_by_collection_replacement_of_*
 failure at all — L16 fixed it in the *query* path. `Save_changed_owned_one_to_one` is likewise
 gone.
 
-### The `PropertyValues` residual — 1 of 196 (2026-08-03, Tier A)
+### The `PropertyValues` residual — 0 of 196, and `ManyToManyTracking` 0 of 200 (2026-08-03, Tier A)
 
-The 16-test `Scalar_store_values_*` / `Scalar_original_values_*` shape this section used to
-describe is **fixed**. What is left is the 3
-`*_for_join_entity_can_be_copied_into_an_object` tests L16 un-hid: they iterate
-`ChangeTracker.Entries<Dictionary<string, object>>()`, which was empty while `Include`d join
-rows went untracked, so the loop asserted nothing and the tests passed. They now reach the
-shared-type join entity limitation and belong to the `ManyToManyTracking` residual, not here.
+Both are clear. The 16-test `Scalar_store_values_*` / `Scalar_original_values_*` shape this
+section used to describe is fixed, and so are the 3
+`*_for_join_entity_can_be_copied_into_an_object` tests L16 un-hid — those had been passing
+vacuously on an empty `ChangeTracker.Entries<Dictionary<string, object>>()`, and L17/L20/L21
+carried them through the shared-type join entity work rather than around it.
 
 The remaining **22** failures outside these classes are M2's query residual, unchanged since Z7,
 plus 1 in `InfoCarrierComplianceTest` — which is the compliance report itself, and moves as
