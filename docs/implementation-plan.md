@@ -2546,6 +2546,24 @@ failures are left red and classified rather than worked immediately.
       override compared against the latter and failed on a substring that looked like a missing
       details clause.
 
+- [x] **A45.** An `Include` is validated against the query as the caller wrote it.
+      **`Total tests: 16100, Passed: 15984, Failed: 24, Skipped: 92`** — FIXED 2, BROKEN none.
+      ✅ `<this commit>`
+
+      `ss.Set<Faction>().Select(f => new { f }).Include(x => x.f.Capital)` was refused, correctly,
+      but by **EF on the server** — and by then the carrier re-carry had renamed the member, so the
+      message said `x.Item1.Capital` where the caller wrote `x.f.Capital`. An internal carrier
+      leaking into a user-facing message is a defect on its own terms; the spec test happens to
+      assert it exactly.
+
+      Two halves, and the first alone measured byte-identical: `RejectInvalidIncludes` now reads
+      the query **as captured**, before flattening and re-carry, *and* it now performs EF's other
+      include check. `x => x.f.Capital` is a perfectly well-formed property path, so
+      `IsPropertyPath` accepted it; what EF rejects is that its **root is not an entity** —
+      `CoreStrings.IncludeOnNonEntity`, which names the whole lambda rather than its body.
+      Shared-type and owned entity types are not reachable by CLR type through
+      `FindEntityType`, so the entity test falls back to scanning `GetEntityTypes()`.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

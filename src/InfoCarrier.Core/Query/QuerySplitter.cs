@@ -58,6 +58,12 @@ public sealed class QuerySplitter
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        // Held for `RejectInvalidIncludes` below, which quotes the offending lambda back to the
+        // caller. Everything under here retypes the tree, and quoting the retyped one names
+        // `x.Item1.Capital` where the caller wrote `x.f.Capital` — an internal carrier leaking
+        // into a user-facing message. The check itself is syntactic and reads the same either way.
+        Expression captured = query;
+
         // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
         // identifier between them holds the *grouping*, which the carrier re-carry below must
         // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …
@@ -94,7 +100,7 @@ public sealed class QuerySplitter
                 $"No part of the query can be executed on the server: '{query}'. {Diagnose(query)}");
         }
 
-        RejectInvalidIncludes(query);
+        RejectInvalidIncludes(captured);
         RejectOpenFragments(analysis);
         RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
 
@@ -241,24 +247,26 @@ public sealed class QuerySplitter
     ///     was found to name an anonymous type, and was quietly treated as a projection boundary
     ///     instead of the mistake it is.
     /// </remarks>
-    private static void RejectInvalidIncludes(Expression query)
+    private void RejectInvalidIncludes(Expression query)
     {
-        if (InvalidIncludeFinder.Find(query) is not { } invalid)
+        if (InvalidIncludeFinder.Find(query, _model) is not var (invalid, onNonEntity))
         {
             return;
         }
 
         throw new InvalidOperationException(
-            Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.InvalidIncludeExpression(invalid));
+            onNonEntity
+                ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.IncludeOnNonEntity(invalid.ToString())
+                : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.InvalidIncludeExpression(invalid));
     }
 
-    private sealed class InvalidIncludeFinder : ExpressionVisitor
+    private sealed class InvalidIncludeFinder(IModel model) : ExpressionVisitor
     {
-        private Expression? _found;
+        private (Expression Invalid, bool OnNonEntity)? _found;
 
-        public static Expression? Find(Expression query)
+        public static (Expression Invalid, bool OnNonEntity)? Find(Expression query, IModel model)
         {
-            var finder = new InvalidIncludeFinder();
+            var finder = new InvalidIncludeFinder(model);
             finder.Visit(query);
             return finder._found;
         }
@@ -270,14 +278,31 @@ public sealed class QuerySplitter
                 && node.Method.Name is nameof(EntityFrameworkQueryableExtensions.Include)
                     or nameof(EntityFrameworkQueryableExtensions.ThenInclude)
                 && node.Arguments.Count == 2
-                && StripQuotes(node.Arguments[1]) is LambdaExpression lambda
-                && !IsPropertyPath(lambda.Body))
+                && StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
             {
-                _found = lambda.Body;
+                if (!IsPropertyPath(lambda.Body))
+                {
+                    _found = (lambda.Body, false);
+                }
+                else if (lambda.Parameters is [{ } root] && !IsEntity(root.Type))
+                {
+                    // EF's other include check, and the reason this whole pass reads the query as
+                    // *captured*: `Select(f => new { f }).Include(x => x.f.Capital)` is a
+                    // well-formed property path whose root is an anonymous type. Left to the
+                    // server it is still refused, but by then the carrier re-carry has renamed
+                    // the member and the message says `x.Item1.Capital` where the caller wrote
+                    // `x.f.Capital`. EF names the whole lambda here, not just its body.
+                    _found = (lambda, true);
+                }
             }
 
             return _found is null ? base.VisitMethodCall(node) : node;
         }
+
+        private bool IsEntity(Type type)
+            => model.FindEntityType(type) is not null
+                // Shared-type and owned entity types are not reachable by CLR type alone.
+                || model.GetEntityTypes().Any(e => e.ClrType == type);
 
         private static bool IsPropertyPath(Expression body)
             => body switch
