@@ -438,10 +438,18 @@ public class ClientResultMaterializer
     ///     indistinguishable from one that was never loaded — so the loader fetches it again, or
     ///     the test simply asks and is told `false`. v1 did the same thing, in its
     ///     <c>SetIsLoadedNoTracking</c>.
+    ///     <para>
+    ///         The loader is looked for on <paramref name="entityType" /> — the type the row
+    ///         actually is — and not on the navigation's declaring type. `UseLazyLoadingProxies`
+    ///         adds the service property only to types it can proxy, so an **abstract** base
+    ///         declaring a navigation never gets one: `LazyLoadProxyTestBase.Parent` is abstract
+    ///         and declares `Children`, while the row is a `Mother`. Asking `Parent` found nothing
+    ///         and the collection came back reporting itself unloaded.
+    ///     </para>
     /// </remarks>
-    private static void SetIsLoadedUntracked(object instance, INavigationBase navigation)
+    private static void SetIsLoadedUntracked(object instance, IEntityType entityType, INavigationBase navigation)
     {
-        IServiceProperty? loaderProperty = navigation.DeclaringEntityType
+        IServiceProperty? loaderProperty = entityType
             .GetServiceProperties()
             .FirstOrDefault(p => p.ClrType == typeof(ILazyLoader));
 
@@ -724,7 +732,7 @@ public class ClientResultMaterializer
                 }
                 else
                 {
-                    SetIsLoadedUntracked(instance, navigation);
+                    SetIsLoadedUntracked(instance, entityType, navigation);
                 }
 
                 continue;
@@ -786,7 +794,7 @@ public class ClientResultMaterializer
             }
             else
             {
-                SetIsLoadedUntracked(instance, navigation);
+                SetIsLoadedUntracked(instance, entityType, navigation);
             }
         }
     }

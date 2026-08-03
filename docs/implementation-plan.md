@@ -1225,6 +1225,30 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       deletion that changes no test and no failure reason is the only kind worth making without
       further argument.
 
+- [x] **L25.** An untracked row's lazy loader is found on the type the row *is*.
+      **`Total tests: 12878, Passed: 12816, Failed: 33, Skipped: 29`** — FIXED 4, BROKEN none.
+      ✅ `<this commit>`
+
+      `SetIsLoadedUntracked` looked for the `ILazyLoader` service property on
+      `navigation.DeclaringEntityType`. `UseLazyLoadingProxies` adds that property only to types
+      it can proxy, so an **abstract** base that declares a navigation never gets one —
+      `LazyLoadProxyTestBase.Parent` is abstract and declares `Children`, and every row is a
+      `Mother` or a `Father`.
+
+      A probe said so in one line, and is worth quoting because the two cases sit side by side:
+
+          SETLOADED type=Child  nav=Parent   prop=LazyLoader loader=LazyLoader instance=ChildProxy
+          SETLOADED type=Parent nav=Children prop=<none>     loader=<null>     instance=MotherProxy
+
+      `Child` is concrete and answers; `Parent` is abstract and does not, so a no-tracking
+      `Include` came back reporting the collection unloaded. Looked up on the row's own entity
+      type instead, which is what EF's `InternalEntityEntry.GetLazyLoader` does — it reads the
+      service property off *this* entry's type, never off a declaring type.
+
+      Lazy is 7 of 825: 4 `Lazy_load_one_to_one_reference_with_recursive_property` (cause settled
+      in L24, the naive fix measured 1126 and was reverted), 1 `Can_serialize_proxies_to_JSON`,
+      and 2 `Fixup_*_reference_after_FK_change_without_DetectChanges`.
+
 ## Phase T — transactions (roadmap M4)
 
 - [x] **T1.** Transactions are remoted; the W3 token is the scope. **`Total tests: 11347,
