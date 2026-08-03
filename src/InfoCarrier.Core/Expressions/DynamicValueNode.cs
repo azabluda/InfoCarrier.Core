@@ -134,6 +134,19 @@ public sealed record DynamicPropertyValue
     ///     conflating them makes the client report an unloaded collection as empty.
     /// </remarks>
     public bool IsLoadedNavigation { get; init; }
+
+    /// <summary>
+    ///     For a loaded <em>skip</em> navigation: whether <see cref="Value" /> carries the join
+    ///     rows behind it rather than the navigation's own targets.
+    /// </summary>
+    /// <remarks>
+    ///     A many-to-many's join rows are entities EF expects in the change tracker, and the
+    ///     client cannot reconstruct them: a payload and a join table's extra foreign keys exist
+    ///     only in the store. The server has them tracked — it had to materialize them to build
+    ///     the skip collection at all — so it sends them, and they materialize like any other
+    ///     row.
+    /// </remarks>
+    public bool IsJoinRows { get; init; }
 }
 
 /// <summary>

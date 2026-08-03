@@ -30,6 +30,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     private Func<object, INavigationBase, bool>? _isNavigationLoaded;
     private Func<object, bool>? _isTracked;
     private Func<object, IProperty, object?>? _readShadowValue;
+    private Func<object, ISkipNavigation, IEnumerable<object>>? _readJoinEntities;
 
     /// <summary>
     ///     Routes an entity-keyed node to the client materializer, wherever in the graph it
@@ -106,11 +107,13 @@ public class DynamicValueMapper : IDynamicValueMapper
         Type type,
         Func<object, INavigationBase, bool> isNavigationLoaded,
         Func<object, bool> isTracked,
-        Func<object, IProperty, object?> readShadowValue)
+        Func<object, IProperty, object?> readShadowValue,
+        Func<object, ISkipNavigation, IEnumerable<object>> readJoinEntities)
     {
         _isNavigationLoaded = isNavigationLoaded;
         _isTracked = isTracked;
         _readShadowValue = readShadowValue;
+        _readJoinEntities = readJoinEntities;
         try
         {
             return ToDynamicValue(value, type);
@@ -120,6 +123,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             _isNavigationLoaded = null;
             _isTracked = null;
             _readShadowValue = null;
+            _readJoinEntities = null;
         }
     }
 
@@ -348,6 +352,29 @@ public class DynamicValueMapper : IDynamicValueMapper
                 Value = ToDynamicValue(related, navigation.ClrType),
                 IsLoadedNavigation = true,
             });
+
+            // A skip navigation's join rows travel with it. EF expects them in the change
+            // tracker, and they are the one part of a many-to-many the client cannot rebuild
+            // from what it already has: a payload and a join table's extra foreign keys exist
+            // only here. Loading the skip collection materialized them, so they are tracked and
+            // free to read.
+            // Not a shared-type join entity: those are `Dictionary<string, object>` and cannot
+            // be decoded as a row on the far side, so the client rebuilds them instead.
+            if (navigation is ISkipNavigation skip
+                && !skip.JoinEntityType.HasSharedClrType
+                && _readJoinEntities is not null)
+            {
+                List<object> joinRows = [.. _readJoinEntities(value, skip)];
+                if (joinRows.Count > 0)
+                {
+                    members.Add(new DynamicPropertyValue
+                    {
+                        Name = navigation.Name,
+                        Value = ToDynamicValue(joinRows, typeof(List<object>)),
+                        IsJoinRows = true,
+                    });
+                }
+            }
         }
 
         return members;

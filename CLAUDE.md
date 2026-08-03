@@ -88,7 +88,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11186, Failed: 129, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11215, Failed: 100, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
@@ -104,9 +104,9 @@ Not yet implemented, in rough priority order:
   tallied by hand — the table it replaced had drifted badly.
 - **Lazy loading** — 27 failures left across `Load` and `LazyLoadProxy`. Phase L in
   `docs/implementation-plan.md`.
-- **The `ManyToManyTracking` residual** — 52 of 200. Join rows are persisted and tracked; what
-  remains is that a join entity with a **CLR payload** cannot be reconstructed on the client and
-  would have to travel on the wire.
+- **The `ManyToManyTracking` residual** — 23 of 200. Join rows are persisted, tracked, and now
+  travel on the wire for CLR-typed join entities; shared-type (`Dictionary<string, object>`)
+  join entities are still rebuilt client-side and cannot carry a payload.
 - **The remaining spec bases** — the rest of the 138 the compliance test reports unadopted.
 - **Transactions** (roadmap M4) — `InfoCarrierTransactionManager` *ignores* them and raises
   `InfoCarrierEventId.TransactionIgnoredWarning` (warning-as-error by default), as EF's

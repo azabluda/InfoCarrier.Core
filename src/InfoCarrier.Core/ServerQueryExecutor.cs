@@ -9,6 +9,7 @@ using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Update;
 
 namespace InfoCarrier.Core;
 
@@ -268,6 +269,44 @@ public class ServerQueryExecutor
         object? ReadShadowValue(object entity, Microsoft.EntityFrameworkCore.Metadata.IProperty property)
             => stateManager.TryGetEntry(entity) is { } entry ? entry.GetCurrentValue(property) : null;
 
+        // The join rows behind a loaded skip navigation. Found by scanning the tracked entries
+        // of the join type for the ones whose foreign key points at this entity: there is no
+        // navigation from a principal to its join rows to read instead — `EntityOne` declares
+        // only `TwoSkip` — and EF materialized them to build that collection, so they are here.
+        IEnumerable<object> ReadJoinEntities(object entity, ISkipNavigation skip)
+        {
+            if (stateManager.TryGetEntry(entity) is not { } ownerEntry)
+            {
+                yield break;
+            }
+
+            IForeignKey foreignKey = skip.ForeignKey;
+            object?[] ownerKey = [.. foreignKey.PrincipalKey.Properties.Select(ownerEntry.GetCurrentValue)];
+
+            foreach (IUpdateEntry candidate in stateManager.Entries)
+            {
+                if (candidate.EntityType != skip.JoinEntityType)
+                {
+                    continue;
+                }
+
+                bool matches = true;
+                for (int i = 0; i < foreignKey.Properties.Count; i++)
+                {
+                    if (!Equals(candidate.GetCurrentValue(foreignKey.Properties[i]), ownerKey[i]))
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (matches)
+                {
+                    yield return candidate.ToEntityEntry().Entity;
+                }
+            }
+        }
+
         static bool HasKey(object entity, IEntityType entityType)
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.GetGetter().GetClrValue(entity) is not null);
@@ -277,7 +316,7 @@ public class ServerQueryExecutor
         {
             nodes.Add(item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
-                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue));
+                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities));
         }
 
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(

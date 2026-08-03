@@ -345,6 +345,8 @@ public class ClientResultMaterializer
         return instance;
     }
 
+
+
     /// <summary>
     ///     Tracks the join row implied by one end of a loaded skip navigation.
     /// </summary>
@@ -603,8 +605,30 @@ public class ClientResultMaterializer
         InternalEntityEntry? entry,
         DynamicValueMapper mapper)
     {
+        // Which skip navigations arrived with their join rows attached. Those must *not* also be
+        // reconstructed: reconstruction would run first — the navigation member precedes the
+        // join-row member — and create a stub without the payload, which identity resolution
+        // would then keep in preference to the real row that follows.
+        var sentJoinRows = new HashSet<string>(
+            row.Properties.Where(p => p.IsJoinRows).Select(p => p.Name),
+            StringComparer.Ordinal);
+
         foreach (DynamicPropertyValue member in row.Properties)
         {
+            // Join rows behind a skip navigation. Materializing them is the whole job — each is
+            // an ordinary entity row, so `MaterializeEntity` tracks it with its payload and its
+            // join-table foreign keys intact. Nothing is assigned to a navigation here; EF's own
+            // fixup wires the graph once the rows are tracked.
+            if (member.IsJoinRows)
+            {
+                foreach (DynamicValueNode joinRow in member.Value?.Items ?? [])
+                {
+                    mapper.FromDynamicValue(joinRow);
+                }
+
+                continue;
+            }
+
             if (!member.IsLoadedNavigation || member.Value is null)
             {
                 continue;
@@ -626,12 +650,17 @@ public class ClientResultMaterializer
                 property.SetValue(instance, related);
             }
 
-            // A skip navigation's join rows are entities in their own right, and EF expects them
-            // in the change tracker: loading `EntityTwo.ThreeSkipFull` leaves five `JoinTwoToThree`
-            // entries beside the six endpoints, which is why the spec asserts eleven. Nothing
-            // else creates them here — the join row is not part of the projection and never
-            // reaches the wire — so a re-query saw six.
-            if (entry is not null && navigation is ISkipNavigation skip && related is System.Collections.IEnumerable targets)
+            // A shared-type join entity is a `Dictionary<string, object>`, and one of those
+            // cannot travel as a row -- it decodes as a shape and the wire's key/value pairs are
+            // rejected by the dictionary itself ("the value [LeftsId, 1] is not of type
+            // System.String"). The server therefore sends join rows only for join types with a
+            // CLR class, and shared ones are still rebuilt here from the two entities they link.
+            // `TrackJoinEntity` no-ops when the row is already tracked, so this stays correct
+            // whichever way the row arrived.
+            if (entry is not null
+                && navigation is ISkipNavigation skip
+                && !sentJoinRows.Contains(member.Name)
+                && related is System.Collections.IEnumerable targets)
             {
                 foreach (object? target in targets)
                 {

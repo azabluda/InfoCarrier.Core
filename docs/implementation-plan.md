@@ -803,20 +803,35 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       and it is printed **even when the fixed and broken lists are both empty** — which is
       precisely the case where it is the only evidence anything happened.
 
-### The `ManyToMany` boundary — what client-side reconstruction cannot reach
+- [x] **L11.** A skip navigation's join rows travel on the wire. **`Total tests: 11344,
+      Passed: 11215, Failed: 100, Skipped: 29`** — FIXED 29, BROKEN none. ✅ `<this commit>`
 
-L7/L9 rebuild a join row from the two entities it links. That works for a join type which is
-its two foreign keys plus convention-created shadow ones, and it cannot go further:
+      L10 recorded this as needing a wire-format change and called it a design problem. It is a
+      wire-format *addition*, and a small one: `DynamicPropertyValue.IsJoinRows`, one member per
+      loaded skip navigation carrying the join rows as ordinary entity rows. The server does not
+      have to find them from a navigation — a principal has none to its join rows, `EntityOne`
+      declares only `TwoSkip` — so it scans its tracked entries for the join type whose foreign
+      key points at the entity. They are there: EF materialized them to build the skip collection.
 
-- **`*_with_payload`, `shared_with_payload`, `self_with_payload`** — the payload has a CLR
-  member and exists only in the store.
-- **`*_suspected_dangling_join` (16)** — the join rows carry `JoinOneToTwoExtraId`, pointing at
-  a `JoinOneToTwoExtra` entity. The test asserts twelve tracked entries including that one and
-  reads `extra.JoinEntities`, which is empty because the reconstructed rows leave that shadow
-  foreign key at its sentinel. Reconstruction cannot invent it.
+      That reaches everything reconstruction could not — a CLR payload, and the
+      `JoinOneToTwoExtraId` of the `*_suspected_dangling_join` family — because the row itself
+      arrives rather than being inferred. `ManyToManyTracking` 52 → 23.
 
-Both need the join row itself on the wire, which is a change to `docs/result-wire-format.md` and
-not a change to the materializer.
+      **Two things the measurement caught that a count would not have.**
+
+      A shared-type join entity is a `Dictionary<string, object>` and cannot travel as a row: it
+      decodes as a shape and the dictionary rejects the wire's pairs — *"the value [LeftsId, 1]
+      is not of type System.String"*. The first attempt sent every join type and measured
+      129 → 127, which looks like progress and was 29 fixed against 27 broken. The server now
+      sends rows only for a join type with a CLR class; shared ones are still rebuilt on the
+      client, and `TrackJoinEntity` stays for exactly that case.
+
+      Then the two paths collided. Reconstruction runs first — the navigation member precedes
+      the join-row member — so it created a stub without the payload, and identity resolution
+      kept the stub in preference to the real row arriving behind it. That cost the whole
+      `*_suspected_dangling_join` family silently: 116 instead of 100, with the family simply
+      absent from the FIXED list rather than present in BROKEN. The two paths are now mutually
+      exclusive by name.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

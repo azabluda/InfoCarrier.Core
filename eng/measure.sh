@@ -40,9 +40,12 @@ dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.lo
 # `|| true`: a red suite is the normal state of this repo (ADR-004), so a non-zero exit from
 # `dotnet test` is data, not an error. A run that never produced a summary line *is* an error,
 # and is caught below.
-dotnet test "$root/InfoCarrier.Core.slnx" --no-build -v q --nologo > "$log" 2>&1 || true
+dotnet test "$root/InfoCarrier.Core.slnx" --no-build -v n --nologo > "$log" 2>&1 || true
 
-summary=$(grep -E "^(Failed!|Passed!)" "$log" | tail -n 1 || true)
+# `-v n` is required for the reasons below — the per-failure `Error Message:` detail is simply
+# absent at `-v q`. It also changes the summary from a `Failed! - Failed: N, Total: T` one-liner
+# to a `Total tests: T` block, so that is what is parsed.
+summary=$(grep -E "^Total tests:" "$log" | tail -n 1 || true)
 if [ -z "$summary" ]; then
     echo "measure: the run produced no summary line — the test host probably crashed." >&2
     tail -5 "$log" >&2
@@ -55,10 +58,16 @@ sed -n 's/^\[xUnit\.net [^]]*\] *\(.*\) \[FAIL\]$/\1/p' "$log" | sort -u > "$sna
 # from "this change fixed what it aimed at and uncovered the next problem in the same tests" --
 # both leave the name list byte-identical. That mistake was made twice in one session and once
 # produced a wrong revert (plan L8), so the reasons are now recorded alongside the names.
-grep -A 3 "Error Message:" "$log"     | grep -E "^[[:space:]]+(System|Microsoft|Assert)"     | sed 's/^ *//' | cut -c1-120 | sort | uniq -c | sort -rn > "$reasons"
+#
+# The `|| true`s matter: an empty reason list is what a green suite looks like, and under
+# `set -euo pipefail` a grep that matches nothing would abort the run instead.
+{ grep -A 3 "Error Message:" "$log" || true; } |
+    { grep -E "^[[:space:]]+(System|Microsoft|Assert)" || true; } |
+    sed 's/^ *//' | cut -c1-120 | sort | uniq -c | sort -rn > "$reasons"
 
-failed=$(sed -n 's/.*Failed: *\([0-9]*\).*/\1/p' <<< "$summary")
-total=$(sed -n 's/.*Total: *\([0-9]*\).*/\1/p' <<< "$summary")
+failed=$(sed -n 's/^ *Failed: *\([0-9]*\).*/\1/p' "$log" | tail -n 1)
+total=$(sed -n 's/^Total tests: *\([0-9]*\).*/\1/p' <<< "$summary")
+failed=${failed:-0}
 
 # The total is guarded for the same reason eng/ratchet.sh guards it: a crashed host reports
 # fewer failures because fewer tests ran, which looks exactly like progress.
