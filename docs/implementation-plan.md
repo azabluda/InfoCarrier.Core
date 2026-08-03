@@ -1339,7 +1339,7 @@ failures are left red and classified rather than worked immediately.
       | 4 | `Assert.NotSame` — values are the same instance | A no-tracking query returning shared instances; identity resolution applied where it must not be. |
       | 4 | `ArgumentNullException (source)` | A collection navigation left null where the test expects an empty one. |
       | 4 | `Operation is not valid due to the current state of the object` | Unclassified. |
-      | 4 | `AmbiguousMatchException` inside `FieldMappingTestBase` | Raised by the *test base's* own reflection over hidden properties (`Include_*_hiding_props`), before it reaches the provider. Suspect ours only after establishing that. |
+      | 4 | `AmbiguousMatchException` on a hidden property | **This classification was wrong** — see A8. Recorded here as "raised by the test base's own reflection, before it reaches the provider"; it is raised by `NodeToExpressionTranslator.TranslateMember`, which is ours. Read from the message alone, without opening the stack. |
       | 2 | `MissingMethodException` — cannot dynamically create an immutable record | The client builds entities through EF's materializer since L1, but something on this path still reflects a parameterless constructor. |
       | 1 | `Assert.Single` — collection empty | `Query_with_keyless_type`: the keyless type's defining query is `ToInMemoryQuery`, which the *client* model cannot carry. Needs the `serverContextType` split the Northwind fixtures use. |
 
@@ -1512,6 +1512,22 @@ failures are left red and classified rather than worked immediately.
       loaded and declines to send — but not every far-side row reaches the client, so some join
       rows are now sent by nobody. Narrower than what it replaces, and left red rather than
       papered over.
+
+- [x] **A8.** A `new`-hidden member resolves to the most derived declaration.
+      **`Total tests: 12878, Passed: 12757, Failed: 92, Skipped: 29`** — FIXED 4, BROKEN none.
+      ✅ `<this commit>`
+
+      `NodeToExpressionTranslator.TranslateMember` resolved a member with
+      `Type.GetProperty(name, flags)`, which **throws** when a derived type hides a base member
+      rather than preferring the nearer one: "ambiguous match found for '… BlogHiding … Posts'".
+      A model whose derived type hides a base property is legitimate —
+      `FieldMappingTestBase`'s `*Hiding` entities are exactly that — and the most-derived
+      declaration is the one the client wrote and the wire named. Now walked one level at a time
+      with `DeclaredOnly`, most-derived first, for properties and fields alike.
+
+      **A1 classified these 4 as the test base's own reflection and it was wrong.** That reading
+      came from the exception message naming `FieldMappingTestBase+BlogHiding`, without opening
+      the stack — where the top frame is this provider's. Corrected in the A1 table.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

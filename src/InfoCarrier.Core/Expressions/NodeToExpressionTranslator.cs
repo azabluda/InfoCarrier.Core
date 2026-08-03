@@ -113,11 +113,39 @@ public class NodeToExpressionTranslator
         Type declaringType = _typeResolver.Resolve(node.DeclaringType);
         Expression? instance = node.Instance is null ? null : TranslateNode(node.Instance);
         MemberInfo member = node.MemberKind == MemberKind.Property
-            ? (MemberInfo?)declaringType.GetProperty(node.MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+            ? (MemberInfo?)FindMember(declaringType, t => t.GetProperty(node.MemberName, DeclaredMembers))
                 ?? throw new InvalidOperationException($"Property '{node.MemberName}' not found on '{declaringType}'.")
-            : declaringType.GetField(node.MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+            : FindMember(declaringType, t => t.GetField(node.MemberName, DeclaredMembers))
                 ?? throw new InvalidOperationException($"Field '{node.MemberName}' not found on '{declaringType}'.");
         return Expression.MakeMemberAccess(instance, member);
+    }
+
+    private const BindingFlags DeclaredMembers =
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static
+        | BindingFlags.DeclaredOnly;
+
+    /// <summary>
+    ///     Finds a member on a type or the first base type that declares it, most-derived first.
+    /// </summary>
+    /// <remarks>
+    ///     One level at a time with <see cref="BindingFlags.DeclaredOnly" />, because the plain
+    ///     lookup throws on a <c>new</c>-hidden member rather than preferring the nearer one:
+    ///     "ambiguous match found for '… BlogHiding … Posts'". A model whose derived type hides a
+    ///     base property is legitimate — <c>FieldMappingTestBase</c>'s `*Hiding` entities are
+    ///     exactly that — and the most-derived declaration is the one the client wrote and the
+    ///     one the wire named.
+    /// </remarks>
+    private static MemberInfo? FindMember(Type declaringType, Func<Type, MemberInfo?> lookup)
+    {
+        for (Type? type = declaringType; type is not null; type = type.BaseType)
+        {
+            if (lookup(type) is { } member)
+            {
+                return member;
+            }
+        }
+
+        return null;
     }
 
     private Expression TranslateMethodCall(MethodCallNode node)
