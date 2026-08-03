@@ -125,7 +125,14 @@ failure once the suite passed ten thousand tests: a shared store's disposal re-a
 and let a later class re-seed the file a live one was still using. `DisposeAsync` now releases
 nothing. Stale files are swept once at startup instead.
 
-**Verify a suspected flake before acting on it, and after fixing it.** Re-run the full suite and
-diff `artifacts/measure/<label>.txt`; a run that differs from the previous snapshot with no code
-change between them is the signal. Three consecutive identical runs is the bar for calling it
-fixed.
+**The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
+already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
+default assumption.
+
+**If you do notice flakiness, it becomes the top priority — before whatever you were doing.** The
+signal is a run that differs from the previous snapshot with **no code change between them**;
+that is the only thing that justifies suspecting it. Stop, find the cause, fix it, and only then
+go back to the work. A flake left in place poisons every measurement after it, which is how this
+repo lost a day to a 698-test phantom failure and later to a nine-test intermittent one. Verify
+the fix with three consecutive identical runs — *that* is what the three-run bar is for, not for
+routine work.
