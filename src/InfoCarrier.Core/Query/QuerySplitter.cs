@@ -470,6 +470,36 @@ public sealed class QuerySplitter
 
             if (!placed)
             {
+                // The rows reached the residual through a navigation from some *other* root:
+                // `Select(c => new { …, c.Orders })` ships `Customer` rows and the residual then
+                // reads `o.OrderDetails` off the orders in the tuple slot. Reaching them means
+                // prefixing the path with the navigation that got there, which is sound exactly
+                // when there is only one — no other navigation could have produced those rows,
+                // and no other shipped query returns them (the loops above just established
+                // that).
+                for (int i = 0; i < result.Count && !placed; i++)
+                {
+                    foreach (IEntityType root in RootEntityTypes(result[i]))
+                    {
+                        if (SingleNavigationTo(root, read.Owner) is not { } step)
+                        {
+                            continue;
+                        }
+
+                        Expression withInclude = IncludeAtRoot(
+                            result[i], root.ClrType, $"{step}.{read.Path}");
+                        if (!ReferenceEquals(withInclude, result[i]))
+                        {
+                            result[i] = withInclude;
+                            placed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!placed)
+            {
                 throw new InvalidOperationException(
                     $"The client-side part of the query reads navigation '{read.Owner.DisplayName()}."
                         + $"{read.Path}', but no query sent to the server returns "
@@ -502,6 +532,55 @@ public sealed class QuerySplitter
     /// </summary>
     private static Expression IncludeAtRoot(Expression query, Type entityType, string path)
         => new RootIncludingVisitor(entityType, path).Visit(query)!;
+
+    /// <summary>
+    ///     The entity types a shipped query is rooted at.
+    /// </summary>
+    private IEnumerable<IEntityType> RootEntityTypes(Expression query)
+    {
+        var roots = new List<Type>();
+        new RootCollectingVisitor(roots).Visit(query);
+        return roots.Distinct().Select(_model.FindEntityType).OfType<IEntityType>();
+    }
+
+    /// <summary>
+    ///     The one navigation from <paramref name="from" /> that reaches <paramref name="to" />,
+    ///     or null when there is none or more than one.
+    /// </summary>
+    private static string? SingleNavigationTo(IEntityType from, IEntityType to)
+    {
+        string? found = null;
+
+        foreach (INavigationBase navigation in from.GetNavigations().Concat<INavigationBase>(from.GetSkipNavigations()))
+        {
+            if (navigation.TargetEntityType != to)
+            {
+                continue;
+            }
+
+            if (found is not null)
+            {
+                return null;
+            }
+
+            found = navigation.Name;
+        }
+
+        return found;
+    }
+
+    private sealed class RootCollectingVisitor(ICollection<Type> into) : ExpressionVisitor
+    {
+        protected override Expression VisitExtension(Expression node)
+        {
+            if (node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root)
+            {
+                into.Add(root.ElementType);
+            }
+
+            return base.VisitExtension(node);
+        }
+    }
 
     private sealed class RootIncludingVisitor(Type entityType, string path) : ExpressionVisitor
     {

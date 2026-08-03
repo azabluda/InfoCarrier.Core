@@ -97,14 +97,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13744, Passed: 13658, Failed: 38, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13745, Passed: 13665, Failed: 32, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 38, read out of `artifacts/measure/a22.txt`: **33 query**, 1 `LazyLoadProxy`, 1
+The 32, read out of `artifacts/measure/a24.txt`: **27 query**, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report. Everything
 outside the query residual is now a single test.
 
@@ -118,7 +118,7 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **The query residual** — 33, and the largest family left. A true long tail: 16 distinct
+- **The query residual** — 27, and the largest family left. A true long tail: 14 distinct
   methods, each with its own cause (client-eval navigation reads, untranslatable subqueries,
   Northwind GroupBy shapes, and — from A16 — an `OrderBy` the splitter leaves on the client where
   a `DefaultIfEmpty` null then dereferences). No shared root cause, so it is individual work.

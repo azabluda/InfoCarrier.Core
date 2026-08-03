@@ -94,3 +94,61 @@ public class SplitTestContext(DbContextOptions<SplitTestContext> options) : DbCo
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options);
 }
+
+/// <summary>
+///     A shelf with <em>two</em> collections of the same entity type.
+/// </summary>
+/// <remarks>
+///     §3.6 carries a navigation the residual reads by prefixing the one navigation that reaches
+///     its owner from a shipped root. "The one" is the whole soundness argument, so the rejection
+///     it falls back to needs a model where there are two — which the two-entity model above
+///     cannot express, every navigation in it being unique in both directions.
+/// </remarks>
+public class Shelf
+{
+    public int Id { get; set; }
+
+    public List<Volume> Volumes { get; set; } = [];
+
+    public List<Volume> Featured { get; set; } = [];
+}
+
+public class Volume
+{
+    public int Id { get; set; }
+
+    public string? Title { get; set; }
+
+    public Shelf? Shelf { get; set; }
+}
+
+/// <summary>
+///     A client-only carrier holding a <see cref="Volume" />, so the entity survives past the
+///     point the projection rewrite can reach (as <see cref="ClientRow" /> does for an author).
+/// </summary>
+public class VolumeRow(string? text, Volume volume)
+{
+    public string? Text { get; } = text;
+
+    public Volume Volume { get; } = volume;
+}
+
+public class AmbiguousSplitTestContext(DbContextOptions<AmbiguousSplitTestContext> options) : DbContext(options)
+{
+    public DbSet<Shelf> Shelves => Set<Shelf>();
+
+    public DbSet<Volume> Volumes => Set<Volume>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Spelled out, because two relationships between the same pair are exactly what
+        // convention cannot resolve on its own.
+        modelBuilder.Entity<Shelf>().HasMany(s => s.Volumes).WithOne(v => v.Shelf).HasForeignKey("ShelfId");
+        modelBuilder.Entity<Shelf>().HasMany(s => s.Featured).WithOne().HasForeignKey("FeaturedShelfId");
+    }
+
+    public static AmbiguousSplitTestContext Create()
+        => new(new DbContextOptionsBuilder<AmbiguousSplitTestContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options);
+}

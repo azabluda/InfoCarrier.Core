@@ -427,16 +427,43 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
-    public void A_navigation_no_shipped_query_can_carry_is_rejected()
+    public void A_navigation_reached_through_one_other_navigation_is_carried()
     {
         // The entity escapes into a client type, and the navigation is read a step later — past
-        // the point the projection rewrite can reach. Answering 0 here is what must not happen.
+        // the point the projection rewrite can reach. Answering 0 here is what must not happen,
+        // and the shipped rows are `Book`, not `Author` — so carrying it means prefixing the one
+        // navigation that reaches an `Author` from a `Book`.
         var query = _context.Books
             .Select(b => new ClientRow(b.Title, b.Author!))
             .Select(x => new { x.Text, Count = x.Author.Books.Count });
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));
-        Assert.Contains("Books", ex.Message, StringComparison.Ordinal);
+        // The value, not the shape: a shape assertion is exactly what let the split answer 0.
+        Assert.Equal(
+            [("Emma", 1)],
+            ((IEnumerable)Run(Split(query))!).Cast<object>()
+                .Select(row => (
+                    (string?)row.GetType().GetProperty("Text")!.GetValue(row),
+                    (int)row.GetType().GetProperty("Count")!.GetValue(row)!))
+                .ToArray());
+    }
+
+    [Fact]
+    public void A_navigation_no_shipped_query_can_carry_is_rejected()
+    {
+        // Two navigations reach a `Volume` from a `Shelf` — `Volumes` and `Featured` — so nothing
+        // says which one produced the rows the residual is reading. Guessing would put the
+        // `Include` on the wrong one and answer an empty value, which is the whole thing §3.6
+        // exists to refuse.
+        using AmbiguousSplitTestContext context = AmbiguousSplitTestContext.Create();
+        var splitter = new QuerySplitter(context.Model);
+
+        var query = context.Shelves
+            .Select(s => new VolumeRow(s.Id.ToString(), s.Volumes.First()))
+            .Select(x => new { x.Text, ShelfId = x.Volume.Shelf!.Id });
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => splitter.Split(query.Expression));
+
         Assert.Contains("silently", ex.Message, StringComparison.Ordinal);
     }
 

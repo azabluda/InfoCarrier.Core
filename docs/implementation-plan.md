@@ -1947,6 +1947,32 @@ failures are left red and classified rather than worked immediately.
       the step before it, and a path that cuts to nothing is dropped. That asks for exactly the
       rows the residual needs and nothing EF will reject.
 
+- [x] **A23.** A navigation is reached through the one navigation that gets to it.
+      **`Total tests: 13745, Passed: 13665, Failed: 32, Skipped: 48`** — FIXED 6, BROKEN none.
+      ✅ `<this commit>`
+
+      §3.6 puts an `Include` on the shipped query that returns the rows the residual reads a
+      navigation off, and refused outright when no shipped query returns rows *of that entity
+      type*. That is too literal. `Select(c => new CustomerViewModel(…, c.Orders.SelectMany(o =>
+      o.OrderDetails…)))` ships `Customer` rows carrying the orders in a tuple slot, and the
+      residual reads `o.OrderDetails` — owner `Order`, and no shipped query returns `Order` rows.
+      The `Include` still belongs on the query; it just needs the step that got there:
+      `Orders.OrderDetails` at the `Customer` root.
+
+      **Sound exactly when there is one such step**, which is why the fallback prefixes only a
+      single unambiguous navigation from a shipped *root* to the read's owner: no other navigation
+      could have produced those rows, and the loops before it have already established that no
+      shipped query returns them directly. Ambiguous, and it still refuses — guessing wrong would
+      put the `Include` on the wrong relationship and answer an empty value, which is the entire
+      point of §3.6.
+
+      `QuerySplitterTest.A_navigation_no_shipped_query_can_carry_is_rejected` went green on the
+      change, because the two-entity model it used has a unique navigation in both directions and
+      the case it described is now *carried* rather than refused. Rather than lose the guardrail's
+      coverage, the read it makes is now the one that is genuinely carried — asserted by **value**,
+      as this file's own preamble argues for — and the rejection moved to a small second model
+      with two collections of the same type.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
