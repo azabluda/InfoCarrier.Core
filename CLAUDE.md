@@ -82,12 +82,12 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11024, Passed: 10649, Failed: 346, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11024, Passed: 10650, Failed: 345, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
 
-**183 of the 346 failures are one feature: lazy loading**, which now largely works (Phase L; it
+**183 of the 345 failures are one feature: lazy loading**, which now largely works (Phase L; it
 was 505 of 505 failing). Do not read the failure count as a long tail; subtract that family
 first.
 
@@ -97,8 +97,8 @@ Not yet implemented, in rough priority order:
   `docs/implementation-plan.md` under S3c, which is read out of `artifacts/measure/` rather than
   tallied by hand — the table it replaced had drifted badly.
 - **Lazy loading** — 183 failures, now largely working. Phase L in `docs/implementation-plan.md`.
-- **The `ManyToManyTracking` residual** — 111 of 200, dominated by a 60-test duplicate-key family
-  that shares a root cause with `GraphUpdates`'s stable-value-generator family.
+- **The `ManyToManyTracking` residual** — 111 of 200. Skip-navigation join rows are not
+  persisted: an insert of 3+3 entities with 5 join rows re-queries as 6 rows, not 11.
 - **The remaining spec bases** — the rest of the 138 the compliance test reports unadopted.
 - **Transactions** (roadmap M4) — `InfoCarrierTransactionManager` *ignores* them and raises
   `InfoCarrierEventId.TransactionIgnoredWarning` (warning-as-error by default), as EF's

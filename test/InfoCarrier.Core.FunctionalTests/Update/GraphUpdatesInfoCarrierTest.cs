@@ -188,10 +188,17 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
         Func<DbContext, Task> nestedTestOperation2 = null,
         Func<DbContext, Task> nestedTestOperation3 = null)
     {
-        await base.ExecuteWithStrategyInTransactionAsync(
-            testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
-
-        await Fixture.ReseedAsync();
+        // `finally`, because a failing test dirties the store exactly as a passing one does, and
+        // reseeding only on success reports the previous test's leftovers against the next one.
+        try
+        {
+            await base.ExecuteWithStrategyInTransactionAsync(
+                testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
+        }
+        finally
+        {
+            await Fixture.ReseedAsync();
+        }
     }
 
     public class InfoCarrierFixture : GraphUpdatesFixtureBase

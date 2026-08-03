@@ -677,6 +677,26 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       which L1 made possible by materializing through EF. `ILazyLoader.SetLoaded` is what v1
       used, in its `SetIsLoadedNoTracking`.
 
+- [x] **L4.** The store is reseeded after a *failing* test too. **`Total tests: 11024,
+      Passed: 10650, Failed: 345, Skipped: 29`** — FIXED 1, BROKEN none. ✅ `<this commit>`
+
+      A near-flat count that changed the meaning of 59 failures, so read the reasons and not the
+      number: `ArgumentException: An item with the same key has already been added` went from 72
+      occurrences to 22, and `Assert.Equal: Values differ` from 42 to 101. The same tests fail;
+      they now report **their own** problem instead of the previous test's leftovers.
+
+      `GraphUpdatesInfoCarrierTest` and `ManyToManyTrackingInfoCarrierTest` reseed after
+      `ExecuteWithStrategyInTransactionAsync`, because this provider ignores transactions and
+      nothing rolls back. That reseed was not in a `finally`, so a test that *failed* skipped it
+      and left its rows for the next parameterization — which then failed on a duplicate key it
+      had nothing to do with.
+
+      **What that exposed about the ManyToMany residual, and it is not what S3c-15 recorded.**
+      The real failure is `Can_insert_many_to_many_with_navs` asserting `Expected: 11, Actual: 6`
+      when a *fresh context* re-queries: 3 left entities + 3 right = 6 arrive, and the **5 join
+      rows do not**. Skip-navigation join entities are not being persisted. The duplicate-key
+      errors were downstream pollution from that, not a story about key generation.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

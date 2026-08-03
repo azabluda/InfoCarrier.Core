@@ -34,10 +34,19 @@ public class ManyToManyTrackingInfoCarrierTest(ManyToManyTrackingInfoCarrierTest
         Func<ManyToManyContext, Task> nestedTestOperation2 = null,
         Func<ManyToManyContext, Task> nestedTestOperation3 = null)
     {
-        await base.ExecuteWithStrategyInTransactionAsync(
-            testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
-
-        await Fixture.ReseedAsync();
+        // `finally`, because a *failing* test dirties the store exactly as a passing one does.
+        // Reseeding only on success let the first parameterization of a method leave its rows
+        // behind for the second, which then failed on "an item with the same key has already
+        // been added" — an error about the previous test, reported against this one.
+        try
+        {
+            await base.ExecuteWithStrategyInTransactionAsync(
+                testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
+        }
+        finally
+        {
+            await Fixture.ReseedAsync();
+        }
     }
 
     // The backend is the InMemory store, which has no database default values.
