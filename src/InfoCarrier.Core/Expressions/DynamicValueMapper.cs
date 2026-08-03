@@ -208,7 +208,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (entityType is not null && value is not null)
         {
             IReadOnlyList<object?> keyValues = entityType.FindPrimaryKey() is { } key
-                ? key.Properties.Select(p => PrimitiveCoercion.ToWireKey(p, ReadProperty(value, p))).ToList()
+                ? key.Properties.Select(p => PrimitiveCoercion.ToWireValue(p, ReadProperty(value, p))).ToList()
                 : [];
             var entityKey = new EntityKeyNode { EntityTypeName = entityType.Name, KeyValues = keyValues };
 
@@ -345,12 +345,16 @@ public class DynamicValueMapper : IDynamicValueMapper
 
         foreach (IProperty property in entityType.GetProperties())
         {
-            object? scalar = ReadProperty(value, property);
+            // The *provider* value, so a value converter is honoured rather than merely gone
+            // through (`PrimitiveCoercion.ToWireValue`). Sending the CLR value instead left the
+            // reflective member walk to decompose whatever the converter was hiding, and
+            // `IPAddress.ScopeId` throws `SocketException` for an IPv4 address.
+            object? scalar = PrimitiveCoercion.ToWireValue(property, ReadProperty(value, property));
             members.Add(new DynamicPropertyValue
             {
                 Name = property.Name,
-                PrimitiveValue = IsPrimitive(scalar) ? PrimitiveCoercion.Normalize(scalar) : null,
-                Value = IsPrimitive(scalar) ? null : ToDynamicValue(scalar, property.ClrType),
+                PrimitiveValue = IsPrimitive(scalar) ? scalar : null,
+                Value = IsPrimitive(scalar) ? null : ToDynamicValue(scalar, PrimitiveCoercion.WireType(property)),
             });
         }
 
@@ -595,7 +599,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             if (property.PropertyInfo is { CanWrite: true } clrProperty)
             {
                 clrProperty.SetValue(
-                    instance, PrimitiveCoercion.FromWireKey(property, node.EntityKey.KeyValues[i]));
+                    instance, PrimitiveCoercion.FromWireValue(property, node.EntityKey.KeyValues[i]));
             }
         }
 

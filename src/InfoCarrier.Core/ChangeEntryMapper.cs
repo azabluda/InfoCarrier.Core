@@ -64,7 +64,9 @@ public static class ChangeEntryMapper
                 (originals ??= []).Add(new DynamicPropertyValue
                 {
                     Name = property.Name,
-                    Value = mapper.ToDynamicValue(entry.GetOriginalValue(property), property.ClrType),
+                    Value = mapper.ToDynamicValue(
+                        Expressions.PrimitiveCoercion.ToWireValue(property, entry.GetOriginalValue(property)),
+                        Expressions.PrimitiveCoercion.WireType(property)),
                 });
             }
 
@@ -84,7 +86,13 @@ public static class ChangeEntryMapper
             properties.Add(new DynamicPropertyValue
             {
                 Name = property.Name,
-                Value = mapper.ToDynamicValue(entry.GetCurrentValue(property), property.ClrType),
+                // The *provider* value, so a value converter is honoured rather than merely
+                // gone through. The CLR value reached the mapper's reflective member walk
+                // instead, and `IPAddress.ScopeId` throws `SocketException` for an IPv4 address
+                // (`ValueConvertersEndToEndTestBase`).
+                Value = mapper.ToDynamicValue(
+                    Expressions.PrimitiveCoercion.ToWireValue(property, entry.GetCurrentValue(property)),
+                    Expressions.PrimitiveCoercion.WireType(property)),
             });
         }
 

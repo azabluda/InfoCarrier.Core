@@ -249,7 +249,7 @@ public class ClientResultMaterializer
         if (row.EntityKey.KeyValues.Count == pk.Properties.Count)
         {
             object?[] keyValues = pk.Properties
-                .Select((p, i) => PrimitiveCoercion.FromWireKey(p, row.EntityKey.KeyValues[i]))
+                .Select((p, i) => PrimitiveCoercion.FromWireValue(p, row.EntityKey.KeyValues[i]))
                 .ToArray();
 
             InternalEntityEntry? tracked = _stateManager.TryGetEntry(pk, keyValues);
@@ -300,7 +300,7 @@ public class ClientResultMaterializer
         // modifications to a row that had only just been read.
         foreach ((IProperty property, DynamicValueNode node) in ComplexScalars(row, entityType))
         {
-            values[property.Name] = mapper.FromDynamicValue(node);
+            values[property.Name] = PrimitiveCoercion.FromWireValue(property, mapper.FromDynamicValue(node));
         }
 
         InternalEntityEntry entry;
@@ -451,7 +451,8 @@ public class ClientResultMaterializer
         {
             if (property.PropertyInfo is { CanWrite: true } clrProperty)
             {
-                clrProperty.SetValue(instance, mapper.FromDynamicValue(node));
+                clrProperty.SetValue(
+                    instance, PrimitiveCoercion.FromWireValue(property, mapper.FromDynamicValue(node)));
             }
         }
 
@@ -662,7 +663,7 @@ public class ClientResultMaterializer
 
             if (entityType.FindProperty(member.Name) is { } property)
             {
-                values[property.Name] = PrimitiveCoercion.Coerce(member.PrimitiveValue, property.ClrType);
+                values[property.Name] = PrimitiveCoercion.FromWireValue(property, member.PrimitiveValue);
             }
         }
 

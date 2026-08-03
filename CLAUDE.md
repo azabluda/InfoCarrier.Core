@@ -97,16 +97,16 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13744, Passed: 13646, Failed: 50, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13744, Passed: 13649, Failed: 47, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 50, read out of `artifacts/measure/a18.txt`: 35 query, 7 `KeysWithConverters`, 3
-`ValueConvertersEndToEnd`, 1 `LazyLoadProxy`, 1 `WithConstructors`, 1 `Update`, 1
-`OptimisticConcurrency`, 1 compliance report.
+The 47, read out of `artifacts/measure/a20.txt`: 35 query, 7 `KeysWithConverters`, 1
+`LazyLoadProxy`, 1 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance
+report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is now **1 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest` — `Can_serialize_proxies_to_JSON`, which
@@ -118,10 +118,8 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **Value converters on the wire** — a converted *key* travels as its provider value (A18);
-  an ordinary converted *property* still travels as an object shape, which is why
-  `IPAddress.get_ScopeId` throws out of the mapper's reflective walk. The general fix is the
-  same rule applied to every property.
+- **Owned entities behind a converted key** — 7 `KeysWithConverters` tests, all
+  `Can_query_and_update_owned_entity_with_*`, come back unpopulated.
 - **The query residual** — 35, and the largest family left. A true long tail: 16 distinct
   methods, each with its own cause (client-eval navigation reads, untranslatable subqueries,
   Northwind GroupBy shapes, and — from A16 — an `OrderBy` the splitter leaves on the client where

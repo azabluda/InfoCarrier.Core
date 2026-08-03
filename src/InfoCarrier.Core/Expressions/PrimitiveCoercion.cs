@@ -33,25 +33,41 @@ internal static class PrimitiveCoercion
             : value;
 
     /// <summary>
-    ///     Converts a key value to the form it travels in: the <em>provider</em> value, when the
-    ///     property has a value converter.
+    ///     Converts a mapped value to the form it travels in: the <em>provider</em> value,
+    ///     whenever the property has a value converter.
     /// </summary>
     /// <remarks>
-    ///     A key behind a converter is an arbitrary CLR type — <c>ComparableBytesStructKey</c>,
-    ///     <c>IntClassKey</c> — and <see cref="EntityKeyNode.KeyValues" /> is declared
-    ///     <see cref="object" />, so the source-generated serializer resolves its
-    ///     <c>JsonTypeInfo</c> by runtime type and has none: every one of
-    ///     `KeysWithConvertersTestBase`'s 40 tests failed on that alone. The converter's provider
-    ///     value is what the store keys on, is by construction one of the registered primitives,
-    ///     and both sides of the wire can compute it from the model.
+    ///     <para>
+    ///         A value behind a converter is an arbitrary CLR type, and the wire has two ways of
+    ///         failing on one. A <em>key</em> lands in <see cref="EntityKeyNode.KeyValues" />,
+    ///         declared <see cref="object" />, where the source-generated serializer resolves
+    ///         <c>JsonTypeInfo</c> by runtime type and has none — all 40 of
+    ///         `KeysWithConvertersTestBase` failed on that alone. An ordinary <em>property</em>
+    ///         falls through to the mapper's reflective member walk, which reads every public
+    ///         getter: `ValueConvertersEndToEndTestBase` stores an <see cref="System.Net.IPAddress" />,
+    ///         whose <c>ScopeId</c> throws <c>SocketException</c> for an IPv4 address.
+    ///     </para>
+    ///     <para>
+    ///         Both go away for the same reason. The provider value is what the store itself
+    ///         holds, is by construction one of the registered primitives, and both sides of the
+    ///         wire compute it from the model — so it is what travels. This is what ADR-008
+    ///         constraint 1 means by reading a scalar through its <c>IProperty</c>: honouring the
+    ///         converter, not merely going through the accessor.
+    ///     </para>
     /// </remarks>
-    public static object? ToWireKey(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
+    public static object? ToWireValue(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
         => Normalize(property.GetValueConverter() is { } converter ? converter.ConvertToProvider(value) : value);
 
     /// <summary>
-    ///     The inverse of <see cref="ToWireKey" />: a wire key value as its CLR type.
+    ///     The type a value of <paramref name="property" /> travels as.
     /// </summary>
-    public static object? FromWireKey(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
+    public static Type WireType(Microsoft.EntityFrameworkCore.Metadata.IProperty property)
+        => property.GetValueConverter()?.ProviderClrType ?? property.ClrType;
+
+    /// <summary>
+    ///     The inverse of <see cref="ToWireValue" />: a wire value as its CLR type.
+    /// </summary>
+    public static object? FromWireValue(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
         => property.GetValueConverter() is { } converter
             ? converter.ConvertFromProvider(Coerce(value, converter.ProviderClrType))
             : Coerce(value, property.ClrType);

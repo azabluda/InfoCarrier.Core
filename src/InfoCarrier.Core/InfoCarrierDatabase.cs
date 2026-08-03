@@ -335,7 +335,10 @@ public class InfoCarrierDatabase : IDatabase
             {
                 if (entityType.FindProperty(value.Name) is { } property)
                 {
-                    entry.SetStoreGeneratedValue(property, mapper.FromPropertyValue(value, property.ClrType));
+                    entry.SetStoreGeneratedValue(
+                        property,
+                        Expressions.PrimitiveCoercion.FromWireValue(
+                            property, mapper.FromPropertyValue(value, Expressions.PrimitiveCoercion.WireType(property))));
                 }
             }
         }

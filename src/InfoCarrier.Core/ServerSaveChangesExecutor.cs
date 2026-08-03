@@ -85,7 +85,8 @@ public class ServerSaveChangesExecutor
                     continue;
                 }
 
-                object? clrValue = _mapper.FromPropertyValue(value, property.ClrType);
+                object? clrValue = PrimitiveCoercion.FromWireValue(
+                    property, _mapper.FromPropertyValue(value, PrimitiveCoercion.WireType(property)));
 
                 if (isAdded
                     && clrValue is not null
@@ -290,7 +291,8 @@ public class ServerSaveChangesExecutor
                     if (replay.EntityType.FindProperty(value.Name) is { } property)
                     {
                         entry.Property(property.Name).OriginalValue =
-                            _mapper.FromPropertyValue(value, property.ClrType);
+                            PrimitiveCoercion.FromWireValue(
+                                property, _mapper.FromPropertyValue(value, PrimitiveCoercion.WireType(property)));
                     }
                 }
             }
@@ -519,7 +521,9 @@ public class ServerSaveChangesExecutor
             values.Add(new DynamicPropertyValue
             {
                 Name = property.Name,
-                Value = _mapper.ToDynamicValue(entry.Property(property.Name).CurrentValue, property.ClrType),
+                Value = _mapper.ToDynamicValue(
+                    PrimitiveCoercion.ToWireValue(property, entry.Property(property.Name).CurrentValue),
+                    PrimitiveCoercion.WireType(property)),
             });
         }
 

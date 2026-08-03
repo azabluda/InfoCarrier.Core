@@ -1845,6 +1845,28 @@ failures are left red and classified rather than worked immediately.
       | 3 | `ValueConvertersEndToEnd.Can_insert_and_read_back_with_conversions` | `IPAddress.get_ScopeId` throws `SocketException` for an IPv4 address, from the mapper's reflective member walk. The general form of the key fix would avoid it: a property with a converter should travel as its **provider** value, not as an object shape. |
       | 2 | `InheritanceRelationships.Nested_include_collection_reference_on_non_entity_base` | `ArgumentException: Expression of type 'IQueryable<…>'` — a residual shape, so it belongs with the query residual. |
 
+- [x] **A19.** A converted *property* travels as its provider value too.
+      **`Total tests: 13744, Passed: 13649, Failed: 47, Skipped: 48`** — FIXED 3, BROKEN none.
+      **`ValueConvertersEndToEndTestBase` is 27 of 27.** ✅ `<this commit>`
+
+      A18 did this for keys. The general rule is the same and the second failure mode is
+      different: an ordinary converted property falls through to the mapper's **reflective member
+      walk**, which reads every public getter — and `ValueConvertersEndToEndTestBase` stores an
+      `IPAddress`, whose `ScopeId` throws `SocketException` for an IPv4 address.
+
+      **The first attempt was measured byte-identical and that was information, not noise.** It
+      changed only `MapRowMembers` — the query-result path — and a probe on `ToWireValue` showed
+      it **never ran** for the failing test. The failure is on the **SaveChanges** path:
+      `ChangeEntryMapper.ToChangeEntry` sends `entry.GetCurrentValue(property)` as the CLR value,
+      and the entity never survives to be queried back. Without the probe the honest reading would
+      have been "converters make no difference", which is the mistake CLAUDE.md warns about.
+
+      So the rule now holds on every edge that carries a mapped value: `MapRowMembers` and
+      `ClientResultMaterializer.ReadPrimitives` for a result row, `ChangeEntryMapper` and
+      `ServerSaveChangesExecutor` for a change entry, and the store-generated values coming back
+      through `InfoCarrierDatabase`. It is what ADR-008 constraint 1 means by reading a scalar
+      through its `IProperty`: honouring the converter, not merely going through the accessor.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
