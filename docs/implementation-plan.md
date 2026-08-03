@@ -2564,6 +2564,35 @@ failures are left red and classified rather than worked immediately.
       Shared-type and owned entity types are not reachable by CLR type through
       `FindEntityType`, so the entity test falls back to scanning `GetEntityTypes()`.
 
+- [x] **A46.** All sixteen `Query.Translations` bases.
+      **`Total tests: 16433, Passed: 16315, Failed: 26, Skipped: 92`** — **333 tests added, 331 of
+      them passing**; FIXED none, BROKEN 2. Unadopted bases **90**. ✅ `<this commit>`
+
+      EF Core 10 replaced the sprawling `*FunctionsQuery` base with one class per CLR type or
+      operator family over a single shared model: `ByteArray`, `Enum`, `Guid`, `Math`,
+      `Miscellaneous`, `String`, the five `Operators.*` and the five `Temporal.*`. They are the
+      densest scalar coverage EF has, and this provider had none of it — every value in them
+      crosses the wire as a constant, a parameter or a projected column, which is exactly what
+      `PrimitiveCoercion` and the allowlist decide (A19, A34). **331 of 333 passed on adoption**,
+      which is what A34 bought.
+
+      Overrides, both mirrored with the reason stated:
+
+      - The three `*_with_StringComparison_unsupported` are EF's own `StringTranslationsInMemoryTest`:
+        the culture-sensitive comparisons no real provider supports and the InMemory one does, so
+        the base asserts a throw this backing store will not produce.
+      - The six `Random_*` are EF's own `MiscellaneousTranslationsRelationalTestBase` (A27).
+        `Random.Next()` in a `Where` is client code in a row-deciding argument, and it is worse
+        here than for a relational provider: a random number drawn on the client would decide which
+        rows are fetched, once, and then be gone.
+
+      **Left red: `Regex_IsMatch` and `Regex_IsMatch_constant_input`.** Not a defect and not an
+      oversight — `System.Text.RegularExpressions.Regex` is not on the allowlist, and the allowlist
+      is ADR-008's constraint 2, the thing that stops a serialized tree from naming arbitrary
+      types. SQLite and SQL Server translate `Regex.IsMatch` to SQL; the InMemory store runs it
+      as .NET. **Whether this provider should allowlist it is a design decision for
+      `docs/roadmap.md`, not a fix**, and it is deliberately not made here.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
