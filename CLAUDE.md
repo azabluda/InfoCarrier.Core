@@ -100,14 +100,14 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13745, Passed: 13684, Failed: 13, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13745, Passed: 13686, Failed: 11, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 13, read out of `artifacts/measure/a29.txt`: **8 query**, 1 `LazyLoadProxy`, 1
+The 11, read out of `artifacts/measure/a30.txt`: **6 query**, 1 `LazyLoadProxy`, 1
 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report. Everything
 outside the query residual is now a single test.
 
@@ -121,12 +121,11 @@ Not yet implemented, in rough priority order:
 - **Complex types** — nothing carries them over the wire. One failure today
   (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
   be adopted until this exists.
-- **The query residual** — 8, classified in full under A28. Only **2** are a real gap
+- **The query residual** — 6, classified in full under A28. Only **2** are a real gap
   (`SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
   that milestone M2-B is for). **4** are spec tests asserting a limitation this provider does not
   have — they run and return the right answer, and the query bodies are `private` to the spec
-  base, so the assertion cannot be inverted from a derived class. The last **2** are
-  `Contains_over_keyless_entity_throws`, still undiagnosed.
+  base, so the assertion cannot be inverted from a derived class. Nothing else is left.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced

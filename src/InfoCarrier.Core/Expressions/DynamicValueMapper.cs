@@ -214,7 +214,20 @@ public class DynamicValueMapper : IDynamicValueMapper
 
             if (_isNavigationLoaded is null)
             {
-                return new DynamicValueNode { Id = id, Type = typeNode, EntityKey = entityKey };
+                // A query-tree constant travels as identity only — except when there is no
+                // identity. A keyless entity type has no key, so "identity only" carries
+                // literally nothing: the server rebuilt an empty shell and
+                // `Set<CustomerQuery>().Contains(x)` answered `false` against a row it had just
+                // sent. Its values *are* what distinguishes it, so those are what travel. Scalars
+                // only — the navigation walk below needs the row-mapping callbacks a constant
+                // does not have.
+                return new DynamicValueNode
+                {
+                    Id = id,
+                    Type = typeNode,
+                    EntityKey = entityKey,
+                    Properties = entityType.FindPrimaryKey() is null ? MapScalars(value, entityType) : [],
+                };
             }
 
             return new DynamicValueNode
@@ -339,7 +352,10 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     honoured, which a public-reflection walk would miss (ADR-008 constraint 1) — plus
     ///     the navigations EF actually loaded.
     /// </summary>
-    private List<DynamicPropertyValue> MapRowMembers(object value, IEntityType entityType)
+    /// <summary>
+    ///     Maps an entity's mapped scalar properties, and nothing else.
+    /// </summary>
+    private List<DynamicPropertyValue> MapScalars(object value, IEntityType entityType)
     {
         var members = new List<DynamicPropertyValue>();
 
@@ -357,6 +373,13 @@ public class DynamicValueMapper : IDynamicValueMapper
                 Value = IsPrimitive(scalar) ? null : ToDynamicValue(scalar, PrimitiveCoercion.WireType(property)),
             });
         }
+
+        return members;
+    }
+
+    private List<DynamicPropertyValue> MapRowMembers(object value, IEntityType entityType)
+    {
+        List<DynamicPropertyValue> members = MapScalars(value, entityType);
 
         foreach (INavigationBase navigation in entityType.GetNavigations().Cast<INavigationBase>()
                      .Concat(entityType.GetSkipNavigations()))
@@ -578,17 +601,29 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     <see cref="EntityKeyNode" /> and nothing else — with its primary key populated.
     /// </summary>
     /// <remarks>
-    ///     That key is the whole point of the reference form: EF rewrites
-    ///     <c>Contains(entity)</c> and <c>entity1 == entity2</c> into comparisons over key
-    ///     values, so an instance without them silently matches nothing rather than failing.
+    ///     <para>
+    ///         That key is the whole point of the reference form: EF rewrites
+    ///         <c>Contains(entity)</c> and <c>entity1 == entity2</c> into comparisons over key
+    ///         values, so an instance without them silently matches nothing rather than failing.
+    ///     </para>
+    ///     <para>
+    ///         A <b>keyless</b> entity type has none, so there is no reference form to rebuild —
+    ///         <see cref="MapToNode" /> sends its values instead, and the ordinary object-shape
+    ///         rehydration is what puts them back.
+    ///     </para>
     /// </remarks>
     private object MaterializeEntityReference(DynamicValueNode node, IEntityType entityType)
     {
+        IKey? primaryKey = entityType.FindPrimaryKey();
+        if (primaryKey is null)
+        {
+            return RehydrateObject(node, entityType.ClrType)!;
+        }
+
         object instance = Activator.CreateInstance(entityType.ClrType, nonPublic: true)!;
         RegisterMaterialized(node.Id, instance);
 
-        IKey? primaryKey = entityType.FindPrimaryKey();
-        if (primaryKey is null || node.EntityKey!.KeyValues.Count != primaryKey.Properties.Count)
+        if (node.EntityKey!.KeyValues.Count != primaryKey.Properties.Count)
         {
             return instance;
         }

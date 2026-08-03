@@ -2122,6 +2122,27 @@ failures are left red and classified rather than worked immediately.
       and the server runs a tree this provider generated from it — A22 is what that distinction
       costs when it is missed.
 
+- [x] **A30.** A keyless entity has no identity, so its values are its identity.
+      **`Total tests: 13745, Passed: 13686, Failed: 11, Skipped: 48`** — FIXED 2, BROKEN none.
+      ✅ `<this commit>`
+
+      `Contains_over_keyless_entity_throws` answered `False` where every EF provider answers
+      `True`. Two probes settled it in one run: the split is **passthrough** and EF issues two
+      queries — `First()`, then `Contains(<the instance it just returned>)` — and the constant
+      arrived on the server as
+      `{"CompanyName":null,"ContactName":null,"ContactTitle":null,"Address":null,"City":null}`.
+
+      An entity in a *query tree* travels as identity only (research-findings §7), which is right
+      and is what makes `Contains(customer)` a key comparison rather than a graph copy. A keyless
+      entity type has no key, so "identity only" carries **literally nothing** and the server
+      rebuilt an empty shell. `CustomerQuery` overrides `Equals` on `CompanyName`, so the store
+      compared a real row against a blank one and said no.
+
+      Now: no primary key means the mapped scalars travel instead, and the reference form
+      rehydrates through the ordinary object-shape path. Scalars only — the navigation half of
+      `MapRowMembers` needs row-mapping callbacks a constant does not have, and `_isNavigationLoaded!`
+      would have thrown. That split is why `MapScalars` now exists.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
