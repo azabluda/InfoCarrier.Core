@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace InfoCarrier.Core;
 
@@ -64,11 +67,6 @@ public class ServerSaveChangesExecutor
                 ?? throw new InvalidOperationException(
                     $"Entity type '{change.EntityTypeName}' is not in the server model.");
 
-            object entity = Activator.CreateInstance(entityType.ClrType)
-                ?? throw new InvalidOperationException(
-                    $"'{entityType.DisplayName()}' has no parameterless constructor, so the server "
-                        + "cannot reconstitute it for SaveChanges.");
-
             // Populate the object *before* it reaches the change tracker. Assigning a key
             // through a tracked entry is refused outright — "the property 'Blog.Id' is part of a
             // key and so cannot be modified" — because EF reads that as re-keying a row rather
@@ -107,7 +105,7 @@ public class ServerSaveChangesExecutor
                 values.Add((property, clrValue));
             }
 
-            pending.Add(new Replay(change, entity, entityType, shadow, generatedKeys, references, isAdded));
+            pending.Add(new Replay(change, Materialize(entityType, values), entityType, shadow, generatedKeys, references, isAdded));
             pending[^1].Values.AddRange(values);
         }
 
@@ -380,6 +378,47 @@ public class ServerSaveChangesExecutor
         ///     and each can be classified as a borrowed one or an ordinary value.
         /// </summary>
         public List<(IProperty Property, object? Value)> Values { get; } = [];
+    }
+
+    /// <summary>
+    ///     Reconstitutes the entity the wire describes, through EF's own materializer.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Activator.CreateInstance</c> was enough only while every entity had a parameterless
+    ///     constructor. `WithConstructorsTestBase` is the model that says otherwise — a
+    ///     constructor-bound `Blog(int id, string title, …)`, and a `BlogAsImmutableRecord` that
+    ///     is a positional record — and both came back "No parameterless constructor defined".
+    ///     The materializer is what performs constructor binding, so the values are laid into a
+    ///     value buffer indexed by <c>IProperty.GetIndex()</c> and handed to it, exactly as
+    ///     <see cref="ClientResultMaterializer" /> does on the other side. The pass that follows
+    ///     writes the same values onto the object again, which is what carries the ones no
+    ///     constructor parameter claimed.
+    /// </remarks>
+    private object Materialize(IEntityType entityType, List<(IProperty Property, object? Value)> values)
+    {
+        var runtimeType = (IRuntimeEntityType)entityType;
+        var buffer = new object?[runtimeType.PropertyCount];
+
+        // A property the request omits takes its sentinel rather than a CLR default, which is
+        // EF's own rule for an absent value.
+        foreach (IProperty property in entityType.GetFlattenedProperties())
+        {
+            if (property.GetIndex() is >= 0 and var index)
+            {
+                buffer[index] = property.Sentinel;
+            }
+        }
+
+        foreach ((IProperty property, object? value) in values)
+        {
+            if (property.GetIndex() is >= 0 and var index)
+            {
+                buffer[index] = value;
+            }
+        }
+
+        return runtimeType.GetOrCreateMaterializer(_context.GetService<IStructuralTypeMaterializerSource>())(
+            new MaterializationContext(new ValueBuffer(buffer), _context));
     }
 
     /// <summary>

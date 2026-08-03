@@ -1657,6 +1657,30 @@ failures are left red and classified rather than worked immediately.
       A9's three-variant table is superseded: the question it was answering — replace the
       collection or leave it alone — does not arise once the items go in one at a time.
 
+- [x] **A15.** The server reconstitutes an entity through EF's materializer, not `Activator`.
+      **`Total tests: 12878, Passed: 12812, Failed: 37, Skipped: 29`** — FIXED 2, BROKEN none.
+      ✅ `<this commit>`
+
+      `ServerSaveChangesExecutor` built the entity to replay with
+      `Activator.CreateInstance(entityType.ClrType)`, which is enough only while every entity has
+      a parameterless constructor. `WithConstructorsTestBase` is the model that says otherwise —
+      a constructor-bound `Blog(int id, string title, int? monthlyRevenue)` and a positional
+      record `BlogAsImmutableRecord` — and both came back **"No parameterless constructor
+      defined"** from inside `SaveChanges`.
+
+      L1 settled this on the client: the materializer is what performs constructor binding, and
+      reflection-constructing an instance skips it. The server had the same defect and nothing
+      adopted until A1 reached it. So the values are read first, laid into a value buffer indexed
+      by `IProperty.GetIndex()`, and handed to
+      `IRuntimeEntityType.GetOrCreateMaterializer(…)` — the same shape as
+      `ClientResultMaterializer.Materialize`. The pass that follows writes the values onto the
+      object again, which is what carries the ones no constructor parameter claimed.
+
+      `WithConstructors` is down to `Query_with_keyless_type`, which is a fixture question rather
+      than a provider one: the keyless type's defining query is `ToInMemoryQuery`, which the
+      *client* model cannot carry, so it needs the `serverContextType` split the Northwind
+      fixtures use.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
