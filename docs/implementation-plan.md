@@ -2619,6 +2619,39 @@ failures are left red and classified rather than worked immediately.
       client does not have; it costs nothing and travels nowhere. Whether to drop the convention
       anyway is a provider question and is not answered here.
 
+- [x] **A48.** The whole residual, classified. No code change. ✅ `<this commit>`
+
+      A33's 98 are down to 16 and the suite to **26 failures over 17136 tests**. This is the map,
+      read out of `artifacts/measure/a47b.txt` — nothing below is undiagnosed, and none of it is
+      a to-do list.
+
+      | Count | Test | Reading |
+      |---:|---|---|
+      | 2 | `Correlated_collection_with_distinct_3_levels` | **A real defect.** The override asserts EF's `DistinctOnSubqueryNotSupported`; the query runs instead (A39) and answers **wrong** — the base's own assertion fails inside the `Assert.Throws`. The only wrong *answer* left in the suite. |
+      | 2 | `Comparison_with_value_converted_subclass` | **A real defect**, `Expected: 1, Actual: 0`. A value-converted key compared against a constant of a *subclass*; A20's rule (a constant is mapped by what it is) and A19's (a converted value travels as its provider value) meet here. |
+      | 2 | `Complex_query_with_let_collection_projection_FirstOrDefault` | `Argument type 'List<string>' does not match … 'IQueryable<string>'`, raised **on the server** inside `InMemoryProjectionBindingExpressionVisitor.VisitNew`. The shipped tree has an anonymous type whose member is declared `IQueryable<string>` holding a `ToList`; `ProjectionRewriter.Materialized` is the only thing that introduces one. |
+      | 2 | `Queryable_in_subquery_works_when_final_projection_is_List` | Same family — `ArgumentException` where the base expects `InvalidOperationException`. |
+      | 2 | `Join_with_result_selector_returning_queryable_throws_validation_error` | Classified in **A38**: `InvalidCastException` where InMemory's shaper builder happens to raise `ArgumentException`. Matching it means synthesising a backend's incidental error. |
+      | 2 | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join` | The A28 shape: the base asserts `QueryInvalidMaterializationType`, and the `Subquery` member never reaches the result past the `Join`, so nothing invalid is materialized. The query body is inline in a `protected static` assert helper. |
+      | 2 | `Join_with_nav_projected_in_subquery_when_client_eval` | The A28 shape, unchanged. |
+      | 2 | `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method` | `NullReferenceException` where the base expects a translation failure. Undiagnosed — the last one. |
+      | 2 | `Query_with_complex_let_containing_ordering_and_filter_projecting_firstOrDefault_element_of_let` | `NullReferenceException` in the residual. Undiagnosed. |
+      | 2 | `Regex_IsMatch`, `Regex_IsMatch_constant_input` | **Deliberate** (A46): `Regex` is not on the allowlist, and the allowlist is ADR-008. A roadmap decision, not a fix. |
+      | 2 | `Can_track_entity_with_complex_property_bag_collections(Added)` | A32's residual: fails inside EF's own `StructuralTypeMaterializerSource`. |
+      | 1 | `Query_with_keyless_type` | Needs the `serverContextType` split; `InheritanceQueryInfoCarrierTest` is the worked example. |
+      | 1 | `Save_optional_many_to_one_dependents` | 1 of 1787, from S3c-9. |
+      | 1 | `Nullable_client_side_concurrency_token_can_be_used` | Rooted in `IMaterializationInterceptor` never running on the client; adopting `MaterializationInterceptionTestBase` is the way in. |
+      | 1 | the compliance report | Not a defect; it moves as bases are adopted. **80 left.** |
+
+      **What the remaining 80 need is a harness, not a query fix.** The next batches —
+      `AdHoc*QueryTestBase` ×5, `SharedTypeQuery`, `OwnedEntityQuery`,
+      `NonSharedModelBulkUpdates`, `NonSharedPrimitiveCollectionsQuery` — all derive from
+      `NonSharedModelTestBase`, which builds a **different context type per test** through
+      `InitializeAsync<TContext>`. `InfoCarrierTestStoreFactory` captures one `ContextType` up
+      front in `SharedTestStoreProperties`, and the backend store resolves the server context from
+      it. Making the server context type per-test is the piece of work that unlocks that whole
+      group, and it is infrastructure rather than adoption.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

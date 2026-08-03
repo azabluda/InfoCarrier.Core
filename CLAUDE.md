@@ -104,16 +104,16 @@ Query, projection split and SaveChanges all work end-to-end. The suite stands at
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
-`ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase` and all sixteen
-`Query.Translations` and the nine `ModelBuilding.ModelBuilderTest` bases on Tier A, plus
+`ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase`, all sixteen
+`Query.Translations` bases and the nine `ModelBuilding.ModelBuilderTest` bases on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 26, read out of `artifacts/measure/a47b.txt`: **16** of them are the three query bases A33
-adopted, classified by cause in `docs/implementation-plan.md` (A33's table, less what A34
-and A36–A45 closed); **2** are `Regex_IsMatch`, which the allowlist deliberately refuses (A46);
-the other 8 are 2 query, 2 `ComplexTypesTracking`, 1 `WithConstructors`, 1 `Update`,
-1 `OptimisticConcurrency` and the compliance report.
+**All 26 are classified test-by-test in A48's table** in `docs/implementation-plan.md`, read out of
+`artifacts/measure/a47b.txt`. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
+`Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec
+tests asserting a limitation this provider does not have, a deliberate allowlist refusal
+(`Regex_IsMatch`, A46), or a known singleton.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
@@ -128,16 +128,22 @@ Not yet implemented, in rough priority order:
   `Query.Associations.ComplexProperties` family is now adoptable and is not adopted.
 - **The query residual** — 2, and **neither is a gap**. A40 closed
   `SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
-  that milestone M2-B existed for, and A43 closed `Select_GroupBy_SelectMany`. The 2 left are spec
-  tests asserting a limitation this provider does not have — they run and return the right answer,
-  and the query bodies are `private` to the spec base, so the assertion cannot be inverted from a
-  derived class.
+  that **milestone M2-B existed for**, and A43 closed `Select_GroupBy_SelectMany`. The 2 left are
+  spec tests asserting a limitation this provider does not have — they run and return the right
+  answer, and the query bodies are `private` to the spec base, so the assertion cannot be inverted
+  from a derived class.
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
 - **The remaining spec bases** — 80 the compliance test still reports unadopted. Phase A in
-  `docs/implementation-plan.md`; adopt in batches and classify what turns red.
+  `docs/implementation-plan.md`; adopt in batches and classify what turns red. **The next batch
+  needs a harness, not a query fix**: `AdHoc*QueryTestBase` ×5, `SharedTypeQuery`,
+  `OwnedEntityQuery` and the `NonSharedModel*` bases all derive from `NonSharedModelTestBase`,
+  which builds a *different context type per test*, while `InfoCarrierTestStoreFactory` captures
+  one `ContextType` up front. See A48.
+- **`Query.Associations.*` is 34 of the 80** and has no InMemory counterpart — a roadmap
+  question (Tier B, or out of scope), not a plan one. Do not start it without asking.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
 
