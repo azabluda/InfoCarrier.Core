@@ -1176,6 +1176,40 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       and only under `NoTrackingWithIdentityResolution` — everywhere else keeps the cached one, so
       nothing else pays for it. Cached per entity type, which lives as long as the model.
 
+- [x] **L24.** `Lazy_load_one_to_one_reference_with_recursive_property` (4) — **cause found,
+      one fix attempted and measured catastrophic, reverted.** Suite unchanged at
+      **`Total tests: 11344, Passed: 11278, Failed: 37, Skipped: 29`**. ✅ `<this commit>`
+
+      The test asserts `ChangeTracker.Entries().Count() == 2`; we hold 1. The parent is loaded —
+      `Assert.NotNull(child.Parent)` passes — but never tracked.
+
+      **The cause is settled, by probe.** `WithRecursiveProperty.IdLoadedFromParent` is a *mapped*
+      property whose getter reads `Parent`, so attaching the child runs it. The probe caught the
+      nested query firing between "before-track" and "after-track":
+
+          row WithRecursiveProperty isTracked=True  behavior=TrackAll
+          before-track WithRecursiveProperty state=Detached tracked=0
+          row Mother                isTracked=False behavior=NoTracking     <- inside SetEntityState
+          after-track  WithRecursiveProperty state=Unchanged tracked=WithRecursiveProperty:Unchanged
+
+      `entry.SetEntityState(Unchanged)` snapshots by *reading the entity's properties*, the getter
+      issues a lazy load, and at that instant the child is still `Detached` — so
+      `EntityFinder.Query` picks `AsNoTracking()` (its `entry.EntityState == Detached` branch) and
+      the parent is materialized untracked. EF's own shaper does not hit this because it tracks
+      from a snapshot the query already built, and never reads the entity back.
+
+      **Attempt: adopt that idiom — `_stateManager.StartTracking(entry)` +
+      `entry.MarkUnchangedFromQuery()`, which is verbatim `EntityFinder.StartTracking`. Measured
+      `Load` + `LazyLoadProxy` 11 → 1126.** `MarkUnchangedFromQuery` is the *from-query* path and
+      assumes the caller supplied the snapshot, as `StateManager.StartTrackingFromQuery(entityType,
+      entity, snapshot)` does; without one the entries have no original values and nearly every
+      test in both classes fails. Reverted.
+
+      Doing this properly means building the snapshot from the wire row and going through
+      `StartTrackingFromQuery`, which is a real piece of work, not a tweak. Note that
+      `StartTracking(entry)` alone cannot help: it does not set `EntityState`, so the load would
+      still see `Detached`.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
