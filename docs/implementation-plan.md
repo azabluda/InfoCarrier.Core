@@ -1146,6 +1146,36 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `IMaterializationInterceptor`, producing a plain `Sponsor` where the test wants a
       `SponsorDoubleProxy`.
 
+- [x] **L23.** An untracked entity is materialized knowing what tracking the query asked for.
+      **`Total tests: 11344, Passed: 11278, Failed: 37, Skipped: 29`** — FIXED 11, BROKEN none.
+      The lazy residual is 22 → 11. ✅ `<this commit>`
+
+      Every failure was `state: Detached, queryTrackingBehavior: NoTrackingWithIdentityResolution`
+      and every one was a duplicate: `Lazy_load_collection_already_partially_loaded` counted 3
+      where 2 were expected, `..._already_loaded_delegate_loader_*` counted 4 where 2 were. The
+      same tests under plain `NoTracking` passed — which is the whole diagnosis, because it says
+      we were behaving as `NoTracking` when asked for identity resolution.
+
+      The chain is entirely EF's, and it turns on a constant baked into a compiled expression:
+
+      - `LazyLoader.Load` asks for `LoadOptions.ForceIdentityResolution` only when its
+        `_queryTrackingBehavior` is `NoTrackingWithIdentityResolution`;
+      - that field is set by `ILazyLoader.Injected`, which the materializer calls with
+        `Constant(bindingInfo.QueryTrackingBehavior)` — see
+        `StructuralTypeMaterializerSource.AddAttachServiceExpressions`;
+      - `EntityFinder.LoadAsync` uses that option to build a stand-alone `StateManager`, track
+        what the navigation already holds, and skip a loaded row already in it.
+
+      `IReadOnlyTypeBase.GetOrCreateMaterializer` — which L1 adopted, and which is right for
+      everything else — is the *cached* materializer, and `GetMaterializer` builds it with
+      `QueryTrackingBehavior = null`, meaning "not from a query". So the loader was told nothing
+      and defaulted to `LoadOptions.None`.
+
+      `MaterializeUntracked` now compiles its own materializer through
+      `CreateMaterializeExpression` with the real behavior, exactly as EF's query pipeline does,
+      and only under `NoTrackingWithIdentityResolution` — everywhere else keeps the cached one, so
+      nothing else pays for it. Cached per entity type, which lives as long as the model.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

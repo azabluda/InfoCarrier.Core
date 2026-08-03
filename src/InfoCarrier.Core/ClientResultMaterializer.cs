@@ -526,9 +526,65 @@ public class ClientResultMaterializer
             buffer[index] = values.TryGetValue(property.Name, out object? value) ? value : property.Sentinel;
         }
 
-        return runtimeType.GetOrCreateMaterializer(_stateManager.EntityMaterializerSource)(
-            new MaterializationContext(new ValueBuffer(buffer), _context));
+        return MaterializerFor(runtimeType)(new MaterializationContext(new ValueBuffer(buffer), _context));
     }
+
+    /// <summary>
+    ///     The materializer to build an untracked instance with, which depends on the tracking
+    ///     behavior the query asked for.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GetOrCreateMaterializer</c> is the cached one, and it bakes
+    ///         <c>QueryTrackingBehavior = null</c> into the compiled expression —
+    ///         <c>StructuralTypeMaterializerSource.GetMaterializer</c> passes null for "not from a
+    ///         query". That constant reaches <c>ILazyLoader.Injected</c>, and the loader reads it
+    ///         back to decide `LoadOptions`: only
+    ///         <see cref="QueryTrackingBehavior.NoTrackingWithIdentityResolution" /> asks
+    ///         <c>EntityFinder</c> for <c>ForceIdentityResolution</c>, which is what stops a lazy
+    ///         load appending a row the navigation already holds.
+    ///     </para>
+    ///     <para>
+    ///         So under that behavior a lazily loaded collection came back with duplicates —
+    ///         `Lazy_load_collection_already_partially_loaded` counted 3 where 2 were expected,
+    ///         and `..._already_loaded_delegate_loader_*` counted 4 where 2 were. EF's query
+    ///         pipeline compiles its own materializer with the real behavior for exactly this
+    ///         reason; this does the same, and keeps the cached one everywhere else so nothing
+    ///         else pays for it.
+    ///     </para>
+    /// </remarks>
+    private Func<MaterializationContext, object> MaterializerFor(IRuntimeEntityType entityType)
+    {
+        if (_trackingBehavior != QueryTrackingBehavior.NoTrackingWithIdentityResolution)
+        {
+            return entityType.GetOrCreateMaterializer(_stateManager.EntityMaterializerSource);
+        }
+
+        return IdentityResolvingMaterializers.GetOrAdd(
+            entityType,
+            static (type, source) =>
+            {
+                var contextParameter = System.Linq.Expressions.Expression.Parameter(
+                    typeof(MaterializationContext), "materializationContext");
+
+                return System.Linq.Expressions.Expression.Lambda<Func<MaterializationContext, object>>(
+                        source.CreateMaterializeExpression(
+                            new Microsoft.EntityFrameworkCore.Query.StructuralTypeMaterializerSourceParameters(
+                                type,
+                                "instance",
+                                type.ClrType,
+                                QueryTrackingBehavior.NoTrackingWithIdentityResolution),
+                            contextParameter),
+                        contextParameter)
+                    .Compile();
+            },
+            _stateManager.EntityMaterializerSource);
+    }
+
+    // Keyed by entity type, which belongs to a model and lives as long as the service provider
+    // that built it, so this is bounded by the models in play rather than by the queries run.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        IRuntimeEntityType, Func<MaterializationContext, object>> IdentityResolvingMaterializers = new();
 
     /// <summary>
     ///     Reads a row's <em>primitive</em> scalar values, keyed by property name for
