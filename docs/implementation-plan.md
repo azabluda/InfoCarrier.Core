@@ -1019,6 +1019,25 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       `Original_values_for_join_entity_can_be_copied_into_an_object` still fails — original
       values are a separate gap, sent only for concurrency tokens since S3c-13.
 
+- [x] **L18.** A shadow navigation has no value to send. **`Total tests: 11344, Passed: 11243,
+      Failed: 72, Skipped: 29`** — FIXED 7, BROKEN none. ✅ `<this commit>`
+
+      `MapRowMembers` read every loaded navigation through `navigation.GetGetter()`, which does
+      not return null for a navigation with no CLR member — it throws: "No backing field could be
+      found for property 'UnidirectionalEntityTwo.UnidirectionalEntityThree' and the property does
+      not have a getter."
+
+      A **unidirectional** many-to-many is where those come from. EF still declares the inverse
+      skip navigation in the model; only the CLR property is absent. So `_isNavigationLoaded`
+      answers yes, the walk reaches it, and the request dies before anything is sent.
+
+      The navigation is skipped, not the loop iteration: there is no value to send and nowhere on
+      the client to put one, but the **join rows** below it are the payload the navigation exists
+      to carry, and they were being lost with it. That is what the seven fixed tests were missing
+      — all seven are `*_unidirectional` or reached through one.
+
+      This reason is now absent from the whole suite, and `ManyToManyTracking` is 23 → 16.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

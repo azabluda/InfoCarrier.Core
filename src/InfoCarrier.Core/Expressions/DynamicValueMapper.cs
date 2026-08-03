@@ -345,13 +345,24 @@ public class DynamicValueMapper : IDynamicValueMapper
                 continue;
             }
 
-            object? related = navigation.GetGetter().GetClrValue(value);
-            members.Add(new DynamicPropertyValue
+            // A shadow navigation has no CLR member to read, and `GetGetter` on one does not
+            // return null — it throws: "No backing field could be found for property
+            // 'UnidirectionalEntityTwo.UnidirectionalEntityThree' and the property does not have
+            // a getter". A *unidirectional* many-to-many is where these come from: EF still
+            // declares the inverse skip navigation in the model, with no property behind it.
+            // There is nothing to send and nowhere on the client to put it, but the join rows
+            // below are still the payload the navigation exists to carry, so the walk continues
+            // rather than skipping the navigation outright.
+            if (!navigation.IsShadowProperty())
             {
-                Name = navigation.Name,
-                Value = ToDynamicValue(related, navigation.ClrType),
-                IsLoadedNavigation = true,
-            });
+                object? related = navigation.GetGetter().GetClrValue(value);
+                members.Add(new DynamicPropertyValue
+                {
+                    Name = navigation.Name,
+                    Value = ToDynamicValue(related, navigation.ClrType),
+                    IsLoadedNavigation = true,
+                });
+            }
 
             // A skip navigation's join rows travel with it. EF expects them in the change
             // tracker, and they are the one part of a many-to-many the client cannot rebuild

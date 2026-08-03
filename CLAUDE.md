@@ -97,7 +97,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11344, Passed: 11236, Failed: 79, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11344, Passed: 11243, Failed: 72, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B.
@@ -107,7 +107,7 @@ Lazy loading works (Phase L): it began at 505 of 505 failing and is now 25 of 82
 first.
 
 Not yet implemented, in rough priority order:
-- **The `ManyToManyTracking` residual** — 23 of 200, plus 1 `PropertyValues` join-entity test.
+- **The `ManyToManyTracking` residual** — 16 of 200, plus 1 `PropertyValues` join-entity test.
   Join rows are persisted, tracked, travel on the wire for CLR-typed join entities, and since
   L17 a shared-type (`Dictionary<string, object>`) join entity can be a query root. What is left
   is the payload: a shared-type join entity is still rebuilt client-side and decodes as a shape,
