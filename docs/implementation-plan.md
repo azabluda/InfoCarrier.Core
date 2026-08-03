@@ -1529,6 +1529,32 @@ failures are left red and classified rather than worked immediately.
       came from the exception message naming `FieldMappingTestBase+BlogHiding`, without opening
       the stack — where the top frame is this provider's. Corrected in the A1 table.
 
+- [x] **A9.** A navigation is *written* through its backing field too.
+      **`Total tests: 12878, Passed: 12766, Failed: 83, Skipped: 29`** — FIXED 9, BROKEN none.
+      ✅ `<this commit>`
+
+      L6 established that a navigation must be *read* through its backing field, because a getter
+      on a lazy-loading entity is itself a load. The write side is the same rule for a different
+      reason: **a setter can refuse.** `FieldMappingTestBase.PostFull.Blog` throws
+      `InvalidOperationException` outright unless the model is seeding, which is that base's way
+      of saying "materialize through the field". EF's own materializer obeys the navigation's
+      `PropertyAccessMode`, whose default prefers the field.
+
+      **Three variants measured, and the middle one was the trap:**
+
+      | Variant | Failures | |
+      |---|---|---|
+      | field always | 86 | FIXED 10, BROKEN 4 |
+      | field for *references* only | 91 | FIXED 1 — gives up almost the whole gain |
+      | field unless a collection already exists | **83** | FIXED 9, BROKEN none |
+
+      A collection navigation's field usually already holds the instance the entity was
+      constructed with, and `Include_collection_read_only_props` exposes no setter at all — EF's
+      fixup was filling that collection perfectly well, and replacing it with a fresh list is a
+      different thing from filling it. But a *null* field is the case with nothing to fill, and
+      there the field is the only way in. Refusing collections outright (the second row) throws
+      away the tests that need exactly that.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

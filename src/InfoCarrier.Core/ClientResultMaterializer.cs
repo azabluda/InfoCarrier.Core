@@ -611,9 +611,29 @@ public class ClientResultMaterializer
                 ? MaterializeCollection(member.Value, navigation, mapper)
                 : ResolveAgainstTracker(mapper.FromDynamicValue(member.Value), navigation, entry);
 
-            if (related is not null && navigation.PropertyInfo is { CanWrite: true } property)
+            if (related is not null)
             {
-                property.SetValue(instance, related);
+                // The backing field first, and the property only when there is no field. L6
+                // established this for *reads* — a property getter on a lazy-loading entity is
+                // itself a load — and the write side is the same rule for a different reason: a
+                // setter can refuse. `FieldMappingTestBase.PostFull.Blog` throws
+                // `InvalidOperationException` outright unless the model is seeding, which is how
+                // that base states "materialize through the field". EF's own materializer obeys
+                // the navigation's `PropertyAccessMode`, whose default prefers the field.
+                // A collection the entity already constructed is left alone: EF's fixup fills it,
+                // and replacing it with a fresh list is a different thing from filling it —
+                // `Include_collection_read_only_props` exposes no setter at all and was being
+                // populated perfectly well. An empty *field* is the case with nothing to fill,
+                // and there the field is the only way in.
+                if (navigation.FieldInfo is { } field
+                    && (!navigation.IsCollection || field.GetValue(instance) is null))
+                {
+                    field.SetValue(instance, related);
+                }
+                else if (navigation.PropertyInfo is { CanWrite: true } property)
+                {
+                    property.SetValue(instance, related);
+                }
             }
 
             // The relationship snapshot is EF's record of what a navigation held when it was
