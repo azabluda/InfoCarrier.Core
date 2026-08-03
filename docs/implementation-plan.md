@@ -2329,6 +2329,27 @@ failures are left red and classified rather than worked immediately.
       null-propagating semantics**, which is a feature and not a fix; classified here, not
       attempted.
 
+- [x] **A37.** A join key is a carrier too.
+      **`Total tests: 16099, Passed: 15931, Failed: 76, Skipped: 92`** — FIXED 4, BROKEN none.
+      **The shadow-property family is gone, 4 → 0.** ✅ `<this commit>`
+
+      A33's table called this "the fifth `GetGetter()`-on-a-shadow-property site", following L18,
+      A3, A10 and A18. It is not one. `ClientPropertyReader` raises that message **deliberately**
+      (projection-split.md §7) — the shadow read was a symptom, and the question was why the read
+      was on the client at all.
+
+      `join l2 in ss.Set<Level2>() on new { A = EF.Property<int?>(l1, "…"), B = … } equals new { A =
+      …, B = … }` builds an anonymous type for the **key**. That type is created inside the query
+      and never reaches its result, which is precisely the structural property this pass exists for
+      — but `CarrierFinder` only ever called `Register` on the body of a *result* selector, and a
+      key selector is not one. So the key stayed a client type, ADR-010 made it a type boundary,
+      the whole join fell to the client, and the key selectors then read the shadow FKs the keys
+      are made of. `Join` and `GroupJoin` now register both key-selector bodies as candidates.
+
+      Everything downstream already handled it: the key type has no `class` constraint (A25), so
+      the `ValueTuple` retype builds, and tuple equality is structural in the same way anonymous
+      equality is.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

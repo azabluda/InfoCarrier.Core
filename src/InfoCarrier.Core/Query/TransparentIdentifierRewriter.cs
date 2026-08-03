@@ -344,7 +344,37 @@ internal static class TransparentIdentifierRewriter
                 Register(selector!.Body, parent: null);
             }
 
+            // A join *key* is a carrier too, and it is the body of no result selector.
+            // `join l2 in … on new { A, B } equals new { A, B }` builds an anonymous type that is
+            // created inside the query and never reaches its result — exactly the structural
+            // property this pass is about — but registering only result-selector bodies left it a
+            // client type. The whole join then fell to the client, where its key selectors read
+            // the shadow FKs the keys are made of and `ClientPropertyReader` refused: four
+            // `Join_condition_optimizations_applied_correctly_when_anonymous_type_*` failures
+            // naming a shadow property and not the join.
+            if (node.Method.DeclaringType is { } owner
+                && (owner == typeof(Queryable) || owner == typeof(Enumerable))
+                && node.Method.Name is nameof(Queryable.Join) or nameof(Queryable.GroupJoin)
+                && node.Arguments.Count >= 4)
+            {
+                RegisterKeySelector(node.Arguments[2]);
+                RegisterKeySelector(node.Arguments[3]);
+            }
+
             return base.VisitMethodCall(node);
+        }
+
+        private void RegisterKeySelector(Expression argument)
+        {
+            while (argument is UnaryExpression { NodeType: ExpressionType.Quote } quote)
+            {
+                argument = quote.Operand;
+            }
+
+            if (argument is LambdaExpression key)
+            {
+                Register(key.Body, parent: null);
+            }
         }
 
         /// <summary>
