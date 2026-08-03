@@ -874,6 +874,39 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       list is used to apply the generated values back — indexing the original would have written
       each store-generated key onto the wrong entry.
 
+- [ ] **L14.** The last six `Update_root_by_collection_replacement_of_*` — **two attempts
+      measured, both negative, both reverted.** Recorded so they are not repeated.
+
+      After L13 these no longer throw a duplicate key; they assert
+      `Expected: 2, Actual: 0` — the replacement rows are gone from the store. **The reasons
+      moved even though the names did not**, which is what L10's tooling now shows.
+
+      **The server's shared-identity pairing is correct.** A probe of the server's tracker
+      immediately before `SaveChanges` shows every relevant entry marked `*paired`:
+
+          FirstLaw:Added[11]*paired   FirstLaw:Deleted[11]*paired
+          SecondLaw:Added[111]*paired SecondLaw:Deleted[111]*paired
+          SecondLaw:Added[112]
+
+      So whatever is wrong is not the reconstruction L13 added.
+
+      The hypothesis was EF's **cascade**: it walks navigations first and falls back to matching
+      foreign-key values, and this side has no navigations — so a replaced principal's *new*
+      children carry the same foreign key as the old ones and looked like cascade targets. Two
+      ways of suppressing it were measured, and **both are worse than leaving it alone**:
+
+      1. `CascadeDeleteTiming.Never` **and** `DeleteOrphansTiming.Never` — 89 → 91, and eight new
+         "the association between entity types 'SecondLaw' and 'ThirdLaw' has been severed, but
+         the relationship is either marked as required or is implicitly required". Orphan
+         deletion is load-bearing.
+      2. `CascadeDeleteTiming.Never` alone — also 91, the same two broken, nothing fixed. It
+         un-fixed `Update_root_by_collection_replacement_of_inserted_first_level`, which L13 had
+         just fixed.
+
+      So the cascade is not the cause either. What is left to check is the *order* the server
+      hands its entries to the store, and whether `SecondLaw:Added[112]` — the only unpaired new
+      row — survives the save at all.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
