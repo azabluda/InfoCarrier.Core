@@ -664,6 +664,19 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       back-reference to wire id 1 resolved to the wrong object. Only a decode running against
       another exchange's state can do that.
 
+- [x] **L3.** An untracked entity records its own loaded navigations.
+      **`Total tests: 11024, Passed: 10649, Failed: 346, Skipped: 29`** — FIXED 140,
+      BROKEN none. ✅ `<this commit>`
+
+      `PopulateNavigations` recorded loaded state with `entry?.SetIsLoaded(navigation)`, and an
+      untracked entity has no entry — so every navigation the server had already sent looked
+      unloaded. The loader then fetched it again, and the tests that ask directly were simply
+      told `false`; that was the 142 `Assert.True` and 91 `Assert.False` failures.
+
+      An untracked entity does have somewhere to keep it: the `ILazyLoader` injected into it,
+      which L1 made possible by materializing through EF. `ILazyLoader.SetLoaded` is what v1
+      used, in its `SetIsLoadedNoTracking`.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

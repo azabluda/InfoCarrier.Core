@@ -330,6 +330,29 @@ public class ClientResultMaterializer
     }
 
     /// <summary>
+    ///     Records a navigation as loaded on an entity that has no entry, through its own lazy
+    ///     loader.
+    /// </summary>
+    /// <remarks>
+    ///     An untracked entity has nowhere to keep loaded-state except the <c>ILazyLoader</c>
+    ///     that was injected into it, and without this a navigation the server already sent is
+    ///     indistinguishable from one that was never loaded — so the loader fetches it again, or
+    ///     the test simply asks and is told `false`. v1 did the same thing, in its
+    ///     <c>SetIsLoadedNoTracking</c>.
+    /// </remarks>
+    private static void SetIsLoadedUntracked(object instance, INavigationBase navigation)
+    {
+        IServiceProperty? loaderProperty = navigation.DeclaringEntityType
+            .GetServiceProperties()
+            .FirstOrDefault(p => p.ClrType == typeof(ILazyLoader));
+
+        if (loaderProperty?.GetGetter().GetClrValue(instance) is ILazyLoader loader)
+        {
+            loader.SetLoaded(instance, navigation.Name);
+        }
+    }
+
+    /// <summary>
     ///     Swaps a freshly materialized navigation target for the tracked instance with the same
     ///     key, when the entity holding the navigation is itself tracked.
     /// </summary>
@@ -507,7 +530,14 @@ public class ClientResultMaterializer
 
             // Distinguishes a loaded-but-empty navigation from an unloaded one
             // (requirements §2.5 step 5).
-            entry?.SetIsLoaded(navigation);
+            if (entry is not null)
+            {
+                entry.SetIsLoaded(navigation);
+            }
+            else
+            {
+                SetIsLoadedUntracked(instance, navigation);
+            }
         }
     }
 
