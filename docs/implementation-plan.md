@@ -987,6 +987,38 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       possible outside the loop body. Left failing, per the guardrail — they belong to the
       `ManyToManyTracking` residual below, not here.
 
+- [x] **L17.** A shared-type entity can be a query root. **`Total tests: 11344, Passed: 11236,
+      Failed: 79, Skipped: 29`** — FIXED 2, BROKEN none. ✅ `<this commit>`
+
+      Two layers, each resolving a shared-type entity by its CLR type, which is the one thing
+      that cannot identify one: every many-to-many join entity is a
+      `Dictionary<string, object>` and several of them are that same type, told apart only by
+      name.
+
+      1. **The wire.** `TypeNodeMapper` fills `TypeNode.EntityTypeName` from
+         `IModel.FindEntityType(Type)`, which returns null for a shared type, so a query root
+         travelled with no name and the server's `RebindQueryRoot` — which already handles the
+         named case — had nothing to use. At a query root the expression itself carries the
+         entity type (`EntityQueryRootExpression.EntityType`), so the name is now taken from
+         there rather than inferred.
+      2. **The provider.** `GetQueryProvider` reflected `DbContext.Set<T>()` over the root's CLR
+         type: "cannot create a DbSet for 'Dictionary<string, object>' … access the entity type
+         via the 'Set' method overload that accepts an entity type name". There was never
+         anything to look up — `InternalDbSet<T>` builds its queryable from
+         `context.GetDependencies().QueryProvider`, one per context — so it now resolves
+         `IAsyncQueryProvider` directly and `QueryRootFinder` is gone with the reflection.
+
+      **The first fix alone measured as "no change" in the affected classes, and was not.** The
+      count held at 26 while the failure moved from the server's model lookup to the provider
+      one layer down — the same trap L8 fell into, caught this time by reading the reason rather
+      than the count.
+
+      The remaining `ManyToMany` failures are past this point now: the "not found in the server
+      model" and `ProxyableShared…` model-lookup errors are gone from the reasons entirely,
+      replaced by payload-level ones ("the value [OneId, 20] is not of type System.String").
+      `Original_values_for_join_entity_can_be_copied_into_an_object` still fails — original
+      values are a separate gap, sent only for concurrency tokens since S3c-13.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -1055,7 +1087,7 @@ Three families have left this table. `Update_root_by_collection_replacement_of_*
 failure at all — L16 fixed it in the *query* path. `Save_changed_owned_one_to_one` is likewise
 gone.
 
-### The `PropertyValues` residual — 3 of 196 (2026-08-03, Tier A)
+### The `PropertyValues` residual — 1 of 196 (2026-08-03, Tier A)
 
 The 16-test `Scalar_store_values_*` / `Scalar_original_values_*` shape this section used to
 describe is **fixed**. What is left is the 3

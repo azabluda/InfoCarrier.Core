@@ -104,7 +104,9 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
         {
             _result = new QueryRootStubNode
             {
-                ElementType = _typeMapper.ToTypeNode(queryable.ElementType),
+                ElementType = RootElementType(
+                    queryable.ElementType,
+                    queryable.Expression as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression),
                 Type = type,
             };
             return node;
@@ -131,13 +133,40 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
         {
             _result = new QueryRootStubNode
             {
-                ElementType = _typeMapper.ToTypeNode(root.ElementType),
+                ElementType = RootElementType(
+                    root.ElementType,
+                    root as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression),
                 Type = _typeMapper.ToTypeNode(node.Type),
             };
             return node;
         }
 
         throw new NotSupportedException($"Unsupported extension expression: {node.GetType()}.");
+    }
+
+    /// <summary>
+    ///     The wire identity of a query root's element type, naming the EF entity type when the
+    ///     CLR type alone cannot.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="TypeNodeMapper" /> fills <see cref="TypeNode.EntityTypeName" /> by looking
+    ///     the CLR type up in the model, and that lookup cannot answer for a shared-type entity:
+    ///     every many-to-many join entity is a <c>Dictionary&lt;string, object&gt;</c> and several
+    ///     of them are that same type, told apart only by name. So the name came out null, the
+    ///     server fell back to resolving the CLR type, and the root failed to bind —
+    ///     "Entity type 'System.Collections.Generic.Dictionary`2&lt;System.String,System.Object&gt;'
+    ///     not found in the server model". At a query root the expression itself carries the
+    ///     entity type, so nothing has to be inferred.
+    /// </remarks>
+    private TypeNode RootElementType(
+        Type elementType,
+        Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression? root)
+    {
+        TypeNode node = _typeMapper.ToTypeNode(elementType);
+
+        return root is null || node.EntityTypeName is not null
+            ? node
+            : node with { EntityTypeName = root.EntityType.Name };
     }
 
     /// <inheritdoc />

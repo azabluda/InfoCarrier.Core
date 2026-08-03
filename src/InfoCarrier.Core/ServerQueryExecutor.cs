@@ -103,7 +103,7 @@ public class ServerQueryExecutor
         // an IEnumerable-returning executor.
         if (request.ReturnsSingleResult)
         {
-            return GetQueryProvider(query).Execute(query);
+            return QueryProvider.Execute(query);
         }
 
         var results = new ArrayList();
@@ -121,61 +121,32 @@ public class ServerQueryExecutor
         // translates it against the real provider (SQL Server / InMemory / …).
         Type elementType = GetElementType(query.Type);
         Type queryableType = typeof(Microsoft.EntityFrameworkCore.Query.Internal.EntityQueryable<>).MakeGenericType(elementType);
-        return (IQueryable)Activator.CreateInstance(queryableType, GetQueryProvider(query), query)!;
+        return (IQueryable)Activator.CreateInstance(queryableType, QueryProvider, query)!;
     }
 
     /// <summary>
-    ///     Resolves the server query provider for a rebound tree, from the entity type of its
-    ///     query <em>root</em>.
+    ///     The server context's query provider.
     /// </summary>
     /// <remarks>
-    ///     Deriving the provider from the query's <em>result</em> type is wrong: a projection
-    ///     (<c>Select(c =&gt; new { … })</c>, <c>Select(c =&gt; c.City)</c>) has a result type
-    ///     the model knows nothing about, so the lookup threw
-    ///     "Entity type '…' not found in the server model" before EF ever saw the query.
-    ///     Every rebound tree is rooted in at least one real entity query root, and any of them
-    ///     yields the same provider.
+    ///     <para>
+    ///         One per context, and the same one every <c>DbSet</c> hands out —
+    ///         <c>InternalDbSet&lt;T&gt;</c> builds its queryable from
+    ///         <c>context.GetDependencies().QueryProvider</c>, which is this service. So there is
+    ///         nothing to derive it from and nothing to look up.
+    ///     </para>
+    ///     <para>
+    ///         This used to reflect <c>DbContext.Set&lt;T&gt;()</c> over the query root's entity
+    ///         type, which had two problems. Deriving from the query's <em>result</em> type was
+    ///         the first and was already fixed by rooting it: a projection
+    ///         (<c>Select(c =&gt; new { … })</c>) has a result type the model knows nothing about.
+    ///         The second outlived that fix — <c>Set&lt;T&gt;()</c> cannot name a shared-type
+    ///         entity at all, so a query rooted at a many-to-many join entity died with "cannot
+    ///         create a DbSet for 'Dictionary&lt;string, object&gt;' … access the entity type via
+    ///         the 'Set' method overload that accepts an entity type name".
+    ///     </para>
     /// </remarks>
-    private IQueryProvider GetQueryProvider(Expression query)
-    {
-        IEntityType entityType = QueryRootFinder.Find(query)
-            ?? throw new InvalidOperationException(
-                "No entity query root found in the rebound query; cannot resolve a server query provider.");
-
-        object set = _context
-            .GetType()
-            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .First(m => m.Name == nameof(DbContext.Set) && m.IsGenericMethodDefinition && m.GetParameters().Length == 0)
-            .MakeGenericMethod(entityType.ClrType)
-            .Invoke(_context, null)!;
-        return ((IQueryable)set).Provider;
-    }
-
-    /// <summary>
-    ///     Finds the first entity query root in a rebound expression tree.
-    /// </summary>
-    private sealed class QueryRootFinder : ExpressionVisitor
-    {
-        private IEntityType? _entityType;
-
-        public static IEntityType? Find(Expression query)
-        {
-            var finder = new QueryRootFinder();
-            finder.Visit(query);
-            return finder._entityType;
-        }
-
-        protected override Expression VisitExtension(Expression node)
-        {
-            if (_entityType is null
-                && node is Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression root)
-            {
-                _entityType = root.EntityType;
-            }
-
-            return _entityType is null ? base.VisitExtension(node) : node;
-        }
-    }
+    private IQueryProvider QueryProvider
+        => _context.GetService<Microsoft.EntityFrameworkCore.Query.IAsyncQueryProvider>();
 
     private static Type GetElementType(Type queryType)
     {
