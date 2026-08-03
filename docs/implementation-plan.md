@@ -697,6 +697,30 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       rows do not**. Skip-navigation join entities are not being persisted. The duplicate-key
       errors were downstream pollution from that, not a story about key generation.
 
+- [x] **L5.** `LazyLoadProxyTestBase` adopted on Tier A. **`Total tests: 11344, Passed: 10891,
+      Failed: 424, Skipped: 29`** — 320 new tests, 241 passing. BROKEN outside the new class:
+      none. ✅ `<this commit>`
+
+      Lazy loading through Castle proxies rather than through an injected `ILazyLoader` — a
+      different mechanism from the one L1–L3 fixed, and the one v1 covered with this same base.
+      `Microsoft.EntityFrameworkCore.Proxies` and `Castle.Core` arrive transitively with the
+      specification-tests package, so this adds no dependency and does not touch ADR-001. The
+      `Ignore` calls in the fixture are EF's own InMemory fixture one for one: the backend *is*
+      the InMemory store, which has no complex types.
+
+      **It also fixed a latent defect in the backend store.** `InfoCarrierBackendTestStore`
+      registered `AddScoped<DbContext>(...)` unconditionally, which is right when the fixture's
+      context is a subclass and wrong when it *is* `DbContext` — as
+      `LazyLoadProxyTestBase.LoadFixtureBase` is. It re-registered `DbContext` as scoped over the
+      transient registration `AddDbContext` had just made, and every test in the class failed
+      identically, before any of them ran, with "cannot resolve scoped service 'DbContext' from
+      root provider". Registered only for a subclass now.
+
+      **The 79 residual** is the same shape as `LoadInfoCarrierTest`'s and should be worked with
+      it, not separately: `Lazy_load_*_reference_to_principal` dominates, plus the shadow-FK
+      family ("relationships using shadow values can only be loaded for tracked entities") which
+      is EF's own designed refusal.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

@@ -44,7 +44,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             services = onAddServices(services);
         }
 
-        ServiceProvider = services
+        services = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
             .AddSingleton(TestModelSource.GetFactory(_testStoreProperties.OnModelCreating!))
@@ -52,9 +52,20 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
                 ServerContextType,
                 (s, b) => AddProviderOptions(b),
                 ServiceLifetime.Transient,
-                ServiceLifetime.Singleton)
-            .AddScoped<DbContext>(sp => (DbContext)sp.GetRequiredService(ServerContextType))
-            .BuildServiceProvider(validateScopes: true);
+                ServiceLifetime.Singleton);
+
+        // Only when the fixture's context is a *subclass*. A spec fixture may be
+        // `SharedStoreFixtureBase<DbContext>` — `LazyLoadProxyTestBase`'s is — and then this
+        // registration would re-register `DbContext` itself as scoped, overriding the transient
+        // one `AddDbContext` just made and making it unresolvable from the root provider:
+        // "cannot resolve scoped service 'DbContext' from root provider", every test in the
+        // class failing identically before any of them ran.
+        if (ServerContextType != typeof(DbContext))
+        {
+            services = services.AddScoped<DbContext>(sp => (DbContext)sp.GetRequiredService(ServerContextType));
+        }
+
+        ServiceProvider = services.BuildServiceProvider(validateScopes: true);
 
         _serializer = ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
     }
