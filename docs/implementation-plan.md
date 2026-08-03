@@ -618,12 +618,26 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       and an entry built by EF's materializer simply has them.
 
       **The largest identified piece of the residual: 80 failures of the form "Object of type
-      `Parent` cannot be converted to type `SinglePkToPk`".** `Parent` and `SinglePkToPk` are a
-      PK-to-PK one-to-one and *share key value 707*, and a navigation resolves to the wrong one
-      of them. Two candidate causes were measured and neither is it — reading node-valued
-      properties before the wire id is registered (neutral), and a type guard on
-      `ResolveAgainstTracker` (never fires). It is upstream of both, in how the mapper resolves a
-      node id to an already-materialized instance. Start there.
+      `Parent` cannot be converted to type `SinglePkToPk`".** Probed, so start from this rather
+      than from the symptom:
+
+          MISMATCH owner=Parent nav=Single       wants=Single       got=Parent nodeRef=1
+          MISMATCH owner=Parent nav=SinglePkToPk wants=SinglePkToPk got=Parent nodeRef=1
+          REF 1 -> Parent (tableSize=1)
+
+      Every one is `Ref = 1` — the *principal's own wire id*. The server is emitting a
+      one-to-one navigation as a **back-reference to the entity that holds it**, so the client
+      dutifully assigns the `Parent` to `Parent.Single`. The bug is in outbound mapping in
+      `DynamicValueMapper.ToDynamicValue`, not in decoding: `_toIds` is
+      `ReferenceEqualityComparer`-keyed, so a shared key value cannot explain it and that lead
+      is dead.
+
+      Three other candidates were measured and are all neutral — do not re-run them: reading
+      node-valued properties before the wire id is registered; a type guard on
+      `ResolveAgainstTracker`; and materializing the whole result before yielding (the
+      hypothesis that a lazy load resets the reference scope mid-decode — it does not apply,
+      because `Set<Parent>().Single()` is fully enumerated before the test touches a
+      navigation).
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
