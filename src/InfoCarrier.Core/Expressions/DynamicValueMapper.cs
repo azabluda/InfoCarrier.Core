@@ -347,13 +347,12 @@ public class DynamicValueMapper : IDynamicValueMapper
             : property.GetGetter().GetClrValue(value);
 
     /// <summary>
-    ///     Maps an entity row's members: every mapped scalar through its
-    ///     <see cref="IProperty" /> accessor — so shadow properties and value converters are
-    ///     honoured, which a public-reflection walk would miss (ADR-008 constraint 1) — plus
-    ///     the navigations EF actually loaded.
-    /// </summary>
-    /// <summary>
-    ///     Maps an entity's mapped scalar properties, and nothing else.
+    ///     Maps an entity's mapped <em>values</em> — every scalar through its
+    ///     <see cref="IProperty" /> accessor, so shadow properties and value converters are
+    ///     honoured where a public-reflection walk would miss them (ADR-008 constraint 1), plus
+    ///     every complex property. No navigations: those are
+    ///     <see cref="MapRowMembers" />'s half, and they need callbacks a query-tree constant
+    ///     does not have.
     /// </summary>
     private List<DynamicPropertyValue> MapScalars(object value, IEntityType entityType)
     {
@@ -374,9 +373,32 @@ public class DynamicValueMapper : IDynamicValueMapper
             });
         }
 
+        // A complex property is not in `GetProperties()` — EF keeps those in a list of their own —
+        // so until this existed a complex member simply never travelled and arrived at its CLR
+        // default. `Culture.Species` came back null out of a query that had just written it.
+        //
+        // Mapped as an ordinary object, nesting and all, which is right because that is what a
+        // complex value *is*: owned, with no identity, no navigations and no sharing. The
+        // reflective object shape is therefore the whole of it, and the receiving side rehydrates
+        // it the same way. (The one thing it does not carry is a value converter or a shadow
+        // property declared *inside* a complex type — those need the accessor walk above, one
+        // level down.)
+        foreach (IComplexProperty complexProperty in entityType.GetComplexProperties())
+        {
+            members.Add(new DynamicPropertyValue
+            {
+                Name = complexProperty.Name,
+                Value = ToDynamicValue(
+                    complexProperty.GetGetter().GetClrValue(value), complexProperty.ClrType),
+            });
+        }
+
         return members;
     }
 
+    /// <summary>
+    ///     Maps an entity row's members: its values, plus the navigations EF actually loaded.
+    /// </summary>
     private List<DynamicPropertyValue> MapRowMembers(object value, IEntityType entityType)
     {
         List<DynamicPropertyValue> members = MapScalars(value, entityType);
@@ -827,9 +849,22 @@ public class DynamicValueMapper : IDynamicValueMapper
             || value.GetType().IsEnum;
 
     private static Type GetElementType(Type type)
-        => type.IsArray
-            ? type.GetElementType()!
-            : type.IsGenericType
-                ? type.GetGenericArguments()[0]
-                : typeof(object);
+    {
+        if (type.IsArray)
+        {
+            return type.GetElementType()!;
+        }
+
+        // What the sequence actually yields, which is not always its first generic argument. A
+        // property-bag complex type is a `Dictionary<string, object>`, whose elements are
+        // `KeyValuePair<string, object>` — taking the first argument built a `List<string>` and
+        // then refused every element: "The value [Name, Clueless] is not of type System.String".
+        Type? enumerable = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+            ? type
+            : type.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+
+        return enumerable?.GetGenericArguments()[0]
+            ?? (type.IsGenericType ? type.GetGenericArguments()[0] : typeof(object));
+    }
 }

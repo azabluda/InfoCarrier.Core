@@ -31,7 +31,8 @@ public class InfoCarrierTypeMappingSource : TypeMappingSource
                 || clrType == typeof(string)
                 || (clrType == typeof(byte[]) && mappingInfo.ElementTypeMapping == null)))
         {
-            return new InfoCarrierTypeMapping(clrType);
+            return new InfoCarrierTypeMapping(
+                clrType, Dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType));
         }
 
         return base.FindMapping(mappingInfo);

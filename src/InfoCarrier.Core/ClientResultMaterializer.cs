@@ -321,6 +321,7 @@ public class ClientResultMaterializer
 
             mapper.RegisterMaterialized(row.Id, instance);
             ClearPlaceholderReferencesBlockingFixup(instance, entityType, values);
+            ApplyComplexValues(row, instance, entityType, mapper);
             _deferred[instance] = entry;
         }
         else
@@ -328,6 +329,7 @@ public class ClientResultMaterializer
             instance = Materialize(entityType, values);
             mapper.RegisterMaterialized(row.Id, instance);
             ClearPlaceholderReferencesBlockingFixup(instance, entityType, values);
+            ApplyComplexValues(row, instance, entityType, mapper);
 
             // Tracked *as coming from a query*, which is what these rows are, and which EF's own
             // shaper does through exactly this call. `SetEntityState(Unchanged)` is the attach
@@ -668,6 +670,54 @@ public class ClientResultMaterializer
         }
 
         return values;
+    }
+
+    /// <summary>
+    ///     Writes a row's complex-property values onto the materialized instance.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A complex property cannot ride in the value dictionary the entity is built from.
+    ///         <c>CreateEntry</c> and <c>ShadowValuesFactory</c> are keyed by property
+    ///         <em>name</em>, and <c>GetFlattenedProperties()</c> gives each complex leaf its own
+    ///         name — so <c>Blog.Culture.Species</c> and <c>Blog.Milk.Species</c> are both
+    ///         <c>"Species"</c> and one would silently overwrite the other. The whole complex
+    ///         value is therefore set through its CLR member instead.
+    ///     </para>
+    ///     <para>
+    ///         Before the row is tracked, so the entry's first snapshot already holds it —
+    ///         writing afterwards would make the from-query path read a row it had only just
+    ///         materialized as modified.
+    ///     </para>
+    ///     <para>
+    ///         Through the backing field where there is one, for the same reason a navigation is
+    ///         (plan L6): on a proxy the property setter is intercepted, and this is
+    ///         materialization, not a change.
+    ///     </para>
+    /// </remarks>
+    private static void ApplyComplexValues(
+        DynamicValueNode row, object instance, IEntityType entityType, DynamicValueMapper mapper)
+    {
+        foreach (DynamicPropertyValue member in row.Properties)
+        {
+            if (member.IsLoadedNavigation
+                || member.Value is null
+                || entityType.FindComplexProperty(member.Name) is not { } complexProperty)
+            {
+                continue;
+            }
+
+            object? value = mapper.FromDynamicValue(member.Value);
+
+            if (complexProperty.FieldInfo is { } field)
+            {
+                field.SetValue(instance, value);
+            }
+            else if (complexProperty.PropertyInfo is { CanWrite: true } property)
+            {
+                property.SetValue(instance, value);
+            }
+        }
     }
 
     /// <summary>

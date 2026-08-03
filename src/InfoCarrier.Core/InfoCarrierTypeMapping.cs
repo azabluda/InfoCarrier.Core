@@ -13,8 +13,17 @@ public class InfoCarrierTypeMapping : CoreTypeMapping
     /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierTypeMapping" /> class.
     /// </summary>
-    public InfoCarrierTypeMapping(Type clrType)
-        : base(new CoreTypeMappingParameters(clrType))
+    /// <param name="clrType">The CLR type being mapped.</param>
+    /// <param name="jsonValueReaderWriter">
+    ///     How EF reads and writes a value of this type as JSON. Not optional in practice: a
+    ///     <em>primitive collection</em> — <c>List&lt;string&gt;</c> on a complex type, say — is
+    ///     mappable only when its element has one, and without it the property is left unmapped
+    ///     and a constructor that takes it fails to bind at model-building time. EF's own
+    ///     <c>InMemoryTypeMappingSource</c> supplies it for the same reason.
+    /// </param>
+    public InfoCarrierTypeMapping(
+        Type clrType, Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? jsonValueReaderWriter = null)
+        : base(new CoreTypeMappingParameters(clrType, jsonValueReaderWriter: jsonValueReaderWriter))
     {
     }
 

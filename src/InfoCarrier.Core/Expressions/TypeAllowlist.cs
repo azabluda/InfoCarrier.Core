@@ -114,6 +114,10 @@ public sealed class TypeAllowlist
                     allowed.Add(property.ClrType);
                 }
 
+                // A complex type is part of the model but is not an entity type, so neither loop
+                // above names it — and a complex value travels as itself, not as a key.
+                AddComplexTypes(entityType, allowed);
+
                 foreach (IPropertyBase member in entityType.GetMembers())
                 {
                     if (member.PropertyInfo?.DeclaringType is { } fromProperty)
@@ -135,6 +139,34 @@ public sealed class TypeAllowlist
         }
 
         return new TypeAllowlist(allowed);
+    }
+
+    /// <summary>
+    ///     Admits a structural type's complex properties, their own property types, and whatever
+    ///     they hold in turn.
+    /// </summary>
+    /// <remarks>
+    ///     Walked by hand rather than through <c>GetFlattenedComplexProperties()</c>, which stops
+    ///     at a complex <em>collection</em> — "including those on non-collection complex types" is
+    ///     its own summary. A third-level complex property reached through one is exactly what a
+    ///     shorter walk missed.
+    /// </remarks>
+    private static void AddComplexTypes(ITypeBase type, HashSet<Type> allowed)
+    {
+        foreach (IComplexProperty complexProperty in type.GetComplexProperties())
+        {
+            // Both, because they differ for a collection: the property is a `List<T>` and the
+            // complex type is `T`.
+            allowed.Add(complexProperty.ClrType);
+            allowed.Add(complexProperty.ComplexType.ClrType);
+
+            foreach (IProperty property in complexProperty.ComplexType.GetProperties())
+            {
+                allowed.Add(property.ClrType);
+            }
+
+            AddComplexTypes(complexProperty.ComplexType, allowed);
+        }
     }
 
     /// <summary>

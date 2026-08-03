@@ -75,6 +75,12 @@ public class ServerSaveChangesExecutor
             var generatedKeys = new List<(IProperty Property, object ClientValue)>();
             var references = new List<(IProperty Property, object ClientValue)>();
             var values = new List<(IProperty Property, object? Value)>();
+
+            // Complex values cannot join `values`: that list feeds a `ValueBuffer` indexed by
+            // `IProperty.GetIndex()`, and a complex property is not an `IProperty`. They are set
+            // on the materialized object instead, which is also how the client's materializer
+            // puts them back.
+            var complexValues = new List<(IComplexProperty Property, object? Value)>();
             var temporaryNames = new HashSet<string>(change.TemporaryProperties ?? [], StringComparer.Ordinal);
             bool isAdded = change.State == nameof(EntityState.Added);
 
@@ -82,6 +88,12 @@ public class ServerSaveChangesExecutor
             {
                 if (entityType.FindProperty(value.Name) is not { } property)
                 {
+                    if (entityType.FindComplexProperty(value.Name) is { } complexProperty)
+                    {
+                        complexValues.Add(
+                            (complexProperty, _mapper.FromPropertyValue(value, complexProperty.ClrType)));
+                    }
+
                     continue;
                 }
 
@@ -106,7 +118,23 @@ public class ServerSaveChangesExecutor
                 values.Add((property, clrValue));
             }
 
-            pending.Add(new Replay(change, Materialize(entityType, values), entityType, shadow, generatedKeys, references, isAdded));
+            object entity = Materialize(entityType, values);
+
+            foreach ((IComplexProperty complexProperty, object? complexValue) in complexValues)
+            {
+                // Through the backing field where there is one, as everything else that writes a
+                // member during materialization does (plan L6).
+                if (complexProperty.FieldInfo is { } field)
+                {
+                    field.SetValue(entity, complexValue);
+                }
+                else if (complexProperty.PropertyInfo is { CanWrite: true } clrProperty)
+                {
+                    clrProperty.SetValue(entity, complexValue);
+                }
+            }
+
+            pending.Add(new Replay(change, entity, entityType, shadow, generatedKeys, references, isAdded));
             pending[^1].Values.AddRange(values);
         }
 

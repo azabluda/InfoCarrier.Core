@@ -96,6 +96,20 @@ public static class ChangeEntryMapper
             });
         }
 
+        // Complex properties are not in `GetProperties()`. Without this a saved entity arrived
+        // with every complex member null, and EF answered "Required properties {'Species',
+        // 'Species'} are missing" — which also names the reason they cannot be flattened into
+        // the loop above: two complex leaves share a name.
+        foreach (IComplexProperty complexProperty in entityType.GetComplexProperties())
+        {
+            properties.Add(new DynamicPropertyValue
+            {
+                Name = complexProperty.Name,
+                Value = mapper.ToDynamicValue(
+                    entry.GetCurrentValue(complexProperty), complexProperty.ClrType),
+            });
+        }
+
         return new ChangeEntry
         {
             CorrelationId = correlationId,

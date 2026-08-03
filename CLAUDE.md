@@ -100,28 +100,28 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13745, Passed: 13687, Failed: 10, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13996, Passed: 13896, Failed: 12, Skipped: 88`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
-`CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
+`CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase` and
+`ComplexTypesTrackingTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 10, read out of `artifacts/measure/a31.txt`: **6 query**, 1 `WithConstructors`, 1 `Update`,
-1 `OptimisticConcurrency`, 1 compliance report. Everything outside the query residual is now a
-single test.
+The 12, read out of `artifacts/measure/a32.txt`: **6 query**, 2 `ComplexTypesTracking`,
+1 `WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
 
 Not yet implemented, in rough priority order:
-- **Complex types** — nothing carries them over the wire: `DynamicValueMapper` walks
-  `entityType.GetProperties()`, which excludes complex properties. **No test shows this today**
-  (A31 corrected the one that was blamed on it), so it is invisible until
-  `ComplexTypesTrackingTestBase` and the `Query.Associations.ComplexProperties` family are
-  adopted — which is the reason to do it. The hard part is that `GetFlattenedProperties()` gives
-  each complex leaf its own name and **names collide** (`Culture.Species` and `Milk.Species` are
-  both `"Species"`), while `IStateManager.CreateEntry` and `ShadowValuesFactory` are name-keyed.
+- **Complex types work** (A32) — `ComplexTypesTrackingTestBase` is **249 of 251**, and the two
+  left are one shape of one feature: a property-bag complex *collection* on an `Added` entity,
+  which fails inside EF's own `StructuralTypeMaterializerSource`. A complex value cannot ride in
+  the value dictionary an entity is built from — `CreateEntry` and `ShadowValuesFactory` are
+  name-keyed and complex leaves collide (`Culture.Species` and `Milk.Species` are both
+  `"Species"`) — so both sides set it through its CLR member instead. The
+  `Query.Associations.ComplexProperties` family is now adoptable and is not adopted.
 - **The query residual** — 6, classified in full under A28. Only **2** are a real gap
   (`SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
   that milestone M2-B is for). **4** are spec tests asserting a limitation this provider does not
@@ -131,7 +131,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 110 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 109 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.

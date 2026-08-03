@@ -2164,6 +2164,50 @@ failures are left red and classified rather than worked immediately.
       of EF's `*InMemoryTest` are consequences of each other, and taking the model configuration
       without the expectations it implies leaves a failure that reads like a provider defect.
 
+- [x] **A32.** Complex types travel, and the base that proves it.
+      **`Total tests: 13996, Passed: 13896, Failed: 12, Skipped: 88`** — **251 tests added, 249 of
+      them passing**; FIXED none, BROKEN 2, both of them new. Unadopted bases **110 → 109**.
+      ✅ `<this commit>`
+
+      A31 removed the only failure complex types had been blamed for, which left the feature with
+      **no test at all** — so it was written and adopted in the same step:
+      `ComplexTypesTrackingTestBase`, EF's own corpus, mirroring `ComplexTypesTrackingInMemoryTest`
+      down to the `TransactionIgnoredWarning` and the `PreferProperty` access mode.
+
+      Four defects, in the order the corpus surfaced them — **211 red, then 28, then 12, then 2**:
+
+      1. **A primitive collection needs a JSON reader/writer to be mapped at all.**
+         `InfoCarrierTypeMappingSource` built its mapping without one, so `List<string>` on a
+         complex type was left unmapped and a constructor taking it failed to bind — 211 failures,
+         all of them at *model building*, before a single byte moved. EF's
+         `InMemoryTypeMappingSource` passes `Dependencies.JsonValueReaderWriterSource.FindReaderWriter`
+         for exactly this; so does ours now.
+      2. **Complex properties are not in `GetProperties()`.** Added to both directions — the query
+         row (`MapScalars`, which is the half of `MapRowMembers` a query-tree constant can also
+         use) and the change entry (`ChangeEntryMapper`, replayed by `ServerSaveChangesExecutor`).
+         A complex value is *owned* — no identity, no navigations, no sharing — so the mapper's
+         ordinary object shape is the whole of it, nesting included.
+      3. **The allowlist has to walk complex types by hand.**
+         `GetFlattenedComplexProperties()` stops at a complex *collection* — "including those on
+         non-collection complex types" is its own summary — so a third-level complex property
+         reached through one was refused on deserialization.
+      4. **A sequence does not always yield its first generic argument.** A property-bag complex
+         type is a `Dictionary<string, object>`, whose elements are `KeyValuePair<string, object>`.
+         `GetElementType` took the first argument, built a `List<string>` and refused every
+         element.
+
+      Neither side can put a complex value in the value dictionary the entity is built from:
+      `CreateEntry` and `ShadowValuesFactory` are keyed by property **name**, and
+      `GetFlattenedProperties()` gives each complex leaf its own — `Culture.Species` and
+      `Milk.Species` are both `"Species"`. Both sides therefore set the whole complex value through
+      its CLR member, through the backing field where there is one (L6), before the row is tracked.
+
+      **Left red: `Can_track_entity_with_complex_property_bag_collections(state: Added)`**, 2 of
+      251. The failure is inside EF's `StructuralTypeMaterializerSource` — *Incorrect number of
+      arguments supplied for call to method 'System.Object get_Item(System.String)'* — raised
+      while building a materializer for a property-bag complex collection. That is one shape of
+      one feature, and the diagnosis belongs with the materializer rather than with the wire.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
