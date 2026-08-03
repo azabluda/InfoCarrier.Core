@@ -278,4 +278,74 @@ public class SqliteSmokeTest
         Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync();
         Assert.Equal("ef", Assert.Single(saved.Tags).Label);
     }
+
+    [ConditionalFact]
+    public async Task A_rolled_back_transaction_leaves_the_relational_store_untouched()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext, seed: _ => Task.CompletedTask);
+
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        await using (await client.Database.BeginTransactionAsync())
+        {
+            client.Blogs.Add(new Blog { Id = 1, Title = "provisional" });
+            await client.SaveChangesAsync();
+
+            // Visible inside, because the query carries the same token and so runs on the
+            // server context the transaction pinned.
+            Assert.Equal(1, await client.Blogs.CountAsync());
+        }
+
+        await using SqliteSmokeContext after = CreateClient(store);
+        Assert.Equal(0, await after.Blogs.CountAsync());
+    }
+
+    [ConditionalFact]
+    public async Task A_committed_transaction_keeps_its_work()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext, seed: _ => Task.CompletedTask);
+
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        await using (var transaction = await client.Database.BeginTransactionAsync())
+        {
+            client.Blogs.Add(new Blog { Id = 1, Title = "kept" });
+            await client.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using SqliteSmokeContext after = CreateClient(store);
+        Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
+    }
+
+    [ConditionalFact]
+    public async Task A_savepoint_rolls_back_part_of_a_transaction()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext, seed: _ => Task.CompletedTask);
+
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        await using (var transaction = await client.Database.BeginTransactionAsync())
+        {
+            // SQLite has savepoints, so this is the tier where the answer is not "no".
+            Assert.True(transaction.SupportsSavepoints);
+
+            client.Blogs.Add(new Blog { Id = 1, Title = "kept" });
+            await client.SaveChangesAsync();
+
+            await transaction.CreateSavepointAsync("sp");
+
+            client.Blogs.Add(new Blog { Id = 2, Title = "undone" });
+            await client.SaveChangesAsync();
+
+            await transaction.RollbackToSavepointAsync("sp");
+            await transaction.CommitAsync();
+        }
+
+        await using SqliteSmokeContext after = CreateClient(store);
+        Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
+    }
 }

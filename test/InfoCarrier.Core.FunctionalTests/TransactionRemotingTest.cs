@@ -123,6 +123,30 @@ public class TransactionRemotingTest
         Assert.Contains("already open", exception.Message);
     }
 
+    [Fact]
+    public async Task Savepoints_are_addressed_by_the_transaction_token_and_a_name()
+    {
+        var client = new RecordingClient();
+        await using var context = new SmokeContext(Options(client));
+
+        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync();
+
+        Assert.True(transaction.SupportsSavepoints);
+        await transaction.CreateSavepointAsync("sp1");
+        await transaction.RollbackToSavepointAsync("sp1");
+        await transaction.ReleaseSavepointAsync("sp1");
+
+        // A savepoint is not a scope of its own, so it carries no token of its own: the
+        // transaction's token plus a name is the whole address.
+        Assert.Equal(
+            [
+                "create:server-token-1:sp1",
+                "rollback:server-token-1:sp1",
+                "release:server-token-1:sp1"
+            ],
+            client.Savepoints);
+    }
+
     private static DbContextOptions<SmokeContext> Options(IInfoCarrierClient client)
         => new DbContextOptionsBuilder<SmokeContext>().UseInfoCarrier(client).Options;
 
@@ -136,6 +160,8 @@ public class TransactionRemotingTest
         public List<string?> SaveTokens { get; } = [];
 
         public List<string> Ends { get; } = [];
+
+        public List<string> Savepoints { get; } = [];
 
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("No query is expected in these tests.");
@@ -163,5 +189,26 @@ public class TransactionRemotingTest
             Ends.Add($"rollback:{transactionId}");
             return Task.CompletedTask;
         }
+
+        public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        {
+            Savepoints.Add($"create:{transactionId}:{name}");
+            return Task.CompletedTask;
+        }
+
+        public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        {
+            Savepoints.Add($"rollback:{transactionId}:{name}");
+            return Task.CompletedTask;
+        }
+
+        public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        {
+            Savepoints.Add($"release:{transactionId}:{name}");
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
     }
 }

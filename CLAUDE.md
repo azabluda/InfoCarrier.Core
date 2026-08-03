@@ -97,7 +97,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 11347, Passed: 11281, Failed: 37, Skipped: 29`** (2026-08-03) across the
+**`Total tests: 11351, Passed: 11285, Failed: 37, Skipped: 29`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase` and `ManyToManyTrackingTestBase` on Tier A, plus `OptimisticConcurrencyTestBase`
 on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking` and `OptimisticConcurrency` are
@@ -118,11 +118,6 @@ Not yet implemented, in rough priority order:
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
 - **The remaining spec bases** — the rest of the 138 the compliance test reports unadopted.
-- **Transactions** (roadmap M4) — **partly done (T1).** Begin/commit/rollback are remoted and
-  the W3 token is on `QueryDataRequest`/`SaveChangesRequest`; the server holds a scope, context
-  and store transaction per token, and `UseInfoCarrierTransaction` enlists a second context.
-  **Savepoints are not implemented**, and `UseTransaction` is an extension method rather than a
-  public client API.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
 

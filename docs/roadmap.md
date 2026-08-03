@@ -150,7 +150,7 @@ class doc carries the same instruction; this is the index.
 Total **48** tests. Each mirrors EF Core's own `*InMemoryTest` override one for one — the
 objective criterion for "store limitation, not our bug".
 
-### M4 — Transactions
+### M4 — Transactions ✅ **complete 2026-08-03** (plan T1–T2)
 
 Untestable before M3: EF InMemory raises `TransactionIgnoredWarning` with
 `WarningBehavior.Throw`, so Tier B is a prerequisite, not a nicety.

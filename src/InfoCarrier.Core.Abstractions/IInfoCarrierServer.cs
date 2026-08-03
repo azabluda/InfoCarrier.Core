@@ -45,4 +45,33 @@ public interface IInfoCarrierServer
     ///     Rolls back the server transaction identified by <paramref name="transactionId" />.
     /// </summary>
     Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Creates a savepoint named <paramref name="name" /> in the server transaction
+    ///     identified by <paramref name="transactionId" />.
+    /// </summary>
+    /// <remarks>
+    ///     Savepoints are the nesting mechanism EF uses instead of nested transactions, so they
+    ///     are named within a transaction rather than being scopes of their own — the W3 token
+    ///     plus a name is the whole address.
+    /// </remarks>
+    Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Rolls the server transaction back to the savepoint named <paramref name="name" />,
+    ///     leaving the transaction itself open.
+    /// </summary>
+    Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Releases the savepoint named <paramref name="name" />, keeping the work done since it.
+    /// </summary>
+    Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Whether the server's store supports savepoints at all. A store that does not — EF's
+    ///     InMemory provider does not — makes every method above throw, and EF expects a provider
+    ///     to answer this rather than let the caller find out by failing.
+    /// </summary>
+    Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default);
 }

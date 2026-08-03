@@ -176,6 +176,22 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => CreateServer().RollbackTransactionAsync(transactionId, cancellationToken);
 
+    /// <inheritdoc />
+    public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => CreateServer().CreateSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => CreateServer().RollbackToSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => CreateServer().ReleaseSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+        => CreateServer().SupportsSavepointsAsync(transactionId, cancellationToken);
+
     private IInfoCarrierServer CreateServer()
         => ServiceProvider.GetRequiredService<IInfoCarrierServer>();
 

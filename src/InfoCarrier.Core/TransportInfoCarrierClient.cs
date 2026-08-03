@@ -54,6 +54,32 @@ public sealed class TransportInfoCarrierClient : IInfoCarrierClient
         => await RoundTripAsync<string, object>(
             InfoCarrierOperation.RollbackTransaction, transactionId, cancellationToken).ConfigureAwait(false);
 
+    /// <inheritdoc />
+    public async Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => await RoundTripAsync<SavepointRequest, object>(
+            InfoCarrierOperation.CreateSavepoint,
+            new SavepointRequest { TransactionId = transactionId, Name = name },
+            cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => await RoundTripAsync<SavepointRequest, object>(
+            InfoCarrierOperation.RollbackToSavepoint,
+            new SavepointRequest { TransactionId = transactionId, Name = name },
+            cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => await RoundTripAsync<SavepointRequest, object>(
+            InfoCarrierOperation.ReleaseSavepoint,
+            new SavepointRequest { TransactionId = transactionId, Name = name },
+            cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+        => await RoundTripAsync<string, bool>(
+            InfoCarrierOperation.SupportsSavepoints, transactionId, cancellationToken).ConfigureAwait(false);
+
     private async Task<TResponse> RoundTripAsync<TRequest, TResponse>(
         InfoCarrierOperation operation,
         TRequest request,

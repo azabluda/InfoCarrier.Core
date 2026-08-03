@@ -66,6 +66,18 @@ public class InfoCarrierTestHelpers : TestHelpers
         public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException(Message);
 
+        public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException(Message);
+
+        public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException(Message);
+
+        public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException(Message);
+
+        public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException(Message);
+
         private static string Message
             => $"{nameof(InfoCarrierTestHelpers)} builds models; it has no server to talk to.";
     }

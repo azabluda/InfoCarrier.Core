@@ -30,6 +30,7 @@ public class InfoCarrierTransaction : IDbContextTransaction
     private readonly Action _onFinished;
     private readonly bool _owned;
     private bool _finished;
+    private bool? _supportsSavepoints;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierTransaction" /> class.
@@ -110,6 +111,48 @@ public class InfoCarrierTransaction : IDbContextTransaction
             await _client.RollbackTransactionAsync(ServerTransactionId, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Savepoints are named within a transaction rather than being scopes of their own, so
+    ///     the W3 token plus a name is the whole address — there is no second token to invent.
+    ///     Whether they work at all is the server store's answer, not this client's; see
+    ///     <see cref="SupportsSavepoints" />.
+    /// </remarks>
+    public virtual void CreateSavepoint(string name)
+        => CreateSavepointAsync(name).GetAwaiter().GetResult();
+
+    /// <inheritdoc />
+    public virtual Task CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
+        => _client.CreateSavepointAsync(ServerTransactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public virtual void RollbackToSavepoint(string name)
+        => RollbackToSavepointAsync(name).GetAwaiter().GetResult();
+
+    /// <inheritdoc />
+    public virtual Task RollbackToSavepointAsync(string name, CancellationToken cancellationToken = default)
+        => _client.RollbackToSavepointAsync(ServerTransactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public virtual void ReleaseSavepoint(string name)
+        => ReleaseSavepointAsync(name).GetAwaiter().GetResult();
+
+    /// <inheritdoc />
+    public virtual Task ReleaseSavepointAsync(string name, CancellationToken cancellationToken = default)
+        => _client.ReleaseSavepointAsync(ServerTransactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     A round trip, because only the server's store knows. It is cached after the first ask:
+    ///     the answer is a property of the store, and EF consults this before every savepoint
+    ///     operation.
+    /// </remarks>
+    public virtual bool SupportsSavepoints
+        => _supportsSavepoints ??= _client
+            .SupportsSavepointsAsync(ServerTransactionId)
+            .GetAwaiter()
+            .GetResult();
 
     /// <inheritdoc />
     public virtual void Dispose()

@@ -120,6 +120,33 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => EndAsync(transactionId, commit: false, cancellationToken);
 
+    /// <inheritdoc />
+    public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => Open(transactionId).Transaction.CreateSavepointAsync(name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => Open(transactionId).Transaction.RollbackToSavepointAsync(name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => Open(transactionId).Transaction.ReleaseSavepointAsync(name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+        => Task.FromResult(Open(transactionId).Transaction.SupportsSavepoints);
+
+    private OpenTransaction Open(string transactionId)
+    {
+        ArgumentNullException.ThrowIfNull(transactionId);
+
+        return _transactions.TryGetValue(transactionId, out OpenTransaction? open)
+            ? open
+            : throw new InvalidOperationException(
+                $"Transaction '{transactionId}' is not open on this server. It was committed, "
+                    + "rolled back, or belongs to a different server.");
+    }
+
     private async Task EndAsync(string transactionId, bool commit, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
@@ -167,12 +194,7 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
             return new Lease(scope.ServiceProvider.GetRequiredService<DbContext>(), scope);
         }
 
-        if (!_transactions.TryGetValue(transactionId, out OpenTransaction? open))
-        {
-            throw new InvalidOperationException(
-                $"Transaction '{transactionId}' is not open on this server. It was committed, "
-                    + "rolled back, or belongs to a different server.");
-        }
+        OpenTransaction open = Open(transactionId);
 
         // A transaction pins the *connection*, not the change tracker. Every request is
         // self-contained — the client sends the state it needs — and the ordinary path gets a

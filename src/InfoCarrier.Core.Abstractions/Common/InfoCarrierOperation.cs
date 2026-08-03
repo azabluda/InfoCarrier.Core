@@ -21,4 +21,16 @@ public enum InfoCarrierOperation
 
     /// <summary>Roll back a transaction.</summary>
     RollbackTransaction = 4,
+
+    /// <summary>Create a savepoint inside a transaction.</summary>
+    CreateSavepoint = 5,
+
+    /// <summary>Roll a transaction back to a savepoint, leaving it open.</summary>
+    RollbackToSavepoint = 6,
+
+    /// <summary>Release a savepoint, keeping the work done since it.</summary>
+    ReleaseSavepoint = 7,
+
+    /// <summary>Ask whether the server's store supports savepoints at all.</summary>
+    SupportsSavepoints = 8,
 }

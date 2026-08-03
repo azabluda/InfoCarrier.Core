@@ -1271,8 +1271,39 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       reason the replaced file gave: on Tier A the remoted transaction still does nothing, so no
       suite count distinguishes "the token flows" from "the token is never sent".
 
-      **Still open for M4:** savepoints, and `Database.UseTransaction` as a public client API
-      rather than the test-only extension.
+      **Still open after T1:** savepoints (T2), and `Database.UseTransaction` as a public client
+      API rather than the test-only extension.
+
+- [x] **T2.** Savepoints, and proof that a transaction is real. **`Total tests: 11351,
+      Passed: 11285, Failed: 37, Skipped: 29`** — FIXED none, BROKEN none, **reasons unchanged**,
+      4 net new tests. ✅ `<this commit>`
+
+      `IDbContextTransaction`'s savepoint members default to throwing `SavepointsNotSupported`, so
+      leaving them was a real gap rather than a formality. Four wire operations
+      (`CreateSavepoint`, `RollbackToSavepoint`, `ReleaseSavepoint`, `SupportsSavepoints`) and a
+      `SavepointRequest` carrying `{ TransactionId, Name }`.
+
+      **A savepoint has no token of its own.** It is not a scope — EF uses savepoints *instead* of
+      nested transactions — so the W3 token plus a name is the whole address, and the server
+      delegates each call to the store transaction it is already holding. `SupportsSavepoints` is
+      a round trip because only the server's store knows the answer, cached after the first ask
+      since EF consults it before every savepoint operation.
+
+      **The interesting part is what now proves any of this works.** T1 changed no test count and
+      no failure reason, which is the correct outcome and also the weakest possible evidence — on
+      Tier A a remoted transaction still does nothing, so nothing in a suite run distinguishes
+      "the token flows" from "the token is never sent". Three end-to-end tests on Tier B, where
+      SQLite has genuine transactions and genuine savepoints, close that:
+
+      - a rolled-back transaction leaves the store untouched, *and* its work is visible from
+        inside it — which only holds if the query carried the token and ran on the pinned server
+        context;
+      - a committed transaction keeps its work;
+      - a savepoint rolls back part of a transaction and the rest still commits.
+
+      That third one is the whole feature in one assertion. **M4's exit criteria are met**: begin,
+      commit, rollback, savepoints, the W3 token across a stateless transport, and client disposal
+      cleaning up the server side.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
