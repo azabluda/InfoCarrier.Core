@@ -595,7 +595,7 @@ public class ClientResultMaterializer
                 continue;
             }
 
-            if (!member.IsLoadedNavigation || member.Value is null)
+            if (!member.IsLoadedNavigation)
             {
                 continue;
             }
@@ -604,6 +604,26 @@ public class ClientResultMaterializer
                 ?? (INavigationBase?)entityType.FindSkipNavigation(member.Name);
             if (navigation is null)
             {
+                continue;
+            }
+
+            // Loaded, but with no value to carry: a *shadow* navigation has no CLR member, so
+            // there is nothing to assign and nothing the client could read it back from. The
+            // loaded flag is still real state — `Load_collection_already_loaded_untyped_*`
+            // asserts `IsLoaded` on exactly such a navigation, named as a string because there is
+            // no property to name it with — and it is all this member exists to carry. The join
+            // rows sent alongside are what actually populate it.
+            if (member.Value is null)
+            {
+                if (entry is not null)
+                {
+                    entry.SetIsLoaded(navigation);
+                }
+                else
+                {
+                    SetIsLoadedUntracked(instance, navigation);
+                }
+
                 continue;
             }
 

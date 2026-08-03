@@ -1555,6 +1555,25 @@ failures are left red and classified rather than worked immediately.
       there the field is the only way in. Refusing collections outright (the second row) throws
       away the tests that need exactly that.
 
+- [x] **A10.** A shadow navigation can still be *loaded*.
+      **`Total tests: 12878, Passed: 12788, Failed: 61, Skipped: 29`** — FIXED 22, BROKEN none.
+      ✅ `<this commit>`
+
+      L18 stopped sending the *value* of a shadow navigation, because `GetGetter` on one throws
+      rather than returning null. Correct, and it threw away something real with it: **"loaded" is
+      state the client cannot learn any other way.** A unidirectional many-to-many's inverse skip
+      navigation is exactly this — declared in the model with no property behind it, which is why
+      `Load_collection_already_loaded_untyped_*` has to name it with a string — and
+      `Assert.True(navigationEntry.IsLoaded)` was failing on it right after an `Include`.
+
+      So a loaded shadow navigation now travels as a **value-less loaded member**: present, flagged
+      loaded, carrying nothing. The client marks the navigation loaded and assigns nothing, which
+      is the only thing it could do and exactly what is wanted. What populates the navigation is
+      the join rows sent alongside it (A6/A7).
+
+      An absent member still means "not loaded", so the flag stays unambiguous — nothing else had
+      to change to tell the two apart.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

@@ -372,13 +372,19 @@ public class DynamicValueMapper : IDynamicValueMapper
             // There is nothing to send and nowhere on the client to put it, but the join rows
             // below are still the payload the navigation exists to carry, so the walk continues
             // rather than skipping the navigation outright.
-            if (loaded && !navigation.IsShadowProperty())
+            if (loaded)
             {
-                object? related = navigation.GetGetter().GetClrValue(value);
+                // A shadow navigation has no CLR member to read — `GetGetter` on one throws
+                // rather than returning null (L18) — so it travels as a *value-less* loaded
+                // member. That is not nothing: "loaded" is real state the client cannot
+                // otherwise learn, and `Load_collection_already_loaded_untyped_*` asserts it on
+                // exactly this kind of navigation. What populates it is the join rows below.
                 members.Add(new DynamicPropertyValue
                 {
                     Name = navigation.Name,
-                    Value = ToDynamicValue(related, navigation.ClrType),
+                    Value = navigation.IsShadowProperty()
+                        ? null
+                        : ToDynamicValue(navigation.GetGetter().GetClrValue(value), navigation.ClrType),
                     IsLoadedNavigation = true,
                 });
             }
