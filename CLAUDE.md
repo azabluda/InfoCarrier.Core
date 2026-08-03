@@ -100,27 +100,28 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 13745, Passed: 13686, Failed: 11, Skipped: 48`** (2026-08-03) across the
+**`Total tests: 13745, Passed: 13687, Failed: 10, Skipped: 48`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase` and `NotificationEntitiesTestBase` on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-The 11, read out of `artifacts/measure/a30.txt`: **6 query**, 1 `LazyLoadProxy`, 1
-`WithConstructors`, 1 `Update`, 1 `OptimisticConcurrency`, 1 compliance report. Everything
-outside the query residual is now a single test.
+The 10, read out of `artifacts/measure/a31.txt`: **6 query**, 1 `WithConstructors`, 1 `Update`,
+1 `OptimisticConcurrency`, 1 compliance report. Everything outside the query residual is now a
+single test.
 
-Lazy loading works (Phase L): it began at 505 of 505 failing and is now **1 of 825** across
-`LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest` — `Can_serialize_proxies_to_JSON`, which
-is a **complex-type** gap (`Culture.Species` arrives null) and not a lazy-loading one:
-`DynamicValueMapper.MapRowMembers` walks `entityType.GetProperties()`, which does not include
-complex properties, so they never travel.
+Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
+`LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
 
 Not yet implemented, in rough priority order:
-- **Complex types** — nothing carries them over the wire. One failure today
-  (`Can_serialize_proxies_to_JSON`), but `ComplexTypesTrackingTestBase` is unadopted and cannot
-  be adopted until this exists.
+- **Complex types** — nothing carries them over the wire: `DynamicValueMapper` walks
+  `entityType.GetProperties()`, which excludes complex properties. **No test shows this today**
+  (A31 corrected the one that was blamed on it), so it is invisible until
+  `ComplexTypesTrackingTestBase` and the `Query.Associations.ComplexProperties` family are
+  adopted — which is the reason to do it. The hard part is that `GetFlattenedProperties()` gives
+  each complex leaf its own name and **names collide** (`Culture.Species` and `Milk.Species` are
+  both `"Species"`), while `IStateManager.CreateEntry` and `ShadowValuesFactory` are name-keyed.
 - **The query residual** — 6, classified in full under A28. Only **2** are a real gap
   (`SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
   that milestone M2-B is for). **4** are spec tests asserting a limitation this provider does not

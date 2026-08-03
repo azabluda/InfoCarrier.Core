@@ -2143,6 +2143,27 @@ failures are left red and classified rather than worked immediately.
       `MapRowMembers` needs row-mapping callbacks a constant does not have, and `_isNavigationLoaded!`
       would have thrown. That split is why `MapScalars` now exists.
 
+- [x] **A31.** Half an override set is not an override set.
+      **`Total tests: 13745, Passed: 13687, Failed: 10, Skipped: 48`** — FIXED 1, BROKEN none.
+      **Lazy loading is 825 of 825.** ✅ `<this commit>`
+
+      `Can_serialize_proxies_to_JSON` had been recorded — in this plan and in CLAUDE.md — as the
+      one **complex-type** failure: `Culture.Species` arrived null, and `MapRowMembers` walks
+      `GetProperties()`, which excludes complex properties. The diagnosis was wrong, and a probe
+      on the metadata is what said so: `Blog`'s complex-property list is **empty**. This fixture
+      does not map `Culture` or `Milk` at all — our own `InfoCarrierFixture` `Ignore`s them,
+      one for one with EF's `LazyLoadProxyInMemoryTest`, because the InMemory store has no
+      complex types.
+
+      EF's InMemory test therefore also overrides `SerializedBlogs1` and `SerializedBlogs2`, whose
+      expected JSON has `"Species": null` where the relational base has `"S1"`. We had adopted the
+      `Ignore` calls and not the strings, so the test was comparing against an expectation for a
+      model nobody built. Both strings adopted verbatim.
+
+      **The lesson generalises past this test.** An override set is adopted as a set: the pieces
+      of EF's `*InMemoryTest` are consequences of each other, and taking the model configuration
+      without the expectations it implies leaves a failure that reads like a provider defect.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
