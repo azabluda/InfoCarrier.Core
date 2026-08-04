@@ -3395,6 +3395,28 @@ failures are left red and classified rather than worked immediately.
       (`Expected: 21, Actual: 20`), plus two `Sequence contains no elements` and one speaker whose
       skip-navigation came back empty. Left classified.
 
+- [x] **A76.** `ConferencePlanner` puts the data back after each test.
+      **`Total tests: 21285, Passed: 20968, Failed: 115, Skipped: 202`** — FIXED 5, BROKEN none.
+      **`ConferencePlannerTestBase` is 24 of 24.** ✅ `<this commit>`
+
+      The third witness for the same rule, and A75 was wrong to say these were "not this". They
+      were the same thing seen from the other end: the base wraps every test in
+      `ExecuteWithStrategyInTransactionAsync` and relies on a **real transaction rolling it back**.
+      Tier A's store has no transaction, so `SessionsController_Put` left its session renamed and
+      the next test looking for it got "Sequence contains no elements"; `AttendeesController_AddSession`
+      counted 20 where it wanted 21 because a prior test had removed one. Counts came out *low*
+      rather than high, which is why it did not look like accumulation — but the cause is identical:
+      **nothing put the store back.**
+
+      Two overrides, both already established here: reseed after the transaction helper (as
+      `GraphUpdates`, `Updates` and `ProxyGraphUpdates` do) and reseed through the **backend** (A74,
+      A75).
+
+      **The rule, now with four witnesses.** A fixture over a mutable store on this provider needs
+      *both*: something that restores the data between tests, and that something must go through
+      `((InfoCarrierTestStore)TestStore).Backend`. Neither is optional and neither is inferable
+      from the base — a base written against a store with transactions simply does not say it.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
