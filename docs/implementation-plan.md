@@ -3451,6 +3451,42 @@ failures are left red and classified rather than worked immediately.
       this backend does not have, and no amount of work on this provider changes that. Complex-type
       queries need Tier B.
 
+- [x] **A79.** The bases InMemory cannot host belong on **Tier B**, not in the bin.
+      **`Total tests: 21470, Passed: 21094, Failed: 173, Skipped: 203`** — **+189 tests, +126
+      passing**, 62 new red, nothing previously green broken. Unadopted bases **50 → 47**.
+      ✅ `<this commit>`
+
+      **A70 and A77 drew the wrong conclusion, and this step is the correction.** Both reverted a
+      base after establishing that EF's InMemory provider could not host it, and both stopped
+      there. ADR-009 defines a second tier *for exactly that case*, and the signal I used to
+      justify the reverts — "EF's own suite does not derive from this base" — was only ever checked
+      against `EFCore.InMemory.FunctionalTests`. Checked against `EFCore.Sqlite.FunctionalTests`,
+      **every one of them has a counterpart**:
+
+      | Base | Tier A | Tier B |
+      |---|---:|---:|
+      | `FunkyDataQueryTestBase` | 2 of 38 | **38 of 38** |
+      | `AdHocComplexTypeQueryTestBase` | 0 of 4 | **4 of 4** |
+      | `Query.ComplexTypeQueryTestBase` | not attempted | 88 of 151 |
+
+      The first two are *first-run, no overrides*. `FunkyDataQuery` is a corpus about predicate
+      translation and Tier A does not translate; `AdHocComplexTypeQuery` needs complex property
+      access translated at all. Neither was ever about this provider — putting them on the tier
+      that translates simply answers them.
+
+      `ComplexTypeQuery` is new coverage rather than a restoration: 88 of 151, with 8 of the
+      failures closed by mirroring EF's own overrides — six from
+      `ComplexTypeQueryRelationalTestBase` (a subquery over a complex type, a set operation between
+      two different ones) and two `ApplyNotSupported` from `ComplexTypeQuerySqliteTest`. That is
+      CLAUDE.md's "grep the relational base as well as SQLite's own suite" rule paying off on a
+      tier where it applies for the first time. **The remaining 62 are left red and undiagnosed on
+      purpose** — two uniform families, `Values differ` (32) and `Strings differ` (30) — and are
+      provider work on a capability surface that did not exist before this step.
+
+      **The rule this replaces the reverts with:** *"EF ships no InMemory test for this base"* is a
+      reason to move it to Tier B, **not** a reason to drop it. Only *"EF ships no test for it on
+      any store we have"* justifies leaving a base unadopted.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

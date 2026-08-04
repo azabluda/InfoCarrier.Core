@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 21281, Passed: 20968, Failed: 111, Skipped: 202`** (2026-08-04) across the
+**`Total tests: 21470, Passed: 21094, Failed: 173, Skipped: 203`** (2026-08-04) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -141,7 +141,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 50 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 47 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red. A49 built
   `NonSharedModelInfoCarrierHarness`, so every remaining `NonSharedModelTestBase` suite
   (`SharedTypeQuery`, `OwnedEntityQuery`, `AdHocComplexTypeQuery`, `AdHocJsonQuery`,
