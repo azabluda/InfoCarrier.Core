@@ -3242,6 +3242,35 @@ failures are left red and classified rather than worked immediately.
       and `Save_two_entity_cycle_with_lazy_loading` on the two lazy flavours, which expects a throw
       and gets none.
 
+- [x] **A70.** `ConferencePlanner` and `AdHocComplexTypeQuery`; **`FunkyDataQuery` attempted and
+      reverted.**
+      **`Total tests: 21285, Passed: 20946, Failed: 137, Skipped: 202`** — +28 tests, +19 passing,
+      9 new red. Unadopted bases **51 → 49**. ✅ `<this commit>`
+
+      `ConferencePlannerInfoCarrierTest` is **19 of 24**. The second application-shaped suite after
+      `MusicStore` and the more useful one: every test is a controller action — load, project into
+      a DTO, mutate, save — against a context per operation, which is the shape a real caller of
+      this provider writes. The 5 left are `Sequence contains no elements` (×2) and three
+      `Assert.All`/`Assert.Equal` count mismatches, all in the `SessionsController` family.
+
+      `AdHocComplexTypeQueryInfoCarrierTest` is **0 of 4**, and the four are one gap:
+      **complex-type equality in a predicate**. Three are `The LINQ expression '…Where(e =>
+      e.ComplexContainer == ComplexContainer)' could not be translated`, one is a
+      `KeyNotFoundException` on a complex property. A32 made complex types *travel*; comparing one
+      to a parameter or to `null` inside a predicate is a separate thing and does not work.
+
+      **`FunkyDataQueryTestBase` is not adoptable on Tier A, and this is the evidence.** Adopted, it
+      came up **2 of 38**, with 34 of the failures reading
+      `ArgumentNullException: Value cannot be null. (Parameter 'value')` from
+      `String.EndsWith(null, StringComparison)` — thrown **inside EF's own InMemory provider**,
+      three frames below `ServerQueryExecutor`. The corpus is built out of nulls and wildcards
+      precisely to break predicate translation, and the InMemory provider client-evaluates those
+      operators without EF's null-guarding. That is why **EF ships no InMemory counterpart for this
+      base** — the same signal that keeps `StoreGeneratedTestBase` off the list. Reverted rather
+      than committed: 36 red tests that report the backing store's behaviour say nothing about this
+      provider, and the guardrail about leaving spec tests red is about tests that *tell* you
+      something.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
