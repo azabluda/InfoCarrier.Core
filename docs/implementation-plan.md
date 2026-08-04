@@ -1364,6 +1364,69 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       commit, rollback, savepoints, the W3 token across a stateless transport, and client disposal
       cleaning up the server side.
 
+## Phase B — the tier audit, and the rework it found
+
+**Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
+InMemory provider could not host it, and stopped there. A79 showed that was the wrong conclusion
+twice over: ADR-009 defines Tier B for exactly that case, and both bases pass on it — `FunkyDataQuery`
+**38 of 38** and `AdHocComplexTypeQuery` **4 of 4**, first run, no overrides. The signal I had been
+using ("EF's own suite does not derive from this base") was only ever checked against
+`EFCore.InMemory.FunctionalTests`.
+
+**The rule, corrected.** *"EF ships no InMemory test for this base"* means **move it to Tier B**.
+Only *"EF ships no test for it on any store we have"* justifies leaving a base unadopted. Adopting
+on the wrong tier is not a neutral choice: it produces failures that describe the backing store
+rather than this provider, and it invites workarounds for problems the right tier does not have.
+
+**The audit.** Every class holding `InfoCarrierTestStoreFactory.InMemory` was matched against the
+spec bases it inherits, and each base against whether EF ships an `…InMemoryTest` and an
+`…SqliteTest`. 48 bases; **46 have an InMemory counterpart and are on the right tier.** Two did not:
+
+| Base | EF InMemory | EF SQLite | Verdict |
+|---|---|---|---|
+| `ConferencePlannerTestBase` | **no** | yes | **Wrong tier. Moved in A80.** |
+| `MonsterFixupTestBase` | yes (`MonsterFixupSnapshot…`) | no | Correct — the audit glob missed the infix. |
+
+- [x] **A80.** `ConferencePlanner` moved to Tier B; the audit above. ✅ `<this commit>`
+
+      **24 of 24 on Tier B, and the A76 workaround deleted rather than carried.** That workaround is
+      the part worth recording: A76 added a reseed-after-every-test override because the base wraps
+      each test in a transaction and Tier A has none. The evidence that the tier was wrong was
+      therefore already in hand, and was read as a fixture quirk instead. On Tier B the transaction
+      is real, `UseTransaction` enlists the second context in it (the same hook
+      `OptimisticConcurrencyInfoCarrierTest` needs), and nothing has to be put back by hand.
+
+      **The tell, for next time: if adopting a base means writing a workaround for a store
+      capability the base assumes, check the tier before writing the workaround.**
+
+- [ ] **B1. Dual-tier the query bases.** Tier A currently carries ~22 Northwind query bases and the
+      complex-navigations / gears-of-war / many-to-many families that EF also ships for SQLite; only
+      `NorthwindJoin`, `NorthwindSelect` and `NorthwindWhere` run on Tier B. This is not a wrong-tier
+      error — those bases have InMemory counterparts and belong on Tier A too — but it is a **gap in
+      what the suite can tell us**, and `NorthwindQueryInfoCarrierSqliteFixture`'s own doc comment
+      has said so since it was written: *"a query failing there may be failing because InMemory
+      cannot do it rather than because this provider is wrong."*
+
+      Concretely: **the 12 failures currently classified as "the A28 shape — a spec test asserting a
+      limitation this provider does not have" have never been checked on a tier that has the
+      limitation.** Some of them may simply pass there; others may fail for a real reason. Until
+      they run on Tier B that classification is an assumption, not a measurement.
+
+      Cheap, because the fixture already exists: one class per base, `InfoCarrierTestStoreFactory.Sqlite`,
+      and EF's SQLite overrides mirrored. Do it in batches and expect the relational overrides to
+      be the bulk of the work.
+
+- [ ] **B2. Re-judge the deferred reds on the tier that can answer them.** Not before B1. In
+      particular:
+
+      | Family | Count | Where it should be judged |
+      |---|---:|---|
+      | `ComplexTypeQuery` `Values differ` / `Strings differ` | 62 | Already Tier B (A79). Real provider work; undiagnosed on purpose. |
+      | `JsonTypes` spatial | 26 | Neither tier: SQLite needs the SpatiaLite package, which is not referenced. A roadmap question, not a plan one. |
+      | `MaterializationInterception` | 26 | Tier A is right (EF ships an InMemory test). 16 are the real gap, 10 are A71's blocked wiring. |
+      | the A28 "asserts a limitation we do not have" set | 12 | **Tier B, after B1.** |
+      | `JsonTypes` decimal | 4 | Neither — machine locale (A64). |
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

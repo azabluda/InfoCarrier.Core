@@ -1,50 +1,44 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.TestModels.ConferencePlanner;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
 /// <summary>
-///     <c>ConferencePlannerTestBase</c> on ADR-009 Tier A.
+///     <c>ConferencePlannerTestBase</c> on ADR-009 <b>Tier B</b>.
 /// </summary>
 /// <remarks>
-///     The second application-shaped suite after <c>MusicStore</c>, and the more useful of the two
-///     here: every test is a controller action — load, project into a DTO, mutate, save — run
-///     against a context per operation. That is the combination a per-feature base never quite
-///     reaches, and it is the shape a real caller of this provider writes.
+///     <para>
+///         The second application-shaped suite after <c>MusicStore</c>, and the more useful of the
+///         two: every test is a controller action — load, project into a DTO, mutate, save — run
+///         against a context per operation. That is the combination a per-feature base never quite
+///         reaches, and it is the shape a real caller of this provider writes.
+///     </para>
+///     <para>
+///         <b>Tier B, corrected in A80.</b> A70 put it on Tier A; the audit found EF ships a SQLite
+///         test for this base and <em>no</em> InMemory one, so Tier A was never the right home. The
+///         evidence was already in hand and misread: A76 had to add a reseed-after-every-test
+///         override because the base wraps each test in a transaction and Tier A has none. Here the
+///         transaction is real, <see cref="UseTransaction" /> enlists the second context in it, and
+///         the workaround is deleted rather than kept.
+///     </para>
 /// </remarks>
 public class ConferencePlannerInfoCarrierTest(ConferencePlannerInfoCarrierTest.ConferencePlannerInfoCarrierFixture fixture)
     : ConferencePlannerTestBase<ConferencePlannerInfoCarrierTest.ConferencePlannerInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
     /// <remarks>
-    ///     The base relies on a real transaction rolling each test back; Tier A's store has none,
-    ///     so a test that renames or removes a session leaves it renamed and the next one fails
-    ///     looking for it — `SessionsController_Get_with_ID` came up "Sequence contains no
-    ///     elements", and `AttendeesController_AddSession` counted 20 where it wanted 21. Putting
-    ///     the data back afterwards is what `GraphUpdatesInfoCarrierTest`,
-    ///     `UpdatesInfoCarrierTest` and `ProxyGraphUpdatesInfoCarrierTest` all do for the same
-    ///     reason.
+    ///     The base opens a transaction on one context and makes a second observe the same
+    ///     uncommitted state. Without enlisting, the second runs on its own SQLite connection and
+    ///     gets "database is locked" — the same hook, and the same reason,
+    ///     <c>OptimisticConcurrencyInfoCarrierTest</c> needs it.
     /// </remarks>
-    protected override async Task ExecuteWithStrategyInTransactionAsync(
-        Func<ApplicationDbContext, Task> testOperation,
-        Func<ApplicationDbContext, Task>? nestedTestOperation1 = null,
-        Func<ApplicationDbContext, Task>? nestedTestOperation2 = null,
-        Func<ApplicationDbContext, Task>? nestedTestOperation3 = null)
-    {
-        try
-        {
-            await base.ExecuteWithStrategyInTransactionAsync(
-                testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
-        }
-        finally
-        {
-            await Fixture.ReseedAsync();
-        }
-    }
+    protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        => facade.UseInfoCarrierTransaction(transaction);
 
     public class ConferencePlannerInfoCarrierFixture : ConferencePlannerFixtureBase
     {
@@ -55,21 +49,8 @@ public class ConferencePlannerInfoCarrierTest(ConferencePlannerInfoCarrierTest.C
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context));
-
-        /// <summary>
-        ///     Reseeds through the <em>backend</em> context (A74/A75: the client side of these
-        ///     APIs is a no-op by construction).
-        /// </summary>
-        public override async Task ReseedAsync()
-        {
-            InfoCarrierBackendTestStore backend = ((InfoCarrierTestStore)TestStore).Backend;
-            using DbContext context = backend.CreateDbContext();
-            await backend.CleanAsync(context);
-            await CleanAsync(context);
-            await SeedAsync((ApplicationDbContext)context);
-        }
     }
 }

@@ -40,6 +40,13 @@ here, and both are cheap to avoid:
   fired and a rewrite that did not help look identical from outside. Establish that the code
   *ran* — a probe writing to a file, since xUnit swallows stdout — before concluding anything
   about the problem.
+- **"EF ships no InMemory test for this base" means move it to Tier B, not drop it.** ADR-009 has
+  two tiers precisely because InMemory cannot host everything, and a base adopted on the wrong one
+  produces failures that describe the *backing store* rather than this provider. Two bases were
+  reverted on that mistake and both pass on Tier B, first run, no overrides (A79). Only "EF ships no
+  test for it on any store we have" justifies leaving a base unadopted. The tell: **if adopting a
+  base means writing a workaround for a store capability the base assumes, check the tier before
+  writing the workaround** (A80 deleted one such workaround by moving a class).
 - **A newly-red SQLite test is not automatically a regression.** Grep
   `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
   with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
