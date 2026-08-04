@@ -3051,6 +3051,27 @@ failures are left red and classified rather than worked immediately.
       again: the base asserts `CoreStrings.TranslationFailed` for an anonymous-type projection over
       a collection mapped as a scalar, and the projection split answers it instead.
 
+- [x] **A63.** `JsonTypesTestBase` — the largest single base adopted so far.
+      **`Total tests: 19317, Passed: 19043, Failed: 111, Skipped: 163`** — **+574 tests, +546
+      passing**, 28 new red. Unadopted bases **60 → 59**. ✅ `<this commit>`
+
+      Every mapped type written and read back through its `JsonValueReaderWriter`, which is the
+      exact mechanism A34 made this provider's fallback for a value the wire has no primitive for.
+      546 of 574 first time.
+
+      | Count | Family | Reading |
+      |---:|---|---|
+      | 26 | every spatial type, `Point` through `Polygon`, plain and `_as_GeoJson` | **No spatial support.** `InfoCarrierTypeMappingSource` maps no `NetTopologySuite` type, so the model does not build: *"The 'Point' property 'PointType.Point' could not be mapped…"*. Consistent with `SpatialQueryTestBase` and `SpatialTestBase` being on the do-not-adopt list. |
+      | 2 | `Can_read_write_decimal_JSON_values(0.0)` and `(1.1)` | **A real wire defect**, and a small one: *"Object of type 'System.String' cannot be converted to type 'System.Decimal'"*. A `decimal` written through its JSON form comes back as the string it was written as. |
+
+      **EF's eight spatial overrides are deliberately not adopted, and that is the point worth
+      recording.** They assert `NullReferenceException` — InMemory maps the spatial type and then
+      fails writing it as JSON. This provider raises `InvalidOperationException` one step earlier,
+      because it never maps the type at all. Copying the override made all eight fail with
+      *"Exception type was not an exact match"*, which is a worse answer than not overriding: it
+      hides the real reason behind a borrowed one. A39's rule runs in this direction too — an
+      override is only worth having when the reason behind it is *ours*.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
