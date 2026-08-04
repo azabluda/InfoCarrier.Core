@@ -3007,6 +3007,28 @@ failures are left red and classified rather than worked immediately.
       moment it was adopted, because a provider that ignores the option looks exactly right until
       somebody turns it off.
 
+- [x] **A61.** `DataAnnotation` and `MaterializationInterception`.
+      **`Total tests: 18621, Passed: 18380, Failed: 82, Skipped: 159`** — **+123 tests, +97
+      passing**, 26 new red, nothing previously green broken. Unadopted bases **66 → 63**.
+      ✅ `<this commit>`
+
+      `DataAnnotationInfoCarrierTest` is **95 of 95**. It is mostly a model-building suite, so it is
+      a direct check that the client model this provider builds is EF's — conventions run on the
+      client. Its six overrides are EF's own `DataAnnotationInMemoryTest`'s, each replacing a
+      store-enforced constraint with the metadata assertion, because the backing store is InMemory
+      and enforces none of them. **One flag differs from EF's and deliberately:**
+      `HasForeignKeyIndexes` is `true` here where InMemory answers `false` — this provider keeps
+      `ForeignKeyIndexConvention`, and A47 measured what happens when the flag lies (136 failures).
+
+      **`MaterializationInterceptionInfoCarrierTest` is 2 of 28, and that is the point of adopting
+      it.** The `OptimisticConcurrency` singleton this residual has carried since A31 was one test
+      of a family; here the family is visible, and it splits in two:
+
+      | Count | Symptom | Reading |
+      |---:|---|---|
+      | 16 | `Assert.Same() Failure: Values are not the same instance` and `Assert.All()` over the instances a query returned | **The gap itself.** This provider does not materialize through EF's shaper — `ClientResultMaterializer` builds rows from the wire — so `IMaterializationInterceptor` never runs on the client. Nothing about it is accidental; closing it means giving the materializer the interceptor pipeline EF's shaper has. |
+      | 10 | *"A call was made to 'AddInterceptors', but Entity Framework is not building its own internal service provider"* | **Wiring, not capability.** The test supplies interceptors through options while the harness has already handed EF an external service provider. EF's own InMemory test does not hit this, so the difference is in how `NonSharedModelInfoCarrierHarness` builds the store's provider — a fixture question, and the cheaper half to fix. |
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
