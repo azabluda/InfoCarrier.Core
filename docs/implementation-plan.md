@@ -2652,6 +2652,64 @@ failures are left red and classified rather than worked immediately.
       it. Making the server context type per-test is the piece of work that unlocks that whole
       group, and it is infrastructure rather than adoption.
 
+- [x] **A49.** A harness for non-shared-model suites, and the five `AdHoc*` query bases.
+      **`Total tests: 17281, Passed: 17092, Failed: 30, Skipped: 159`** — **145 tests added, 141 of
+      them passing**; FIXED none, BROKEN 4. Unadopted bases **75**. ✅ `<this commit>`
+
+      The infrastructure A48 named. Every other fixture has one `DbContext` type for its lifetime,
+      and `InfoCarrierTestStoreFactory` captures it up front because `ITestStoreFactory`'s members
+      take only a store name; a `NonSharedModelTestBase` builds a different one per test, and the
+      backend store builds its **server** provider eagerly from it.
+      `InfoCarrierTestStoreFactory.CreateDeferred` reads the properties at store-creation time and
+      `NonSharedModelInfoCarrierHarness` supplies them from `CreateContextFactory<TContext>`, which
+      EF calls before `CreateTestStore` and is where `TContext` first exists.
+
+      A **mixin, not a base class** — the spec bases already derive from `NonSharedModelTestBase`,
+      so an adopting class holds one and forwards two members. Three things it has to do that a
+      shared fixture does by hand:
+
+      - **Clear `Fixture`.** `NonSharedFixture` caches one store for the whole test class, which is
+        sound for a provider whose store is a database name and wrong here, because this store
+        carries a server provider built for one context type.
+      - **Pass the test's `onConfiguring` to the server.** Unlike the fixture-wide `AddOptions`
+        A29 deliberately withholds, this is written by the test for the one context it is about to
+        build, and the server builds that same context.
+        `Can_ignore_invalid_include_path_error` suppresses a warning there and asserts the query
+        then runs.
+      - **Copy the client context's own state per request.** A query filter may close over a
+        property of the context — `MultiContext_query_filter_test` writes `context.Tenant = 1` and
+        expects `e.SomeValue == Tenant` to follow. A shared fixture names those properties in its
+        `CopyDbContextParameters`; with no fixture to name them in, every writable public instance
+        property declared *below* `DbContext` is copied, `DbSet`s excluded.
+
+      **Two provider defects the adoption found:**
+
+      1. A45's entity test refused an `Include` **rooted at an interface** the entity implements,
+         which EF allows. Assignability, not identity: the question is whether the root *can* be an
+         entity, not whether it is spelled as one.
+      2. A C# **collection expression** is a constant whose runtime type is the compiler's
+         `<>z__ReadOnlyArray<T>`, which the allowlist rightly refuses (A20 reads a constant by what
+         it is). So `IgnoreQueryFilters(["ActiveFilter", "NameFilter"])` was unshippable *whole*,
+         only the query root travelled, and the marker sat on the client doing nothing — the server
+         applied the very filters the caller had excluded, and the test read 1 row of 2. Normalized
+         to a plain array before the split.
+
+         Two attempts before it worked, both worth keeping. Testing for
+         `[CompilerGenerated]` never fired — the type does not carry it. Testing only "not on the
+         allowlist" fired **too often**: `OrderedEnumerable<T>` is not on it either, and turning
+         one into an array threw away the ordering
+         `Contains_with_local_ordered_enumerable_inline` is about. The condition that holds is an
+         **unspeakable name** — the caller cannot have named it, so no round trip can be expected
+         to preserve it.
+
+      **Left red: 4.** `ThenInclude_with_interface_navigations` (a `NullReferenceException` once
+      past the include check), `Collection_without_setter_materialized_correctly` (our
+      `AugmentWithNavigations` cannot place `Post.Comments`),
+      `Casts_are_removed_from_expression_tree_when_redundant` (`InvalidCastException` where the
+      base expects `InvalidOperationException`) and
+      `Double_convert_interface_created_expression_tree` (`ArgumentNullException`). Three of the
+      four involve an interface-typed navigation, which is the thread to pull.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

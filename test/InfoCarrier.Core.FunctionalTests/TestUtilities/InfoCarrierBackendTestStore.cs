@@ -46,8 +46,18 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
         services = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-            .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-            .AddSingleton(TestModelSource.GetFactory(_testStoreProperties.OnModelCreating!))
+            .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>();
+
+        // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
+        // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`
+        // only when the test supplies a customization — registering one built from `null` would
+        // replace the context's model with an empty one.
+        if (_testStoreProperties.OnModelCreating is { } modelCustomization)
+        {
+            services = services.AddSingleton(TestModelSource.GetFactory(modelCustomization));
+        }
+
+        services = services
             .AddDbContext(
                 ServerContextType,
                 (s, b) => AddProviderOptions(b),

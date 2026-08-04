@@ -64,6 +64,15 @@ public sealed class QuerySplitter
         // into a user-facing message. The check itself is syntactic and reads the same either way.
         Expression captured = query;
 
+        // A C# collection expression is a constant whose *runtime* type is the compiler's
+        // `<>z__ReadOnlyArray<T>` — a type the server's assembly does not have, and one the
+        // allowlist rightly refuses because a constant is read by what it is (A20). What the
+        // caller wrote is a sequence, and an array says that with no compiler-generated type in
+        // it. Left alone, `IgnoreQueryFilters(["ActiveFilter", "NameFilter"])` was unshippable
+        // whole, so only the query root travelled and the marker stayed on the client where it
+        // does nothing at all — the server applied the filters the caller had just excluded.
+        query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
+
         // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
         // identifier between them holds the *grouping*, which the carrier re-carry below must
         // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …
@@ -301,8 +310,12 @@ public sealed class QuerySplitter
 
         private bool IsEntity(Type type)
             => model.FindEntityType(type) is not null
-                // Shared-type and owned entity types are not reachable by CLR type alone.
-                || model.GetEntityTypes().Any(e => e.ClrType == type);
+                // Shared-type and owned entity types are not reachable by CLR type alone — and
+                // an `Include` may be rooted at an *interface* the entity implements, which EF
+                // allows and `ThenInclude_with_interface_navigations` asserts. Assignability, not
+                // identity: the question is whether the root can be an entity, not whether it is
+                // spelled as one.
+                || model.GetEntityTypes().Any(e => type.IsAssignableFrom(e.ClrType));
 
         private static bool IsPropertyPath(Expression body)
             => body switch
@@ -635,6 +648,65 @@ public sealed class QuerySplitter
     ///     <c>EnumerableQuery</c>'s rewriter fails on them. Tracking behavior has already been
     ///     read off the original tree by the time this runs.
     /// </remarks>
+    /// <summary>
+    ///     Rewrites a compiler-generated collection constant as a plain array of the same
+    ///     elements.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately narrow, and the condition is the one that matters rather than a guess at
+    ///     what the compiler emits: the runtime type is <em>not on the allowlist</em>, it really is
+    ///     a sequence, and an array of its element type still satisfies the node's declared type.
+    ///     A value the caller built out of a type the server knows is left alone, and so is one the
+    ///     server could not reconstruct from an array either.
+    /// </remarks>
+    private sealed class CollectionExpressionNormalizer(TypeAllowlist allowlist) : ExpressionVisitor
+    {
+        public static Expression Normalize(Expression query, TypeAllowlist allowlist)
+            => new CollectionExpressionNormalizer(allowlist).Visit(query);
+
+        protected override Expression VisitConstant(ConstantExpression node)
+        {
+            if (node.Value is not System.Collections.IEnumerable sequence
+                || node.Value.GetType() is not { IsArray: false } runtime
+                // Unspeakable, so the caller cannot have named it and no round trip can preserve
+                // it. `OrderedEnumerable<T>` is not on the allowlist either and is *not* this:
+                // rewriting one to an array cost `Contains_with_local_ordered_enumerable_inline`,
+                // which is about the ordering that array would have thrown away.
+                || !runtime.Name.StartsWith('<')
+                || allowlist.IsAllowed(runtime)
+                || ServerBoundaryAnalyzer.SequenceElementType(runtime) is not { } element
+                || element == runtime)
+            {
+                return node;
+            }
+
+            // The node is usually typed as the value itself — EF's funcletizer builds constants
+            // through `Expression.Constant(value)`, which reads the runtime type — so the array
+            // has to become the node's type too. Where the node was declared more broadly
+            // (`IReadOnlyList<string>`), that declaration is kept and only the value changes.
+            Type arrayType = element.MakeArrayType();
+            Type declared = node.Type.IsAssignableFrom(arrayType) ? node.Type : arrayType;
+            if (node.Type != runtime && declared != node.Type)
+            {
+                return node;
+            }
+
+            var items = new List<object?>();
+            foreach (object? item in sequence)
+            {
+                items.Add(item);
+            }
+
+            Array array = Array.CreateInstance(element, items.Count);
+            for (int i = 0; i < items.Count; i++)
+            {
+                array.SetValue(items[i], i);
+            }
+
+            return Expression.Constant(array, declared);
+        }
+    }
+
     private sealed class MarkerStrippingVisitor : ExpressionVisitor
     {
         protected override Expression VisitMethodCall(MethodCallExpression node)

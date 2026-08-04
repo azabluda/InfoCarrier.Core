@@ -100,17 +100,18 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 17136, Passed: 16952, Failed: 26, Skipped: 158`** (2026-08-03) across the
+**`Total tests: 17281, Passed: 17092, Failed: 30, Skipped: 159`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
 `ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase`, all sixteen
-`Query.Translations` bases and the nine `ModelBuilding.ModelBuilderTest` bases on Tier A, plus
+`Query.Translations` bases, the nine `ModelBuilding.ModelBuilderTest` bases and the five
+`AdHoc*Query` bases on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 26 are classified test-by-test in A48's table** in `docs/implementation-plan.md`, read out of
-`artifacts/measure/a47b.txt`. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
+**All 30 are classified**: 26 test-by-test in A48's table in `docs/implementation-plan.md`, plus
+the 4 A49 left red — read out of `artifacts/measure/a49e.txt`. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
 `Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec
 tests asserting a limitation this provider does not have, a deliberate allowlist refusal
 (`Regex_IsMatch`, A46), or a known singleton.
@@ -136,12 +137,12 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 80 the compliance test still reports unadopted. Phase A in
-  `docs/implementation-plan.md`; adopt in batches and classify what turns red. **The next batch
-  needs a harness, not a query fix**: `AdHoc*QueryTestBase` ×5, `SharedTypeQuery`,
-  `OwnedEntityQuery` and the `NonSharedModel*` bases all derive from `NonSharedModelTestBase`,
-  which builds a *different context type per test*, while `InfoCarrierTestStoreFactory` captures
-  one `ContextType` up front. See A48.
+- **The remaining spec bases** — 75 the compliance test still reports unadopted. Phase A in
+  `docs/implementation-plan.md`; adopt in batches and classify what turns red. A49 built
+  `NonSharedModelInfoCarrierHarness`, so every remaining `NonSharedModelTestBase` suite
+  (`SharedTypeQuery`, `OwnedEntityQuery`, `AdHocComplexTypeQuery`, `AdHocJsonQuery`,
+  `NonSharedModel*`, `Scaffolding`) is now adoptable the same way — two forwarded members per
+  class.
 - **`Query.Associations.*` is 34 of the 80** and has no InMemory counterpart — a roadmap
   question (Tier B, or out of scope), not a plan one. Do not start it without asking.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has

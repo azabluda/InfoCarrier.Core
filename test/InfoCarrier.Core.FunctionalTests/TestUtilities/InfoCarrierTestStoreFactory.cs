@@ -33,11 +33,11 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     public static InfoCarrierBackendTestStoreFactory Sqlite
         => (name, shared, props) => new SqliteInfoCarrierBackendTestStore(name, shared, props);
 
-    private readonly SharedTestStoreProperties _props;
+    private readonly Func<SharedTestStoreProperties> _props;
     private readonly InfoCarrierBackendTestStoreFactory _backendFactory;
 
     private InfoCarrierTestStoreFactory(
-        SharedTestStoreProperties props,
+        Func<SharedTestStoreProperties> props,
         InfoCarrierBackendTestStoreFactory backendFactory)
     {
         _props = props;
@@ -56,25 +56,42 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Action<DbContext, DbContext>? copyDbContextParameters = null,
         Type? serverContextType = null,
         Func<IServiceCollection, IServiceCollection>? onAddServices = null)
-        => new InfoCarrierTestStoreFactory(
-            new SharedTestStoreProperties
-            {
-                ContextType = contextType,
-                ServerContextType = serverContextType,
-                OnModelCreating = onModelCreating,
-                OnAddOptions = onAddOptions,
-                CopyDbContextParameters = copyDbContextParameters,
-                OnAddServices = onAddServices,
-            },
-            backendFactory);
+    {
+        var props = new SharedTestStoreProperties
+        {
+            ContextType = contextType,
+            ServerContextType = serverContextType,
+            OnModelCreating = onModelCreating,
+            OnAddOptions = onAddOptions,
+            CopyDbContextParameters = copyDbContextParameters,
+            OnAddServices = onAddServices,
+        };
+
+        return new InfoCarrierTestStoreFactory(() => props, backendFactory);
+    }
+
+    /// <summary>
+    ///     Creates a factory whose properties are read <em>at store-creation time</em>.
+    /// </summary>
+    /// <remarks>
+    ///     A <c>NonSharedModelTestBase</c> builds a different <see cref="DbContext" /> type per
+    ///     test, so the server context type and model customization are not known when the fixture
+    ///     builds its factory — only when a test calls <c>InitializeAsync&lt;TContext&gt;</c>. This
+    ///     overload lets <see cref="NonSharedModelInfoCarrierTestBase" /> supply them then. Every
+    ///     other fixture has one context type for its lifetime and uses the overload above.
+    /// </remarks>
+    public static ITestStoreFactory CreateDeferred(
+        InfoCarrierBackendTestStoreFactory backendFactory,
+        Func<SharedTestStoreProperties> properties)
+        => new InfoCarrierTestStoreFactory(properties, backendFactory);
 
     /// <inheritdoc />
     public virtual TestStore Create(string storeName)
-        => new InfoCarrierTestStore(_backendFactory(storeName, shared: false, _props));
+        => new InfoCarrierTestStore(_backendFactory(storeName, shared: false, _props()));
 
     /// <inheritdoc />
     public virtual TestStore GetOrCreate(string storeName)
-        => new InfoCarrierTestStore(_backendFactory(storeName, shared: true, _props));
+        => new InfoCarrierTestStore(_backendFactory(storeName, shared: true, _props()));
 
     /// <inheritdoc />
     public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
