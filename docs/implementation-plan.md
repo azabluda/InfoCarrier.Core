@@ -3027,7 +3027,7 @@ failures are left red and classified rather than worked immediately.
       | Count | Symptom | Reading |
       |---:|---|---|
       | 16 | `Assert.Same() Failure: Values are not the same instance` and `Assert.All()` over the instances a query returned | **The gap itself.** This provider does not materialize through EF's shaper — `ClientResultMaterializer` builds rows from the wire — so `IMaterializationInterceptor` never runs on the client. Nothing about it is accidental; closing it means giving the materializer the interceptor pipeline EF's shaper has. |
-      | 10 | *"A call was made to 'AddInterceptors', but Entity Framework is not building its own internal service provider"* | **Wiring, not capability.** The test supplies interceptors through options while the harness has already handed EF an external service provider. EF's own InMemory test does not hit this, so the difference is in how `NonSharedModelInfoCarrierHarness` builds the store's provider — a fixture question, and the cheaper half to fix. |
+      | 10 | *"A call was made to 'AddInterceptors', but Entity Framework is not building its own internal service provider"* | **Wiring, not capability — but not the cheap half either.** Diagnosed in **A71**: the client is clean (the base passes `useServiceProvider: false` for exactly this case); the context that throws is the **server's**, whose options pin `UseInternalServiceProvider` and then apply the forwarded `onConfiguring`. The fix EF's message prescribes is blocked by `CoreOptionsExtension.WithInterceptors` concatenating rather than replacing. |
 
 - [x] **A62.** The three data-type bases: `BuiltInDataTypes`, `ConvertToProviderTypes`,
       `CustomConverters`.
@@ -3270,6 +3270,39 @@ failures are left red and classified rather than worked immediately.
       than committed: 36 red tests that report the backing store's behaviour say nothing about this
       provider, and the guardrail about leaving spec tests red is about tests that *tell* you
       something.
+
+- [x] **A71.** `MaterializationInterception`'s ten wiring failures, diagnosed. **Attempted,
+      measured, reverted.** No code change; this is the finding. ✅ `<this commit>`
+
+      A61 called these "wiring, and the cheaper half to fix". The first half of that is right and
+      the second is not.
+
+      **What they are.** `SingletonInterceptorsTestBase.CreateContext` passes
+      `useServiceProvider: inject` — so when the test supplies interceptors through
+      `AddInterceptors` (`inject: false`) the *client* deliberately has **no** internal service
+      provider, and `NonSharedModelTestBase.ConfigureOptions` calls
+      `EnableServiceProviderCaching(false)` instead. The client is therefore clean. The context that
+      throws is the **server's**: `InfoCarrierBackendTestStore.AddProviderOptions` pins
+      `UseInternalServiceProvider(ServiceProvider)` and *then* applies the forwarded `onConfiguring`
+      (A49 forwards it on purpose), and EF refuses that pairing by name.
+
+      **The attempt, and the trap that killed it.** EF's own message names the fix — "build the
+      `ISingletonInterceptor` services to use into the service provider before passing it" — so the
+      attempt read the interceptors off a throwaway builder, registered them as singletons in the
+      server's collection, and removed them from the options with
+      `CoreOptionsExtension.WithInterceptors(kept)`. A probe confirms the first two steps work:
+      `onAddOptions=True singletons=7`. The count did not move.
+
+      **`WithInterceptors` concatenates, it does not replace** —
+      `clone._interceptors = _interceptors == null ? interceptors : _interceptors.Concat(interceptors)`.
+      So the "strip" appended, and there is **no public API on `CoreOptionsExtension` that removes
+      an interceptor**; `Clone` is protected. Without that, the only routes left are dropping
+      `UseInternalServiceProvider` for the server — which would give every server context a fresh
+      InMemory root and lose the store between requests — or not forwarding `onConfiguring` at all,
+      which A49 added for a reason.
+
+      Reverted rather than committed. The 10 stay red next to the 16 that are the real
+      `IMaterializationInterceptor` gap.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
