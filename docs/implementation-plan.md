@@ -3134,6 +3134,29 @@ failures are left red and classified rather than worked immediately.
       server's copy. Adopting it needs either a second constructor on our side or a store that can
       be handed a context *factory*; it is not two forwarded members.
 
+- [x] **A66.** The F1 model on Tier A: `Serialization` and `DataBinding`.
+      **`Total tests: 19419, Passed: 19137, Failed: 119, Skipped: 163`** — **+64 tests, +64
+      passing, nothing red.** Unadopted bases **57 → 55**. ✅ `<this commit>`
+
+      `SerializationInfoCarrierTest` **6 of 6**, `DataBindingInfoCarrierTest` **58 of 58**, first
+      run, no overrides of any kind.
+
+      Both needed a Tier A `F1InfoCarrierFixture`, which did not exist. `F1FixtureBase` builds its
+      model *externally* and applies it with `UseModel` — deliberately, as EF's regression coverage
+      for doing so — and `F1Context` has no `OnModelCreating`, so the `OnModelCreating` route every
+      other store here takes would leave the server with a bare convention model. The server is
+      handed its own copy, built over `InMemoryConventionSetBuilder`'s conventions rather than this
+      provider's, plus the `UseSeeding`/`UseAsyncSeeding` pair and
+      `F1MaterializationInterceptor`. It is the Tier A twin of
+      `OptimisticConcurrencyInfoCarrierTest.InfoCarrierFixture` and much shorter, because an
+      InMemory server needs none of the table mappings SQLite's needs.
+
+      Worth noting what came up clean. `Serialization` walks a *tracked graph* with
+      `System.Text.Json` and Newtonsoft — a navigation still pointing at a half-built instance
+      surfaces there as a cycle, and `ClientResultMaterializer` builds every one of those entities
+      itself. `DataBinding` reads `Local` and the binding lists straight off the change tracker,
+      which this provider populates by hand. Neither had been exercised before.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
