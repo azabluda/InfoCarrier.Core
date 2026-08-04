@@ -1438,6 +1438,16 @@ spec bases it inherits, and each base against whether EF ships an `…InMemoryTe
       Do it a base at a time, measuring, and record which tier each one ends on and why. Do **not**
       do it as one sweep.
 
+      **Reason 1 is now answered, and it was the one that could be settled by experiment.** B8 ran
+      `ComplexNavigations` on Tier B: not one of its ten A28-shape failures moved, and
+      `No exception was thrown` means on a translating store exactly what it meant on a
+      client-evaluating one. **The classification was right; there is nothing there to find.**
+
+      What is left of B1 is reasons 2 and 3, and neither is a measurement — B8 priced the move at
+      **~32 genuinely new reds per base after the `APPLY` overrides are mirrored**, and there are
+      twenty-odd bases. **That is a scope decision. Put the number to the roadmap before moving any
+      more query bases.**
+
 - [ ] **B2. Re-judge the deferred reds on the tier that can answer them.** Not before B1. In
       particular:
 
@@ -1682,6 +1692,45 @@ constructor, so the backend store cannot build the server's copy.
       base hands the seed is the *client's*, which has no database.** Each must run against
       `((InfoCarrierTestStore)TestStore).Backend.CreateDbContext()` instead — the same rule A74/A75/
       A76 found, and the reason `MusicStore` and `GraphUpdates` reseed through the backend.
+
+- [x] **B8. B1's premise, tested on `ComplexNavigations` — and the code reverted.**
+      ✅ `<this commit>`
+
+      B1 says the twelve failures classified as *"asserts a limitation this provider does not
+      have"* have never been run on a tier that **has** the limitation, that the classification is
+      therefore an assumption, and that moving those bases is the measurement that settles it.
+      `ComplexNavigationsQuery` and `ComplexNavigationsCollectionsQuery` carry 20 of the 331
+      between them, so they are where to test it. The fixture was switched to the SQLite backend,
+      the seven InMemory `NonComposedGroupByNotSupported` overrides removed, and the pair run.
+
+      **`Failed: 84, Passed: 844, Total: 928`, against 10 failures on Tier A — and not one of the
+      ten moved.** The measurement settles the question it was asked, in the negative:
+
+      | Test | Tier A | Tier B |
+      |---|---|---|
+      | `Complex_query_with_let_collection_SelectMany` | `Assert.Throws: No exception was thrown` | **the same** |
+      | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join` | same shape | **the same** |
+      | `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method` | same shape | **the same** |
+      | `Queryable_in_subquery_works_when_final_projection_is_List` | `Assert.Contains: Sub-string not found` | **the same** |
+      | `Join_with_result_selector_returning_queryable_throws_validation_error` | `ArgumentException` expected (EF InMemory's override) | `ApplyNotSupported` expected — **an override swap, not a defect** |
+
+      **The A28 classification is confirmed, not refuted.** `No exception was thrown` on a tier that
+      translates means the same thing it meant on the tier that does not: the query runs and returns
+      the right answer, and the spec base asserts a limitation this provider genuinely does not
+      have — on either backing store. There is nothing here to fix.
+
+      **And the tier question is not settled by it.** Tier B costs 84 where Tier A costs 10. Of the
+      84, **52 are `SQL APPLY`** — convergence, closable by mirroring
+      `ComplexNavigationsQuerySqliteTest`'s and `ComplexNavigationsCollectionsQuerySqliteTest`'s
+      overrides, about 64 methods across the two classes and their shared-type twins. That still
+      leaves **~32 genuinely new reds** (14 `Type 'GroupBySingleQuery…'`, 8 untranslatable LINQ, and
+      a tail). Those are real information — a translating store finds real defects — but **32 new
+      reds per base, across the twenty-odd remaining query bases, is a scope decision and not a
+      plan one.**
+
+      Reverted, per the rule that a measured negative result is committed as a finding and dead
+      neutral code is not. **B1 now needs an answer from the roadmap, not another experiment** — see
+      the note under B1.
 
 - [ ] **B6. `ValueGenerated` is part of the shared model and the client does not compute it.**
       Follows B3f. The client provider is not relational, so `RelationalValueGenerationConvention`
