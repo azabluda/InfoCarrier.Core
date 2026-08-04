@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 18420, Passed: 18217, Failed: 44, Skipped: 159`** (2026-08-04) across the
+**`Total tests: 18498, Passed: 18269, Failed: 70, Skipped: 159`** (2026-08-04) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -110,8 +110,8 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 44 are classified in one table — A54 in `docs/implementation-plan.md`**, read out of
-`artifacts/measure/`. Only **4** are wrong answers
+**Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
+A59's own table for the 26 it added**, read out of `artifacts/measure/`. Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`) and
 **6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
 limitation this provider does not have, whose query body is inline in a `protected static` assert
@@ -139,7 +139,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 70 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 66 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red. A49 built
   `NonSharedModelInfoCarrierHarness`, so every remaining `NonSharedModelTestBase` suite
   (`SharedTypeQuery`, `OwnedEntityQuery`, `AdHocComplexTypeQuery`, `AdHocJsonQuery`,

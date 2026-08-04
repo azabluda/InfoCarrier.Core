@@ -2966,6 +2966,24 @@ failures are left red and classified rather than worked immediately.
       it does not fix the test, its blast radius covers every client-side entity comparison, and it
       would be a wash on the count at best. Recorded so the option is not re-derived.
 
+- [x] **A59.** Four more bases: `Updates`, `MusicStore`, and the two `ConcurrencyDetector` halves.
+      **`Total tests: 18498, Passed: 18269, Failed: 70, Skipped: 159`** — **+78 tests, +52 passing**,
+      26 new red, nothing previously green broken. Unadopted bases **70 → 66**. ✅ `<this commit>`
+
+      Every fixture is EF's own InMemory one with the store factory swapped, including
+      `MusicStoreInMemoryTest`'s `EnsureDeleted` transaction shim, `UpdatesInMemoryTestBase`'s
+      reseed-after-transaction and its `#29875` override, and
+      `ConcurrencyDetectorDisabledInMemoryTest`'s `EnableThreadSafetyChecks(false)` that *replaces*
+      rather than extends the base options.
+
+      **The 26, classified. Three unrelated causes, and two of them are real provider defects.**
+
+      | Count | Family | Reading |
+      |---:|---|---|
+      | 14 | every `ConcurrencyDetectorDisabledInfoCarrierTest` method | **A provider defect, fixed in A60.** *"A second operation was started on this context instance"* — thrown by `ConcurrencyDetector.EnterCriticalSection`, which `QueryExecutor` calls unconditionally. `QueryContext.ConcurrencyDetector` is never null in EF 10; every provider gates the call on `ICoreSingletonOptions.AreThreadSafetyChecksEnabled` instead, and this one did not. |
+      | 7 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | Two shapes. **`Dangling wire reference 1: no value with that id has been materialized`** (×2) is a real wire defect on a `byte[]` concurrency token. The rest are the token's *original* value not surviving the round trip, so the store does not detect the conflict and the message differs. |
+      | 5 | `MusicStoreInfoCarrierTest` cart and catalogue counts | **Not a provider defect — a fixture one.** EF's shim ends a "transaction" with `context.Database.EnsureDeleted()`, and on this provider that is the *client* context, which has no database. The backing store keeps every cart item from the previous test and the counts accumulate. Remoting `EnsureDeleted` is a roadmap question (there is no DDL on the wire), not a plan one. |
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
