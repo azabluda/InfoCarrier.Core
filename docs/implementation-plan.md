@@ -2806,6 +2806,50 @@ failures are left red and classified rather than worked immediately.
       The details clause names `ComplexNavigationsQueryTestBase<…SharedTypeFixture>`: the shared
       -type base derives from the ordinary one, and `ClientMethodNullableInt` is declared up there.
 
+- [x] **A55.** Why the server does not track. **It does. The premise was wrong.** No code change;
+      this is the finding. ✅ `<this commit>`
+
+      A51 recorded `tracked=False` for every row on the server and read it as a defect. One probe
+      in `ServerQueryExecutor.ExecuteAsync` — logging `request.TrackingBehavior`, the server
+      context's `ChangeTracker.QueryTrackingBehavior` and `stateManager.Entries.Count()` — settles
+      it in two runs:
+
+      | Suite | Probe |
+      |---|---|
+      | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | `req=NoTracking ctx=NoTracking entries=0` |
+      | `NorthwindAsTrackingQuery` | `req=TrackAll ctx=TrackAll entries=6 / 7 / 91 / 919` |
+
+      **The server tracks exactly when the client asks it to.** `QueryExecutor.TrackingBehaviorFinder`
+      reads the marker off the query, `ExecuteAsync` sets it on the server context, and EF picks it
+      up — `QueryCompilationContextDependencies.QueryTrackingBehavior` is
+      `_currentContext.Context.ChangeTracker.QueryTrackingBehavior`, so there is nothing between
+      the two. The owned-projection tests are `NoTracking` because **that is what the fixture asks
+      for**: `OwnedQueryTestBase` asserts through `AssertQuery`, and the spec query fixtures set
+      `QueryTrackingBehavior.NoTracking` on the context they hand out (`ComplexNavigationsQueryFixtureBase.CreateContext`
+      is the explicit one). A51 probed a no-tracking query and found no tracking.
+
+      **So the tracker is not a second source, and cannot be made into one.** Forcing the server to
+      track regardless was the alternative on the table and it is wrong twice over: under `TrackAll`
+      EF returns the *same* instance for two rows that reference one entity, which the wire then
+      sends as a back-reference and the client rebuilds as one object — identity resolution leaking
+      into a query that asked not to have it — and the shipped tree still carries the client's
+      `AsNoTracking()` marker, so EF on the server would override the setting anyway.
+
+      **What the second source has to be, from the same probes.** For
+      `Select(p => p.PersonAddress)` the row is an `OwnedAddress` with
+      `runtimeET=∅ candidates=4` — the model itself cannot disambiguate, because
+      `OwnedPerson.PersonAddress`, `Branch.BranchAddress`, `LeafA.LeafAAddress` and
+      `LeafB.LeafBAddress` are all that CLR type. The only thing on the server that *can* name it is
+      the query, and the server has the query:
+
+          [EntityQueryRootExpression].OrderBy(o => o.Id).Select(p => p.PersonAddress)
+          [EntityQueryRootExpression].OrderBy(p => p.Id).Select(p => new ValueTuple`3(
+              Item1 = p.Orders, Item2 = p.PersonAddress, Item3 = p.PersonAddress.Country.Planet))
+
+      `p` is the root's entity type; `p.PersonAddress` is a navigation and a navigation names its
+      target. That is A52's rule, applied one level higher — to the projection instead of to a
+      value already in hand. A56 implements it.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -3535,7 +3579,7 @@ Continued from the M1 plan; the run population is unchanged (4,247).
       | 8 | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join`, `Join_with_result_selector_returning_queryable_throws_validation_error` (×2 models each) | Classified in A38/A39. The base asserts a materialization error this provider does not raise, or raises differently; the query bodies are inline in `protected static` assert helpers. |
       | 4 | `Complex_query_with_let_collection_projection_FirstOrDefault`, `Queryable_in_subquery_works_when_final_projection_is_List` (×2 models) | `Argument type 'List<string>' does not match 'IQueryable<string>'`, raised **on the server** in `InMemoryProjectionBindingExpressionVisitor.VisitNew`. `ProjectionRewriter.Materialized` is the only thing that puts a `ToList` where an `IQueryable` member is declared. **The best-understood open defect.** |
       | 4 | `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method` (×2 models) | `NullReferenceException` where the base expects a translation failure. Undiagnosed. |
-      | 4 | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | A52's fix reaches an owned value through the **navigation** that owns it. These project one directly, where there is no navigation in hand — the same root cause down a different path. **The server not tracking is what makes `_findEntityType` useless here; whether it should is the open question.** |
+      | 4 | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | A52's fix reaches an owned value through the **navigation** that owns it. These project one directly, where there is no navigation in hand — the same root cause down a different path. ~~The server not tracking is what makes `_findEntityType` useless here; whether it should is the open question.~~ **A55: the server tracks when asked; these are `NoTracking` by fixture, so the tracker is not a source here and never can be. The query is.** |
       | 4 | `OwnsMany_correlated_projection`, `Multiple_single_result_in_projection_containing_owned_types` | EF's own guard (*a tracking query is attempting to project an owned entity without a corresponding owner*), and a tuple-carrier lambda typed `Func<…, Anonymous>` handed to `Select<…, object>`. |
       | 4 | `ThenInclude_with_interface_navigations`, `Collection_without_setter_materialized_correctly`, `Casts_are_removed_from_expression_tree_when_redundant`, `Double_convert_interface_created_expression_tree` | A49's residual. Three of the four involve an **interface-typed navigation**. |
       | 2 | `Correlated_collection_with_distinct_3_levels` | **A wrong answer** — the only one left of that kind, with `Comparison_with_value_converted_subclass`. |
