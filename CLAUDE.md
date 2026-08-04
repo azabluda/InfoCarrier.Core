@@ -100,18 +100,19 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 17281, Passed: 17092, Failed: 30, Skipped: 159`** (2026-08-03) across the
+**`Total tests: 18420, Passed: 18163, Failed: 98, Skipped: 159`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
 `ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase`, all sixteen
 `Query.Translations` bases, the nine `ModelBuilding.ModelBuilderTest` bases and the five
-`AdHoc*Query` bases on Tier A, plus
+`AdHoc*Query` bases, `OwnedQueryTestBase` and the shared-type query bases on Tier A, plus
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 30 are classified**: 26 test-by-test in A48's table in `docs/implementation-plan.md`, plus
-the 4 A49 left red — read out of `artifacts/measure/a49e.txt`. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
+**All 98 are classified**, read out of `artifacts/measure/a50.txt`: **68** are the five bases A50
+adopted — 50 of them one symptom, an owned navigation arriving null — 26 are A48's table in
+`docs/implementation-plan.md`, and 4 are A49's. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
 `Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec
 tests asserting a limitation this provider does not have, a deliberate allowlist refusal
 (`Regex_IsMatch`, A46), or a known singleton.
@@ -137,7 +138,7 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 75 the compliance test still reports unadopted. Phase A in
+- **The remaining spec bases** — 70 the compliance test still reports unadopted. Phase A in
   `docs/implementation-plan.md`; adopt in batches and classify what turns red. A49 built
   `NonSharedModelInfoCarrierHarness`, so every remaining `NonSharedModelTestBase` suite
   (`SharedTypeQuery`, `OwnedEntityQuery`, `AdHocComplexTypeQuery`, `AdHocJsonQuery`,

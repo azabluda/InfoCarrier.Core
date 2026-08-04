@@ -2710,6 +2710,32 @@ failures are left red and classified rather than worked immediately.
       `Double_convert_interface_created_expression_tree` (`ArgumentNullException`). Three of the
       four involve an interface-typed navigation, which is the thread to pull.
 
+- [x] **A50.** Five more bases: owned queries, shared-type queries, shared-type complex navigations.
+      **`Total tests: 18420, Passed: 18163, Failed: 98, Skipped: 159`** — **1139 tests added, 1071
+      of them passing**; FIXED none, BROKEN 68, **every one of them inside the five new classes**.
+      Unadopted bases **70**. ✅ `<this commit>`
+
+      `OwnedQueryTestBase` and `ComplexNavigations*SharedTypeQueryTestBase` share fixtures the
+      ordinary way; `SharedTypeQueryTestBase` and `OwnedEntityQueryTestBase` go through A49's
+      harness. Every override is EF's own `*InMemoryTest`, adopted as a set (A31); the extra
+      `[ConditionalTheory]`s EF adds to its InMemory classes are that store's tests, not spec base
+      members, and are not carried (A47).
+
+      Two capabilities this reaches for the first time, and one of them is largely red:
+
+      - **A shared-type entity type** is keyed by *name*, not by CLR type: several are the same
+        `Dictionary<string, object>`. Reading a value by its CLR member is not enough, and the
+        model has to be consulted — which is most of what this provider's mapper does.
+        `ComplexNavigations*SharedType` is **14 of 236** red.
+      - **An owned entity type** has no identity of its own; it is addressed through its owner.
+        `OwnedQueryTestBase` is **50 of 656** red and `OwnedEntityQuery` 4 of 12.
+
+      **The 50 are one symptom**: the owned reference comes back `null` — `Expected: 804 S.
+      Lakeshore Road, Actual: null`. The owner arrives, its owned navigation does not. That is a
+      single question about whether an owned navigation counts as *loaded* on the way out
+      (`ServerQueryExecutor.IsLoaded` → `HasKey`, whose key for an owned type is the owner's and
+      is usually shadow), and it is A51's.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
