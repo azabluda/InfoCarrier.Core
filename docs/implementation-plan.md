@@ -3157,6 +3157,40 @@ failures are left red and classified rather than worked immediately.
       itself. `DataBinding` reads `Local` and the binding lists straight off the change tracker,
       which this provider populates by hand. Neither had been exercised before.
 
+- [x] **A67.** The two interception bases: `SaveChangesInterception` and `QueryExpressionInterception`.
+      **`Total tests: 19547, Passed: 19253, Failed: 131, Skipped: 163`** — **+128 tests, +116
+      passing**, 12 new red. Unadopted bases **55 → 52** (`InterceptionTestBase` comes with them).
+      ✅ `<this commit>`
+
+      **`SaveChangesInterception` is 112 of 112.** `ISaveChangesInterceptor` runs on the *client*
+      context, whose `SaveChanges` is a wire call rather than a store write, so this is a direct
+      check that remoting the save did not move it out from under EF's own interception points. It
+      did not — every one of the 112, across both the diagnostic-listener and plain fixtures.
+
+      **`QueryExpressionInterception` is 4 of 16, and the 12 are one real gap.**
+      `Assert.Same() … Actual: null` out of `AssertNormalOutcome`: the interceptor's `Context` is
+      never set, i.e. **`IQueryExpressionInterceptor` does not run on the client**. That is the
+      query-side twin of the `IMaterializationInterceptor` gap A61 exposed, and it is the more
+      surprising of the two — the client's query compiler is EF's own, and ADR-006 captures at
+      `IDatabase.CompileQuery`, which is downstream of where EF raises
+      `QueryCompilationStarting`. Undiagnosed; it is the next thing to look at in this family.
+
+      **One fixture problem was real and is worth recording, because the first fix was wrong.**
+      `InterceptionTestBase` seeds through `SeedAsync` on *every* `CreateContextAsync`, and its
+      tests insert rows with fixed keys. That is sound for every other provider because
+      `Fixture.CreateOptions` builds a **fresh internal service provider per call** and an InMemory
+      database is rooted in that provider — each test genuinely gets an empty store. Here the
+      client's provider is fresh but the *server* is the fixture's one store, which persists, so
+      the second test collided: *"An item with the same key has already been added. Key: 77"*, 62 of
+      112 and 12 of 16.
+
+      Cleaning the store first fixed `SaveChanges` outright. It did **not** fix
+      `QueryExpression` — a probe printing the row count either side of
+      `Fixture.TestStore.CleanAsync` shows `before=2 after=2`, so that path does not empty this
+      store, and had the probe not been written the 12 would have been read as the same collision
+      they started as. Seeding idempotently instead is what made the real failure visible. **The
+      store-clean path not clearing is a loose end of its own**, unrelated to interception.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
