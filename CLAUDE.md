@@ -160,6 +160,12 @@ failure once the suite passed ten thousand tests: a shared store's disposal re-a
 and let a later class re-seed the file a live one was still using. `DisposeAsync` now releases
 nothing. Stale files are swept once at startup instead.
 
+**The runtime culture on this machine is `en-SE`, whose decimal separator is a comma.** Four
+`JsonTypes` decimal parameterizations fail here purely because xUnit cannot convert their
+`InlineData` strings, and EF's own suite fails them the same way (A64). The suite total is
+therefore **locale-dependent** — a machine with a `.` separator reports two fewer failures with no
+code change. Grep a run for *"cannot be converted to type"* before treating that as movement.
+
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
 default assumption.

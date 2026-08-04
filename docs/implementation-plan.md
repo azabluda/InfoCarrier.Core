@@ -3062,7 +3062,7 @@ failures are left red and classified rather than worked immediately.
       | Count | Family | Reading |
       |---:|---|---|
       | 26 | every spatial type, `Point` through `Polygon`, plain and `_as_GeoJson` | **No spatial support.** `InfoCarrierTypeMappingSource` maps no `NetTopologySuite` type, so the model does not build: *"The 'Point' property 'PointType.Point' could not be mapped…"*. Consistent with `SpatialQueryTestBase` and `SpatialTestBase` being on the do-not-adopt list. |
-      | 2 | `Can_read_write_decimal_JSON_values(0.0)` and `(1.1)` | **A real wire defect**, and a small one: *"Object of type 'System.String' cannot be converted to type 'System.Decimal'"*. A `decimal` written through its JSON form comes back as the string it was written as. |
+      | 2 | `Can_read_write_decimal_JSON_values(0.0)` and `(1.1)` | ~~A real wire defect~~ — **wrong, corrected in A64: this is a machine-locale artifact and not a defect at all.** |
 
       **EF's eight spatial overrides are deliberately not adopted, and that is the point worth
       recording.** They assert `NullReferenceException` — InMemory maps the spatial type and then
@@ -3071,6 +3071,38 @@ failures are left red and classified rather than worked immediately.
       *"Exception type was not an exact match"*, which is a worse answer than not overriding: it
       hides the real reason behind a borrowed one. A39's rule runs in this direction too — an
       override is only worth having when the reason behind it is *ours*.
+
+- [x] **A64.** The two decimal failures are the *machine's locale*, not a defect. A63's table
+      corrected. No code change. ✅ `<this commit>`
+
+      A63 classified `Can_read_write_decimal_JSON_values("0.0")` and `("1.1")` as "a real wire
+      defect — a `decimal` written through its JSON form comes back as the string it was written
+      as". That was wrong, and the stack said so if read properly: **there is not one InfoCarrier
+      frame in it.** It is `MethodBase.Invoke` refusing to bind a `String` argument to a `decimal`
+      parameter — xUnit's own theory-data conversion, before any provider code runs.
+
+      Why only those two of the four parameterizations, when
+      `-79228162514264337593543950335` passes: those two are the only ones containing a `.`. A
+      three-line program settles it —
+
+          culture=en-SE  sep=','
+          Convert.ChangeType("1.1", typeof(decimal)) → FormatException: The input string '1.1' was not in a correct format.
+
+      **The .NET runtime culture on this machine is `en-SE`, whose decimal separator is a comma.**
+      xUnit converts `InlineData` strings with the current culture, fails, and passes the raw
+      string through. EF's own suite fails these two here for exactly the same reason. The clue was
+      in plain sight all session: `dotnet` prints `Restored … (in 5,26 sec)`.
+
+      **What this means for every measurement in this repo.** These are the only four occurrences
+      of the signature in the full run — grep `artifacts/measure/<label>.log` for
+      *"cannot be converted to type"* to check — so nothing else is affected today. But the suite
+      total is **locale-dependent**, and a run on a machine with a `.` decimal separator will report
+      **two fewer failures** with no code change. That is the one shape of difference that is not
+      flakiness and must not be chased as such.
+
+      Recorded as its own step rather than edited quietly into A63, because the mistake is the
+      useful part: a failure whose stack contains no code of yours is not your failure, and the
+      count that "looks about right" is the one worth reading the stack for.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
