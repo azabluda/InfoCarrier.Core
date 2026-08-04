@@ -3214,6 +3214,34 @@ failures are left red and classified rather than worked immediately.
 
       Two events, twelve tests, and a whole base green.
 
+- [x] **A69.** `ProxyGraphUpdatesTestBase`, all three proxy flavours.
+      **`Total tests: 21257, Passed: 20927, Failed: 128, Skipped: 202`** — **+1710 tests, +1662
+      passing**, 9 new red. Unadopted bases **52 → 51**. ✅ `<this commit>`
+
+      The largest adoption of the session by an order of magnitude, and **1662 of 1671 pass on the
+      first run that got past the fixture.** It is the `GraphUpdates` corpus — reparenting,
+      severing, cascading a whole graph — over entities that are *proxies*, in the lazy-loading,
+      change-tracking and both-at-once flavours. `LazyLoadProxyInfoCarrierTest` covers the loading
+      half and `GraphUpdatesInfoCarrierTest` the saving half; this is the only place they meet.
+      Structure and the 39 skips are EF's own `ProxyGraphUpdatesInMemoryTest`'s (issues #2166,
+      #3924).
+
+      **The fixture needed one thing no previous one did, and the first cut got 1671 of 1671
+      wrong.** The seed builds its graph out of `context.CreateProxy<Root>()`, and it runs on the
+      **server's** context — `InfoCarrierTestStore.InitializeAsync` deliberately ignores the
+      fixture's context factory, because the backend owns the real store. So proxies had to be
+      enabled on *both* sides, `UseLazyLoadingProxies`/`UseChangeTrackingProxies` through
+      `onAddOptions` and `AddEntityFrameworkProxies` through `onAddServices`, or the seed died with
+      "Unable to create proxy for 'Root' because proxies are not enabled" before a single test ran.
+      Each flavour states its proxies once, in `AddProxyOptions`, and the base applies them to
+      client and server alike. **This is the first fixture here whose *seed* needs a client-side
+      feature**, and the shape is worth remembering for the next one.
+
+      The 9 left are two families: 7 parameterizations of
+      `Optional_many_to_one_dependents_are_orphaned_starting_detached` (`Assert.Equal` on counts),
+      and `Save_two_entity_cycle_with_lazy_loading` on the two lazy flavours, which expects a throw
+      and gets none.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
