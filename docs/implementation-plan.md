@@ -3360,6 +3360,23 @@ failures are left red and classified rather than worked immediately.
       where the base wants `UpdateConcurrencyTokenException` ("on the concurrency token") — the
       store cannot find the row rather than finding it with a stale token. Undiagnosed.
 
+- [x] **A74.** `ProxyGraphUpdates` reseeds through the backend.
+      **`Total tests: 21285, Passed: 20958, Failed: 125, Skipped: 202`** — FIXED 7, BROKEN none.
+      **`ProxyGraphUpdatesTestBase` is 1669 of 1671.** ✅ `<this commit>`
+
+      A69's seven-parameterization family, and not a provider defect at all. The test opens with
+      `Assert.Equal(2, root.OptionalChildren.Count())` and read **4** — the seed had run twice.
+
+      `SharedStoreFixtureBase.ReseedAsync` cleans and reseeds through a *client* context.
+      `GraphUpdatesInfoCarrierTest` has overridden that since S3c to go through the **backend**,
+      because the initial seed runs server-side and a reseed that went through the client would
+      make every test's setup depend on remoted `SaveChanges` — the thing under test. A69 adopted
+      the proxy variant without carrying that override, so the clean did not reach the store and
+      the seed accumulated.
+
+      Same override, same five lines. **Every new fixture over a mutable store needs it**, and the
+      symptom is arithmetic: a count that is an exact multiple of the seeded one.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

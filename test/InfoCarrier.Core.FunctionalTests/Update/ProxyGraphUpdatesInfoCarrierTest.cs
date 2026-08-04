@@ -163,6 +163,26 @@ public class ProxyGraphUpdatesInfoCarrierTest
                 => AddProxyOptions(
                     base.AddOptions(builder.ConfigureWarnings(w => w.Ignore(InfoCarrierEventId.TransactionIgnoredWarning))));
 
+            /// <summary>
+            ///     Reseeds through the <em>backend</em> context rather than the client one.
+            /// </summary>
+            /// <remarks>
+            ///     The same override `GraphUpdatesInfoCarrierTest` carries, and for the same
+            ///     reason: the initial seed runs server-side, so a reseed that went through a
+            ///     client context would make every test's setup depend on remoted `SaveChanges` —
+            ///     the thing under test — and, here, would not empty the store at all. Without it
+            ///     the seed accumulated and `Optional_many_to_one_dependents_are_orphaned_starting_detached`
+            ///     opened with `Assert.Equal(2, root.OptionalChildren.Count())` reading **4**.
+            /// </remarks>
+            public override async Task ReseedAsync()
+            {
+                InfoCarrierBackendTestStore backend = ((InfoCarrierTestStore)TestStore).Backend;
+                using DbContext context = backend.CreateDbContext();
+                await backend.CleanAsync(context);
+                await CleanAsync(context);
+                await SeedAsync(context);
+            }
+
             protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
                 => base.AddServices(serviceCollection.AddEntityFrameworkProxies());
         }
