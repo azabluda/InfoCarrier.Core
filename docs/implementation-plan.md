@@ -3029,6 +3029,28 @@ failures are left red and classified rather than worked immediately.
       | 16 | `Assert.Same() Failure: Values are not the same instance` and `Assert.All()` over the instances a query returned | **The gap itself.** This provider does not materialize through EF's shaper — `ClientResultMaterializer` builds rows from the wire — so `IMaterializationInterceptor` never runs on the client. Nothing about it is accidental; closing it means giving the materializer the interceptor pipeline EF's shaper has. |
       | 10 | *"A call was made to 'AddInterceptors', but Entity Framework is not building its own internal service provider"* | **Wiring, not capability.** The test supplies interceptors through options while the harness has already handed EF an external service provider. EF's own InMemory test does not hit this, so the difference is in how `NonSharedModelInfoCarrierHarness` builds the store's provider — a fixture question, and the cheaper half to fix. |
 
+- [x] **A62.** The three data-type bases: `BuiltInDataTypes`, `ConvertToProviderTypes`,
+      `CustomConverters`.
+      **`Total tests: 18743, Passed: 18497, Failed: 83, Skipped: 163`** — **+122 tests, +117
+      passing**, **1** new red. Unadopted bases **63 → 60**. ✅ `<this commit>`
+
+      The best return of any batch so far, and the least eventful. `BuiltInDataTypes` is **30 of
+      30**, `ConvertToProviderTypes` **32 of 32**, `CustomConverters` **55 of 56** with EF's own
+      four `Issue#17050` skips. Every capability flag and every override is EF's
+      `…InMemoryTest`'s, because all of them describe the *backing store*: strict equality, no
+      ANSI, no binary keys, a case-sensitive string comparison, and the non-composed `GroupBy`.
+
+      Worth saying why this matters more than the count. `BuiltInDataTypes` writes and reads back
+      every primitive the CLR has, which is `PrimitiveCoercion`'s whole subject;
+      `ConvertToProviderTypes` does it again with a converter on every property, which is A19's
+      rule applied to all of them at once rather than to the one that exposed it. That the two
+      came up clean on the first run is the strongest evidence so far that the wire format is
+      right, and it is evidence this suite did not previously have.
+
+      The one failure, `Composition_over_collection_of_complex_mapped_as_scalar`, is the A28 shape
+      again: the base asserts `CoreStrings.TranslationFailed` for an anonymous-type projection over
+      a collection mapped as a scalar, and the projection split answers it instead.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
