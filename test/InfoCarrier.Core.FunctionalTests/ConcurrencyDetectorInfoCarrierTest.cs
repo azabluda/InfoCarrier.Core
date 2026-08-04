@@ -27,7 +27,8 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
     }
 }
 
@@ -51,7 +52,8 @@ public class ConcurrencyDetectorDisabledInfoCarrierTest(
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
             => builder.EnableThreadSafetyChecks(enableChecks: false);

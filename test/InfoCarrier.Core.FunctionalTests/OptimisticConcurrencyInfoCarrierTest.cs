@@ -167,7 +167,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
                         F1Context.AddSeedData((F1Context)c);
                         await c.SaveChangesAsync(t);
                     }),
-                onAddServices: s => s.AddSingleton<ISingletonInterceptor, F1MaterializationInterceptor>());
+                onAddServices: s => s.AddSingleton<ISingletonInterceptor, F1MaterializationInterceptor>(),
+                configureConventions: ConfigureConventions);
 
         public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
             // Mirrors F1InMemoryFixtureBase, which ignores InMemory's equivalent warning: every

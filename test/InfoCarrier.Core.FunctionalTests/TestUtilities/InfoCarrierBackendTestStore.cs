@@ -54,7 +54,8 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // replace the context's model with an empty one.
         if (_testStoreProperties.OnModelCreating is { } modelCustomization)
         {
-            services = services.AddSingleton(TestModelSource.GetFactory(modelCustomization));
+            services = services.AddSingleton(
+                TestModelSource.GetFactory(modelCustomization, _testStoreProperties.ConfigureConventions));
         }
 
         services = services

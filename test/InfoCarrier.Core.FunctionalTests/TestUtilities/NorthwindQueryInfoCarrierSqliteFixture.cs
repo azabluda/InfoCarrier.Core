@@ -33,7 +33,8 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer> : Northwin
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
-            serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext));
+            serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
+            configureConventions: ConfigureConventions);
 
     /// <inheritdoc />
     protected override bool ShouldLogCategory(string logCategory)

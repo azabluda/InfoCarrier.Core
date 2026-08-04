@@ -55,13 +55,15 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null,
         Action<DbContext, DbContext>? copyDbContextParameters = null,
         Type? serverContextType = null,
-        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null)
     {
         var props = new SharedTestStoreProperties
         {
             ContextType = contextType,
             ServerContextType = serverContextType,
             OnModelCreating = onModelCreating,
+            ConfigureConventions = configureConventions,
             OnAddOptions = onAddOptions,
             CopyDbContextParameters = copyDbContextParameters,
             OnAddServices = onAddServices,

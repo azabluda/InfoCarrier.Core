@@ -153,5 +153,6 @@ public class BasicTypesQueryInfoCarrierFixture : BasicTypesQueryFixtureBase
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
             InfoCarrierTestStoreFactory.InMemory,
             ContextType,
-            (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+            (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 }

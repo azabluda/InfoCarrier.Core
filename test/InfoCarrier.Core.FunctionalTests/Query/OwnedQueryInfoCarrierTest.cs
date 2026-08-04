@@ -35,7 +35,8 @@ public class OwnedQueryInfoCarrierTest(OwnedQueryInfoCarrierTest.OwnedQueryInfoC
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
     }
 
     /// <inheritdoc />
@@ -89,7 +90,7 @@ public class SharedTypeQueryInfoCarrierTest(NonSharedFixture fixture)
         bool useServiceProvider = true)
     {
         Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring);
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
@@ -119,7 +120,7 @@ public class OwnedEntityQueryInfoCarrierTest(NonSharedFixture fixture)
         bool useServiceProvider = true)
     {
         Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring);
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,

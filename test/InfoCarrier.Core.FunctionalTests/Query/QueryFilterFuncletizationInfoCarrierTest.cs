@@ -28,7 +28,8 @@ public class QueryFilterFuncletizationInfoCarrierTest(QueryFilterFuncletizationI
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 copyDbContextParameters: (client, server) => Copy(
-                    (QueryFilterFuncletizationContext)client, (QueryFilterFuncletizationContext)server));
+                    (QueryFilterFuncletizationContext)client, (QueryFilterFuncletizationContext)server),
+                configureConventions: ConfigureConventions);
 
         /// <summary>
         ///     Carries the context state every filter in this model closes over to the server.

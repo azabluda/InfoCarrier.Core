@@ -125,7 +125,8 @@ public class PropertyValuesInfoCarrierTest(PropertyValuesInfoCarrierTest.InfoCar
                 // The seed asserts that the materialization interceptor ran, and the seed runs
                 // against the server — so the server provider needs it too.
                 onAddServices: services =>
-                    services.AddSingleton<ISingletonInterceptor, PropertyValuesMaterializationInterceptor>());
+                    services.AddSingleton<ISingletonInterceptor, PropertyValuesMaterializationInterceptor>(),
+                configureConventions: ConfigureConventions);
 
         public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
             => base.AddOptions(builder)

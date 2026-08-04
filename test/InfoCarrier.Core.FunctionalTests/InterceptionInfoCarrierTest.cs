@@ -78,7 +78,8 @@ public abstract class QueryExpressionInterceptionInfoCarrierTestBase(
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         /// <inheritdoc />
         /// <remarks>
@@ -173,7 +174,8 @@ public abstract class SaveChangesInterceptionInfoCarrierTestBase(
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         /// <inheritdoc />
         protected override IServiceCollection InjectInterceptors(

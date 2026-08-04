@@ -49,7 +49,8 @@ public class ComplexTypesTrackingInfoCarrierTest(ComplexTypesTrackingInfoCarrier
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 onAddOptions: builder => builder.ConfigureWarnings(
-                    w => w.Log(InMemoryEventId.TransactionIgnoredWarning)));
+                    w => w.Log(InMemoryEventId.TransactionIgnoredWarning)),
+                configureConventions: ConfigureConventions);
 
         /// <inheritdoc />
         public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)

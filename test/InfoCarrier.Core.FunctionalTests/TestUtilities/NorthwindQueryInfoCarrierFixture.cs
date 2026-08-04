@@ -29,7 +29,8 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
             // The server adds the InMemory defining queries for the keyless entity types; the
             // client model has the types but not the store's means of producing their rows.
-            serverContextType: typeof(NorthwindInfoCarrierServerContext));
+            serverContextType: typeof(NorthwindInfoCarrierServerContext),
+            configureConventions: ConfigureConventions);
 
     /// <summary>
     ///     Enables Query-category logging, as EF Core's own <c>NorthwindQueryInMemoryFixture</c>

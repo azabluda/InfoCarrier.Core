@@ -558,7 +558,8 @@ public class LazyLoadProxyInfoCarrierTest(LazyLoadProxyInfoCarrierTest.InfoCarri
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
         {

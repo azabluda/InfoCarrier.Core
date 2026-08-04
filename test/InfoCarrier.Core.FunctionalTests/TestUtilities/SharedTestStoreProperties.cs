@@ -35,6 +35,21 @@ public struct SharedTestStoreProperties
     public Action<ModelBuilder, DbContext>? OnModelCreating;
 
     /// <summary>
+    ///     The fixture's convention configuration — the other half of its model.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="OnModelCreating" /> is not all a fixture says about its model.
+    ///     <c>ConfigureConventions</c> is where a type-wide rule goes: every
+    ///     <c>NorthwindQueryFixtureBase</c> routes its model customizer through it,
+    ///     <c>LazyLoadProxyTestBase</c> declares five complex types there, and
+    ///     <c>StoreGeneratedFixtureBase</c> registers three dozen value converters. The server
+    ///     builds <em>the same model as the client</em> or the wire has nothing to agree on, so it
+    ///     needs both halves — <c>TestModelSource.GetFactory</c> has taken this since EF wrote it,
+    ///     and it was simply never passed.
+    /// </remarks>
+    public Action<ModelConfigurationBuilder>? ConfigureConventions;
+
+    /// <summary>
     ///     Additional options configuration applied to the server context.
     /// </summary>
     public Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? OnAddOptions;

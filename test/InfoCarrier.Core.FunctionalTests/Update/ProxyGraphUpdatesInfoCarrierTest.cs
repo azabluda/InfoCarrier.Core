@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -157,7 +157,8 @@ public class ProxyGraphUpdatesInfoCarrierTest
                     ContextType,
                     (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                     onAddOptions: AddProxyOptions,
-                    onAddServices: s => s.AddEntityFrameworkProxies());
+                    onAddServices: s => s.AddEntityFrameworkProxies(),
+                    configureConventions: ConfigureConventions);
 
             public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
                 => AddProxyOptions(

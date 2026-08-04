@@ -1550,6 +1550,33 @@ constructor, so the backend store cannot build the server's copy.
       own SQLite suite overrides them), 6 `no such column: p.Int`, and a tail of translation
       failures including `Array_of_byte`.
 
+- [x] **B5. The server gets the fixture's `ConfigureConventions` too.**
+      **`Total tests: 20725, Passed: 20320, Failed: 204, Skipped: 201`** — **byte-identical to B4**:
+      no test fixed, none broken, reasons unchanged. Kept anyway. ✅ `<this commit>`
+
+      **What was missing.** A fixture states its model in two places, and the harness carried one.
+      `SharedTestStoreProperties` had `OnModelCreating` and nothing for `ConfigureConventions`, so
+      the server model was built without it — every `NorthwindQueryFixtureBase` routes its model
+      customizer through it, `LazyLoadProxyTestBase` declares five complex types there, and
+      `StoreGeneratedFixtureBase` registers three dozen value converters. `TestModelSource.GetFactory`
+      has taken a `configureConventions` argument since EF wrote it; it was simply never passed.
+
+      Now plumbed through `SharedTestStoreProperties.ConfigureConventions`, `Create`'s new optional
+      `configureConventions`, and `NonSharedModelInfoCarrierHarness.Prepare`, and **passed at all 51
+      call sites** rather than at the ones judged to need it — "the server builds the same model as
+      the client" is the harness's contract, and a per-fixture judgement about half of it is exactly
+      the drift that produces a wrong classification later.
+
+      **Why a null result is kept.** It is inert *today* because no adopted fixture's
+      `ConfigureConventions` changes what its server model does — that is a fact about the bases
+      adopted so far, not about the harness. B3f cannot be adopted without it: `StoreGenerated`'s
+      converters live there and nowhere else.
+
+      **And the null result was verified rather than assumed** (the A57 rule): a probe on the model-
+      source registration prints `store=Northwind conventions=True`, so the delegate arrives and is
+      passed. An unmeasurable change that is never shown to run is indistinguishable from one that
+      does nothing.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

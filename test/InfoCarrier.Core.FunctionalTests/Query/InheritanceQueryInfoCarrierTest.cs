@@ -76,7 +76,8 @@ public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase
             // The keyless `AnimalQuery` is produced by an InMemory defining query, which is how
             // the *store* makes its rows and therefore no part of the client's model — the same
             // split the Northwind fixture makes for its keyless types.
-            serverContextType: typeof(InheritanceInfoCarrierServerContext));
+            serverContextType: typeof(InheritanceInfoCarrierServerContext),
+            configureConventions: ConfigureConventions);
 
     /// <summary>
     ///     Complex types are off, as EF's own InMemory fixture has them: nothing carries a complex

@@ -54,11 +54,13 @@ public sealed class NonSharedModelInfoCarrierHarness(
         Type contextType,
         Action<ModelBuilder>? onModelCreating,
         Func<IServiceCollection, IServiceCollection>? addServices,
-        Action<DbContextOptionsBuilder>? onConfiguring = null)
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null)
         => _pending = new SharedTestStoreProperties
         {
             ContextType = contextType,
             OnModelCreating = onModelCreating is null ? null : (modelBuilder, _) => onModelCreating(modelBuilder),
+            ConfigureConventions = configureConventions,
             OnAddServices = addServices,
 
             // The server gets the test's own `onConfiguring`, unlike the fixture-wide `AddOptions`

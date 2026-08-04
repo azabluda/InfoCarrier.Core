@@ -27,6 +27,7 @@ public class ManyToManyFieldsLoadInfoCarrierTest(ManyToManyFieldsLoadInfoCarrier
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
     }
 }

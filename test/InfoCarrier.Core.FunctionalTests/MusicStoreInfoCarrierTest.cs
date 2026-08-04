@@ -33,7 +33,8 @@ public class MusicStoreInfoCarrierTest(MusicStoreInfoCarrierTest.MusicStoreInfoC
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         /// <summary>
         ///     Ends a "transaction" by emptying the store, as EF's InMemory fixture does — but

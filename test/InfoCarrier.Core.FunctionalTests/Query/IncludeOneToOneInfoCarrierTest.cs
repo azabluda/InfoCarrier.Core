@@ -26,6 +26,7 @@ public class IncludeOneToOneInfoCarrierTest(IncludeOneToOneInfoCarrierTest.InfoC
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
     }
 }

@@ -40,7 +40,8 @@ public class BuiltInDataTypesInfoCarrierTest(BuiltInDataTypesInfoCarrierTest.Bui
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         public override bool StrictEquality => true;
 
@@ -88,7 +89,8 @@ public class ConvertToProviderTypesInfoCarrierTest(
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         public override bool StrictEquality => true;
 
@@ -163,7 +165,8 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         public override bool StrictEquality => true;
 

@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -66,7 +66,8 @@ public class F1InfoCarrierFixture : F1FixtureBase<byte[]>
                     F1Context.AddSeedData((F1Context)c);
                     await c.SaveChangesAsync(t);
                 }),
-            onAddServices: s => s.AddSingleton<ISingletonInterceptor, F1MaterializationInterceptor>());
+            onAddServices: s => s.AddSingleton<ISingletonInterceptor, F1MaterializationInterceptor>(),
+            configureConventions: ConfigureConventions);
 
     /// <inheritdoc />
     /// <remarks>

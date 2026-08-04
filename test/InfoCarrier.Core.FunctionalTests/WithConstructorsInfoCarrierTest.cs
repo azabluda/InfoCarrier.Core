@@ -41,7 +41,8 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         /// <inheritdoc />
         public override async Task ReseedAsync()

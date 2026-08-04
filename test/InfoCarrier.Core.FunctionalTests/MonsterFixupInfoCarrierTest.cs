@@ -40,7 +40,8 @@ public class MonsterFixupInfoCarrierTest(MonsterFixupInfoCarrierTest.MonsterFixu
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
                 typeof(SnapshotMonsterContext),
-                (modelBuilder, context) => OnModelCreating(modelBuilder, context));
+                (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                configureConventions: ConfigureConventions);
 
         /// <inheritdoc />
         protected override void OnModelCreating<TMessage, TProduct, TProductPhoto, TProductReview, TComputerDetail, TDimensions>(
