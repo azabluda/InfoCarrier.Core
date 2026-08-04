@@ -3253,11 +3253,9 @@ failures are left red and classified rather than worked immediately.
       this provider writes. The 5 left are `Sequence contains no elements` (×2) and three
       `Assert.All`/`Assert.Equal` count mismatches, all in the `SessionsController` family.
 
-      `AdHocComplexTypeQueryInfoCarrierTest` is **0 of 4**, and the four are one gap:
-      **complex-type equality in a predicate**. Three are `The LINQ expression '…Where(e =>
-      e.ComplexContainer == ComplexContainer)' could not be translated`, one is a
-      `KeyNotFoundException` on a complex property. A32 made complex types *travel*; comparing one
-      to a parameter or to `null` inside a predicate is a separate thing and does not work.
+      `AdHocComplexTypeQueryInfoCarrierTest` was **0 of 4** — ~~complex-type equality in a predicate
+      does not work~~ **wrong, corrected in A77: the InMemory provider does not translate complex
+      property access at all, and the class is reverted.**
 
       **`FunkyDataQueryTestBase` is not adoptable on Tier A, and this is the evidence.** Adopted, it
       came up **2 of 38**, with 34 of the failures reading
@@ -3416,6 +3414,28 @@ failures are left red and classified rather than worked immediately.
       *both*: something that restores the data between tests, and that something must go through
       `((InfoCarrierTestStore)TestStore).Backend`. Neither is optional and neither is inferable
       from the base — a base written against a store with transactions simply does not say it.
+
+- [x] **A77.** `AdHocComplexTypeQuery` is not adoptable on Tier A either. Reverted.
+      **`Total tests: 21281, Passed: 20968, Failed: 111, Skipped: 202`** — 4 red removed with the
+      class; nothing else moved. Unadopted bases **49 → 50**. ✅ `<this commit>`
+
+      A70 adopted it and classified its 0-of-4 as "complex-type equality in a predicate does not
+      work". Reading the errors properly says something else: **all four are raised by EF's own
+      translator on the server**, out of `QueryableMethodTranslatingExpressionVisitor.Translate`,
+      and three say *"Translation of member 'ComplexContainer' on entity type 'EntityType' failed.
+      This commonly occurs when the specified member is unmapped."*
+
+      That is the InMemory provider declining to translate a complex property access at all — not
+      this provider losing one. Two independent confirmations: EF's InMemory suite contains **no
+      complex-type query test of any kind**, and the *two* spec bases about querying complex types
+      (`AdHocComplexTypeQueryTestBase` and `Query.ComplexTypeQueryTestBase`) both lack an InMemory
+      counterpart. Same signal as `FunkyDataQuery` (A70) and `StoreGeneratedTestBase`.
+
+      **This also corrects A62's aside** that `Query.Associations.ComplexProperties` "is now
+      adoptable and is not adopted". It is not, on Tier A. `ComplexTypesTrackingTestBase` is 249 of
+      251 because that base *tracks* complex values; querying against them is a store capability
+      this backend does not have, and no amount of work on this provider changes that. Complex-type
+      queries need Tier B.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
