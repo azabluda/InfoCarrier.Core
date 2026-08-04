@@ -46,7 +46,10 @@ here, and both are cheap to avoid:
   reverted on that mistake and both pass on Tier B, first run, no overrides (A79). Only "EF ships no
   test for it on any store we have" justifies leaving a base unadopted. The tell: **if adopting a
   base means writing a workaround for a store capability the base assumes, check the tier before
-  writing the workaround** (A80 deleted one such workaround by moving a class).
+  writing the workaround** (A80 deleted one such workaround by moving a class). And **a base belongs
+  to exactly one tier** — three Northwind bases ran on both, green on both, 906 tests of pure
+  duplication (A81). When a base could go either way, the tier that *translates* is the one whose
+  green means more.
 - **A newly-red SQLite test is not automatically a regression.** Grep
   `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
   with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
@@ -107,7 +110,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 21470, Passed: 21094, Failed: 173, Skipped: 203`** (2026-08-04) across the
+**`Total tests: 20560, Passed: 20188, Failed: 173, Skipped: 199`** (2026-08-04) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,

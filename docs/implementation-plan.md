@@ -1399,22 +1399,44 @@ spec bases it inherits, and each base against whether EF ships an `…InMemoryTe
       **The tell, for next time: if adopting a base means writing a workaround for a store
       capability the base assumes, check the tier before writing the workaround.**
 
-- [ ] **B1. Dual-tier the query bases.** Tier A currently carries ~22 Northwind query bases and the
-      complex-navigations / gears-of-war / many-to-many families that EF also ships for SQLite; only
-      `NorthwindJoin`, `NorthwindSelect` and `NorthwindWhere` run on Tier B. This is not a wrong-tier
-      error — those bases have InMemory counterparts and belong on Tier A too — but it is a **gap in
-      what the suite can tell us**, and `NorthwindQueryInfoCarrierSqliteFixture`'s own doc comment
-      has said so since it was written: *"a query failing there may be failing because InMemory
-      cannot do it rather than because this provider is wrong."*
+- [x] **A81. Every base is adopted exactly once.** **`Total tests: 20560, Passed: 20188,
+      Failed: 173, Skipped: 199`** — **910 tests removed, failure count unchanged, unadopted bases
+      unchanged at 47.** ✅ `<this commit>`
 
-      Concretely: **the 12 failures currently classified as "the A28 shape — a spec test asserting a
-      limitation this provider does not have" have never been checked on a tier that has the
-      limitation.** Some of them may simply pass there; others may fail for a real reason. Until
-      they run on Tier B that classification is an assumption, not a measurement.
+      Three bases were adopted on **both** tiers: `NorthwindJoinQueryTestBase`,
+      `NorthwindSelectQueryTestBase` and `NorthwindWhereQueryTestBase`. All three pairs were green
+      on both, with identical counts — 906 tests of pure duplication, about 4% of the suite's
+      runtime for no additional information. The Tier A copies are removed and the Tier B ones kept.
 
-      Cheap, because the fixture already exists: one class per base, `InfoCarrierTestStoreFactory.Sqlite`,
-      and EF's SQLite overrides mirrored. Do it in batches and expect the relational overrides to
-      be the bulk of the work.
+      **Why Tier B is the one to keep for a query base.** Tier A client-evaluates nearly everything,
+      so a green there is weaker evidence than a green on a tier that actually translates — which is
+      the reason `NorthwindQueryInfoCarrierSqliteFixture` was written in the first place. Keeping
+      the weaker copy and deleting the stronger one would be the wrong way round.
+
+      That the failure count did not move, and that no base became unadopted, is the check that this
+      removed duplication rather than coverage.
+
+- [ ] **B1. One tier per base — decide where the rest of the query corpus belongs.**
+      **Supersedes the "dual-tier the query bases" item this replaces, which was wrong:** a base
+      belongs on exactly one tier (A81), so the question is *which*, not *both*.
+
+      Nineteen Northwind bases plus the complex-navigations, gears-of-war and many-to-many families
+      still run on Tier A alone, and EF ships SQLite counterparts for all of them. By the argument
+      A81 settles, a query base is better judged on the tier that translates — so the default answer
+      is "move them" — but three things have to be weighed first, and none of them is free:
+
+      1. **The 12 failures classified as "asserts a limitation this provider does not have" have
+         never been run on a tier that has the limitation.** That classification is an assumption.
+         Moving those bases is the measurement that settles it, and it may turn some of them green
+         and others into real defects.
+      2. **Tier A is not worthless for a query base.** It is where the InMemory-limitation overrides
+         were derived, and it is the tier most of the change-tracking suite runs on; moving the
+         query corpus wholesale leaves the two halves of the suite on different stores.
+      3. **The Tier B store is file-backed and slower.** 906 duplicated tests cost ~4% of runtime;
+         moving twenty-odd bases changes the whole suite's shape.
+
+      Do it a base at a time, measuring, and record which tier each one ends on and why. Do **not**
+      do it as one sweep.
 
 - [ ] **B2. Re-judge the deferred reds on the tier that can answer them.** Not before B1. In
       particular:
