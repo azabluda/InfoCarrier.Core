@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using InfoCarrier.Core.Common;
@@ -6,7 +6,9 @@ using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core;
 
@@ -34,6 +36,7 @@ internal sealed class QueryExecutor<TElement>
     private readonly SplitQuery _split;
     private readonly QueryTrackingBehavior _trackingBehavior;
     private readonly ClientResultMaterializer _materializer;
+    private readonly bool _threadSafetyChecks;
 
     public QueryExecutor(
         QueryContext queryContext,
@@ -56,6 +59,19 @@ internal sealed class QueryExecutor<TElement>
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
 
+        // `EnableThreadSafetyChecks(false)` is answered here, not by the detector.
+        // `QueryContext.ConcurrencyDetector` is never null in EF 10 and always throws when
+        // re-entered from a second operation, so a provider that calls it unconditionally ignores
+        // the option outright — which is what every `ConcurrencyDetectorDisabledTestBase` method
+        // caught (A59). EF's own providers read the same flag:
+        // `InMemoryShapedQueryCompilingExpressionVisitor` and its relational counterpart both hold
+        // `dependencies.CoreSingletonOptions.AreThreadSafetyChecksEnabled` and emit the call only
+        // when it is set.
+        _threadSafetyChecks = queryContext.Context
+            .GetInfrastructure()
+            .GetRequiredService<ICoreSingletonOptions>()
+            .AreThreadSafetyChecksEnabled;
+
         // A split query materializes every row the server sent, but only the entities the
         // residual yields belong in the change tracker (docs/projection-split.md §4). One
         // materializer for the whole execution, so identity is resolved across its parts.
@@ -77,7 +93,7 @@ internal sealed class QueryExecutor<TElement>
             return singleResult ? (object)FirstOrDefaultAsync(asyncEnum) : asyncEnum;
         }
 
-        using var criticalSection = _queryContext.ConcurrencyDetector.EnterCriticalSection();
+        using IDisposable? criticalSection = CriticalSection();
 
         var results = new List<object?>(_split.ServerQueries.Count);
         foreach (ServerQuery serverQuery in _split.ServerQueries)
@@ -117,7 +133,7 @@ internal sealed class QueryExecutor<TElement>
         while (true)
         {
             bool moved;
-            using (_queryContext.ConcurrencyDetector.EnterCriticalSection())
+            using (CriticalSection())
             {
                 moved = enumerator.MoveNext();
             }
@@ -131,6 +147,13 @@ internal sealed class QueryExecutor<TElement>
         }
     }
 
+    /// <summary>
+    ///     The concurrency critical section, or <see langword="null" /> when the context has thread
+    ///     safety checks turned off.
+    /// </summary>
+    private IDisposable? CriticalSection()
+        => _threadSafetyChecks ? _queryContext.ConcurrencyDetector.EnterCriticalSection() : null;
+
     private async IAsyncEnumerable<TElement> ExecuteAsync(bool singleResult)
     {
         CancellationToken cancellationToken = _queryContext.CancellationToken;
@@ -141,7 +164,7 @@ internal sealed class QueryExecutor<TElement>
             QueryDataResult result;
             try
             {
-                using (_queryContext.ConcurrencyDetector.EnterCriticalSection())
+                using (CriticalSection())
                 {
                     // Checked before the round-trip, as EF does in MoveNextAsync: an
                     // already-cancelled token must surface as OperationCanceledException rather

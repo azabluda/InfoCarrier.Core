@@ -1,4 +1,4 @@
-# Implementation Plan — M2: Projection split
+﻿# Implementation Plan — M2: Projection split
 
 Status: **IN PROGRESS** · Milestone [M2](roadmap.md#m2--projection-split-requirements-3)
 
@@ -2980,9 +2980,32 @@ failures are left red and classified rather than worked immediately.
 
       | Count | Family | Reading |
       |---:|---|---|
-      | 14 | every `ConcurrencyDetectorDisabledInfoCarrierTest` method | **A provider defect, fixed in A60.** *"A second operation was started on this context instance"* — thrown by `ConcurrencyDetector.EnterCriticalSection`, which `QueryExecutor` calls unconditionally. `QueryContext.ConcurrencyDetector` is never null in EF 10; every provider gates the call on `ICoreSingletonOptions.AreThreadSafetyChecksEnabled` instead, and this one did not. |
+      | ~~14~~ 0 | every `ConcurrencyDetectorDisabledInfoCarrierTest` method | **A provider defect, fixed in A60.** *"A second operation was started on this context instance"* — thrown by `ConcurrencyDetector.EnterCriticalSection`, which `QueryExecutor` calls unconditionally. `QueryContext.ConcurrencyDetector` is never null in EF 10; every provider gates the call on `ICoreSingletonOptions.AreThreadSafetyChecksEnabled` instead, and this one did not. |
       | 7 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | Two shapes. **`Dangling wire reference 1: no value with that id has been materialized`** (×2) is a real wire defect on a `byte[]` concurrency token. The rest are the token's *original* value not surviving the round trip, so the store does not detect the conflict and the message differs. |
       | 5 | `MusicStoreInfoCarrierTest` cart and catalogue counts | **Not a provider defect — a fixture one.** EF's shim ends a "transaction" with `context.Database.EnsureDeleted()`, and on this provider that is the *client* context, which has no database. The backing store keeps every cart item from the previous test and the counts accumulate. Remoting `EnsureDeleted` is a roadmap question (there is no DDL on the wire), not a plan one. |
+
+- [x] **A60.** `EnableThreadSafetyChecks(false)` is answered by the provider, not by the detector.
+      **`Total tests: 18498, Passed: 18283, Failed: 56, Skipped: 159`** — FIXED 14, BROKEN none.
+      **`ConcurrencyDetectorDisabledTestBase` is 16 of 16.** ✅ `<this commit>`
+
+      A59's largest family, and a one-line reading of EF's source settles it.
+      `QueryContext.ConcurrencyDetector` is `Dependencies.ConcurrencyDetector` and is **never
+      null** — it throws whenever it is re-entered, whatever the option says. Nothing about the
+      option reaches it. What reads the option is the *provider*:
+      `InMemoryShapedQueryCompilingExpressionVisitor` and
+      `RelationalShapedQueryCompilingExpressionVisitor` each hold
+      `dependencies.CoreSingletonOptions.AreThreadSafetyChecksEnabled` and emit the
+      `EnterCriticalSection` call only when it is set.
+
+      So `QueryExecutor` reads the same flag once, in its constructor, and all three critical
+      sections — the synchronous round trip, the asynchronous one, and Z1's per-row section over the
+      residual — go through one `CriticalSection()` returning `IDisposable?`. A `using` over `null`
+      is a no-op, so the shape of the code is unchanged.
+
+      Worth noting what this was *not*: not a missing service registration, and not something
+      `ConcurrencyDetectorEnabledTestBase` could ever have caught — that half was 16 of 16 from the
+      moment it was adopted, because a provider that ignores the option looks exactly right until
+      somebody turns it off.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
