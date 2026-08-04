@@ -1609,6 +1609,25 @@ constructor, so the backend store cannot build the server's copy.
       `This operation is not supported for a relative URI` on a wrapped-`Uri` key, and one is
       `Sequence contains no elements` in the composite-key-cycle propagation test.
 
+- [x] **B3e. `Types.TypeTest` on Tier B.** **`Failed: 0, Passed: 16, Total: 16`** — clean, first
+      run, no overrides. ✅ `<this commit>`
+
+      Sixteen classes, one per CLR type EF's SQLite suite covers, over the core `TypeTestBase`:
+      one entity, one property, one value, one query. It is a thin base and that is why it is worth
+      having — **B4 was a family of per-type wire defects, and nothing in the suite asked the
+      question one type at a time.** All sixteen pass, which is a real statement about the wire and
+      not a formality.
+
+      The core base rather than `RelationalTypeTestBase`, which is in
+      `EFCore.Relational.Specification.Tests` — not referenced here (A79 mirrors that assembly's
+      overrides by hand for the same reason) — and whose extra tests assert JSON columns and
+      `ExecuteUpdate`.
+
+      **One deliberate divergence: a store name per type.** EF names every one of these fixtures
+      `TypeTest` and keeps them apart with `[Collection("Type tests")]`. The Tier B store is
+      file-backed, and a shared file whose contents depend on class ordering is the exact coupling
+      that produced the 698-test phantom failure.
+
 - [ ] **B6. `ValueGenerated` is part of the shared model and the client does not compute it.**
       Follows B3f. The client provider is not relational, so `RelationalValueGenerationConvention`
       never runs: `HasDefaultValue` and `HasComputedColumnSql` leave `ValueGenerated` at `Never` on
