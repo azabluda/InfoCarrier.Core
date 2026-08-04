@@ -35,13 +35,27 @@ public class MusicStoreInfoCarrierTest(MusicStoreInfoCarrierTest.MusicStoreInfoC
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context));
 
+        /// <summary>
+        ///     Ends a "transaction" by emptying the store, as EF's InMemory fixture does — but
+        ///     through the <em>backend</em>.
+        /// </summary>
+        /// <remarks>
+        ///     EF writes <c>context.Database.EnsureDeleted()</c>, and on this provider that is the
+        ///     <em>client</em> context, which has no database: it deletes nothing and returns.
+        ///     Every test's cart therefore survived into the next one and the counts accumulated
+        ///     (A59 classified five failures that way). The backend owns the store, so it is the
+        ///     backend that has to be emptied — the same rule A74 found for reseeding.
+        /// </remarks>
         public override IDisposable BeginTransaction(DbContext context)
-            => new InMemoryCleaner(context);
+            => new BackendCleaner(((InfoCarrierTestStore)TestStore).Backend);
 
-        private sealed class InMemoryCleaner(DbContext context) : IDisposable
+        private sealed class BackendCleaner(InfoCarrierBackendTestStore backend) : IDisposable
         {
             public void Dispose()
-                => context.Database.EnsureDeleted();
+            {
+                using DbContext context = backend.CreateDbContext();
+                backend.CleanAsync(context).GetAwaiter().GetResult();
+            }
         }
     }
 }

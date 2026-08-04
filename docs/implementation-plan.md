@@ -2982,7 +2982,7 @@ failures are left red and classified rather than worked immediately.
       |---:|---|---|
       | ~~14~~ 0 | every `ConcurrencyDetectorDisabledInfoCarrierTest` method | **A provider defect, fixed in A60.** *"A second operation was started on this context instance"* — thrown by `ConcurrencyDetector.EnterCriticalSection`, which `QueryExecutor` calls unconditionally. `QueryContext.ConcurrencyDetector` is never null in EF 10; every provider gates the call on `ICoreSingletonOptions.AreThreadSafetyChecksEnabled` instead, and this one did not. |
       | ~~7~~ 2 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | **Four fixed by A72** (a `byte[]` token's two values are the same array and the definition was written into the payload decoded *second*) and **one by A73** (a partial update wrote every column). The 2 left both raise `UpdateConcurrencyException` where the base wants `UpdateConcurrencyTokenException`. |
-      | 5 | `MusicStoreInfoCarrierTest` cart and catalogue counts | **Not a provider defect — a fixture one.** EF's shim ends a "transaction" with `context.Database.EnsureDeleted()`, and on this provider that is the *client* context, which has no database. The backing store keeps every cart item from the previous test and the counts accumulate. Remoting `EnsureDeleted` is a roadmap question (there is no DDL on the wire), not a plan one. |
+      | ~~5~~ 0 | `MusicStoreInfoCarrierTest` cart and catalogue counts | **Fixed in A75.** Not a provider defect — a fixture one. EF's shim ends a "transaction" with `context.Database.EnsureDeleted()`, and on this provider that is the *client* context, which has no database. The backing store keeps every cart item from the previous test and the counts accumulate. Remoting `EnsureDeleted` is a roadmap question (there is no DDL on the wire), not a plan one. |
 
 - [x] **A60.** `EnableThreadSafetyChecks(false)` is answered by the provider, not by the detector.
       **`Total tests: 18498, Passed: 18283, Failed: 56, Skipped: 159`** — FIXED 14, BROKEN none.
@@ -3376,6 +3376,24 @@ failures are left red and classified rather than worked immediately.
 
       Same override, same five lines. **Every new fixture over a mutable store needs it**, and the
       symptom is arithmetic: a count that is an exact multiple of the seeded one.
+
+- [x] **A75.** `MusicStore` empties the backend, not the client.
+      **`Total tests: 21285, Passed: 20963, Failed: 120, Skipped: 202`** — FIXED 5, BROKEN none.
+      **`MusicStoreTestBase` is 18 of 18.** ✅ `<this commit>`
+
+      A59's five, and A74's rule again from the other direction. EF's
+      `MusicStoreInMemoryTest` ends a "transaction" with `context.Database.EnsureDeleted()`; on
+      this provider that is the **client** context, which has no database, so it deleted nothing
+      and returned. Every test's cart survived into the next and the counts accumulated.
+
+      The backend owns the store, so the backend is what gets emptied. Together with A74 this is
+      now a rule with two witnesses: **anything a fixture does to the store — clean, delete,
+      reseed — has to go through `((InfoCarrierTestStore)TestStore).Backend`, because the client
+      side of those APIs is a no-op by construction.**
+
+      `ConferencePlanner`'s 5 are *not* this — its counts come out **low**, not high
+      (`Expected: 21, Actual: 20`), plus two `Sequence contains no elements` and one speaker whose
+      skip-navigation came back empty. Left classified.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
