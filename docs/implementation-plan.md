@@ -3104,6 +3104,36 @@ failures are left red and classified rather than worked immediately.
       useful part: a failure whose stack contains no code of yours is not your failure, and the
       count that "looks about right" is the one worth reading the stack for.
 
+- [x] **A65.** `MonsterFixup` and `BadDataJsonDeserialization`.
+      **`Total tests: 19355, Passed: 19073, Failed: 119, Skipped: 163`** — **+38 tests, +30
+      passing**, 8 new red. Unadopted bases **59 → 57**. ✅ `<this commit>`
+
+      **`MonsterFixupInfoCarrierTest` is 12 of 12, and it is the result worth reporting.** The
+      monster model is EF's largest — every relationship kind at once, seeded three separate ways
+      (by foreign key, by navigation, and by both) and then verified from every end. This provider
+      reassembles that graph from the wire rather than through EF's shaper, so a relationship that
+      fixes up in one direction and not the other is exactly the defect a smaller base cannot see.
+      It came up clean on the first run.
+
+      The context type is named explicitly rather than read from the fixture:
+      `MonsterFixupFixtureBase` derives from `ServiceProviderFixtureBase`, which has no
+      `ContextType` and states its context through `CreateContext(DbContextOptions)` instead. The
+      three `ValueGeneratedOnAdd` calls are EF's own InMemory ones and describe the backing store
+      (S3c-8: InMemory generates those keys at `Add` time).
+
+      `BadDataJsonDeserializationInfoCarrierTest` is **18 of 26**, and all 8 failures are
+      `Throws_for_bad_point_as_GeoJson` — **the same absent spatial mapping A63 found**, arriving
+      as *"The 'Point' property … could not be mapped"* before any JSON is read. No new
+      information, and no store is involved: the base builds a model and reads JSON directly, so
+      the client is configured through `InfoCarrierTestHelpers.UseProviderOptions`, whose client
+      throws if anything ever reaches it.
+
+      **`SeedingTestBase` was attempted in this batch and is not adoptable as it stands.** Its
+      `SeedingContext` takes a `string testId` and has no `DbContextOptions` constructor, so the
+      backend store — which registers the context type with `AddDbContext` — cannot build the
+      server's copy. Adopting it needs either a second constructor on our side or a store that can
+      be handed a context *factory*; it is not two forwarded members.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
