@@ -112,10 +112,11 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
 **All 44 are classified in one table — A54 in `docs/implementation-plan.md`**, read out of
 `artifacts/measure/`. Only **4** are wrong answers
-(`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`); the
-best-understood open defect is the 4 `List<string>` vs `IQueryable<string>` ones; 4 more are
-undiagnosed exceptions; the rest are spec tests asserting a limitation this provider does not
-have, a deliberate allowlist refusal (`Regex_IsMatch`, A46), or a known singleton.
+(`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`) and
+**6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
+limitation this provider does not have, whose query body is inline in a `protected static` assert
+helper so the assertion cannot be inverted from a derived class. The rest are a deliberate allowlist
+refusal (`Regex_IsMatch`, A46) or a known singleton.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.

@@ -2878,6 +2878,49 @@ failures are left red and classified rather than worked immediately.
       considered here was making the server track regardless of what the client asked, and *that*
       fails loudly and far away (A55).
 
+- [x] **A57.** A `let` holding a subquery is an intermediate, so it travels materialized.
+      **`Total tests: 18420, Passed: 18217, Failed: 44, Skipped: 159`** — FIXED 4, BROKEN 4.
+      **The count did not move and the change is still right; the argument is below.**
+      ✅ `<this commit>`
+
+      **The defect.** `Complex_query_with_let_collection_projection_FirstOrDefault` died on the
+      server with `ArgumentException: Argument type 'List<string>' does not match the corresponding
+      member type 'IQueryable<string>'`, raised inside
+      `InMemoryProjectionBindingExpressionVisitor.VisitNew`. EF's InMemory suite passes that test —
+      only SQLite overrides it, and for `ApplyNotSupported` — so this is a gap, not a limitation.
+
+      Two probes, because the first guess was wrong. The carrier is **not** the transparent
+      identifier rewrite's: a probe in `TransparentIdentifierRewriter.Rewrite` prints
+      `carriers=[] element=` for this query. `ProjectionRewriter` builds it, and a second probe over
+      its fragments prints the whole answer:
+
+          frags=[Level2:False:l2 | IQueryable`1:False:<subquery>]   ← IsQueryableCollection = False
+
+      `Materialized` is gated on `consumed.Contains(fragment)` and the `let`'s value goes *straight
+      into* the transparent identifier `new { l2, innerL1s }` — no operator touches it in that
+      lambda. The operator that reads it (`ti => ti.innerL1s.ToList()`) is one level **up**, and
+      this pass runs innermost-first, so at the moment of decision it has not been seen.
+
+      **The fix is to ask the whole tree.** `MemberReadCollector` collects every `(DeclaringType,
+      Name)` the query reads, once, before any rewriting; a slot of a constructed row counts as
+      consumed when its member is read anywhere. By declaring type and name rather than by
+      `MemberInfo`, because a `NewExpression`'s recorded member and the `MemberExpression` reading it
+      back need not be the same reflection object.
+
+      **The trade, stated plainly.** Four tests turn red — `Complex_query_with_let_collection_SelectMany`
+      on both models — and every one of them is an `AssertInvalidMaterializationType` test: the base
+      asserts that EF *refuses* the query, and with this change we answer it. The measurement is
+      unambiguous that we answer it **correctly**: the failure is `Assert.Throws() Failure: No
+      exception was thrown`, which is only reachable after the inner `AssertQuery` has compared every
+      row. So the suite total is unchanged and the capability is strictly larger — we no longer
+      refuse a query EF answers, and we additionally answer four EF refuses. Those four join the A28
+      family already in the table.
+
+      **What was not done, and why.** A discriminator does exist that would have kept all eight
+      green: materialize only when the element type is not an entity type. It is arbitrary — there is
+      no reason a collection of `string` should behave differently from a collection of `Level1` —
+      and inventing a rule to move a number is the thing this plan keeps a *Do not repeat* list for.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -3604,8 +3647,8 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 
       | Count | Family | Reading |
       |---:|---|---|
-      | 8 | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join`, `Join_with_result_selector_returning_queryable_throws_validation_error` (×2 models each) | Classified in A38/A39. The base asserts a materialization error this provider does not raise, or raises differently; the query bodies are inline in `protected static` assert helpers. |
-      | 4 | `Complex_query_with_let_collection_projection_FirstOrDefault`, `Queryable_in_subquery_works_when_final_projection_is_List` (×2 models) | `Argument type 'List<string>' does not match 'IQueryable<string>'`, raised **on the server** in `InMemoryProjectionBindingExpressionVisitor.VisitNew`. `ProjectionRewriter.Materialized` is the only thing that puts a `ToList` where an `IQueryable` member is declared. **The best-understood open defect.** |
+      | ~~8~~ 12 | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join`, `Join_with_result_selector_returning_queryable_throws_validation_error`, **`Complex_query_with_let_collection_SelectMany`** (×2 models each) | Classified in A38/A39. The base asserts a materialization error this provider does not raise, or raises differently; the query bodies are inline in `protected static` assert helpers. The third joined them in **A57**, which chose answering a query EF refuses over refusing one EF answers. |
+      | ~~4~~ 2 | ~~`Complex_query_with_let_collection_projection_FirstOrDefault`~~, `Queryable_in_subquery_works_when_final_projection_is_List` (×2 models) | **Half fixed by A57**: a `let` whose value is read anywhere in the query is an intermediate, so it travels materialized. What is left is the same A28 shape as the row above — the base asserts `QueryInvalidMaterializationType` and we raise `ArgumentException`. |
       | 4 | `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method` (×2 models) | `NullReferenceException` where the base expects a translation failure. Undiagnosed. |
       | ~~4~~ 0 | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | **Fixed by A56.** A52's fix reaches an owned value through the navigation that owns it; these project one directly. A55 established the tracker can never help (they are `NoTracking` by fixture) and A56 read the entity type off the query instead. |
       | 4 | `OwnsMany_correlated_projection`, `Multiple_single_result_in_projection_containing_owned_types` | EF's own guard (*a tracking query is attempting to project an owned entity without a corresponding owner*), and a tuple-carrier lambda typed `Func<…, Anonymous>` handed to `Select<…, object>`. |

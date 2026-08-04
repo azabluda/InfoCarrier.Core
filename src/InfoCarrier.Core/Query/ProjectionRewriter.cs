@@ -63,6 +63,16 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    ///     Every member the query reads anywhere, by declaring type and name.
+    /// </summary>
+    /// <remarks>
+    ///     Whether a slot is read is not a question the selector building it can answer — the read
+    ///     is in the <em>next</em> operator up, and this pass works innermost-first. So it is asked
+    ///     of the whole tree, once, before any rewriting. See <see cref="IsQueryableCollection" />.
+    /// </remarks>
+    private IReadOnlySet<(Type, string)> _read = new HashSet<(Type, string)>();
+
+    /// <summary>
     ///     A client-side rebuild another pass already produced. Rewriting it would only wrap one
     ///     carrier in another.
     /// </summary>
@@ -85,7 +95,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         out IReadOnlySet<Expression> reassemblies,
         Expression? alreadyReassembled = null)
     {
-        var rewriter = new ProjectionRewriter(analyzer) { _preserved = alreadyReassembled };
+        var rewriter = new ProjectionRewriter(analyzer)
+        {
+            _preserved = alreadyReassembled,
+            _read = MemberReadCollector.Find(query),
+        };
         Expression result = rewriter.Visit(query);
         reassemblies = rewriter._reassemblies;
         return result;
@@ -145,7 +159,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return call;
         }
 
-        IReadOnlySet<Expression> consumed = OperatorSourceCollector.Find(selector.Body);
+        IReadOnlySet<Expression> consumed = Consumed(selector.Body);
 
         Expression tuple = TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))]);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
@@ -301,7 +315,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return null;
         }
 
-        IReadOnlySet<Expression> consumed = OperatorSourceCollector.Find(innerSelector.Body);
+        IReadOnlySet<Expression> consumed = Consumed(innerSelector.Body);
 
         Expression tuple = TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))]);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
@@ -348,6 +362,52 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
+    ///     Everything in <paramref name="body" /> that something else reads: a value handed to a
+    ///     query operator, and a slot of a constructed row whose member the query reads elsewhere.
+    /// </summary>
+    private IReadOnlySet<Expression> Consumed(Expression body)
+    {
+        var consumed = new HashSet<Expression>(
+            OperatorSourceCollector.Find(body), ReferenceEqualityComparer.Instance);
+
+        AddReadSlots(body, consumed);
+
+        return consumed;
+    }
+
+    private void AddReadSlots(Expression body, HashSet<Expression> consumed)
+    {
+        switch (body)
+        {
+            case NewExpression { Members: { } members } constructed:
+                for (int i = 0; i < members.Count && i < constructed.Arguments.Count; i++)
+                {
+                    if (IsRead(members[i]))
+                    {
+                        consumed.Add(constructed.Arguments[i]);
+                    }
+                }
+
+                break;
+
+            case MemberInitExpression init:
+                AddReadSlots(init.NewExpression, consumed);
+                foreach (MemberBinding binding in init.Bindings)
+                {
+                    if (binding is MemberAssignment assignment && IsRead(assignment.Member))
+                    {
+                        consumed.Add(assignment.Expression);
+                    }
+                }
+
+                break;
+        }
+    }
+
+    private bool IsRead(MemberInfo member)
+        => member.DeclaringType is { } declaring && _read.Contains((declaring, member.Name));
+
+    /// <summary>
     ///     Whether a fragment is a queryable collection, which cannot travel as one.
     /// </summary>
     /// <remarks>
@@ -358,11 +418,17 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private static bool IsQueryableCollection(Expression fragment, IReadOnlySet<Expression> consumed)
         => fragment.Type.IsGenericType
             && fragment.Type.GetGenericTypeDefinition() == typeof(IQueryable<>)
-            // Only when the projection *composes over* it. A queryable handed straight to the
-            // result is what the caller asked for, and EF is right to refuse it — two spec tests
-            // assert exactly that error (`AssertInvalidMaterializationType`), and materializing
-            // here suppressed it. The projection's own operators are the signal: `frag.Select(…)`
-            // is an intermediate, `new Dto { Orders = frag }` is the answer.
+            // Only when something *reads* it. A queryable handed straight to the result is what the
+            // caller asked for, and EF is right to refuse it — three spec tests assert exactly that
+            // error (`AssertInvalidMaterializationType`) and materializing here suppresses it.
+            //
+            // Two kinds of read count, and they are found in different places. An operator applied
+            // in the projection body itself — `frag.Select(…)` — is `consumed`. A slot of a row the
+            // body constructs is read by the *next* operator up, which this innermost-first pass has
+            // not reached yet; `_read` is collected from the whole tree for that case, and it is what
+            // separates `select new { l2, innerL1s }` followed by `ti => ti.innerL1s.ToList()` — a
+            // `let`, an intermediate — from `select new { Subquery = q }`, where nothing ever looks
+            // at `Subquery` and EF's refusal is the answer.
             && consumed.Contains(fragment);
 
     /// <summary>
@@ -433,6 +499,37 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             }
 
             return base.VisitMethodCall(node);
+        }
+    }
+
+    /// <summary>
+    ///     Every member the query reads, anywhere in it.
+    /// </summary>
+    /// <remarks>
+    ///     By declaring type and name rather than by <see cref="MemberInfo" />: the member a
+    ///     <see cref="NewExpression" /> records for a constructor argument and the one a
+    ///     <see cref="MemberExpression" /> reads back are not required to be the same reflection
+    ///     object — a property's getter and the property itself both name it.
+    /// </remarks>
+    private sealed class MemberReadCollector : ExpressionVisitor
+    {
+        private readonly HashSet<(Type, string)> _members = [];
+
+        public static IReadOnlySet<(Type, string)> Find(Expression query)
+        {
+            var collector = new MemberReadCollector();
+            collector.Visit(query);
+            return collector._members;
+        }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            if (node.Member.DeclaringType is { } declaring)
+            {
+                _members.Add((declaring, node.Member.Name));
+            }
+
+            return base.VisitMember(node);
         }
     }
 
