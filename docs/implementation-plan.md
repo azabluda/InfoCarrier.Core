@@ -1628,6 +1628,26 @@ constructor, so the backend store cannot build the server's copy.
       file-backed, and a shared file whose contents depend on class ordering is the exact coupling
       that produced the 698-test phantom failure.
 
+- [x] **B3c. `JsonQuery` on Tier B.** **`Failed: 162, Passed: 230, Skipped: 7, Total: 399`**,
+      first run, no overrides. ✅ `<this commit>`
+
+      A deep owned graph — reference and collection, two levels down, with inheritance, custom
+      naming, converters and a type-per-property entity — stored in JSON columns. EF ships
+      `JsonQuerySqliteTest` and no InMemory counterpart, for the obvious reason: there is no JSON
+      column in a store that keeps live objects.
+
+      The core base, not `JsonQueryRelationalTestBase`, which asserts SQL. **The `ToJson()` mapping
+      is mirrored from `JsonQueryRelationalFixture` and the collection-of-collections ignores from
+      `JsonQuerySqliteFixture`** — a JSON column is what the base is named for, so adopting it
+      without one would take the base's name and leave its subject behind.
+
+      **230 passing is the finding; the 162 are a new surface, deliberately undiagnosed**, exactly
+      as A79 left `ComplexTypeQuery`'s 62. They are four blocks: **72 `Values differ`**, **48
+      `NullReferenceException`**, **36 `SQL APPLY`** (the A79 shape — EF's own SQLite suite
+      overrides these, so they are convergence, and they go in with `PrimitiveCollectionsQuery`'s 13
+      in one sweep) and **6** `a tracking query is attempting to project an owned entity without a
+      corresponding owner`.
+
 - [ ] **B6. `ValueGenerated` is part of the shared model and the client does not compute it.**
       Follows B3f. The client provider is not relational, so `RelationalValueGenerationConvention`
       never runs: `HasDefaultValue` and `HasComputedColumnSql` leave `ValueGenerated` at `Never` on
