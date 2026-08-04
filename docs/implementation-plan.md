@@ -3524,3 +3524,46 @@ Continued from the M1 plan; the run population is unchanged (4,247).
 | 2026-08-02 | 5180 |  41 | 5234 | after Z5 (collection fragment materialized before it ships) |
 | 2026-08-02 | 5189 |  33 | 5235 | after Z3 (collection projection reassembled above the SelectMany) |
 | 2026-08-02 | 5193 |  31 | 5237 | after Z6 (client-only key without value equality is refused) |
+
+- [x] **A54.** The 48, in one table. No code change. ✅ `<this commit>`
+
+      A48's map is six entries out of date. This replaces it as the single place to look, read out
+      of `artifacts/measure/a53.txt`. **48 failures over 18420 tests; 70 spec bases unadopted.**
+
+      | Count | Family | Reading |
+      |---:|---|---|
+      | 8 | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join`, `Join_with_result_selector_returning_queryable_throws_validation_error` (×2 models each) | Classified in A38/A39. The base asserts a materialization error this provider does not raise, or raises differently; the query bodies are inline in `protected static` assert helpers. |
+      | 4 | `Complex_query_with_let_collection_projection_FirstOrDefault`, `Queryable_in_subquery_works_when_final_projection_is_List` (×2 models) | `Argument type 'List<string>' does not match 'IQueryable<string>'`, raised **on the server** in `InMemoryProjectionBindingExpressionVisitor.VisitNew`. `ProjectionRewriter.Materialized` is the only thing that puts a `ToList` where an `IQueryable` member is declared. **The best-understood open defect.** |
+      | 4 | `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method` (×2 models) | `NullReferenceException` where the base expects a translation failure. Undiagnosed. |
+      | 4 | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | A52's fix reaches an owned value through the **navigation** that owns it. These project one directly, where there is no navigation in hand — the same root cause down a different path. **The server not tracking is what makes `_findEntityType` useless here; whether it should is the open question.** |
+      | 4 | `OwnsMany_correlated_projection`, `Multiple_single_result_in_projection_containing_owned_types` | EF's own guard (*a tracking query is attempting to project an owned entity without a corresponding owner*), and a tuple-carrier lambda typed `Func<…, Anonymous>` handed to `Select<…, object>`. |
+      | 4 | `ThenInclude_with_interface_navigations`, `Collection_without_setter_materialized_correctly`, `Casts_are_removed_from_expression_tree_when_redundant`, `Double_convert_interface_created_expression_tree` | A49's residual. Three of the four involve an **interface-typed navigation**. |
+      | 2 | `Correlated_collection_with_distinct_3_levels` | **A wrong answer** — the only one left of that kind, with `Comparison_with_value_converted_subclass`. |
+      | 2 | `Comparison_with_value_converted_subclass` | **A wrong answer.** A value-converted key compared against a constant of a *subclass*; A19's and A20's rules meet here. |
+      | 2 | `Query_with_complex_let_containing_ordering_and_filter_projecting_firstOrDefault_element_of_let` | `NullReferenceException` in the residual. Undiagnosed. |
+      | 2 | `Join_with_nav_projected_in_subquery_when_client_eval` | The A28 shape, unchanged since. |
+      | 2 | `Regex_IsMatch`, `Regex_IsMatch_constant_input` | **Deliberate** (A46). `Regex` is not on the allowlist and the allowlist is ADR-008. A roadmap decision. |
+      | 2 | `Can_track_entity_with_complex_property_bag_collections(Added)` | A32's residual: fails inside EF's own `StructuralTypeMaterializerSource`. |
+      | 1 | `Query_with_keyless_type` | Needs the `serverContextType` split; `InheritanceQueryInfoCarrierTest` is the worked example. |
+      | 1 | `Save_optional_many_to_one_dependents` | 1 of 1787, from S3c-9. |
+      | 1 | `Nullable_client_side_concurrency_token_can_be_used` | `IMaterializationInterceptor` never runs on the client; adopting `MaterializationInterceptionTestBase` is the way in. |
+      | 1 | the compliance report | Not a defect. **70 bases left.** |
+
+      **What the 70 need.** A49's harness makes every remaining `NonSharedModelTestBase` suite
+      adoptable two-members-per-class; A46 and A47 show the shared-fixture batches are mechanical.
+      The ones that are *not* mechanical, and why:
+
+      - **`Query.Associations.*` is 34 of the 70** and has no InMemory counterpart at all — a
+        roadmap question (a relational tier, or explicitly out of scope), not a plan one. Complex
+        types work since A32, so its `ComplexProperties` third is no longer blocked on capability.
+      - **`BulkUpdates.*` (5)** — the provider implements nothing of `ExecuteUpdate`/`ExecuteDelete`.
+        Same roadmap question.
+      - **Six infrastructure bases** (`ApiConsistency`, `Logging`, `Scaffolding.CompiledModel`,
+        `ServiceCollectionExtensions`, `ModelBuilding101`, `Spatial*`) are not worth adopting;
+        `StoreGeneratedTestBase` is not adoptable at all (EF's own InMemory test does not derive
+        from it).
+      - Everything else — `Updates`, `MonsterFixup`, `Seeding`, `MusicStore`, `CustomConverters`,
+        `ConvertToProviderTypes`, `BuiltInDataTypes`, `JsonTypes`, `DataAnnotation`, `DataBinding`,
+        `Serialization`, `ProxyGraphUpdates`, the three interception bases — is an ordinary batch.
+        `MaterializationInterception` is worth taking for its own sake: it is the root of the
+        `OptimisticConcurrency` singleton above.

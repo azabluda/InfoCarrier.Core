@@ -110,9 +110,10 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 48 are classified**, read out of `artifacts/measure/a53.txt`: 26 are A48's table in
-`docs/implementation-plan.md`, 4 are A49's, and the rest are the five bases A50 adopted — down from
-68 after A52 closed the owned-navigation family (46 tests). Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
+**All 48 are classified in one table — A54 in `docs/implementation-plan.md`**, read out of
+`artifacts/measure/a53.txt`. Only **4** are wrong answers
+(`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`); the
+best-understood open defect is the 4 `List<string>` vs `IQueryable<string>` ones. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
 `Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec
 tests asserting a limitation this provider does not have, a deliberate allowlist refusal
 (`Regex_IsMatch`, A46), or a known singleton.
