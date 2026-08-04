@@ -2921,6 +2921,51 @@ failures are left red and classified rather than worked immediately.
       no reason a collection of `string` should behave differently from a collection of `Level1` —
       and inventing a rule to move a number is the thing this plan keeps a *Do not repeat* list for.
 
+- [x] **A58.** `Comparison_with_value_converted_subclass`, diagnosed end to end. No code change;
+      this is the finding. ✅ `<this commit>`
+
+      One of the four wrong answers, and now fully understood. Three probes — the captured tree,
+      the residual, and every `ConstantExpression`'s declared *and* runtime type:
+
+          CAPTURED  [EntityQueryRootExpression].Where(f => (f.ServerAddress == Convert(127.0.0.1, IPAddress)))
+          RESIDUAL  server0 => server0.Where(f => (f.ServerAddress == Convert(127.0.0.1, IPAddress)))
+          TREE      [EntityQueryRootExpression]
+          CONSTS    decl=ReadOnlyIPAddress rt=ReadOnlyIPAddress v=127.0.0.1
+
+      **The whole `Where` falls to the client and nothing says so.** `IPAddress.Loopback` is not an
+      `IPAddress`: it is `System.Net.IPAddress+ReadOnlyIPAddress`, an internal subclass — which is
+      what the test's name has been saying all along. The model maps `Faction.ServerAddress` as
+      `IPAddress`, so `IPAddress` is on the allowlist and `ReadOnlyIPAddress` is not; the constant
+      cannot be named on the wire, the predicate is unshippable, and the split leaves it in the
+      residual. On the client `==` between two `IPAddress` references is **reference equality** —
+      `IPAddress` overrides `Equals` but declares no `operator ==` — so nothing matches and the
+      answer is `Expected: 1, Actual: 0`.
+
+      EF's InMemory suite passes this test (only SQLite overrides it, and only to assert SQL), so it
+      is a gap.
+
+      **The fix is two independent halves, and neither alone is enough.**
+
+      1. *Naming.* `Convert(Constant(v, ReadOnlyIPAddress), IPAddress)` should travel as
+         `Constant(v, IPAddress)`. A20's "a constant is mapped by what it *is*" needs the corollary
+         that what a value *is* may be a type no one can name, and the tree already says which base
+         it stands for. That is a small normalizer.
+      2. *Serializing.* Naming it is useless on its own. `DynamicValueMapper` would then reach an
+         `IPAddress` with no `IProperty` in hand, fall through to the reflective object shape, and
+         (A19's finding) `IPAddress.ScopeId` throws `SocketException` for an IPv4 address — and the
+         reverse path has no constructor to match, since `IPAddress`'s take `long`/`byte[]`. A34's
+         rule says such a value travels as its JSON form **off the type mapping**, and the mapping
+         hangs off the property. The property is right there structurally — it is the other side of
+         the comparison, which is how EF infers a constant's type mapping too — but the mapper has
+         no expression context, so somebody has to carry it in.
+
+      **What is not the fix.** Widening `ClientCodeFinder.VisitBinary` — which today refuses
+      reference equality only between types the allowlist does not know — to refuse it for any type
+      lacking `operator ==` would turn this wrong answer into an honest translation failure. That is
+      strictly better than answering `0`, and it is ADR-010's own line. It is *not* done here because
+      it does not fix the test, its blast radius covers every client-side entity comparison, and it
+      would be a wash on the count at best. Recorded so the option is not re-derived.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -3654,7 +3699,7 @@ Continued from the M1 plan; the run population is unchanged (4,247).
       | 4 | `OwnsMany_correlated_projection`, `Multiple_single_result_in_projection_containing_owned_types` | EF's own guard (*a tracking query is attempting to project an owned entity without a corresponding owner*), and a tuple-carrier lambda typed `Func<…, Anonymous>` handed to `Select<…, object>`. |
       | 4 | `ThenInclude_with_interface_navigations`, `Collection_without_setter_materialized_correctly`, `Casts_are_removed_from_expression_tree_when_redundant`, `Double_convert_interface_created_expression_tree` | A49's residual. Three of the four involve an **interface-typed navigation**. |
       | 2 | `Correlated_collection_with_distinct_3_levels` | **A wrong answer** — the only one left of that kind, with `Comparison_with_value_converted_subclass`. |
-      | 2 | `Comparison_with_value_converted_subclass` | **A wrong answer.** A value-converted key compared against a constant of a *subclass*; A19's and A20's rules meet here. |
+      | 2 | `Comparison_with_value_converted_subclass` | **A wrong answer**, fully diagnosed in **A58**: `IPAddress.Loopback` is an internal `ReadOnlyIPAddress`, which the allowlist cannot name, so the whole `Where` stays on the client — where `==` on `IPAddress` is reference equality. Needs both halves A58 names. |
       | 2 | `Query_with_complex_let_containing_ordering_and_filter_projecting_firstOrDefault_element_of_let` | `NullReferenceException` in the residual. Undiagnosed. |
       | 2 | `Join_with_nav_projected_in_subquery_when_client_eval` | The A28 shape, unchanged since. |
       | 2 | `Regex_IsMatch`, `Regex_IsMatch_constant_input` | **Deliberate** (A46). `Regex` is not on the allowlist and the allowlist is ADR-008. A roadmap decision. |
