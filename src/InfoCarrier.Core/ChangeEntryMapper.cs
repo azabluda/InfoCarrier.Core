@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.Json;
 using InfoCarrier.Core.Common;
@@ -52,8 +52,19 @@ public static class ChangeEntryMapper
         bool carriesOriginals = entry.EntityState is EntityState.Modified or EntityState.Deleted;
         List<DynamicPropertyValue>? originals = null;
 
+        // Only a `Modified` entry has a meaningful answer: on an `Added` one EF reports every
+        // property modified, and on a `Deleted` one none, and neither is information the server
+        // needs. Collected as the loop goes so the whole set is in hand before the request is
+        // built.
+        List<string>? modified = entry.EntityState == EntityState.Modified ? [] : null;
+
         foreach (IProperty property in entityType.GetProperties())
         {
+            if (modified is not null && entry.IsModified(property))
+            {
+                modified.Add(property.Name);
+            }
+
             if (entry.HasTemporaryValue(property))
             {
                 // Sent, and flagged. The value is meaningless to the store, but a principal and
@@ -129,6 +140,7 @@ public static class ChangeEntryMapper
             SerializedValues = Serialize(entityType, properties, mapper),
             SerializedOriginalValues = originals is null ? null : Serialize(entityType, originals, mapper),
             TemporaryProperties = temporary,
+            ModifiedProperties = modified,
         };
     }
 

@@ -55,6 +55,21 @@ public sealed record ChangeEntry
     ///     entity, which has foreign keys but no navigations to link through.
     /// </remarks>
     public IReadOnlyList<string>? TemporaryProperties { get; init; }
+
+    /// <summary>
+    ///     Names of the properties a <c>Modified</c> entry actually changed, or
+    ///     <see langword="null" /> when the whole row is being written.
+    /// </summary>
+    /// <remarks>
+    ///     A <em>partial</em> update is an ordinary EF operation: attach a stub carrying only the
+    ///     key, set one property, mark that one modified, save. Which properties are modified is
+    ///     change-tracker state and does not follow from the values — every property's value is on
+    ///     the wire either way — so it has to be named. Without it the server set
+    ///     <c>State = Modified</c>, EF marked *every* property modified, and the row's untouched
+    ///     columns were written from the stub: `Save_partial_update` watched "Apple Cider" become
+    ///     <see langword="null" />.
+    /// </remarks>
+    public IReadOnlyList<string>? ModifiedProperties { get; init; }
 }
 
 

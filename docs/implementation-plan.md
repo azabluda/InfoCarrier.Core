@@ -2981,7 +2981,7 @@ failures are left red and classified rather than worked immediately.
       | Count | Family | Reading |
       |---:|---|---|
       | ~~14~~ 0 | every `ConcurrencyDetectorDisabledInfoCarrierTest` method | **A provider defect, fixed in A60.** *"A second operation was started on this context instance"* — thrown by `ConcurrencyDetector.EnterCriticalSection`, which `QueryExecutor` calls unconditionally. `QueryContext.ConcurrencyDetector` is never null in EF 10; every provider gates the call on `ICoreSingletonOptions.AreThreadSafetyChecksEnabled` instead, and this one did not. |
-      | ~~7~~ 3 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | **Four fixed by A72**: a `byte[]` token's current and original values are the same array, and the definition was written into the payload decoded *second*. The 3 left are `Save_partial_update` and two `..._mismatch_throws`. |
+      | ~~7~~ 2 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | **Four fixed by A72** (a `byte[]` token's two values are the same array and the definition was written into the payload decoded *second*) and **one by A73** (a partial update wrote every column). The 2 left both raise `UpdateConcurrencyException` where the base wants `UpdateConcurrencyTokenException`. |
       | 5 | `MusicStoreInfoCarrierTest` cart and catalogue counts | **Not a provider defect — a fixture one.** EF's shim ends a "transaction" with `context.Database.EnsureDeleted()`, and on this provider that is the *client* context, which has no database. The backing store keeps every cart item from the previous test and the counts accumulate. Remoting `EnsureDeleted` is a roadmap question (there is no DDL on the wire), not a plan one. |
 
 - [x] **A60.** `EnableThreadSafetyChecks(false)` is answered by the provider, not by the detector.
@@ -3331,6 +3331,34 @@ failures are left red and classified rather than worked immediately.
 
       It also fixed the two `..._mismatch_throws` siblings, which had a different array and so a
       different symptom — the token check ran against a value that never arrived.
+
+- [x] **A73.** A partial update writes only the properties the client changed.
+      **`Total tests: 21285, Passed: 20951, Failed: 132, Skipped: 202`** — FIXED 1, BROKEN none.
+      **`UpdatesTestBase` is 26 of 28.** ✅ `<this commit>`
+
+      One test, and a real hole in the wire protocol. A partial update is ordinary EF: attach a
+      stub carrying only the key, set one property, mark that one modified, save.
+      `Save_partial_update` does exactly that and expects `Name` to still read "Apple Cider"
+      afterwards; it read `null`.
+
+      **Which properties are modified is change-tracker state and does not follow from the
+      values** — every property's value is on the wire either way — so nothing carried it. The
+      server set `State = Modified`, EF marked *every* property modified, and the untouched columns
+      were written from the stub.
+
+      `ChangeEntry` gained `ModifiedProperties`, filled from `IUpdateEntry.IsModified` for a
+      `Modified` entry only (on an `Added` one EF reports all of them and on a `Deleted` one none,
+      neither of which is information). The server applies it **after** setting the state, because
+      that is what marked them all, and skips key properties — EF refuses to be told a key is
+      modified on a tracked entry, and `State = Modified` leaves keys alone anyway.
+
+      Measured across the whole `GraphUpdates`/`ProxyGraphUpdates` corpus (3,500 saves) with
+      nothing broken, which is the point of measuring a change in this path at all.
+
+      **Left red: 2**, `…_on_concurrency_token_original_value_mismatch_throws` for `Save_partial`
+      and `Remove_partial`. Both raise EF's `UpdateConcurrencyException` ("with the key value")
+      where the base wants `UpdateConcurrencyTokenException` ("on the concurrency token") — the
+      store cannot find the row rather than finding it with a stale token. Undiagnosed.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

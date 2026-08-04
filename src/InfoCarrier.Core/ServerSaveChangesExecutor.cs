@@ -273,6 +273,30 @@ public class ServerSaveChangesExecutor
 
             entry.State = state;
 
+            // A *partial* update writes only the properties the client actually changed. Setting
+            // `State = Modified` marks every one of them modified, which is right for an entity
+            // the client loaded and edited and wrong for the stub `Save_partial_update` attaches:
+            // there `Name` was never set, and writing it put `null` over "Apple Cider".
+            //
+            // Which properties are modified is change-tracker state, not something the values
+            // imply — every value is on the wire either way — so the client names them
+            // (`ChangeEntry.ModifiedProperties`). Applied after the state, because that is what
+            // set them all in the first place.
+            if (state == EntityState.Modified && replay.Change.ModifiedProperties is { } modifiedProperties)
+            {
+                var modified = new HashSet<string>(modifiedProperties, StringComparer.Ordinal);
+
+                foreach (IProperty property in replay.EntityType.GetProperties())
+                {
+                    // A key is never "modified" and EF refuses to be told otherwise on a tracked
+                    // entry; `State = Modified` leaves it alone already.
+                    if (!property.IsKey())
+                    {
+                        entry.Property(property.Name).IsModified = modified.Contains(property.Name);
+                    }
+                }
+            }
+
             // What the store will call this row, so references to the client's placeholder can
             // find it. On a backend that generates at save time the value is itself temporary,
             // and that travels with it — every reference stays temporary too and EF replaces the
