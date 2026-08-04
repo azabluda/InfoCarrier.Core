@@ -118,18 +118,23 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 20725, Passed: 20320, Failed: 204, Skipped: 201`** (2026-08-04) across the
+**`Total tests: 21351, Passed: 20812, Failed: 331, Skipped: 208`** (2026-08-05) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
 `ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase`, all sixteen
 `Query.Translations` bases, the nine `ModelBuilding.ModelBuilderTest` bases and the five
 `AdHoc*Query` bases, `OwnedQueryTestBase` and the shared-type query bases on Tier A, plus
-`OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
+`OptimisticConcurrency`, `ConferencePlanner`, `FunkyDataQuery`, `ComplexTypeQuery`,
+`AdHocComplexTypeQuery`, `PrimitiveCollectionsQuery`, `NonSharedPrimitiveCollectionsQuery`,
+`JsonQuery`, `StoreGenerated` and the sixteen `Types.TypeTest` classes on Tier B.
+`PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
-the A59/A61/A62/A63/A65 tables for the 75 those batches added**, read out of `artifacts/measure/`. Only **4** are wrong answers
+the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B3f for the 140
+the Tier B adoptions added** (128 `JsonQuery`, 12 `StoreGenerated`), read out of
+`artifacts/measure/`. Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`) and
 **6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
 limitation this provider does not have, whose query body is inline in a `protected static` assert
@@ -159,14 +164,18 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — 47 the compliance test still reports unadopted. Phase A in
-  `docs/implementation-plan.md`; adopt in batches and classify what turns red. A49 built
-  `NonSharedModelInfoCarrierHarness`, so every remaining `NonSharedModelTestBase` suite
-  (`SharedTypeQuery`, `OwnedEntityQuery`, `AdHocComplexTypeQuery`, `AdHocJsonQuery`,
-  `NonSharedModel*`, `Scaffolding`) is now adoptable the same way — two forwarded members per
-  class.
-- **`Query.Associations.*` is 34 of the 80** and has no InMemory counterpart — a roadmap
-  question (Tier B, or out of scope), not a plan one. Do not start it without asking.
+- **The remaining spec bases** — **41**, and the adoption queue is nearly empty. **32 are
+  `Query.Associations.*` (27) and `BulkUpdates.*` (5)** — a roadmap question, below. **8 are
+  genuinely not adoptable**: six infrastructure (`ApiConsistency`,
+  `EntityFrameworkServiceCollectionExtensions`, `Logging`, `ModelBuilding101`,
+  `Scaffolding.CompiledModel`, and `ComplianceTestBase` itself), and two spatial, which need the
+  SpatiaLite package. **`SeedingTestBase` is blocked** by A65 — its `SeedingContext` takes a
+  `string testId` and has no `DbContextOptions` constructor, so the backend cannot build the
+  server's copy. That leaves **exactly one adoptable base: `AdHocJsonQuery`** (plan item B3d).
+- **`Query.Associations.*` + `BulkUpdates.*` is 32 of the 41.** The standing note said they have
+  no InMemory counterpart and were therefore out of scope; after A79 that is a **Tier B** question,
+  not an out-of-scope one, so re-examine the premise before asking. Either way it is a roadmap
+  decision. Do not start it without asking.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
 

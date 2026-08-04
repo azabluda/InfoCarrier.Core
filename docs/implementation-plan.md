@@ -1648,6 +1648,41 @@ constructor, so the backend store cannot build the server's copy.
       in one sweep) and **6** `a tracking query is attempting to project an owned entity without a
       corresponding owner`.
 
+- [x] **B7. The `SQL APPLY` overrides, and the B3 batch measured whole.**
+      **`Total tests: 21351, Passed: 20812, Failed: 331, Skipped: 208`** ✅ `<this commit>`
+
+      **FIXED: 13, all of them `PrimitiveCollectionsQuery`'s `APPLY` failures. BROKEN: 140 — 128
+      `JsonQuery`, 12 `StoreGenerated`, and nothing outside the classes B3 adopted.** That is the
+      check that five new bases and a harness change disturbed nothing: 21351 − 20725 = 626 new
+      tests = 211 + 16 + 399, and 331 − 204 = 127 = 140 − 13.
+
+      Thirty overrides in two classes, all EF's own: 13 from `PrimitiveCollectionsQuerySqliteTest`
+      and 17 from `JsonQuerySqliteTest`, each a query that now reaches SQL and asks SQLite for
+      `APPLY`. `JsonQuery` **162 → 128**, `PrimitiveCollectionsQuery` **31 → 18**.
+
+      **What was deliberately not taken matters as much as what was.** EF overrides 14 and 24; the
+      counts here are 13 and 17. Only the intersection with what actually fails that way was
+      adopted — A63 borrowed eight spatial overrides on the strength of EF having them and all
+      eight failed with *"Exception type was not an exact match"*, hiding the real reason behind a
+      borrowed one. One goes the other way and is left red:
+      `Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution`
+      raises `APPLY` here and EF does not override it, so there is no override to borrow.
+
+      **Unadopted bases: 46 → 41.** Of those, **32 are `Query.Associations.*` (27) and
+      `BulkUpdates.*` (5)**, which is a roadmap question; **8 are genuinely not adoptable** (six
+      infrastructure, two spatial); and **exactly one adoptable base is left — `AdHocJsonQuery`,
+      B3d.**
+
+- [ ] **B3d. `AdHocJsonQuery` on Tier B.** The last adoptable base outside `Associations`/
+      `BulkUpdates`, deferred rather than blocked, and the shape of the work is known.
+
+      Seven `protected abstract Task Seed*` methods, whose SQLite implementations in
+      `AdHocJsonQuerySqliteTest` are ~200 lines of `ExecuteSqlAsync` with JSON literals. They
+      cannot be copied as-is: **`Database.ExecuteSqlAsync` is a relational API and the context the
+      base hands the seed is the *client's*, which has no database.** Each must run against
+      `((InfoCarrierTestStore)TestStore).Backend.CreateDbContext()` instead — the same rule A74/A75/
+      A76 found, and the reason `MusicStore` and `GraphUpdates` reseed through the backend.
+
 - [ ] **B6. `ValueGenerated` is part of the shared model and the client does not compute it.**
       Follows B3f. The client provider is not relational, so `RelationalValueGenerationConvention`
       never runs: `HasDefaultValue` and `HasComputedColumnSql` leave `ValueGenerated` at `Never` on

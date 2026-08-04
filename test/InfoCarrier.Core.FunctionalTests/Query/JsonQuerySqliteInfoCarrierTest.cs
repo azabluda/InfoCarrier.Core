@@ -3,8 +3,10 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestModels.JsonQuery;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Query;
 
@@ -35,6 +37,94 @@ public class JsonQuerySqliteInfoCarrierTest(
     JsonQuerySqliteInfoCarrierTest.JsonQuerySqliteInfoCarrierFixture fixture)
     : JsonQueryTestBase<JsonQuerySqliteInfoCarrierTest.JsonQuerySqliteInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     The seventeen overrides below are EF's own, from <c>JsonQuerySqliteTest</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Each is a query that now reaches SQL and asks SQLite for <c>APPLY</c>, which it does not
+    ///     have — convergence with the reference provider rather than a defect of this one.
+    ///     <para>
+    ///         EF overrides seven more the same way and they are deliberately <em>not</em> taken:
+    ///         they do not fail here for that reason, and an override whose reason is not ours
+    ///         hides the real one (A63 adopted eight such and all eight failed with "Exception type
+    ///         was not an exact match"). One of ours goes the other way —
+    ///         <c>Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution</c>
+    ///         raises <c>APPLY</c> here and EF does not override it — and is left red for the same
+    ///         reason in reverse: it is not EF's limitation, so it is not EF's override to borrow.
+    ///     </para>
+    /// </remarks>
+    public override async Task Json_branch_collection_distinct_and_other_collection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_branch_collection_distinct_and_other_collection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_Select_entity_in_anonymous_object_ElementAt(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_Select_entity_in_anonymous_object_ElementAt(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_Select_entity_with_initializer_ElementAt(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_Select_entity_with_initializer_ElementAt(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_distinct_in_projection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_distinct_in_projection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_filter_in_projection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_filter_in_projection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_in_projection_with_anonymous_projection_of_scalars(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_in_projection_with_anonymous_projection_of_scalars(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_primitive_arrays(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_primitive_arrays(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_scalars(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_scalars(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_leaf_filter_in_projection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_leaf_filter_in_projection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_of_primitives_SelectMany(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_of_primitives_SelectMany(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_skip_take_in_projection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_skip_take_in_projection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_skip_take_in_projection_project_into_anonymous_type(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_skip_take_in_projection_project_into_anonymous_type(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_collection_skip_take_in_projection_with_json_reference_access_as_final_operation(bool async)
+        => await AssertApplyNotSupported(() => base.Json_collection_skip_take_in_projection_with_json_reference_access_as_final_operation(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_leaf_collection_distinct_and_other_collection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_leaf_collection_distinct_and_other_collection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_multiple_collection_projections(bool async)
+        => await AssertApplyNotSupported(() => base.Json_multiple_collection_projections(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_nested_collection_anonymous_projection_in_projection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_nested_collection_anonymous_projection_in_projection(async));
+
+    /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    public override async Task Json_nested_collection_filter_in_projection(bool async)
+        => await AssertApplyNotSupported(() => base.Json_nested_collection_filter_in_projection(async));
+
+    private static async Task AssertApplyNotSupported(Func<Task> query)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
+
     public class JsonQuerySqliteInfoCarrierFixture : JsonQueryFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
