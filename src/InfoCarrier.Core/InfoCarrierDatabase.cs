@@ -26,6 +26,7 @@ public class InfoCarrierDatabase : IDatabase
     private readonly IExpressionSerializer _expressionSerializer;
     private readonly ICurrentDbContext _currentContext;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger;
+    private readonly IDiagnosticsLogger<DbLoggerCategory.Query> _queryLogger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierDatabase" /> class.
@@ -34,10 +35,12 @@ public class InfoCarrierDatabase : IDatabase
         IDbContextOptions options,
         IExpressionSerializer expressionSerializer,
         ICurrentDbContext currentContext,
-        IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger)
+        IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger,
+        IDiagnosticsLogger<DbLoggerCategory.Query> queryLogger)
     {
         _currentContext = currentContext;
         _updateLogger = updateLogger;
+        _queryLogger = queryLogger;
         _client = options.Extensions
             .OfType<InfoCarrierOptionsExtension>()
             .First()
@@ -53,6 +56,26 @@ public class InfoCarrierDatabase : IDatabase
     /// <inheritdoc />
     public virtual Func<QueryContext, TResult> CompileQuery<TResult>(Expression query, bool async)
     {
+        // Every other provider raises this from `QueryCompilationContext.CreateQueryExecutorExpression`,
+        // which this provider never reaches — the whole point of ADR-006 is to take the tree
+        // *before* EF's translation pipeline. So the event, and with it every
+        // `IQueryExpressionInterceptor`, has to be raised from the capture point instead. Not
+        // optional and not only a log line: the interceptor's return value is the query, which is
+        // what `Intercept_to_change_query_expression` asserts (A67 found it never ran at all).
+        //
+        // Raised before the shape questions below, so an interceptor that replaces the tree is
+        // answered about *its* tree and not the caller's.
+        var expressionPrinter = new ExpressionPrinter();
+        query = _queryLogger.QueryCompilationStarting(
+            _currentContext.Context, expressionPrinter, query).Query;
+
+        // The other half of the pair, and it is observable: a diagnostic listener asserts the two
+        // events arrive in this order. EF raises it from the `finally` of the same method, over the
+        // executor expression it built; there is no executor expression here, and the query itself
+        // is the honest answer to "what was planned" — this provider's plan *is* the tree it is
+        // about to ship.
+        _queryLogger.QueryExecutionPlanned(_currentContext.Context, expressionPrinter, query);
+
         // Determine the element type and whether the query returns a single result.
         Type resultType = typeof(TResult);
         bool singleResult = QueryReturnsSingleResult(query);

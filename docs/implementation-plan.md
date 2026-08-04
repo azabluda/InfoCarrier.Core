@@ -3191,6 +3191,29 @@ failures are left red and classified rather than worked immediately.
       they started as. Seeding idempotently instead is what made the real failure visible. **The
       store-clean path not clearing is a loose end of its own**, unrelated to interception.
 
+- [x] **A68.** The capture point raises EF's query-compilation events.
+      **`Total tests: 19547, Passed: 19265, Failed: 119, Skipped: 163`** — FIXED 12, BROKEN none.
+      **`QueryExpressionInterceptionTestBase` is 16 of 16.** ✅ `<this commit>`
+
+      A67's gap, and the cause is structural rather than a bug.
+      `CoreEventId.QueryCompilationStarting` — and with it every `IQueryExpressionInterceptor` — is
+      raised by EF from `QueryCompilationContext.CreateQueryExecutorExpression`, which **this
+      provider never reaches**: ADR-006 takes the tree at `IDatabase.CompileQuery`, upstream of
+      EF's whole translation pipeline. So nothing raised it, and no interceptor ran.
+
+      `CompileQuery` now raises it, and it is **not** merely a log line: the interceptor's return
+      value *is* the query, which is what `Intercept_to_change_query_expression` asserts. It is
+      raised before the element-type and single-result questions below it, so an interceptor that
+      replaces the tree is answered about its own tree rather than the caller's.
+
+      `CoreEventId.QueryExecutionPlanned` follows it, because the pair is observable: the
+      diagnostic-listener fixture asserts the two arrive **in order**, and only that fixture's four
+      tests fail without it. EF raises it from the same method's `finally` over the executor
+      expression it built. There is no executor expression here, and the query itself is the honest
+      answer to what was planned — this provider's plan *is* the tree it is about to ship.
+
+      Two events, twelve tests, and a whole base green.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
