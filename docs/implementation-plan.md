@@ -3237,10 +3237,24 @@ failures are left red and classified rather than worked immediately.
       client and server alike. **This is the first fixture here whose *seed* needs a client-side
       feature**, and the shape is worth remembering for the next one.
 
-      The 9 left are two families: 7 parameterizations of
-      `Optional_many_to_one_dependents_are_orphaned_starting_detached` (`Assert.Equal` on counts),
-      and `Save_two_entity_cycle_with_lazy_loading` on the two lazy flavours, which expects a throw
-      and gets none.
+      **The 2 left are a category nothing had named before: a spec test that branches on
+      `context.Database.ProviderName`.** `Save_two_entity_cycle_with_lazy_loading` reads
+
+          if (context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory") { … }
+          else { Assert.Throws<InvalidOperationException>(…CircularDependency…); }
+
+      and this provider's name is **not its backing store's** — it is
+      `InfoCarrier.Core`, whatever it is running over. So a store-specific branch always takes the
+      *other* path: the test asks for a circular-dependency refusal that only a store with real
+      insert ordering raises, while the actual store is the InMemory one that resolves the cycle.
+      The assertion is correct about InMemory and cannot see that InMemory is what it is talking to.
+
+      Not overridable without copying the thirty-line body (A28's rule), and not fixable by
+      renaming the provider. **Every base that branches on `ProviderName` will do this**, which is
+      worth knowing before the next adoption that comes up short by exactly one or two tests.
+
+      (The other 7 were `Optional_many_to_one_dependents_are_orphaned_starting_detached`, fixed in
+      A74 — a reseed, not a defect.)
 
 - [x] **A70.** `ConferencePlanner` and `AdHocComplexTypeQuery`; **`FunkyDataQuery` attempted and
       reverted.**
