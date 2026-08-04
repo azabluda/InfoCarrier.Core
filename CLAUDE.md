@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 18420, Passed: 18209, Failed: 52, Skipped: 159`** (2026-08-03) across the
+**`Total tests: 18420, Passed: 18213, Failed: 48, Skipped: 159`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -110,7 +110,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 52 are classified**, read out of `artifacts/measure/a52.txt`: 26 are A48's table in
+**All 48 are classified**, read out of `artifacts/measure/a53.txt`: 26 are A48's table in
 `docs/implementation-plan.md`, 4 are A49's, and the rest are the five bases A50 adopted — down from
 68 after A52 closed the owned-navigation family (46 tests). Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
 `Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec

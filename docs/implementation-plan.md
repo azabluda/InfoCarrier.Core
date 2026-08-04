@@ -2795,6 +2795,17 @@ failures are left red and classified rather than worked immediately.
       `Preserve_includes_when_applying_skip_take_after_anonymous_type_select` and
       `A tracking query is attempting to project an owned entity without a corresponding owner`.
 
+- [x] **A53.** A44's two overrides, on the shared-type twin.
+      **`Total tests: 18420, Passed: 18213, Failed: 48, Skipped: 159`** — FIXED 4, BROKEN none.
+      ✅ `<this commit>`
+
+      `ComplexNavigationsSharedTypeQueryTestBase` runs the same query bodies over a shared-type
+      model, so it needs the same two client-evaluation overrides A44 mirrored onto the ordinary
+      one — and EF carries them in the same two places, on
+      `ComplexNavigationsSharedTypeQueryRelationalTestBase` and in its SQLite shared-type suite.
+      The details clause names `ComplexNavigationsQueryTestBase<…SharedTypeFixture>`: the shared
+      -type base derives from the ordinary one, and `ClientMethodNullableInt` is declared up there.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

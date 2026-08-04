@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.InMemory.Internal;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -30,6 +31,30 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
     /// <inheritdoc />
     public override Task Correlated_projection_with_first(bool async)
         => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     A44 on this model. EF overrides it on `ComplexNavigationsSharedTypeQueryRelationalTestBase`
+    ///     for the same reason: client code in a <c>Where</c> decides which rows, so running it
+    ///     here means fetching all of them.
+    /// </remarks>
+    public override Task Complex_query_with_optional_navigations_and_client_side_evaluation(bool async)
+        => AssertTranslationFailed(
+            () => base.Complex_query_with_optional_navigations_and_client_side_evaluation(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The same rule for an <c>OrderBy</c> key, with the details clause EF's SQLite shared-type
+    ///     suite asserts. The declaring type is <c>ComplexNavigationsQueryTestBase</c> — the shared
+    ///     -type base derives from it, and `ClientMethodNullableInt` is declared up there.
+    /// </remarks>
+    public override Task GroupJoin_client_method_in_OrderBy(bool async)
+        => AssertTranslationFailedWithDetails(
+            () => base.GroupJoin_client_method_in_OrderBy(async),
+            CoreStrings.QueryUnableToTranslateMethod(
+                "Microsoft.EntityFrameworkCore.Query.ComplexNavigationsQueryTestBase<"
+                    + typeof(ComplexNavigationsSharedTypeQueryInfoCarrierFixture).FullName + ">",
+                "ClientMethodNullableInt"));
 }
 
 /// <summary>
