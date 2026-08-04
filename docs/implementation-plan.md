@@ -1449,6 +1449,54 @@ spec bases it inherits, and each base against whether EF ships an `…InMemoryTe
       | the A28 "asserts a limitation we do not have" set | 12 | **Tier B, after B1.** |
       | `JsonTypes` decimal | 4 | Neither — machine locale (A64). |
 
+### B3 — the bases the corrected rule makes adoptable
+
+The audit that produced A80 asked one question of each *adopted* class. This asks the other
+question of each *unadopted* base: not "does EF ship an InMemory test", but "does EF ship a test
+on **any** store we have". Six of the 46 turn out to have a SQLite counterpart and no InMemory
+one, which under the corrected rule is a Tier B adoption, not a reason to leave them out:
+
+| Base | EF InMemory | EF SQLite | Verdict |
+|---|---|---|---|
+| `Query.NonSharedPrimitiveCollectionsQueryTestBase` | no | `NonSharedPrimitiveCollectionsQuerySqliteTest` | **Tier B — B3a** |
+| `Query.PrimitiveCollectionsQueryTestBase` | no | `PrimitiveCollectionsQuerySqliteTest` | **Tier B — B3b** |
+| `Query.JsonQueryTestBase` | no | `JsonQuerySqliteTest` | **Tier B — B3c** |
+| `Query.AdHocJsonQueryTestBase` | no | `AdHocJsonQuerySqliteTest` | **Tier B — B3d** |
+| `Types.TypeTestBase` | no | `SqliteMiscellaneousTypeTest` &c. | **Tier B — B3e** |
+| `StoreGeneratedTestBase` | no | `StoreGeneratedSqliteTest` | **Tier B — B3f** |
+
+The nine that stay unadopted are unchanged and stay for their own reasons: six are infrastructure
+(`ApiConsistency`, `EntityFrameworkServiceCollectionExtensions`, `Logging`, `ModelBuilding101`,
+`Scaffolding.CompiledModel`, and `ComplianceTestBase` itself), two are spatial (SQLite needs the
+SpatiaLite package, which is not referenced — a roadmap question), and `SeedingTestBase` is
+blocked by A65: its `SeedingContext` takes a `string testId` and has no `DbContextOptions`
+constructor, so the backend store cannot build the server's copy.
+
+- [x] **B3a. `NonSharedPrimitiveCollectionsQuery` on Tier B.** **`Failed: 7, Passed: 18,
+      Skipped: 1, Total: 26`**, first run, no overrides. ✅ `<this commit>`
+
+      Two forwarded members on the A49 harness, the SQLite backend behind the wire, and the core
+      base rather than `NonSharedPrimitiveCollectionsQueryRelationalTestBase`, which asserts SQL.
+
+      **The 7 reds are one defect and one loose end, and both are new information — this is the
+      first base that puts a primitive *collection* on the wire.**
+
+      **Six of them (`Array_of_DateTime`, `…_with_milliseconds`, `…_with_microseconds`,
+      `Array_of_DateTimeOffset`, `Array_of_TimeOnly`, `Array_of_decimal`) are one bug: the wire
+      form of a primitive collection is provider-specific, so the two sides disagree about it.**
+      `PrimitiveCoercion.JsonForm` reads the reader/writer off `property.FindTypeMapping()`, and
+      that mapping is the *backing store's* on the server and this provider's on the client.
+      SQLite's `DateTime` element writes `2023-01-01 12:30:00`; core's `JsonDateTimeReaderWriter`
+      reads ISO-8601 and throws `FormatException: The JSON value is not in a supported DateTime
+      format`. `decimal` is the same shape — SQLite writes `'1.0'` as a JSON string, core's reader
+      wants a number. Both directions are affected, since `SaveChanges` runs the mirror image.
+      Fixed in B4.
+
+      The seventh, `Array_of_byte`, is unrelated and left red: the server fails to translate
+      `a => a == 1` over the collection, which EF's own SQLite suite does not have to override.
+
+- [ ] **B4. A primitive collection's wire form must not be the backing store's.** Follows B3a.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
