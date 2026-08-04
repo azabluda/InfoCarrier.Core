@@ -1510,8 +1510,45 @@ constructor, so the backend store cannot build the server's copy.
       go in once B4 has cleared the noise around them. Six are `no such column: p.Int`, three are
       unsupported LINQ, and the rest are singletons.
 
-- [ ] **B4. A primitive collection's wire form must not be the backing store's.** Follows B3a/B3b,
-      and is worth **~107** between them.
+- [x] **B4. A primitive collection's wire form must not be the backing store's.**
+      **`Total tests: 20725, Passed: 20320, Failed: 204, Skipped: 201`** — **106 fixed** across the
+      two bases B3a/B3b adopted, nothing broken anywhere else. ✅ `<this commit>`
+
+      `PrimitiveCollectionsQuery` **132 → 31**, `NonSharedPrimitiveCollectionsQuery` **7 → 2**.
+      Measured against `a81`, so the run's `BROKEN` list is the two new bases' residual and its
+      `FIXED` list is empty by construction; what matters is that the residual is 33 where the
+      adoptions reported 139, and that no reason outside those two classes moved.
+
+      **The defect.** `PrimitiveCoercion.JsonForm` read the JSON reader/writer off
+      `property.FindTypeMapping()`. That mapping is the *backing store's* on the server and this
+      provider's on the client, and the two do not agree: SQLite writes a `DateTime` element as
+      `2023-01-01 12:30:00`, EF's core `JsonDateTimeReaderWriter` reads ISO-8601 and threw
+      `FormatException: The JSON value is not in a supported DateTime format`. `decimal` was the
+      same shape — SQLite writes the JSON string `'1.0'` where the core reader wants a number.
+      Both directions were affected; `SaveChanges` runs the mirror image.
+
+      **Why it only surfaced now.** For a *scalar* it cannot happen: every store agrees on the wire
+      primitives and `IsWirePrimitive` short-circuits them before a mapping is consulted. A
+      *collection* of them is not itself a wire primitive, so it fell through to the mapping — and a
+      mapping is exactly the thing the two ends are entitled to disagree about. Tier A never showed
+      it because EF's InMemory provider does not map primitive collections at all, which is why
+      these two bases were unadopted until B3.
+
+      **The fix, and the one thing to keep hold of.** The collection's JSON form is now derived from
+      the **CLR type alone**, through EF's own core `JsonValueReaderWriterSource` (which no provider
+      replaces) and its own collection wrappers, with `ConcreteCollectionType` copied from
+      `TypeMappingSourceBase.TryFindJsonCollectionMapping`. Deriving it from the *model* instead —
+      `IProperty.GetElementType()` — would have reintroduced the asymmetry, because that is a
+      modelling answer each side computes for itself with its own mapping source. An element the
+      core source does not know, which includes every element behind a value converter, falls
+      through to the old path unchanged.
+
+      **The rule: anything the wire computes from a type mapping is computed twice, by two
+      providers, and is only sound if the two agree.**
+
+      What is left in the two bases is unrelated and genuine: 13 `SQL APPLY` (the A79 shape — EF's
+      own SQLite suite overrides them), 6 `no such column: p.Int`, and a tail of translation
+      failures including `Array_of_byte`.
 
 ## Phase A — adopting the remaining spec bases
 

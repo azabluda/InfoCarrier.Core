@@ -107,10 +107,18 @@ repo-wide and do not refactor to avoid them — but do prefer public API where o
 **Do not add a NuGet dependency on Remote.Linq or Aqua** (ADR-001). They are specification
 material only.
 
+**Anything the wire computes from a type mapping is computed twice, by two different providers,
+and is only sound if the two agree.** The client's model is built by this provider and the
+server's by the backing store, so `FindTypeMapping()` is not one answer but two. B4: a
+`DateTime[]` was written by SQLite's JSON form (`2023-01-01 12:30:00`) and read by EF's core one
+(ISO-8601), 106 failures in both directions. Scalars are safe because `PrimitiveCoercion`
+short-circuits the wire primitives before any mapping is consulted; anything else must be derived
+from the **CLR type alone**, through a service no provider replaces.
+
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 20560, Passed: 20188, Failed: 173, Skipped: 199`** (2026-08-04) across the
+**`Total tests: 20725, Passed: 20320, Failed: 204, Skipped: 201`** (2026-08-04) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,

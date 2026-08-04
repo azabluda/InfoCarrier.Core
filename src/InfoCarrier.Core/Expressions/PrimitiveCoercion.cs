@@ -1,7 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Storage.Json;
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -117,7 +119,131 @@ internal static class PrimitiveCoercion
         Microsoft.EntityFrameworkCore.Metadata.IProperty property)
         => IsWirePrimitive(property.ClrType)
             ? null
-            : property.GetJsonValueReaderWriter() ?? property.FindTypeMapping()?.JsonValueReaderWriter;
+            : CollectionForm(property.ClrType)
+                ?? property.GetJsonValueReaderWriter()
+                ?? property.FindTypeMapping()?.JsonValueReaderWriter;
+
+    /// <summary>
+    ///     The <em>store-independent</em> JSON form of a collection of wire primitives, or
+    ///     <see langword="null" /> if the type is not one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A JSON form read off <c>FindTypeMapping()</c> is the <em>backing store's</em>, and
+    ///         the two ends of the wire do not have the same one. The server's model is built by
+    ///         SQLite, whose <c>DateTime</c> element writes <c>2023-01-01 12:30:00</c>; the client's
+    ///         is built by this provider, whose reader is EF's core <c>JsonDateTimeReaderWriter</c>
+    ///         and wants ISO-8601. It threw <c>FormatException: The JSON value is not in a supported
+    ///         DateTime format</c> — 101 of the 132 failures `PrimitiveCollectionsQuery` opened with,
+    ///         plus 6 of `NonSharedPrimitiveCollectionsQuery`'s 7, in both directions, since
+    ///         <c>SaveChanges</c> runs the mirror image. `decimal` is the same shape: SQLite writes
+    ///         the JSON string <c>'1.0'</c> where the core reader wants a number.
+    ///     </para>
+    ///     <para>
+    ///         For a scalar this never came up, because every store agrees on the wire primitives
+    ///         and <see cref="IsWirePrimitive" /> short-circuits them. A <em>collection</em> of them
+    ///         is not itself a wire primitive, so it fell through to the mapping — and a mapping is
+    ///         exactly the thing the two sides are entitled to disagree about.
+    ///     </para>
+    ///     <para>
+    ///         The form is therefore derived from the <b>CLR type alone</b>, through EF's own
+    ///         core <see cref="JsonValueReaderWriterSource" /> (which no provider replaces) and its
+    ///         own collection wrappers. Deriving it from the model instead — <c>GetElementType()</c>
+    ///         — would reintroduce the asymmetry it fixes, since that is a modelling answer each
+    ///         side computes for itself. An element the core source does not know, which includes
+    ///         every element behind a value converter, falls through to the old path unchanged.
+    ///     </para>
+    /// </remarks>
+    private static Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? CollectionForm(Type collectionType)
+        => CollectionForms.GetOrAdd(collectionType, BuildCollectionForm);
+
+    private static readonly JsonValueReaderWriterSource CoreReaderWriters = new(new JsonValueReaderWriterSourceDependencies());
+
+    private static readonly ConcurrentDictionary<Type, JsonValueReaderWriter?> CollectionForms = new();
+
+    private static JsonValueReaderWriter? BuildCollectionForm(Type collectionType)
+    {
+        if (ElementTypeOf(collectionType) is not { } elementType)
+        {
+            return null;
+        }
+
+        Type underlying = Nullable.GetUnderlyingType(elementType) ?? elementType;
+
+        if (CoreReaderWriters.FindReaderWriter(underlying) is not { } elementReaderWriter)
+        {
+            return null;
+        }
+
+        Type openForm = underlying != elementType
+            ? typeof(JsonCollectionOfNullableStructsReaderWriter<,>)
+            : elementType.IsValueType
+                ? typeof(JsonCollectionOfStructsReaderWriter<,>)
+                : typeof(JsonCollectionOfReferencesReaderWriter<,>);
+
+        return (JsonValueReaderWriter?)Activator.CreateInstance(
+            openForm.MakeGenericType(ConcreteCollectionType(collectionType, elementType), underlying),
+            elementReaderWriter);
+    }
+
+    /// <summary>
+    ///     The element type of a collection of primitives, or <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="string" /> and <see cref="byte" /><c>[]</c> are enumerable and are wire
+    ///     primitives in their own right; a dictionary is enumerable and is not a collection of its
+    ///     values. EF's own <c>TryFindJsonCollectionMapping</c> excludes the same three.
+    /// </remarks>
+    private static Type? ElementTypeOf(Type collectionType)
+    {
+        if (collectionType == typeof(string)
+            || collectionType == typeof(byte[])
+            || collectionType.GetInterfaces().Any(
+                i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>)))
+        {
+            return null;
+        }
+
+        if (collectionType.IsArray)
+        {
+            return collectionType.GetElementType();
+        }
+
+        foreach (Type candidate in collectionType.GetInterfaces().Prepend(collectionType))
+        {
+            if (candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            {
+                return candidate.GetGenericArguments()[0];
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     The type EF's collection reader/writer instantiates, copied from
+    ///     <c>TypeMappingSourceBase.TryFindJsonCollectionMapping</c>: the declared type when it can
+    ///     be constructed, <c>List&lt;T&gt;</c> when it cannot.
+    /// </summary>
+    private static Type ConcreteCollectionType(Type collectionType, Type elementType)
+    {
+        if (collectionType.IsArray)
+        {
+            return collectionType;
+        }
+
+        Type listOfElement = typeof(List<>).MakeGenericType(elementType);
+
+        if (!collectionType.IsAssignableFrom(listOfElement))
+        {
+            return collectionType;
+        }
+
+        return !collectionType.IsAbstract
+            && collectionType.GetConstructor(Type.EmptyTypes) is { IsPublic: true }
+                ? collectionType
+                : listOfElement;
+    }
 
     private static bool IsWirePrimitive(Type type)
     {
