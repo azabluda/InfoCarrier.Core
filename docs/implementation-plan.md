@@ -2981,7 +2981,7 @@ failures are left red and classified rather than worked immediately.
       | Count | Family | Reading |
       |---:|---|---|
       | ~~14~~ 0 | every `ConcurrencyDetectorDisabledInfoCarrierTest` method | **A provider defect, fixed in A60.** *"A second operation was started on this context instance"* — thrown by `ConcurrencyDetector.EnterCriticalSection`, which `QueryExecutor` calls unconditionally. `QueryContext.ConcurrencyDetector` is never null in EF 10; every provider gates the call on `ICoreSingletonOptions.AreThreadSafetyChecksEnabled` instead, and this one did not. |
-      | 7 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | Two shapes. **`Dangling wire reference 1: no value with that id has been materialized`** (×2) is a real wire defect on a `byte[]` concurrency token. The rest are the token's *original* value not surviving the round trip, so the store does not detect the conflict and the message differs. |
+      | ~~7~~ 3 | `UpdatesInfoCarrierTest` concurrency-token and partial-update methods | **Four fixed by A72**: a `byte[]` token's current and original values are the same array, and the definition was written into the payload decoded *second*. The 3 left are `Save_partial_update` and two `..._mismatch_throws`. |
       | 5 | `MusicStoreInfoCarrierTest` cart and catalogue counts | **Not a provider defect — a fixture one.** EF's shim ends a "transaction" with `context.Database.EnsureDeleted()`, and on this provider that is the *client* context, which has no database. The backing store keeps every cart item from the previous test and the counts accumulate. Remoting `EnsureDeleted` is a roadmap question (there is no DDL on the wire), not a plan one. |
 
 - [x] **A60.** `EnableThreadSafetyChecks(false)` is answered by the provider, not by the detector.
@@ -3303,6 +3303,34 @@ failures are left red and classified rather than worked immediately.
 
       Reverted rather than committed. The 10 stay red next to the 16 that are the real
       `IMaterializationInterceptor` gap.
+
+- [x] **A72.** A wire reference may only point backwards in *decode* order.
+      **`Total tests: 21285, Passed: 20950, Failed: 133, Skipped: 202`** — FIXED 4, BROKEN none.
+      **`UpdatesTestBase` is 25 of 28**, from 21. ✅ `<this commit>`
+
+      A59's *"Dangling wire reference 1: no value with that id has been materialized"*, and it is a
+      two-line reordering once seen.
+
+      A `byte[]` concurrency token is **not a wire primitive**, so it travels as a referenceable
+      object: the first mapping of an instance defines it, every later one is a back-reference.
+      When the token has not been changed the current and original values are the **same array** —
+      which is precisely what `..._original_value_matches_does_not_throw` sets up — so exactly one
+      of the two is a `Ref`.
+
+      `ChangeEntryMapper.ToChangeEntry` mapped the original **first**, so the definition landed in
+      `SerializedOriginalValues` and the reference in `SerializedValues`. Those are two separate
+      payloads, decoded independently, and the server decodes `SerializedValues` at the top of
+      `ExecuteAsync` and `SerializedOriginalValues` three hundred lines later, after the state is
+      set — deliberately, because setting the state re-snapshots originals. So the current values
+      arrived holding a reference to a value nobody had materialized yet.
+
+      Mapping the current value first puts the definition where it is read first. **The rule this
+      states, and which nothing wrote down before: a wire reference may only point backwards in
+      the order the payloads are *decoded*, which is not the order they are written in a
+      `ChangeEntry`.**
+
+      It also fixed the two `..._mismatch_throws` siblings, which had a different array and so a
+      different symptom — the token check ran against a value that never arrived.
 
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive

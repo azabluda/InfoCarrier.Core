@@ -54,22 +54,6 @@ public static class ChangeEntryMapper
 
         foreach (IProperty property in entityType.GetProperties())
         {
-            if (carriesOriginals && property.IsConcurrencyToken)
-            {
-                // The value the check is made against. Only the token's original matters: the
-                // server rebuilds the entity from the *current* values, attaches it and sets
-                // `Modified`, so every original it has equals its current one by construction —
-                // and a client that bumps its own token would then be checked against the value
-                // it had just written, refusing a write nobody conflicted with.
-                (originals ??= []).Add(new DynamicPropertyValue
-                {
-                    Name = property.Name,
-                    Value = mapper.ToDynamicValue(
-                        Expressions.PrimitiveCoercion.ToWireValue(property, entry.GetOriginalValue(property)),
-                        Expressions.PrimitiveCoercion.WireType(property)),
-                });
-            }
-
             if (entry.HasTemporaryValue(property))
             {
                 // Sent, and flagged. The value is meaningless to the store, but a principal and
@@ -94,6 +78,32 @@ public static class ChangeEntryMapper
                     Expressions.PrimitiveCoercion.ToWireValue(property, entry.GetCurrentValue(property)),
                     Expressions.PrimitiveCoercion.WireType(property)),
             });
+
+            if (carriesOriginals && property.IsConcurrencyToken)
+            {
+                // The value the check is made against. Only the token's original matters: the
+                // server rebuilds the entity from the *current* values, attaches it and sets
+                // `Modified`, so every original it has equals its current one by construction —
+                // and a client that bumps its own token would then be checked against the value
+                // it had just written, refusing a write nobody conflicted with.
+                //
+                // **After the current value, and that ordering is load-bearing.** A `byte[]` token
+                // is not a wire primitive, so it travels as a referenceable object: the first
+                // mapping of an instance defines it, every later one is a back-reference. When the
+                // token has *not* been changed both values are the same array — which is the whole
+                // point of `..._original_value_matches_does_not_throw` — so one of the two is a
+                // `Ref`. The two payloads are decoded independently and `SerializedValues` is
+                // decoded first, so the definition has to be there. Mapping the original first put
+                // it in `SerializedOriginalValues` and the current values arrived holding a
+                // reference to a value nobody had materialized yet: "Dangling wire reference 1".
+                (originals ??= []).Add(new DynamicPropertyValue
+                {
+                    Name = property.Name,
+                    Value = mapper.ToDynamicValue(
+                        Expressions.PrimitiveCoercion.ToWireValue(property, entry.GetOriginalValue(property)),
+                        Expressions.PrimitiveCoercion.WireType(property)),
+                });
+            }
         }
 
         // Complex properties are not in `GetProperties()`. Without this a saved entity arrived

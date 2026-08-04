@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 21285, Passed: 20946, Failed: 137, Skipped: 202`** (2026-08-04) across the
+**`Total tests: 21285, Passed: 20950, Failed: 133, Skipped: 202`** (2026-08-04) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
