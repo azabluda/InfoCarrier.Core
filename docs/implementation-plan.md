@@ -2850,6 +2850,34 @@ failures are left red and classified rather than worked immediately.
       target. That is A52's rule, applied one level higher — to the projection instead of to a
       value already in hand. A56 implements it.
 
+- [x] **A56.** The query names what it projects.
+      **`Total tests: 18420, Passed: 18217, Failed: 44, Skipped: 159`** — FIXED 4, BROKEN none.
+      **`OwnedQueryTestBase` is 192 of 194.** ✅ `<this commit>`
+
+      A55's finding, implemented. `ProjectionShape.Of(query)` reads the rebound tree on the server
+      and answers, for the row it is about to map, which entity type it is — and for a constructed
+      row, which entity type each member is. A query root is its entity type; a member access on an
+      entity type that names a navigation is that navigation's target; `Select`/`SelectMany`/`Join`
+      bind their parameters and re-shape; every other operator that keeps the element type keeps the
+      shape. The result is threaded as `declared` exactly where A52 put the navigation's target
+      entity type, so the two sources meet at one site and are consulted in the same place, last.
+
+          [EntityQueryRootExpression].OrderBy(o => o.Id).Select(p => p.PersonAddress)
+          [EntityQueryRootExpression].OrderBy(p => p.Id).Select(p => new ValueTuple`3(
+              Item1 = p.Orders, Item2 = p.PersonAddress, Item3 = p.PersonAddress.Country.Planet))
+
+      Both shapes above are what the two fixed tests ship. The first is a bare row; the second is a
+      **re-carried** projection, so the members are named `Item1…` on a `ValueTuple` whose
+      constructor parameters are `item1…` — the member map is `OrdinalIgnoreCase` for that reason,
+      which is also how `RehydrateObject` reads them back.
+
+      **Resolution is partial on purpose.** Anything unrecognised yields `null`, which leaves the
+      mapper exactly where it was, and a resolved answer still only applies when the value really is
+      an instance of the named type (A52's guard). So the failure mode of a wrong shape is the
+      previous behaviour, not a mislabelled row — which matters, because the alternative source
+      considered here was making the server track regardless of what the client asked, and *that*
+      fails loudly and far away (A55).
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
@@ -3579,7 +3607,7 @@ Continued from the M1 plan; the run population is unchanged (4,247).
       | 8 | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join`, `Join_with_result_selector_returning_queryable_throws_validation_error` (×2 models each) | Classified in A38/A39. The base asserts a materialization error this provider does not raise, or raises differently; the query bodies are inline in `protected static` assert helpers. |
       | 4 | `Complex_query_with_let_collection_projection_FirstOrDefault`, `Queryable_in_subquery_works_when_final_projection_is_List` (×2 models) | `Argument type 'List<string>' does not match 'IQueryable<string>'`, raised **on the server** in `InMemoryProjectionBindingExpressionVisitor.VisitNew`. `ProjectionRewriter.Materialized` is the only thing that puts a `ToList` where an `IQueryable` member is declared. **The best-understood open defect.** |
       | 4 | `GroupJoin_on_a_subquery_containing_another_GroupJoin_projecting_outer_with_client_method` (×2 models) | `NullReferenceException` where the base expects a translation failure. Undiagnosed. |
-      | 4 | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | A52's fix reaches an owned value through the **navigation** that owns it. These project one directly, where there is no navigation in hand — the same root cause down a different path. ~~The server not tracking is what makes `_findEntityType` useless here; whether it should is the open question.~~ **A55: the server tracks when asked; these are `NoTracking` by fixture, so the tracker is not a source here and never can be. The query is.** |
+      | ~~4~~ 0 | `Project_multiple_owned_navigations`, `Project_owned_reference_navigation_which_owns_additional` | **Fixed by A56.** A52's fix reaches an owned value through the navigation that owns it; these project one directly. A55 established the tracker can never help (they are `NoTracking` by fixture) and A56 read the entity type off the query instead. |
       | 4 | `OwnsMany_correlated_projection`, `Multiple_single_result_in_projection_containing_owned_types` | EF's own guard (*a tracking query is attempting to project an owned entity without a corresponding owner*), and a tuple-carrier lambda typed `Func<…, Anonymous>` handed to `Select<…, object>`. |
       | 4 | `ThenInclude_with_interface_navigations`, `Collection_without_setter_materialized_correctly`, `Casts_are_removed_from_expression_tree_when_redundant`, `Double_convert_interface_created_expression_tree` | A49's residual. Three of the four involve an **interface-typed navigation**. |
       | 2 | `Correlated_collection_with_distinct_3_levels` | **A wrong answer** — the only one left of that kind, with `Comparison_with_value_converted_subclass`. |

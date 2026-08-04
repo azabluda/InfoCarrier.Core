@@ -1,7 +1,8 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Collections;
 using System.Reflection;
+using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core.Expressions;
@@ -116,6 +117,26 @@ public class DynamicValueMapper : IDynamicValueMapper
         Func<object, IProperty, object?> readShadowValue,
         Func<object, ISkipNavigation, bool, IEnumerable<object>> readJoinEntities,
         Func<object, IEntityType?> findEntityType)
+        => ToRowValue(value, type, isNavigationLoaded, isTracked, readShadowValue, readJoinEntities, findEntityType, shape: null);
+
+    /// <summary>
+    ///     Maps an entity result row whose entity types the <em>query</em> named.
+    /// </summary>
+    /// <remarks>
+    ///     A row projected straight out of a navigation — <c>Select(p =&gt; p.PersonAddress)</c> —
+    ///     is an owned entity with no CLR-type name, no tracker entry to be found through, and no
+    ///     navigation in hand at this point to ask. The query is what knows; see
+    ///     <see cref="ProjectionShape" /> (A55/A56).
+    /// </remarks>
+    internal DynamicValueNode ToRowValue(
+        object? value,
+        Type type,
+        Func<object, INavigationBase, bool> isNavigationLoaded,
+        Func<object, bool> isTracked,
+        Func<object, IProperty, object?> readShadowValue,
+        Func<object, ISkipNavigation, bool, IEnumerable<object>> readJoinEntities,
+        Func<object, IEntityType?> findEntityType,
+        ProjectionShape? shape)
     {
         _isNavigationLoaded = isNavigationLoaded;
         _isTracked = isTracked;
@@ -124,7 +145,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         _findEntityType = findEntityType;
         try
         {
-            return ToDynamicValue(value, type);
+            return ToDynamicValue(value, type, shape);
         }
         finally
         {
@@ -147,12 +168,15 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     An owned entity type is no more addressable by CLR type than a shared-type one: EF
     ///     names it for the navigation that owns it (`OwnedPerson.PersonAddress#OwnedAddress`),
     ///     and four of the owned types in `OwnedQueryTestBase`'s model are the same
-    ///     <c>OwnedAddress</c>. The tracker fallback below cannot help either — on the server the
-    ///     rows of a query are not tracked. But whoever is mapping a navigation's value knows the
-    ///     navigation, and therefore knows its target entity type; that is what this carries
-    ///     (A52). Passed down through collections so a collection navigation's *items* get it.
+    ///     <c>OwnedAddress</c>. The tracker fallback below cannot help either — not because the
+    ///     server refuses to track, but because it tracks exactly what the client asked for and
+    ///     these are no-tracking queries (A55). Two callers can name it anyway: whoever maps a
+    ///     navigation's value knows the navigation and therefore its target (A52), and the query
+    ///     itself names what it projects (<see cref="ProjectionShape" />, A56). Passed down through
+    ///     collections so a collection navigation's *items* get it, and through a constructed row's
+    ///     members.
     /// </remarks>
-    internal DynamicValueNode ToDynamicValue(object? value, Type type, IEntityType? declared)
+    internal DynamicValueNode ToDynamicValue(object? value, Type type, ProjectionShape? declared)
     {
         if (value is not null && _toIds.TryGetValue(value, out int seenId))
         {
@@ -173,7 +197,7 @@ public class DynamicValueMapper : IDynamicValueMapper
         return MapToNode(value, type, id, declared);
     }
 
-    private DynamicValueNode MapToNode(object? value, Type type, int id, IEntityType? declared)
+    private DynamicValueNode MapToNode(object? value, Type type, int id, ProjectionShape? declared)
     {
         // Entity. Two modes: a query-tree constant travels as identity only (research-findings
         // §7); a result row travels with its data.
@@ -204,9 +228,9 @@ public class DynamicValueMapper : IDynamicValueMapper
         // type down for the sake of the items, and the collection itself passes through here
         // first — an unguarded `??=` made a `HashSet<Order>` an `Order`, and the entity walk read
         // `Order`'s properties off it: "Unable to cast HashSet<Order> to Order".
-        if (entityType is null && declared is not null && declared.ClrType.IsInstanceOfType(value))
+        if (entityType is null && declared?.EntityType is { } named && named.ClrType.IsInstanceOfType(value))
         {
-            entityType = declared;
+            entityType = named;
         }
 
         // A row is mapped by its runtime type, but a *navigation* is mapped by the type the
@@ -324,10 +348,10 @@ public class DynamicValueMapper : IDynamicValueMapper
             // TypeNode — but only when it is a primitive. Widening the *node* type to the
             // runtime type generally would make the mapper walk graphs the declared type used to
             // truncate (an `object` member holding a DbContext), and that stack-overflows.
-            Type declared = Nullable.GetUnderlyingType(memberType) ?? memberType;
+            Type memberDeclaredType = Nullable.GetUnderlyingType(memberType) ?? memberType;
             bool isPrimitive = IsPrimitive(memberValue);
             bool asPrimitive = isPrimitive
-                && (memberValue is null || declared == memberValue.GetType());
+                && (memberValue is null || memberDeclaredType == memberValue.GetType());
 
             properties.Add(new DynamicPropertyValue
             {
@@ -338,9 +362,15 @@ public class DynamicValueMapper : IDynamicValueMapper
                 // (ADR-008 constraint 8), so an un-normalized one fails at write time —
                 // AutoTransactionBehavior on a captured DbContext did exactly that.
                 PrimitiveValue = asPrimitive ? PrimitiveCoercion.Normalize(memberValue) : null,
+
+                // A constructed row's member is where a directly projected owned entity actually
+                // lands — `Select(p => new { p.PersonAddress, … })` — so the shape descends with it.
                 Value = asPrimitive
                     ? null
-                    : ToDynamicValue(memberValue, isPrimitive ? memberValue!.GetType() : memberType),
+                    : ToDynamicValue(
+                        memberValue,
+                        isPrimitive ? memberValue!.GetType() : memberType,
+                        declared?.Member(name)),
             });
         }
 
@@ -464,7 +494,7 @@ public class DynamicValueMapper : IDynamicValueMapper
                         : ToDynamicValue(
                             navigation.GetGetter().GetClrValue(value),
                             navigation.ClrType,
-                            navigation.TargetEntityType),
+                            ProjectionShape.For(navigation.TargetEntityType)),
                     IsLoadedNavigation = true,
                 });
             }

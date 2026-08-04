@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 EF Core 10 database provider that remotes LINQ queries and change-tracking over a wire
 protocol. Client `DbContext` has no database; the server executes against a real provider.
@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 18420, Passed: 18213, Failed: 48, Skipped: 159`** (2026-08-03) across the
+**`Total tests: 18420, Passed: 18217, Failed: 44, Skipped: 159`** (2026-08-04) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -110,13 +110,12 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 48 are classified in one table — A54 in `docs/implementation-plan.md`**, read out of
-`artifacts/measure/a53.txt`. Only **4** are wrong answers
+**All 44 are classified in one table — A54 in `docs/implementation-plan.md`**, read out of
+`artifacts/measure/`. Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`); the
-best-understood open defect is the 4 `List<string>` vs `IQueryable<string>` ones. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
-`Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec
-tests asserting a limitation this provider does not have, a deliberate allowlist refusal
-(`Regex_IsMatch`, A46), or a known singleton.
+best-understood open defect is the 4 `List<string>` vs `IQueryable<string>` ones; 4 more are
+undiagnosed exceptions; the rest are spec tests asserting a limitation this provider does not
+have, a deliberate allowlist refusal (`Regex_IsMatch`, A46), or a known singleton.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.

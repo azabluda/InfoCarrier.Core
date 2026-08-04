@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -54,8 +55,10 @@ public class ServerQueryExecutor
             // Execute against the server context.
             object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
 
-            // Map results to the wire format (entity rows vs columnar projections).
-            return MapResults(result, request.ReturnsSingleResult);
+            // Map results to the wire format (entity rows vs columnar projections). The query is
+            // read for the entity types its rows carry: an owned or shared-type value projected
+            // directly has no other name (A56).
+            return MapResults(result, request.ReturnsSingleResult, ProjectionShape.Of(query));
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
@@ -158,7 +161,7 @@ public class ServerQueryExecutor
         return queryable?.GetGenericArguments()[0] ?? queryType;
     }
 
-    private QueryDataResult MapResults(object? result, bool singleResult)
+    private QueryDataResult MapResults(object? result, bool singleResult, ProjectionShape? shape)
     {
         List<object?> rows = ToRows(result, singleResult);
 
@@ -169,7 +172,7 @@ public class ServerQueryExecutor
 
         return new QueryDataResult
         {
-            SerializedResults = SerializeResult(rows, elementType),
+            SerializedResults = SerializeResult(rows, elementType, shape),
             IsEntityResult = isEntityResult,
             ElementTypeName = elementType?.FullName,
         };
@@ -199,7 +202,7 @@ public class ServerQueryExecutor
     ///     public-property walk, and lazy-loading proxies get walked as data
     ///     (ADR-008 constraints 1 and 5).
     /// </remarks>
-    private byte[] SerializeResult(List<object?> rows, Type? elementType)
+    private byte[] SerializeResult(List<object?> rows, Type? elementType, ProjectionShape? shape)
     {
         var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
@@ -355,7 +358,8 @@ public class ServerQueryExecutor
         {
             nodes.Add(item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
-                : mapper.ToRowValue(item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType));
+                : mapper.ToRowValue(
+                    item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape));
         }
 
         return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
