@@ -1495,7 +1495,23 @@ constructor, so the backend store cannot build the server's copy.
       The seventh, `Array_of_byte`, is unrelated and left red: the server fails to translate
       `a => a == 1` over the collection, which EF's own SQLite suite does not have to override.
 
-- [ ] **B4. A primitive collection's wire form must not be the backing store's.** Follows B3a.
+- [x] **B3b. `PrimitiveCollectionsQuery` on Tier B.** **`Failed: 132, Passed: 31, Skipped: 2,
+      Total: 165`**, first run, no overrides. ✅ `<this commit>`
+
+      The shared-model half of the same corpus, and it makes B3a's finding much larger than it
+      looked: **99 of the 132 are the one `FormatException` B4 is about**, plus one
+      `DateTimeOffset` and one `Cannot get the value of a token type 'String' as a number` — the
+      decimal shape — for **101 of 132 on a single cause**. The base's entity carries a
+      `DateTime[]`, so nearly every test in it reads one back.
+
+      Of the remaining 31: **13 are `Translating this query requires the SQL APPLY operation`**,
+      which is the A79 shape — a limit of the backing store that EF's own SQLite suite overrides,
+      so they are convergence with the reference provider rather than defects, and the overrides
+      go in once B4 has cleared the noise around them. Six are `no such column: p.Int`, three are
+      unsupported LINQ, and the rest are singletons.
+
+- [ ] **B4. A primitive collection's wire form must not be the backing store's.** Follows B3a/B3b,
+      and is worth **~107** between them.
 
 ## Phase A — adopting the remaining spec bases
 
