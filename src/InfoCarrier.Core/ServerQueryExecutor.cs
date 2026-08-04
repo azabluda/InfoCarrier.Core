@@ -236,7 +236,16 @@ public class ServerQueryExecutor
                 return false;
             }
 
+            // Read through `GetGetter()`, deliberately, including for a collection — even though
+            // that getter is typed for the navigation's *target* and throws
+            // `InvalidCastException: Unable to cast HashSet<Order> to Order` on an owned
+            // collection whose declaring type is a base of the instance's (A51). Reading the
+            // backing field instead is **measured worse**: it bypasses a lazy-loading proxy, and
+            // the suite answered with 102 `Assert.False()` failures and a family of "the
+            // navigation cannot have 'IsLoaded' set to false" across the lazy bases. Whatever
+            // fixes the cast has to keep going through the model's own accessor.
             object? related = navigation.GetGetter().GetClrValue(entity);
+
             return related is not null
                 && (navigation.IsCollection || HasKey(related, navigation.TargetEntityType));
         }

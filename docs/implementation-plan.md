@@ -2736,6 +2736,39 @@ failures are left red and classified rather than worked immediately.
       (`ServerQueryExecutor.IsLoaded` → `HasKey`, whose key for an owned type is the owner's and
       is usually shadow), and it is A51's.
 
+- [x] **A51.** The owned-navigation family, diagnosed. One attempt, measured, reverted.
+      **`Total tests: 18420, Passed: 18163, Failed: 98, Skipped: 159`** — unchanged from A50.
+      ✅ `<this commit>`
+
+      Three probes, and the answer is neither of the two things A50 guessed at.
+
+      **The server sends the owned reference.** `ServerQueryExecutor.IsLoaded` answers *true* for
+      `OwnedPerson.PersonAddress`: the owner is untracked server-side, so the CLR path decides, the
+      value is a real `OwnedAddress`, and `HasKey` already tolerates the shadow key an owned type
+      has. **The client receives it**, too — a probe over `row.Properties` shows
+      `PersonAddress*` present with a value on every `OwnedPerson`, `Branch`, `LeafA` and `LeafB`
+      row.
+
+      **What is missing is a row for the owned entity itself.** The same probe, placed at the top
+      of the client's row walk, never prints `ROW OwnedAddress` — the owned node is decoded as a
+      plain object rather than materialized as an entity. It cannot be: an **owned entity type is
+      not addressable by its CLR type**, exactly as a shared-type entity is not (A45 met the same
+      rule on the include check). The wire node can carry an entity-type *name* — `RebindQueryRoot`
+      resolves query roots that way — and it is written from
+      `ServerQueryExecutor.FindEntityType`, which is `stateManager.TryGetEntry(entity)?.EntityType`.
+      **The server does not track**, so that returns null and the node carries only a CLR type the
+      client cannot resolve. The two halves of the diagnosis are the same fact seen twice.
+
+      **The attempt, and why it is reverted.** The probe turned up a second, real defect on the
+      way: `IsLoaded` reads *every* navigation through `GetGetter()`, and that getter is typed for
+      the navigation's target — so an owned collection reached from a derived type
+      (`Branch.Orders`, declared on `OwnedPerson`) throws `InvalidCastException: Unable to cast
+      HashSet<Order> to Order`. Reading the backing field instead is **measured much worse**: 98 →
+      far more, including **102 `Assert.False()` failures** and a family of *"the navigation cannot
+      have 'IsLoaded' set to false because the reference is set"* across the lazy-loading bases. A
+      backing-field read bypasses a lazy-loading proxy, which is precisely what `GetGetter()` is
+      for. Reverted; the cast still needs fixing, but through the model's own accessor.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`
