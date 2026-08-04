@@ -138,6 +138,21 @@ public class DynamicValueMapper : IDynamicValueMapper
 
     /// <inheritdoc />
     public DynamicValueNode ToDynamicValue(object? value, Type type)
+        => ToDynamicValue(value, type, declared: null);
+
+    /// <summary>
+    ///     Maps a value whose entity type the <em>caller</em> knows.
+    /// </summary>
+    /// <remarks>
+    ///     An owned entity type is no more addressable by CLR type than a shared-type one: EF
+    ///     names it for the navigation that owns it (`OwnedPerson.PersonAddress#OwnedAddress`),
+    ///     and four of the owned types in `OwnedQueryTestBase`'s model are the same
+    ///     <c>OwnedAddress</c>. The tracker fallback below cannot help either — on the server the
+    ///     rows of a query are not tracked. But whoever is mapping a navigation's value knows the
+    ///     navigation, and therefore knows its target entity type; that is what this carries
+    ///     (A52). Passed down through collections so a collection navigation's *items* get it.
+    /// </remarks>
+    internal DynamicValueNode ToDynamicValue(object? value, Type type, IEntityType? declared)
     {
         if (value is not null && _toIds.TryGetValue(value, out int seenId))
         {
@@ -155,10 +170,10 @@ public class DynamicValueMapper : IDynamicValueMapper
             _toIds[value] = id;
         }
 
-        return MapToNode(value, type, id);
+        return MapToNode(value, type, id, declared);
     }
 
-    private DynamicValueNode MapToNode(object? value, Type type, int id)
+    private DynamicValueNode MapToNode(object? value, Type type, int id, IEntityType? declared)
     {
         // Entity. Two modes: a query-tree constant travels as identity only (research-findings
         // §7); a result row travels with its data.
@@ -180,6 +195,19 @@ public class DynamicValueMapper : IDynamicValueMapper
         entityType ??= value is not null && _findEntityType is not null
             ? _findEntityType(value)
             : null;
+
+        // Last: what the caller said this is. An owned entity type has no CLR-type name and no
+        // tracker entry to be found through, so the navigation that owns it is the only thing
+        // that can name it.
+        //
+        // Only when the value really is one. A *collection* navigation hands its target entity
+        // type down for the sake of the items, and the collection itself passes through here
+        // first — an unguarded `??=` made a `HashSet<Order>` an `Order`, and the entity walk read
+        // `Order`'s properties off it: "Unable to cast HashSet<Order> to Order".
+        if (entityType is null && declared is not null && declared.ClrType.IsInstanceOfType(value))
+        {
+            entityType = declared;
+        }
 
         // A row is mapped by its runtime type, but a *navigation* is mapped by the type the
         // navigation declares — and in a TPH hierarchy those differ. `Root.OptionalSingle` is
@@ -268,7 +296,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             Type elementType = GetElementType(type);
             foreach (object? item in enumerable)
             {
-                items.Add(ToDynamicValue(item, item?.GetType() ?? elementType));
+                items.Add(ToDynamicValue(item, item?.GetType() ?? elementType, declared));
             }
 
             return new DynamicValueNode { Id = id, Type = typeNode, Items = items };
@@ -433,7 +461,10 @@ public class DynamicValueMapper : IDynamicValueMapper
                     Name = navigation.Name,
                     Value = navigation.IsShadowProperty()
                         ? null
-                        : ToDynamicValue(navigation.GetGetter().GetClrValue(value), navigation.ClrType),
+                        : ToDynamicValue(
+                            navigation.GetGetter().GetClrValue(value),
+                            navigation.ClrType,
+                            navigation.TargetEntityType),
                     IsLoadedNavigation = true,
                 });
             }

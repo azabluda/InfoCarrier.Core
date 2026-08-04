@@ -2769,6 +2769,32 @@ failures are left red and classified rather than worked immediately.
       backing-field read bypasses a lazy-loading proxy, which is precisely what `GetGetter()` is
       for. Reverted; the cast still needs fixing, but through the model's own accessor.
 
+- [x] **A52.** A navigation names the entity type its value is.
+      **`Total tests: 18420, Passed: 18209, Failed: 52, Skipped: 159`** — FIXED 46, BROKEN none.
+      **`OwnedQueryTestBase` is 190 of 194**, from 144. ✅ `<this commit>`
+
+      A51's diagnosis, implemented. `DynamicValueMapper.MapToNode` resolves an entity type two
+      ways, and neither can see an owned one: `FindRuntimeEntityType(clrType)` because EF names an
+      owned type for the navigation that owns it (`OwnedPerson.PersonAddress#OwnedAddress`, and
+      four of this model's owned types are the same `OwnedAddress`), and `_findEntityType` because
+      that reads the change tracker and the server does not track a query's rows. So the owned
+      value was decoded as a plain object and the navigation arrived null.
+
+      Whoever maps a navigation's value *does* know the navigation, and therefore its target entity
+      type. `ToDynamicValue` gained an internal overload carrying it, threaded through collections
+      so a collection navigation's **items** get it, and consulted last — after the CLR type and
+      after the tracker, so nothing that could already name itself is overridden.
+
+      **The guard is the whole of the second attempt.** Applied unconditionally, the target entity
+      type also landed on the *collection object* a collection navigation hands down first: a
+      `HashSet<Order>` became an `Order`, the entity walk read `Order`'s properties off it, and
+      `OwnedQuery` went 50 red to **78**. It applies only when `declared.ClrType.IsInstanceOfType(value)`.
+
+      **Left red: 4 of 194**, and they are four different things —
+      `Union_over_owned_collection`, `Skip_Take_over_owned_collection`,
+      `Preserve_includes_when_applying_skip_take_after_anonymous_type_select` and
+      `A tracking query is attempting to project an owned entity without a corresponding owner`.
+
 - [x] **S3c-18.** A shared SQLite store is initialized once per *process*, not once per live
       store. **`Total tests: 11024, Passed: 10310, Failed: 685, Skipped: 29`**, three consecutive
       identical runs. ✅ `<this commit>`

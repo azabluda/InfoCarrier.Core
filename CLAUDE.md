@@ -100,7 +100,7 @@ material only.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 18420, Passed: 18163, Failed: 98, Skipped: 159`** (2026-08-03) across the
+**`Total tests: 18420, Passed: 18209, Failed: 52, Skipped: 159`** (2026-08-03) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -110,10 +110,9 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `OptimisticConcurrencyTestBase` on Tier B. `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
-**All 98 are classified**, read out of `artifacts/measure/a51b.txt`: **68** are the five bases A50
-adopted — 50 of them one symptom, **diagnosed in A51**: an owned entity type is not addressable by
-its CLR type, and the server does not track, so the wire node cannot name it and the client decodes
-it as a plain object. 26 are A48's table in `docs/implementation-plan.md`, and 4 are A49's. Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
+**All 52 are classified**, read out of `artifacts/measure/a52.txt`: 26 are A48's table in
+`docs/implementation-plan.md`, 4 are A49's, and the rest are the five bases A50 adopted — down from
+68 after A52 closed the owned-navigation family (46 tests). Only **4** are wrong answers (`Correlated_collection_with_distinct_3_levels`,
 `Comparison_with_value_converted_subclass`); 4 more are undiagnosed exceptions; the rest are spec
 tests asserting a limitation this provider does not have, a deliberate allowlist refusal
 (`Regex_IsMatch`, A46), or a known singleton.
