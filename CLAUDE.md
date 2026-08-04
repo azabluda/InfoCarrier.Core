@@ -128,7 +128,9 @@ Not yet implemented, in rough priority order:
   the value dictionary an entity is built from — `CreateEntry` and `ShadowValuesFactory` are
   name-keyed and complex leaves collide (`Culture.Species` and `Milk.Species` are both
   `"Species"`) — so both sides set it through its CLR member instead. The
-  `Query.Associations.ComplexProperties` family is now adoptable and is not adopted.
+  `Query.Associations.ComplexProperties` family is **not** adoptable on Tier A (A77): EF's InMemory
+  provider does not translate a complex property access at all, which is why EF ships no InMemory
+  complex-type query test. Complex-type *queries* need Tier B.
 - **The query residual** — 2, and **neither is a gap**. A40 closed
   `SelectMany_correlated_subquery_hard`, the correlated subquery under a client-side projection
   that **milestone M2-B existed for**, and A43 closed `Select_GroupBy_SelectMany`. The 2 left are
