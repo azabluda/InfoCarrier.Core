@@ -1870,6 +1870,34 @@ constructor, so the backend store cannot build the server's copy.
       - Accept that the two models key these types differently, and leave the 38 red — which also
         means owned JSON collections stay unusable under tracking.
 
+- [x] **B13. The rest of the 179, classified.** No code change; read out of `artifacts/measure/b12`.
+      ✅ `<this commit>`
+
+      | # | Where | Reading |
+      |---|---|---|
+      | 38 | `JsonQuery` | **B12** — the owned-collection key. One defect, awaiting a decision. |
+      | 8 | `JsonQuery` | *"a tracking query is attempting to project an owned entity without a corresponding owner"* — EF's own refusal, and 6 of the 8 are the three `Project_json_*_in_tracking_query_fails` tests, which **want** it. Check the exception type before treating these as failures. |
+      | 26 | `JsonTypes` | **26 of the 28 are spatial** and need the SpatiaLite package (roadmap); the other 2 are A64's locale, not a failure of anything. Nothing here is ours. |
+      | 26 | `MaterializationInterception` | Unchanged: 16 a real gap (the client builds rows from the wire, so `IMaterializationInterceptor` never runs — A68's query-side twin is the template), 10 blocked by A71. |
+      | 6 | `PrimitiveCollectionsQuery` | `SQLite Error 1: 'no such column: p.Int'` — the server's SQL correlates a column that is not in scope. One cause, six tests, undiagnosed. |
+      | 4 | `PrimitiveCollectionsQuery` | **`EF.Constant`.** The server's funcletizer evaluates the `EF.Constant(…)` call itself and the method body throws *"may only be used within Entity Framework LINQ queries"*. EF handles it in `ExpressionTreeFuncletizer.VisitMethodCall`, forcing the argument to parameterize; the likely difference is ADR-006's substitution of captured variables as **plain constants**, which changes the argument's evaluatability state before the server ever sees it. Worth a probe: it is the first place that substitution has been shown to matter. |
+      | 6 | `PrimitiveCollectionsQuery` | Untranslatable LINQ and one `Values differ` — singletons. |
+      | 8 | `ComplexNavigations` ×2 | A28 shape, closed by B8. |
+      | 8 | `BadDataJsonDeserialization` | Spatial GeoJson. |
+      | ~49 | the rest | The A54/A59/A61–A65 tables and the known singletons. |
+
+- [ ] **B3d. `AdHocJsonQuery` is not the seven-seed job it was filed as.** Re-examined, not started.
+      The plan assumed the work was `AdHocJsonQuerySqliteTest`'s ~200 lines of seed SQL rerouted
+      through `((InfoCarrierTestStore)TestStore).Backend`, which is right as far as it goes. What it
+      missed is that **the core base's `OnModelCreating*` methods do not map anything to JSON** —
+      every `ToJson()` in this corpus lives in `AdHocJsonQueryRelationalTestBase`, which this
+      project does not reference. Mirroring it by hand is ~630 lines of model configuration on top
+      of the seeds, and without it the raw-SQL seeds do not match the schema they insert into.
+
+      That is still only transcription, but the payoff is now gated: the corpus is owned JSON
+      collections throughout, so most of what it would add lands on **B12**. Worth doing after B12
+      is decided, and hard to justify before.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

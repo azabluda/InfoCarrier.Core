@@ -181,7 +181,16 @@ Not yet implemented, in rough priority order:
   `Scaffolding.CompiledModel`, and `ComplianceTestBase` itself), and two spatial, which need the
   SpatiaLite package. **`SeedingTestBase` is blocked** by A65 — its `SeedingContext` takes a
   `string testId` and has no `DbContextOptions` constructor, so the backend cannot build the
-  server's copy. That leaves **exactly one adoptable base: `AdHocJsonQuery`** (plan item B3d).
+  server's copy. That leaves **exactly one adoptable base: `AdHocJsonQuery`** (plan item B3d) —
+  and B3d re-priced it: the seeds are ~200 lines, but the `ToJson()` mapping the whole corpus
+  needs lives in `AdHocJsonQueryRelationalTestBase`, another ~630 lines to mirror, and what it
+  would add lands on B12. It is worth doing **after** B12 is decided.
+- **JSON-mapped owned collections need a decision (B12).** The server keys an element by its
+  ordinal in the array; the client keys it by the CLR `Id`, which the document does not carry and
+  which is `0` for every element — so EF's fixup gives every element to every owner. Both sides
+  run the same `OnModelCreating`; only the *convention* that rewrites such a key is relational.
+  38 failures, and no client-side route that does not either invent the ordinal or overwrite a
+  property a query can project.
 - **`Query.Associations.*` + `BulkUpdates.*` is 32 of the 41.** The standing note said they have
   no InMemory counterpart and were therefore out of scope; after A79 that is a **Tier B** question,
   not an out-of-scope one, so re-examine the premise before asking. Either way it is a roadmap
