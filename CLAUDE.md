@@ -132,10 +132,11 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
-the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B12 for what the
-Tier B adoptions added** — read out of `artifacts/measure/`, currently `b14`. The largest blocks
+the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B16 for what the
+Tier B adoptions added** — read out of `artifacts/measure/`, currently `b15c`. The largest blocks
 are **46 `JsonQuery`** (38 of them B12, a decision), **28 `JsonTypes`**, **26
-`MaterializationInterception`** (16 a real gap, 10 blocked by A71) and **10
+`MaterializationInterception`** (12 are B16, a decision; 4 the same question about binding
+interceptors; 10 blocked by A71) and **10
 `PrimitiveCollectionsQuery`**. Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`) and
 **6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
@@ -185,6 +186,11 @@ Not yet implemented, in rough priority order:
   and B3d re-priced it: the seeds are ~200 lines, but the `ToJson()` mapping the whole corpus
   needs lives in `AdHocJsonQueryRelationalTestBase`, another ~630 lines to mirror, and what it
   would add lands on B12. It is worth doing **after** B12 is decided.
+- **A user's `IMaterializationInterceptor` needs a decision (B16).** The server materializes too —
+  from the SaveChanges replay and from EF's own shaper — so an interceptor registered on both sides
+  is handed the *server's* context and `Assert.Same` fails. Removing it from the server fixes those
+  12 and breaks 246 elsewhere: `PropertyValuesFixtureBase` uses one to set `CreatedCalled` and its
+  seed, which runs server-side, asserts it. Whose hook is it?
 - **JSON-mapped owned collections need a decision (B12).** The server keys an element by its
   ordinal in the array; the client keys it by the CLR `Id`, which the document does not carry and
   which is `0` for every element — so EF's fixup gives every element to every owner. Both sides

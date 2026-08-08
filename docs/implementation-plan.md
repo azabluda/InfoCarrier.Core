@@ -1930,6 +1930,57 @@ constructor, so the backend store cannot build the server's copy.
       real fix is to stop substituting and ship the parameter *values* instead, which is a change to
       the wire, not to a visitor.
 
+- [x] **B15. The client's materializer now names the tracking behaviour it is materializing for.**
+      **`Total tests: 21351, Passed: 20972, Failed: 171, Skipped: 208`** — 171 → 171, **FIXED none,
+      BROKEN none, reasons byte-identical.** ✅ `<this commit>`
+
+      Kept anyway, on B5's precedent and with better evidence than B5 had. `MaterializerFor` compiled
+      a behaviour-specific materializer only for
+      `NoTrackingWithIdentityResolution` and used EF's cached one everywhere else, "so nothing else
+      pays for it". Both halves of that were wrong: the compiled delegate is cached here too, so
+      nothing pays anything, and the cached materializer bakes in
+      `QueryTrackingBehavior = null` — *"not from a query"* — which is also what
+      `MaterializationInterceptionData.QueryTrackingBehavior` reports to a user interceptor. Every
+      row this class builds came from a query, so the behaviour is never genuinely unknown.
+
+      **It was observed, not assumed.** Twelve `Assert.Equal() Failure: Expected TrackAll, Actual
+      null` appeared the moment a taller failure in front of them was removed, out of EF's own
+      `ValidatingMaterializationInterceptor` — the value reaching user code, read back. They are red
+      again now for the reason below, which is why this step measures neutral.
+
+- [ ] **B16. A user's `IMaterializationInterceptor` sees the server's context too, and both fixtures
+      that care want opposite things.** Diagnosed, **not fixed — it is a decision.** Worth 12 in
+      `MaterializationInterception`; 4 more there are the same question about
+      `IInstantiationBindingInterceptor`, and the remaining 10 are A71.
+
+      `MaterializationInterceptionTestBase`'s interceptor asserts that the context it is handed is
+      the one it was registered on. It is handed the **server's**, because the server materializes:
+      first from `ServerSaveChangesExecutor.Materialize`, and — once that is fixed — from EF's own
+      shaper inside `InMemoryShapedQueryCompilingExpressionVisitor.QueryingEnumerable`. Twelve
+      `Assert.Same` failures, both sides printing the same type name.
+
+      Three things were tried and all three are recorded here rather than in the code:
+
+      - **Filtering every `ISingletonInterceptor` out of the server's services.** Fixes the twelve,
+        and costs **1629**: `AddEntityFrameworkProxies` registers `ProxyBindingInterceptor` as one,
+        and without it the proxy *conventions* still run, so the server's model binds a `LazyLoader`
+        member the plain CLR type does not have.
+      - **Filtering only `IMaterializationInterceptor`.** Fixes the twelve and costs **246**:
+        `PropertyValuesFixtureBase` uses a materialization interceptor to set `CreatedCalled` and
+        friends, and its seed — which runs on the server, as every seed here does — asserts them.
+        *"The given key 'CreatedCalled' was not present in the dictionary."* That fixture wants the
+        interceptor server-side as much as the other wants it client-only.
+      - **Suppressing interception in `ServerSaveChangesExecutor.Materialize` alone**, by building
+        EF's materializer source with the materialization interceptors removed and the binding ones
+        kept. Defensible on its own — reconstructing the client's entity is not a materialization,
+        and EF raises no event for `new Blog { … }` + `Attach` — but it **pays nothing**, because
+        the server's *query* path materializes through EF's compiled shaper, which has no such lever.
+        Reverted.
+
+      So the question is not "where should this provider raise the event" but **whose hook is it**:
+      the client's, the server's, or both. Every route above answers it, and two of the three
+      answers are contradicted by an existing fixture.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
