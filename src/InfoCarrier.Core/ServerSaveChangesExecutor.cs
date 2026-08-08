@@ -245,6 +245,23 @@ public class ServerSaveChangesExecutor
         {
             EntityState state = Enum.Parse<EntityState>(replay.Change.State);
 
+            // What nobody set has to arrive unset, and the value alone cannot say so — see
+            // `ChangeEntry.SentinelProperties`. Materialization has just written the property's
+            // *read* value into its member (`false` for an unset `bool?` field), which is a real
+            // value as far as EF is concerned; putting the server's own sentinel back is what
+            // leaves the column out of the `INSERT` so the store's default applies.
+            //
+            // Through the backing field first, because that is where the distinction lives: the
+            // sentinel of a `bool` property read through a `bool?` field is `null`, and `null`
+            // cannot be written through the `bool` setter at all.
+            foreach (string name in replay.Change.SentinelProperties ?? [])
+            {
+                if (replay.EntityType.FindProperty(name) is { } sentinelProperty)
+                {
+                    SetSentinel(replay, sentinelProperty);
+                }
+            }
+
             // Redirect borrowed placeholders *before* tracking, while the key is still an
             // ordinary field on a detached object.
             foreach ((IProperty property, object clientValue) in replay.References)
@@ -507,6 +524,34 @@ public class ServerSaveChangesExecutor
             // keeps a redirected reference from being overwritten by the value it replaced.
             shadow.RemoveAll(s => s.Property == property);
             shadow.Add((property, value));
+        }
+    }
+
+    /// <summary>
+    ///     Puts a property the client never set back to this model's sentinel.
+    /// </summary>
+    /// <remarks>
+    ///     The mirror of <see cref="SetOnEntity" /> and deliberately not the same order: that one
+    ///     writes a <em>value</em> and prefers the CLR property, this one writes the <em>absence</em>
+    ///     of one and prefers the backing field, which is the only member that can hold it. A
+    ///     property with neither — a shadow property, or a shared-type entity's indexer — keeps its
+    ///     sentinel in the entry, which is where its values live anyway.
+    /// </remarks>
+    private static void SetSentinel(Replay replay, IProperty property)
+    {
+        if (property.FieldInfo is { } fieldInfo)
+        {
+            fieldInfo.SetValue(replay.Entity, property.Sentinel);
+        }
+        else if (property.PropertyInfo is { CanWrite: true } propertyInfo
+                 && propertyInfo.GetIndexParameters().Length == 0)
+        {
+            propertyInfo.SetValue(replay.Entity, property.Sentinel);
+        }
+        else
+        {
+            replay.Shadow.RemoveAll(s => s.Property == property);
+            replay.Shadow.Add((property, property.Sentinel));
         }
     }
 

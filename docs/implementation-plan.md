@@ -1761,23 +1761,40 @@ constructor, so the backend store cannot build the server's copy.
       Six of the eight, not eight. The two left are a *different* defect the exception had been
       hiding, now visible as `Assert.True() Failure` and `System.Exception : Bang!` — see B9.
 
-- [ ] **B9. "No value was set" does not survive the wire.** Uncovered by B6. EF distinguishes a
+- [x] **B9. "No value was set" does not survive the wire.**
+      **`Total tests: 21351, Passed: 20820, Failed: 323, Skipped: 208`** — 325 → 323, **FIXED 2,
+      BROKEN none**. ✅ `<this commit>`
+
+      Uncovered by B6, which removed the exception that had been hiding it. EF distinguishes a
       property a user set to `0` from one nobody set at all, and it does *not* do so by the value:
       it compares against `IProperty.Sentinel` — the default of the CLR **member** EF reads the
-      property through. That is why `WithNullableBackingFields` backs a `bool` property with a
-      `bool?` field: the field's `null` is the sentinel, and `HasExplicitValue` is what tells the
-      store to leave the column out of the `INSERT` so its default applies.
+      property through. That is why the spec's `WithNullableBackingFields` backs a `bool` property
+      with a `bool?` field. The field's `null` is the sentinel, `HasExplicitValue` is false, and
+      that is what leaves the column out of the `INSERT` so the store's default applies.
 
-      The wire carries values, not that distinction. `entry.GetCurrentValue` reads the field into
-      the property's CLR type, so an unset `bool?` field arrives as `false`; the server writes it
-      back through `PropertyInfo.SetValue`, the field becomes a real `false`, `HasExplicitValue` is
-      now true, and the `INSERT` states the value the test expected the default to supply.
+      The wire carries values, and that distinction is not one. `GetCurrentValue` reads the field
+      into the property's CLR type, so an unset `bool?` arrives as `false`; the server materializes
+      it into a real `false`, `HasExplicitValue` is now true, and the `INSERT` states the value the
+      default was supposed to supply. `Nullable_fields_get_defaults_when_not_set` read the row back
+      as `false`, and `Object_fields_get_defaults_when_not_set` — whose getter throws `Bang!` when
+      the field is unset — proved it from the other side, on the client, by never being told
+      anything.
 
-      `HasExplicitValue` is change-tracker state, not something the values imply — exactly the
-      argument `ChangeEntry.ModifiedProperties` and `TemporaryProperties` already make. So the
-      client names them and the server puts each one back to *its own* `property.Sentinel`, through
-      the backing field where there is one, because `null` cannot be written through a `bool`
-      setter.
+      So the client names them, as it already names `ModifiedProperties` and `TemporaryProperties`
+      for the same reason, and the server puts each one back to **its own** `property.Sentinel`
+      through the backing field — the only member that can hold a `null` sentinel for a `bool`.
+
+      **The interesting half is which properties it does *not* name**, and the first attempt got it
+      wrong: naming every property with no explicit value broke
+      `Properties_get_set_values_when_not_set_to_sentinel_values`. The sentinel is computed twice
+      like everything else the two models each derive, and it *diverges* —
+      `HasDefaultValue(true)` makes a `bool`'s sentinel `true` on the server and leaves it `false`
+      here. `TrueDefault = false` reads as unset on the client and as deliberate on the server, and
+      the server is right: it holds both the value and its own sentinel, and comparing them is
+      exactly what EF does. The client therefore speaks only where the *value* cannot: when the
+      current value is not equal to the sentinel it stands for, so the server has no way to
+      reconstruct it. B4's rule, again — derive what you can from what both sides can see, and send
+      only what neither side can compute alone.
 
 ## Phase A — adopting the remaining spec bases
 

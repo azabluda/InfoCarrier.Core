@@ -70,6 +70,30 @@ public sealed record ChangeEntry
     ///     <see langword="null" />.
     /// </remarks>
     public IReadOnlyList<string>? ModifiedProperties { get; init; }
+
+    /// <summary>
+    ///     Names of the properties nobody set — the ones whose value is EF's <em>sentinel</em>, so
+    ///     the store supplies its own.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         "Nobody set this" is not a value and cannot be read off one. EF decides it by
+    ///         comparing against <c>IProperty.Sentinel</c>, which is the default of the CLR
+    ///         <em>member</em> the property is read through — which is why the spec's
+    ///         <c>WithNullableBackingFields</c> backs a <c>bool</c> property with a <c>bool?</c>
+    ///         field. The field's <see langword="null" /> is the sentinel; the property still reads
+    ///         <c>false</c>. So the value on the wire is <c>false</c> either way, and only the flag
+    ///         distinguishes the two.
+    ///     </para>
+    ///     <para>
+    ///         Change-tracker state that does not follow from the values, exactly like
+    ///         <see cref="ModifiedProperties" /> and <see cref="TemporaryProperties" />, and named
+    ///         for the same reason. Without it the server rebuilt the entity by writing every value
+    ///         through its CLR member, the sentinel became a real <c>false</c>, and the
+    ///         <c>INSERT</c> stated the value the column default was supposed to supply.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyList<string>? SentinelProperties { get; init; }
 }
 
 

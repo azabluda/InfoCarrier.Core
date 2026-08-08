@@ -58,11 +58,32 @@ public static class ChangeEntryMapper
         // built.
         List<string>? modified = entry.EntityState == EntityState.Modified ? [] : null;
 
+        // Which properties nobody set, but *only where the value cannot say so itself*.
+        //
+        // The sentinel is computed twice, like everything else the two models each derive — and it
+        // diverges, because `HasDefaultValue(true)` makes a `bool`'s sentinel `true` on the server
+        // and leaves it `false` here. Naming every unset property would therefore hand the server
+        // *this* model's answer to a question its own model answers better: it holds the value and
+        // its own sentinel, and comparing them is exactly what EF does. `TrueDefault = false` reads
+        // as unset here and as deliberate there, and there is right.
+        //
+        // What the server cannot recover is a sentinel the wire could not carry. EF reads a `bool`
+        // property through a `bool?` field, so an unset one arrives as `false` — indistinguishable
+        // from a real `false`, and no longer equal to the sentinel it was. That is the case this
+        // names, and the equality test below is what limits it to that case.
+        List<string>? sentinel = null;
+
         foreach (IProperty property in entityType.GetProperties())
         {
             if (modified is not null && entry.IsModified(property))
             {
                 modified.Add(property.Name);
+            }
+
+            if (!entry.HasExplicitValue(property)
+                && !Equals(property.Sentinel, entry.GetCurrentValue(property)))
+            {
+                (sentinel ??= []).Add(property.Name);
             }
 
             if (entry.HasTemporaryValue(property))
@@ -141,6 +162,7 @@ public static class ChangeEntryMapper
             SerializedOriginalValues = originals is null ? null : Serialize(entityType, originals, mapper),
             TemporaryProperties = temporary,
             ModifiedProperties = modified,
+            SentinelProperties = sentinel,
         };
     }
 
