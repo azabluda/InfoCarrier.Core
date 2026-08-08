@@ -1820,6 +1820,26 @@ constructor, so the backend store cannot build the server's copy.
       82 of the 323, from four lines. `JsonQuery` 128 → 46, and the whole `NullReferenceException`
       block — 51 across the suite — is down to 3.
 
+- [x] **B11. A no-tracking result carried no complex values.**
+      **`Total tests: 21351, Passed: 20964, Failed: 179, Skipped: 208`** — 241 → 179, **FIXED 62,
+      BROKEN none**. ✅ `<this commit>`
+
+      A79's undiagnosed `ComplexTypeQuery` residual, all 62 of it, and one line. The failures read
+      `Assert.Equal(expected is null, actual is null)` — Expected `False`, Actual `True` — from
+      inside EF's `AssertAddress`: `Customer.ShippingAddress` was null on the client.
+
+      A probe on the server said it was not null there (`CX Customer . ShippingAddress clr=set`),
+      and a second probe on the client said `ApplyComplexValues` never ran. It is called from both
+      branches of the *tracked* path and from neither of the untracked one:
+      `MaterializeUntracked` handled scalars and navigations, and a complex value is neither. Every
+      complex member of every no-tracking result was therefore dropped — and `ComplexTypeQuery`'s
+      fixture is no-tracking throughout, which is why the whole class failed the same way and why
+      `ComplexTypesTracking`, which tracks, has been at 249 of 251 for months.
+
+      **The class is now 150 of 151** — the one skip is EF's. Nothing outside it moved, which is
+      the expected shape: the tracked path already did this, so no tracked test could have been
+      relying on the omission.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

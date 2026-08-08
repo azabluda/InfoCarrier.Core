@@ -458,6 +458,13 @@ public class ClientResultMaterializer
             }
         }
 
+        // A complex value is not a scalar and not a navigation, so neither of the two loops above
+        // it is the one that carries it — the tracked path calls this and this path did not, which
+        // simply dropped every complex member of every no-tracking result. `ComplexTypeQuery`'s
+        // fixture is no-tracking throughout, and 62 of its assertions were reading a `null`
+        // `Customer.ShippingAddress` the server had sent in full (B11).
+        ApplyComplexValues(row, instance, entityType, mapper);
+
         PopulateNavigations(row, instance, entityType, entry: null, mapper);
         return instance;
     }
