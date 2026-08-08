@@ -220,9 +220,25 @@ public class ServerQueryExecutor
         // separates the two: an entity materialized from the store always has one, and the
         // placeholder never does. A collection needs no such check; EF only ever assigns one
         // when it populates it, empty included.
+        // An owned dependent is the one thing the tracker can be wrong about, and only in one
+        // direction. "Loaded" is a flag EF sets when something *does the loading*, and nothing
+        // loads an owned collection stored inside its owner's row: EF's JSON materializer builds
+        // `JsonOwnedRoot.OwnedCollectionBranch` straight out of the document and never flags it, so
+        // a tracked entry reports `IsLoaded: false` for a collection it is holding two elements of.
+        // Every JSON-mapped owned collection was therefore dropped from the wire and arrived null,
+        // which is what 48 of `JsonQuery`'s failures were (B10).
+        //
+        // Owned *references* were flagged and did travel, which is why only half of each document
+        // was missing — and why the answer is not to distrust the tracker generally, but to fall
+        // through to the value for the case where "loaded" was never a question. An owned
+        // dependent cannot be loaded later: it came with the row or it does not exist.
+        static bool IsOwnership(INavigationBase navigation)
+            => navigation is INavigation { ForeignKey.IsOwnership: true };
+
         bool IsLoaded(object entity, INavigationBase navigation)
         {
-            if (stateManager.TryGetEntry(entity) is { } entry)
+            if (stateManager.TryGetEntry(entity) is { } entry
+                && (entry.IsLoaded(navigation) || !IsOwnership(navigation)))
             {
                 return entry.IsLoaded(navigation);
             }

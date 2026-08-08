@@ -1796,6 +1796,30 @@ constructor, so the backend store cannot build the server's copy.
       reconstruct it. B4's rule, again — derive what you can from what both sides can see, and send
       only what neither side can compute alone.
 
+- [x] **B10. A JSON-mapped owned collection never left the server.**
+      **`Total tests: 21351, Passed: 20902, Failed: 241, Skipped: 208`** — 323 → 241, **FIXED 82,
+      BROKEN none**. ✅ `<this commit>`
+
+      B3c's 128 `JsonQuery` failures were 72 `Values differ` and 48 `NullReferenceException`, and
+      the NRE said where to look: it was thrown from EF's own `AssertOwnedBranch`, dereferencing an
+      `actual` that was null. `JsonOwnedRoot.OwnedCollectionBranch` arrived empty.
+
+      A navigation travels only if EF says it is *loaded*, and for a tracked entity the change
+      tracker answers. **"Loaded" is a flag something sets when it does the loading, and nothing
+      loads a collection that is already inside its owner's row.** EF's JSON materializer builds
+      `OwnedCollectionBranch` straight out of the document and never flags it, so a tracked entry
+      reports `IsLoaded: false` for a collection it is holding two elements of. A probe on the
+      server's mapper said so exactly: `OwnedCollectionBranch loaded=False clr=count 2`.
+
+      Owned *references* were flagged and did travel — which is why every document arrived half
+      built rather than empty, and why the answer is not to distrust the tracker in general. An
+      owned dependent is the one thing whose loadedness is not a question: it came with the row or
+      it does not exist. So an ownership navigation the tracker calls unloaded falls through to the
+      same value test an untracked entity already used, and everything else is unchanged.
+
+      82 of the 323, from four lines. `JsonQuery` 128 → 46, and the whole `NullReferenceException`
+      block — 51 across the suite — is down to 3.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
