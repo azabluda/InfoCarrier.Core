@@ -2026,6 +2026,32 @@ constructor, so the backend store cannot build the server's copy.
       wanted `Func<row, object>`, and `Expression.Call` rejected it before the query reached the wire
       at all. Built with the explicit delegate type now — which is how the tree arrived.
 
+- [ ] **B19. A `ThenInclude` chain does not ship, and only its first segment is re-derived.**
+      Diagnosed, not fixed. `AdHocNavigationsQuery.ThenInclude_with_interface_navigations`, and
+      `AdHocAdvancedMappingsQuery.Double_convert_interface_created_expression_tree` is very likely
+      the same shape — both are interface-typed navigations and both fail by dereferencing something
+      that arrived null.
+
+      A probe dumping the server's rebound tree says it exactly. For
+
+          Parents.Include(p => p.ChildCollection).ThenInclude(c => c.SelfReferenceCollection)
+
+      the server receives
+
+          [EntityQueryRootExpression].Include("ChildCollection")
+
+      — the **string** overload with one segment, which is not the user's `Include` at all but the
+      one `AugmentWithNavigations` synthesizes for a navigation the *residual* reads. So the whole
+      `Include`/`ThenInclude` chain was judged unshippable, went to the client, and the splitter then
+      recovered only the top-level read. `SelfReferenceCollection` arrives null and the test
+      dereferences it.
+
+      The next question is which of the two rules rejected it — `ServerBoundaryAnalyzer`'s
+      serializable-kind check or `TypeAllowlist`. The suspicion is the allowlist: `ThenInclude`'s
+      lambda is typed by the *interface* (`ICollection<IChild>`), and an interface is not an entity
+      CLR type. `InvalidIncludeFinder.IsEntity` already had to learn that lesson — its comment names
+      this very test — so the same fix may simply be missing one level down.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
