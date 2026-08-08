@@ -1,10 +1,12 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
+using Xunit.Sdk;
 
 namespace InfoCarrier.Core.FunctionalTests.Query;
 
@@ -84,6 +86,44 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     /// <inheritdoc cref="Column_collection_SelectMany" />
     public override async Task Project_multiple_collections()
         => await AssertApplyNotSupported(() => base.Project_multiple_collections());
+
+    /// <summary>
+    ///     Four more of EF's own, from the same class, for a different SQLite limitation.
+    /// </summary>
+    /// <remarks>
+    ///     Indexing an inline collection by a column puts that column in the correlated subquery's
+    ///     <c>OFFSET</c>, which SQLite refuses — <c>no such column: "p"."Int"</c>. EF asserts the
+    ///     raw <see cref="SqliteException" /> here rather than overriding the query, and so do we:
+    ///     the exception is the engine's, raised at the same place for the same reason, which is
+    ///     what makes it convergence rather than a borrowed excuse.
+    ///     <para>
+    ///         Note what is <em>not</em> taken. EF overrides the two
+    ///         <c>Parameter_collection_index_Column_*</c> tests too, but by calling
+    ///         <c>base</c> — they pass there, because a parameter reaches SQL as a JSON string and
+    ///         is indexed with <c>-&gt;&gt;</c> rather than through a subquery. They fail here for a
+    ///         reason of ours (B14), so they stay red.
+    ///     </para>
+    /// </remarks>
+    public override async Task Inline_collection_index_Column()
+        => await Assert.ThrowsAsync<SqliteException>(() => base.Inline_collection_index_Column());
+
+    /// <inheritdoc cref="Inline_collection_index_Column" />
+    public override async Task Inline_collection_value_index_Column()
+        => await Assert.ThrowsAsync<SqliteException>(() => base.Inline_collection_value_index_Column());
+
+    /// <inheritdoc cref="Inline_collection_index_Column" />
+    public override async Task Inline_collection_List_value_index_Column()
+        => await Assert.ThrowsAsync<SqliteException>(() => base.Inline_collection_List_value_index_Column());
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own override, for EF issue #32561: concatenating a parameter collection onto a
+    ///     column collection returns the wrong rows on SQLite, and EF asserts the mismatch rather
+    ///     than the result. Ours mismatches identically — an <see cref="EqualException" /> out of
+    ///     the same assertion — so the override transfers.
+    /// </remarks>
+    public override async Task Parameter_collection_Concat_column_collection()
+        => await Assert.ThrowsAsync<EqualException>(() => base.Parameter_collection_Concat_column_collection());
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

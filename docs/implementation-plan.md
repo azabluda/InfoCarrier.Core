@@ -1898,6 +1898,38 @@ constructor, so the backend store cannot build the server's copy.
       collections throughout, so most of what it would add lands on **B12**. Worth doing after B12
       is decided, and hard to justify before.
 
+- [x] **B14. `EF.Constant` and its argument's shape, plus four SQLite overrides.**
+      **`Total tests: 21351, Passed: 20972, Failed: 171, Skipped: 208`** — 179 → 171, **FIXED 8,
+      BROKEN none**. ✅ `<this commit>`
+
+      Two rules, each right on its own, meeting badly. §6 substitution spells a collection parameter
+      out as a `NewArrayExpression` rather than one constant, because that is the shape
+      `QueryRootProcessor` turns into an inline collection and a single `Constant` holding a
+      `List<T>` translates as nothing. EF's funcletizer, meanwhile, insists on *parameterizing*
+      `EF.Constant`'s argument — "even EF.Constant will be parameter here", so the query caches —
+      **except** for a `NewArrayExpression`, which it deliberately refuses to parameterize so that
+      `new[] { x, y }` can reach SQL as `IN (x, y)`. It bubbles the argument's evaluatable state up
+      instead, and the caller then evaluates the `EF.Constant` call itself, whose body throws *"may
+      only be used within Entity Framework LINQ queries"*.
+
+      A probe printed the server's rebound tree and settled it in one line —
+      `Constant(new [] {2, 999, 1000}).Contains(c.Id)`, with `isEF=True`: the method was found, the
+      branch was entered, and the *argument's shape* is what defeated it. Inside a call on `EF` the
+      collection now stays whole. Nothing downstream wants the spelled-out form there — `EF.Constant`
+      exists to say "inline this", and EF does that itself once translation reaches it. **4 tests.**
+
+      The other four are EF's own overrides adopted as convergence. Three are
+      `Assert.ThrowsAsync<SqliteException>` for indexing an inline collection by a column, which puts
+      that column in a correlated subquery's `OFFSET` and SQLite refuses; one is
+      `Assert.ThrowsAsync<EqualException>` for EF issue #32561. Each matches ours exactly in type and
+      origin. **EF overrides two more `Parameter_collection_index_Column_*` by calling `base` — they
+      pass there and fail here**, because a real parameter reaches SQL as a JSON string indexed with
+      `->>` while our substitution makes it a subquery. Those stay red: the reason is ours, not
+      SQLite's, and it is the same §6 trade the first half of this step navigated. **The remaining 6
+      in this class are worth reading together** — five of them are the substitution's shape, and the
+      real fix is to stop substituting and ship the parameter *values* instead, which is a change to
+      the wire, not to a visitor.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

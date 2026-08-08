@@ -516,11 +516,57 @@ internal sealed class QueryExecutor<TElement>
         public SubstituteParametersExpressionVisitor(QueryContext queryContext)
             => _queryContext = queryContext;
 
+        /// <summary>
+        ///     Set while inside a call to a method on <see cref="EF" />, where a collection must
+        ///     stay a single constant.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <c>EF.Constant(ids)</c> and its siblings are handled by EF's funcletizer before
+        ///         anything else looks at them, and it insists on parameterizing the argument —
+        ///         "even EF.Constant will be parameter here", so that the query caches, with the
+        ///         constantization happening later in the pipeline. A
+        ///         <see cref="NewArrayExpression" /> is the one shape that refuses: the funcletizer
+        ///         deliberately does *not* parameterize an inline array, because <c>new[] { x, y }</c>
+        ///         is meant to reach SQL as <c>IN (x, y)</c>. It bubbles the argument's evaluatable
+        ///         state up instead — and the caller then evaluates the <c>EF.Constant</c> call
+        ///         itself, whose body throws *"may only be used within Entity Framework LINQ
+        ///         queries"*.
+        ///     </para>
+        ///     <para>
+        ///         The two rules are individually right and meet badly. Inside an <see cref="EF" />
+        ///         call the collection therefore stays whole, which is the shape EF's own client
+        ///         pipeline hands it — a captured variable, parameterized — and nothing downstream
+        ///         needs the element-by-element form there: <c>EF.Constant</c> exists precisely to
+        ///         say "inline this", and EF does that itself once translation reaches it.
+        ///     </para>
+        /// </remarks>
+        private bool _insideEFCall;
+
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
                 && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
                     ? Substitute(WithoutNullEntities(value, queryParameter.Type), queryParameter.Type)
                     : base.VisitExtension(node);
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType != typeof(EF))
+            {
+                return base.VisitMethodCall(node);
+            }
+
+            bool outer = _insideEFCall;
+            _insideEFCall = true;
+            try
+            {
+                return base.VisitMethodCall(node);
+            }
+            finally
+            {
+                _insideEFCall = outer;
+            }
+        }
 
         /// <summary>
         ///     Drops <see langword="null" /> elements from a collection of <em>entities</em>.
@@ -594,9 +640,10 @@ internal sealed class QueryExecutor<TElement>
         ///         <c>Contains</c> either way.
         ///     </para>
         /// </remarks>
-        private static Expression Substitute(object? value, Type parameterType)
+        private Expression Substitute(object? value, Type parameterType)
         {
-            if (value is not System.Collections.IEnumerable sequence
+            if (_insideEFCall
+                || value is not System.Collections.IEnumerable sequence
                 || value is string
                 || SequenceElementType(parameterType) is not { } elementType
                 // An `object` element type carries boxed values whose real types differ per
