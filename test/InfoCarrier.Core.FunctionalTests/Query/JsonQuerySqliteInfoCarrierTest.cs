@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestModels.JsonQuery;
@@ -119,6 +120,39 @@ public class JsonQuerySqliteInfoCarrierTest(
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
     public override async Task Json_nested_collection_filter_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_nested_collection_filter_in_projection(async));
+
+    /// <summary>
+    ///     Three the core base leaves to the provider, mirrored from
+    ///     <c>JsonQueryRelationalTestBase</c>.
+    /// </summary>
+    /// <remarks>
+    ///     The base says so in a comment on the test itself — *"verify exception on the provider
+    ///     level, relational and core throw different exceptions"* — and then projects an owned
+    ///     entity out of a tracking query without its owner, which is a thing EF refuses. The
+    ///     relational base asserts the refusal's message; this provider raises the same one, from
+    ///     the same place, because the query it raises on is the one the server ran.
+    ///     <para>
+    ///         Not adopted for the fourth test that fails this way. `OwnsMany_correlated_projection`
+    ///         raises it here and EF overrides nothing — it passes there — so that one is a failure
+    ///         of ours and stays red.
+    ///     </para>
+    /// </remarks>
+    public override async Task Project_json_reference_in_tracking_query_fails(bool async)
+        => await AssertOwnedWithoutOwner(() => base.Project_json_reference_in_tracking_query_fails(async));
+
+    /// <inheritdoc cref="Project_json_reference_in_tracking_query_fails" />
+    public override async Task Project_json_collection_in_tracking_query_fails(bool async)
+        => await AssertOwnedWithoutOwner(() => base.Project_json_collection_in_tracking_query_fails(async));
+
+    /// <inheritdoc cref="Project_json_reference_in_tracking_query_fails" />
+    public override async Task Project_json_entity_in_tracking_query_fails_even_when_owner_is_present(bool async)
+        => await AssertOwnedWithoutOwner(
+            () => base.Project_json_entity_in_tracking_query_fails_even_when_owner_is_present(async));
+
+    private static async Task AssertOwnedWithoutOwner(Func<Task> query)
+        => Assert.Equal(
+            CoreStrings.OwnedEntitiesCannotBeTrackedWithoutTheirOwner,
+            (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

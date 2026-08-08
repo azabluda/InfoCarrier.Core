@@ -30,6 +30,31 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
         await Fixture.ReseedAsync();
     }
 
+    /// <summary>
+    ///     The <em>server-side</em> context: the shared model plus the InMemory defining query that
+    ///     produces the keyless <c>BlogQuery</c>'s rows.
+    /// </summary>
+    /// <remarks>
+    ///     The base maps <c>BlogQuery</c> as keyless and stops there; where its rows come from is
+    ///     the store's business, and EF's own <c>WithConstructorsInMemoryFixture</c> supplies them
+    ///     with <c>ToInMemoryQuery</c>. A defining query is a query — it cannot be part of the
+    ///     client's model, which has no store to run it against — so it goes on the server's copy,
+    ///     exactly as the Northwind and inheritance fixtures split their keyless types (A1
+    ///     classified this failure and named the fix; this is it).
+    /// </remarks>
+    public class WithConstructorsInfoCarrierServerContext(DbContextOptions options)
+        : WithConstructorsContext(options)
+    {
+        /// <inheritdoc />
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<BlogQuery>().HasNoKey()
+                .ToInMemoryQuery(() => Set<Blog>().Select(b => new BlogQuery(b.Title, b.MonthlyRevenue)));
+        }
+    }
+
     public class InfoCarrierFixture : WithConstructorsFixtureBase
     {
         private ITestStoreFactory _testStoreFactory;
@@ -42,6 +67,7 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                serverContextType: typeof(WithConstructorsInfoCarrierServerContext),
                 configureConventions: ConfigureConventions);
 
         /// <inheritdoc />

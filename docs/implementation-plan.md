@@ -1981,6 +1981,38 @@ constructor, so the backend store cannot build the server's copy.
       the client's, the server's, or both. Every route above answers it, and two of the three
       answers are contradicted by an existing fixture.
 
+- [x] **B17. Three overrides EF leaves to the provider, and the keyless type A1 left open.**
+      **`Total tests: 21351, Passed: 20981, Failed: 162, Skipped: 208`** — 171 → 162, **FIXED 9,
+      BROKEN none**. ✅ `<this commit>`
+
+      Three separate things, none of them a provider change.
+
+      **`JsonQuery`'s three `Project_json_*_in_tracking_query_fails`** are tests the core base
+      deliberately hands to the provider — it says so on the test itself, *"verify exception on the
+      provider level, relational and core throw different exceptions"* — and then projects an owned
+      entity out of a tracking query without its owner. `JsonQueryRelationalTestBase` asserts
+      `CoreStrings.OwnedEntitiesCannotBeTrackedWithoutTheirOwner`; this provider raises exactly that,
+      from the same place, because the query it raises on is the one the server ran. Mirrored, as
+      that assembly always must be. **Not** taken for the fourth test that fails the same way:
+      `OwnsMany_correlated_projection` raises it here and passes for EF, so it is ours and stays red.
+
+      **`Updates`' two concurrency-token messages** were asserted against
+      `InMemoryStrings.UpdateConcurrencyTokenException` — EF's *insensitive* variant — while the
+      backend runs with `EnableSensitiveDataLogging`, which
+      `InfoCarrierBackendTestStore.AddProviderOptions` sets deliberately so that a server-side
+      exception reads the way the fixture asked for. The store composes the message, so the store's
+      options decide which of the two it is; EF ships both variants in two classes for exactly this
+      reason. *"entity type 'Product' **with the key value**…"* against *"entity type 'Product' **on
+      the concurrency token**…"* is where they first diverge, at character 62. `Updates` is now
+      **28 of 28**.
+
+      **`WithConstructors.Query_with_keyless_type`** is the last of A1's nineteen, and A1 named the
+      fix without applying it: the base maps `BlogQuery` as keyless and stops, because where its rows
+      come from is the store's business. A defining query cannot live in the client's model — there
+      is no store to run it against — so it goes on the server's copy through `serverContextType`,
+      as Northwind and `Inheritance` already do for theirs. **`WithConstructors` is 41 of 41**, and
+      A1's batch is now entirely clear except for the classifications it got wrong at the time.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

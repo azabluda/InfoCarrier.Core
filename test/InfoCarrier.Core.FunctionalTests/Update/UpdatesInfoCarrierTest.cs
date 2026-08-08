@@ -36,8 +36,19 @@ public class UpdatesInfoCarrierTest(UpdatesInfoCarrierTest.UpdatesInfoCarrierFix
         => InMemoryStrings.UpdateConcurrencyException;
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own, from <c>UpdatesInMemoryWith<b>Sensitive</b>DataLoggingTest</c> and not from the
+    ///     insensitive twin, because this suite's backend enables sensitive data logging — see
+    ///     <c>InfoCarrierBackendTestStore.AddProviderOptions</c>, which does it so that an exception
+    ///     raised while the *server* runs a query reads the way the fixture asked for on the client.
+    ///     The store is what composes this message, so it is the store's options that decide which
+    ///     of the two it is: *"entity type 'Product' <b>with the key value</b>…"* rather than
+    ///     *"entity type 'Product' <b>on the concurrency token</b>…"*, which is exactly where the
+    ///     two strings first diverge.
+    /// </remarks>
     protected override string UpdateConcurrencyTokenMessage
-        => InMemoryStrings.UpdateConcurrencyTokenException("Product", "{'Price'}");
+        => InMemoryStrings.UpdateConcurrencyTokenExceptionSensitive(
+            "Product", "{Id: 984ade3c-2f7b-4651-a351-642e92ab7146}", "{Price: 3.49}", "{Price: 1.49}");
 
     /// <inheritdoc />
     /// <remarks>EF issue #29875, on its own InMemory suite too.</remarks>
