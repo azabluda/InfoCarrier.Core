@@ -2013,6 +2013,19 @@ constructor, so the backend store cannot build the server's copy.
       as Northwind and `Inheritance` already do for theirs. **`WithConstructors` is 41 of 41**, and
       A1's batch is now entirely clear except for the classifications it got wrong at the time.
 
+- [x] **B18. A rewritten projection's lambda is typed by the operator, not by its body.**
+      **`Total tests: 21351, Passed: 20983, Failed: 160, Skipped: 208`** — 162 → 160, **FIXED 2,
+      BROKEN none**. ✅ `<this commit>`
+
+      `ProjectionRewriter` rebuilt the client-side half of a split projection with
+      `Expression.Lambda(clientBody, row)`, letting the delegate type be inferred from the body. The
+      two can legitimately differ: C# lets `Select(x => new { … })` instantiated as
+      `Select<T, object>` carry a body whose own type is the anonymous one, and
+      `LambdaExpression.ReturnType` is what the *operator* was instantiated with, not what the body
+      evaluates to. Inferring produced `Func<row, <>f__AnonymousType>` where `Select<row, object>`
+      wanted `Func<row, object>`, and `Expression.Call` rejected it before the query reached the wire
+      at all. Built with the explicit delegate type now — which is how the tree arrived.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

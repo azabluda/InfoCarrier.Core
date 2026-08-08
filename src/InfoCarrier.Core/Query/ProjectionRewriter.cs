@@ -194,11 +194,20 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
                 Wrap(Expression.Lambda(tuple, selector.Parameters)),
             ]);
 
+        // Built with an explicit delegate type rather than inferred from the body, because the two
+        // can legitimately differ: C# lets `Select(x => new { … })` typed `Func<T, object>` carry a
+        // body whose own type is the anonymous one, and `LambdaExpression.ReturnType` is what the
+        // *operator* was instantiated with. Inferring gave `Func<row, <>f__AnonymousType>` where
+        // `Select<row, object>` wanted `Func<row, object>`, and `Expression.Call` rejected it
+        // outright — `Multiple_single_result_in_projection_containing_owned_types`, both
+        // parameterizations, before the query reached the wire at all.
         MethodCallExpression reassembly = Expression.Call(
             (quoted ? QueryableSelect : EnumerableSelect)
                 .MakeGenericMethod(tuple.Type, selector.ReturnType),
             serverCall,
-            Wrap(Expression.Lambda(clientBody, row)));
+            Wrap(
+                Expression.Lambda(
+                    typeof(Func<,>).MakeGenericType(row.Type, selector.ReturnType), clientBody, row)));
 
         _reassemblies.Add(reassembly);
         return reassembly;
