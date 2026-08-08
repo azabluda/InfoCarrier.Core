@@ -334,10 +334,29 @@ public class InfoCarrierDatabase : IDatabase
     ///     Writes store-generated values back onto the client's entries.
     /// </summary>
     /// <remarks>
-    ///     Keyed by correlation id rather than by key value, because the whole point is that the
-    ///     client's key was temporary and the server's is not (research-findings §9). Setting the
-    ///     current value is what lets EF's own <c>AcceptAllChanges</c> replace the temporary key
-    ///     and fix up everything that referenced it.
+    ///     <para>
+    ///         Keyed by correlation id rather than by key value, because the whole point is that the
+    ///         client's key was temporary and the server's is not (research-findings §9). Setting the
+    ///         current value is what lets EF's own <c>AcceptAllChanges</c> replace the temporary key
+    ///         and fix up everything that referenced it.
+    ///     </para>
+    ///     <para>
+    ///         <b>Which properties may receive a generated value is decided twice</b>, and the two
+    ///         answers differ — the same asymmetry CLAUDE.md states for type mappings, one level up.
+    ///         <c>ValueGenerated</c> is not stated by the model builder; it is inferred by a
+    ///         convention, and the one that reads <c>HasDefaultValue</c> is
+    ///         <c>RelationalValueGenerationConvention</c>, which the server's provider runs and this
+    ///         one does not. So a property the server generates is <c>ValueGenerated.Never</c> on the
+    ///         client, has no store-generated slot, and <c>SetStoreGeneratedValue</c> refuses it
+    ///         (B6, 8 failures in <c>StoreGenerated</c>).
+    ///     </para>
+    ///     <para>
+    ///         The client therefore accepts whatever the server actually generated rather than
+    ///         deciding in advance what it may generate: with no slot to write to, the value is
+    ///         written as the current value instead. Nothing is lost — the sidecar exists so that
+    ///         <c>AcceptAllChanges</c> can promote a generated value over an explicit one, and a
+    ///         property the client believes is never generated has no such conflict to resolve.
+    ///     </para>
     /// </remarks>
     private static void ApplyGeneratedValues(
         List<IUpdateEntry> entries,
@@ -358,10 +377,18 @@ public class InfoCarrierDatabase : IDatabase
             {
                 if (entityType.FindProperty(value.Name) is { } property)
                 {
-                    entry.SetStoreGeneratedValue(
-                        property,
-                        Expressions.PrimitiveCoercion.FromWireValue(
-                            property, mapper.FromPropertyValue(value, Expressions.PrimitiveCoercion.WireType(property))));
+                    object? clientValue = Expressions.PrimitiveCoercion.FromWireValue(
+                        property, mapper.FromPropertyValue(value, Expressions.PrimitiveCoercion.WireType(property)));
+
+                    if (Microsoft.EntityFrameworkCore.Metadata.Internal.PropertyBaseExtensions
+                        .GetStoreGeneratedIndex(property) == -1)
+                    {
+                        entry.ToEntityEntry().Property(property.Name).CurrentValue = clientValue;
+                    }
+                    else
+                    {
+                        entry.SetStoreGeneratedValue(property, clientValue);
+                    }
                 }
             }
         }
