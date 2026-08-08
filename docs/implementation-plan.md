@@ -1840,6 +1840,36 @@ constructor, so the backend store cannot build the server's copy.
       the expected shape: the tracked path already did this, so no tracked test could have been
       relying on the omission.
 
+- [ ] **B12. A JSON-mapped owned collection is keyed differently on the two sides.** Diagnosed,
+      **not fixed — it needs a decision about what the client's model is, and that is not mine to
+      make.** It is the whole of `JsonQuery`'s remaining **38 `Values differ`**, and B10 is what
+      made it visible: the collections could not be wrong before they travelled at all.
+
+      The failure is `Assert.Equal(expected.OwnedCollectionBranch.Count, actual…Count)` — *Expected
+      2, Actual 4*. Two owned roots, two branches each, and one root ends up holding all four. A
+      probe on the client's tracking, printing each entry's key beside the key the wire carried:
+
+          TRACK JsonOwnedRoot #6594565  key=[OwnerId:1,Id:0]  wirekey=[1,1]
+          TRACK JsonOwnedRoot #66212867 key=[OwnerId:1,Id:0]  wirekey=[1,2]
+
+      **The server keys an element by its ordinal in the JSON array; the client keys it by the CLR
+      `Id` property, which the document does not contain and which is `0` for every element.** So
+      every element of an owned collection has the same client-side key, and EF's own fixup — doing
+      exactly what it should with the keys it was given — hands every branch to every root.
+
+      Both sides run the same `OnModelCreating`, `ToJson()` included. What differs is which
+      *conventions* act on it: replacing a JSON-mapped owned collection's key with a synthesized
+      ordinal is relational, and this provider is not. **The same shape as B6**, and this time
+      there is no route (c): the client cannot derive the ordinal, and writing the server's key
+      value into the client's `Id` would corrupt a property a query can legitimately project.
+
+      Two routes, and picking one is the same question B6 asked and answered without needing an
+      answer:
+      - Teach the client provider to build the key a JSON-mapped owned collection actually has.
+        This is "the client honours relational annotations" again, narrowed to keys.
+      - Accept that the two models key these types differently, and leave the 38 red — which also
+        means owned JSON collections stay unusable under tracking.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

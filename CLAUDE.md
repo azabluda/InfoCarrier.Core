@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 21351, Passed: 20812, Failed: 331, Skipped: 208`** (2026-08-05) across the
+**`Total tests: 21351, Passed: 20964, Failed: 179, Skipped: 208`** (2026-08-08) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -132,14 +132,24 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
-the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B3f for the 140
-the Tier B adoptions added** (128 `JsonQuery`, 12 `StoreGenerated`), read out of
-`artifacts/measure/`. Only **4** are wrong answers
+the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B12 for what the
+Tier B adoptions added** — read out of `artifacts/measure/`, currently `b12`. The largest blocks
+are **46 `JsonQuery`** (38 of them B12, a decision), **28 `JsonTypes`**, **26
+`MaterializationInterception`** (16 a real gap, 10 blocked by A71) and **16
+`PrimitiveCollectionsQuery`**. Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`) and
 **6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
 limitation this provider does not have, whose query body is inline in a `protected static` assert
 helper so the assertion cannot be inverted from a derived class. The rest are a deliberate allowlist
 refusal (`Regex_IsMatch`, A46) or a known singleton.
+
+**Two failures of the same shape are one defect until measured otherwise, and the shape is
+usually "which of the two models was asked".** Four consecutive steps closed 152 failures with
+four small changes, and every one of them was a question the client's model could not answer:
+which properties may be store-generated (B6), which had no value set (B9), which navigations are
+loaded (B10), and whether a no-tracking row carries complex values at all (B11). Read the
+*assertion*, not the count — `AssertOwnedBranch` dereferencing a null and `AssertAddress`
+comparing `expected is null` to `actual is null` each named their defect outright.
 
 Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
