@@ -1707,6 +1707,48 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       it would add lands on **B12**, which is still open. Worth doing after B12 is decided, and hard
       to justify before. Left reported.
 
+- [ ] **C11. Phase C measured whole — and it surfaced an intermittent. TOP PRIORITY next session.**
+      **`Total tests: 22102, Passed: 21512, Failed: 382, Skipped: 208`** (`c10b`). No code change;
+      this entry is the measurement and the flake. `<this commit>`
+
+      **The adoption, whole.** 150 → 382 failures on 21351 → **22102** tests: **751 new tests, 233
+      new failures, and not one previously-failing test changed state** — `comm` between `b21b` and
+      `c10` is empty in the FIXED direction and every prior failure is still present. Nothing was
+      masked and nothing regressed. Where the 233 land:
+
+      | # | Class | Reading |
+      |---|---|---|
+      | 158 | `BulkUpdates` | 136 are C4's one defect (`ExecuteUpdate` evaluated client-side); the rest Tier B translation limits |
+      | 64 | `Query.Associations` | C1 ×4, C2 ×13, C3 ×47 — classified in those entries |
+      | 4 | `Scaffolding.CompiledModel` | C8's missing `[DesignTimeProviderServices]` |
+      | 6 | infrastructure | C5's six |
+      | 1 | `SqliteSmokeTest` | **the flake, below** |
+
+      **The flake.** `SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity` failed
+      in `c10` and passed in `c10b` — **same commit, two runs, one test**. That is exactly the signal
+      CLAUDE.md says to stop for, and it is why the honest count is 382 with one known intermittent
+      rather than a flat 383.
+
+      What is already known, so the next session does not repeat it:
+
+      - It has **never** failed before — absent from `b18`, `b20`, `b21b`.
+      - It **passes in isolation** (12 of 12) and in every pairing tried: with `Seeding`, with
+        `CompiledModel`, with all of `BulkUpdates`, with all of `Query.Associations`, with the
+        infrastructure four. Only the full run reproduces it, which points at timing rather than at
+        any one class.
+      - The failure is an identity conflict on a **temporary** key —
+        *"another instance with the key value '{Id: -2147482646}' is already being tracked"* — at
+        `StateManager.StartTracking`. Two entities in one context ended up with the same temporary.
+      - **The correlation id is not the culprit**, though the test's own comment points at it: it is
+        an index into the request's `entries` list (`InfoCarrierDatabase` line 373), per-request and
+        not shared.
+      - `-2147482646` is `int.MinValue + 1002`, so the temporary-value generator is being shared
+        across contexts — expected, since EF caches a service provider per equivalent options — and
+        the next question is whether anything in this provider's SaveChanges path resets or
+        re-reads it non-atomically.
+
+      **Do not measure anything else until this is closed**, and hold it to the three-run bar.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
