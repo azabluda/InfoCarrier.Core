@@ -1441,6 +1441,41 @@ ships a test on, and where both exist the tier that *translates* is the one whos
         a native dependency at all. That may close part of the 32 spatial failures for a managed
         package reference; it stays in M7 because `SpatialQueryTestBase` still wants the store.
 
+- [x] **C1. `Query.Associations.Navigations.*` on Tier B — 7 classes, and 27 bases become 20.**
+      **`Failed: 4, Passed: 105, Skipped: 0, Total: 109`.** Test-side only, so the targeted run is
+      the honest number. ✅ `<this commit>`
+
+      109 new tests, **105 green on adoption**, and the two things that got them there are both the
+      "mirror the relational assembly by hand, with the reason stated" rule:
+
+      **`AutoInclude` was 63 of the first run's 79 failures — one line six times.**
+      `NavigationsRelationalFixtureBase` marks all six navigations `AutoInclude()`, and that
+      assembly is not referenced. It is not decoration: every query in these seven classes returns
+      bare `RootEntity` rows and **no test writes an `Include`**, while
+      `AssociationsQueryFixtureBase.AssertRootEntity` walks the whole association graph against the
+      fully-populated `AssociationsData`. Without it the associates are simply never loaded —
+      `Expected: Root5_RequiredAssociate, Actual: null`, sixty-three times, out of one asserter.
+      Safe to mirror because `AutoInclude` is a **core** modelling API: both models make the
+      statement for themselves from the same `OnModelCreating`, so it is not something one side
+      computes and the other has to agree with (the B4/B6/B12 hazard).
+
+      **Fifteen of the remaining nineteen are EF's own overrides**, six from
+      `Navigations*SqliteTest` and nine from `Navigations*RelationalTestBase`, each matched by
+      *reason* before being taken (A63) — `SqliteStrings.ApplyNotSupported`,
+      `RelationalStrings.DistinctOnCollectionNotSupported`,
+      `RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin`, and EF's own
+      note that a traditional relational collection navigation cannot be compared reliably.
+
+      **The four left are ours, and three of them are the A28 shape.**
+      `AssociationsCollectionTestBase.AssertOrderedCollectionQuery` expects an
+      `InvalidOperationException` when `AreCollectionsOrdered` is false — indexing an unordered
+      collection is not translatable. `Index_constant`, `Index_parameter` and `Index_out_of_bounds`
+      **throw nothing here**, because the indexing lands on the client where a `List` indexes
+      perfectly well: a spec test asserting a limitation this provider does not have.
+      `Index_column` is the fourth and is the §6 trade again —
+      `SqliteException: no such column: r.Id`, the correlated-subquery `OFFSET` shape B14 and B20
+      both navigate, and B22 prices.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
