@@ -183,14 +183,21 @@ members" restriction ADR-008 specifies. Narrower than before, not yet sufficient
 - Exception fidelity across the wire (W5) and cancellation (W6).
 - Security review of the deserialization path.
 
-### M6 — Coverage expansion
+### M6 — Coverage expansion ← **in progress** (plan Phase C)
 
 Work the M1 compliance inventory down. Every spec base ends up either implemented or in
 `IgnoredTestBases` **with a stated reason** — nothing silently forgotten.
 
+**Scope confirmed 2026-08-09: all 41 remaining bases are in.** `Query.Associations.*` (27) and
+`BulkUpdates.*` (5) had been held back pending this call; they are **Tier B**, decided by the fact
+that `EFCore.InMemory.FunctionalTests` ships neither family at all. The per-base tier verdict is
+plan item C0 and is not re-derived per batch.
+
 **Exit criteria**
 - Relationships, owned types, table splitting, TPH/TPT inheritance (requirements §2.7).
 - Compliance inventory fully classified.
+- `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` green, or every remaining base in
+  `IgnoredTestBases` with its reason in the plan.
 
 ### M7 — SQL Server (Tier C) + spatial
 

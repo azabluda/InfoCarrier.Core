@@ -1364,6 +1364,83 @@ locally. Correct but coarse; A must never be *silently* wrong, which is what A4 
       commit, rollback, savepoints, the W3 token across a stateless transport, and client disposal
       cleaning up the server side.
 
+## Phase C — the last 41 bases (roadmap M6)
+
+**Why this phase exists.** Roadmap M6 says every spec base ends up either implemented or in
+`IgnoredTestBases` **with a stated reason** — nothing silently forgotten. The compliance test
+reports **41** unimplemented, and the standing note deferred 32 of them (`Associations.*` +
+`BulkUpdates.*`) pending a scope call. **Scope call given 2026-08-09: adopt them all.** This phase
+is that work, and the tier verdict for each base is the part that has to be got right — ADR-009,
+A79 and A81: a base belongs to **exactly one** tier, the tier is decided by which store EF itself
+ships a test on, and where both exist the tier that *translates* is the one whose green means more.
+
+- [x] **C0. The tier audit.** No code change; the table is the deliverable. ✅ `<this commit>`
+
+      **The single most decisive fact, checked first:** `EFCore.InMemory.FunctionalTests` contains
+      **no `Associations` directory and no `BulkUpdates` file at all** — 0 against SQLite's 40-odd
+      and 18. So all 32 of the deferred bases are **Tier B**, unambiguously, with no "could go
+      either way" to adjudicate. The standing note's premise ("no InMemory counterpart, therefore
+      out of scope") was right about the fact and wrong about the conclusion, exactly as A79 found
+      for `FunkyDataQuery`.
+
+      **27 bases are 20 classes.** `ComplianceTestBase.Implements` walks base types transitively, and
+      the three concrete families each derive from the shared `Associations*TestBase` — e.g.
+      `NavigationsCollectionTestBase<T> : AssociationsCollectionTestBase<T>`. So adopting the leaves
+      satisfies the seven shared bases for free; there is nothing to write for them.
+
+      **The fixtures are in the core assembly**, which is what makes this affordable and is the
+      opposite of B3d's finding. `AssociationsQueryFixtureBase`, `AssociationsData`,
+      `AssociationsModel`, `NavigationsFixtureBase`, `OwnedNavigationsFixtureBase` and
+      `ComplexPropertiesFixtureBase` all live in `EFCore.Specification.Tests`. The relational
+      assembly adds only *mapping-strategy* variants — `ComplexJson`, `OwnedJson`,
+      `ComplexTableSplitting`, `OwnedTableSplitting` — which the compliance test does not ask for
+      and which would each need a hand-mirrored `ToJson()`/table-splitting model. **Not adopting
+      those is a deliberate line**, and it is where the ~630-line mirror B3d priced would reappear.
+
+      | # | Base(s) | EF InMemory | EF SQLite | Tier | Batch |
+      |---|---|---|---|---|---|
+      | 7 | `Query.Associations.Navigations.*` | — | ✔ | **B** | C1 |
+      | 6 | `Query.Associations.OwnedNavigations.*` | — | ✔ | **B** | C2 |
+      | 7 | `Query.Associations.ComplexProperties.*` | — | ✔ | **B** | C3 |
+      | 7 | `Query.Associations.Associations*` (shared) | — | ✔ | **B** | *covered transitively by C1–C3* |
+      | 5 | `BulkUpdates.*` | — | ✔ | **B** | C4 |
+      | 1 | `LoggingTestBase` | ✔ | — | **A** | C5 |
+      | 1 | `ModelBuilding101TestBase` | ✔ | — | **A** | C5 |
+      | 1 | `EntityFrameworkServiceCollectionExtensionsTestBase` | ✔ | — | **A** | C5 |
+      | 1 | `ApiConsistencyTestBase` | ✔ | ✔ | **neither** | C6 |
+      | 1 | `SeedingTestBase` | ✔ | ✔ | A65 | C7 |
+      | 1 | `Scaffolding.CompiledModelTestBase` | ✔ | ✔ | **A** | C8 |
+      | 2 | `SpatialTestBase`, `Query.SpatialQueryTestBase` | ✔ / ✔ | ✔ / — | **A** | C9 (M7) |
+      | 1 | `Query.AdHocJsonQueryTestBase` | — | — (relational only) | **B** | C10 (behind B12) |
+
+      **Four entries in that table are not the mechanical answer, and each is the reason to write a
+      table rather than a rule:**
+
+      - **`ApiConsistencyTestBase` has no tier**, and it is the only base here that does not. It
+        asserts things about `InfoCarrier.Core.dll`'s own public surface — async suffixes, virtual
+        members, `IReadOnly`/`IMutable` metadata pairs — and never touches a store. Both providers
+        ship one because both are providers, not because either is a backing store. Putting it on a
+        tier at all would be a category error.
+      - **`BulkUpdates` looked like a feature and is probably an adoption.** `ExecuteDelete` is
+        `source.Provider.Execute<int>(Expression.Call(ExecuteDeleteMethodInfo, source.Expression))`
+        — an ordinary query tree through the ordinary pipeline, so it reaches ADR-006's capture
+        point and ships. `ExecuteUpdate` builds its setters *before* calling the provider
+        (`setterBuilder.BuildSettersExpression()`), so the `Action<UpdateSettersBuilder<T>>` never
+        enters the tree either. The client being non-relational is therefore not obviously a
+        blocker: the server is SQLite and it supports both. **Nothing in the roadmap mentions
+        `ExecuteUpdate`/`ExecuteDelete`**, so if this turns out to need product work it is new
+        scope and stops for a decision rather than being absorbed.
+      - **`ComplexProperties` is the one A77 already answered.** EF's InMemory provider does not
+        translate a complex property access at all, which is why no InMemory test exists; A77 read
+        that as "not adoptable" and B-phase's rule corrects it to "Tier B". This batch is that
+        correction being cashed.
+      - **`SpatialTestBase` is Tier A, not Tier B**, which is the opposite of where instinct puts
+        it. EF ships **both** an InMemory and a SQLite spatial test — SQLite's needs the SpatiaLite
+        native library, InMemory's needs only the NetTopologySuite types. Under A81's "exactly one
+        tier" and the cheaper-green rule, the InMemory one is the one to take, and it does not need
+        a native dependency at all. That may close part of the 32 spatial failures for a managed
+        package reference; it stays in M7 because `SpatialQueryTestBase` still wants the store.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
