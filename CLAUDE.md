@@ -186,17 +186,26 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases** — **41**, and the adoption queue is nearly empty. **32 are
-  `Query.Associations.*` (27) and `BulkUpdates.*` (5)** — a roadmap question, below. **8 are
-  genuinely not adoptable**: six infrastructure (`ApiConsistency`,
-  `EntityFrameworkServiceCollectionExtensions`, `Logging`, `ModelBuilding101`,
-  `Scaffolding.CompiledModel`, and `ComplianceTestBase` itself), and two spatial, which need the
-  SpatiaLite package. **`SeedingTestBase` is blocked** by A65 — its `SeedingContext` takes a
-  `string testId` and has no `DbContextOptions` constructor, so the backend cannot build the
-  server's copy. That leaves **exactly one adoptable base: `AdHocJsonQuery`** (plan item B3d) —
-  and B3d re-priced it: the seeds are ~200 lines, but the `ToJson()` mapping the whole corpus
-  needs lives in `AdHocJsonQueryRelationalTestBase`, another ~630 lines to mirror, and what it
-  would add lands on B12. It is worth doing **after** B12 is decided.
+- **The remaining spec bases — 2** (Phase C, 2026-08-09: 41 adopted down to 2). Everything the
+  compliance test used to list is in, including the four "infrastructure" bases and `Seeding`,
+  whose A65 blocker turned out to be a statement about the *client's* constructor only (C7). The
+  two left:
+  - **Spatial ×2 — the route is known and it is not SpatiaLite.** v1 solved this in two halves
+    (C12): the same NetTopologySuite branch in `InfoCarrierTypeMappingSource` that every provider
+    has, plus a **value-mapper seam** — v1's `IInfoCarrierValueMapper` chain — so a geometry is
+    written as one string instead of being walked reflectively. Without the seam the walk meets
+    `Geometry.Boundary`/`Envelope` and **overflows the stack, aborting the test host** (C9). v1 kept
+    NetTopologySuite out of its *product* assembly entirely by registering the geometry mapper
+    test-side; do the same, and use **WKT, not v1's GeoJSON**, which loses the Z/M ordinates
+    requirements §2.8 exists for.
+  - **`AdHocJsonQuery`** — B3d's price re-checked in C10 and it holds: 626 + 322 lines of relational
+    mirror and seven abstract seeds only EF's relational classes implement. Behind **B12**.
+- **The ~20-line NTS branch is worth ~34 red tests before any of that** (C14). The long-standing
+  note that the spatial `JsonTypes` and `BadDataJsonDeserialization` failures "need the SpatiaLite
+  package" is **wrong**: they fail in `ModelValidator` because *the client* cannot map a `Point`.
+  `JsonTypes` runs on Tier A, whose InMemory backend maps geometry fine, and
+  `BadDataJsonDeserialization` has no store at all. Land the branch **alone** and measure it before
+  touching the seam or the spatial bases.
 - **`MaterializationInterception` is 27 and is *not* a decision (B16, answered 2026-08-09).** This
   provider is **two EF instances**, and a real deployment must be free to define materialization
   hooks on either side or both — so the three routes B16 measured, each of which suppresses one
