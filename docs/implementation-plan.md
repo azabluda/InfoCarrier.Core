@@ -1630,6 +1630,31 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       statement about **one** of the two contexts, and this provider has a supported way to make
       them different types. A65 concluded from the client's shape that the server was blocked.
 
+- [x] **C8. `Scaffolding.CompiledModelTestBase` on Tier A — and C0's price for it was wrong.**
+      **`Failed: 4, Passed: 0, Skipped: 0, Total: 4`.** ✅ `<this commit>`
+
+      C0 called this expensive on the strength of the **112 generated baseline files** EF ships
+      beside its own InMemory variant, and that was the wrong thing to look at.
+      `CompiledModelTestBase.AssertBaseline` returns early when the baseline directory does not
+      exist — *"cannot look for the baseline"* — so the baselines are **opt-in**, and the base's
+      real contract is **one abstract member**, `TestHelpers`, which this project has had since
+      `F1FixtureBase` needed it. The adoption is 40 lines.
+
+      **All four fail on one thing, and it is a real gap this base exists to find:**
+
+          Unable to find expected assembly attribute [DesignTimeProviderServices] in provider
+          assembly 'InfoCarrier.Core'.
+
+      Every EF provider ships an `IDesignTimeServices` implementation and names it in an assembly
+      attribute; `InMemoryDesignTimeServices` is ~15 lines. This provider ships neither, so nothing
+      can scaffold its model into source — which for a provider whose entire job is moving models
+      across a wire is a pointed omission, and one no other base in the suite was asking about.
+
+      **Not fixed here, because it is a dependency decision.** `IDesignTimeServices` lives in
+      `Microsoft.EntityFrameworkCore.Design`, and `InfoCarrier.Core.csproj` references only
+      `Microsoft.EntityFrameworkCore` and `…Relational`. Adding a third package reference to the
+      **product** assembly belongs with M8's productization work, not smuggled into a test adoption.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
