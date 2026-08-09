@@ -96,8 +96,19 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         => new InfoCarrierTestStore(_backendFactory(storeName, shared: true, _props()));
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The geometry mapper is the client half of ADR-012's seam, and it is registered
+    ///     <em>here</em> — in the test utilities — rather than in the product, which is how v1
+    ///     kept NetTopologySuite out of `InfoCarrier.Core` and how this provider keeps it out
+    ///     too. Registered for every fixture, not only the spatial ones: a mapper that is not
+    ///     handed a geometry declines, so the cost is one type test per non-primitive value and
+    ///     the benefit is that the seam is exercised by the whole suite rather than by two
+    ///     classes. See <see cref="InfoCarrierBackendTestStore" /> for the server half.
+    /// </remarks>
     public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
-        => serviceCollection.AddEntityFrameworkInfoCarrier();
+        => serviceCollection
+            .AddEntityFrameworkInfoCarrier()
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
     /// <inheritdoc />
     public ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)

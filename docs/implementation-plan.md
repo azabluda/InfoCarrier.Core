@@ -1959,6 +1959,54 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       answer to "a CLR type the wire cannot walk", and B23's `IPAddress` is the other instance —
       its diagnosis is complete and the converter route it rejected cost 381.
 
+- [x] **C18. The two spatial bases adopted — Tier A, 169 of 173, and C9's host abort did not
+      recur.** ✅ `<this commit>`
+
+      **`Failed: 4, Passed: 169, Skipped: 0, Total: 173`** across `SpatialInfoCarrierTest` (5 of 5)
+      and `Query.SpatialQueryInfoCarrierTest` (164 of 168).
+
+      **The mapper is test-side, and that is the point.** `InfoCarrierNetTopologySuiteValueMapper`
+      lives in `TestUtilities` and is registered by the test store factory (client) and the backend
+      store (server) — v1's arrangement, and the reason neither v1's product assembly nor this one
+      has ever referenced NetTopologySuite. The only spatial code in `src/` is C15's branch, which
+      matches a type name as a *string*.
+
+      **WKT with XYZM, not v1's GeoJSON**, which has no Z or M ordinate — requirements §2.8's
+      recorded v1 defect, roadmap M7 Q7's answer. SRID rides as an EWKT `SRID=n;` prefix, written
+      and read by this mapper's two halves (NTS 2.6's `WKTWriter` has no SRID switch).
+      **The spatial suites could not have caught a regression here**: their model is XY at SRID 0,
+      so a mapper silently dropping Z, M and SRID passes all 173. `GeometryWireFormatTest` asserts
+      the ordinates directly, which is where losing them is visible.
+
+      **Two product defects fell out, both real and neither spatial:**
+
+      - **The wire could not carry `NaN`.** `Point.Z` on a point with no Z ordinate is `NaN`, JSON
+        has no literal for it, and System.Text.Json's default is to refuse the *entire payload*.
+        `AllowNamedFloatingPointLiterals` on `ExpressionJsonContext` — **not** on
+        `SystemTextJsonInfoCarrierSerializer`, where it does nothing, exactly as the `MaxDepth`
+        comment beside it already recorded. And the writing half alone turns "cannot be written"
+        into "cannot be read": the named form is a JSON *string*, so `PrimitiveCoercion.Coerce`
+        needed the matching read for `double` and `float`.
+      - **A `GeometryCollection` is a sequence to the projection split, and must not be.** The 4
+        left are `Item` ×2 and `IGeometryCollection_Count` ×2: `MultiLineString` implements
+        `IEnumerable<Geometry>`, so the splitter puts it in a slot as `List<Geometry>` and
+        `e.MultiLineString[0]` / `.Count` then fail to bind — *"Method `get_Item` declared on
+        `GeometryCollection` cannot be called with instance of type `List<Geometry>`"*, out of
+        `ProjectionRewriter.SlotSubstitutingVisitor`. **The fix is not a special case for
+        geometry**: it is that a type the value-mapper chain claims travels *whole*, and the
+        boundary analyzer has no way to ask, because `TryMapToWire` takes an instance rather than
+        a type. Adding a type-level probe to `IInfoCarrierValueMapper` is the route; it is an
+        addition to a just-locked ADR-012 and worth 4, so it is recorded rather than taken.
+
+      Four of EF's `SpatialQueryInMemoryTest` overrides were checked by reason and all four
+      matched (A63): both `Intersects_*_to_null` raise the same `NullReferenceException` from
+      `Geometry.Intersects` inside the InMemory backend's own lambda;
+      `GetGeometryN_with_null_argument` fails with literally EF's comment, *"Sequence contains no
+      elements"*; and `Distance_constant_lhs`, whose EF override is a bare no-op with no stated
+      reason, fails here with `ApplicationException: null geometries are not supported` raised by
+      NetTopologySuite **server-side**, before anything reaches the wire. The override carries the
+      measured reason rather than EF's silence.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

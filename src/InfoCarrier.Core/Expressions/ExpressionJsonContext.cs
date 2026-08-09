@@ -30,7 +30,21 @@ namespace InfoCarrier.Core.Expressions;
     // was tried first and did nothing: these nodes serialize through this source-generated
     // context, and a context carries its own options. The unchanged "depth of 64" in the error
     // is what showed the setting had not taken.
-    MaxDepth = 256)]
+    MaxDepth = 256,
+
+    // `NaN`, `Infinity` and `-Infinity` are ordinary values of `double` and `float`, JSON has no
+    // literal for any of them, and System.Text.Json's default is to refuse the *whole payload*
+    // rather than write one — "positive and negative infinity cannot be written as valid JSON".
+    // That is a wire unable to carry a value of a type it claims to carry: `Point.Z` on a point
+    // with no Z ordinate is `NaN`, and the query projecting it died before a row came back.
+    // The named-literal form is System.Text.Json's own answer and is symmetric — what it writes
+    // it also reads.
+    //
+    // Here and not on `SystemTextJsonInfoCarrierSerializer`, for the same reason `MaxDepth` is:
+    // these nodes serialize through this source-generated context, and a context carries its own
+    // options. Setting it on the transport serializer changes nothing, and the unchanged error
+    // message is what shows it.
+    NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals)]
 [JsonSerializable(typeof(ExpressionNode))]
 [JsonSerializable(typeof(ConstantNode))]
 [JsonSerializable(typeof(ParameterNode))]

@@ -46,7 +46,14 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
         services = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-            .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>();
+            .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+
+            // The server half of ADR-012's seam. A value the wire cannot walk has to be mapped
+            // on *both* halves — the client's is registered in
+            // `InfoCarrierTestStoreFactory.AddProviderServices` — and a mapper registered on one
+            // side only fails asymmetrically, which is precisely the "computed twice by two
+            // providers" hazard the ADR states the contract in CLR-type terms to avoid.
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
         // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
         // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`

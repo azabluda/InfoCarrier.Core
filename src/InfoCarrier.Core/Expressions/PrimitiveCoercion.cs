@@ -297,8 +297,25 @@ internal static class PrimitiveCoercion
             if (underlying == typeof(ushort)) return element.GetUInt16();
             if (underlying == typeof(byte)) return element.GetByte();
             if (underlying == typeof(sbyte)) return element.GetSByte();
-            if (underlying == typeof(double)) return element.GetDouble();
-            if (underlying == typeof(float)) return element.GetSingle();
+            // `NaN`, `Infinity` and `-Infinity` have no JSON number literal, so
+            // `ExpressionJsonContext`'s `AllowNamedFloatingPointLiterals` writes them as JSON
+            // *strings*. `GetDouble()` on a string element throws ("requires an element of type
+            // 'Number'"), so the named form has to be read back explicitly — the writing half
+            // alone turns "cannot be written" into "cannot be read", which is no better.
+            if (underlying == typeof(double))
+            {
+                return element.ValueKind is JsonValueKind.String
+                    ? double.Parse(element.GetString()!, CultureInfo.InvariantCulture)
+                    : element.GetDouble();
+            }
+
+            if (underlying == typeof(float))
+            {
+                return element.ValueKind is JsonValueKind.String
+                    ? float.Parse(element.GetString()!, CultureInfo.InvariantCulture)
+                    : element.GetSingle();
+            }
+
             if (underlying == typeof(decimal)) return element.GetDecimal();
             if (underlying == typeof(char)) return element.GetString() is { Length: > 0 } s ? s[0] : default(char);
             if (underlying == typeof(Guid)) return element.GetGuid();
