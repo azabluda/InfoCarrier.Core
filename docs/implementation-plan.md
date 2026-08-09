@@ -1909,6 +1909,26 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       The nullable variants all pass now, and EF does not override them either — the same tell that
       the eight are a genuine InMemory-shaped limitation rather than an accident of ours.
 
+- [x] **C16. EF's eight spatial `JsonTypes` overrides, now that the reason matches.**
+      **`Failed: 9, Passed: 591, Skipped: 0, Total: 600`** across `JsonTypes` +
+      `BadDataJsonDeserialization` — **17 → 9**, test-side only so the targeted number is the
+      honest one. ✅ `<this commit>`
+
+      The class's own doc comment recorded why these were *not* taken: EF's
+      `JsonTypesInMemoryTest` asserts `NullReferenceException` and this provider raised
+      `InvalidOperationException` one step earlier, because it mapped no spatial type at all — so
+      copying the override would have asserted a symptom this provider did not have (A39). **C15
+      removed that difference.** The model now validates, the failure is InMemory's own null
+      reader/writer dereference, and A63's bar is met.
+
+      Worth stating as the general rule, because it is the mirror of A63's other half: **an
+      override EF has that we could not take is a note to re-check after the thing that made us
+      different is fixed**, exactly as an override of ours EF does not have is a workaround to
+      delete once the limitation goes.
+
+      The nine left: 7 `_as_GeoJson` (A64, the `en-SE` locale — see C15's table) and 2 decimal
+      parameterizations xUnit cannot convert (A64 proper).
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
