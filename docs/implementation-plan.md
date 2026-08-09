@@ -1476,6 +1476,42 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `SqliteException: no such column: r.Id`, the correlated-subquery `OFFSET` shape B14 and B20
       both navigate, and B22 prices.
 
+- [x] **C2. `Query.Associations.OwnedNavigations.*` on Tier B — 6 classes.**
+      **`Failed: 13, Passed: 78, Skipped: 0, Total: 91`.** Test-side only. ✅ `<this commit>`
+
+      **The model did not validate at all** on the first run — *"The table
+      'RootEntity_NestedCollection' cannot be used for entity type …"*, **69 of 81 failures**, one
+      cause: three different owners each have a `NestedCollection` and the default table-splitting
+      convention gives all three the same table name. The `ToTable` calls that fix it live in
+      `OwnedTableSplittingRelationalFixtureBase` and `OwnedNavigationsRelationalFixtureBase`, ~110
+      lines between them, mirrored by hand on B3c's `ToJson()` precedent. **A physical table name is
+      the backing store's business and the client has no store — but both sides run this one
+      `OnModelCreating`, so if it is not stated here it is not stated at all, and the server's model
+      is the one that has to validate.**
+
+      `AreCollectionsOrdered` is mirrored too, and for a sharper reason than it looks: the core
+      fixture leaves the base's `true` standing because a *document* store preserves an owned
+      collection's order, and the relational fixture sets it false because a relational one does
+      not. The backing store here is SQLite, so false is the true answer. No auto-includes were
+      needed — an owned dependent comes with its owner's row by definition, which is the fact B10
+      turned on.
+
+      Nine of the remaining 21 are EF's own overrides, matched by reason: two
+      `DistinctOnCollectionNotSupported`, one `ApplyNotSupported`, two set-operation limits (one of
+      them `SetOperationOverDifferentStructuralTypes` — an owned navigation models each property as
+      its own structural type even when the CLR type is shared), and four `Contains_with_*` where
+      EF asserts only the exception type because an owned collection under a relational store
+      carries a synthesized ordinal key and shadow FKs that `Contains` cannot read.
+
+      **The 13 left, classified:**
+
+      | # | Tests | Reading |
+      |---|---|---|
+      | 6 | `OwnedNavigationsProjection*` | **EF does not run this facet on SQLite at all.** `OwnedNavigationsProjectionSqliteTest.cs` is an empty file whose only content is the comment *"All tests … currently fail because of #26708 (Stop generating composite keys for owned collections on SQLite)"*. Not ours, and not a base to override — there is no override to borrow. |
+      | 4 | `Index_*` | C1's, verbatim: three are the A28 shape (no exception where the base expects one, because the indexing lands on the client) and `Index_column` is the §6 trade. |
+      | 2 | `Over_associate_collection_projected` | EF's override taken and still red — the exception arrives but not from the same place. Undiagnosed; the one entry here that is genuinely open. |
+      | 1 | `Distinct_projected(TrackAll)` | EF's `ApplyNotSupported` override fires for `NoTracking` and not for `TrackAll`. Undiagnosed. |
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
