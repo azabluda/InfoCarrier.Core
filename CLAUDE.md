@@ -137,9 +137,10 @@ the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a
 Tier B adoptions added** — read out of `artifacts/measure/`, currently `b21b`. The largest blocks
 are **40 `JsonQuery`** (38 of them B12, a decision), **28 `JsonTypes`**, **26
 `MaterializationInterception`** (12 are B16, a decision; 4 the same question about binding
-interceptors; 10 blocked by A71) and **10
-`PrimitiveCollectionsQuery`**. Only **4** are wrong answers
-(`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`) and
+interceptors; 10 blocked by A71) and **5
+`PrimitiveCollectionsQuery`** (4 are B22's §6 trade, 1 is EF issue #30730). Only **4** are wrong
+answers (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
+— the latter diagnosed in full and reverted, B23) and
 **6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
 limitation this provider does not have, whose query body is inline in a `protected static` assert
 helper so the assertion cannot be inverted from a derived class. The rest are a deliberate allowlist
@@ -191,7 +192,10 @@ Not yet implemented, in rough priority order:
   from the SaveChanges replay and from EF's own shaper — so an interceptor registered on both sides
   is handed the *server's* context and `Assert.Same` fails. Removing it from the server fixes those
   12 and breaks 246 elsewhere: `PropertyValuesFixtureBase` uses one to set `CreatedCalled` and its
-  seed, which runs server-side, asserts it. Whose hook is it?
+  seed, which runs server-side, asserts it. Whose hook is it? **B23 found a thirteenth test and a
+  second symptom**: `OptimisticConcurrency.Nullable_client_side_concurrency_token_can_be_used` reads
+  `"Intercepted: Intercepted: New name"` — the same interceptor running on both sides, doing visible
+  damage to a value rather than failing an `Assert.Same`.
 - **JSON-mapped owned collections need a decision (B12).** The server keys an element by its
   ordinal in the array; the client keys it by the CLR `Id`, which the document does not carry and
   which is `0` for every element — so EF's fixup gives every element to every owner. Both sides

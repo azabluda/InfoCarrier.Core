@@ -2215,6 +2215,65 @@ constructor, so the backend store cannot build the server's copy.
         value ships as a distinct constant, so the server's plan cache misses on every call. A
         funcletized parameter restores the cache key EF designed.
 
+- [x] **B23. The singleton tail, read one by one — and one attempt measured and reverted.**
+      No code change. Read out of `artifacts/measure/b21b`. ✅ `<this commit>`
+
+      **The reverted attempt first, because it is the useful half.**
+      `Comparison_with_value_converted_subclass` — `Where(f => f.ServerAddress == IPAddress.Loopback)`,
+      expecting 1 row and getting 0 — is **three defects stacked**, and the third has no cheap fix.
+
+      1. A probe on the boundary analyzer named the first in one line:
+         `DENY System.Net.IPAddress+ReadOnlyIPAddress on Constant :: 127.0.0.1`. **`IPAddress.Loopback`
+         is not an `IPAddress`** — it is a private nested subclass, and EF's funcletizer types the
+         constant by the value it holds. So the constant named a type no allowlist can admit and no
+         transport could resolve, the whole `Where` went client-side, and the answer was silently
+         wrong rather than an error.
+      2. Widening a non-visible type to its nearest visible base makes it ship. **But the base must
+         not be `object`**: an anonymous type is also invisible, and widening one to `object` cost
+         **92 in `GearsOfWarQuery` alone** — it is not a private implementation of anything, it *is*
+         the projection. `!type.IsVisible && BaseType != typeof(object)` is the exact rule.
+      3. Then the value has nowhere to go. `IPAddress` is not a wire primitive; EF's core
+         `JsonValueReaderWriterSource` — the CLR-type-only service `CollectionForm` already uses —
+         **does not know it**; and the mapper's reflective walk is what is left, where `ScopeId`
+         throws `SocketException` for an IPv4 address, exactly the signature `PrimitiveCoercion`
+         was written for. `PrimitiveCoercion.JsonForm` handles this **for a value reached through
+         its `IProperty`**, which is why a *result row* carrying `Faction.ServerAddress` is fine. A
+         constant in a query tree has no property to be read through.
+
+      Routing it through EF's core `ValueConverterSelector` instead — which *does* know `IPAddress`,
+      from the CLR type alone, through a service no provider replaces — **fixes the test and costs
+      381**: `Total 21351, Failed 529` against 150, FIXED 2, BROKEN 381. The reason is where it had
+      to be applied: `PrimitiveCoercion.Coerce` is on every scalar path in the provider, so a
+      converter branch at its head hijacks shadow properties, keys and enums —
+      *"'Order.ClientId' is a shadow property"*, *"Object must implement IConvertible"*. Reverted
+      whole. **A fix would have to reach only the constant path, and that is a design question
+      about where the wire's scalar form is decided, not a patch.**
+
+      **The rest of the tail, classified.** Four are the A28 shape — a spec test asserting a
+      limitation this provider does not have — and they read identically,
+      `Assert.Throws() Failure: No exception was thrown`:
+      `ProxyGraphUpdates.Save_two_entity_cycle_with_lazy_loading` (×2),
+      `NorthwindNavigations.Join_with_nav_projected_in_subquery_when_client_eval` (×2),
+      `CustomConverters.Composition_over_collection_of_complex_mapped_as_scalar`.
+      `AdHocAdvancedMappings.Casts_are_removed_from_expression_tree_when_redundant` is the same
+      family with the exception present but different: `Cast<IDummyEntity>()` names an interface no
+      entity implements, so it stays client-side and `Enumerable.Cast` throws `InvalidCastException`
+      where EF's translation would have thrown `InvalidOperationException`.
+
+      **One is not a singleton at all: it is B16's thirteenth test, with a second symptom.**
+      `OptimisticConcurrency.Nullable_client_side_concurrency_token_can_be_used` reads
+      *Expected "Intercepted: New name", Actual "Intercepted: **Intercepted:** New name"*.
+      `F1MaterializationInterceptor` is a user `IMaterializationInterceptor` that prepends a prefix,
+      and it runs **twice** — once on the server materializing the row, once on the client
+      materializing the wire row. Every other B16 failure is an `Assert.Same` on the wrong context;
+      this one is the same defect doing visible damage to a value. It belongs in B16's count.
+
+      **Still undiagnosed, one:** `StoreGenerated.Store_generated_values_are_propagated_with_composite_key_cycles`
+      — `SaveChanges` succeeds and the read-back `SingleAsync(e => e.PrincipalId == id)` finds
+      nothing, so the dependent's FK does not carry the value the store generated for its principal.
+      B6's shape one level on, in a composite-key cycle. The other three `StoreGenerated` are B6
+      route (a) and fail at `context.Add`, before the wire.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
