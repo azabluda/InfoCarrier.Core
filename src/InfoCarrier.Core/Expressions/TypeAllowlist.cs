@@ -108,6 +108,7 @@ public sealed class TypeAllowlist
             foreach (IEntityType entityType in model.GetEntityTypes())
             {
                 allowed.Add(entityType.ClrType);
+                AddSupertypes(entityType.ClrType, allowed);
 
                 foreach (IProperty property in entityType.GetProperties())
                 {
@@ -129,6 +130,12 @@ public sealed class TypeAllowlist
                     {
                         allowed.Add(fromField);
                     }
+
+                    // A navigation need not be spelled as the entity type it targets.
+                    if (member is INavigationBase)
+                    {
+                        AddDeclaredType(member.ClrType, allowed);
+                    }
                 }
             }
         }
@@ -139,6 +146,82 @@ public sealed class TypeAllowlist
         }
 
         return new TypeAllowlist(allowed);
+    }
+
+    /// <summary>
+    ///     Admits the interfaces an entity CLR type implements and the classes it derives from.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A query may legitimately name an entity by a supertype rather than by the type the
+    ///         model registered. <c>HasAction17794&lt;T&gt;() where T : IOffer</c> builds its
+    ///         predicate against the interface, so the tree the client captures reads
+    ///         <c>Convert(v, IOffer).OfferActions</c> — a cast whose target is not an entity CLR
+    ///         type and was therefore refused, taking the whole <c>Where</c> to the client with it.
+    ///     </para>
+    ///     <para>
+    ///         This is the same statement as the declaring-type rule above, from the other side:
+    ///         a supertype of an entity type is reachable only through an instance the model
+    ///         itself produced, so naming one widens nothing.
+    ///         <c>QuerySplitter.InvalidIncludeFinder.IsEntity</c> asks the identical question with
+    ///         <c>type.IsAssignableFrom(e.ClrType)</c>; this is that answer, precomputed.
+    ///     </para>
+    /// </remarks>
+    private static void AddSupertypes(Type clrType, HashSet<Type> allowed)
+    {
+        foreach (Type @interface in clrType.GetInterfaces())
+        {
+            allowed.Add(@interface);
+        }
+
+        // `object` is a built-in already, and stopping there keeps the set to types the
+        // application declared.
+        for (Type? super = clrType.BaseType; super is not null && super != typeof(object); super = super.BaseType)
+        {
+            allowed.Add(super);
+        }
+    }
+
+    /// <summary>
+    ///     Admits the type a navigation is <em>declared</em> as, and the types that compose it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A navigation's CLR type is not always its target entity type.
+    ///         <c>HasMany(p =&gt; (ICollection&lt;Child&gt;)p.ChildCollection)</c> maps a navigation
+    ///         declared as <c>ICollection&lt;IChild&gt;</c> — EF supports it, and
+    ///         <c>ThenInclude_with_interface_navigations</c> is the spec test that says so. Every
+    ///         node of the resulting <c>Include</c>/<c>ThenInclude</c> chain is then spelled with
+    ///         the <em>interface</em>: the member read yields an <c>ICollection&lt;IChild&gt;</c>
+    ///         and <c>ThenInclude</c>'s lambda parameter is an <c>IChild</c>. An interface is not an
+    ///         entity CLR type, so neither of the loops above names it, and the whole chain was
+    ///         refused.
+    ///     </para>
+    ///     <para>
+    ///         Which did not raise anything: an unshippable <c>Include</c> goes to the client, and
+    ///         the splitter then re-derives only the one segment the residual reads. A chain
+    ///         silently degrading to its first segment is a <em>wrong answer</em>, and it is what
+    ///         B19 found. <see cref="Query.QuerySplitter" />'s <c>InvalidIncludeFinder.IsEntity</c>
+    ///         had to learn the same lesson one level up.
+    ///     </para>
+    ///     <para>
+    ///         Nothing widens: the model itself declares this member with this type, and an
+    ///         interface constructs nothing.
+    ///     </para>
+    /// </remarks>
+    private static void AddDeclaredType(Type type, HashSet<Type> allowed)
+    {
+        // Already present means already descended — and a self-referencing navigation would
+        // otherwise recur forever.
+        if (!allowed.Add(type) || !type.IsConstructedGenericType)
+        {
+            return;
+        }
+
+        foreach (Type argument in type.GetGenericArguments())
+        {
+            AddDeclaredType(argument, allowed);
+        }
     }
 
     /// <summary>

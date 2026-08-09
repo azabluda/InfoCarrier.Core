@@ -843,7 +843,55 @@ public class DynamicValueMapper : IDynamicValueMapper
             return Activator.CreateInstance(hashSet, items);
         }
 
-        return CreateRange(type, elementType, items);
+        return CreateRange(type, elementType, items) ?? AddToNew(type, elementType, items);
+    }
+
+    /// <summary>
+    ///     Builds <paramref name="type" /> by constructing it empty and adding each element —
+    ///     EF's own first rule for a collection navigation, mirrored here.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>CollectionTypeFactory.TryFindTypeToInstantiate</c> instantiates the declared type
+    ///         verbatim whenever it is concrete and declares a public parameterless constructor,
+    ///         and only then falls back to a <c>HashSet</c> or a <c>List</c>. So a navigation
+    ///         declared as <c>class MyGenericCollection&lt;T&gt; : List&lt;T&gt;</c> holds exactly
+    ///         that on the server, and the wire says so — but nothing above could rebuild it: it
+    ///         has no single-argument constructor, no set interface accepts it, and no static
+    ///         factory returns it. The list fell through instead, and the cast to the declared type
+    ///         failed one frame later, in <c>ClientResultMaterializer.Materialize</c> or inside a
+    ///         constructor the rehydrator was invoking.
+    ///     </para>
+    ///     <para>
+    ///         The declared constructor, not an inherited one: constructors are not inherited, and
+    ///         the rule is EF's — a type whose only way in takes an argument
+    ///         (<c>MyInvalidCollection(int)</c>) is one EF itself refuses to create, and refusing
+    ///         it here keeps the two sides saying the same thing.
+    ///     </para>
+    /// </remarks>
+    private static object? AddToNew(Type type, Type elementType, IList items)
+    {
+        if (type.IsInterface
+            || type.IsAbstract
+            || type.GetConstructor(Type.EmptyTypes) is not { IsPublic: true } constructor)
+        {
+            return null;
+        }
+
+        Type collection = typeof(ICollection<>).MakeGenericType(elementType);
+        if (!collection.IsAssignableFrom(type))
+        {
+            return null;
+        }
+
+        object instance = constructor.Invoke([]);
+        MethodInfo add = collection.GetMethod(nameof(ICollection<object>.Add))!;
+        foreach (object? item in items)
+        {
+            add.Invoke(instance, [item]);
+        }
+
+        return instance;
     }
 
     /// <summary>

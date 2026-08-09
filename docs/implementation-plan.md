@@ -2026,31 +2026,52 @@ constructor, so the backend store cannot build the server's copy.
       wanted `Func<row, object>`, and `Expression.Call` rejected it before the query reached the wire
       at all. Built with the explicit delegate type now — which is how the tree arrived.
 
-- [ ] **B19. A `ThenInclude` chain does not ship, and only its first segment is re-derived.**
-      Diagnosed, not fixed. `AdHocNavigationsQuery.ThenInclude_with_interface_navigations`, and
-      `AdHocAdvancedMappingsQuery.Double_convert_interface_created_expression_tree` is very likely
-      the same shape — both are interface-typed navigations and both fail by dereferencing something
-      that arrived null.
+- [x] **B19. The allowlist knew only the types the model *registered*, not the types it *names*.**
+      **`Total tests: 21351, Passed: 20986, Failed: 157, Skipped: 208`** — 160 → 157, **FIXED 3,
+      BROKEN none**. ✅ `<this commit>`
 
-      A probe dumping the server's rebound tree says it exactly. For
+      B19's diagnosis stood: for
 
           Parents.Include(p => p.ChildCollection).ThenInclude(c => c.SelfReferenceCollection)
 
-      the server receives
+      the server receives `[EntityQueryRootExpression].Include("ChildCollection")` — the **string**
+      overload with one segment, which is not the user's `Include` at all but the one
+      `AugmentWithNavigations` synthesizes for a navigation the *residual* reads. The chain was
+      judged unshippable, went client-side, and only its first segment came back.
 
-          [EntityQueryRootExpression].Include("ChildCollection")
+      A probe on the two candidate rules named the second one in one line each. It is
+      `TypeAllowlist`, twice, for the same reason:
 
-      — the **string** overload with one segment, which is not the user's `Include` at all but the
-      one `AugmentWithNavigations` synthesizes for a navigation the *residual* reads. So the whole
-      `Include`/`ThenInclude` chain was judged unshippable, went to the client, and the splitter then
-      recovered only the top-level read. `SelfReferenceCollection` arrives null and the test
-      dereferences it.
+          DENY …Context3409+IChild on Parameter :: c
+          DENY ICollection`1[…Context3409+IChild] on MemberAccess :: p.ChildCollection
+          DENY …Context17794+IOffer on Convert :: Convert(v, IOffer)
 
-      The next question is which of the two rules rejected it — `ServerBoundaryAnalyzer`'s
-      serializable-kind check or `TypeAllowlist`. The suspicion is the allowlist: `ThenInclude`'s
-      lambda is typed by the *interface* (`ICollection<IChild>`), and an interface is not an entity
-      CLR type. `InvalidIncludeFinder.IsEntity` already had to learn that lesson — its comment names
-      this very test — so the same fix may simply be missing one level down.
+      **`ForModel` admitted the types the model registered and the types it declares members
+      *through*, but not the types it declares members *as*.** Two edits, each a sentence:
+
+      - **A navigation's CLR type.** `HasMany(p => (ICollection<Child>)p.ChildCollection)` maps a
+        navigation declared as `ICollection<IChild>`, so every node of the resulting chain is
+        spelled with the interface. Admitted now, with its generic arguments.
+      - **An entity CLR type's supertypes.** `HasAction17794<T>() where T : IOffer` builds its
+        predicate against the interface, so the captured tree reads `Convert(v, IOffer).OfferActions`
+        — a cast target that is not an entity CLR type. `InvalidIncludeFinder.IsEntity` asks exactly
+        this with `type.IsAssignableFrom(e.ClrType)`; this is that answer, precomputed. Neither
+        widens anything: both are reachable only through an instance the model itself produced.
+
+      **The third test is the one the first two uncovered**, and it is why this measures 3 rather
+      than 2. `Customer_collections_materialize_properly` had been *passing by refusal*: a projection
+      of `MyGenericCollection<Order>` was denied, ran on the client, and got the right answer. Once
+      it ships, the wire says `MyGenericCollection<Order>` — EF's `CollectionTypeFactory`
+      instantiates a concrete collection with a public parameterless constructor verbatim — and
+      nothing in `DynamicValueMapper` could rebuild one: no single-argument constructor, no set
+      interface, no static factory. The `List<T>` fell through and the cast failed one frame later.
+      `AddToNew` mirrors EF's own first rule — construct it empty, `ICollection<T>.Add` each element
+      — and refuses the same types EF refuses, so the two sides still say the same thing about
+      `MyInvalidCollection(int)`. That also closed `Collection_without_setter_materialized_correctly`,
+      which had been a §3.6 refusal and became this the moment the navigation could travel.
+
+      **An include chain silently degrading to its first segment is a wrong answer, not an error**,
+      and nothing else in the suite would have caught it.
 
 ## Phase A — adopting the remaining spec bases
 
