@@ -1606,6 +1606,30 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       | `Logging.InvalidIncludePathError_throws_by_default` | an include-path diagnostic this provider does not raise |
       | `ApiConsistency` ×1 | one public-surface convention |
 
+- [x] **C7. `SeedingTestBase` on Tier A — A65's blocker was a route, not a wall.**
+      **`Failed: 0, Passed: 4, Skipped: 0, Total: 4`.** ✅ `<this commit>`
+
+      A65 filed this base as blocked and it stayed blocked through Phase B: *"its `SeedingContext`
+      takes a `string testId` and has no `DbContextOptions` constructor, so the backend cannot build
+      the server's copy."* Every word of that is true, and it is not the whole picture.
+
+      **The base hands *client* context construction to the derived class.**
+      `CreateContextWithEmptyDatabase(testId)` is abstract — EF's own InMemory variant just does
+      `new SeedingInMemoryContext(testId)` and configures it in `OnConfiguring`. So the awkward
+      constructor is only ever the *client's*, and only the **server's** copy needs the ordinary
+      one — which is exactly what `serverContextType` has existed for since the Northwind and
+      `Inheritance` fixtures. A separate server context with a `DbContextOptions` constructor and
+      the same `HasData` closes it.
+
+      And the second half falls out of the first: the client's `EnsureCreated` is a no-op —
+      `InfoCarrierDatabaseCreator` reports success because there is no store to create — so the two
+      seeded rows the test queries for can only come from the **backend's** database, created from
+      the same seeded model. They do. **Green on adoption, no overrides.**
+
+      Worth noting as a rule rather than a one-off: *"the backend cannot build this context"* is a
+      statement about **one** of the two contexts, and this provider has a supported way to make
+      them different types. A65 concluded from the client's shape that the server was blocked.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
