@@ -1549,6 +1549,36 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       are a per-test reason match (A63) rather than a fixture fact, and the batch discipline is to
       adopt, classify, and work failures separately.
 
+- [x] **C4. `BulkUpdates.*` on Tier B — 4 classes covering 5 bases.**
+      **`Failed: 158, Passed: 90, Skipped: 9, Total: 257`.** Test-side only. ✅ `<this commit>`
+
+      Adopted knowing they largely fail, which is the batch discipline: a base's failures are left
+      red and classified rather than worked. `BulkUpdatesTestBase` is covered transitively by the
+      other three; `NonSharedModelBulkUpdates` goes through the same harness
+      `NonSharedPrimitiveCollectionsQuery` uses.
+
+      **C0's open question, closed with a number: 136 of the 158 are one thing**, and it is the one
+      C3 surfaced — `UnreachableException : Can't call this overload directly`, out of
+      `EntityFrameworkQueryableExtensions.ExecuteUpdate<TSource>(IQueryable, IReadOnlyList<…>)`.
+      C0 was right that both operations reach a provider as ordinary query trees, and wrong that
+      this makes them a pure adoption. **The projection split evaluates the call on the client**,
+      and that overload is a marker EF never means anyone to invoke; the operator has to be
+      *shipped* instead.
+
+      **That is product work and it is new scope** — neither `ExecuteUpdate` nor `ExecuteDelete`
+      appears anywhere in `roadmap.md` — so it is recorded and not absorbed. The shape of the fix is
+      already legible from the phase-B work: `ServerBoundaryAnalyzer.IsExecutableQuery` recognises
+      terminal operators by declaring type, and `EntityFrameworkQueryableExtensions` is already in
+      that list, so the gap is likely narrower than "implement bulk updates" — but it is a wire and
+      boundary change and wants its own step.
+
+      **90 pass**, which is the more interesting half: those are the tests whose assertions are
+      about the *query* the bulk operation filters on rather than the mutation. The remaining 22
+      are ordinary Tier B translation limits — 12 `ApplyNotSupported`, 6 untranslatable LINQ, 2
+      `Nullable object must have a value`, 2 the owned-without-owner refusal — and EF carries
+      overrides for most of them in `NorthwindBulkUpdatesSqliteTest`, not taken in this batch for
+      the same reason as C3's sixteen.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
