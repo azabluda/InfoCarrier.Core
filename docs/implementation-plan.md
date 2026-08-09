@@ -1691,6 +1691,38 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       inapplicable* to a remoting provider and these are merely not built yet — which is exactly the
       distinction that file's own doc comment draws.
 
+- [ ] **C12. The spatial route, read out of ICC v1 — which solved this, in two halves.** No code
+      change; this is the finding, and it supersedes C9's "blocked until M7". `<this commit>`
+
+      v1 shipped `SpatialInfoCarrierTest` and `SpatialQueryInfoCarrierTest`, on its InMemory tier —
+      so C0's **Tier A** call was right, and so was the reverted type-mapping branch:
+      `subrepos/infocarrier-v1/src/InfoCarrier.Core/Client/Storage/Internal/InfoCarrierTypeMappingSource.cs`
+      carries the NTS branch **verbatim**, `GeometryValueComparer<>` and all. C9 got that half right
+      and stopped one step early.
+
+      **The half C9 was missing is a value-mapper seam, and v1 had one.**
+      `IInfoCarrierValueMapper` (v1, `Common/ValueMapping/`) is a chain the result mapper walks
+      before its own reflective handling — v1 ships standard members of it for arrays and byte
+      arrays. `InfoCarrierNetTopologySuiteValueMapper` is one more, and it is the thing that stops
+      the `Geometry.Boundary` / `Geometry.Envelope` recursion dead: a geometry is written as a
+      single string and read back with one call.
+
+      **And the seam is why v1 needed no NetTopologySuite dependency in its product assembly.** The
+      NTS mapper lives in v1's **test** utilities and is registered by the test store factory —
+      `.AddSingleton<IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()`. An
+      application that wants geometries supplies the mapper; the provider stays ignorant of NTS.
+      That is a better answer than putting spatial support in the product, and **v2 has no such
+      seam at all**: `IDynamicValueMapper` is the whole mapper, not a chain, so there is nowhere to
+      register one.
+
+      **Do not copy v1's format.** v1 used `GeoJsonWriter`/`GeoJsonReader`, and GeoJSON has no Z or
+      M ordinate — which is exactly the defect requirements §2.8 records as *"v1 lost them"* and
+      roadmap M7 Q7 answers with **WKT**. So the route is: add the value-mapper seam (product,
+      small, useful well beyond spatial), then a WKT/WKB mapper test-side, then the type-mapping
+      branch, then the two bases fall in. **The seam is the piece worth building regardless of
+      spatial** — it is the general answer to "a CLR type the wire cannot walk", which is also what
+      B23's `IPAddress` was.
+
 - [ ] **C10. `AdHocJsonQueryTestBase`: B3d's price re-checked and it holds.** No code change.
       `<this commit>`
 
