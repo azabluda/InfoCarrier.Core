@@ -2154,6 +2154,67 @@ constructor, so the backend store cannot build the server's copy.
       Both are *composed* sequences. The rule is a **member read** and nothing else — the same
       distinction the tracking half needed, one layer down.
 
+- [ ] **B22. §6 substitution priced: it does not need a wire change, and that is the finding.**
+      Priced, **not started** — it reverses a stated decision (research-findings §6), so it needs
+      an answer rather than a patch. No code change; this entry is the price.
+
+      **What is left after B20.** Four in `PrimitiveCollectionsQuery`, all one trade:
+
+      | Test | Why |
+      |---|---|
+      | `Parameter_collection_index_Column_equal_Column` | EF calls `base` — it passes there |
+      | `Parameter_collection_index_Column_equal_constant` | EF calls `base` — it passes there |
+      | `Parameter_collection_with_type_inference_for_JsonScalarExpression` | EF calls `base` |
+      | `Parameter_collection_null_Contains` | EF calls `base`; ours reads `null.Contains(p.Int)` |
+
+      A real parameter reaches SQLite as a JSON string indexed with `->>`. §6 substitution spells
+      the collection out as a `NewArrayExpression`, which becomes an inline collection and therefore
+      a correlated subquery, and the column is out of scope in its `OFFSET`. The last one is the
+      same trade with a different face: a `null` collection parameter substitutes as a literal
+      `null` constant, and `null.Contains(x)` is not a thing to translate.
+
+      **The queue priced this as a wire change — "send `QueryContext.Parameters` alongside the tree
+      and have the server rebuild `QueryParameterExpression`s against its own `QueryContext`". That
+      route does not exist, and a cheaper one does.** The server executes through EF's own
+      `EntityQueryProvider.Execute`, which builds the `QueryContext` itself from the tree it is
+      given; nothing public injects values into it. But `ExpressionTreeFuncletizer.VisitMember` says
+      in its own comment: *"any evaluatable `MemberExpression` is treated as a captured variable"* —
+      `State.CreateEvaluatable(typeof(MemberExpression), containsCapturedVariable: true)` — and
+      `ProcessEvaluatableRoot` parameterizes anything with a captured variable in it. **So the
+      client does not have to send parameters beside the tree. It has to send them in a shape the
+      server's own funcletizer will lift back out**: `Field(Constant(box), "Value")`, which is
+      precisely what a captured variable looks like to EF.
+
+      **The change, then:**
+
+      | Where | What | Size |
+      |---|---|---|
+      | a public `ParameterBox<T>` holder | one field, one ctor | ~15 lines |
+      | `TypeAllowlist.BuiltInGenericDefinitions` | add `typeof(ParameterBox<>)` | 1 line |
+      | `QueryExecutor.SubstituteParametersExpressionVisitor.Substitute` | box instead of `Constant`/`NewArrayInit` | ~10 lines |
+      | the serializer | **believed** unchanged — a member read over a constant is an existing node pair, and `RehydrateObject` rebuilds a public-property holder. Not verified. | 0, or a day if wrong |
+
+      **The cost is not the code. It is that §6 chose the opposite on purpose.** research-findings
+      §6 says plain constants, *"never wrapped in custom generic structs (the v1 `ValueWrapper<T>`
+      trap)"* — and a `ParameterBox<T>` is exactly a custom generic wrapper. Reversing that needs
+      the v1 trap re-read to establish which failure it actually was, and a dated supersession, not
+      a code change that quietly contradicts it.
+
+      **What else moves, both directions:**
+
+      - **Three tests would newly fail, and each one has EF's override waiting.** B20 deliberately
+        did *not* adopt `Column_collection_equality_inline_collection_with_parameters`,
+        `Parameter_collection_in_subquery_and_Convert_as_compiled_query` and
+        `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query`,
+        because this provider *passes* them and EF does not — and §6's substitution is exactly why.
+        Ship real parameters and they fail as EF's do, so they become three overrides to adopt
+        rather than three regressions. **Net 4, not 7.**
+      - **Tier A should not move at all.** §6 already records why: *"EF's InMemory provider
+        client-evaluates the `Contains` either way."*
+      - **The server's compiled-query cache is a side benefit.** Today every distinct parameter
+        value ships as a distinct constant, so the server's plan cache misses on every call. A
+        funcletized parameter restores the cache key EF designed.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
