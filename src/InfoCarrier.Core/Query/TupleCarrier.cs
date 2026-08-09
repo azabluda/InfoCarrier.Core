@@ -121,6 +121,20 @@ internal static class TupleCarrier
     }
 
     /// <summary>
+    ///     Whether <paramref name="type" /> is one of the carrier families.
+    /// </summary>
+    /// <remarks>
+    ///     Used to tell a row this rewrite <em>generated</em> from a row the user asked for. A
+    ///     user query may of course project a tuple of its own, and then this says yes — which is
+    ///     harmless wherever it is asked, because a hand-written tuple projection is the same kind
+    ///     of row: a carrier of values, not a result the caller holds identity in.
+    /// </remarks>
+    public static bool IsCarrier(Type type)
+        => type.IsConstructedGenericType
+            && (Array.IndexOf(ValueDefinitions, type.GetGenericTypeDefinition()) >= 0
+                || Array.IndexOf(ReferenceDefinitions, type.GetGenericTypeDefinition()) >= 0);
+
+    /// <summary>
     ///     Reads the value at <paramref name="index" /> back out.
     /// </summary>
     public static Expression Read(Expression tuple, int index)

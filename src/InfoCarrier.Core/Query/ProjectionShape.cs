@@ -71,6 +71,30 @@ internal sealed class ProjectionShape
     public static ProjectionShape? Of(Expression query)
         => Resolve(query, []);
 
+    /// <summary>
+    ///     Every entity type this row carries, at any depth.
+    /// </summary>
+    /// <remarks>
+    ///     Partial in the same way the rest of this class is: a member whose shape could not be
+    ///     resolved is simply absent, so a caller reading this can under-report but never invent an
+    ///     entity type the query does not project.
+    /// </remarks>
+    public IEnumerable<IEntityType> EntityTypes()
+    {
+        if (EntityType is not null)
+        {
+            yield return EntityType;
+        }
+
+        foreach (ProjectionShape member in _members?.Values ?? Enumerable.Empty<ProjectionShape>())
+        {
+            foreach (IEntityType entityType in member.EntityTypes())
+            {
+                yield return entityType;
+            }
+        }
+    }
+
     private static ProjectionShape? Resolve(
         Expression node,
         Dictionary<ParameterExpression, ProjectionShape> bindings)

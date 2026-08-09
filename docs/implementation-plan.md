@@ -2108,6 +2108,52 @@ constructor, so the backend store cannot build the server's copy.
       classification carries the same information. Note the shape: `_with_milliseconds` and
       `_with_microseconds` pass and only the whole-second value fails, which is #30730 exactly.
 
+- [x] **B21. A carrier row is not the query the caller wrote.**
+      **`Total tests: 21351, Passed: 20993, Failed: 150, Skipped: 208`** — 152 → 150, **FIXED 2,
+      BROKEN none**. ✅ `<this commit>`
+
+      `OwnsMany_correlated_projection`, which B17 left red for the right reason — EF overrides
+      nothing here, so the failure was ours. Two defects in a row, and the first attempt at each
+      was too broad by exactly the same amount.
+
+      **The projection.** `Contacts.Select(c => new ContactDto { Id = c.Id, Names = c.Names.Select(n => new NameDto()).ToArray() })`
+      splits, because `ContactDto` is a client type. A probe on the server's rebound tree:
+
+          TREE track=TrackAll :: [EntityQueryRootExpression].Select(contact => new ValueTuple`2(
+              Item1 = contact.Id, Item2 = contact.Names))
+
+      **Defect one: the server refused to track it.** `Name` is owned by `Contact`, the carrier
+      holds `contact.Names` beside a scalar, and EF's
+      `OwnedEntitiesCannotBeTrackedWithoutTheirOwner` fires before a row is read. EF is right —
+      an owned dependent has no identity apart from its owner — and **a user query that asks for
+      this must still be refused**: B17 adopted three `Project_json_*_in_tracking_query_fails`
+      that assert exactly it. But a `TupleCarrier` row is not a user query; it is what
+      `ProjectionRewriter` generated, for a user query EF itself translates. The server's change
+      tracker is a serialization scratchpad — the client rebuilds every row from the wire and
+      tracks what the *residual* yields — so for a carrier the tracking is dropped and
+      `NoTrackingWithIdentityResolution` kept, which is A55's back-reference behaviour exactly and
+      the entries EF will not make, nothing else.
+
+      Stated without the carrier condition it cost **4**: the three `Project_json_*` overrides and
+      one more, each a spec test *wanting* the refusal.
+
+      **Defect two: the slot's declared type could not be built.** `Contact.Names` is
+      `IReadOnlyList<Name>` — the spec maps it with a `protected` setter — and InMemory's
+      `MaterializeCollection<TElement, TCollection>` constrains
+      `TCollection : class, ICollection<TElement>`, so `MakeGenericMethod` throws
+      `VerificationException` before a row is read. EF never meets this in a user query, because a
+      projection returning a collection ends in `ToList`/`ToArray` — its documented requirement.
+      **This rewrite is what put the bare navigation in a slot, so this rewrite owes the
+      materialization**, and a `List<T>` satisfies every collection interface the client body could
+      have been written against.
+
+      Stated over any sequence type it cost **23 more**, and the two shapes say why: an
+      `IGrouping<K, T>` is an `IEnumerable<T>` that is not an `ICollection<T>`, and `ToList`-ing one
+      throws its key away (20 of the 23 were `GroupBy`); and `b.Posts1.OrderBy(p => p.Id)` in a
+      final projection is a refusal `Collection_without_setter_materialized_correctly` asserts.
+      Both are *composed* sequences. The rule is a **member read** and nothing else — the same
+      distinction the tracking half needed, one layer down.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the

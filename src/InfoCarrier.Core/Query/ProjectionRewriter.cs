@@ -466,7 +466,69 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             ? Expression.Call(
                 EnumerableToList.MakeGenericMethod(fragment.Type.GetGenericArguments()[0]),
                 fragment)
-            : fragment;
+            : UnbuildableNavigationElement(fragment) is { } element
+                ? Expression.Call(EnumerableToList.MakeGenericMethod(element), fragment)
+                : fragment;
+
+    /// <summary>
+    ///     The element type of a <em>bare navigation read</em> whose declared collection type the
+    ///     store's shaper cannot build, or <see langword="null" /> when there is no such problem.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A slot carries a fragment with the type the user's model gave it, and a collection
+    ///         navigation may be declared as something the shaper cannot fill.
+    ///         <c>IReadOnlyList&lt;Name&gt;</c> is the spec's own — <c>OwnsMany_correlated_projection</c>
+    ///         maps it with a <c>protected</c> setter — and InMemory's
+    ///         <c>MaterializeCollection&lt;TElement, TCollection&gt;</c> constrains
+    ///         <c>TCollection : class, ICollection&lt;TElement&gt;</c>, so the generic method
+    ///         cannot even be closed over it: <c>VerificationException</c>, before a row is read.
+    ///     </para>
+    ///     <para>
+    ///         EF never meets this in the user's own query because a projection returning a
+    ///         collection ends in <c>ToList</c> or <c>ToArray</c> — its documented requirement. The
+    ///         shape only arises because <em>this</em> rewrite is what puts the bare navigation in
+    ///         a slot, so it is this rewrite that owes the materialization. A <c>List&lt;T&gt;</c>
+    ///         satisfies every collection interface the body could have been written against, so
+    ///         the client-side read needs no adjustment.
+    ///     </para>
+    ///     <para>
+    ///         <b>A member read and nothing else.</b> Stated over any sequence type this cost 27
+    ///         tests, and the two shapes it wrongly caught say why. An <c>IGrouping&lt;K, T&gt;</c>
+    ///         is an <c>IEnumerable&lt;T&gt;</c> that is not an <c>ICollection&lt;T&gt;</c>, and
+    ///         <c>ToList</c>-ing one throws its key away — twenty of the twenty-seven were
+    ///         <c>GroupBy</c>. And <c>b.Posts1.OrderBy(p =&gt; p.Id)</c> in a final projection is
+    ///         something EF <em>refuses</em>, which
+    ///         <c>Collection_without_setter_materialized_correctly</c> asserts; materializing it
+    ///         suppressed the refusal. Both are composed sequences, not member reads, which is the
+    ///         line this test draws.
+    ///     </para>
+    ///     <para>
+    ///         Deliberately not merged with <see cref="IsQueryableCollection" />: that rule turns
+    ///         on whether anything <em>reads</em> the fragment, because an unread
+    ///         <see cref="IQueryable{T}" /> in a final projection is another refusal three spec
+    ///         tests assert. This one is about a type that cannot be built at all, read or not.
+    ///     </para>
+    /// </remarks>
+    private static Type? UnbuildableNavigationElement(Expression fragment)
+    {
+        if (fragment is not MemberExpression)
+        {
+            return null;
+        }
+
+        Type type = fragment.Type;
+        if (type == typeof(string) || type.IsArray || typeof(IQueryable).IsAssignableFrom(type))
+        {
+            return null;
+        }
+
+        Type element = ServerBoundaryAnalyzer.SequenceElementType(type);
+
+        return element != type && !typeof(ICollection<>).MakeGenericType(element).IsAssignableFrom(type)
+            ? element
+            : null;
+    }
 
     /// <summary>
     ///     Reads a materialized slot back as the queryable the client-side body was built against.

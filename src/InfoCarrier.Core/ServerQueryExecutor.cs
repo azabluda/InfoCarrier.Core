@@ -40,9 +40,6 @@ public class ServerQueryExecutor
     /// </summary>
     public virtual async Task<QueryDataResult> ExecuteAsync(QueryDataRequest request, CancellationToken cancellationToken)
     {
-        // Match the client's tracking behavior on the server context.
-        _context.ChangeTracker.QueryTrackingBehavior = request.TrackingBehavior;
-
         // Start of a message exchange: wire reference ids restart at 1.
         ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
 
@@ -52,13 +49,19 @@ public class ServerQueryExecutor
             ExpressionNode node = DeserializeNode(request.SerializedQuery);
             Expression query = Rebind(node);
 
+            // The query is read for the entity types its rows carry: an owned or shared-type value
+            // projected directly has no other name (A56). Read before execution, because it also
+            // decides whether this query can be tracked at all.
+            ProjectionShape? shape = ProjectionShape.Of(query);
+
+            // Match the client's tracking behavior on the server context.
+            _context.ChangeTracker.QueryTrackingBehavior = TrackingBehaviorFor(request.TrackingBehavior, query, shape);
+
             // Execute against the server context.
             object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
 
-            // Map results to the wire format (entity rows vs columnar projections). The query is
-            // read for the entity types its rows carry: an owned or shared-type value projected
-            // directly has no other name (A56).
-            return MapResults(result, request.ReturnsSingleResult, ProjectionShape.Of(query));
+            // Map results to the wire format (entity rows vs columnar projections).
+            return MapResults(result, request.ReturnsSingleResult, shape);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
@@ -73,6 +76,61 @@ public class ServerQueryExecutor
             ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
             throw; // Unreachable; the compiler cannot see that Throw() does not return.
         }
+    }
+
+    /// <summary>
+    ///     The tracking behaviour the server can actually honour for a <em>carrier</em> row.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF refuses to track a result that carries an owned entity without its owner —
+    ///         <c>CoreStrings.OwnedEntitiesCannotBeTrackedWithoutTheirOwner</c>, raised by
+    ///         <c>StructuralTypeMaterializerInjector</c> before a row is read — and it is right:
+    ///         an owned dependent has no identity apart from its owner, so an entry for one alone
+    ///         cannot be keyed. **A user query that asks for this must still be refused**, and
+    ///         three spec tests assert it (B17's <c>Project_json_*_in_tracking_query_fails</c>).
+    ///     </para>
+    ///     <para>
+    ///         A <see cref="TupleCarrier" /> row is not a user query. It is what
+    ///         <see cref="ProjectionRewriter" /> generated to carry values back:
+    ///         <c>Select(c =&gt; new ContactDto { Names = c.Names.Select(…) })</c> — which EF
+    ///         itself translates — ships as <c>Select(c =&gt; new ValueTuple(c.Id, c.Names))</c>,
+    ///         an owned collection beside a scalar. The refusal there is aimed at a projection the
+    ///         caller never wrote, and the server is not the caller anyway: every row is rebuilt
+    ///         from the wire on the client, which tracks what the <em>residual</em> yields.
+    ///     </para>
+    ///     <para>
+    ///         So for a carrier the tracking is dropped and the <em>identity resolution</em> kept.
+    ///         That half matters and A55 says why: under <c>TrackAll</c> EF returns one instance
+    ///         for two rows naming the same entity, the wire sends the second as a back-reference,
+    ///         and the client rebuilds one object. <c>NoTrackingWithIdentityResolution</c> keeps
+    ///         exactly that and drops exactly the entries EF will not make.
+    ///     </para>
+    ///     <para>
+    ///         Narrow twice over: only a carrier row, and only when
+    ///         <see cref="ProjectionShape" /> — which is partial and reports only what it could
+    ///         resolve — actually finds an ownerless owned type.
+    ///     </para>
+    /// </remarks>
+    private static QueryTrackingBehavior TrackingBehaviorFor(
+        QueryTrackingBehavior requested, Expression query, ProjectionShape? shape)
+    {
+        if (requested != QueryTrackingBehavior.TrackAll
+            || shape is null
+            || !TupleCarrier.IsCarrier(ServerBoundaryAnalyzer.SequenceElementType(query.Type)))
+        {
+            return requested;
+        }
+
+        IEntityType[] carried = [.. shape.EntityTypes()];
+
+        return Array.Exists(
+                carried,
+                e => e.IsOwned()
+                    && e.FindOwnership()?.PrincipalEntityType is { } owner
+                    && !Array.Exists(carried, c => c == owner))
+            ? QueryTrackingBehavior.NoTrackingWithIdentityResolution
+            : requested;
     }
 
     private Expression Rebind(ExpressionNode node)

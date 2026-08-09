@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 21351, Passed: 20986, Failed: 157, Skipped: 208`** (2026-08-09) across the
+**`Total tests: 21351, Passed: 20993, Failed: 150, Skipped: 208`** (2026-08-09) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -134,7 +134,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `ComplexTypeQuery` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B16 for what the
-Tier B adoptions added** — read out of `artifacts/measure/`, currently `b20`. The largest blocks
+Tier B adoptions added** — read out of `artifacts/measure/`, currently `b21b`. The largest blocks
 are **40 `JsonQuery`** (38 of them B12, a decision), **28 `JsonTypes`**, **26
 `MaterializationInterception`** (12 are B16, a decision; 4 the same question about binding
 interceptors; 10 blocked by A71) and **10
