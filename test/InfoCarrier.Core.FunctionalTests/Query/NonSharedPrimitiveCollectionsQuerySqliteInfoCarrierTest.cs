@@ -31,6 +31,20 @@ public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFi
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
 
+    /// <summary>
+    ///     EF's own, from <c>NonSharedPrimitiveCollectionsQueryRelationalTestBase</c>, which this
+    ///     project does not reference and so must mirror by hand.
+    /// </summary>
+    /// <remarks>
+    ///     EF's reason, verbatim: "On relational databases, <c>byte[]</c> gets mapped to a special
+    ///     binary data type, which isn't queryable as a regular primitive collection." The backing
+    ///     store is relational, so the limit is the store's — and it is stated on the relational
+    ///     base rather than in SQLite's own suite, which is why reading only the latter left this
+    ///     classified as a failure of this provider.
+    /// </remarks>
+    public override Task Array_of_byte()
+        => AssertTranslationFailed(() => TestArray((byte)1, (byte)2));
+
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(
         Action<ModelBuilder>? onModelCreating = null,

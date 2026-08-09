@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -124,6 +125,41 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     /// </remarks>
     public override async Task Parameter_collection_Concat_column_collection()
         => await Assert.ThrowsAsync<EqualException>(() => base.Parameter_collection_Concat_column_collection());
+
+    /// <summary>
+    ///     Four from <c>PrimitiveCollectionsQueryRelationalTestBase</c>, which this project does not
+    ///     reference and so must mirror by hand.
+    /// </summary>
+    /// <remarks>
+    ///     Each is a limit <em>every</em> relational provider has, which is why EF states it on the
+    ///     relational base rather than in SQLite's own suite — and why reading only the latter left
+    ///     all four classified as failures of this provider. The reason has to match, not just the
+    ///     name (A63): an empty inline collection and a <c>Concat</c> in a projection each raise the
+    ///     exact <c>RelationalStrings</c> message EF asserts, and the two inline-collection equality
+    ///     comparisons fail translation for the reason EF's TODO gives — comparing a relational
+    ///     rowset against a primitive collection, EF issue #33792.
+    /// </remarks>
+    public override async Task Inline_collection_Count_with_zero_values()
+        => Assert.Equal(
+            RelationalStrings.EmptyCollectionNotSupportedAsInlineQueryRoot,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Inline_collection_Count_with_zero_values())).Message);
+
+    /// <inheritdoc cref="Inline_collection_Count_with_zero_values" />
+    public override async Task Project_inline_collection_with_Concat()
+        => Assert.Equal(
+            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Project_inline_collection_with_Concat())).Message);
+
+    /// <inheritdoc cref="Inline_collection_Count_with_zero_values" />
+    public override async Task Column_collection_Concat_parameter_collection_equality_inline_collection()
+        => await AssertTranslationFailed(
+            () => base.Column_collection_Concat_parameter_collection_equality_inline_collection());
+
+    /// <inheritdoc cref="Inline_collection_Count_with_zero_values" />
+    public override async Task Column_collection_Where_equality_inline_collection()
+        => await AssertTranslationFailed(() => base.Column_collection_Where_equality_inline_collection());
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

@@ -2073,6 +2073,41 @@ constructor, so the backend store cannot build the server's copy.
       **An include chain silently degrading to its first segment is a wrong answer, not an error**,
       and nothing else in the suite would have caught it.
 
+- [x] **B20. Five of the ten primitive-collection failures were stated on the relational base.**
+      **`Failed: 5, Passed: 158, Skipped: 2, Total: 165`** across the two classes — 10 → 5,
+      **FIXED 5, BROKEN none**. Test-side only, so the targeted run is the honest number.
+      ✅ `<this commit>`
+
+      CLAUDE.md's rule, collected: *"**Grep `EFCore.Relational.Specification.Tests` too** — a limit
+      every relational provider has is overridden on the relational base, not in SQLite's own
+      suite."* Both classes derive from the **core** base — the relational one asserts SQL a client
+      with no database does not have — so five overrides that were sitting one file away had every
+      one of their tests classified as a failure of this provider.
+
+      | Test | EF states | Ours |
+      |---|---|---|
+      | `Inline_collection_Count_with_zero_values` | `RelationalStrings.EmptyCollectionNotSupportedAsInlineQueryRoot` | the same message, from `QuerySqlGenerator.GenerateValues` |
+      | `Project_inline_collection_with_Concat` | `RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin` | the same message, from `SelectExpression.ApplyProjection` |
+      | `Column_collection_Where_equality_inline_collection` | `AssertTranslationFailed` (EF's TODO: comparing a relational rowset to a primitive collection, #33792) | translation failed |
+      | `Column_collection_Concat_parameter_collection_equality_inline_collection` | `AssertTranslationFailed` | translation failed |
+      | `NonShared…Array_of_byte` | `AssertTranslationFailed` — *"byte[] gets mapped to a special binary data type, which isn't queryable as a regular primitive collection"* | translation failed |
+
+      A63's rule held throughout — the reason has to match, not the name. Three of the relational
+      base's overrides were **not** taken, because this provider does not have the limitation they
+      assert: `Column_collection_equality_inline_collection_with_parameters`,
+      `Parameter_collection_in_subquery_and_Convert_as_compiled_query` and
+      `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query` all
+      *pass* here, and §6's substitution is why — the inline form EF cannot type-map is the one this
+      provider ships.
+
+      **Five left, and they are two things.** Four are §6's trade, priced in B21 below. The fifth is
+      `Array_of_TimeOnly`, and it is **not ours**: EF's own SQLite suite carries
+      `[ConditionalFact(Skip = "Issue #30730: TODO: SQLite is not matching elements here.")]` on it,
+      and our failure is `Sequence contains no elements` — the same non-match, one layer up. It is
+      left red rather than skipped, because CLAUDE.md forbids introducing a `[Skip]` and the
+      classification carries the same information. Note the shape: `_with_milliseconds` and
+      `_with_microseconds` pass and only the whole-second value fails, which is #30730 exactly.
+
 ## Phase A — adopting the remaining spec bases
 
 The compliance test reports **131** unadopted bases. That is a far larger unknown than the
