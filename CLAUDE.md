@@ -136,8 +136,8 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B16 for what the
 Tier B adoptions added** — read out of `artifacts/measure/`, currently `b21b`. The largest blocks
 are **40 `JsonQuery`** (38 of them B12, a decision), **28 `JsonTypes`**, **26
-`MaterializationInterception`** (12 are B16, a decision; 4 the same question about binding
-interceptors; 10 blocked by A71) and **5
+`MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
+A71) and **5
 `PrimitiveCollectionsQuery`** (4 are B22's §6 trade, 1 is EF issue #30730). Only **4** are wrong
 answers (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
 — the latter diagnosed in full and reverted, B23) and
@@ -145,6 +145,15 @@ answers (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_
 limitation this provider does not have, whose query body is inline in a `protected static` assert
 helper so the assertion cannot be inverted from a derived class. The rest are a deliberate allowlist
 refusal (`Regex_IsMatch`, A46) or a known singleton.
+
+**A28 has a second face, and it is the one to check first when a spec test looks like a design
+question.** A28 proper is a spec test asserting a *materialization* limitation this provider does
+not have. B16 turned out to be the same shape asserting a *topology* it does not have: EF's test
+bases are written for one `DbContext`, this provider is two, and `Assert.Same(context, …)` has no
+answer under two. Three "routes" were measured against that test before anyone asked whether the
+assertion was reachable at all — and every one of them would have suppressed a hook a real
+deployment is entitled to define. **Ask what the assertion assumes about the topology before
+treating it as a statement about the provider.**
 
 **Two failures of the same shape are one defect until measured otherwise, and the shape is
 usually "which of the two models was asked".** Four consecutive steps closed 152 failures with
@@ -188,14 +197,18 @@ Not yet implemented, in rough priority order:
   and B3d re-priced it: the seeds are ~200 lines, but the `ToJson()` mapping the whole corpus
   needs lives in `AdHocJsonQueryRelationalTestBase`, another ~630 lines to mirror, and what it
   would add lands on B12. It is worth doing **after** B12 is decided.
-- **A user's `IMaterializationInterceptor` needs a decision (B16).** The server materializes too —
-  from the SaveChanges replay and from EF's own shaper — so an interceptor registered on both sides
-  is handed the *server's* context and `Assert.Same` fails. Removing it from the server fixes those
-  12 and breaks 246 elsewhere: `PropertyValuesFixtureBase` uses one to set `CreatedCalled` and its
-  seed, which runs server-side, asserts it. Whose hook is it? **B23 found a thirteenth test and a
-  second symptom**: `OptimisticConcurrency.Nullable_client_side_concurrency_token_can_be_used` reads
-  `"Intercepted: Intercepted: New name"` — the same interceptor running on both sides, doing visible
-  damage to a value rather than failing an `Assert.Same`.
+- **`MaterializationInterception` is 27 and is *not* a decision (B16, answered 2026-08-09).** This
+  provider is **two EF instances**, and a real deployment must be free to define materialization
+  hooks on either side or both — so the three routes B16 measured, each of which suppresses one
+  side, may none of them be taken. Nothing in `src/` forwards an interceptor: the server sees the
+  user's only because `InfoCarrierBackendTestStore.AddProviderOptions` forwards the client's
+  `onConfiguring` for model parity (A49) and it rides along. Each side is individually correct —
+  `"Intercepted: Intercepted:"` proves two invocations, `Assert.Same` proves they carry different
+  contexts, and B15's fix landing on the *client's* materializer proves the client raises it. **The
+  A28 family, one level up**: A28's spec tests assert a materialization limitation this provider
+  does not have, these assert a *topology* it does not have. Red and classified. Making them green
+  is a harness change (stop forwarding interceptors, register the backend's additively) and is
+  optional.
 - **JSON-mapped owned collections need a decision (B12).** The server keys an element by its
   ordinal in the array; the client keys it by the CLR `Id`, which the document does not carry and
   which is `0` for every element — so EF's fixup gives every element to every owner. Both sides

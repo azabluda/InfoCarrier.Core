@@ -1981,6 +1981,44 @@ constructor, so the backend store cannot build the server's copy.
       the client's, the server's, or both. Every route above answers it, and two of the three
       answers are contradicted by an existing fixture.
 
+      **Answered 2026-08-09, and the answer dissolves the question: both, and the product already
+      does that.** The premise above — that a side has to be chosen — is wrong. A real deployment
+      must be free to define materialization hooks on the client, on the server, or on both, and
+      each of the three routes recorded above suppresses one side, so **none of them may be taken.**
+
+      The premise came from reading a two-instance system through a one-instance test base.
+      `MaterializationInterceptionTestBase` asserts `Assert.Same(context, …)` because in EF there
+      *is* a context; under this provider there are two, and both materialize. Nothing in `src/`
+      forwards an interceptor from one to the other — the product assembly contains no interceptor
+      plumbing at all. **The server sees the user's interceptor only because
+      `InfoCarrierBackendTestStore.AddProviderOptions` forwards the client's `onConfiguring`**, which
+      A49 does so that the two models match; the interceptor rides along as collateral. One object,
+      two instances.
+
+      Three independent confirmations that each side is individually correct, all already in hand:
+
+      | Evidence | What it proves |
+      |---|---|
+      | `"Intercepted: Intercepted: New name"` (B23) | **two** invocations — a mutating interceptor registered on both sides applies twice, which is what that registration asks for |
+      | `Assert.Same` ×12 | one invocation carried a context that is not the one the test registered on — i.e. the other instance's |
+      | B15's twelve `QueryTrackingBehavior` failures, which appeared and were fixed on the **client's** materializer | the client raises the event properly, with its own context |
+
+      **So this is the A28 family, one level up.** A28 is a spec test asserting a *materialization*
+      limitation this provider does not have; these assert a *topology* — one EF instance — that this
+      provider does not have either. Left red and classified, which is what the guardrail prescribes:
+      27 tests (12 `Assert.Same`, 4 the same for `IInstantiationBindingInterceptor`, 10 A71's
+      wiring, 1 `OptimisticConcurrency.Nullable_client_side_concurrency_token_can_be_used`).
+
+      **What remains is a harness question, not a product one, and it is optional.** The 27 would go
+      green if the harness stopped forwarding the *interceptors* while still forwarding everything
+      else `onConfiguring` carries — then the client's context is the only one registered on and
+      `Assert.Same` holds. Two obstacles, both real: A71's wall means they cannot be *subtracted*
+      (`CoreOptionsExtension.WithInterceptors` concatenates, `Clone` is protected), so the server's
+      `CoreOptionsExtension` would have to be **replaced wholesale** with one rebuilt by hand from
+      its public `With*` setters; and `PropertyValuesFixtureBase`'s seed genuinely wants an
+      interceptor server-side, which under "both sides are allowed" is answered by registering it on
+      the backend *additively* rather than by forwarding. Neither is required for correctness.
+
 - [x] **B17. Three overrides EF leaves to the provider, and the keyless type A1 left open.**
       **`Total tests: 21351, Passed: 20981, Failed: 162, Skipped: 208`** — 171 → 162, **FIXED 9,
       BROKEN none**. ✅ `<this commit>`
