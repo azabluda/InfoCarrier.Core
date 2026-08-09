@@ -1579,6 +1579,33 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       overrides for most of them in `NorthwindBulkUpdatesSqliteTest`, not taken in this batch for
       the same reason as C3's sixteen.
 
+- [x] **C5. The four infrastructure bases — `Logging`, `ModelBuilding101`,
+      `EntityFrameworkServiceCollectionExtensions` on Tier A, and `ApiConsistency` on no tier.**
+      **`Failed: 6, Passed: 144, Skipped: 0, Total: 150`.** Test-side only. ✅ `<this commit>`
+
+      C0 split these into C5 and C6; they land in one file and one theme, so they are one step.
+      None of them runs a query. For the first three "tier" means only which of EF's two suites
+      states the base, and for all three it is the InMemory one.
+
+      **`ApiConsistency` is the one base in C0's table with no tier at all**, and it earns its own
+      sentence because the mechanical rule would have got it wrong: EF ships one on InMemory *and*
+      one on SQLite, which looks like A81's "could go either way". It is neither. The base asserts
+      things about `InfoCarrier.Core.dll`'s own public surface — async suffixes, virtual members,
+      the `IReadOnly`/`IMutable`/`IConvention` metadata triples, fluent-API return types — and never
+      touches a store. Both providers ship one because both are providers. **18 of 19 green**, which
+      is a real statement about this provider's API hygiene that nothing else in the suite was
+      making.
+
+      The six failures are all provider-plumbing detail, and all worth keeping red:
+
+      | Test | Reading |
+      |---|---|
+      | `ServiceCollectionExtensions.Required_services_are_registered_with_expected_lifetimes` | a registered service's lifetime differs from EF's expectation |
+      | `ServiceCollectionExtensions.Repeated_calls_to_add_do_not_modify_collection` | `AddEntityFrameworkInfoCarrier()` is not idempotent — *Expected 121, Actual 126* |
+      | `Logging.Logs_context_initialization_no_tracking`, `…_sensitive_data_logging` | the initialization log line does not compose the way EF's does |
+      | `Logging.InvalidIncludePathError_throws_by_default` | an include-path diagnostic this provider does not raise |
+      | `ApiConsistency` ×1 | one public-surface convention |
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
