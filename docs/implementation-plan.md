@@ -1845,6 +1845,36 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       *"Cosmos (and possibly others) don't support navigations"*. EF ships `EFCore.Cosmos` in-box
       alongside InMemory, Sqlite and SqlServer.
 
+      **Measured 2026-08-09, and it changes the answer: there is very little to retarget *to*.**
+      The proposal is not "add a tier" but "move the classes that fit a document store better" —
+      which is right in principle, and ADR-009's own rule then applies in reverse. A base can only
+      live on a tier EF ships a test for, and EF's own document provider ships very few:
+
+      | Family | Cosmos | SQLite | InMemory |
+      |---|---|---|---|
+      | `Associations` | 7 | 41 | 0 |
+      | `JsonQuery` | 3 | 3 | 0 |
+      | `Northwind` | 9 | 29 | 23 |
+      | `BulkUpdates` | **0** | 18 | 0 |
+      | `GearsOfWar`, `ComplexNavigations`, `ManyToMany`, `PropertyValues`, `GraphUpdates` | **0** | 41 | 20 |
+
+      **And `EFCore.Cosmos.FunctionalTests` has no `ComplianceTest` at all** — only the two
+      *relational* providers do. EF does not hold its document provider to the specification suite,
+      so nobody is even tracking that gap.
+
+      So the retarget ceiling is roughly **B12's 38 `JsonQuery` plus some part of the 64
+      `Associations`** — call it 40–70, and speculative, since whether a document store keys an
+      owned collection the way the client does is the very thing B12 asks. What **cannot** move is
+      the biggest block: `BulkUpdates` has no Cosmos counterpart, and its 158 are 136 of our own
+      `ExecuteUpdate` defect anyway, which no store fixes. `GraphUpdates`, `ManyToMany`,
+      `ComplexNavigations` and `GearsOfWar` cannot move either.
+
+      **MongoDB's provider does not shortcut this.** It supports EF Core 10 on .NET 10, so
+      compatibility is not the blocker — but it is *working towards* specification-suite coverage
+      rather than having it, so there is no ready-made proof that the suite fits a document store.
+      An ephemeral/embedded Mongo would be lighter than the Cosmos emulator; it would not be
+      cheaper in adoption work.
+
       **The honest cost, and the open question.** Cosmos is the in-box candidate and it needs the
       emulator — which makes it **Tier C-shaped** (nightly, Docker, like SQL Server in M7) rather
       than the *lightweight* store the idea asks for. Whether a lightweight embedded document
