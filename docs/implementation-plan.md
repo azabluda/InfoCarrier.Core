@@ -2246,7 +2246,8 @@ constructor, so the backend store cannot build the server's copy.
       to be applied: `PrimitiveCoercion.Coerce` is on every scalar path in the provider, so a
       converter branch at its head hijacks shadow properties, keys and enums —
       *"'Order.ClientId' is a shadow property"*, *"Object must implement IConvertible"*. Reverted
-      whole. **A fix would have to reach only the constant path, and that is a design question
+      whole; its run is kept as `artifacts/measure/b23-reverted.*` so the label cannot be mistaken
+      for the current state. **A fix would have to reach only the constant path, and that is a design question
       about where the wire's scalar form is decided, not a patch.**
 
       **The rest of the tail, classified.** Four are the A28 shape — a spec test asserting a
