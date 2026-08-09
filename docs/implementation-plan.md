@@ -1784,6 +1784,46 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       been tried. **A recurrence makes it a defect**: note each sighting here, and act on the
       second, holding any fix to the three-run bar.
 
+- [ ] **C13. A non-relational Tier D — raised 2026-08-09, recorded, not started.** A roadmap
+      question; ADR-009 owns the tier list. `<this commit>`
+
+      **First, a correction of what prompted it.** C10's *"seven abstract `Seed*` methods only the
+      relational classes implement"* is a statement about **EF's own code**, not about a store this
+      project lacks: `AdHocJsonQueryTestBase` declares the seeds abstract, and the only
+      implementations EF ships are in `AdHocJsonQueryRelationalTestBase` / `AdHocJsonQuerySqliteTest`,
+      which insert JSON documents with raw SQL. The cost is that **we would write those seeds by
+      hand**. Nothing there argues for another backend.
+
+      **The idea stands on its own evidence, though, and it is better than the thing that prompted
+      it.** Both existing tiers are compromised in opposite directions, and Phase C measured both:
+
+      - **Tier A (InMemory) does not translate.** That is why A77 called complex-property queries
+        unadoptable, why EF ships no InMemory test for `Associations`, `BulkUpdates`,
+        `PrimitiveCollections` or `JsonQuery`, and why all of those had to go to Tier B.
+      - **Tier B (SQLite) is relational**, so adopting anything there means hand-mirroring
+        relational modelling the client provider is not: C1's `AutoInclude`, C2's `ToTable`
+        (69 failures until it was there), C3's `ToJson` (134). Each was found by the failure being
+        uniform, and each is a statement the *store* makes that the client has to be told.
+
+      **B12 is the sharpest argument.** The whole 38-failure block is that a JSON-mapped owned
+      collection is keyed by its **ordinal in the array** on the server and by the CLR `Id` on the
+      client — and *"only the convention that rewrites such a key is relational"*. On a document
+      store there is no such convention, so the two models would agree by construction. B12 is not a
+      defect of this provider; it is a seam between a non-relational client and a relational server,
+      and a non-relational server closes it rather than working around it.
+
+      **The spec suite is already written for one.** The fixtures adopted in C1–C3 name it:
+      *"Don't use database value generation since e.g. Cosmos doesn't support it"* twice, and
+      *"Cosmos (and possibly others) don't support navigations"*. EF ships `EFCore.Cosmos` in-box
+      alongside InMemory, Sqlite and SqlServer.
+
+      **The honest cost, and the open question.** Cosmos is the in-box candidate and it needs the
+      emulator — which makes it **Tier C-shaped** (nightly, Docker, like SQL Server in M7) rather
+      than the *lightweight* store the idea asks for. Whether a lightweight embedded document
+      provider for EF Core 10 exists is **not something this entry establishes** and should be
+      checked before the tier is designed: if there is one, this is cheap and closes B12; if Cosmos
+      is the only option, it is an M7-sized commitment and competes with SQL Server for that slot.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
