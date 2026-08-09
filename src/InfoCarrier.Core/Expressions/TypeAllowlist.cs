@@ -41,6 +41,15 @@ public sealed class TypeAllowlist
         typeof(System.Globalization.CultureInfo), typeof(StringComparison),
         typeof(IEnumerable), typeof(ICollection), typeof(IList), typeof(IQueryable),
         typeof(IOrderedQueryable), typeof(IQueryProvider),
+
+        // `ExecuteUpdate`'s setters travel as `IReadOnlyList<ITuple>` — EF's own signature for
+        // the private overload the public one rewrites into
+        // (`EntityFrameworkQueryableExtensions.ExecuteUpdateMethodInfo`). `IReadOnlyList<>` and
+        // `Tuple<,>` were both already admitted and `ITuple` was the one name missing, which
+        // refused the whole call and left it to be *evaluated* on the client — where that
+        // overload is a marker that throws `UnreachableException: Can't call this overload
+        // directly`. An interface constructs nothing, so admitting it widens nothing.
+        typeof(System.Runtime.CompilerServices.ITuple),
     ];
 
     // Static holders that appear as a MethodNode's declaring type. A method still has to be

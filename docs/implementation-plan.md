@@ -2007,6 +2007,44 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       NetTopologySuite **server-side**, before anything reaches the wire. The override carries the
       measured reason rather than EF's silence.
 
+- [x] **C19. `ExecuteUpdate` was never a boundary problem. It was one name on the allowlist.**
+      **`Total tests: 22278, Passed: 21864, Failed: 206, Skipped: 208`** (`c19`) — **359 → 206,
+      153 fixed, 0 broken.** ✅ `<this commit>`
+
+      C0 guessed this would be a boundary or wire change and flagged it as new scope; C3 and C4
+      priced it at 136 and recorded it as product work. **The probe answered it in one run**, and
+      the answer was neither:
+
+          DIAG: … names the type 'System.Collections.Generic.IReadOnlyList`1[
+                System.Runtime.CompilerServices.ITuple]', which is not on the type allowlist.
+
+      `ExecuteUpdate`'s public overload builds its setters and rewrites the call into the private
+      `ExecuteUpdate<TSource>(IQueryable, IReadOnlyList<ITuple>)` marker before the provider ever
+      sees it. `IReadOnlyList<>` and `Tuple<,>` were both already admitted; **`ITuple` was the one
+      name missing**, so the call was refused as unshippable, evaluated on the client, and the
+      marker did the only thing it does — `UnreachableException: Can't call this overload
+      directly`, 164 times. An interface constructs nothing, so admitting it widens nothing
+      (ADR-008 constraint 2 is intact, and this is the same argument `AddSupertypes` and
+      `AddDeclaredType` already make).
+
+      **`ExecuteDelete` was never broken at all.** The probe established that first, which is why
+      it cost nothing to find out: `WHOLLY: True`, shipped, green. C0's reading of it was right
+      and the two operators were only ever failing together because C4 tallied them together.
+
+      **This is the probe rule paying for itself.** CLAUDE.md's standing instruction is to
+      establish that the code *ran* before concluding anything about the problem; here the same
+      instrument was pointed one step earlier — *where is the call being cut* — and it named a
+      one-line cause under a heading three plan entries had filed as a wire change. The cost of
+      the guess was two entries of speculative pricing; the cost of the probe was one filtered
+      test run.
+
+      **The 30 left are all `NorthwindBulkUpdates`** and are ordinary Tier B translation limits —
+      set operations (`Union`/`Except`/`Intersect`/`Concat`), `Distinct`, `GroupBy…First`, the
+      owned-without-owner refusal — most of which EF carries overrides for in
+      `NorthwindBulkUpdatesSqliteTest`. See C20. The two `UnreachableException`s that remain are
+      `Update_with_invalid_lambda_in_set_property_throws`, a test that asserts what an *invalid*
+      setter lambda does, which is a different question.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
