@@ -1512,6 +1512,43 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       | 2 | `Over_associate_collection_projected` | EF's override taken and still red — the exception arrives but not from the same place. Undiagnosed; the one entry here that is genuinely open. |
       | 1 | `Distinct_projected(TrackAll)` | EF's `ApplyNotSupported` override fires for `NoTracking` and not for `TrackAll`. Undiagnosed. |
 
+- [x] **C3. `Query.Associations.ComplexProperties.*` on Tier B — 7 classes. A77 cashed.**
+      **`Failed: 47, Passed: 89, Skipped: 0, Total: 136`.** Test-side only. ✅ `<this commit>`
+
+      A77 tried this family on Tier A, found EF's InMemory provider does not translate a complex
+      property access at all, and concluded "not adoptable". Phase B's rule says that is the
+      definition of Tier B, and it is — 89 green on adoption.
+
+      **Two fixture mirrors, both load-bearing, both found by the failure being uniform:**
+
+      - **`ToJson()` — 134 of the first run's 136.** *"The complex collection property
+        'RootEntity.AssociateCollection' must be mapped to a JSON column."* A relational store has
+        no other way to hold a complex collection, so on Tier B this mapping is what the family
+        **is**. ~20 lines from `ComplexJsonRelationalFixtureBase`. This is the one place C0's "core
+        family, not the mapping-strategy variants" line bends, and the distinction that keeps it
+        honest is that what is mirrored is the *mapping*, not the `ComplexJson*TestBase` classes —
+        those assert SQL and stay unadopted.
+      - **`UseTransaction` — all 31 `ComplexPropertiesBulkUpdate` failures, and not one of them was
+        about bulk updates.** `AssociationsQueryFixtureBase.UseTransaction` throws
+        `NotSupportedException` and every relational fixture overrides it; the stack named the
+        fixture one frame in. `facade.UseInfoCarrierTransaction(transaction)`, the same hook
+        `StoreGenerated`, `ConferencePlanner` and `OptimisticConcurrency` already use.
+
+      **And that uncovered C0's open question, answered.** With the transaction enlisted, the bulk
+      tests reach their real failure: `UnreachableException : Can't call this overload directly`, out
+      of `EntityFrameworkQueryableExtensions.ExecuteUpdate<TSource>(IQueryable, IReadOnlyList<...>)`.
+      C0 was right that both bulk operations arrive as ordinary query trees and wrong that this
+      makes them a pure adoption: **the split evaluates them on the client**, where that overload is
+      a marker EF never means anyone to invoke. Shipping `ExecuteUpdate`/`ExecuteDelete` to the
+      server instead is product work and **new scope** — the roadmap mentions neither — so it is
+      recorded here and not absorbed. See C4.
+
+      The other 16 are relational translation limits — 10 `ApplyNotSupported`, 4 collection-subquery
+      projections, 1 `DistinctOnCollectionNotSupported`, 1 set-operation-over-different-types — and
+      EF carries overrides for these on its `ComplexJson*` classes. **Not taken in this batch**: they
+      are a per-test reason match (A63) rather than a fixture fact, and the batch discipline is to
+      adopt, classify, and work failures separately.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
