@@ -160,7 +160,54 @@ public class OwnedNavigationsPrimitiveCollectionQueryInfoCarrierTest(OwnedNaviga
     : OwnedNavigationsPrimitiveCollectionTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture);
 
 public class OwnedNavigationsProjectionQueryInfoCarrierTest(OwnedNavigationsQueryInfoCarrierFixture fixture)
-    : OwnedNavigationsProjectionTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture);
+    : OwnedNavigationsProjectionTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture)
+{
+    /// <summary>
+    ///     <c>OwnedNavigationsProjectionRelationalTestBase</c>'s two. The second is a full test
+    ///     replacement rather than an exception assertion, and EF states why: a traditional
+    ///     relational collection navigation projected from a <see langword="null" /> instance comes
+    ///     back as an <em>empty</em> collection, not as null — which is the opposite of both client
+    ///     evaluation and the JSON collection behaviour. Ours failed with <c>Assert.Null() Failure:
+    ///     Value is not null</c>, which is that sentence stated from the other side.
+    /// </summary>
+    public override Task Select_required_associate_via_optional_navigation(QueryTrackingBehavior queryTrackingBehavior)
+        => AssertOwnedTrackingQuery(
+            queryTrackingBehavior,
+            () => base.Select_required_associate_via_optional_navigation(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_required_associate_via_optional_navigation" />
+    public override Task Select_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? base.Select_nested_collection_on_optional_associate(queryTrackingBehavior)
+            : AssertQuery(
+                ss => ss.Set<RootEntity>().OrderBy(e => e.Id).Select(x => x.OptionalAssociate!.NestedCollection),
+                ss => ss.Set<RootEntity>().OrderBy(e => e.Id)
+                    .Select(x => x.OptionalAssociate!.NestedCollection ?? new List<NestedAssociateType>()),
+                assertOrder: true,
+                elementAsserter: (e, a) => AssertCollection(e, a, elementSorter: r => r.Id),
+                queryTrackingBehavior: queryTrackingBehavior);
+
+    /// <summary>
+    ///     SQLite has no <c>APPLY</c>, and <c>OwnedJsonProjectionSqliteTest</c> borrows the same
+    ///     limit. **Only for <c>NoTracking</c>.** EF no-ops the <c>TrackAll</c> half because on
+    ///     SQLite it reaches the APPLY refusal before the base's "can't track owned entities"
+    ///     assertion; here <c>TrackAll</c> fails on a string comparison instead, which is a
+    ///     different statement — so it is left red rather than silenced under a reason that is
+    ///     not ours (A63 cuts both ways).
+    /// </summary>
+    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior)
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_subquery_optional_related_FirstOrDefault" />
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior)
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+}
 
 public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(OwnedNavigationsQueryInfoCarrierFixture fixture)
     : OwnedNavigationsSetOperationsTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture)

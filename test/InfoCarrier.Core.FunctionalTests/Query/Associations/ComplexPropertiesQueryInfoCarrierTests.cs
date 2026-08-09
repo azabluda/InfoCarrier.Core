@@ -3,11 +3,13 @@
 using InfoCarrier.Core;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Query.Associations;
 using Microsoft.EntityFrameworkCore.Query.Associations.ComplexProperties;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Query.Associations;
 
@@ -106,14 +108,67 @@ public class ComplexPropertiesQueryInfoCarrierFixture : ComplexPropertiesFixture
     }
 }
 
-// The seven ComplexProperties facets (ADR-004), starting with no overrides. Every failure is real
-// information, triaged in docs/implementation-plan.md under C3.
+// The seven ComplexProperties facets (ADR-004). C3 adopted them with no overrides at all,
+// deliberately: the batch discipline is adopt, classify, then work the failures. C20 is that
+// second pass — the overrides below come from EF's `ComplexJson*` classes, which is where a
+// relational limit on a JSON-mapped complex type is stated, and each was matched by reason
+// against a measured failure first (A63). Not every reason matched; those stay red.
 
 public class ComplexPropertiesBulkUpdateQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
-    : ComplexPropertiesBulkUpdateTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
+    : ComplexPropertiesBulkUpdateTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture)
+{
+    /// <summary>
+    ///     <c>ComplexJsonBulkUpdateRelationalTestBase</c>'s five, with EF's issue numbers: #36678
+    ///     for <c>ExecuteDelete</c> on a complex type, #36336 for <c>ExecuteUpdate</c> over a
+    ///     projected complex associate, #36679 for non-constant inline collections, #36722 for
+    ///     <c>ExecuteUpdate</c> inside a JSON-mapped structural collection. All five are the
+    ///     backing store's, and C19 is what made them legible: until <c>ITuple</c> was allowlisted
+    ///     every one of them failed as <c>UnreachableException</c> instead.
+    /// </summary>
+    public override Task Delete_required_associate()
+        => AssertTranslationFailedWithDetails(
+            RelationalStrings.ExecuteDeleteOnNonEntityType, base.Delete_required_associate);
+
+    /// <inheritdoc cref="Delete_required_associate" />
+    public override Task Delete_optional_associate()
+        => Assert.ThrowsAsync<InvalidOperationException>(base.Delete_optional_associate);
+
+    /// <inheritdoc cref="Delete_required_associate" />
+    public override Task Update_property_on_projected_associate_with_OrderBy_Skip()
+        => AssertTranslationFailedWithDetails(
+            RelationalStrings.ExecuteUpdateSubqueryNotSupportedOverComplexTypes("RootEntity.RequiredAssociate#AssociateType"),
+            base.Update_property_on_projected_associate_with_OrderBy_Skip);
+
+    /// <inheritdoc cref="Delete_required_associate" />
+    public override Task Update_collection_referencing_the_original_collection()
+        => Assert.ThrowsAsync<InvalidOperationException>(base.Update_collection_referencing_the_original_collection);
+
+    /// <inheritdoc cref="Delete_required_associate" />
+    public override Task Update_inside_structural_collection()
+        => Assert.ThrowsAsync<InvalidOperationException>(base.Update_inside_structural_collection);
+}
 
 public class ComplexPropertiesCollectionQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
-    : ComplexPropertiesCollectionTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
+    : ComplexPropertiesCollectionTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture)
+{
+    /// <summary>
+    ///     <c>ComplexJsonCollectionRelationalTestBase</c>'s two. EF issue #36421 for the first
+    ///     (projecting a complex JSON type out of a <c>Distinct</c>); the second is the same
+    ///     <c>DistinctOnCollectionNotSupported</c> limit C1 and C2 already borrowed.
+    /// </summary>
+    public override async Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => Assert.Equal(
+            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Distinct_projected(queryTrackingBehavior))).Message);
+
+    /// <inheritdoc cref="Distinct_projected" />
+    public override async Task Distinct_over_projected_filtered_nested_collection()
+        => Assert.Equal(
+            RelationalStrings.DistinctOnCollectionNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.Distinct_over_projected_filtered_nested_collection)).Message);
+}
 
 public class ComplexPropertiesMiscellaneousQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
     : ComplexPropertiesMiscellaneousTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
@@ -122,10 +177,63 @@ public class ComplexPropertiesPrimitiveCollectionQueryInfoCarrierTest(ComplexPro
     : ComplexPropertiesPrimitiveCollectionTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
 
 public class ComplexPropertiesProjectionQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
-    : ComplexPropertiesProjectionTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
+    : ComplexPropertiesProjectionTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture)
+{
+    /// <summary>
+    ///     <c>ComplexJsonProjectionSqliteTest</c>'s five. SQLite has no <c>APPLY</c>, and each of
+    ///     these needs one — this provider surfaces `SqliteStrings.ApplyNotSupported` verbatim,
+    ///     the backing store's answer relayed unchanged.
+    /// </summary>
+    public override Task SelectMany_associate_collection(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.SelectMany_associate_collection(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task SelectMany_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task SelectMany_nested_collection_on_required_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+}
 
 public class ComplexPropertiesSetOperationsQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
-    : ComplexPropertiesSetOperationsTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
+    : ComplexPropertiesSetOperationsTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture)
+{
+    /// <summary>
+    ///     <c>ComplexJsonSetOperationsRelationalTestBase</c>'s two, with EF's reasons: issues
+    ///     #33485 / #34849 for the first — EF notes it fails the same way with ordinary
+    ///     navigations, which is why C2 borrowed the identical override for `OwnedNavigations` —
+    ///     and for the second that complex mapping models two properties as different structural
+    ///     types even when the CLR type is shared.
+    /// </summary>
+    public override async Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => Assert.Equal(
+            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Over_associate_collection_projected(queryTrackingBehavior))).Message);
+
+    /// <inheritdoc cref="Over_associate_collection_projected" />
+    public override async Task Over_different_collection_properties()
+        => Assert.Equal(
+            RelationalStrings.SetOperationOverDifferentStructuralTypes(
+                "RootEntity.RequiredAssociate#AssociateType.NestedCollection#NestedAssociateType",
+                "RootEntity.OptionalAssociate#AssociateType.NestedCollection#NestedAssociateType"),
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.Over_different_collection_properties)).Message);
+}
 
 public class ComplexPropertiesStructuralEqualityQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
     : ComplexPropertiesStructuralEqualityTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);

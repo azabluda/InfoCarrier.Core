@@ -2045,6 +2045,57 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `Update_with_invalid_lambda_in_set_property_throws`, a test that asserts what an *invalid*
       setter lambda does, which is a different question.
 
+- [x] **C20. The borrowed overrides C3 and C4 deferred — the second pass.**
+      **`Total tests: 22278, Passed: 21913, Failed: 157, Skipped: 208`** (`c20`) — **206 → 157,
+      49 fixed, 0 broken.** Test-side only. ✅ `<this commit>`
+
+      C3 and C4 adopted their bases with no overrides at all, on purpose: adopt, classify, then
+      work the failures separately. This is that second pass, and it had to wait for C19 —
+      **until `ITuple` was allowlisted, every bulk-update failure read `UnreachableException`
+      and no reason could be matched against anything.**
+
+      | # | Taken from | Reason matched |
+      |---|---|---|
+      | 12 | `NorthwindBulkUpdatesSqliteTest` | `SqliteStrings.ApplyNotSupported`, verbatim |
+      | 12 | `NorthwindBulkUpdatesRelationalTestBase` | `ExecuteDeleteOnNonEntityType`, `NoSetPropertyInvocation`, `MultipleTablesInExecuteUpdate`, `InvalidPropertyInSetProperty` — the server raises each one; only the assertion was missing |
+      | 10 | `ComplexJsonProjectionSqliteTest` | `ApplyNotSupported` again |
+      | 5 | `ComplexJsonBulkUpdateRelationalTestBase` | EF issues #36678, #36336, #36679, #36722 |
+      | 3 | `ComplexJsonCollectionRelationalTestBase` | #36421, and `DistinctOnCollectionNotSupported` |
+      | 3 | `ComplexJsonSetOperationsRelationalTestBase` | `InsufficientInformationToIdentifyElementOfCollectionJoin`, `SetOperationOverDifferentStructuralTypes` |
+      | 4 | `OwnedNavigationsProjectionRelationalTestBase` | `AssertOwnedTrackingQuery`, and the null-vs-empty collection statement below |
+
+      **The `ComplexJson*` classes are where a relational limit on a JSON-mapped complex type is
+      stated**, and C3's mirror is why their reasons are ours: C3 mirrored `ToJson()` because a
+      relational store has no other way to hold a complex collection, so the model this suite runs
+      is a JSON one and EF's JSON overrides are the matching ones. The classes themselves stay
+      unadopted — they assert SQL — which is the same line C3 drew.
+
+      **The one that is a test replacement rather than an assertion is worth reading**:
+      `Select_nested_collection_on_optional_associate` fails here with `Assert.Null() Failure:
+      Value is not null`, and EF's relational override says why — *"traditional relational
+      collection navigations projected from null instances are returned as empty collections
+      rather than null … in contrast to client evaluation behavior"*. That is our failure stated
+      from the other side.
+
+      **A63 cuts both ways, and three places show it.** EF no-ops the `TrackAll` half of
+      `Select_subquery_*_related_FirstOrDefault` because on SQLite it hits the APPLY refusal
+      before the base's owned-tracking assertion; here `TrackAll` fails on a *string comparison*,
+      which is a different statement, so only the `NoTracking` half is taken and `TrackAll` stays
+      red. Likewise EF's `[ConditionalTheory(Skip = "Issue#28886")]` on two
+      `NorthwindBulkUpdates` tests is **not** adopted: the reason matches exactly
+      (`SQLite Error 1: 'no such column'`) but a skip hides a count, and this repo records an EF
+      issue red — as `PrimitiveCollectionsQuery`'s #30730 already is.
+
+      **The 14 left in `Query.Associations`** are 8 `Index_*` (C1/C2's A28 shape plus the §6
+      trade), 2 `Over_associate_collection_projected` (C2's undiagnosed pair), 2
+      `Select_subquery_*(TrackAll)`, 1 `Distinct_projected(TrackAll)` and 1
+      `Contains_with_nested_and_composed_operators`. **The 6 left in `BulkUpdates`** are 4 EF
+      issue #28886 and 2 `Update_with_invalid_lambda_in_set_property_throws` — the latter still
+      `UnreachableException`, because an unshippable *setter* (the test's own `MaybeScalar`
+      extension is not allowlisted, correctly) refuses the whole call and lets EF's marker throw
+      instead of raising a diagnostic. That is a small real defect and it is the one C19 did not
+      cover.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
