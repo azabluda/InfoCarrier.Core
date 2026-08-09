@@ -1655,6 +1655,58 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `Microsoft.EntityFrameworkCore` and `…Relational`. Adding a third package reference to the
       **product** assembly belongs with M8's productization work, not smuggled into a test adoption.
 
+- [ ] **C9. The two spatial bases: attempted, measured, reverted. The blocker is the wire, not the
+      package.** No code change; this is the finding. `<this commit>`
+
+      C0 put these on **Tier A** and that part holds: EF ships an InMemory spatial suite as well as
+      a SQLite one, `SpatialFixtureBase` and `SpatialQueryFixtureBase` are in the core assembly this
+      project already references, and EF's own fixtures for them are four lines each. No SpatiaLite,
+      no native library. The adoption itself was 70 lines and built first time.
+
+      **Then 173 of 173 failed identically**, before any query ran:
+
+          No suitable constructor was found for the type 'LineString'.
+          Cannot bind 'points' in 'LineString(Coordinate[] points)'
+
+      `InfoCarrierTypeMappingSource` maps value types, `string` and `byte[]`; a geometry is a
+      *reference* type, so it falls through, the mapping source says "not a scalar", and EF's
+      convention concludes the only other thing available — that `LineString` is an **entity type**.
+      `InMemoryTypeMappingSource`, which this class was copied from, carries an explicit
+      NetTopologySuite branch that ours is missing. Mirroring it is ~20 lines and is obviously
+      right.
+
+      **And that is where it stops, hard.** With geometries mapped as scalars they travel, and
+      `DynamicValueMapper`'s reflective object-shape walk meets `Geometry.Boundary` and
+      `Geometry.Envelope` — properties that return geometries. It recurses until the stack overflows
+      and **the test host aborts**. That is categorically worse than any number of failures: CLAUDE.md
+      already records that a crashed host reports fewer failures because fewer tests ran, and once
+      came within one measurement of looking like an improvement. Both changes reverted whole.
+
+      **The real price, now known.** A geometry needs a *wire form* — WKB or WKT — the way B4's
+      collections needed a store-independent JSON form. The roadmap already has this parked in the
+      right place: **M7, Q7 "spatial Z/M via WKT"**, with requirements §2.8 demanding Z and M
+      ordinates survive, which v1 lost. So the sequence is: give the wire a geometry form, then the
+      type-mapping branch, then these two bases fall in. They stay reported by the compliance test
+      rather than going into `IgnoredTestBases`, because that list is for bases *conceptually
+      inapplicable* to a remoting provider and these are merely not built yet — which is exactly the
+      distinction that file's own doc comment draws.
+
+- [ ] **C10. `AdHocJsonQueryTestBase`: B3d's price re-checked and it holds.** No code change.
+      `<this commit>`
+
+      C3 made this worth re-checking — B3d priced the `ToJson()` mirror at ~630 lines and C3's
+      turned out to be ~20 — but the two are not the same shape. Measured:
+      `AdHocJsonQueryRelationalTestBase` is **626 lines** and `AdHocJsonQuerySqliteTest` **322**, and
+      the core base declares **seven abstract `Seed*` methods** (`Seed30028`, `Seed33046`,
+      `SeedJunkInJson`, `SeedTrickyBuffering`, `SeedShadowProperties`, `SeedNotICollection`,
+      `SeedBadJsonProperties`) that only those two classes implement — with raw SQL inserting JSON
+      documents. C3's twenty lines were a *mapping*; this is a mapping **and** the entire corpus's
+      seed data.
+
+      B3d's other half also holds: the corpus is owned JSON collections throughout, so most of what
+      it would add lands on **B12**, which is still open. Worth doing after B12 is decided, and hard
+      to justify before. Left reported.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
