@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **M2 in progress** · Milestone-level plan for the whole project.
+Status: **M6 in progress** · Milestone-level plan for the whole project.
 
 This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
 only when scope changes.
@@ -17,15 +17,18 @@ Authority: [`infocarrier-core-requirements.md`](infocarrier-core-requirements.md
 ## Where we are
 
 The query pipeline is complete end to end — capture → serialize → transport → server rebind →
-EF execute → client materialization with identity resolution — and the **projection split
-(M2) is implemented**, with the type boundary enforced rather than hidden by the in-process
-harness.
+EF execute → client materialization with identity resolution. The **projection split (M2)**,
+**SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
+rather than hidden by the in-process harness.
 
-Measured 2026-08-02: **4,196 passed / 91 failed / 4,296 total**, across all 21
-`Northwind*QueryTestBase` classes. The suite inherits Microsoft's spec tests (ADR-004), so
-coverage scales by adopting bases, not by writing tests.
+Measured 2026-08-10 (`artifacts/measure/c20`): **`Total tests: 22278, Passed: 21904,
+Failed: 157, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
+scales by adopting bases, not by writing tests — M6 took the unadopted count from 41 to 1.
 
-The 91 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
+The 157 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
+About 125 of them are already answered rather than open: 40 wait on the B12 decision, 26 are
+the `MaterializationInterception` topology B24 settled, 9 are a locale defect in EF's own test
+code, and the rest are spec tests asserting a limitation this provider does not have.
 
 ---
 
@@ -44,7 +47,7 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
   inventory of unimplemented spec bases.
 - Doc integrity closed: ADR-008/ADR-009 recorded ✅, subrepo revisions pinned.
 
-### M2 — Projection split (requirements §3) ← **current**
+### M2 — Projection split (requirements §3) ✅ **complete**
 
 The one genuinely unsolved design problem. **Spec written 2026-08-01:**
 [`projection-split.md`](projection-split.md), recorded as [ADR-010](decisions.md#adr-010).
@@ -118,7 +121,7 @@ minimal-column payload (W1).
   translation failure they assert are re-checked: each returns to asserting its original failure,
   or is deleted.
 
-### M3 — SQLite backend + SaveChanges
+### M3 — SQLite backend + SaveChanges ✅ **complete**
 
 **Exit criteria**
 - `SqliteInfoCarrierBackendTestStore` (ADR-009 Tier B) — holds one connection open for the
@@ -193,18 +196,52 @@ Work the M1 compliance inventory down. Every spec base ends up either implemente
 that `EFCore.InMemory.FunctionalTests` ships neither family at all. The per-base tier verdict is
 plan item C0 and is not re-derived per batch.
 
+**State 2026-08-10: 41 adopted down to 1.** `AdHocJsonQueryTestBase` is the only base the
+compliance test still reports.
+
 **Exit criteria**
-- Relationships, owned types, table splitting, TPH/TPT inheritance (requirements §2.7).
-- Compliance inventory fully classified.
+- Relationships, owned types, table splitting, TPH/TPT inheritance (requirements §2.7). ✅
+- Compliance inventory fully classified. ✅
 - `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` green, or every remaining base in
   `IgnoredTestBases` with its reason in the plan.
 
-### M7 — SQL Server (Tier C) + spatial
+**Only the first of those two routes is open, and that is a scope fact rather than a
+preference.** `IgnoredTestBases` is for bases *conceptually inapplicable* to a remoting provider —
+that is the distinction its own doc comment draws, and plan item C9 applied it when it kept the
+spatial bases reported rather than ignored, on the ground that "not built yet" does not qualify.
+`AdHocJsonQuery` is also merely not built yet. **So M6 closes by adopting it, and by nothing
+else.**
+
+**And that adoption sits behind [B12](implementation-plan.md).** The corpus is owned JSON
+collections throughout, so most of what it adds lands on the undecided question of how a
+JSON-mapped owned collection is keyed. Plan item C21 records the price and the decision not to pay
+it yet: 626 + 322 lines of relational mirror plus seven abstract seeds that only EF's relational
+classes implement. **M6 is therefore blocked on a decision, not on work.**
+
+### M7 — SQL Server (Tier C) + spatial *(spatial half already complete)*
 
 **Exit criteria**
 - Docker SQL Server backend store; nightly CI job (ADR-009 Tier C).
 - `rowversion` concurrency, computed columns, sequences, TPT/TPC.
-- NetTopologySuite with **Z/M ordinates preserved** (requirements §2.8) — v1 lost them.
+- ~~NetTopologySuite with **Z/M ordinates preserved** (requirements §2.8) — v1 lost them.~~
+  ✅ **Done 2026-08-10, in M6. Do not plan this again.**
+
+**The spatial criterion closed early, and it needed no SQL Server.** It arrived in three pieces,
+each landed and measured on its own because plan item C9 had attempted two of them together and
+aborted the test host:
+
+| Piece | Plan | What it is |
+|---|---|---|
+| Type mapping | C15 | The NetTopologySuite branch every provider carries, in `InfoCarrierTypeMappingSource`. Worth 19 tests by itself: the client — not SpatiaLite — was what could not map a `Point`. |
+| Value-mapper seam | C17, [ADR-012](decisions.md#adr-012) | Product API. A geometry travels as one wire primitive instead of being walked reflectively, which is what overflowed the stack in C9. |
+| WKT mapper | C18 | **Test-side**, so `InfoCarrier.Core` still does not reference NetTopologySuite — v1's arrangement, kept. |
+
+**Z and M survive because the format is WKT, not v1's GeoJSON**, which carries neither. That is
+the defect requirements §2.8 records, and Q7 below is the entry that named WKT as the answer.
+`GeometryWireFormatTest` asserts the ordinates and the SRID directly: the two spatial spec suites
+model XY at SRID 0 and would pass all 173 tests against a mapper that silently dropped them.
+
+Both spatial bases are adopted on **Tier A**, 169 of 173.
 
 ### M8 — Productization
 
@@ -250,4 +287,4 @@ From wire-protocol §5 and research-findings §10 — resolved in the milestone 
 | W5 exception fidelity · W6 cancellation | M5 |
 | Q5 canonical form + compiled-query cache · Q10 server delegate cache | M8 |
 | Q6/W4 streaming vs identity resolution | M8 |
-| Q7 spatial Z/M via WKT | M7 |
+| ~~Q7 spatial Z/M via WKT~~ ✅ **done 2026-08-10** (C15/C17/C18, landed in M6) | ~~M7~~ |

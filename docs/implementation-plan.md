@@ -5874,15 +5874,28 @@ Both are now in CLAUDE.md, because each has cost a wrong verdict:
 
 ## Exit criteria
 
-M2 closes when all of:
+**This section had drifted four milestones — it described M2 until 2026-08-10.** That is the exact
+failure the roadmap/plan split exists to prevent, and it is worth one sentence about why it went
+unnoticed: nothing reads this section on the way past. The checkboxes above are what each session
+works from, so a stale heading below them costs nothing until a milestone boundary arrives, and
+then it is wrong at the one moment it is consulted. **Rewrite it in the same commit that opens a
+new milestone, not in the one that closes the old one.**
 
-1. N1–N6 done (M1's infrastructure tail).
-2. Boundary computed on the client; `ServerQueryExecutor` unchanged.
-3. W1 minimal-column payload demonstrated (B3).
-4. `NorthwindSelectQueryTestBase` and `NorthwindJoinQueryTestBase` adopted and passing.
-5. Suite failures at or below the pre-L1 baseline of **32**, with the ~1,305 M2 failures cleared.
+M6 closes when all of:
 
-Then rewrite this doc for **M3 — SQLite backend + SaveChanges**.
+1. Relationships, owned types, table splitting, TPH/TPT inheritance covered (requirements §2.7). ✅
+2. The compliance inventory fully classified — every failure attributable to a plan entry. ✅
+3. `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` green.
+
+**Criterion 3 has one base left, `AdHocJsonQuery`, and only one route to it.** The roadmap's
+alternative — "every remaining base in `IgnoredTestBases` with its reason" — does not apply:
+that list is for bases *conceptually inapplicable* to a remoting provider, and C9 already refused
+it for the spatial bases on the ground that "not built yet" does not qualify. The same refusal
+binds here. **So M6 is blocked on the B12 decision** (C21), not on available work.
+
+Then archive this doc as `docs/archive/2026-08-m6-coverage-expansion-plan.md` and rewrite it for
+**M7 — SQL Server (Tier C)**, whose spatial half is already done and must not be re-planned
+(C15/C17/C18).
 
 ## Baseline log
 
