@@ -238,12 +238,14 @@ nothing. Stale files are swept once at startup instead.
 therefore **locale-dependent** — a machine with a `.` separator reports two fewer failures with no
 code change. Grep a run for *"cannot be converted to type"* before treating that as movement.
 
-**There is one known intermittent, and closing it is the next session's first job (C11).**
-`SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity` failed in `c10` and passed
-in `c10b` on the same commit. It passes in isolation and in every pairing tried; only the full run
-reproduces it. The failure is an identity conflict on a *temporary* key, so two entities in one
-context got the same one. **Do not measure anything else until it is closed** — a flake poisons
-every measurement after it — and hold the fix to the three-run bar.
+**One intermittent is on watch — `SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity`.**
+It failed in `c10` and passed in `c10b` on the same commit; it passes in isolation and in every
+pairing tried, and only the full run reproduces it. The failure is an identity conflict on a
+*temporary* key, so two entities in one context got the same one. **One incident is recorded (C11)
+and that is deliberately all: watch for it, and act on a recurrence.** Chasing a
+single-occurrence intermittent costs more than it returns — but note the sighting in the plan when
+it happens, because the second one is what makes it a defect, and hold any fix to the three-run
+bar.
 
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the

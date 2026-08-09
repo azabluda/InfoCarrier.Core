@@ -1779,7 +1779,10 @@ ships a test on, and where both exist the tier that *translates* is the one whos
         the next question is whether anything in this provider's SaveChanges path resets or
         re-reads it non-atomically.
 
-      **Do not measure anything else until this is closed**, and hold it to the three-run bar.
+      **Decision 2026-08-09: record this one incident and watch.** Not chased — a single occurrence
+      with no second data point costs more to hunt than it returns, and everything cheap has already
+      been tried. **A recurrence makes it a defect**: note each sighting here, and act on the
+      second, holding any fix to the three-run bar.
 
 ## Phase B — the tier audit, and the rework it found
 
