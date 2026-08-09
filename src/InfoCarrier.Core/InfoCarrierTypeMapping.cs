@@ -14,6 +14,13 @@ public class InfoCarrierTypeMapping : CoreTypeMapping
     ///     Initializes a new instance of the <see cref="InfoCarrierTypeMapping" /> class.
     /// </summary>
     /// <param name="clrType">The CLR type being mapped.</param>
+    /// <param name="comparer">
+    ///     How EF compares and snapshots a value of this type. Left null for the CLR primitives,
+    ///     whose default comparer is correct; supplied for a type EF cannot compare structurally
+    ///     on its own — a NetTopologySuite geometry, whose comparer is built by reflection so that
+    ///     naming it costs no package reference.
+    /// </param>
+    /// <param name="keyComparer">As <paramref name="comparer" />, for a value used as a key.</param>
     /// <param name="jsonValueReaderWriter">
     ///     How EF reads and writes a value of this type as JSON. Not optional in practice: a
     ///     <em>primitive collection</em> — <c>List&lt;string&gt;</c> on a complex type, say — is
@@ -22,8 +29,17 @@ public class InfoCarrierTypeMapping : CoreTypeMapping
     ///     <c>InMemoryTypeMappingSource</c> supplies it for the same reason.
     /// </param>
     public InfoCarrierTypeMapping(
-        Type clrType, Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? jsonValueReaderWriter = null)
-        : base(new CoreTypeMappingParameters(clrType, jsonValueReaderWriter: jsonValueReaderWriter))
+        Type clrType,
+        Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer? comparer = null,
+        Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer? keyComparer = null,
+        Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? jsonValueReaderWriter = null)
+        : base(
+            new CoreTypeMappingParameters(
+                clrType,
+                converter: null,
+                comparer,
+                keyComparer,
+                jsonValueReaderWriter: jsonValueReaderWriter))
     {
     }
 

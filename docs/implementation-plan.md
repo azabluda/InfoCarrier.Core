@@ -1882,6 +1882,33 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       checked before the tier is designed: if there is one, this is cheap and closes B12; if Cosmos
       is the only option, it is an M7-sized commitment and competes with SQL Server for that slot.
 
+- [x] **C15. The NetTopologySuite branch in `InfoCarrierTypeMappingSource`, landed alone.**
+      **`Total tests: 22102, Passed: 21531, Failed: 363, Skipped: 208`** (`c15`) — **382 → 363, 19
+      fixed, 0 broken, total unchanged.** ✅ `<this commit>`
+
+      C14 said the ~20-line branch was worth up to 34 red tests and that it had to be measured by
+      itself, because C9's combined attempt aborted the host. Landed alone: **no abort, nothing
+      broken, and the 19 it fixed are exactly the two classes C14 named** — 8 of
+      `BadDataJsonDeserialization`'s `Throws_for_bad_point_as_GeoJson` and 11 `JsonTypes`.
+
+      The change is `InMemoryTypeMappingSource`'s branch, which is also v1's verbatim: match
+      `NetTopologySuite.Geometries.Geometry` by `FullName` up the base-type chain, build a
+      `GeometryValueComparer<>` through `Activator`, pass it as comparer *and* key comparer.
+      `InfoCarrierTypeMapping` grew the two comparer parameters `InMemoryTypeMapping` has.
+      **No package reference**: `GeometryValueComparer<>` is in EFCore proper and reflects for
+      `EqualsExact`/`Copy`, and the type match is on a string, so the product assembly still does
+      not know NetTopologySuite exists.
+
+      **The 15 spatial failures left are two blocks, and neither is this provider:**
+
+      | # | Tests | Reading |
+      |---|---|---|
+      | 8 | `Can_read_write_{point,point_with_M,point_with_Z,point_with_Z_and_M,line_string,multi_line_string,polygon,polygon_typed_as_geometry}` | `NullReferenceException` — no `JsonValueReaderWriter` exists for a geometry, so the JSON round-trip dereferences null. **EF's `JsonTypesInMemoryTest` overrides these exact eight with `Assert.ThrowsAsync<NullReferenceException>`**, and now that the model validates the reason matches ours character for character. A63 says take them; C16 does. |
+      | 7 | the `_as_GeoJson` variants of the same eight, less `line_string` | **A64, the `en-SE` locale.** `JsonGeoJsonReaderWriter` (EF's own, in `JsonTypesTestBase`) writes a number with `StringBuilder.Append(reader.GetDecimal())`, which is culture-sensitive: `[2.0,4.0]` is re-emitted as `[2,0,4,0]` and read back as `POINT (2 0)`. `line_string_as_GeoJson` passes by luck — its ordinates are 0 and 1, so the doubled array still starts with the right pair. |
+
+      The nullable variants all pass now, and EF does not override them either — the same tell that
+      the eight are a genuine InMemory-shaped limitation rather than an accident of ours.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

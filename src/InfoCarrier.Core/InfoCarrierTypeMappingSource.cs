@@ -26,15 +26,51 @@ public class InfoCarrierTypeMappingSource : TypeMappingSource
         // change tracking works. No store-specific conversion — the server owns the real
         // store mapping.
         Type? clrType = mappingInfo.ClrType;
-        if (clrType is not null
-            && (clrType.IsValueType
-                || clrType == typeof(string)
-                || (clrType == typeof(byte[]) && mappingInfo.ElementTypeMapping == null)))
+        if (clrType is null)
+        {
+            return base.FindMapping(mappingInfo);
+        }
+
+        if (clrType.IsValueType
+            || clrType == typeof(string)
+            || (clrType == typeof(byte[]) && mappingInfo.ElementTypeMapping == null))
         {
             return new InfoCarrierTypeMapping(
-                clrType, Dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType));
+                clrType,
+                jsonValueReaderWriter: Dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType));
+        }
+
+        // A NetTopologySuite geometry is the one reference type that has to be mapped as a
+        // scalar. Without this the property falls through, the mapping source says "not a
+        // scalar", and EF's convention concludes the only other thing available — that
+        // `Point` is an *entity type*, which fails model validation. `GeometryValueComparer<>`
+        // lives in EFCore proper and is built by reflection, so naming NetTopologySuite here
+        // costs no package reference (mirrors `InMemoryTypeMappingSource`).
+        if (IsGeometry(clrType))
+        {
+            var comparer = (Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer)Activator.CreateInstance(
+                typeof(Microsoft.EntityFrameworkCore.ChangeTracking.GeometryValueComparer<>).MakeGenericType(clrType))!;
+
+            return new InfoCarrierTypeMapping(
+                clrType,
+                comparer,
+                comparer,
+                Dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType));
         }
 
         return base.FindMapping(mappingInfo);
+    }
+
+    private static bool IsGeometry(Type clrType)
+    {
+        for (Type? t = clrType; t is not null; t = t.BaseType)
+        {
+            if (t.FullName == "NetTopologySuite.Geometries.Geometry")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
