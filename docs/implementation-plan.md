@@ -1740,7 +1740,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       to justify before. Left reported.
 
 - [ ] **C11. Phase C measured whole — and it surfaced an intermittent. TOP PRIORITY next session.**
-      **`Total tests: 22102, Passed: 21512, Failed: 382, Skipped: 208`** (`c10b`). No code change;
+      **`Total tests: 22102, Passed: 21503, Failed: 382, Skipped: 217`** (`c10b`). No code change;
       this entry is the measurement and the flake. `<this commit>`
 
       **The adoption, whole.** 150 → 382 failures on 21351 → **22102** tests: **751 new tests, 233
@@ -1883,7 +1883,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       is the only option, it is an M7-sized commitment and competes with SQL Server for that slot.
 
 - [x] **C15. The NetTopologySuite branch in `InfoCarrierTypeMappingSource`, landed alone.**
-      **`Total tests: 22102, Passed: 21531, Failed: 363, Skipped: 208`** (`c15`) — **382 → 363, 19
+      **`Total tests: 22102, Passed: 21522, Failed: 363, Skipped: 217`** (`c15`) — **382 → 363, 19
       fixed, 0 broken, total unchanged.** ✅ `<this commit>`
 
       C14 said the ~20-line branch was worth up to 34 red tests and that it had to be measured by
@@ -1930,7 +1930,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       parameterizations xUnit cannot convert (A64 proper).
 
 - [x] **C17. The value-mapper seam — new public API, ADR-012.**
-      **`Total tests: 22102, Passed: 21539, Failed: 355, Skipped: 208`** (`c17`) — **363 → 355, 8
+      **`Total tests: 22102, Passed: 21530, Failed: 355, Skipped: 217`** (`c17`) — **363 → 355, 8
       fixed, 0 broken**, and the 8 are C16's overrides arriving in a full run. The seam itself
       moved nothing, which is what it promised. ✅ `<this commit>`
 
@@ -2008,7 +2008,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       measured reason rather than EF's silence.
 
 - [x] **C19. `ExecuteUpdate` was never a boundary problem. It was one name on the allowlist.**
-      **`Total tests: 22278, Passed: 21864, Failed: 206, Skipped: 208`** (`c19`) — **359 → 206,
+      **`Total tests: 22278, Passed: 21855, Failed: 206, Skipped: 217`** (`c19`) — **359 → 206,
       153 fixed, 0 broken.** ✅ `<this commit>`
 
       C0 guessed this would be a boundary or wire change and flagged it as new scope; C3 and C4
@@ -2046,7 +2046,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       setter lambda does, which is a different question.
 
 - [x] **C20. The borrowed overrides C3 and C4 deferred — the second pass.**
-      **`Total tests: 22278, Passed: 21913, Failed: 157, Skipped: 208`** (`c20`) — **206 → 157,
+      **`Total tests: 22278, Passed: 21904, Failed: 157, Skipped: 217`** (`c20`) — **206 → 157,
       49 fixed, 0 broken.** Test-side only. ✅ `<this commit>`
 
       C3 and C4 adopted their bases with no overrides at all, on purpose: adopt, classify, then
@@ -2095,6 +2095,29 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       extension is not allowlisted, correctly) refuses the whole call and lets EF's marker throw
       instead of raising a diagnostic. That is a small real defect and it is the one C19 did not
       cover.
+
+- [x] **C21. `AdHocJsonQuery` not taken, and the `Skipped` figure corrected.** No code change.
+      ✅ `<this commit>`
+
+      **`AdHocJsonQuery` is left unadopted, deliberately, and is now the only base the compliance
+      test reports.** C10's price re-check holds and nothing since has changed it: 626 + 322 lines
+      of relational mirror, seven abstract `Seed*` methods that only EF's relational classes
+      implement (raw SQL inserting JSON documents), and a corpus that is owned JSON collections
+      throughout — so most of what it would add lands on **B12**, still an open decision. Adopting
+      it would buy a large, hand-written mirror whose output is a block of red tests attributable
+      to a design question nobody has answered. **Worth doing after B12 is decided; hard to justify
+      before.**
+
+      **The `Skipped` figure recorded against `c10b` was wrong, and it propagated.** `c10b.log`
+      says `Passed: 21503, Failed: 382, Skipped: 217`; C11 recorded `21512 / 382 / 208`. The `208`
+      was `b21b`'s, still right there — Phase C's own adoptions brought nine of EF's skips with
+      them at `c10` — and `Passed` was then derived by subtraction rather than read. C11 is
+      corrected in place, and C15/C17/C19/C20 above are corrected too, having inherited it.
+
+      **`Failed` and `Total` were right throughout**, which is why nothing was judged wrongly: those
+      are the two `eng/measure.sh` parses and the two `eng/ratchet.sh` guards. But the rule the
+      repo already states for counts applies to all four — **read them out of the run's summary
+      block; none of them is arithmetic.**
 
 ## Phase B — the tier audit, and the rework it found
 

@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22102, Passed: 21512, Failed: 382, Skipped: 208`** (2026-08-09) across the
+**`Total tests: 22278, Passed: 21904, Failed: 157, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -127,24 +127,31 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `AdHoc*Query` bases, `OwnedQueryTestBase` and the shared-type query bases on Tier A, plus
 `OptimisticConcurrency`, `ConferencePlanner`, `FunkyDataQuery`, `ComplexTypeQuery`,
 `AdHocComplexTypeQuery`, `PrimitiveCollectionsQuery`, `NonSharedPrimitiveCollectionsQuery`,
-`JsonQuery`, `StoreGenerated` and the sixteen `Types.TypeTest` classes on Tier B.
+`JsonQuery`, `StoreGenerated`, the sixteen `Types.TypeTest` classes, `Query.Associations.*` and
+`BulkUpdates.*` on Tier B, and the two spatial bases on Tier A.
 `PropertyValues`, `Find`, `ManyToManyTracking`,
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load`, `Updates`, `WithConstructors`,
-`ComplexTypeQuery` and both `ManyToMany*Load` bases are clear.
+`ComplexTypeQuery`, `Spatial` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
-the A59/A61/A62/A63/A65 tables for the 75 those batches added, and Phase B's B3a–B16 for what the
-Tier B adoptions added** — read out of `artifacts/measure/`, currently `c10b`. The largest blocks
-are **40 `JsonQuery`** (38 of them B12, a decision), **28 `JsonTypes`**, **26
+the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
+Tier B adoptions added, and Phase C's C1–C20 for the rest** — read out of `artifacts/measure/`,
+currently `c20`. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
-A71) and **5
-`PrimitiveCollectionsQuery`** (4 are B22's §6 trade, 1 is EF issue #30730). Only **4** are wrong
-answers (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
+A71), **20 `ComplexNavigations`**, **14 `Query.Associations`** (C20) and **9 `JsonTypes`** (7 of
+them A64's locale, not this provider). Only **4** are wrong answers
+(`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
 — the latter diagnosed in full and reverted, B23) and
 **6** are undiagnosed exceptions; **12** are the A28 shape — a spec test asserting a materialization
 limitation this provider does not have, whose query body is inline in a `protected static` assert
 helper so the assertion cannot be inverted from a derived class. The rest are a deliberate allowlist
 refusal (`Regex_IsMatch`, A46) or a known singleton.
+
+**`Skipped` is 217, and was 217 in `c10b` too.** The number recorded against `c10b` was `208` —
+carried over from `b21b`, where it was right — and `Passed` was then derived from it rather than
+read. Phase C's adoptions brought nine of EF's own skips with them. `Failed` and `Total` were
+correct throughout, so nothing was judged wrongly, but **all four figures come out of the run's
+own summary block; none of them is arithmetic.**
 
 **A28 has a second face, and it is the one to check first when a spec test looks like a design
 question.** A28 proper is a spec test asserting a *materialization* limitation this provider does
@@ -186,26 +193,26 @@ Not yet implemented, in rough priority order:
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
   had drifted badly.
-- **The remaining spec bases — 2** (Phase C, 2026-08-09: 41 adopted down to 2). Everything the
-  compliance test used to list is in, including the four "infrastructure" bases and `Seeding`,
-  whose A65 blocker turned out to be a statement about the *client's* constructor only (C7). The
-  two left:
-  - **Spatial ×2 — the route is known and it is not SpatiaLite.** v1 solved this in two halves
-    (C12): the same NetTopologySuite branch in `InfoCarrierTypeMappingSource` that every provider
-    has, plus a **value-mapper seam** — v1's `IInfoCarrierValueMapper` chain — so a geometry is
-    written as one string instead of being walked reflectively. Without the seam the walk meets
-    `Geometry.Boundary`/`Envelope` and **overflows the stack, aborting the test host** (C9). v1 kept
-    NetTopologySuite out of its *product* assembly entirely by registering the geometry mapper
-    test-side; do the same, and use **WKT, not v1's GeoJSON**, which loses the Z/M ordinates
-    requirements §2.8 exists for.
-  - **`AdHocJsonQuery`** — B3d's price re-checked in C10 and it holds: 626 + 322 lines of relational
-    mirror and seven abstract seeds only EF's relational classes implement. Behind **B12**.
-- **The ~20-line NTS branch is worth ~34 red tests before any of that** (C14). The long-standing
-  note that the spatial `JsonTypes` and `BadDataJsonDeserialization` failures "need the SpatiaLite
-  package" is **wrong**: they fail in `ModelValidator` because *the client* cannot map a `Point`.
-  `JsonTypes` runs on Tier A, whose InMemory backend maps geometry fine, and
-  `BadDataJsonDeserialization` has no store at all. Land the branch **alone** and measure it before
-  touching the seam or the spatial bases.
+- **The remaining spec bases — 1** (Phase C, 2026-08-10: 41 adopted down to 1). Everything the
+  compliance test used to list is in, including the four "infrastructure" bases, `Seeding` (C7) and
+  **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`** — B3d's price
+  re-checked in C10 and it holds: 626 + 322 lines of relational mirror and seven abstract seeds only
+  EF's relational classes implement, and the corpus is owned JSON collections throughout so most of
+  what it adds lands on **B12**, which is undecided.
+- **Spatial works, and the shape of how is worth keeping.** Three pieces, landed and measured
+  separately because C9's combined attempt aborted the host: the NetTopologySuite branch in
+  `InfoCarrierTypeMappingSource` (C15, worth 19 on its own — the long-standing "needs SpatiaLite"
+  note was wrong, and the provider that could not map a `Point` was *the client*); **ADR-012's
+  value-mapper seam** (C17); and a **WKT** geometry mapper registered **test-side** (C18), which is
+  why the product assembly still does not reference NetTopologySuite. Not GeoJSON — it carries no Z
+  or M, which is the v1 defect requirements §2.8 records.
+- **The seam is the general answer to "a CLR type the wire cannot walk."** B23's `IPAddress` is the
+  other instance and its diagnosis is complete and waiting; the converter route it rejected costs
+  381. **Its one known gap**: `IInfoCarrierValueMapper.TryMapToWire` takes an *instance*, so the
+  boundary analyzer cannot ask whether a **type** travels whole — which is why a
+  `GeometryCollection`, being `IEnumerable<Geometry>`, is slotted as a `List<Geometry>` and
+  `MultiLineString[0]` fails to bind (C18's 4). A type-level probe is the route and is an addition
+  to a just-locked ADR.
 - **`MaterializationInterception` is 27 and is *not* a decision (B16, answered 2026-08-09).** This
   provider is **two EF instances**, and a real deployment must be free to define materialization
   hooks on either side or both — so the three routes B16 measured, each of which suppresses one
@@ -224,12 +231,23 @@ Not yet implemented, in rough priority order:
   run the same `OnModelCreating`; only the *convention* that rewrites such a key is relational.
   38 failures, and no client-side route that does not either invent the ordinal or overwrite a
   property a query can project.
-- **`Query.Associations.*` + `BulkUpdates.*` is 32 of the 41.** The standing note said they have
-  no InMemory counterpart and were therefore out of scope; after A79 that is a **Tier B** question,
-  not an out-of-scope one, so re-examine the premise before asking. Either way it is a roadmap
-  decision. Do not start it without asking.
+- **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
+  The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
+  they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all
+  classified in C20.
 - **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
   `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
+
+**`ExecuteUpdate` is the cautionary tale of this phase, and it is about pricing rather than code.**
+Three plan entries (C0, C3, C4) recorded it as a wire or boundary change and priced it at 136 —
+on the strength of reading `UnreachableException: Can't call this overload directly` as proof that
+the split evaluated the call on the client. It *was* evaluated on the client, and the cause was one
+missing name on the ADR-008 allowlist: `ExecuteUpdate`'s rewritten call names
+`IReadOnlyList<ITuple>`, `Tuple<,>` and `IReadOnlyList<>` were both already admitted, and `ITuple`
+was not. **A probe in `QuerySplitter.Split` printing the boundary verdict and `Diagnose(query)`
+named it in one filtered run** (C19, 153 closed), and the same probe established in the run before
+that `ExecuteDelete` had never been broken at all. The standing probe rule is "establish that the
+code *ran*"; point it one step earlier — *where is this being cut* — before pricing a gap.
 
 The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF
 Core's own `SqliteTestStore` is. Do not move it back to `Mode=Memory;Cache=Shared`: that makes
@@ -241,11 +259,16 @@ failure once the suite passed ten thousand tests: a shared store's disposal re-a
 and let a later class re-seed the file a live one was still using. `DisposeAsync` now releases
 nothing. Stale files are swept once at startup instead.
 
-**The runtime culture on this machine is `en-SE`, whose decimal separator is a comma.** Four
-`JsonTypes` decimal parameterizations fail here purely because xUnit cannot convert their
-`InlineData` strings, and EF's own suite fails them the same way (A64). The suite total is
-therefore **locale-dependent** — a machine with a `.` separator reports two fewer failures with no
-code change. Grep a run for *"cannot be converted to type"* before treating that as movement.
+**The runtime culture on this machine is `en-SE`, whose decimal separator is a comma**, and it
+costs **nine** failures, all in `JsonTypes` and none of them this provider's. Two are decimal
+parameterizations xUnit cannot convert from their `InlineData` strings, and EF's own suite fails
+them the same way (A64). The other seven are the `_as_GeoJson` family: EF's own
+`JsonGeoJsonReaderWriter` re-emits a number with `StringBuilder.Append(reader.GetDecimal())`, which
+is culture-sensitive, so `[2.0,4.0]` comes back as `[2,0,4,0]` and the point reads as
+`POINT (2 0)`. `line_string_as_GeoJson` passes by luck, its ordinates being 0 and 1. The suite
+total is therefore **locale-dependent** — a machine with a `.` separator reports nine fewer
+failures with no code change. Grep a run for *"cannot be converted to type"* and for
+`_as_GeoJson` before treating either as movement.
 
 **One intermittent is on watch — `SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity`.**
 It failed in `c10` and passed in `c10b` on the same commit; it passes in isolation and in every
