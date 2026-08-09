@@ -1784,6 +1784,34 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       been tried. **A recurrence makes it a defect**: note each sighting here, and act on the
       second, holding any fix to the three-run bar.
 
+- [ ] **C14. "The spatial failures need SpatiaLite" is wrong, and has been for a while.** No code
+      change; this is the correction. `<this commit>`
+
+      CLAUDE.md has said since A64 that the spatial block *"needs the SpatiaLite package"* and the
+      roadmap parks it in M7 on that basis. Reading the actual failure says otherwise:
+
+          The 'Point' property 'PointType.Point' could not be mapped because the database provider
+          does not support this type.
+            at ModelValidator.ValidatePropertyMapping
+
+      **The model does not validate.** No store is involved, and the two classes say why:
+      `JsonTypesInfoCarrierTest` is on **Tier A** — its backend is InMemory, which carries the NTS
+      branch and maps geometry perfectly well — and `BadDataJsonDeserializationTestBase` has **no
+      store at all**; it builds a model and tests JSON deserialization. The provider that "does not
+      support this type" is **the client**, and it is the same missing branch in
+      `InfoCarrierTypeMappingSource` that C9 found and C12 traced to v1.
+
+      **So the ~20-line branch is worth up to 34 currently-red tests on its own** — 26 `JsonTypes`
+      and 8 `BadDataJsonDeserialization` by keyword count in `c10b` — before any spatial base is
+      adopted and before any wire form exists.
+
+      **Measure it alone.** C9's stack overflow came from `SpatialQueryTestBase` running queries
+      that return geometries through `DynamicValueMapper`'s reflective walk. These 34 do not cross
+      the wire that way, so the branch should be safe by itself — but "should be" is exactly the
+      kind of claim this repo measures, and the failure mode is a host abort, which is the one
+      outcome worse than a red test. **Land the branch on its own, measure, and only then take the
+      seam and the spatial bases (C12).**
+
 - [ ] **C13. A non-relational Tier D — raised 2026-08-09, recorded, not started.** A roadmap
       question; ADR-009 owns the tier list. `<this commit>`
 
