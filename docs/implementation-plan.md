@@ -1929,6 +1929,36 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       The nine left: 7 `_as_GeoJson` (A64, the `en-SE` locale — see C15's table) and 2 decimal
       parameterizations xUnit cannot convert (A64 proper).
 
+- [x] **C17. The value-mapper seam — new public API, ADR-012.**
+      **`Total tests: 22102, Passed: 21539, Failed: 355, Skipped: 208`** (`c17`) — **363 → 355, 8
+      fixed, 0 broken**, and the 8 are C16's overrides arriving in a full run. The seam itself
+      moved nothing, which is what it promised. ✅ `<this commit>`
+
+      C12 read the route out of v1 and named the missing half: `IDynamicValueMapper` is the whole
+      mapper, not a chain, so an application had nowhere to say "this CLR type travels as one
+      string". `InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper` is that chain —
+      `TryMapToWire` / `TryMapFromWire`, both `bool`, both able to decline. Consulted in exactly
+      two places: forward in `MapToNode` after the primitive branch and before the collection and
+      object-shape branches, reverse in `Materialize` before the scalar branch.
+
+      **Why it cannot regress anything.** With no mapper registered both hooks are `foreach` loops
+      over an empty list. The measurement is the claim: 0 broken, and the only reason-histogram
+      movement is C16's ten `NullReferenceException`s becoming two.
+
+      **No wire-format change.** A claimed value rides as one wire primitive under a `TypeNode`
+      naming its *original* CLR type — which is also what keeps ADR-008 constraint 2 intact, since
+      a mapped property type is already on `TypeAllowlist.ForModel`. Nothing was widened.
+
+      Registration is the application's on **both** halves, and the two are found differently: the
+      client's chain comes out of EF's internal service provider (DI, alongside the rest of the
+      serialization pipeline), the server's out of the provider `InProcessInfoCarrierServer` was
+      built with, because `ExpressionSerializer.CreateForModel` is called by hand there rather
+      than resolved.
+
+      **This is the piece worth building regardless of spatial**, as C12 said: it is the general
+      answer to "a CLR type the wire cannot walk", and B23's `IPAddress` is the other instance —
+      its diagnosis is complete and the converter route it rejected cost 381.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

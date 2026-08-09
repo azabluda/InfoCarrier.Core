@@ -60,11 +60,21 @@ public class ExpressionSerializer : IExpressionSerializer
     ///     which constructs the pipeline from the resolved <see cref="Microsoft.EntityFrameworkCore.DbContext.Model" />
     ///     rather than resolving <see cref="IModel" /> from DI (which is scoped to the context).
     /// </summary>
-    public static ExpressionSerializer CreateForModel(Microsoft.EntityFrameworkCore.Metadata.IModel model)
+    /// <param name="model">The server's EF model.</param>
+    /// <param name="valueMappers">
+    ///     The server's <see cref="ValueMapping.IInfoCarrierValueMapper" /> chain. A value the
+    ///     wire cannot walk has to be mapped on <em>both</em> halves, and the server's half is
+    ///     not DI-resolved along with the rest of this pipeline, so it is passed in — see
+    ///     <see cref="InProcessInfoCarrierServer" />, which reads it from the service provider it
+    ///     was built with.
+    /// </param>
+    public static ExpressionSerializer CreateForModel(
+        Microsoft.EntityFrameworkCore.Metadata.IModel model,
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null)
     {
         var typeMapper = new TypeNodeMapper(model);
         var typeResolver = new TypeNodeResolver(model);
-        var valueMapper = new DynamicValueMapper(model, typeMapper, typeResolver);
+        var valueMapper = new DynamicValueMapper(model, typeMapper, typeResolver, valueMappers);
         var forward = new ExpressionToNodeTranslator(typeMapper, valueMapper);
         return new ExpressionSerializer(forward, typeResolver, valueMapper);
     }

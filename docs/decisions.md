@@ -315,3 +315,55 @@ collection. The verification guard is what makes a wrong rewrite cost nothing.
 wrote is still a boundary. Only compiler-generated identifiers are re-carried. Server-ok remains
 a type property and not a translatability property, so the guards reduce risk without removing
 it — which is why each phase is measured separately and reverted if it does not pay.
+
+## ADR-012 — A value-mapper seam for CLR types the wire cannot walk — LOCKED (2026-08-09)
+
+**Context.** The wire's default handling of a non-primitive, non-entity value is a reflective
+walk of its public readable members. That is right for an anonymous type, a record or a DTO, and
+it is *destructive* for a type whose members are computed. Two instances are already in the
+suite, and neither is hypothetical:
+
+- **`NetTopologySuite.Geometries.Geometry`** exposes `Boundary` and `Envelope`, both of which
+  return geometries. C9 mapped geometries as scalars, let one travel, and the walk recursed until
+  **the stack overflowed and the test host aborted** — the one outcome this repo holds to be
+  worse than any number of red tests.
+- **`System.Net.IPAddress`**, whose `ScopeId` throws `SocketException` for an IPv4 address. B23
+  diagnosed `Comparison_with_value_converted_subclass` in full and found no narrow route: sending
+  such a scalar through EF's core `ValueConverterSelector` inside `PrimitiveCoercion.Coerce` fixes
+  it and costs **381**, because `Coerce` is on every scalar path.
+
+ICC v1 solved the first with an `IInfoCarrierValueMapper` chain the result mapper walked before
+its own reflective handling, and kept NetTopologySuite out of its product assembly entirely by
+registering the geometry mapper test-side (C12). v2 had no equivalent: `IDynamicValueMapper` is
+the whole mapper, not a chain, so there was nowhere to register one.
+
+**Decision.** A public `InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper` with two methods,
+`TryMapToWire` and `TryMapFromWire`. Both return `bool` and **both may decline**. The chain is
+resolved from DI — EF's internal service provider on the client, the server's own on the server —
+and `DynamicValueMapper` consults it in two places only:
+
+- forward, in `MapToNode`, **after** the primitive branch and **before** the collection and
+  object-shape branches;
+- reverse, in `Materialize`, **before** the scalar branch.
+
+A claimed value travels as **one wire primitive** — a `string` or a `byte[]`, the forms
+`ExpressionJsonContext` already registers — under a `TypeNode` naming its **original** CLR type.
+
+**Rationale.** Declining is what makes this safe to add: with no mapper registered the two hooks
+are loops that do not run, so nothing that does not opt in can change. Carrying the original type
+on the node is what makes the reverse side able to find the mapper at all, and it keeps
+[ADR-008](#adr-008) constraint 2 intact — the type named is a mapped property type, which
+`TypeAllowlist.ForModel` already admits, so no allowlist widening is implied and none was made.
+**No wire-format change**: this adds no message, no node kind and no field.
+
+The contract is stated in terms of the **CLR type alone**, deliberately. A mapper runs on both
+halves, and the two halves' models are built by different providers — the standing hazard behind
+B4's 106 failures. A seam that let either side consult a type mapping to decide would reintroduce
+exactly that, so `declaredType` is what a mapper matches on and nothing else is offered.
+
+**Consequences.** Spatial support stays *out* of the product assembly, as it was in v1: a WKT
+geometry mapper is ~30 lines and belongs to whoever already depends on NetTopologySuite.
+Registration is the application's on **both** halves, and a value mapped on one side only will
+fail asymmetrically — that is inherent, and it is why the interface documents it rather than
+guessing a default. This is new public API and so is `ApiConsistencyTestBase`'s business; it is
+also the general answer to "a CLR type the wire cannot walk", which is the shape B23 left open.

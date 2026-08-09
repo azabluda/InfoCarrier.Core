@@ -20,6 +20,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     private readonly IModel? _model;
     private readonly TypeNodeMapper _typeMapper;
     private readonly TypeNodeResolver _typeResolver;
+    private readonly IReadOnlyList<ValueMapping.IInfoCarrierValueMapper> _valueMappers;
 
     // Per-message reference maps (aqua ToContext/FromContext), ReferenceEqualityComparer-keyed.
     // The forward map holds wire ids, not nodes: identity has to survive serialization.
@@ -52,11 +53,26 @@ public class DynamicValueMapper : IDynamicValueMapper
     /// <summary>
     ///     Initializes a new instance of the <see cref="DynamicValueMapper" /> class.
     /// </summary>
-    public DynamicValueMapper(IModel? model, TypeNodeMapper typeMapper, TypeNodeResolver typeResolver)
+    /// <param name="model">The EF model, or <see langword="null" /> when none is available.</param>
+    /// <param name="typeMapper">Writes wire type identities.</param>
+    /// <param name="typeResolver">Resolves them back, through the ADR-008 allowlist.</param>
+    /// <param name="valueMappers">
+    ///     The application's <see cref="ValueMapping.IInfoCarrierValueMapper" /> chain, in
+    ///     registration order — first claim wins. Empty by default, and an empty chain is
+    ///     exactly today's behaviour: the hooks below are two loops that do not run.
+    /// </param>
+    public DynamicValueMapper(
+        IModel? model,
+        TypeNodeMapper typeMapper,
+        TypeNodeResolver typeResolver,
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null)
     {
         _model = model;
         _typeMapper = typeMapper;
         _typeResolver = typeResolver;
+        _valueMappers = valueMappers as IReadOnlyList<ValueMapping.IInfoCarrierValueMapper>
+            ?? valueMappers?.ToList()
+            ?? [];
     }
 
     /// <summary>
@@ -311,6 +327,35 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (IsPrimitive(value))
         {
             return new DynamicValueNode { Type = typeNode, PrimitiveValue = PrimitiveCoercion.Normalize(value) };
+        }
+
+        // The application's value-mapper chain, which gets first refusal on anything that would
+        // otherwise be walked reflectively. Placed here on purpose: *after* the primitive branch,
+        // so a mapper cannot shadow a wire primitive, and *before* the collection and
+        // object-shape branches, which are the two it exists to pre-empt. A custom type can be
+        // enumerable, and the reflective walk is what overflows the stack on a geometry.
+        foreach (ValueMapping.IInfoCarrierValueMapper mapper in _valueMappers)
+        {
+            if (!mapper.TryMapToWire(value, type, out object? wireValue))
+            {
+                continue;
+            }
+
+            // A claimed value has to produce something, because the reverse side keys on
+            // `PrimitiveValue` being present. Declining is how a mapper says "not mine".
+            if (wireValue is null)
+            {
+                throw new InvalidOperationException(
+                    $"Value mapper '{mapper.GetType().Name}' claimed a value of type '{type}' but produced "
+                        + "no wire value. A mapper that cannot map a value must return false instead.");
+            }
+
+            return new DynamicValueNode
+            {
+                Id = id,
+                Type = typeNode,
+                PrimitiveValue = PrimitiveCoercion.Normalize(wireValue),
+            };
         }
 
         // Collection / array.
@@ -641,6 +686,21 @@ public class DynamicValueMapper : IDynamicValueMapper
         if (node.TypeValue is not null)
         {
             return _typeResolver.Resolve(node.TypeValue);
+        }
+
+        // The reverse of the value-mapper hook in MapToNode. Must precede the scalar branch: the
+        // node carries a wire primitive under the value's *original* type, so `Coerce` would be
+        // asked to turn a string into a `Point` and would fail. Keyed on the declared type, so a
+        // chain that does not claim this type costs one predicate per registered mapper.
+        if (node.PrimitiveValue is not null)
+        {
+            foreach (ValueMapping.IInfoCarrierValueMapper mapper in _valueMappers)
+            {
+                if (mapper.TryMapFromWire(node.PrimitiveValue, type, out object? mapped))
+                {
+                    return mapped;
+                }
+            }
         }
 
         // Scalar (mirrors the primitive branch in MapToNode).

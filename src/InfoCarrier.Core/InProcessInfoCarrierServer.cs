@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Collections.Concurrent;
 using InfoCarrier.Core.Common;
@@ -35,6 +35,18 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
     public InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         => _serviceProvider = serviceProvider;
 
+    /// <summary>
+    ///     The server half of the application's value-mapper chain
+    ///     (<see cref="ValueMapping.IInfoCarrierValueMapper" />).
+    /// </summary>
+    /// <remarks>
+    ///     Resolved from the root provider, not a request scope: a mapper converts between a CLR
+    ///     type and a wire primitive and has nothing to hold per request. Empty unless the
+    ///     application registered one, which is the no-op the seam guarantees.
+    /// </remarks>
+    private IEnumerable<ValueMapping.IInfoCarrierValueMapper> ValueMappers
+        => _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>();
+
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
@@ -43,7 +55,7 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model);
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers);
             var executor = new ServerQueryExecutor(lease.Context, serializer);
             return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         }
@@ -61,7 +73,7 @@ public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model);
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers);
             var executor = new ServerSaveChangesExecutor(
                 lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
             return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
