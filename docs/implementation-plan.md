@@ -3090,10 +3090,59 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       NuGet dependency **and a native library** that has to load on this Windows box and on CI's
       ubuntu runner.
 
-      **That is not a tier move, it is a dependency decision, and it belongs to M7.** Note the
-      distinction from the old "needs SpatiaLite" note C15 demolished: that note was wrong about
-      the *client's* type mapping, which needed only an NTS branch. A SQLite *backend* storing
-      geometry genuinely does need SpatiaLite. The two claims look alike and are not.
+      ~~**That is not a tier move, it is a dependency decision, and it belongs to M7.**~~
+      **Retracted by C52**, which added the package and found `mod_spatialite.dll` arrives from
+      NuGet with no manual install. The dependency was never the blocker. The real answer is in
+      C52 and it is better: the tier does not matter, because the index is evaluated on the
+      client. Note the distinction from the old "needs SpatiaLite" note C15 demolished: that note
+      was wrong about the *client's* type mapping, which needed only an NTS branch. A SQLite
+      *backend* storing geometry does need SpatiaLite — it just comes for free.
+
+- [x] **C52. Spatial on Tier B: attempted, measured, reverted — and `Item` is not a tier question
+      at all.** **This class on Tier B: 12 failed of 168. On Tier A: 2 of 168.** No code change
+      survives; this is the negative result. ✅ `<this commit>`
+
+      C43 said Tier B was the cheap route for `SpatialQuery.Item` ×2. C51 said it was blocked by a
+      native dependency. **Both were wrong, and the experiment settled it in one filtered run.**
+
+      **C51's blocker does not exist.** `Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite`
+      depends on the `mod_spatialite` NuGet package, which ships the native library —
+      `runtimes/win-x64/native/mod_spatialite.dll` appeared in the output directory from a package
+      reference alone, exactly as it does for EF's own `EFCore.Sqlite.FunctionalTests`. Nothing has
+      to be installed. That claim is retracted.
+
+      The fixture ported cleanly too: EF's three pieces —
+      `AddEntityFrameworkSqliteNetTopologySuite()`, a `GeoPoint` type-mapping replacement, and a
+      `Distance` DbFunction — are all **server-side**, and the factory's `onAddServices` /
+      `onModelCreating` hooks reach the backend without touching the client model, which knows
+      nothing relational.
+
+      **And then the run said no.**
+
+      | | Tier A | Tier B |
+      |---|---|---|
+      | failing | **2** | **12** |
+
+      | Outcome | Tests | What it means |
+      |---|---|---|
+      | **`Item` unchanged** | 2 | **The decisive one.** Identical `NullReferenceException`, in the same client-side lambda. |
+      | `Intersects_*` overrides become wrong | 4 | *"No exception was thrown"* — SQLite handles the null and the base **passes**. These two overrides are Tier-A workarounds. |
+      | `SimpleSelect`, `Normalized`, `XY_with_collection_join` | 6 | New: `JsonException` converting to a NetTopologySuite geometry. The wire form against SpatiaLite's representation. Undiagnosed. |
+
+      **`Item` is the finding, and C43 had already written it down before contradicting itself.**
+      C24 moved the index onto the **client residual**, so the store never evaluates
+      `MultiLineString[0]` under *any* backend. C43's own analysis says exactly that — and its
+      closing sentence recommended changing the backend anyway. **The error was not the analysis;
+      it was a conclusion inconsistent with the analysis two paragraphs above it.**
+
+      **Do not repeat this.** Spatial stays Tier A. If it ever moves for another reason, the
+      `Intersects_equal_to_null` / `Intersects_not_equal_to_null` overrides must be deleted, and
+      the six `JsonException`s are the price to diagnose first.
+
+      **Noticed while restoring, and unrelated:** `dotnet restore` already reports two known
+      high-severity vulnerabilities in the test project's transitive graph —
+      `System.Security.Cryptography.Xml` 9.0.0 and `SQLitePCLRaw.lib.e_sqlite3` 2.1.11. Both
+      predate this step and are test-only, but nothing in the repo mentions them.
 
 ## Phase B — the tier audit, and the rework it found
 

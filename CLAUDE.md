@@ -213,6 +213,13 @@ Not yet implemented, in rough priority order:
   value-mapper seam** (C17); and a **WKT** geometry mapper registered **test-side** (C18), which is
   why the product assembly still does not reference NetTopologySuite. Not GeoJSON — it carries no Z
   or M, which is the v1 defect requirements §2.8 records.
+- **Spatial stays Tier A, and `SpatialQuery.Item` is not a tier question — measured (C52).** The
+  move was tried: `mod_spatialite` arrives from NuGet with no manual install, EF's three fixture
+  pieces port cleanly server-side, and the run still said no — **12 failing on Tier B against 2 on
+  Tier A**. `Item` fails *identically* on both, because C24 put the index on the client residual
+  and no backend ever evaluates it. Do not retry. If spatial ever moves for another reason, the
+  two `Intersects_*` overrides become wrong (SQLite passes the base) and six new `JsonException`s
+  on geometry are the price to diagnose.
 - **The client residual has no null semantics, and that is now a stated open question (C43).**
   `SpatialQuery.Item` ×2 asserts that an index into a null geometry yields null — the base leaves
   the guard out of the *actual* query on purpose, because a relational store propagates it and
