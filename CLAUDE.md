@@ -165,6 +165,16 @@ read. Phase C's adoptions brought nine of EF's own skips with them. `Failed` and
 correct throughout, so nothing was judged wrongly, but **all four figures come out of the run's
 own summary block; none of them is arithmetic.**
 
+**Two spec-test failures are the A28 shape with the sign flipped, and C59 measured what it costs
+to close them.** EF refuses a query and this provider answers it — a client method in a projection
+that another operator composes over. Implementing EF's stated rule ("client evaluation is legal
+only in the final projection") fixes six and breaks **eighteen**, and every one of the eighteen has
+`client_eval` or `client_projection` in its name: **EF permits an operator over a client-evaluated
+projection in at least five named shapes** (`GroupJoin` in a subquery, `Count`, a `SelectMany`
+collection shaper, `Union` under `FirstOrDefault`). The line EF actually draws is narrower than its
+own prose, and finding it means reading `NavigationExpandingExpressionVisitor`, not fitting another
+rule to six tests.
+
 **A28 has a second face, and it is the one to check first when a spec test looks like a design
 question.** A28 proper is a spec test asserting a *materialization* limitation this provider does
 not have. B16 turned out to be the same shape asserting a *topology* it does not have: EF's test

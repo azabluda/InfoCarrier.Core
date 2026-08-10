@@ -3395,6 +3395,47 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       upgrade — plus a per-fixture DI change, for at most half a family that is already classified.
       **Not taken.**
 
+- [x] **C59. "Client evaluation is legal only in the final projection" is not a rule you can
+      implement. Measured: 6 fixed, 18 broken.**
+      **`Total tests: 22358, Passed: 22014, Failed: 127, Skipped: 217`** (`c59`) — **115 → 127.**
+      Reverted; no code change survives. ✅ `<this commit>`
+
+      Six failures across two families shared one shape, and a probe in `RejectClientEvaluation`
+      printed it rather than leaving it to be inferred:
+
+          Join(root, root.Select(o => (o, o.Customer)).Select(row => ClientProjection(…)), …)
+          …Select(row => ClientLevel1(…)).Take(2).LeftJoin(root, …)
+
+      Both put a **join on the client** over a sequence the client computed — fetching both sides
+      entire, the plan ADR-010 exists to refuse — and EF refuses both queries outright. The
+      client code sits in a `ProjectionRewriter` **reassembly**, and `ClientEvaluationFinder`
+      exempts reassemblies wholesale, so the finder returned `<none>`.
+
+      The rule tried: a reassembly is exempt only while it is *final* — that is, while no query
+      operator composes over it, walking up through the operators that pick a row rather than
+      change the projection (cardinality, markers, `Take`/`Skip`). Restricted to client **methods**,
+      because refusing a constructed client *type* in that position is the boundary this milestone
+      is about and cost 235 tests once. It fixes the six, and:
+
+      | Broken | What it is |
+      |---|---|
+      | `GroupJoin_in_subquery_with_client_projection` + `_nested1` + `_nested2` ×2 classes ×2 | 12 |
+      | `Count_on_projection_with_client_eval` ×2, `SelectMany_with_client_eval_with_collection_shaper_ignored` ×2, `Client_eval_Union_FirstOrDefault` ×2 | 6 |
+
+      **Every one of the eighteen has `client_eval` or `client_projection` in its name, and EF
+      passes them all.** So the rule is wrong, and specifically: **EF permits a query operator over
+      a client-evaluated projection in at least five named shapes** — a `GroupJoin` in a subquery,
+      a `Count`, a `SelectMany` collection shaper, and a `Union` under `FirstOrDefault`. What EF
+      actually refuses in the six is narrower than "the projection is not final", and reading its
+      test names is what says so.
+
+      **Left as a negative result rather than narrowed by guessing.** Narrowing it to "a `Join`
+      whose source is a client-computed sequence" is contradicted by
+      `GroupJoin_in_subquery_with_client_projection` in the same run. Finding the real line means
+      reading what `NavigationExpandingExpressionVisitor` does with a client-evaluated shaper, not
+      another rule fitted to six tests. The six stay red and classified: **this provider answers a
+      query EF refuses**, which is the A28 shape with the sign flipped.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
