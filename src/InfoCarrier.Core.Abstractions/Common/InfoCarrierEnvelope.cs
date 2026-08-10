@@ -7,7 +7,14 @@ namespace InfoCarrier.Core.Common;
 ///     Protocol version is present from day 1; the payload is the operation-specific body
 ///     serialized via the configured <see cref="IInfoCarrierSerializer" />.
 /// </summary>
-public sealed record InfoCarrierEnvelope
+/// <remarks>
+///     Marked <see cref="IInfoCarrierRequest" /> although it carries traffic in both directions:
+///     the type cannot say which leg it is on, and the leg that matters is the one where an
+///     untrusted caller chooses the bytes. A client that would rather not bound the responses it
+///     buffers can raise <see cref="InfoCarrierPayloadLimits.MaxRequestBytes" /> on its own
+///     serializer. Distinguishing the two properly is part of M5's still-open envelope criterion.
+/// </remarks>
+public sealed record InfoCarrierEnvelope : IInfoCarrierRequest
 {
     /// <summary>
     ///     The current wire contract major version.

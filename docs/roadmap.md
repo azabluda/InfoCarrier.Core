@@ -193,14 +193,21 @@ inside a binary, unary or type-binary node was the part genuinely open: a free s
 `Enum.TryParse`, which admits every `ExpressionType` name — `Assign` and `Throw` included — plus
 bare numbers and comma lists. C36 replaced it with a per-node-kind allowlist of the pure subset.
 
-**The rest of M5 is still open**: payload limits, the envelope, exception fidelity, cancellation,
-and the review.
+**Payload limits are in** (C37). The depth half was already there (`ExpressionJsonContext`'s
+`MaxDepth = 256`); the size half is `InfoCarrierPayloadLimits`, default-on at 64 MiB **in the
+request direction only**. That asymmetry is measured, not stylistic: one bound applied to both
+directions broke four Northwind spec tests on results of 560 MB and 111 MB — cross-joins the
+caller had asked for — while no request came close. The threat this milestone names is
+server-inbound; capping what a client gets back is a page-size policy, and a different question.
+
+**The rest of M5 is still open**: the envelope, exception fidelity, cancellation, and the review.
 
 **Exit criteria**
 - Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,
   opt-in registration for model entities and declared projection types.
   *Types* ✅ (`TypeAllowlist`, 2026-08-01) · *methods* ✅ (C30, 2026-08-10) · *node kinds* ✅ (C36, 2026-08-10).
 - Payload depth/size limits (v1 needed a 10 MB stack for >1 MB payloads).
+  *Depth* ✅ (`ExpressionJsonContext.MaxDepth`) · *size* ✅ (C37, 2026-08-10).
 - `InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests — currently the
   backend test store implements `IInfoCarrierClient` directly and bypasses both.
 - Exception fidelity across the wire (W5) and cancellation (W6).

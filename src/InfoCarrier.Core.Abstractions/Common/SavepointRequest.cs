@@ -9,7 +9,7 @@ namespace InfoCarrier.Core.Common;
 ///     A savepoint is not a scope of its own, so it has no token: the transaction's token plus a
 ///     name is the whole address.
 /// </remarks>
-public sealed record SavepointRequest
+public sealed record SavepointRequest : IInfoCarrierRequest
 {
     /// <summary>
     ///     The open server transaction the savepoint lives in.

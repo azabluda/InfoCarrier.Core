@@ -100,7 +100,7 @@ public sealed record ChangeEntry
 /// <summary>
 ///     A SaveChanges request: the serialized change-tracker entries (wire-protocol §2.2).
 /// </summary>
-public sealed record SaveChangesRequest
+public sealed record SaveChangesRequest : IInfoCarrierRequest
 {
     /// <summary>
     ///     The change entries, in submission order. The server replays them in order.

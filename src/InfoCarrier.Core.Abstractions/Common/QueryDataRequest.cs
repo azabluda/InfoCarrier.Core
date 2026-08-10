@@ -9,7 +9,7 @@ namespace InfoCarrier.Core.Common;
 ///     (wire-protocol §2.1). The expression tree is the raw captured LINQ tree
 ///     (ADR-006 raw capture), serialized per expression-serialization §3.
 /// </summary>
-public sealed record QueryDataRequest
+public sealed record QueryDataRequest : IInfoCarrierRequest
 {
     /// <summary>
     ///     The serialized expression tree payload (the serialized query expression DTO).

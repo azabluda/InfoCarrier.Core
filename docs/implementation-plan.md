@@ -2548,6 +2548,49 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       map, never an int-cast (expression-serialization §3.7)"*. It was an `Enum.TryParse` over the
       whole enum. This is where that sentence becomes true.
 
+- [x] **C37. The payload size bound — and the measurement moved it to the other direction.**
+      **`Total tests: 22312, Passed: 21949, Failed: 146, Skipped: 217`** (`c37b`) — **145 → 146,
+      0 fixed, 1 broken, and the one broken is the C11 intermittent**, whose third and fourth
+      sightings this step produced. Nothing broke on the bound. ✅ `<this commit>`
+
+      M5 lists *"payload depth/size limits (v1 needed a 10 MB stack for >1 MB payloads)"*. The
+      **depth** half has been in and load-bearing for some time — `ExpressionJsonContext` sets
+      `MaxDepth = 256`. The **size** half did not exist, and depth does not imply it: a flat array
+      of a hundred million constants is depth 3.
+
+      `InfoCarrierPayloadLimits` is the bound, checked **before** the parse — the allocation a
+      parse costs is what it bounds, so a node count, knowable only by parsing, would be too late.
+      `SystemTextJsonInfoCarrierSerializer` takes one and applies it; `ServerQueryExecutor`
+      applies the default to the serialized query tree, which is the one wholly caller-controlled
+      deserialization on the server.
+
+      **The first attempt was one bound for both directions at 64 MiB, and the run refused it.**
+
+      | Broken | Payload | What it was |
+      |---|---|---|
+      | `Handle_materialization_properly_when_more_than_two_query_sources_are_involved` ×2 | **560,839,164 bytes** | a `QueryDataResult` |
+      | `Take_with_single_select_many` ×2 | **111,089,698 bytes** | a `QueryDataResult` |
+
+      Every one a **result**, and no request came near the limit (`c37`, 145 → 150). Half a
+      gigabyte from a triple cross-join is what the caller asked its own server for. **A control
+      that has to be widened past half a gigabyte so the suite can pass is bounding the wrong
+      direction** — roadmap M5 states the threat as "accepting serialized expression trees from
+      remote clients", which is server-inbound, and a page-size policy on results is a different
+      question this library has no basis to answer.
+
+      So the bound is two numbers, and the direction is declared rather than inferred:
+      `IInfoCarrierRequest` marks `QueryDataRequest`, `SaveChangesRequest`, `SavepointRequest` and
+      `InfoCarrierEnvelope`; `MaxRequestBytes` defaults to **64 MiB** and `MaxResponseBytes` to
+      **null**. Opting out is an explicit `null`, never a very large number. `c37b` re-measured it
+      at zero cost.
+
+      **The envelope caveat, stated rather than left to be discovered.** `ServerQueryExecutor` uses
+      `InfoCarrierPayloadLimits.Default` because it is constructed from
+      `(DbContext, IExpressionSerializer)` and has no options seam — the expression payload travels
+      through `ExpressionJsonContext` directly rather than through the configured
+      `IInfoCarrierSerializer`. That is the same gap M5's envelope criterion already names, not a
+      new one. An unconfigurable bound is worth more than no bound in the meantime.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

@@ -440,7 +440,24 @@ public class ServerQueryExecutor
             nodes, ExpressionJsonContext.Default.ListDynamicValueNode);
     }
 
+    /// <summary>
+    ///     The query tree as it arrives from a remote client — the one deserialization on the
+    ///     server that is entirely caller-controlled, and so the one the size bound most needs to
+    ///     be on (milestone M5).
+    /// </summary>
+    /// <remarks>
+    ///     It uses <see cref="InfoCarrierPayloadLimits.Default" /> rather than a configured
+    ///     instance because this executor is constructed from <c>(DbContext, IExpressionSerializer)</c>
+    ///     and has no options seam to read one from. That is the same gap M5's envelope criterion
+    ///     names: the expression payload travels through <see cref="ExpressionJsonContext" />
+    ///     directly rather than through the configured <see cref="IInfoCarrierSerializer" />, so
+    ///     nothing configured on the latter reaches here yet. The bound is applied at the default
+    ///     in the meantime, because an unconfigurable bound is worth more than no bound.
+    /// </remarks>
     private static ExpressionNode DeserializeNode(byte[] payload)
-        => System.Text.Json.JsonSerializer.Deserialize<ExpressionNode>(
+    {
+        InfoCarrierPayloadLimits.Default.GuardRequest(payload.Length, "serialized query");
+        return System.Text.Json.JsonSerializer.Deserialize<ExpressionNode>(
             payload, ExpressionJsonContext.Default.ExpressionNode)!;
+    }
 }
