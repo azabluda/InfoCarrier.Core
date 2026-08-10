@@ -525,7 +525,25 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         Type element = ServerBoundaryAnalyzer.SequenceElementType(type);
 
-        return element != type && !typeof(ICollection<>).MakeGenericType(element).IsAssignableFrom(type)
+        if (element == type || typeof(ICollection<>).MakeGenericType(element).IsAssignableFrom(type))
+        {
+            return null;
+        }
+
+        // …and only when a `List<T>` is actually a legal value for the declared type. The whole
+        // remedy here is to substitute one, so a declared type it does not satisfy must be left
+        // alone — otherwise this rewrite replaces the fragment with something that cannot stand
+        // where it stood.
+        //
+        // `MultiLineString` is the case that found this: it implements `IEnumerable<Geometry>`,
+        // so every test above passes, but it is a *domain type that happens to be enumerable*
+        // rather than a collection. Slotting it as `List<Geometry>` left `e.MultiLineString[0]`
+        // and `.Count` unable to bind — "Method 'get_Item' declared on type 'GeometryCollection'
+        // cannot be called with instance of type 'List<Geometry>'" (C18's four).
+        //
+        // The types this method exists for are unaffected: `IReadOnlyList<Name>` is satisfied by
+        // a `List<Name>`, which is the point of it.
+        return type.IsAssignableFrom(typeof(List<>).MakeGenericType(element))
             ? element
             : null;
     }

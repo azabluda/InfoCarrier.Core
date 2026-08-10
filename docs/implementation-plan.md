@@ -1784,6 +1784,45 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       been tried. **A recurrence makes it a defect**: note each sighting here, and act on the
       second, holding any fix to the three-run bar.
 
+      **Second sighting 2026-08-10, in `c24`. It is now a defect.** Eight full runs have been made
+      on it: it failed in `c10` and `c24`, and passed in `c10b`, `c15`, `c17`, `c18`, `c19`, `c20`
+      and `c23c`. **Roughly one run in four.** It still passes in isolation (12 of 12, checked
+      again at `c24`).
+
+      **Not caused by the change `c24` measured.** That change is in
+      `ProjectionRewriter.UnbuildableNavigationElement`, which decides how a *collection navigation*
+      enters a projection slot. This test runs `SaveChanges` and projects nothing, and the failure
+      predates the change by fourteen commits.
+
+      **What the second stack adds.** The first sighting recorded only `StateManager.StartTracking`.
+      This one names the caller — `ServerSaveChangesExecutor.TrackOne`, at `entry.State = state` —
+      and the entity type is `Blog`, of which **this test creates exactly two in one
+      `SaveChanges`**:
+
+          var first = new Blog { Title = "alpha" };
+          var second = new Blog { Title = "beta" };
+          client.AddRange(first, second);
+
+      So the two colliding instances are the test's own two rows, tracked one after the other in
+      **one server context**, and they received the same temporary key.
+
+      **The sharp question, for whoever takes it.** `Blog.Id` is store-generated, so the client
+      holds temporary values and deliberately does **not** send them — that is what the correlation
+      id exists for, and `A_new_dependent_of_a_new_principal_gets_the_generated_foreign_key`
+      documents it. So the server sees `Id = 0` twice, sets `State = Added` twice, and EF generates
+      a temporary each time from a generator whose counter is `Interlocked`-decremented. **Two
+      calls to that generator cannot return the same number.** Therefore either the second entity
+      never reached the generator — it was tracked under a value it already carried — or the two
+      entries are not both going through it. `-2147482646` is `int.MinValue + 1002`, so the
+      generator is process-wide and about a thousand temporaries have been issued by that point in
+      a full run, which is consistent with the failure needing a full run to appear.
+
+      **Next step is a probe, not a reading.** Gate on `IC_PROBE` in `TrackOne`, write the entity
+      type, the key value and the context's hash code for every tracked entry, and run the full
+      suite until it reproduces — expect about four runs. Then hold any fix to the three-run bar.
+      Do not attempt a fix from the analysis above; it is a hypothesis with two branches and the
+      probe distinguishes them in one run.
+
 - [ ] **C14. "The spatial failures need SpatiaLite" is wrong, and has been for a while.** No code
       change; this is the correction. `<this commit>`
 
@@ -2166,6 +2205,38 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       package, and an application hitting this today gets a wrong answer rather than an error. But
       a default-registered mapper changes what travels for every existing caller, and ADR-012 says
       registration is the application's. **That is a decision, not a patch.**
+
+- [x] **C24. A `List<T>` may only stand in where a `List<T>` fits.**
+      **`Total tests: 22278, Passed: 21907, Failed: 154, Skipped: 217`** (`c24`) — **155 → 154,
+      2 fixed, 1 "broken" which is C11's intermittent and not this change.** ✅ `<this commit>`
+
+      C18 left four spatial failures and called them the `GeometryCollection`-is-a-sequence
+      problem, with a type-level probe on ADR-012 as the route. **The probe is not needed, and the
+      defect was more general than spatial.** `ProjectionRewriter.UnbuildableNavigationElement`
+      wraps a collection-navigation fragment in `ToList()` when the declared type is enumerable and
+      is not an `ICollection<>`. It never asked whether a `List<T>` is a *legal value* for that
+      declared type. `MultiLineString` implements `IEnumerable<Geometry>` and passes every test in
+      that method, but it is a domain type that happens to be enumerable, not a collection — so the
+      slot held a `List<Geometry>` and `e.MultiLineString[0]` and `.Count` could not bind.
+
+      One clause: rewrite only when `type.IsAssignableFrom(typeof(List<>).MakeGenericType(element))`.
+      The types the method exists for are untouched — a `List<Name>` satisfies
+      `IReadOnlyList<Name>`, which is its whole point.
+
+      **`IGeometryCollection_Count` ×2 fixed. `Item` ×2 moved to a different defect** and stay red:
+      the base's actual query is `Select(e => e.MultiLineString[0])` with **no null guard** — the
+      expected query adds one — so it relies on the store to propagate null through the index. The
+      index now lands on the client, where a null reference is a `NullReferenceException`. That is
+      null-propagation semantics, not the collection-type family.
+
+      **The second instance of the family is still open**, and it is the one that showed the family
+      exists: `Join_with_result_selector_returning_queryable_throws_validation_error` fails with
+      *"Unable to cast `List<Level3>` to `IQueryable<Level3>`"*. Same shape from the other side —
+      `DynamicValueMapper`'s collection branch cannot rebuild an `IQueryable<T>`, and
+      `ConstructCollection` declines because it is an interface. `list.AsQueryable()` is the
+      obvious candidate and was **not** taken here: the test asserts that an invalid result selector
+      *throws*, so the question is which exception is correct, not whether the cast can be made to
+      work. Worth one measured attempt, separately.
 
 ## Phase B — the tier audit, and the rework it found
 
