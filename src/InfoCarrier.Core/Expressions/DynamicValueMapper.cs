@@ -48,7 +48,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     constructor took the ctor branch, which registered no wire id) every back-reference
     ///     from its loaded navigations dangled.
     /// </remarks>
-    public Func<DynamicValueNode, object?>? EntityMaterializer { get; set; }
+    public virtual Func<DynamicValueNode, object?>? EntityMaterializer { get; set; }
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="DynamicValueMapper" /> class.
@@ -78,7 +78,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     /// <summary>
     ///     The type mapper this value mapper writes wire type identities with.
     /// </summary>
-    public TypeNodeMapper TypeMapper => _typeMapper;
+    public virtual TypeNodeMapper TypeMapper => _typeMapper;
 
     /// <summary>
     ///     Clears the per-message reference scope. **Must** be called at every message
@@ -92,7 +92,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     a collision was impossible and a stale entry was merely a leak — integer keys make
     ///     the reset load-bearing.)
     /// </remarks>
-    public void ResetReferenceScope()
+    public virtual void ResetReferenceScope()
     {
         _toIds.Clear();
         _fromIds.Clear();
@@ -125,7 +125,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     entity is exactly that case: every many-to-many join entity is a
     ///     <c>Dictionary&lt;string, object&gt;</c>, and several of them are that same type.
     /// </param>
-    public DynamicValueNode ToRowValue(
+    public virtual DynamicValueNode ToRowValue(
         object? value,
         Type type,
         Func<object, INavigationBase, bool> isNavigationLoaded,
@@ -174,7 +174,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     }
 
     /// <inheritdoc />
-    public DynamicValueNode ToDynamicValue(object? value, Type type)
+    public virtual DynamicValueNode ToDynamicValue(object? value, Type type)
         => ToDynamicValue(value, type, declared: null);
 
     /// <summary>
@@ -593,7 +593,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     A <see cref="DynamicPropertyValue" /> carries either a primitive directly or a nested
     ///     node; callers that only ever see one of the two would silently read null for the other.
     /// </remarks>
-    public object? FromPropertyValue(DynamicPropertyValue property, Type declaredType)
+    public virtual object? FromPropertyValue(DynamicPropertyValue property, Type declaredType)
     {
         ArgumentNullException.ThrowIfNull(property);
 
@@ -602,7 +602,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             : PrimitiveCoercion.Coerce(property.PrimitiveValue, declaredType);
     }
 
-    public object? FromDynamicValue(DynamicValueNode node)
+    public virtual object? FromDynamicValue(DynamicValueNode node)
     {
         // Back-reference: the target must already be registered. It is, because the forward
         // side only ever emits a Ref for a value it has already begun mapping, and this side
@@ -638,7 +638,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     Entity rows are constructed by the client materializer, not here, because setting
     ///     shadow-state values requires the change tracker.
     /// </remarks>
-    public void RegisterMaterialized(int id, object? value)
+    public virtual void RegisterMaterialized(int id, object? value)
     {
         if (id != 0)
         {
@@ -654,7 +654,7 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     back through <see cref="FromDynamicValue" /> would re-enter the entity hook that just
     ///     gave up on it, and recurse forever.
     /// </remarks>
-    public object? FromShape(DynamicValueNode node)
+    public virtual object? FromShape(DynamicValueNode node)
     {
         object? value = RehydrateObject(node, _typeResolver.Resolve(node.Type));
         RegisterMaterialized(node.Id, value);

@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using System.Reflection;
@@ -39,7 +39,7 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     /// <summary>
     ///     Translates an expression to its node DTO.
     /// </summary>
-    public ExpressionNode Translate(Expression expression)
+    public virtual ExpressionNode Translate(Expression expression)
     {
         // Translate is both the public entry point and the recursive one, so parameter identity
         // is reset only at depth 0 — clearing on every call would break identity mid-tree.
@@ -398,7 +398,7 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     /// <summary>
     ///     Maps a <see cref="MethodInfo" /> to a re-resolvable <see cref="MethodNode" />.
     /// </summary>
-    protected MethodNode ToMethodNode(MethodInfo method)
+    protected virtual MethodNode ToMethodNode(MethodInfo method)
         => new()
         {
             DeclaringType = _typeMapper.ToTypeNode(method.DeclaringType!),

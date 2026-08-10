@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -20,6 +20,6 @@ public class InfoCarrierQueryContextFactory : IQueryContextFactory
         => _dependencies = dependencies;
 
     /// <inheritdoc />
-    public QueryContext Create()
+    public virtual QueryContext Create()
         => new InfoCarrierQueryContext(_dependencies);
 }

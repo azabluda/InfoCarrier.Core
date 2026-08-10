@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using InfoCarrier.Core.Expressions;
@@ -35,14 +35,14 @@ public class ExpressionSerializer : IExpressionSerializer
     ///     paths map entity rows through the same EF-metadata-driven mapper (and the same
     ///     per-message reference map) as the query tree.
     /// </summary>
-    public IDynamicValueMapper ValueMapper => _valueMapper;
+    public virtual IDynamicValueMapper ValueMapper => _valueMapper;
 
     /// <inheritdoc />
-    public ExpressionNode ToNode(Expression expression)
+    public virtual ExpressionNode ToNode(Expression expression)
         => _forward.Translate(expression);
 
     /// <inheritdoc />
-    public Expression ToExpression(ExpressionNode node)
+    public virtual Expression ToExpression(ExpressionNode node)
         => ToExpression(node, (stub, type) => throw new NotSupportedException(
             "Query-root rebinding requires a server query-root factory (Phase D)."));
 
@@ -50,7 +50,7 @@ public class ExpressionSerializer : IExpressionSerializer
     ///     Translates a node DTO back to a live expression, rebinding query roots via the
     ///     supplied factory (server-side, research-findings §2).
     /// </summary>
-    public Expression ToExpression(
+    public virtual Expression ToExpression(
         ExpressionNode node,
         Func<QueryRootStubNode, Type, Expression> queryRootFactory)
         => new NodeToExpressionTranslator(_typeResolver, _valueMapper, queryRootFactory).Translate(node);

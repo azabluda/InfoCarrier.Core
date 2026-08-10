@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace InfoCarrier.Core;
 
@@ -36,14 +37,36 @@ public static class InfoCarrierServiceCollectionExtensions
             .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
             .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
             .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
+
+            // Required of every provider by `EntityFrameworkServicesBuilder.CoreServices`, and
+            // deliberately unimplementable here — see `InfoCarrierQueryPipelineFactories`. Both
+            // throw with the reason. Registering them replaces EF's generic "no service has been
+            // registered" with a sentence that explains ADR-006, and nothing in this provider
+            // resolves either one.
+            .TryAdd<IQueryableMethodTranslatingExpressionVisitorFactory,
+                InfoCarrierQueryableMethodTranslatingExpressionVisitorFactory>()
+            .TryAdd<IShapedQueryCompilingExpressionVisitorFactory,
+                InfoCarrierShapedQueryCompilingExpressionVisitorFactory>()
             .TryAddCoreServices();
 
         // Expression serialization pipeline (DI-resolved, no statics).
-        services.AddScoped<TypeNodeMapper>();
-        services.AddScoped<TypeNodeResolver>();
-        services.AddScoped<IDynamicValueMapper, DynamicValueMapper>();
-        services.AddScoped<ExpressionToNodeTranslator>();
-        services.AddScoped<IExpressionSerializer, ExpressionSerializer>();
+        //
+        // `TryAdd*`, not `Add*`. **Calling this method twice must not change the collection** —
+        // `EntityFrameworkServiceCollectionExtensionsTestBase.Repeated_calls_to_add_do_not_modify_collection`
+        // asserts it, and it was failing at *Expected 121, Actual 126*: exactly these five
+        // registrations, appended a second time. Everything above goes through
+        // `EntityFrameworkServicesBuilder`, which is already idempotent; these five bypassed it
+        // because they are this provider's own services rather than EF contracts.
+        //
+        // Duplicate registrations are not harmless. The last one wins for a single resolve, so
+        // the visible behaviour is unchanged — but every one of these is `Scoped`, and an
+        // `IEnumerable<T>` resolve would yield the service twice, which is exactly how the
+        // value-mapper chain of ADR-012 is consumed.
+        services.TryAddScoped<TypeNodeMapper>();
+        services.TryAddScoped<TypeNodeResolver>();
+        services.TryAddScoped<IDynamicValueMapper, DynamicValueMapper>();
+        services.TryAddScoped<ExpressionToNodeTranslator>();
+        services.TryAddScoped<IExpressionSerializer, ExpressionSerializer>();
 
         return services;
     }

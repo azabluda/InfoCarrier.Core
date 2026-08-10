@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
@@ -51,7 +51,7 @@ public class InfoCarrierDatabase : IDatabase
     /// <summary>
     ///     The client used to ship operations to the server.
     /// </summary>
-    protected IInfoCarrierClient Client => _client;
+    protected virtual IInfoCarrierClient Client => _client;
 
     /// <inheritdoc />
     public virtual Func<QueryContext, TResult> CompileQuery<TResult>(Expression query, bool async)

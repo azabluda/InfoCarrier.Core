@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
@@ -63,14 +63,14 @@ public class ClientResultMaterializer
     ///     time tracked all 919 rows of a join whose projection returned 7 entities, and a query
     ///     projecting no entities at all still filled the tracker.
     /// </remarks>
-    public IReadOnlyDictionary<object, InternalEntityEntry> Deferred => _deferred;
+    public virtual IReadOnlyDictionary<object, InternalEntityEntry> Deferred => _deferred;
 
     private readonly Dictionary<object, InternalEntityEntry> _deferred = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     ///     Attaches one deferred entity, if it is one this materializer built.
     /// </summary>
-    public void AttachIfDeferred(object entity)
+    public virtual void AttachIfDeferred(object entity)
     {
         if (_deferred.Remove(entity, out InternalEntityEntry? entry)
             && entry.EntityState == EntityState.Detached)
@@ -82,7 +82,7 @@ public class ClientResultMaterializer
     /// <summary>
     ///     Materializes the wire result into a sequence of <typeparamref name="TElement" />.
     /// </summary>
-    public IEnumerable<TElement> Materialize<TElement>(QueryDataResult result)
+    public virtual IEnumerable<TElement> Materialize<TElement>(QueryDataResult result)
     {
         var mapper = (DynamicValueMapper)_serializer.ValueMapper;
 

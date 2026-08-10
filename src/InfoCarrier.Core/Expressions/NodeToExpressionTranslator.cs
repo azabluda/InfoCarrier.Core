@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using System.Reflection;
@@ -42,7 +42,7 @@ public class NodeToExpressionTranslator
     /// <summary>
     ///     Translates a node DTO to a live expression.
     /// </summary>
-    public Expression Translate(ExpressionNode node)
+    public virtual Expression Translate(ExpressionNode node)
     {
         _parameters.Clear();
         return TranslateNode(node);

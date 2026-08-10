@@ -2338,6 +2338,48 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       removing the switch — the output is quoted in C11, and it is what produced C11's surviving
       hypothesis.
 
+- [x] **C29. Three of C5's six infrastructure failures were real product defects.**
+      **`Total tests: 22278, Passed: 21911, Failed: 150, Skipped: 217`** (`c29`) — **153 → 150,
+      3 fixed, 0 broken.** ✅ `<this commit>`
+
+      C5 adopted the infrastructure bases and left six failures classified as "provider-plumbing
+      detail, all worth keeping red". Three of them were defects, and none needed a decision.
+
+      **1. `AddEntityFrameworkInfoCarrier()` was not idempotent** — *Expected 121, Actual 126*, and
+      the difference is exactly the five `AddScoped` calls for the serialization pipeline.
+      Everything above them goes through `EntityFrameworkServicesBuilder`, which is idempotent
+      already; those five bypassed it because they are this provider's own services rather than EF
+      contracts. `TryAddScoped` fixes it. **Not cosmetic**: the last registration wins for a single
+      resolve, so behaviour looked fine — but all five are scoped, and an `IEnumerable<T>` resolve
+      returns a duplicated service, which is exactly how ADR-012's value-mapper chain is consumed.
+
+      **2. Fourteen public members were not `virtual`.** `ApiConsistencyTestBase` requires it of a
+      provider's inheritable surface, and EF's own providers comply. Found in four rounds because
+      the failure reports a batch at a time; the bulk pass was scripted over the non-sealed public
+      classes in `src/`, then two `protected` members finished it
+      (`InfoCarrierDatabase.Client`, `ExpressionToNodeTranslator.ToMethodNode`).
+
+      **3. Two required services were simply not registered**, and this is the interesting one.
+      `EntityFrameworkServicesBuilder.CoreServices` requires every provider to supply
+      `IQueryableMethodTranslatingExpressionVisitorFactory` and
+      `IShapedQueryCompilingExpressionVisitorFactory`. **This provider cannot implement either, by
+      design** — ADR-006 captures the raw query at `IDatabase.CompileQuery` and the *server's*
+      provider does the translating, so there is no client-side visitor to build and no shaper to
+      compile. They are now registered as factories that throw with that sentence in the message.
+      Nothing here resolves them; the point is that "not registered" was the wrong way to say
+      "deliberately not implemented" — anyone who resolved one got EF's generic *"no service has
+      been registered"* rather than the reason.
+
+      Found by a throwaway override of `LifetimeTest` that listed the missing services instead of
+      asserting; EF's own assertion is `Assert.Single`, which says *"the collection was empty"* and
+      names nothing.
+
+      **The three left are genuinely not ours to fix**, and C5's reading of them holds: two
+      `Logging` tests where the initialization log line does not compose the way EF's does, and
+      `InvalidIncludePathError_throws_by_default`, which fails inside `InfoCarrierTestHelpers`
+      (*"builds models; it has no server"*) rather than in the provider — a harness limitation, not
+      a missing diagnostic.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
