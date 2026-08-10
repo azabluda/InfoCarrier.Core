@@ -3191,6 +3191,73 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **And it is a W1 win independent of the two tests**: the wire now carries one indexed
       geometry per row instead of an entire `MultiLineString`.
 
+- [x] **C55. The eight `Index_*` are the server's warning, not a missing client-side one — and
+      forwarding the fixture's warning configuration is measured at 132 → 750.**
+      **`Total tests: 22355, Passed: 21388, Failed: 750, Skipped: 217`** (`c55`) — **8 fixed, 626
+      broken.** Reverted; no code change survives. ✅ `<this commit>`
+
+      `Index_constant` / `Index_column` / `Index_parameter` / `Index_out_of_bounds` on
+      `NavigationsCollectionQuery` and `OwnedNavigationsCollectionQuery` fail
+      *"Assert.Throws() Failure: No exception was thrown"*. The base is
+      `AssociationsCollectionTestBase.AssertOrderedCollectionQuery`, which expects an
+      `InvalidOperationException` when `Fixture.AreCollectionsOrdered` is false —
+      `NavigationsFixtureBase` and `OwnedNavigationsRelationalFixtureBase` both override it to
+      `false`, and EF's own comment names what should throw:
+      `RowLimitingOperationWithoutOrderByWarning`.
+
+      **The standing plan was to raise it client-side, as C40 does for `InvalidIncludePathError`.
+      That is wrong, and one probe said so.** C40's diagnostic comes out of *core*'s
+      `NavigationExpandingExpressionVisitor`, which ADR-006 means nobody runs. This one comes out
+      of `RelationalQueryableMethodTranslatingExpressionVisitor` — the **backend's** translator —
+      and the probe in `QuerySplitter.Split` shows the query reaching it untouched:
+
+          CAPTURED:  [EntityQueryRootExpression].Where(e => (e.AssociateCollection.get_Item(0).Int == 8))
+          REWRITTEN: <identical>
+          wholly=True shippable=1
+
+      Nothing is missing on the client. **The server raises the warning and does not throw on it**,
+      because `InfoCarrierBackendTestStore.AddProviderOptions` forwards
+      `EnableSensitiveDataLogging` and deliberately not the rest of `FixtureBase.AddOptions` —
+      its `ConfigureWarnings(Default(Throw))`. The comment there already said why: *"the server
+      runs a tree this provider generated."*
+
+      **Measured, because the comment was a reason rather than a number, and now it is a number.**
+      Forwarding `Default(Throw).Log(SensitiveDataLoggingEnabled).Log(PossibleUnintendedReferenceComparison)`
+      — the fixture's own configuration, verbatim — fixes all eight and breaks **626**:
+
+      | New reason | Count |
+      |---|---|
+      | `Model.MappedComplexProperties` warning-as-error | 196 |
+      | `Model.Validation.ShadowForeignKey` | 124 |
+      | `Query.MultipleCollectionIncludeWarning` | 100 |
+      | `Model.ConflictingKeylessAndKeyAttributes` | 95 |
+      | `Model.MappedEntityTypeIgnoredMember` | 40 |
+      | `Query.RowLimitingOperationWithoutOrderBy` (**tests other than these eight**) | 26 |
+      | eight more query and model warnings | 45 |
+
+      **The finding is in the distribution, not the total.** Most of the 626 are **model**
+      warnings, and the server's model is not the caller's — it is built by
+      `TestModelSource` against the backing store, so it validates differently from the client's.
+      A warning about the model is a statement about a thing the caller never wrote. The query
+      warnings are the same argument one level along: 100 `MultipleCollectionIncludeWarning`s land
+      on trees this provider's `ProjectionRewriter` and `GroupJoinFlattener` produced.
+
+      **So the honest classification, and it is a harness knob rather than a provider gap.** These
+      eight tests assert a diagnostic that this provider *does* raise, in the half of itself that
+      knows about it, and that the harness does not configure as an error there. Making them green
+      means either forwarding the whole configuration (626) or naming
+      `RowLimitingOperationWithoutOrderByWarning` on its own, which is choosing one event because
+      six tests assert it — test-tuning wearing a configuration's clothes. **Left red and
+      classified.** If a real deployment configures warnings-as-error on its server, its callers
+      get the exception these tests expect; that is the arrangement being reproduced, not a
+      missing feature.
+
+      **And the ordering question the classification turned on is settled with it:** this
+      provider's collections are **not** ordered. They inherit the backing store's order, which is
+      exactly what EF's two fixtures say by overriding `AreCollectionsOrdered` to `false` for this
+      model on this store. Overriding it back to `true` on our fixtures would assert an ordering
+      nothing guarantees, so that route is closed rather than untried.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

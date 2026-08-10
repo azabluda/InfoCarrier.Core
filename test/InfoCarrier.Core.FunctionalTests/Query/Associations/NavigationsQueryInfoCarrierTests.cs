@@ -100,7 +100,11 @@ public class NavigationsQueryInfoCarrierFixture : NavigationsFixtureBase
 // `Navigations*SqliteTest`, and each was matched by *reason* before being taken (A63): every one
 // of them is a limit of the backing store or of relational translation generally, raised here from
 // the same place with the same message. Nothing else is overridden — the four `Index_*` failures
-// left red are ours and are classified in docs/implementation-plan.md under C1.
+// left red are classified in docs/implementation-plan.md under C55, which corrects C1 twice over:
+// there are four here and four more on `OwnedNavigations`, and they are not this provider's. The
+// server raises `RowLimitingOperationWithoutOrderByWarning` exactly where a relational provider
+// does; the harness does not configure warnings-as-error on that side, and forwarding the
+// fixture's configuration so that it does was measured at 8 fixed, 626 broken.
 
 public class NavigationsCollectionQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
     : NavigationsCollectionTestBase<NavigationsQueryInfoCarrierFixture>(fixture)
