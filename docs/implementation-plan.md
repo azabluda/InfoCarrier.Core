@@ -2471,6 +2471,35 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `Store_generated_values_are_propagated_with_composite_key_cycles`, which S3c already records
       as undiagnosed.
 
+- [x] **C34. A wrapped `Uri` key needed both halves of the wire's answer to "not a primitive".**
+      **`Total tests: 22278, Passed: 21916, Failed: 145, Skipped: 217`** (`c34`) — **146 → 145,
+      1 fixed, 0 broken.** ✅ `<this commit>`
+
+      `Insert_update_and_delete_with_wrapped_Uri_key` failed with *"This operation is not supported
+      for a relative URI"*, thrown from `Uri.get_AbsolutePath` through
+      `RuntimeMethodInfo.Invoke` — **ADR-012's case exactly, and its third distinct instance**: a
+      geometry's members recurse, `IPAddress.ScopeId` throws for IPv4, and `Uri.AbsolutePath`
+      throws for a relative URI. One seam, three unrelated CLR types, all reached by the same
+      reflective object-shape walk.
+
+      `InfoCarrierUriValueMapper` (test-side, beside the other two) stopped the walk — and
+      uncovered the second half, which is a different mechanism on a different path:
+
+          JsonTypeInfo metadata for type 'System.Uri' was not provided by TypeInfoResolver
+          ... Path: $.EntityKey.KeyValues
+
+      The seam is consulted in `MapToNode`, which covers **property** values. A **key** value goes
+      through `PrimitiveCoercion.ToWireValue` into `EntityKeyNode.KeyValues`, which is declared
+      `object` and so resolved by *runtime* type by the source-generated serializer. `Uri` was not
+      registered there. **The precedent is already in the file**: `byte[]` is registered with
+      exactly this reasoning — not in `IsPrimitive`'s set, but what a converter over a binary key
+      produces — so `Uri` is registered the same way, with the same comment shape.
+
+      **Worth stating as a rule.** "The wire cannot handle this type" has *two* answers and they
+      are not interchangeable: the seam decides how a value is **written**, and the serializer
+      context decides whether the wire can carry the result at all. A converted key exercises both,
+      and fixing only the first moves the failure rather than closing it.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

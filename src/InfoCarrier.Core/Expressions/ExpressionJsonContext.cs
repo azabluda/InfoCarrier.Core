@@ -107,6 +107,17 @@ namespace InfoCarrier.Core.Expressions;
 // key produces (`ComparableBytesStructKey` -> `byte[]`), and a key value travels as its provider
 // value (`PrimitiveCoercion.ToWireKey`).
 [JsonSerializable(typeof(byte[]))]
+
+// `Uri` is the same statement for the same reason: `WrappedUriClassKey`'s converter produces one,
+// so a `Uri` lands in `EntityKeyNode.KeyValues`, which is declared `object` and therefore resolved
+// by *runtime* type. Without this the payload failed to serialize at all — "JsonTypeInfo metadata
+// for type 'System.Uri' was not provided ... Path: $.EntityKey.KeyValues".
+//
+// Distinct from the value-mapper seam (ADR-012), which is what stops a `Uri` being *walked*
+// reflectively as an object shape — `Uri.AbsolutePath` throws outright for a relative URI. The two
+// cover different paths: the seam covers property values, this covers key values, and a wrapped
+// `Uri` key needs both.
+[JsonSerializable(typeof(Uri))]
 public partial class ExpressionJsonContext : JsonSerializerContext
 {
 }

@@ -54,7 +54,8 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             // side only fails asymmetrically, which is precisely the "computed twice by two
             // providers" hazard the ADR states the contract in CLR-type terms to avoid.
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
-            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierIPAddressValueMapper>();
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierIPAddressValueMapper>()
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierUriValueMapper>();
 
         // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
         // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`
