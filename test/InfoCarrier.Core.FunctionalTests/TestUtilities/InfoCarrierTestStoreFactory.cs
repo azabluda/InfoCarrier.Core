@@ -108,7 +108,8 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
         => serviceCollection
             .AddEntityFrameworkInfoCarrier()
-            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierIPAddressValueMapper>();
 
     /// <inheritdoc />
     public ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)

@@ -350,10 +350,16 @@ public class DynamicValueMapper : IDynamicValueMapper
                         + "no wire value. A mapper that cannot map a value must return false instead.");
             }
 
+            // `Nameable`, not `typeNode`: a value the chain claims may be a non-public
+            // implementation type — `IPAddress.Loopback` is an `IPAddress+ReadOnlyIPAddress` —
+            // and the receiving side has to be handed a name its allowlist admits and its
+            // resolver can find. Safe *here* and nowhere else: an entity, a proxy, a primitive
+            // and a `Type` value have all returned above, which is exactly what made the
+            // general application of this rule cost 375 (C23).
             return new DynamicValueNode
             {
                 Id = id,
-                Type = typeNode,
+                Type = _typeMapper.ToTypeNode(TypeNodeMapper.Nameable(type)),
                 PrimitiveValue = PrimitiveCoercion.Normalize(wireValue),
             };
         }

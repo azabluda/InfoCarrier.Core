@@ -2119,6 +2119,54 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       repo already states for counts applies to all four — **read them out of the run's summary
       block; none of them is arithmetic.**
 
+- [x] **C23. B23 closed through the seam — and the widening rule cost two measured reverts to
+      confine.** **`Total tests: 22278, Passed: 21906, Failed: 155, Skipped: 217`** (`c23c`) —
+      **157 → 155, 2 fixed, 0 broken.** ✅ `<this commit>`
+
+      `Comparison_with_value_converted_subclass` was one of only four wrong answers in the suite:
+      `Where(f => f.ServerAddress == IPAddress.Loopback)` returned 0 rows instead of 1, silently.
+      B23 diagnosed it as three stacked defects and found no route to the third. **C17's seam is
+      that route**, and this is ADR-012's second consumer — the one that shows the seam is not a
+      spatial feature. `IPAddress` fails the reflective walk the same way a geometry does: its
+      `ScopeId` getter throws `SocketException` for an IPv4 address.
+
+      **Defect 1, confirmed by probe before anything was written**, exactly as B23 recorded it:
+
+          DENY System.Net.IPAddress+ReadOnlyIPAddress | visible=False | base=System.Net.IPAddress
+
+      `IPAddress.Loopback` is a private nested subclass, and EF's funcletizer types a constant by
+      the value it holds. So the constant named a type no allowlist can admit, the whole `Where`
+      went client-side, and LINQ-to-Objects answered it wrongly.
+
+      **Defect 2 is the widening rule, and getting it confined took two full runs.** Both are kept:
+
+      | Attempt | Where applied | Result |
+      |---|---|---|
+      | `c23` | `TypeNodeMapper.ToTypeNode`, i.e. every node kind | **157 → 530.** 107 `Load`, 77 `GraphUpdates`, 52 `OwnedQuery`. A lazy-loading **proxy** is also non-public with a public base, and `DynamicValueMapper` already strips proxies deliberately *through the model*; a second unrelated rewrite upstream fought it. Kept as `c23-widening-reverted`. |
+      | `c23b` | three constant-only sites, base ≠ `object` | **157 → 186.** An `internal enum` widened to `System.Enum` — public, and useless — *"The JSON value could not be converted to System.Enum"* ×27, plus a compiler-generated array widened to `System.Array`. |
+      | `c23c` | the same three sites, base ∉ {`object`, `ValueType`, `Enum`, `Array`, `Delegate`, `MulticastDelegate`} | **157 → 155, 0 broken.** |
+
+      **The rule that survives: widen only to a base that is a real type, never to a category.**
+      C9 had already measured `object` at 92 and stated the exclusion as `BaseType != typeof(object)`;
+      that was right about the shape and one item long. `ValueType`, `Enum`, `Array` and the two
+      delegate roots are the same mistake one level out.
+
+      **And the three sites are exact**, because a constant is the one expression node whose `Type`
+      is a *runtime* type rather than a declared one: `ExpressionToNodeTranslator.VisitConstant`
+      (what is written), `WireTypeCollector`'s constant branch (what the analyzer asks the
+      allowlist about — **these two must agree or a subtree is refused over a name that is never
+      sent**), and `DynamicValueMapper.MapToNode`'s value-mapper branch, which every entity, proxy,
+      primitive and `Type` value has already returned before.
+
+      **Defect 3 is the seam, and the mapper is test-side** — `InfoCarrierIPAddressValueMapper`,
+      registered beside the geometry one. So ADR-012's statement holds unchanged: the provider
+      knows nothing about which CLR types an application carries. **Whether the product should ship
+      a default set of standard mappers is a real question and is deliberately not answered here.**
+      v1 had `StandardValueMappers` in its product assembly, `IPAddress` is BCL rather than a
+      package, and an application hitting this today gets a wrong answer rather than an error. But
+      a default-registered mapper changes what travels for every existing caller, and ADR-012 says
+      registration is the application's. **That is a decision, not a patch.**
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

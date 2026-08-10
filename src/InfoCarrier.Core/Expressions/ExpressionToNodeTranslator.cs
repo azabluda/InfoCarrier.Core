@@ -96,7 +96,17 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     /// <inheritdoc />
     protected override Expression VisitConstant(ConstantExpression node)
     {
-        TypeNode type = _typeMapper.ToTypeNode(node.Type);
+        // A constant is the one expression node whose `Type` is a *runtime* type rather than a
+        // declared one — EF's funcletizer types it by the value it holds. So it is the one node
+        // that can name a non-public implementation type, and `IPAddress.Loopback` does exactly
+        // that: it is a private `IPAddress+ReadOnlyIPAddress`. `Nameable` reports the nearest
+        // public base, which is what the receiving allowlist and resolver can act on (B23).
+        //
+        // Here and not inside `ToTypeNode`, which every other node kind also goes through: a
+        // lazy-loading proxy is non-public with a public base too, and rewriting one centrally
+        // cost 375 (C23). `WireTypeCollector`'s constant branch mirrors this line — the two must
+        // agree or the analyzer refuses a subtree over a name that is never sent.
+        TypeNode type = _typeMapper.ToTypeNode(TypeNodeMapper.Nameable(node.Type));
 
         // EF queryable roots (DbSet<T> / EntityQueryRootExpression-backed IQueryables) become
         // query-root stubs (research-findings §2).

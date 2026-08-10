@@ -46,7 +46,15 @@ public static class WireTypeCollector
 
         // Every node writes its own Type, query-root stubs included — `QueryRootStubNode` carries
         // both an ElementType and a Type.
-        into.Add(node.Type);
+        //
+        // A *constant* is the one node whose `Type` is a runtime type rather than a declared one:
+        // EF's funcletizer types it by the value it holds, so `IPAddress.Loopback` arrives typed
+        // as the private `IPAddress+ReadOnlyIPAddress`. `TypeNodeMapper.Nameable` reports what the
+        // wire will actually name, which is what this analysis has to ask the allowlist about —
+        // asking about the raw type refused a subtree over a name that would never be sent (B23).
+        // Confined to constants on purpose; see the remarks on `Nameable` for the 375 that a
+        // general application of it cost.
+        into.Add(node is ConstantExpression ? Expressions.TypeNodeMapper.Nameable(node.Type) : node.Type);
 
         switch (node)
         {
@@ -64,7 +72,7 @@ public static class WireTypeCollector
                 // client-only type on the wire even though the node's Type is `object`.
                 if (constant.Value is { } value)
                 {
-                    into.Add(value.GetType());
+                    into.Add(Expressions.TypeNodeMapper.Nameable(value.GetType()));
                 }
 
                 break;
