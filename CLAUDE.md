@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22278, Passed: 21907, Failed: 154, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22278, Passed: 21908, Failed: 153, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -136,7 +136,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C20 for the rest** — read out of `artifacts/measure/`,
-currently `c24`. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
+currently `c27`. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
 A71), **20 `ComplexNavigations`**, **14 `Query.Associations`** (C20) and **9 `JsonTypes`** (7 of
 them A64's locale, not this provider). Only **4** are wrong answers
@@ -277,10 +277,20 @@ run in four. The failure is an identity conflict on a *temporary* key (`int.MinV
 `ServerSaveChangesExecutor.TrackOne`, and the two colliding rows are the test's own two `Blog`s,
 added in one `SaveChanges`. **Both sightings and the full analysis are in C11.**
 
-**Its probe is not written yet, and the obvious one does not work.** A probe that calls
-`File.AppendAllText` per tracked entry perturbs the suite badly — 154 → 348 under parallel test
-collections — so it measures nothing. Buffer per-process and flush once, or write to a
-thread-local file per collection, before spending another full run on it.
+**It is instrumented rather than chased, and the instrument is already in.** C27 makes
+`ServerSaveChangesExecutor` rethrow an identity conflict with the whole request appended — every
+entry's temporary flags, generated keys and borrowed references, and every tracked entry's key.
+Nothing is written on the happy path, which matters: the previous attempt wrote a line per tracked
+entry and cost 194 extra failures through file I/O under parallel collections. **So do not hunt
+it. The next sighting arrives diagnosed** — read the dump, compare *"placeholder values expected"*
+against the tracked keys, and see C11 for what each answer means.
+
+**The surviving hypothesis, evidenced.** Client placeholder values and server temporary values are
+drawn from two independent counters that both start near `int.MinValue`, so they occupy the *same
+numeric range* — a passing run shows the client's placeholders are `-2147482647`/`-2147482646`,
+exactly what the server issues. This executor identifies a borrowed placeholder **by bare value**,
+and its own comment calls a false positive improbable; that is only true while the ranges differ.
+Store isolation and parallelism-alone are ruled out by reading (C11).
 
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
