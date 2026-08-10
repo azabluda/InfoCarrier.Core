@@ -3467,6 +3467,53 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       | `NonSharedPrimitiveCollectionsQuerySqlite.Array_of_TimeOnly` | *"Sequence contains no elements"* — the server matched no row. **Undiagnosed, and the clue is in its siblings**: `Array_of_TimeOnly_with_milliseconds` and `_with_microseconds` both pass, so whatever it is, it is specific to a `TimeOnly` with no sub-second part rather than to `TimeOnly` as such. |
       | `Query.StringTranslations.Regex_IsMatch` ×2 | A46, a deliberate allowlist refusal. Unchanged. |
 
+- [x] **C61. The `GearsOfWar` `let` pair, probed as C53 prescribes — it is the sequence-slot guard,
+      and that guard is already priced at 107.** No code change; this is the diagnosis C60 said was
+      owed. ✅ `<this commit>`
+
+      C60 left `Query_with_complex_let_containing_ordering_and_filter_projecting_firstOrDefault_element_of_let`
+      ×2 as *"C43's shape, and C53's lesson says probe the boundary verdict before calling it
+      semantics — that probe has not been run"*. It has now, and the answer is not semantics.
+
+      **Three probes, each one step further in.** The split:
+
+          CAPTURED:  …Select(g => new AnonType456(g = g, automaticWeapons = g.Weapons.OrderByDescending(…).Where(…)))
+                     …Select(ti => new AnonType457(Nickname = ti.g.Nickname,
+                                                   WeaponName = ti.automaticWeapons.FirstOrDefault().Name))
+          REWRITTEN: …Select(g => new ValueTuple(Item1 = g, Item2 = g.Weapons.…))          <- ships
+                     …Select(row => new AnonType456(g = row.Item1, automaticWeapons = row.Item2))
+                     …Select(ti => new AnonType457(… ti.automaticWeapons.FirstOrDefault().Name))
+          wholly=False shippable=1
+
+      The **final** projection is on the client, and there `FirstOrDefault()` over a gear with no
+      automatic weapon is `null`, so `.Name` is a `NullReferenceException`. The refusal probe named
+      the type: `AnonType456<Gear, IEnumerable<Weapon>>` — the `let`'s transparent identifier,
+      which is exactly what ADR-011's re-carry exists to remove.
+
+      **So why did the re-carry not remove it?** A third probe, in `ReCarryInternalTypes`:
+
+          RECARRY: changed=True  kept=False
+
+      It produced a candidate and `RewriteVerifier` rejected it as `NoGain` — **correctly**, because
+      the candidate had tupled only `AnonType457`, the *result* type, which `RebuildAtRoot` then
+      rebuilds anyway. `AnonType456` was never a candidate at all.
+
+      **And that is a guard with a number on it.** `CarrierFinder.Register`:
+
+          if (construction.Arguments.Any(a => IsSequence(a.Type) && !IsNull(a)))
+          {
+              _disqualified.Add(construction.Type);
+
+      *"A slot holding a sequence asks SQL to navigate out of a projected tuple back into a
+      correlated collection — `t.Item2.DefaultIfEmpty()` — and 107 translation failures followed."*
+      `automaticWeapons` is a sequence, so the carrier is disqualified by design, and the consumer
+      here does the very thing the guard is about: `t.Item2.FirstOrDefault().Name`.
+
+      **Reclassified, and this is the point of the entry.** These two are not C43's null-propagation
+      question and not an unexamined gap — they are **the measured cost of the sequence-slot guard,
+      visible from the other side.** Anyone tempted to relax that guard should read spec §4 first
+      and expect to pay 107; the two tests here are what one would buy.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
