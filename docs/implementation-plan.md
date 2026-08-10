@@ -3144,6 +3144,53 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `System.Security.Cryptography.Xml` 9.0.0 and `SQLitePCLRaw.lib.e_sqlite3` 2.1.11. Both
       predate this step and are test-only, but nothing in the repo mentions them.
 
+- [x] **C53. `SpatialQuery.Item` was never about null semantics or tiers. A member declared on a
+      base class the model never names.**
+      **`Total tests: 22347, Passed: 21998, Failed: 132, Skipped: 217`** (`c53`) — **134 → 132,
+      2 fixed, 0 broken.** ✅ `<this commit>`
+
+      **Three wrong diagnoses preceded this one, and the difference each time was a probe.** C43
+      called it null-propagation semantics in the client residual and a decision about what the
+      split guarantees. C51 called it blocked by a native dependency. C52 proved the tier is
+      irrelevant but still framed the remedy as a projection-split question. All three reasoned
+      from "the index is on the client" without asking **why**.
+
+      Two probes answered it. The first printed the split:
+
+          CAPTURED:  Select(e => new AnonType(Id = e.Id, Item0 = e.MultiLineString.get_Item(0)))
+          REWRITTEN: Select(e => new ValueTuple(Item1 = e.Id, Item2 = e.MultiLineString))   <- ships
+                    .Select(row => new AnonType(Id = row.Item1, Item0 = row.Item2.get_Item(0)))
+
+      `CollectFragments` takes the **maximal** server-evaluable subexpression, so it stopping at
+      `e.MultiLineString` meant the analyzer had refused the call. The second probe said why:
+
+          REFUSED node: e.MultiLineString.get_Item(0)
+             disallowed type: NetTopologySuite.Geometries.GeometryCollection
+
+      **`MultiLineString`'s indexer is declared on `GeometryCollection`** — an intermediate class
+      between it and `Geometry`, which the model never mentions. The allowlist admits a property's
+      own CLR type and nothing above it, so the call named a type it had never heard of, the node
+      was not server-ok, and the rewriter shipped the whole geometry and indexed it on the client
+      — where `null[0]` is a `NullReferenceException`, because C# has no null propagation unless
+      the expression asks for it.
+
+      **The fix is four lines, and the argument was already in this file.** `AddSupertypes` admits
+      an entity type's supertypes with the reasoning *"a supertype of an entity type is reachable
+      only through an instance the model itself produced, so naming one widens nothing"*. That is
+      exactly as true of a mapped **property** type, and had never been applied to one.
+      `AddPropertyBaseTypes` walks the base-class chain, **base classes only and never a
+      category** — interfaces would drag the whole generic-math surface in behind an `int`, and
+      C23 measured widening to `ValueType`/`Enum` at **145 → 186** on a neighbouring mechanism.
+
+      **The prediction was wrong in the good direction, which is worth recording too.** C52
+      reasoned that pushing the index server-side would merely relocate the failure, because
+      InMemory would evaluate `get_Item(0)` on a null in its own compiled lambda. It does not —
+      EF's InMemory pipeline null-guards it, and both tests pass on **Tier A**. No SpatiaLite, no
+      tier move, no semantic decision about the split.
+
+      **And it is a W1 win independent of the two tests**: the wire now carries one indexed
+      geometry per row instead of an entire `MultiLineString`.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

@@ -122,6 +122,7 @@ public sealed class TypeAllowlist
                 foreach (IProperty property in entityType.GetProperties())
                 {
                     allowed.Add(property.ClrType);
+                    AddPropertyBaseTypes(property.ClrType, allowed);
                 }
 
                 // A complex type is part of the model but is not an entity type, so neither loop
@@ -176,6 +177,49 @@ public sealed class TypeAllowlist
     ///         <c>type.IsAssignableFrom(e.ClrType)</c>; this is that answer, precomputed.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     Admits the base classes of a mapped property's CLR type.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A member is often declared on a base class the model never names.</b>
+    ///         <c>MultiLineStringEntity.MultiLineString</c> is a <c>MultiLineString</c>, and its
+    ///         indexer is declared on <c>GeometryCollection</c> — an intermediate class between it
+    ///         and <c>Geometry</c>. So <c>e.MultiLineString[0]</c> named a type the allowlist had
+    ///         never heard of, the boundary analyzer refused the call, and the projection rewriter
+    ///         shipped the whole geometry and evaluated the index on the client instead.
+    ///     </para>
+    ///     <para>
+    ///         The argument is the one <see cref="AddSupertypes" /> already makes for entity
+    ///         types, from the same side: <b>a base class of a mapped type is reachable only
+    ///         through a value the model itself produced</b>, so naming one widens nothing a
+    ///         payload could not already reach.
+    ///     </para>
+    ///     <para>
+    ///         <b>Base classes only, and never a category.</b> Interfaces are left out because a
+    ///         primitive property would drag in the whole generic-math surface for no gain, and
+    ///         the category types are excluded because C23 measured that exact widening at
+    ///         <b>145 → 186</b> on a neighbouring mechanism: widening to <c>ValueType</c> or
+    ///         <c>Enum</c> names a kind of thing rather than a thing.
+    ///     </para>
+    /// </remarks>
+    private static void AddPropertyBaseTypes(Type clrType, HashSet<Type> allowed)
+    {
+        for (Type? super = clrType.BaseType;
+            super is not null && super != typeof(object) && !IsCategory(super);
+            super = super.BaseType)
+        {
+            allowed.Add(super);
+        }
+
+        static bool IsCategory(Type type)
+            => type == typeof(ValueType)
+                || type == typeof(Enum)
+                || type == typeof(Array)
+                || type == typeof(Delegate)
+                || type == typeof(MulticastDelegate);
+    }
+
     private static void AddSupertypes(Type clrType, HashSet<Type> allowed)
     {
         foreach (Type @interface in clrType.GetInterfaces())

@@ -29,6 +29,9 @@
 #
 # 2026-08-10 (C42) — 144 -> 143, the composite-key-cycle store-generation fix.
 #
+# 2026-08-10 (C53) — 134 -> 132. SpatialQuery.Item, closed by admitting the base classes of a
+# mapped property type.
+#
 # 2026-08-10 (C50) — 143 -> 134. The nine `en-SE` locale failures, removed by pinning the test
 # run to the invariant culture. THIS IS THE ENTRY THAT MATTERS FOR THIS FILE: until C50 the
 # number below was only true on one machine, because EF's own JsonGeoJsonReaderWriter formats
@@ -38,5 +41,5 @@
 # 2026-08-10 (C46) — failures unchanged at 143; `total` 22312 -> 22327 for the 15 tests C45 and
 # C46 added (envelope protocol, fault fidelity). The total is raised deliberately: leaving it low
 # is what would let a crashed host lose fifteen tests unnoticed, which is the guard's whole job.
-failed=134
+failed=132
 total=22347

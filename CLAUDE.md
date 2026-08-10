@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22347, Passed: 21996, Failed: 134, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22347, Passed: 21998, Failed: 132, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,7 +137,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C43 for the rest** — read out of `artifacts/measure/`,
-currently `c50`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
+currently `c53`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
 node-kind and payload-size controls, no movement in the failing count; C40 then took 145 to 144
 and C42 took it to 143. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
@@ -213,22 +213,22 @@ Not yet implemented, in rough priority order:
   value-mapper seam** (C17); and a **WKT** geometry mapper registered **test-side** (C18), which is
   why the product assembly still does not reference NetTopologySuite. Not GeoJSON — it carries no Z
   or M, which is the v1 defect requirements §2.8 records.
-- **Spatial stays Tier A, and `SpatialQuery.Item` is not a tier question — measured (C52).** The
-  move was tried: `mod_spatialite` arrives from NuGet with no manual install, EF's three fixture
-  pieces port cleanly server-side, and the run still said no — **12 failing on Tier B against 2 on
-  Tier A**. `Item` fails *identically* on both, because C24 put the index on the client residual
-  and no backend ever evaluates it. Do not retry. If spatial ever moves for another reason, the
-  two `Intersects_*` overrides become wrong (SQLite passes the base) and six new `JsonException`s
-  on geometry are the price to diagnose.
-- **The client residual has no null semantics, and that is now a stated open question (C43).**
-  `SpatialQuery.Item` ×2 asserts that an index into a null geometry yields null — the base leaves
-  the guard out of the *actual* query on purpose, because a relational store propagates it and
-  EF's SQLite test passes with no override. Neither half of this provider does: on Tier A the
-  backend is InMemory, and after C24 the index lands on the **client residual** anyway. Two
-  overrides in that same class (`Intersects_equal_to_null` and its pair) are the identical shape,
-  already classified as "the store's, not the wire's". **Making the residual propagate null is a
-  decision about what the split guarantees, for every client-side projection, not a bug fix** —
-  and the cheaper route is spatial on Tier B.
+- **`SpatialQuery.Item` is CLOSED (C53), and the three diagnoses before it were all wrong in the
+  same way.** It was not null semantics in the residual (C43), not a native dependency (C51), not
+  a tier question (C52) — it was **a member declared on a base class the model never names**.
+  `MultiLineString`'s indexer lives on `GeometryCollection`; the allowlist admitted a property's
+  own CLR type and nothing above it, so the analyzer refused the call and the rewriter shipped the
+  whole geometry and indexed it client-side, where `null[0]` throws. `AddPropertyBaseTypes` walks
+  the base chain — **base classes only, never a category**, because C23 measured `ValueType`/`Enum`
+  widening at 145 → 186. **The rule to carry forward: when a projection lands on the client for no
+  obvious reason, probe the boundary verdict before theorising about semantics.** Two probes —
+  what the split produced, then which type was refused — replaced three sessions of plausible
+  reasoning.
+- **Spatial stays Tier A, and moving it is measured-worse (C52): 12 failing on Tier B against 2.**
+  `mod_spatialite` does arrive from NuGet with no manual install, and EF's fixture pieces port
+  cleanly server-side, so the move is *possible* — it is just worse. If it is ever attempted again,
+  the two `Intersects_*` overrides become wrong (SQLite passes the base) and six `JsonException`s
+  on geometry conversion are the price to diagnose.
 - **The seam is the general answer to "a CLR type the wire cannot walk", and it now has three
   consumers.** A geometry's members recurse (C18), `IPAddress.ScopeId` throws for an IPv4 address
   (C23), and `Uri.AbsolutePath` throws for a relative URI (C34). Three unrelated CLR types, one
