@@ -206,13 +206,23 @@ Not yet implemented, in rough priority order:
   value-mapper seam** (C17); and a **WKT** geometry mapper registered **test-side** (C18), which is
   why the product assembly still does not reference NetTopologySuite. Not GeoJSON — it carries no Z
   or M, which is the v1 defect requirements §2.8 records.
-- **The seam is the general answer to "a CLR type the wire cannot walk."** B23's `IPAddress` is the
-  other instance and its diagnosis is complete and waiting; the converter route it rejected costs
-  381. **Its one known gap**: `IInfoCarrierValueMapper.TryMapToWire` takes an *instance*, so the
-  boundary analyzer cannot ask whether a **type** travels whole — which is why a
-  `GeometryCollection`, being `IEnumerable<Geometry>`, is slotted as a `List<Geometry>` and
-  `MultiLineString[0]` fails to bind (C18's 4). A type-level probe is the route and is an addition
-  to a just-locked ADR.
+- **The seam is the general answer to "a CLR type the wire cannot walk", and it now has three
+  consumers.** A geometry's members recurse (C18), `IPAddress.ScopeId` throws for an IPv4 address
+  (C23), and `Uri.AbsolutePath` throws for a relative URI (C34). Three unrelated CLR types, one
+  mechanism, all reached by the same reflective object-shape walk.
+  **A DECISION IS WAITING on the back of that**: all three mappers are registered *test-side*, so
+  the suite is green and a real application hitting any of them is not. v1 shipped
+  `StandardValueMappers` in its product assembly; ADR-012 says registration is the application's.
+  Two of the three are BCL types. **Recorded in C23 and C34; not taken, because it is a scope
+  call.**
+- **"The wire cannot handle this type" has two answers and they are not interchangeable** (C34).
+  The seam decides how a value is *written*; `ExpressionJsonContext` decides whether the wire can
+  carry the result at all — a key value lands in `EntityKeyNode.KeyValues`, declared `object` and
+  resolved by runtime type, which the seam never sees. A converted key exercises both, and fixing
+  only the first moves the failure rather than closing it.
+- **C18's `GeometryCollection` gap turned out not to need the type-level probe** it proposed (C24).
+  `ProjectionRewriter` was substituting a `List<T>` for a declared type a `List<T>` does not
+  satisfy; one clause fixed it and ADR-012 needed no amendment.
 - **`MaterializationInterception` is 27 and is *not* a decision (B16, answered 2026-08-09).** This
   provider is **two EF instances**, and a real deployment must be free to define materialization
   hooks on either side or both — so the three routes B16 measured, each of which suppresses one
