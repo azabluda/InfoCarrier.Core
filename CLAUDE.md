@@ -254,7 +254,8 @@ Not yet implemented, in rough priority order:
 - **C18's `GeometryCollection` gap turned out not to need the type-level probe** it proposed (C24).
   `ProjectionRewriter` was substituting a `List<T>` for a declared type a `List<T>` does not
   satisfy; one clause fixed it and ADR-012 needed no amendment.
-- **`MaterializationInterception` is 27 and is *not* a decision (B16, answered 2026-08-09).** This
+- **`MaterializationInterception` is 26 and is *not* a decision (B16, answered 2026-08-09; the
+  optional remedy priced in C58).** This
   provider is **two EF instances**, and a real deployment must be free to define materialization
   hooks on either side or both — so the three routes B16 measured, each of which suppresses one
   side, may none of them be taken. Nothing in `src/` forwards an interceptor: the server sees the
@@ -263,9 +264,15 @@ Not yet implemented, in rough priority order:
   `"Intercepted: Intercepted:"` proves two invocations, `Assert.Same` proves they carry different
   contexts, and B15's fix landing on the *client's* materializer proves the client raises it. **The
   A28 family, one level up**: A28's spec tests assert a materialization limitation this provider
-  does not have, these assert a *topology* it does not have. Red and classified. Making them green
-  is a harness change (stop forwarding interceptors, register the backend's additively) and is
-  optional.
+  does not have, these assert a *topology* it does not have. Red and classified.
+  **C58 attempted the optional harness remedy and priced it.** Two facts came out of it and both
+  are load-bearing: `DbContextOptions.WithExtension` keys the map on `extension.GetType()`, so
+  **no subclass of `CoreOptionsExtension` can ever replace it** — B16's hand-rebuild from the
+  public `With*` setters is the only route, not one of several. And the family arrives on *two*
+  channels, because `SingletonInterceptorsTestBase` passes `useServiceProvider: inject`: half
+  through options and half through the server's service collection, which the options route does
+  not touch at all. A71's ten `AddInterceptors` failures are the **server's** and the same defect
+  as the twelve `Assert.Same`, not a separate one.
 - **JSON-mapped owned collections need a decision (B12).** The server keys an element by its
   ordinal in the array; the client keys it by the CLR `Id`, which the document does not carry and
   which is `0` for every element — so EF's fixup gives every element to every owner. Both sides

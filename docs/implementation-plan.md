@@ -3340,6 +3340,61 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       and not the relational base's: **the identical test passes on `Navigations`**, where the
       query does not reach APPLY.
 
+- [x] **C58. B16's optional remedy, attempted: the cheap route into `CoreOptionsExtension` does not
+      exist, and half the family was never on that channel anyway.** No code change survives; this
+      is the mechanism, established by two probes. ✅ `<this commit>`
+
+      B16 left the `MaterializationInterception` family red-and-classified with an optional harness
+      remedy: stop forwarding the client's *interceptors* to the server while still forwarding
+      everything else `onConfiguring` carries. It named one obstacle — *"`WithInterceptors`
+      concatenates, `Clone` is protected, so the extension would have to be replaced wholesale with
+      one rebuilt by hand from its public `With*` setters"*. **There appeared to be a way around
+      that, and there is not.**
+
+      The apparent way: `CoreOptionsExtension`'s copy constructor is `protected` and reads the
+      `Interceptors` and `SingletonInterceptors` **properties**, both `virtual`. So a subclass
+      overriding them to null, copy-constructed twice, yields an extension with both the properties
+      and the backing fields empty — which covers `Validate` (property) and `ApplyServices` (field)
+      alike. It builds, it runs, and the probe says it strips nothing:
+
+          SERVER opts:  core=True interceptors=4 singleton=4
+          AFTER STRIP:  type=CoreOptionsExtension interceptors=4 singleton=4
+
+      **`DbContextOptions<TContext>.WithExtension` keys the map on `extension.GetType()`, the
+      runtime type.** A subclass is therefore filed under its *own* key and the original
+      `CoreOptionsExtension` stays exactly where it was — still found by `FindExtension`, still
+      validated. **Any subclass route is closed**, whatever it overrides. B16's "rebuilt by hand
+      from its public `With*` setters" is not one option among several; it is the only one.
+
+      **And the second probe halves the prize.** The 26 arrive on two different channels, because
+      `SingletonInterceptorsTestBase.CreateContext` passes `useServiceProvider: inject`:
+
+      | `inject` | How the interceptor reaches the server | What stripping options would do |
+      |---|---|---|
+      | `False` | the client's `onConfiguring` → `AddInterceptors` → `CoreOptionsExtension` | removes it |
+      | `True` | `addServices` → the server's own `IServiceCollection` | **nothing** |
+
+      So the options rebuild reaches at most half, and the other half is the service-collection
+      filter B16 already measured at **1629** (all `ISingletonInterceptor` — `AddEntityFrameworkProxies`
+      registers one) or **246** (`IMaterializationInterceptor` only — `PropertyValuesFixtureBase`
+      wants its server-side). Closing that half means changing `PropertyValues`' fixture to
+      register on the backend additively, per fixture, by hand.
+
+      **Corrected while here: A71 is not what it was filed as.** The 10
+      *"A call was made to `AddInterceptors`, but Entity Framework is not building its own internal
+      service provider"* failures are the **server's**, not a client-side wiring gap — the server
+      always calls `UseInternalServiceProvider`, and it is the forwarded `onConfiguring` that then
+      calls `AddInterceptors`. EF's own client never hits it, because `useServiceProvider: inject`
+      means the internal provider and the options-level interceptor are never both present there.
+      They are the same defect as the twelve `Assert.Same`, not a separate one.
+
+      **Still optional, and still B16's answer**: the product forwards no interceptor, a real
+      deployment may hook either side or both, and what these tests assert is a one-context
+      topology. Priced properly the remedy is a hand-rebuilt `CoreOptionsExtension` — sixteen
+      `With*` properties to mirror, silently wrong if one is missed, and re-checked at every EF
+      upgrade — plus a per-fixture DI change, for at most half a family that is already classified.
+      **Not taken.**
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
