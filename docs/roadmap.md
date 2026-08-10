@@ -42,7 +42,11 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
 - `QueryParameterExpression` substitution and STJ primitive registration fixed; failure count
   recorded and reduced (expected ≈ 141 → ≈ 350 of 413).
 - CI builds the correct solution file and runs a **failure-count ratchet** (below) that fails
-  the build when failures increase.
+  the build when failures increase. ✅ (N1–N4 for the workflow; C39 refreshed the baseline, which
+  had gone eight months stale at `111/5215` against an actual `145/22312` and would have failed
+  the gate on the failure count while the total quadrupled. **A ratchet whose baseline is not
+  maintained is a broken build waiting, not a safety net** — lower it in the same commit as the
+  fix that lowers it.)
 - `InfoCarrierComplianceTest` (F8) landed and **red on purpose**, publishing the authoritative
   inventory of unimplemented spec bases.
 - Doc integrity closed: ADR-008/ADR-009 recorded ✅, subrepo revisions pinned.

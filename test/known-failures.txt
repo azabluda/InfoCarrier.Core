@@ -8,9 +8,20 @@
 # commit message; the last deliberate rise was step L1, which turned on the type allowlist and
 # converted ~1,305 illusory passes into real M2 failures.
 #
+# BOTH NUMBERS ARE READ OUT OF THE TRX, not out of the console summary and never by arithmetic.
+# The TRX is what eng/ratchet.sh parses, so it is the only source that cannot disagree with the
+# gate. (They do agree today — `Total tests: 22312, Passed: 21950, Failed: 145, Skipped: 217` —
+# but `passed + failed` is 22095, because the TRX counts the 217 skips in `total` and in neither
+# of the other two. Deriving one figure from the others has cost this repo three commits before.)
+#
 # 2026-08-02 — the projection split is implemented and the type boundary is enforced
 # (1421 -> 90 on Tier A), and ADR-009 Tier B (SQLite) is now running the Where base too.
 # The rise from 90 to 115 is the 406 new Tier B tests bringing 24 known failures with them,
 # not a regression: Tier A is unchanged at 90.
-failed=111
-total=5215
+#
+# 2026-08-10 (C39) — first refresh since the file was written, and it was eight months of Phase
+# A/B/C adoptions stale: 111/5215 against an actual 145/22312. CI would have failed on the
+# failure count while the total quadrupled. Every failure behind this number is classified —
+# Phase C's C1–C20 and the A/B tables in docs/implementation-plan.md.
+failed=145
+total=22312

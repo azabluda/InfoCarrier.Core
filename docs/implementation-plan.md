@@ -2662,6 +2662,50 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **The 22278 → 22312 growth across C36–C38 is 34 new tests, not movement.** The failing count
       has been 145 throughout.
 
+- [x] **C39. CI was not broken. Its baseline was — by a factor of four.** No suite change; the
+      counts below are `c38c`'s, re-read out of a TRX. ✅ `<this commit>`
+
+      CLAUDE.md has carried *"CI is broken — `build.yml` restores `InfoCarrier.Core.sln`, and its
+      `~InMemory`/`~SqlServer` filters match no current test class"* for a long time, and this step
+      began by going to fix it. **The workflow already says `.slnx`, already runs two jobs, and
+      already invokes `eng/ratchet.sh`.** Commit `51f4684` — *"Step N1–N4: CI that can actually
+      run, then park it"* — did all of that; the note described the file as it was *before* that
+      commit and was never retired. **Read the file before repeating a note about it.**
+
+      **The real defect was one the note never mentioned.** `test/known-failures.txt` still read
+
+          failed=111
+          total=5215
+
+      dated 2026-08-02, from before Phase A, B and C adopted forty-one spec bases. Against an
+      actual `145/22312` the gate errors on the failure count — and the total, the guard that
+      exists to catch a crashed host reporting fewer failures because fewer tests ran, had
+      quadrupled underneath it. **A ratchet whose baseline is not maintained is a broken build
+      waiting, not a safety net.**
+
+      **The baseline is now read out of the TRX**, which is what the script parses, and that is
+      recorded in the file because the two sources do not agree in the obvious way: the TRX's
+      `total` (22312) counts the 217 skips that neither its `passed` (21950) nor its `failed`
+      (145) does, so `passed + failed` is 22095. Deriving one of these figures from the others is
+      the mistake that cost this repo three commits (see CLAUDE.md on `Skipped`).
+
+      **Verified locally in five directions, since GitHub Actions cannot be run from here** —
+      and *the workflow itself is therefore unverified*; what is verified is the script it calls:
+
+      | Case | Result |
+      |---|---|
+      | current TRX vs current baseline | `exit=0` |
+      | failures rose (`144` → 145) | `exit=1`, `::error::Failures rose 144 -> 145` |
+      | total shrank (`22400` → 22312) | `exit=1`, `::error::Total dropped 22400 -> 22312` |
+      | failures fell (`200` → 145) | `exit=0`, `::notice::` to lower the baseline |
+      | TRX missing entirely | `exit=1`, refuses rather than passing vacuously |
+
+      **Two small repairs to the workflow while here.** It triggered on `main`/`develop` only,
+      and every commit in this project is on `v10-claude` — *a gate that never runs on the branch
+      it is gating is not a gate*. And the full-suite step got `timeout-minutes: 90`; it is ~15
+      minutes locally at 22312 tests, and a runner slow enough to be killed at the default would
+      report a partial TRX, which the ratchet would then read as a shrinking total.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

@@ -20,7 +20,7 @@ not explain:
 | Script | What it is for |
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
-| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only.** The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count. It guards the **total** as well: a crashed host reports fewer failures because fewer tests ran, which once came within one measurement of looking like an improvement. Nothing invokes it today — CI is broken (see *Current state*), and fixing CI means wiring this up. |
+| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count. It guards the **total** as well: a crashed host reports fewer failures because fewer tests ran, which once came within one measurement of looking like an improvement. **The baseline is read out of the TRX, never out of the console block and never by arithmetic** — the TRX is what this script parses, and its `total` counts the skips its `passed` and `failed` do not. |
 | `eng/gate.sh` | A detached delay used to schedule an unattended session. Sleeps 7200s, then writes `artifacts/gate-open.txt`. Not part of the build; delete it if it stops being useful. |
 
 **Measuring a change: `eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which
@@ -246,8 +246,12 @@ Not yet implemented, in rough priority order:
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
   they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all
   classified in C20.
-- **CI is broken** — `.github/workflows/build.yml` restores `InfoCarrier.Core.sln` (repo has
-  `.slnx`), and its `~InMemory` / `~SqlServer` filters match no current test class.
+- ~~**CI is broken**~~ — **it is not, and had not been since Phase N** (C39, 2026-08-10). The
+  `.sln`-vs-`.slnx` and `~InMemory`/`~SqlServer` claims that stood here described the file as it
+  was before `51f4684`; the workflow has restored `.slnx`, run two jobs and invoked
+  `eng/ratchet.sh` ever since. What *was* broken was `test/known-failures.txt`, eight months stale
+  at `111/5215` against an actual `145/22312` — the gate would have failed on the failure count
+  while the total quadrupled. **Read the file before repeating a note about it.**
 
 **`ExecuteUpdate` is the cautionary tale of this phase, and it is about pricing rather than code.**
 Three plan entries (C0, C3, C4) recorded it as a wire or boundary change and priced it at 136 —

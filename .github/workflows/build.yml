@@ -2,7 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: [main, develop]
+    # `v10-claude` is where the work actually happens; a gate that never runs on the branch it
+    # is gating is not a gate. `main`/`develop` stay for when that changes.
+    branches: [main, develop, v10-claude]
   pull_request:
     branches: [main]
 
@@ -59,9 +61,15 @@ jobs:
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
 
       # Failures are the expected state here, so a non-zero exit must not end the job —
-      # the ratchet step below is what decides.
+      # the ratchet step below is what decides. A crashed host is not exempted by this: it
+      # reports *fewer* failures because fewer tests ran, and the ratchet catches that on the
+      # total.
+      #
+      # ~15 minutes locally at 22312 tests, so allow generously rather than have a slow runner
+      # look like a regression.
       - name: Test (full suite)
         continue-on-error: true
+        timeout-minutes: 90
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
