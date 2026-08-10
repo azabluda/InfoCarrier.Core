@@ -21,7 +21,7 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-Measured 2026-08-10 (`artifacts/measure/c53`): **`Total tests: 22347, Passed: 21998,
+Measured 2026-08-10 (`artifacts/measure/c54`): **`Total tests: 22355, Passed: 22006,
 Failed: 132, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
 scales by adopting bases, not by writing tests — M6 took the unadopted count from 41 to 1.
 

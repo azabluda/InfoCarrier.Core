@@ -238,4 +238,97 @@ public class DeserializationHardeningTest
             () => System.Text.Json.JsonSerializer.Deserialize(
                 json, ExpressionJsonContext.Default.ExpressionNode));
     }
+
+    // ---- C53's widening, bounded ------------------------------------------------------------
+
+    /// <summary>
+    ///     C53 admits the base classes of a mapped property's CLR type. These pin what that adds,
+    ///     against a real model rather than the model-free allowlist the tests above use.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The method-reachability delta is nil, and that is the load-bearing fact.</b>
+    ///         <c>ResolveMethod</c> calls <c>declaringType.GetMethods(flags)</c> without
+    ///         <c>BindingFlags.DeclaredOnly</c>, so inherited public methods are found by naming
+    ///         the <em>derived</em> type. Everything public on a base was callable before C53 by
+    ///         saying the subclass; admitting the base adds no method.
+    ///     </para>
+    ///     <para>
+    ///         What it adds is the ability to <em>name</em> and <em>construct</em> the base — and
+    ///         that base is, by construction, a base of something the application itself mapped.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void A_mapped_propertys_base_class_is_admitted_but_a_category_is_not()
+    {
+        using var context = new BaseChainContext();
+        TypeAllowlist allowlist = TypeAllowlist.ForModel(context.Model);
+
+        Assert.True(allowlist.IsAllowed(typeof(MiddleThing)), "the intermediate base is admitted");
+        Assert.True(allowlist.IsAllowed(typeof(RootThing)), "and the one above it");
+
+        // The category stays out: `int`'s base is `ValueType`, and C23 measured widening to one
+        // of these at 145 -> 186. Every value-typed property in every model would otherwise put
+        // it on the list.
+        Assert.False(allowlist.IsAllowed(typeof(ValueType)));
+
+        // `Delegate` *is* allowed, by a rule that predates C53 and is not affected by it: the
+        // branch that admits `Func<,>` so a lambda can travel reaches `typeof(Delegate)` itself,
+        // because `Delegate.IsAssignableFrom(Delegate)`. Harmless — it is abstract and
+        // constructs nothing — and asserted here so the next reader does not mistake it for
+        // something the base-class rule did.
+        Assert.True(allowlist.IsAllowed(typeof(Delegate)));
+    }
+
+    /// <summary>
+    ///     The conjunction from <c>security-review.md</c> §2 still holds under a
+    ///     <em>model-derived</em> allowlist, which is the one a server actually runs. The theory
+    ///     earlier in this file checks the model-free list, which C53 does not touch — so without
+    ///     this the widening would be unpinned exactly where it applies.
+    /// </summary>
+    [Theory]
+    [InlineData("System.Reflection.Binder")]
+    [InlineData("System.Reflection.MethodBase")]
+    [InlineData("System.Reflection.MethodInfo")]
+    [InlineData("System.Reflection.ConstructorInfo")]
+    [InlineData("System.Activator")]
+    [InlineData("System.AppDomain")]
+    [InlineData("System.Reflection.Assembly")]
+    public void A_model_derived_allowlist_still_refuses_the_reflection_invocation_surface(string typeName)
+    {
+        using var context = new BaseChainContext();
+        TypeAllowlist allowlist = TypeAllowlist.ForModel(context.Model);
+        System.Type type = System.Type.GetType(typeName) ?? typeof(object).Assembly.GetType(typeName)!;
+
+        Assert.NotNull(type);
+        Assert.False(allowlist.IsAllowed(type));
+    }
+
+    private class RootThing
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private class MiddleThing : RootThing;
+
+    private sealed class LeafThing : MiddleThing;
+
+    private sealed class BaseChainEntity
+    {
+        public int Id { get; set; }
+
+        public LeafThing Leaf { get; set; } = new();
+    }
+
+    private sealed class BaseChainContext : Microsoft.EntityFrameworkCore.DbContext
+    {
+        protected override void OnConfiguring(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder optionsBuilder)
+            => Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions
+                .UseInMemoryDatabase(optionsBuilder, "hardening-base-chain");
+
+        protected override void OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder)
+            => modelBuilder.Entity<BaseChainEntity>()
+                .Property(e => e.Leaf)
+                .HasConversion(v => v.Name, v => new LeafThing { Name = v });
+    }
 }

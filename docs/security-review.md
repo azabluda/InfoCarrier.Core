@@ -1,4 +1,4 @@
-# Security review — the deserialization path
+﻿# Security review — the deserialization path
 
 Milestone **M5** exit criterion. Reviewed **2026-08-10** against commit `f346a63` (plan item C48).
 
@@ -63,6 +63,44 @@ a convenience type to a list.
 carry `Type` values. If a later audit finds they do not, removing it collapses the conjunction to a
 single clause and is worth doing. Removing it now is a change with a full-suite cost and no
 demonstrated benefit, so it is recorded rather than made.
+
+## 2a. Amendment — C53's base-class rule, and why it does not widen the surface
+
+Reviewed **2026-08-10**, two commits after §2 was written, because C53 admits the **base classes
+of a mapped property's CLR type** and §2's whole point is that adding types is how the conjunction
+breaks. The question is fair and the answer is not "trust me".
+
+**The method-reachability delta is nil, and that is the load-bearing fact.** `ResolveMethod` calls
+`declaringType.GetMethods(flags)` **without** `BindingFlags.DeclaredOnly`, so inherited public
+methods are found by naming the *derived* type. Every public method on a base was already callable
+before C53 by saying the subclass. Admitting the base adds no method to the reachable set.
+
+What it does add:
+
+| Added | Bound |
+|---|---|
+| the base may be **named** (cast target, parameter type, generic argument) | a cast to a base of an admitted type is trivially safe |
+| the base may be **constructed** via `NewNode` | it is a base of a type the application itself mapped, whose own constructors were already reachable |
+
+**What it cannot add**, and this is now enforced rather than argued: `AddPropertyBaseTypes` stops
+at the reflection invocation surface — `Binder`, `MemberInfo` and everything derived from it,
+`Assembly`, `Module`, `AppDomain`. It could only have reached one if an application mapped a
+property whose CLR type derived from one, which is absurd but not impossible; the guard means
+§2's conjunction does not depend on nobody ever doing it.
+
+It also stops at the **categories** (`ValueType`, `Enum`, `Array`, `Delegate`,
+`MulticastDelegate`), which is not a security rule but a correctness one — C23 measured widening
+to a category at **145 → 186**. Without it every value-typed property in every model would put
+`ValueType` on the list.
+
+`DeserializationHardeningTest` pins both against a **model-derived** allowlist, which is the one a
+server actually runs; §2's theory checks the model-free list, which C53 does not touch, so without
+the new cases the widening would have been unpinned exactly where it applies.
+
+**Noted while writing this:** `typeof(Delegate)` is admitted, by the pre-existing branch that lets
+`Func<,>` travel so a lambda can be serialized — `Delegate.IsAssignableFrom(Delegate)` is true.
+Harmless (abstract, constructs nothing) and unrelated to C53, but it was mistaken for C53's doing
+on first reading, so it is written down.
 
 ## 3. What is genuinely bounded
 

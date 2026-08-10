@@ -209,6 +209,18 @@ public sealed class TypeAllowlist
             super is not null && super != typeof(object) && !IsCategory(super);
             super = super.BaseType)
         {
+            if (IsReflectionInvocationSurface(super))
+            {
+                // Belt and braces. `docs/security-review.md` §2 records that the allowlist's
+                // safety is a *conjunction*: `System.Type` is admitted and every enum is, and the
+                // only thing stopping a payload turning a `Type.GetType(...)` into a call is that
+                // these types are not. A rule that admits base classes must not be able to
+                // reintroduce one — which it could only do if an application mapped a property
+                // whose CLR type derived from one, absurd but not impossible. Refusing here means
+                // the conjunction does not depend on nobody ever doing that.
+                break;
+            }
+
             allowed.Add(super);
         }
 
@@ -219,6 +231,21 @@ public sealed class TypeAllowlist
                 || type == typeof(Delegate)
                 || type == typeof(MulticastDelegate);
     }
+
+    /// <summary>
+    ///     The types that would turn an admitted <see cref="Type" /> into an invocation
+    ///     (<c>docs/security-review.md</c> §2). Never admitted by inference — only ever by an
+    ///     application registering one explicitly, which is its own decision.
+    /// </summary>
+    private static bool IsReflectionInvocationSurface(Type type)
+        => type == typeof(System.Reflection.Binder)
+            || type == typeof(System.Reflection.MemberInfo)
+            || type == typeof(System.Reflection.MethodBase)
+            || type == typeof(System.Reflection.Assembly)
+            || type == typeof(System.Reflection.Module)
+            || type == typeof(AppDomain)
+            || typeof(System.Reflection.MemberInfo).IsAssignableFrom(type)
+            || typeof(System.Reflection.Assembly).IsAssignableFrom(type);
 
     private static void AddSupertypes(Type clrType, HashSet<Type> allowed)
     {

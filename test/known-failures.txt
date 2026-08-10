@@ -42,4 +42,4 @@
 # C46 added (envelope protocol, fault fidelity). The total is raised deliberately: leaving it low
 # is what would let a crashed host lose fifteen tests unnoticed, which is the guard's whole job.
 failed=132
-total=22347
+total=22355
