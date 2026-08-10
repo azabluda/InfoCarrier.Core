@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
@@ -241,6 +241,94 @@ public class ServerSaveChangesExecutor
             }
         }
 
+        // Diagnostic context for an identity conflict during replay, built only when one happens.
+        //
+        // **This is a standing probe for a known intermittent** (plan C11): two of one request's
+        // rows have twice ended up under the same *temporary* key, about one full suite run in
+        // four, and never in isolation. The previous attempt at catching it wrote a line per
+        // tracked entry and perturbed the suite from 154 failures to 348 — file I/O per entry
+        // under xUnit's parallel collections is not free. So nothing is written unless the
+        // conflict actually occurs, and then everything the diagnosis needs is already in hand.
+        //
+        // It is also plain good behaviour: a server replaying someone else's change entries that
+        // hits an identity conflict should say which entries collided. EF's own message names one
+        // key and no entry at all.
+        string Diagnose(Exception failure, Replay failing)
+        {
+            // Never let the diagnostic replace the fault it describes. This walks arbitrary
+            // application values, and this suite contains a type whose members throw *on
+            // purpose* — `GraphUpdatesTestBase.MyDiscriminator.GetHashCode` — which the
+            // placeholder scan above already has to guard against.
+            try
+            {
+                return DiagnoseCore(failure, failing);
+            }
+            catch (Exception diagnosticFailure)
+            {
+                return $"{Environment.NewLine}(InfoCarrier replay diagnostic unavailable: "
+                    + $"{diagnosticFailure.GetType().Name}: {diagnosticFailure.Message})";
+            }
+        }
+
+        string DiagnoseCore(Exception failure, Replay failing)
+        {
+            var report = new System.Text.StringBuilder();
+            report.AppendLine().AppendLine(
+                "InfoCarrier replay diagnostic (plan C11 — identity conflict while replaying a "
+                + "client's change entries):");
+            report.Append("  failing entry: ").Append(failing.EntityType.Name)
+                .Append(" correlationId=").Append(failing.Change.CorrelationId)
+                .Append(" state=").Append(failing.Change.State)
+                .Append(" temporaryProperties=[")
+                .Append(string.Join("|", failing.Change.TemporaryProperties ?? []))
+                .AppendLine("]");
+
+            report.Append("  placeholders resolved so far: ").AppendLine(
+                placeholders.Count == 0
+                    ? "(none)"
+                    : string.Join(", ", placeholders.Select(p => $"{p.Key}->{p.Value.Value}(tmp={p.Value.IsTemporary})")));
+            report.Append("  placeholder values expected in this request: ").AppendLine(
+                expected.Count == 0 ? "(none)" : string.Join(", ", expected));
+
+            report.AppendLine("  every entry in this request:");
+            foreach (Replay other in pending)
+            {
+                report.Append("    ").Append(other.EntityType.Name)
+                    .Append(" correlationId=").Append(other.Change.CorrelationId)
+                    .Append(" state=").Append(other.Change.State)
+                    .Append(" temporaryProperties=[")
+                    .Append(string.Join("|", other.Change.TemporaryProperties ?? []))
+                    .Append("] generatedKeys=[")
+                    .Append(string.Join("|", other.GeneratedKeys.Select(g => $"{g.Property.Name}={g.ClientValue}")))
+                    .Append("] borrowedReferences=[")
+                    .Append(string.Join("|", other.References.Select(r => $"{r.Property.Name}={r.ClientValue}")))
+                    .Append("] keyValuesSent=[")
+                    .Append(string.Join(
+                        "|",
+                        other.Values.Where(v => v.Property.IsKey() || v.Property.IsForeignKey())
+                            .Select(v => $"{v.Property.Name}={v.Value}")))
+                    .AppendLine("]");
+            }
+
+            report.AppendLine("  entries already tracked, with the keys they landed on:");
+            foreach ((int correlationId, EntityEntry trackedEntry, IEntityType trackedType, EntityState trackedState) in tracked)
+            {
+                report.Append("    ").Append(trackedType.Name)
+                    .Append(" correlationId=").Append(correlationId)
+                    .Append(" state=").Append(trackedState)
+                    .Append(" key=[")
+                    .Append(string.Join(
+                        "|",
+                        (trackedType.FindPrimaryKey()?.Properties ?? []).Select(
+                            p => $"{p.Name}={trackedEntry.Property(p.Name).CurrentValue}"
+                                + $"(tmp={trackedEntry.Property(p.Name).IsTemporary})")))
+                    .AppendLine("]");
+            }
+
+            report.Append("  underlying: ").Append(failure.Message);
+            return report.ToString();
+        }
+
         void TrackOne(Replay replay)
         {
             EntityState state = Enum.Parse<EntityState>(replay.Change.State);
@@ -288,7 +376,17 @@ public class ServerSaveChangesExecutor
                 entry.Property(property.Name).CurrentValue = value;
             }
 
-            entry.State = state;
+            try
+            {
+                entry.State = state;
+            }
+            catch (InvalidOperationException failure)
+            {
+                // Rethrown as the same type with the original message first, so an assertion that
+                // matches on EF's wording still matches. The diagnostic is appended, and the
+                // original is the inner exception.
+                throw new InvalidOperationException(failure.Message + Diagnose(failure, replay), failure);
+            }
 
             // A *partial* update writes only the properties the client actually changed. Setting
             // `State = Modified` marks every one of them modified, which is right for an entity

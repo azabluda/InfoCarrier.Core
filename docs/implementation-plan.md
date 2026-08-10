@@ -1817,11 +1817,48 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       generator is process-wide and about a thousand temporaries have been issued by that point in
       a full run, which is consistent with the failure needing a full run to appear.
 
-      **Next step is a probe, not a reading.** Gate on `IC_PROBE` in `TrackOne`, write the entity
-      type, the key value and the context's hash code for every tracked entry, and run the full
-      suite until it reproduces — expect about four runs. Then hold any fix to the three-run bar.
-      Do not attempt a fix from the analysis above; it is a hypothesis with two branches and the
-      probe distinguishes them in one run.
+      **Strategy set 2026-08-10: do not chase it. Instrument it and carry on.** Dedicated
+      reproduction is poor value at one run in four, and the obvious instrument does not work — a
+      probe writing a line per tracked entry took the suite from 154 failures to **348** under
+      xUnit's parallel collections, so that run measured nothing. C27 is the instrument that does
+      work: nothing is written unless the conflict happens, and then the whole request is dumped.
+      The next sighting should arrive already diagnosed.
+
+      **Two candidates ruled out by reading, so nobody re-checks them:**
+
+      - **Store isolation.** `SqliteSmokeTest.CreateStore()` uses `Guid.NewGuid().ToString()` as
+        the store name with `shared: false`, so no two tests share a `.db` file or a service
+        provider. Not a file-naming collision.
+      - **Parallelism alone.** The conflict is inside **one** identity map, and EF's temporary
+        value generator decrements under `Interlocked`. Two calls cannot return the same number,
+        and two contexts have separate identity maps. Concurrency can change *timing* here but
+        cannot by itself produce the collision.
+
+      **The candidate that survives, and it is now evidenced.** C27's diagnostic, printed from a
+      forced conflict on a passing run, shows the client's placeholders for the two blogs are
+      `-2147482647` and `-2147482646` — **exactly the numbers the server's own generator issues**,
+      and in the same order. Client placeholder values and server temporary values are drawn from
+      two independent counters that both start near `int.MinValue`, so **they occupy the same
+      numeric range**, and this executor compares them **by value**:
+
+          var expected = new HashSet<object>(pending.SelectMany(p => p.GeneratedKeys)
+              .Select(g => g.ClientValue));
+
+      The comment above that line already states the hazard — *"a false positive needs a stored key
+      that equals one of them in the same request"* — and treats it as improbable. It is not
+      improbable when the two ranges coincide; it is a question of how far each counter has
+      advanced, which is exactly what varies between a full run and an isolated one, and exactly
+      what would make the failure rare and order-dependent. **A server-generated key that happens
+      to equal a client placeholder in the same request is indistinguishable from a borrowed
+      placeholder, and the redirect then points a second row at the first row's key.**
+
+      **What the next sighting must show, to confirm or kill it.** In the dump, compare
+      `placeholder values expected in this request` against the keys in
+      `entries already tracked` — if a server-issued key appears in the expected set, the
+      hypothesis is confirmed and the fix is to stop identifying placeholders by bare value
+      (tag them, or namespace the client's range away from the server's). If they are disjoint,
+      the cause is elsewhere and the dump still names every entry, its temporary flags and the
+      key it landed on. **Hold any fix to the three-run bar.**
 
 - [ ] **C14. "The spatial failures need SpatiaLite" is wrong, and has been for a while.** No code
       change; this is the correction. `<this commit>`
@@ -2275,6 +2312,31 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **Not attempted here.** Building that set is M5's work and wants its own plan; this entry
       establishes the shape it must have and rules out the cheap version, which is what the
       measurement was for.
+
+- [x] **C27. A standing diagnostic for the C11 intermittent — written only when it fires.**
+      **`Total tests: 22278, Passed: 21908, Failed: 153, Skipped: 217`** (`c27`) — 154 → 153,
+      **0 broken**; the one test that moved is the intermittent itself, absent this run. ✅ `<this commit>`
+
+      The instrument, not the hunt. `ServerSaveChangesExecutor` now catches the
+      `InvalidOperationException` from `entry.State = state` and rethrows **the same type, with
+      EF's original message first** and the whole request appended: every entry's correlation id,
+      state, temporary-property names, generated keys, borrowed references and sent key values;
+      the placeholders resolved so far; and every already-tracked entry with the key it landed on.
+      The original is the inner exception. No spec test asserts EF's identity-conflict wording, so
+      putting it first keeps any `Assert.Contains` match intact.
+
+      **Zero cost until it fires**, which is the whole design: the previous attempt wrote a line
+      per tracked entry and cost 194 extra failures through file I/O under parallel collections.
+      Nothing is written here on the happy path — the report is built from state already in hand.
+
+      **The diagnostic cannot replace the fault it describes.** `DiagnoseCore` runs inside a
+      `try`/`catch` that degrades to one line, because it walks arbitrary application values and
+      this suite ships a type whose members throw on purpose (`MyDiscriminator`), which the
+      placeholder scan twenty lines above already has to guard against.
+
+      Verified by forcing a conflict behind a temporary switch, reading the rendered report, and
+      removing the switch — the output is quoted in C11, and it is what produced C11's surviving
+      hypothesis.
 
 ## Phase B — the tier audit, and the rework it found
 
