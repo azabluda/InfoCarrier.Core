@@ -211,6 +211,15 @@ Not yet implemented, in rough priority order:
   value-mapper seam** (C17); and a **WKT** geometry mapper registered **test-side** (C18), which is
   why the product assembly still does not reference NetTopologySuite. Not GeoJSON — it carries no Z
   or M, which is the v1 defect requirements §2.8 records.
+- **The client residual has no null semantics, and that is now a stated open question (C43).**
+  `SpatialQuery.Item` ×2 asserts that an index into a null geometry yields null — the base leaves
+  the guard out of the *actual* query on purpose, because a relational store propagates it and
+  EF's SQLite test passes with no override. Neither half of this provider does: on Tier A the
+  backend is InMemory, and after C24 the index lands on the **client residual** anyway. Two
+  overrides in that same class (`Intersects_equal_to_null` and its pair) are the identical shape,
+  already classified as "the store's, not the wire's". **Making the residual propagate null is a
+  decision about what the split guarantees, for every client-side projection, not a bug fix** —
+  and the cheaper route is spatial on Tier B.
 - **The seam is the general answer to "a CLR type the wire cannot walk", and it now has three
   consumers.** A geometry's members recurse (C18), `IPAddress.ScopeId` throws for an IPv4 address
   (C23), and `Uri.AbsolutePath` throws for a relative URI (C34). Three unrelated CLR types, one

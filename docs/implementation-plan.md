@@ -2818,6 +2818,45 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       narrowed with `property.IsKey()`: **a row cannot disagree with the store about its own
       identity**, and that is the only case where the client cannot recover the value itself.
 
+- [x] **C43. `SpatialQuery.Item` ×2 is null propagation the base borrows from a relational store,
+      and this class has already classified the same shape twice.** No code change; this is the
+      classification, and it names what a fix would cost. ✅ `<this commit>`
+
+      After C24 these fail with `NullReferenceException` rather than the old cast error. The base:
+
+          actual:   ss.Set<MultiLineStringEntity>().Select(e => new { e.Id, Item0 = e.MultiLineString[0] })
+          expected: ss.Set<MultiLineStringEntity>().Select(e => new { e.Id,
+                        Item0 = e.MultiLineString == null ? null : e.MultiLineString[0] })
+
+      **The guard is in the expected query and deliberately not in the actual one** — the base is
+      asserting that the *store* propagates null through the index. EF's SQLite test confirms it
+      by passing with no override at all: `GeometryN("m"."MultiLineString", 0 + 1)` over `NULL` is
+      `NULL`. Compare the `Length` test three methods below, where EF writes the guard into *both*
+      queries; it does that exactly when the store cannot be relied on.
+
+      **Neither side of this provider is a relational store on Tier A.** These bases run on the
+      InMemory backend (C18), which evaluates NetTopologySuite in a compiled lambda and throws.
+      `SpatialQueryInfoCarrierTest` already carries two overrides of precisely this shape —
+      `Intersects_equal_to_null` and `Intersects_not_equal_to_null`, both asserting
+      `NullReferenceException` with the note *"the store's, not the wire's"*. `Item` is the third,
+      differing only in that C24 moved the index onto the **client residual**, so the throw is now
+      in `QueryExecutor.Guarded` instead of in the backend's lambda. The answer is the same either
+      way: nothing in this configuration propagates null through an index.
+
+      **Left red rather than overridden, and that is the difference from the other two.** For
+      `Intersects_*` the throw was *measured* coming out of the backend, which is what justified
+      asserting it. Here the split means the server never sees the index, so the same claim about
+      the store cannot be demonstrated without shipping it — and asserting an exception one cannot
+      attribute is how a suppressed test starts.
+
+      **What a fix would actually be, so it is not mistaken for a small one.** Making the client
+      residual propagate null through a moved member or index access means giving the residual
+      *relational* null semantics — for every client-side projection, not just this one — in a
+      provider whose Tier A backend does not have them and whose own spec suite contains tests
+      asserting the throw. **That is a semantic decision about what the split guarantees, not a
+      bug fix**, and it is the same question in a different coat as "what does the boundary
+      preserve". The cheaper route is spatial on Tier B, where the store answers it.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
