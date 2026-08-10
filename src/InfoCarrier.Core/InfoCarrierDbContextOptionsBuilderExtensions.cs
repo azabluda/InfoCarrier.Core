@@ -24,8 +24,17 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     {
         InfoCarrierOptionsExtension extension = GetOrCreateExtension(optionsBuilder)
             .WithInfoCarrierClient(client);
-        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
+
+        // `ConfigureWarnings` **before** `AddOrUpdateExtension`, which is the order every EF
+        // provider uses and is not arbitrary. `DbContextOptions.Extensions` yields extensions by
+        // *insertion ordinal*, and that order is what `BuildOptionsFragment` prints in the
+        // context-initialized log line. Configuring warnings is what first creates
+        // `CoreOptionsExtension`, so doing it first puts the core options ahead of the provider's
+        // — `"NoTracking using InfoCarrier"`, which is the shape `LoggingTestBase` composes its
+        // expectation in (`ExpectedMessage("NoTracking " + DefaultOptions)`) and the shape every
+        // other provider produces. Adding ours first printed `"using InfoCarrier NoTracking"`.
         ConfigureWarnings(optionsBuilder);
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
         return optionsBuilder;
     }
 

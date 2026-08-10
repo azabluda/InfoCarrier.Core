@@ -2420,6 +2420,57 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       fidelity (W5), cancellation (W6), and the security review. **The type allowlist and now the
       method allowlist are the two that were specified as default-deny, and both are in.**
 
+- [x] **C32. The context-initialized log line put the provider's options before the core's.**
+      Measured with C33 in one run (`c32`, **150 → 146, 4 fixed, 0 broken**); the FIXED list
+      attributes these two. ✅ `<this commit>`
+
+      `Logs_context_initialization_no_tracking` and `…_sensitive_data_logging` expected
+      `"NoTracking using InfoCarrier"` and got `"using InfoCarrier NoTracking"`. C5 filed both as
+      *"the initialization log line does not compose the way EF's does"*, which was the right
+      observation and stopped one step short of the cause.
+
+      `DbContextOptions.Extensions` yields extensions **by insertion ordinal**, and
+      `BuildOptionsFragment` concatenates their `LogFragment`s in that order. `UseInfoCarrier`
+      called `AddOrUpdateExtension` first and `ConfigureWarnings` second — **every EF provider does
+      it the other way round**, because configuring warnings is what first creates
+      `CoreOptionsExtension`, so doing it first puts core options ahead of the provider's.
+      `UseInMemoryDatabase` has the two calls in exactly that order and for exactly this reason.
+
+      Two lines swapped. Worth recording because the fix is invisible from the failure: nothing
+      about *"strings differ at position 153"* points at the order of two statements in an
+      extension method, and the answer was in reading how EF's own provider spells the same method.
+
+- [x] **C33. A key behind an enum or a value converter had no client-side value generator.**
+      Measured with C32 in `c32`; the FIXED list attributes these two. ✅ `<this commit>`
+
+      `Insert_update_and_delete_with_enum_key` and `…_with_wrapped_int_key` failed at
+      `context.Add` — **before the wire**, so no server work could have helped:
+
+          The property 'EnumPrincipal.Id' does not have a value set and no value generator is
+          available for properties of type 'KeyEnum'.
+
+      `InfoCarrierValueGeneratorSelector` guarded on `property.ClrType` against a list of numeric
+      types. `TemporaryNumberValueGeneratorFactory` — the factory the guard is deciding whether to
+      call — is broader in two ways it did not mirror: it unwraps an **enum** to its underlying
+      type, and it looks through a **value converter** to `ProviderClrType`. So the generator
+      existed in both cases and only the guard refused to ask for it. It now asks the question the
+      same way, through the type mapping rather than the CLR type.
+
+      **The converter case needed a second half**, and the first attempt found it: with the guard
+      widened, the factory produced a generator of the *provider* type and EF stored its output as
+      the model type — *"Unable to cast object of type 'System.Int32' to type
+      'WrappedIntKeyClass'"*, inside `ValueComparer.Snapshot`. EF's core selector wraps such a
+      generator with `WithConverter`; so does this one now.
+
+      **These were two of the three CLAUDE.md attributed to B6 route (a), and they were not.**
+      B6 route (a) is about a client convention reading *relational annotations* to learn which
+      properties are store-generated. These two never got that far: the client already knew the
+      property was generated — `ValueGenerated != Never` is what triggered the lookup — and simply
+      had no generator to offer. The remaining `StoreGenerated` two are unrelated to each other:
+      `…_with_wrapped_Uri_key` (*"This operation is not supported for a relative URI"*) and
+      `Store_generated_values_are_propagated_with_composite_key_cycles`, which S3c already records
+      as undiagnosed.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
