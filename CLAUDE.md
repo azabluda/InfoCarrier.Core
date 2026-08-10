@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22347, Passed: 21987, Failed: 143, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22347, Passed: 21996, Failed: 134, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,7 +137,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C43 for the rest** — read out of `artifacts/measure/`,
-currently `c48`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
+currently `c50`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
 node-kind and payload-size controls, no movement in the failing count; C40 then took 145 to 144
 and C42 took it to 143. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
@@ -289,16 +289,15 @@ failure once the suite passed ten thousand tests: a shared store's disposal re-a
 and let a later class re-seed the file a live one was still using. `DisposeAsync` now releases
 nothing. Stale files are swept once at startup instead.
 
-**The runtime culture on this machine is `en-SE`, whose decimal separator is a comma**, and it
-costs **nine** failures, all in `JsonTypes` and none of them this provider's. Two are decimal
-parameterizations xUnit cannot convert from their `InlineData` strings, and EF's own suite fails
-them the same way (A64). The other seven are the `_as_GeoJson` family: EF's own
-`JsonGeoJsonReaderWriter` re-emits a number with `StringBuilder.Append(reader.GetDecimal())`, which
-is culture-sensitive, so `[2.0,4.0]` comes back as `[2,0,4,0]` and the point reads as
-`POINT (2 0)`. `line_string_as_GeoJson` passes by luck, its ordinates being 0 and 1. The suite
-total is therefore **locale-dependent** — a machine with a `.` separator reports nine fewer
-failures with no code change. Grep a run for *"cannot be converted to type"* and for
-`_as_GeoJson` before treating either as movement.
+**The runtime culture is pinned to invariant, and that was a ratchet fix rather than a test fix
+(C50).** The machine is `en-SE`, whose decimal separator is a comma, and it cost **nine**
+failures — seven in the `_as_GeoJson` family, where EF's own `JsonGeoJsonReaderWriter` re-emits a
+number with the culture-sensitive `StringBuilder.Append(reader.GetDecimal())` so `[2.0,4.0]` reads
+back as `POINT (2 0)`, and two decimal `InlineData` parameterizations xUnit could not convert.
+None was this provider's; EF's own suite failed them identically. **The reason to fix it was that
+the suite total was a property of the machine** — the `test/known-failures.txt` baseline CI gates
+on was true only here. A `[ModuleInitializer]` now pins `CultureInfo.DefaultThreadCurrentCulture`
+before xUnit creates a thread. Nothing is skipped and no assertion is inverted.
 
 **The one intermittent is CLOSED (C38, 2026-08-10), and how it was closed is the reusable part.**
 `SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity` failed roughly one run in

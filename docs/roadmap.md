@@ -21,11 +21,11 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-Measured 2026-08-10 (`artifacts/measure/c48`): **`Total tests: 22347, Passed: 21987,
-Failed: 143, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
+Measured 2026-08-10 (`artifacts/measure/c50`): **`Total tests: 22347, Passed: 21996,
+Failed: 134, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
 scales by adopting bases, not by writing tests — M6 took the unadopted count from 41 to 1.
 
-The 143 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
+The 134 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
 Most are already answered rather than open: 40 wait on the B12 decision, 26 are the
 `MaterializationInterception` topology B24 settled, 9 are a locale defect in EF's own test code,
 and the majority of the rest are spec tests asserting a limitation this provider does not have.

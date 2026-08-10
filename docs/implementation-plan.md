@@ -2856,7 +2856,9 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       provider whose Tier A backend does not have them and whose own spec suite contains tests
       asserting the throw. **That is a semantic decision about what the split guarantees, not a
       bug fix**, and it is the same question in a different coat as "what does the boundary
-      preserve". The cheaper route is spatial on Tier B, where the store answers it.
+      preserve". ~~The cheaper route is spatial on Tier B, where the store answers it.~~
+      **Underpriced — see C51.** Tier B has no SpatiaLite and cannot map a `Point`; that route is
+      a native dependency and belongs to M7.
 
 - [x] **C45. The envelope had a client half and no server half. Now the whole suite goes through
       it.**
@@ -3042,6 +3044,56 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **a security consequence of W6 before it is built**: `CorrelationId` becomes a handle by
       which one caller can affect another caller's in-flight request, so it must be unguessable
       and connection-scoped.
+
+- [x] **C50. The suite's failure count was a property of this machine. Now it is not.**
+      **`Total tests: 22347, Passed: 21996, Failed: 134, Skipped: 217`** (`c50`) — **143 → 134,
+      9 fixed, 0 broken.** ✅ `<this commit>`
+
+      A64 established that nine failures were the `en-SE` locale and none of them this provider's:
+      seven `_as_GeoJson`, where EF's own `JsonGeoJsonReaderWriter` re-emits a number with the
+      culture-sensitive `StringBuilder.Append(reader.GetDecimal())` so `[2.0,4.0]` returns as
+      `[2,0,4,0]`, and two decimal `InlineData` parameterizations xUnit cannot convert. EF's own
+      suite fails them identically on this machine. They were left alone as "not ours".
+
+      **Leaving them was the wrong call, and the reason is the ratchet rather than the nine.**
+      CLAUDE.md had already written the tell without drawing the conclusion: *"the suite total is
+      therefore locale-dependent — a machine with a `.` separator reports nine fewer failures with
+      no code change."* C39 then committed `failed=143` to `test/known-failures.txt` and wired CI
+      to gate on it. **That baseline was only true on this box.** A ratchet whose baseline depends
+      on the runner's locale is not a ratchet, and the CI runner is not `en-SE`.
+
+      A `[ModuleInitializer]` pins `CultureInfo.DefaultThreadCurrentCulture` to invariant before
+      xUnit creates a test thread. Not a fixture: threads inherit the default unless they set
+      their own, which is every thread in a parallel run, and a test that deliberately sets a
+      culture still overrides it.
+
+      **Not a suppression, and the distinction is worth keeping.** Nothing is skipped and no
+      assertion is inverted; an environmental variable EF does not handle is removed, and the
+      tests then run in the configuration EF supports. The nine were passing on other people's
+      machines all along. What actually changed is that the number now means the same thing
+      everywhere.
+
+- [x] **C51. Correction: spatial on Tier B is not the cheap route C43 called it.** No code change.
+      ✅ `<this commit>`
+
+      C43 closed `SpatialQuery.Item` ×2 by classifying them, and ended *"the cheaper route is
+      spatial on Tier B, where the store answers it"*. Priced properly, that is wrong, and it is
+      the second underpriced claim of this phase after C40's.
+
+      What checks out: **82 of EF's 83 `SpatialQuerySqliteTest` overrides just add `AssertSql`**
+      and are behaviourally identical to the base, so SQLite really would answer the null-through-
+      index question the base assumes. Only one changes behaviour.
+
+      What does not: **there is no SpatiaLite in this repo at all** — no
+      `Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite` package, no `UseNetTopologySuite`,
+      no `mod_spatialite`. The Tier B store cannot map a `Point`. Moving the class means adding a
+      NuGet dependency **and a native library** that has to load on this Windows box and on CI's
+      ubuntu runner.
+
+      **That is not a tier move, it is a dependency decision, and it belongs to M7.** Note the
+      distinction from the old "needs SpatiaLite" note C15 demolished: that note was wrong about
+      the *client's* type mapping, which needed only an NTS branch. A SQLite *backend* storing
+      geometry genuinely does need SpatiaLite. The two claims look alike and are not.
 
 ## Phase B — the tier audit, and the rework it found
 
