@@ -3548,6 +3548,53 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **The option is recorded rather than taken**: adopting EF's attribute verbatim would move it
       from `Failed` to `Skipped`, and it is a one-line change if that is preferred.
 
+- [x] **C63. The six `BulkUpdates`, read out rather than filed: four are EF's own `[Skip]`, and the
+      other two name a hole in `RejectClientEvaluation`'s filter.** No code change; C20's split was
+      right and neither half had the evidence attached. ✅ `<this commit>`
+
+      **The four.** `Update_with_cross_join_left_join_set_constant` ×2 and
+      `Update_with_two_inner_joins` ×2 fail as `SQLite Error 1: 'no such column: c.CustomerID'` and
+      `'no such column: o.OrderID'` — SQL the *server* generated and SQLite refused. EF's own suite
+      carries them as `[ConditionalTheory(Skip = "Issue#28886")]`, and the SQL it records under the
+      skip is the same `UPDATE … FROM … LEFT JOIN` shape. Confirmed upstream, not this provider's.
+      Left red rather than skipped, for C62's reason.
+
+      **The other two are more interesting, and C20 called them "the setter gap" without saying
+      what the gap was.** `Update_with_invalid_lambda_in_set_property_throws` ×2 fails with
+
+          System.Diagnostics.UnreachableException : Can't call this overload directly
+             at EntityFrameworkQueryableExtensions.ExecuteUpdate[TSource](IQueryable, IReadOnlyList<…>)
+             at lambda_method633129(Closure, IQueryable`1)          <- the residual
+
+      **which means the `ExecuteUpdate` call was invoked on the client.** The setter is
+      `s.SetProperty(e => e.MaybeScalar(e => e.OrderID), 10300)`, and `MaybeScalar` is a test
+      helper — a method on a declaring type the allowlist does not admit — so the call is not
+      server-ok, is not shippable, and lands in the residual. C19's rule applied one step earlier:
+      *where is this being cut.*
+
+      **`RejectClientEvaluation` should have refused it and cannot see it.**
+      `ClientEvaluationFinder.VisitMethodCall` filters on
+      `declaring == typeof(Queryable) || declaring == typeof(Enumerable)`, and `ExecuteUpdate`
+      lives on `EntityFrameworkQueryableExtensions`. So an unshippable bulk-update is never
+      examined for client code and is simply run, where EF's marker overload throws its internal
+      sentinel.
+
+      **Three sibling tests prove the machinery is otherwise sound.**
+      `Update_without_property_to_set_throws`, `Update_multiple_tables_throws` and
+      `Update_unmapped_property_throws` all pass against mirrored relational messages — the last
+      one asserting `InvalidPropertyInSetProperty("c => c.IsLondon")`, which the **server**
+      produces. The difference is that `IsLondon` is a property *read* and stays server-ok, while
+      `MaybeScalar` is a method call and does not.
+
+      **What a fix buys, stated so it is not mistaken for a win: zero tests.** Adding
+      `EntityFrameworkQueryableExtensions` to the finder's declaring-type set replaces
+      `UnreachableException` — an internal EF sentinel no caller should ever see — with EF's
+      `TranslationFailed`, whose details clause would name `MaybeScalar`. The spec test asserts
+      `InvalidPropertyInSetProperty`, a statement about the *property*, so it stays red either way.
+      **Not taken here**: it is a product change with a full-run cost and no test to show for it,
+      and the filter also covers `Include`, whose lambdas would newly be walked. Recorded as a
+      one-line candidate with its price.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
