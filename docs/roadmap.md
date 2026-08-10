@@ -217,7 +217,15 @@ server-inbound; capping what a client gets back is a page-size policy, and a dif
   every request and **nothing that unwrapped one** — the only dispatcher was inline in a smoke
   test and handled one of nine operations. `InfoCarrierEnvelopeServer` is the missing half, and
   all 22321 tests now cross a real envelope with the version checked before dispatch.)
-- Exception fidelity across the wire (W5) and cancellation (W6).
+- Exception fidelity across the wire (W5) ✅ (C46, 2026-08-10) and cancellation (W6).
+
+  W5 is `InfoCarrierFault`: a failure travels as data and is raised again on the client, keeping
+  the type, the message and the inner chain — which is what EF's spec tests assert on, so the
+  whole suite verifies it. Two limits are real and stated rather than worked around: a store's own
+  exception type (`SqliteException`) is not reconstructible by a client that has no reason to
+  reference the backend's driver, and `DbUpdateException.Entries` are the *server's* update
+  entries, so the client is given its own. Both were previously hidden by client and server
+  sharing a process.
 - Security review of the deserialization path.
 
 ### M6 — Coverage expansion ← **in progress** (plan Phase C)

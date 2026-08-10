@@ -222,6 +222,21 @@ public class InfoCarrierDatabase : IDatabase
             // `ex.Entries` — `GetDatabaseValues`, `SetValues`, `Reload` all do.
             throw new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
         }
+        catch (DbUpdateException exception)
+        {
+            // The same re-raise, one level up the hierarchy, and W5 is what made it necessary.
+            // `DbUpdateException.Entries` is the part callers use — the spec base does
+            // `ex.Entries.Single()` and asserts the entity's type — and those entries are *update
+            // entries of the server's context*. They cannot cross a wire under any encoding, and
+            // in-process they only arrived because the exception was the same object.
+            //
+            // So the exception is re-raised naming the entries *this* context sent. `Translate`
+            // matches the server's entries by key where it has them and falls back to the whole
+            // sent list where it does not, which after a wire crossing is always. That is the
+            // honest answer: the client knows exactly which of its own entries it submitted, and
+            // it is those the caller can do anything with.
+            throw new DbUpdateException(exception.Message, exception, Translate([], sent));
+        }
 
         ApplyGeneratedValues(sent, result, mapper);
         return result.Count;

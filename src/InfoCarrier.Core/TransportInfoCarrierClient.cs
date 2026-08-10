@@ -93,6 +93,16 @@ public sealed class TransportInfoCarrierClient : IInfoCarrierClient
         };
 
         InfoCarrierEnvelope response = await _transport.SendAsync(envelope, cancellationToken).ConfigureAwait(false);
+
+        // The fault first, and before the payload is looked at (wire-protocol W5). A failed
+        // response carries a placeholder payload, so reading it first would deserialize a null
+        // and report the failure as an empty result — which is the one way an error can do more
+        // damage than the operation that caused it.
+        if (response.Fault is { } fault)
+        {
+            throw InfoCarrierFaultMapper.Rehydrate(fault);
+        }
+
         return (await _serializer.DeserializeAsync<TResponse>(response.Payload, cancellationToken).ConfigureAwait(false))!;
     }
 }

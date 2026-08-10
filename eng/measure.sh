@@ -62,7 +62,7 @@ sed -n 's/^\[xUnit\.net [^]]*\] *\(.*\) \[FAIL\]$/\1/p' "$log" | sort -u > "$sna
 # The `|| true`s matter: an empty reason list is what a green suite looks like, and under
 # `set -euo pipefail` a grep that matches nothing would abort the run instead.
 { grep -A 3 "Error Message:" "$log" || true; } |
-    { grep -E "^[[:space:]]+(System|Microsoft|Assert)" || true; } |
+    { grep -E "^[[:space:]]+(System|Microsoft|Assert|InfoCarrier|Xunit)" || true; } |
     sed 's/^ *//' | cut -c1-120 | sort | uniq -c | sort -rn > "$reasons"
 
 failed=$(sed -n 's/^ *Failed: *\([0-9]*\).*/\1/p' "$log" | tail -n 1)

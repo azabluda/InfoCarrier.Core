@@ -63,14 +63,113 @@ public class EnvelopeProtocolTest
         Assert.Empty(server.Calls);
     }
 
+    /// <summary>
+    ///     An unknown operation comes back as a <em>fault</em>, not as a thrown exception. The two
+    ///     ends still agree what an envelope is — they disagree about what is in it — so the
+    ///     protocol can carry the refusal, and W5 says a failure the protocol can carry is one it
+    ///     must carry.
+    /// </summary>
     [Fact]
-    public async Task An_unknown_operation_is_refused_by_name()
+    public async Task An_unknown_operation_is_refused_by_name_as_a_fault()
     {
-        NotSupportedException ex = await Assert.ThrowsAsync<NotSupportedException>(
-            () => Server(new ThrowingServer()).DispatchAsync(
-                Envelope((InfoCarrierOperation)99)));
+        InfoCarrierEnvelope response = await Server(new ThrowingServer()).DispatchAsync(
+            Envelope((InfoCarrierOperation)99));
 
-        Assert.Contains("99", ex.Message);
+        Assert.NotNull(response.Fault);
+        Assert.Equal(typeof(NotSupportedException).FullName, response.Fault!.TypeName);
+        Assert.Contains("99", response.Fault.Message);
+
+        // And rehydrates to the type the caller would have seen in-process.
+        Assert.IsType<NotSupportedException>(InfoCarrierFaultMapper.Rehydrate(response.Fault));
+    }
+
+    /// <summary>
+    ///     A version mismatch is the one failure that still escapes rather than travelling as a
+    ///     fault: the two ends do not agree what an envelope <em>is</em>, so answering with one
+    ///     assumes the thing in dispute.
+    /// </summary>
+    [Fact]
+    public async Task A_version_mismatch_escapes_rather_than_becoming_a_fault()
+        => await Assert.ThrowsAsync<NotSupportedException>(
+            () => Server(new ThrowingServer()).DispatchAsync(
+                Envelope(InfoCarrierOperation.BeginTransaction, version: 2)));
+
+    /// <summary>
+    ///     A server-side failure comes back with its type, message and inner chain intact — which
+    ///     is what EF's spec tests assert on, and the whole point of W5.
+    /// </summary>
+    [Fact]
+    public async Task A_server_failure_keeps_its_type_message_and_inner_chain()
+    {
+        InfoCarrierEnvelope response = await Server(
+                new FailingServer(new InvalidOperationException("outer", new FormatException("inner"))))
+            .DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction));
+
+        Assert.NotNull(response.Fault);
+
+        Exception rebuilt = InfoCarrierFaultMapper.Rehydrate(response.Fault!);
+
+        Assert.IsType<InvalidOperationException>(rebuilt);
+        Assert.Equal("outer", rebuilt.Message);
+        Assert.IsType<FormatException>(rebuilt.InnerException);
+        Assert.Equal("inner", rebuilt.InnerException!.Message);
+
+        // The server's stack is kept where it cannot disturb a message assertion.
+        Assert.NotNull(rebuilt.Data[InfoCarrierFaultMapper.ServerStackTraceKey]);
+    }
+
+    /// <summary>
+    ///     An exception type this process cannot rebuild degrades to
+    ///     <see cref="InfoCarrierServerException" /> and still names the original. A
+    ///     store-specific exception is the real case: the client assembly has no reason to
+    ///     reference the backend that threw it.
+    /// </summary>
+    [Fact]
+    public void An_unresolvable_exception_type_degrades_but_keeps_the_name()
+    {
+        Exception rebuilt = InfoCarrierFaultMapper.Rehydrate(new InfoCarrierFault
+        {
+            TypeName = "Some.Backend.SpecificException",
+            Message = "the store said no",
+        });
+
+        var server = Assert.IsType<InfoCarrierServerException>(rebuilt);
+        Assert.Equal("Some.Backend.SpecificException", server.ServerExceptionTypeName);
+        Assert.Equal("the store said no", server.Message);
+    }
+
+    /// <summary>
+    ///     Rehydration never loads an assembly and never constructs a non-exception, whatever the
+    ///     payload names.
+    /// </summary>
+    [Theory]
+    [InlineData("System.Text.StringBuilder")]
+    [InlineData("System.Diagnostics.Process")]
+    [InlineData("System.Exception+NotAThing")]
+    public void Rehydration_refuses_a_type_that_is_not_an_exception(string typeName)
+        => Assert.IsType<InfoCarrierServerException>(
+            InfoCarrierFaultMapper.Rehydrate(
+                new InfoCarrierFault { TypeName = typeName, Message = "x" }));
+
+    private sealed class FailingServer(Exception failure) : IInfoCarrierServer
+    {
+        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest r, CancellationToken c = default) => throw failure;
+
+        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest r, CancellationToken c = default) => throw failure;
+
+        public Task<TransactionResult> BeginTransactionAsync(CancellationToken c = default) => throw failure;
+
+        public Task CommitTransactionAsync(string t, CancellationToken c = default) => throw failure;
+
+        public Task RollbackTransactionAsync(string t, CancellationToken c = default) => throw failure;
+
+        public Task CreateSavepointAsync(string t, string n, CancellationToken c = default) => throw failure;
+
+        public Task RollbackToSavepointAsync(string t, string n, CancellationToken c = default) => throw failure;
+
+        public Task ReleaseSavepointAsync(string t, string n, CancellationToken c = default) => throw failure;
+
+        public Task<bool> SupportsSavepointsAsync(string t, CancellationToken c = default) => throw failure;
     }
 
     /// <summary>

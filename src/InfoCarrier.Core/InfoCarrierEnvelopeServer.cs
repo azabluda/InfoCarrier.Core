@@ -62,7 +62,37 @@ public sealed class InfoCarrierEnvelopeServer
                 + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
         }
 
-        return request.Operation switch
+        try
+        {
+            return await ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // **A failure is a result, not an escape** (wire-protocol W5). In-process an exception
+            // reaches the caller by propagating; no network transport can do that, so it has to
+            // travel as data in the response and be raised again on the other side. Routing it
+            // through the envelope here is what makes the suite test the wire's error behaviour
+            // rather than the absence of a wire.
+            //
+            // The version check above is deliberately outside this: a version mismatch means the
+            // two ends do not agree what an envelope *is*, so answering with one is optimistic.
+            //
+            // `OperationCanceledException` is excluded because cancellation is not a server-side
+            // failure to report — it is the caller's own token, and the caller is entitled to see
+            // its own `OperationCanceledException` rather than a rebuilt copy. That is W6's
+            // question and it is still open.
+            return request with
+            {
+                Payload = _serializer.Serialize<object?>(null),
+                Fault = InfoCarrierFaultMapper.Capture(exception),
+            };
+        }
+    }
+
+    private async Task<InfoCarrierEnvelope> ExecuteAsync(
+        InfoCarrierEnvelope request,
+        CancellationToken cancellationToken)
+        => request.Operation switch
         {
             InfoCarrierOperation.Query
                 => await RespondAsync(
@@ -113,7 +143,6 @@ public sealed class InfoCarrierEnvelopeServer
             _ => throw new NotSupportedException(
                 $"InfoCarrier operation '{request.Operation}' is not supported by this server."),
         };
-    }
 
     private T Payload<T>(InfoCarrierEnvelope request)
         => _serializer.Deserialize<T>(request.Payload)

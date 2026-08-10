@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
@@ -94,9 +94,10 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     /// <remarks>
     ///     Indexing an inline collection by a column puts that column in the correlated subquery's
     ///     <c>OFFSET</c>, which SQLite refuses — <c>no such column: "p"."Int"</c>. EF asserts the
-    ///     raw <see cref="SqliteException" /> here rather than overriding the query, and so do we:
-    ///     the exception is the engine's, raised at the same place for the same reason, which is
-    ///     what makes it convergence rather than a borrowed excuse.
+    ///     raw <see cref="SqliteException" /> here rather than overriding the query, and so did we
+    ///     until W5 (plan C46): the exception is the engine's, raised at the same place for the
+    ///     same reason, which is what makes it convergence rather than a borrowed excuse. What
+    ///     changed is only how it reaches this client — see <see cref="AssertStoreRefuses" />.
     ///     <para>
     ///         Note what is <em>not</em> taken. EF overrides the two
     ///         <c>Parameter_collection_index_Column_*</c> tests too, but by calling
@@ -105,16 +106,49 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         reason of ours (B14), so they stay red.
     ///     </para>
     /// </remarks>
-    public override async Task Inline_collection_index_Column()
-        => await Assert.ThrowsAsync<SqliteException>(() => base.Inline_collection_index_Column());
+    public override Task Inline_collection_index_Column()
+        => AssertStoreRefuses(base.Inline_collection_index_Column);
 
     /// <inheritdoc cref="Inline_collection_index_Column" />
-    public override async Task Inline_collection_value_index_Column()
-        => await Assert.ThrowsAsync<SqliteException>(() => base.Inline_collection_value_index_Column());
+    public override Task Inline_collection_value_index_Column()
+        => AssertStoreRefuses(base.Inline_collection_value_index_Column);
 
     /// <inheritdoc cref="Inline_collection_index_Column" />
-    public override async Task Inline_collection_List_value_index_Column()
-        => await Assert.ThrowsAsync<SqliteException>(() => base.Inline_collection_List_value_index_Column());
+    public override Task Inline_collection_List_value_index_Column()
+        => AssertStoreRefuses(base.Inline_collection_List_value_index_Column);
+
+    /// <summary>
+    ///     The same refusal EF asserts, described the way a <em>remoting</em> client can see it
+    ///     (wire-protocol W5, plan C46).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         These three used to assert <see cref="SqliteException" /> directly, and that passed
+    ///         only because client and server share a process: the store's exception reached the
+    ///         caller by propagating, as the same object. Once a failure crosses as data, it
+    ///         cannot — <see cref="SqliteException" /> has no message-and-inner constructor to be
+    ///         rebuilt through, and more fundamentally **a client has no reason to reference the
+    ///         backend's driver at all**. That is a property of remoting, not a defect.
+    ///     </para>
+    ///     <para>
+    ///         So the assertion moves to what actually crosses, and it is <em>stronger</em> than
+    ///         what it replaces: the engine still refuses the query at the same place, and the
+    ///         type name and the engine's own message both survive the wire intact. Asserting
+    ///         only <see cref="InfoCarrierServerException" /> would have been weaker; asserting
+    ///         the name and the message is not.
+    ///     </para>
+    ///     <para>
+    ///         The base test still runs, still reaches SQLite, and still fails there. Nothing is
+    ///         suppressed.
+    ///     </para>
+    /// </remarks>
+    private static async Task AssertStoreRefuses(Func<Task> query)
+    {
+        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(query);
+
+        Assert.Equal(typeof(SqliteException).FullName, exception.ServerExceptionTypeName);
+        Assert.Contains("no such column", exception.Message);
+    }
 
     /// <inheritdoc />
     /// <remarks>

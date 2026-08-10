@@ -28,5 +28,9 @@
 # as the fix, which is what the header above asks for.
 #
 # 2026-08-10 (C42) — 144 -> 143, the composite-key-cycle store-generation fix.
+#
+# 2026-08-10 (C46) — failures unchanged at 143; `total` 22312 -> 22327 for the 15 tests C45 and
+# C46 added (envelope protocol, fault fidelity). The total is raised deliberately: leaving it low
+# is what would let a crashed host lose fifteen tests unnoticed, which is the guard's whole job.
 failed=143
-total=22312
+total=22327

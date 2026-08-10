@@ -44,4 +44,17 @@ public sealed record InfoCarrierEnvelope : IInfoCarrierRequest
     ///     (wire-protocol W6). Null when not used.
     /// </summary>
     public string? CorrelationId { get; init; }
+
+    /// <summary>
+    ///     The server-side failure this response reports, or <see langword="null" /> on success
+    ///     (wire-protocol W5).
+    /// </summary>
+    /// <remarks>
+    ///     A response envelope carries either a <see cref="Payload" /> or a
+    ///     <see cref="Fault" />, never both meaningfully — the payload of a fault response is a
+    ///     placeholder, because the field is required and a zero-length body is not valid JSON.
+    ///     Checking this before reading the payload is what makes an error a *result* of the
+    ///     protocol rather than an accident of running in one process.
+    /// </remarks>
+    public InfoCarrierFault? Fault { get; init; }
 }

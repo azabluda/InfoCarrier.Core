@@ -2904,6 +2904,65 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `Enum.GetValues<InfoCarrierOperation>().Length`, so a tenth operation added without a
       dispatch arm fails there rather than at a caller's first use.
 
+- [x] **C46. W5 — a server-side failure now crosses as data, and three things fell out of it.**
+      **`Total tests: 22327, Passed: 21967, Failed: 143, Skipped: 217`** (`c46c`) — **143 → 143,
+      0 fixed, 0 broken.** ✅ `<this commit>`
+
+      In-process a server exception reaches the caller by propagating — the same object on the
+      same stack. **No network transport can do that**, so a suite that only ever runs in-process
+      is not testing the error behaviour it appears to test. Roadmap M2's re-scoping note is the
+      precedent: the type allowlist was introduced to break exactly this kind of illusion.
+
+      `InfoCarrierFault` carries type name, message, stack and the inner chain;
+      `InfoCarrierEnvelopeServer` catches and returns it in the response;
+      `TransportInfoCarrierClient` checks it **before** the payload and rethrows. Fidelity is
+      defined by what callers depend on — type, message, inner chain — because that is what EF's
+      spec tests assert, and thousands of them now cross this path.
+
+      **A version mismatch still escapes rather than becoming a fault.** The two ends disagree
+      about what an envelope *is*, so answering with one assumes the thing in dispute. An unknown
+      *operation* does become a fault: there the ends agree on the envelope.
+
+      **Three findings, each of which cost a run or would have.**
+
+      1. **`ArgumentNullException(string)` takes a *paramName*, not a message.** Rebuilding through
+         the one-string constructor nested the message inside itself —
+         `Value cannot be null. (Parameter 'Value cannot be null. (Parameter 'value')')` — and
+         eight `GearsOfWarQuery` tests said so in one run. `ArgumentOutOfRangeException` and
+         `ObjectDisposedException` are the same trap. The fix is to prefer
+         `(string message, Exception? inner)` **even when there is no inner**, because that
+         overload is unambiguous for every one of them.
+
+      2. **`DbUpdateException.Entries` was surviving on the in-process leak.** They are update
+         entries *of the server's context* and cannot cross a wire under any encoding.
+         `InfoCarrierDatabase` already re-raised `DbUpdateConcurrencyException` with translated
+         client entries for this exact reason; W5 made the plain `DbUpdateException` case need the
+         same treatment, one level up the hierarchy.
+
+      3. **A store's own exception type is not reconstructible, and that is correct.**
+         `SqliteException` has no message-and-inner constructor, and more fundamentally a client
+         has no reason to reference the backend's driver. Our three
+         `Inline_collection_*index_Column` overrides asserted it directly and passed only on the
+         illusion. They now assert `InfoCarrierServerException` **plus** that
+         `ServerExceptionTypeName` is SQLite's and the message is the engine's — *stronger* than
+         what they replaced, because it proves both survived the wire. The base test still runs,
+         still reaches SQLite, still fails there. **These are our own overrides, not EF spec
+         tests**; nothing is suppressed.
+
+      **The reasons histogram went blind, and that is the finding worth keeping.** `measure.sh`
+      filtered reason lines to those beginning `System|Microsoft|Assert`, so **42 lines now
+      beginning `InfoCarrier.Core.InfoCarrierServerException` vanished from it** — a diff showing
+      removals with no additions, which is precisely the "names identical, reasons moved" case the
+      third level of `measure.sh` exists to catch. The filter now includes `InfoCarrier` and
+      `Xunit`, and `c46c.reasons.txt` was regenerated from its own log. Both sides total **142**
+      reason lines and every one is accounted for. `.reasons.txt` files older than this predate
+      the filter and are not comparable to it.
+
+      Twelve of those 42 are `MaterializationInterception`'s `Assert.Same` — a user interceptor
+      running **server-side** whose assertion throws there. Its `XunitException` used to propagate;
+      it now crosses as a fault with the message intact. Same tests, same substance, and a neat
+      proof that the fault path is engaged inside user code on the far side.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
