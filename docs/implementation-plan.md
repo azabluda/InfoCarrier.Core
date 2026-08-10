@@ -2502,7 +2502,8 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       B6 route (a) is about a client convention reading *relational annotations* to learn which
       properties are store-generated. These two never got that far: the client already knew the
       property was generated — `ValueGenerated != Never` is what triggered the lookup — and simply
-      had no generator to offer. The remaining `StoreGenerated` two are unrelated to each other:
+      had no generator to offer. The remaining `StoreGenerated` two were unrelated to each other,
+      and **both are closed now** — the second by C42:
       `…_with_wrapped_Uri_key` (*"This operation is not supported for a relative URI"*) and
       `Store_generated_values_are_propagated_with_composite_key_cycles`, which S3c already records
       as undiagnosed.
