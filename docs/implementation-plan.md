@@ -3514,6 +3514,40 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       visible from the other side.** Anyone tempted to relax that guard should read spec §4 first
       and expect to pay 107; the two tests here are what one would buy.
 
+- [x] **C62. `Array_of_TimeOnly` is EF issue #30730, and EF skips it in its own SQLite suite.** No
+      code change; this is the diagnosis C60 said was owed, and it closes the last undiagnosed
+      exception outside `JsonQuery`. ✅ `<this commit>`
+
+      C60 recorded it as *"undiagnosed, and the clue is in its siblings"* — `_with_milliseconds`
+      and `_with_microseconds` both pass, so it is specific to a `TimeOnly` with no sub-second
+      part. **Two probes, C42's order: what the client holds, then the row the store actually
+      holds.**
+
+          ROW 1: [12:30:00.0000000, 12:30:00.0000000]      <- read back through the wire
+          CONSTANT value1 = 12:30:00.0000000
+          DB …db Id=1 SomeArray=["12:30:00.0000000","12:30:00.0000000"]
+
+      **Everything this provider touches is correct.** The seed crossed the wire, the server wrote
+      it, SQLite holds a seven-digit fraction, and the client reads the same value back. The
+      constant is right too. So the failure — *"Sequence contains no elements"* out of
+      `SingleAsync` — is in the SQL comparison, and EF's own suite says exactly what it is:
+
+          [ConditionalFact(Skip = "Issue #30730: TODO: SQLite is not matching elements here.")]
+          public override async Task Array_of_TimeOnly()
+              …  WHERE "s"."value" = '12:30:00') = 2
+
+      **`'12:30:00'` against a stored `"12:30:00.0000000"`.** SQLite's `TimeOnly` literal drops a
+      trailing zero fraction and its JSON element keeps all seven digits; the two agree for
+      `.1230000` and `.1234560`, which is why the two siblings pass, and disagree for a whole
+      second. Not this provider's — the same defect, the same store, the same SQL.
+
+      **Left red rather than skipped, and that is a deliberate reading of the two rules.** A63
+      encourages adopting EF's own override when the reason matches, and the reason matches
+      exactly — but EF's override here *is* a `[Skip]`, which the guardrail names by name. Leaving
+      it red with a stated, verified reason costs one number and keeps the guardrail unambiguous.
+      **The option is recorded rather than taken**: adopting EF's attribute verbatim would move it
+      from `Failed` to `Skipped`, and it is a one-line change if that is preferred.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

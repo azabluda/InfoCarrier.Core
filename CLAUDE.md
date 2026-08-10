@@ -145,8 +145,10 @@ configure it as an error there), **8 `ComplexNavigations`** (4 classified in C56
 `BulkUpdates`** and **4 `GearsOfWar`**. Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
 — the latter diagnosed in full and reverted, B23) and
-**5** are undiagnosed exceptions — C42 diagnosed and closed one of the six, and its two probes
-are the worked example: metadata first, then read the row the store actually holds. The rest are a
+**the undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
+closed the last two outside it, and all three used the same two probes in the same order: what the
+metadata and the client say, then **read the row the store actually holds**. That second probe is
+what turned `Array_of_TimeOnly` from "ours" into EF issue #30730 in one run. The rest are a
 deliberate allowlist refusal (`Regex_IsMatch`, A46) or a known singleton. **`JsonTypes` is clear**
 — the nine that stood here were A64's locale, and C50 removed them by pinning the culture.
 
