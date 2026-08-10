@@ -2706,6 +2706,72 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       minutes locally at 22312 tests, and a runner slow enough to be killed at the default would
       report a partial TRX, which the ratchet would then read as a shrinking total.
 
+- [x] **C40. A string `Include` naming nothing was never validated — and where the check went is
+      the finding.**
+      **`Total tests: 22312, Passed: 21951, Failed: 144, Skipped: 217`** (`c40b`) — **145 → 144,
+      1 fixed, 0 broken.** ✅ `<this commit>`
+
+      `Logging.InvalidIncludePathError_throws_by_default` did `Set<Animal>().Include("Wheels")`
+      against a model with no such navigation and got *"InfoCarrierTestHelpers builds models; it
+      has no server to talk to"* — the path had shipped. EF raises
+      `CoreEventId.InvalidIncludePathError` in `NavigationExpandingExpressionVisitor.ProcessInclude`,
+      a warning-as-error by default, and that visitor is precisely what ADR-006's capture point
+      means this provider never runs. `RejectInvalidIncludes` already covered the *lambda* forms;
+      a string names no member, so nothing saw it.
+
+      `StringIncludeValidator` mirrors EF's walk — the breadth-first queue over navigations,
+      `FindNavigations`' four cases (navigation, derived declared navigation, skip navigation,
+      derived declared skip navigation), and the decision to keep reporting after a failed
+      segment. **The message is not reproduced**: `_queryLogger.InvalidIncludePathError(chain,
+      name)` is EF's own extension, so the `WarningAsErrorTemplate` wrapper the test asserts comes
+      from EF's plumbing and cannot drift from it. `QuerySplitter` gained an optional
+      `IDiagnosticsLogger<DbLoggerCategory.Query>`, which `QueryExecutor` passes from
+      `queryContext.QueryLogger`.
+
+      **The first attempt failed and it is the more useful half of this entry.** The new check
+      went into `RejectInvalidIncludes`, and that method sits *after* `Split`'s
+      `IsWhollyServerExecutable` early return — so it never ran for the query in question, which
+      is wholly shippable. **A probe established that in one filtered run**: nothing was written
+      at all, which said the method was not reached rather than that the matcher had missed.
+
+      Moving the whole of `RejectInvalidIncludes` above the early return then measured
+      **1 fixed, 18 broken** (`c40`), and every one of the 18 is *"Cannot apply the 'Include'
+      operation with argument …"* on a **legitimate** include:
+
+          Include(e => EF.Property<X>(e, "OneToOne_Optional_FK1"))
+          ThenInclude(g => ((Officer)g).Reports)
+
+      **`IsPropertyPath` accepts neither an `EF.Property` call nor a cast, and has never had to:
+      those queries are all wholly shippable, so the check has never run on one.** A latent
+      over-strictness, invisible for as long as the placement hid it. So only the string half
+      moved up; `RejectInvalidIncludes` stays exactly where it was, and its placement is now
+      documented as load-bearing rather than incidental. Widening `IsPropertyPath` is its own
+      change with its own measurement, and is not needed for this one.
+
+- [x] **C41. `ComplexTypesTracking.Can_track_entity_with_complex_property_bag_collections` ×2 is
+      EF's, and the stack says so outright.** No code change; this is the classification. ✅
+      `<this commit>`
+
+      The message — *"Incorrect number of arguments supplied for call to method
+      'System.Object get_Item(System.String)'"* — reads like expression construction, which would
+      make it ours. The frame above it says otherwise:
+
+          at System.Linq.Expressions.Expression.Property(Expression, PropertyInfo)
+          at StructuralTypeMaterializerSource.<AddInitializeExpression>g__CreateMemberAssignment|10_0
+          at StructuralTypeMaterializerSource.AddInitializeExpression
+          …
+          at RuntimeEntityType.GetOrCreateMaterializer
+          at ServerSaveChangesExecutor.Materialize          <- ours, and only as the caller
+
+      A **property-bag** entity type's members are the indexer `get_Item(string)`. EF's own
+      `CreateMemberAssignment` hands that `PropertyInfo` to `Expression.Property(expression,
+      property)`, the overload for a parameterless property, and an indexer needs an argument.
+      Everything between our call and the throw is EF's, and the only thing this provider
+      contributes is asking for a materializer for a type EF cannot build one for.
+
+      **Confirms A32 as written** and closes the queue's doubt: CLAUDE.md said it fails inside
+      EF's `StructuralTypeMaterializerSource` and it does. Red, classified, not ours.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

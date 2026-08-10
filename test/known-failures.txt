@@ -1,4 +1,4 @@
-# Spec-suite ratchet baseline — see eng/ratchet.sh and roadmap.md §CI strategy.
+﻿# Spec-suite ratchet baseline — see eng/ratchet.sh and roadmap.md §CI strategy.
 #
 # The suite is red on purpose: it inherits Microsoft's EFCore.Specification.Tests (ADR-004) and
 # CLAUDE.md forbids skipping a test to force green. CI therefore gates on direction — failures
@@ -23,5 +23,8 @@
 # A/B/C adoptions stale: 111/5215 against an actual 145/22312. CI would have failed on the
 # failure count while the total quadrupled. Every failure behind this number is classified —
 # Phase C's C1–C20 and the A/B tables in docs/implementation-plan.md.
-failed=145
+#
+# 2026-08-10 (C40) — 145 -> 144, the string-Include path validator. Lowered in the same commit
+# as the fix, which is what the header above asks for.
+failed=144
 total=22312

@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core.Query;
@@ -35,6 +36,7 @@ public sealed class QuerySplitter
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
     private readonly ServerBoundaryAnalyzer _analyzer;
+    private readonly IDiagnosticsLogger<DbLoggerCategory.Query>? _queryLogger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="QuerySplitter" /> class.
@@ -44,11 +46,21 @@ public sealed class QuerySplitter
     ///     The types the server accepts. Defaults to one derived from <paramref name="model" />,
     ///     which is what the server derives from its own.
     /// </param>
-    public QuerySplitter(IModel model, TypeAllowlist? allowlist = null)
+    /// <param name="queryLogger">
+    ///     The query logger, for the diagnostics EF raises during navigation expansion — which
+    ///     ADR-006 means this provider never runs, so anything raised there has to be raised here
+    ///     instead. Optional because the splitter is also constructed in tests that have no
+    ///     context; a null one simply skips those checks.
+    /// </param>
+    public QuerySplitter(
+        IModel model,
+        TypeAllowlist? allowlist = null,
+        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null)
     {
         _model = model;
         _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
         _analyzer = new ServerBoundaryAnalyzer(_allowlist);
+        _queryLogger = queryLogger;
     }
 
     /// <summary>
@@ -63,6 +75,21 @@ public sealed class QuerySplitter
         // `x.Item1.Capital` where the caller wrote `x.f.Capital` — an internal carrier leaking
         // into a user-facing message. The check itself is syntactic and reads the same either way.
         Expression captured = query;
+
+        // Before anything else, and in particular before the `IsWhollyServerExecutable` return
+        // below. A bad *string* include path is a mistake in the caller's query, not a property
+        // of where the boundary falls, and `Set<Animal>().Include("Wheels")` is wholly shippable
+        // — so it took that early exit and travelled to the server unexamined.
+        //
+        // Only the string half runs here. `RejectInvalidIncludes` below stays where it is, and
+        // that placement turns out to be load-bearing rather than incidental: moving it up too
+        // was measured at **1 fixed, 18 broken** (`c40`), every one of them a legitimate include
+        // its `IsPropertyPath` refuses —
+        // `Include(e => EF.Property<X>(e, "OneToOne_Optional_FK1"))` and
+        // `ThenInclude(g => ((Officer)g).Reports)`. Those queries are wholly shippable, so the
+        // check has never run on them and its strictness has never been tested. Widening it is
+        // its own change with its own measurement; this one does not need it.
+        ValidateStringIncludePaths(captured);
 
         // A C# collection expression is a constant whose *runtime* type is the compiler's
         // `<>z__ReadOnlyArray<T>` — a type the server's assembly does not have, and one the
@@ -256,6 +283,33 @@ public sealed class QuerySplitter
     ///     was found to name an anonymous type, and was quietly treated as a projection boundary
     ///     instead of the mistake it is.
     /// </remarks>
+    /// <summary>
+    ///     Reports a string <c>Include</c> path naming a navigation the model does not have.
+    /// </summary>
+    /// <remarks>
+    ///     A string include names no member, so the syntactic check below cannot see it:
+    ///     <c>Include("Wheels")</c> is well-formed and only the model can say the navigation does
+    ///     not exist. EF finds out in
+    ///     <c>NavigationExpandingExpressionVisitor.ProcessInclude</c> and raises
+    ///     <c>CoreEventId.InvalidIncludePathError</c>, a warning-as-error by default — and that
+    ///     visitor is exactly what ADR-006's capture point means this provider never runs, so an
+    ///     unvalidated path used to travel to the server and be silently ignored.
+    ///     <para>
+    ///         Raised through EF's own logger extension rather than by composing the message
+    ///         here. The spec test asserts
+    ///         <c>WarningAsErrorTemplate(…, LogInvalidIncludePath.GenerateMessage(…), …)</c>;
+    ///         reproducing that string would mean reproducing EF's warning-as-error plumbing too,
+    ///         and calling the extension gets both for free and cannot drift from it.
+    ///     </para>
+    /// </remarks>
+    private void ValidateStringIncludePaths(Expression query)
+    {
+        if (_queryLogger is not null)
+        {
+            StringIncludeValidator.Validate(query, _model, _queryLogger);
+        }
+    }
+
     private void RejectInvalidIncludes(Expression query)
     {
         if (InvalidIncludeFinder.Find(query, _model) is not var (invalid, onNonEntity))
@@ -267,6 +321,101 @@ public sealed class QuerySplitter
             onNonEntity
                 ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.IncludeOnNonEntity(invalid.ToString())
                 : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.InvalidIncludeExpression(invalid));
+    }
+
+    /// <summary>
+    ///     Walks a string <c>Include</c> path against the model and reports the first segment
+    ///     that names no navigation, exactly where EF would.
+    /// </summary>
+    /// <remarks>
+    ///     A deliberate mirror of <c>NavigationExpandingExpressionVisitor.ProcessInclude</c> and
+    ///     its <c>FindNavigations</c>, down to the breadth-first queue and the decision to keep
+    ///     going after a failed segment. What matters is the <em>set</em> of navigations that
+    ///     counts as found — a derived type's declared navigation and a skip navigation both do,
+    ///     and a stricter walk here would refuse paths EF accepts.
+    /// </remarks>
+    private sealed class StringIncludeValidator(
+        IModel model,
+        IDiagnosticsLogger<DbLoggerCategory.Query> logger) : ExpressionVisitor
+    {
+        public static void Validate(
+            Expression query, IModel model, IDiagnosticsLogger<DbLoggerCategory.Query> logger)
+            => new StringIncludeValidator(model, logger).Visit(query);
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            // Only `Include` has a string overload; `ThenInclude` does not.
+            if (node.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
+                && node.Method.Name == nameof(EntityFrameworkQueryableExtensions.Include)
+                && node.Arguments is [_, ConstantExpression { Value: string navigationChain }]
+                && node.Method.IsGenericMethod
+                && model.FindEntityType(node.Method.GetGenericArguments()[0]) is { } rootEntityType)
+            {
+                Walk(navigationChain, rootEntityType);
+            }
+
+            return base.VisitMethodCall(node);
+        }
+
+        private void Walk(string navigationChain, IEntityType rootEntityType)
+        {
+            var reached = new Queue<IEntityType>();
+            reached.Enqueue(rootEntityType);
+
+            foreach (string navigationName in navigationChain.Split('.'))
+            {
+                int toProcess = reached.Count;
+                while (toProcess-- > 0)
+                {
+                    foreach (INavigationBase navigation in FindNavigations(reached.Dequeue(), navigationName))
+                    {
+                        reached.Enqueue(navigation.TargetEntityType);
+                    }
+                }
+
+                if (reached.Count == 0)
+                {
+                    // Not stopped, because EF does not: with the queue empty every later segment
+                    // reports too, so `Include("Wheels.Spokes")` logs twice. Immaterial by
+                    // default — the event is a warning-as-error and the first one throws — but it
+                    // is what an application that downgraded it to a warning would see from EF.
+                    logger.InvalidIncludePathError(navigationChain, navigationName);
+                }
+            }
+        }
+
+        private static IEnumerable<INavigationBase> FindNavigations(IEntityType entityType, string navigationName)
+        {
+            if (entityType.FindNavigation(navigationName) is { } navigation)
+            {
+                yield return navigation;
+            }
+            else
+            {
+                foreach (IEntityType derived in entityType.GetDerivedTypes())
+                {
+                    if (derived.FindDeclaredNavigation(navigationName) is { } derivedNavigation)
+                    {
+                        yield return derivedNavigation;
+                    }
+                }
+            }
+
+            if (entityType.FindSkipNavigation(navigationName) is { } skipNavigation)
+            {
+                yield return skipNavigation;
+            }
+            else
+            {
+                foreach (IEntityType derived in entityType.GetDerivedTypes())
+                {
+                    if (derived.FindDeclaredSkipNavigation(navigationName) is { } derivedSkipNavigation)
+                    {
+                        yield return derivedSkipNavigation;
+                    }
+                }
+            }
+        }
     }
 
     private sealed class InvalidIncludeFinder(IModel model) : ExpressionVisitor

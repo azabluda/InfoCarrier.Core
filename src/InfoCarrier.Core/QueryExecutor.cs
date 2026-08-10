@@ -54,7 +54,8 @@ internal sealed class QueryExecutor<TElement>
         // Then, and only then, decide what the server can execute: a surviving closure field
         // access names a compiler-generated display class and would push the boundary in for
         // no reason (ADR-010, docs/projection-split.md).
-        _split = new QuerySplitter(queryContext.Context.Model).Split(substituted);
+        _split = new QuerySplitter(
+            queryContext.Context.Model, allowlist: null, queryContext.QueryLogger).Split(substituted);
 
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
