@@ -2858,6 +2858,52 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       bug fix**, and it is the same question in a different coat as "what does the boundary
       preserve". The cheaper route is spatial on Tier B, where the store answers it.
 
+- [x] **C45. The envelope had a client half and no server half. Now the whole suite goes through
+      it.**
+      **`Total tests: 22321, Passed: 21961, Failed: 143, Skipped: 217`** (`c45`) — **143 → 143,
+      0 fixed, 0 broken, reasons unchanged.** Total up 9 for the new tests. ✅ `<this commit>`
+
+      M5's criterion read *"`InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests —
+      currently the backend test store implements `IInfoCarrierClient` directly and bypasses
+      both"*. The store was only half the problem. **`TransportInfoCarrierClient` has wrapped every
+      request in an envelope since it was written, and nothing in `src/` ever unwrapped one.** The
+      only dispatcher in the repo was inline in `InMemorySmokeTest`, handled `Query`, and threw for
+      the other eight operations. A network transport author had a client to call and no server to
+      answer it; the envelope and the version were write-only fields.
+
+      **`InfoCarrierEnvelopeServer` is the missing half**, and it belongs in the product for the
+      same reason `TransportInfoCarrierClient` does. It checks `ProtocolVersion` **before**
+      running anything — a version field nobody reads is documentation, not a compatibility
+      mechanism — and refuses an unknown operation by name rather than treating it as one it
+      knows. The smoke test's hand-rolled dispatcher is deleted in favour of it.
+
+      The backend test store now talks through `TransportInfoCarrierClient`, so all **22321**
+      tests cross a real envelope, including the transaction operations. Those are the ones with
+      no payload to speak of, which is exactly why they had never exercised dispatch: a wrong
+      discriminator arm for `ReleaseSavepoint` would have been invisible.
+
+      **The transport is a test-side one rather than `InProcessInfoCarrierTransport`, and that is
+      a measurement, not a preference.** That transport re-serializes the whole envelope, and an
+      envelope's payload is *already serialized bytes* — so the payload would be base64'd into a
+      second JSON document on every hop. C37 measured this suite's largest result at
+      **560,839,164 bytes**; base64 makes that ~750 MB of extra JSON, twice per query, for
+      coverage already had. The payload round-trips regardless — the client serializes it and
+      `InfoCarrierEnvelopeServer` deserializes it, which is where every wire-serializability
+      failure this suite has caught was caught. `InMemorySmokeTest` keeps the real
+      `InProcessInfoCarrierTransport` on small payloads, so the envelope's own serializability
+      stays covered.
+
+      **This retro-validates C37.** The payload size bound sits on `IInfoCarrierSerializer`, and
+      C37 had to note that the suite did not use that path. It does now: every request payload in
+      the suite passes the request bound, and `IInfoCarrierRequest`'s direction split is exercised
+      rather than argued.
+
+      Nine tests cover what 22321 green runs cannot — the refusals. A suite that only ever sends
+      the current version never learns what happens to a different one, and
+      `Every_declared_operation_dispatches_to_its_own_server_method` asserts against
+      `Enum.GetValues<InfoCarrierOperation>().Length`, so a tenth operation added without a
+      dispatch arm fails there rather than at a caller's first use.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

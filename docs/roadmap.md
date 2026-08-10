@@ -1,4 +1,4 @@
-# Roadmap
+﻿# Roadmap
 
 Status: **M6 in progress** · Milestone-level plan for the whole project.
 
@@ -212,8 +212,11 @@ server-inbound; capping what a client gets back is a page-size policy, and a dif
   *Types* ✅ (`TypeAllowlist`, 2026-08-01) · *methods* ✅ (C30, 2026-08-10) · *node kinds* ✅ (C36, 2026-08-10).
 - Payload depth/size limits (v1 needed a 10 MB stack for >1 MB payloads).
   *Depth* ✅ (`ExpressionJsonContext.MaxDepth`) · *size* ✅ (C37, 2026-08-10).
-- `InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests — currently the
-  backend test store implements `IInfoCarrierClient` directly and bypasses both.
+- `InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests. ✅ (C45, 2026-08-10.
+  The store was half the problem: the product had a `TransportInfoCarrierClient` that wrapped
+  every request and **nothing that unwrapped one** — the only dispatcher was inline in a smoke
+  test and handled one of nine operations. `InfoCarrierEnvelopeServer` is the missing half, and
+  all 22321 tests now cross a real envelope with the version checked before dispatch.)
 - Exception fidelity across the wire (W5) and cancellation (W6).
 - Security review of the deserialization path.
 

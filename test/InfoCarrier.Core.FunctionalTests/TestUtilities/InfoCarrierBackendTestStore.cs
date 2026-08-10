@@ -103,6 +103,52 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         ServiceProvider = services.BuildServiceProvider(validateScopes: true);
 
         _serializer = ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
+
+        // The whole suite now goes through the real envelope path (C45): the product's
+        // `TransportInfoCarrierClient` wraps each request in an `InfoCarrierEnvelope`, a transport
+        // carries it, and the product's `InfoCarrierEnvelopeServer` checks the protocol version
+        // and dispatches. Before this the store implemented `IInfoCarrierClient` itself and both
+        // halves of the envelope protocol were unexercised — the M5 exit criterion.
+        _client = new TransportInfoCarrierClient(
+            new EnvelopeTransport(
+                envelope => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
+                    .DispatchAsync(envelope)),
+            _serializer);
+    }
+
+    private readonly IInfoCarrierClient _client;
+
+    /// <summary>
+    ///     Carries an envelope to the in-process server.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Not <see cref="InProcessInfoCarrierTransport" />, and the reason is a
+    ///         measurement rather than a preference.</b> That transport re-serializes the whole
+    ///         envelope, and an envelope's payload is <em>already serialized bytes</em> — so the
+    ///         payload would be base64'd into a second JSON document on every hop. C37 measured
+    ///         this suite's largest result at <b>560,839,164 bytes</b>; base64 makes that about
+    ///         750 MB of additional JSON, twice per query, for coverage that is already had.
+    ///     </para>
+    ///     <para>
+    ///         <b>Nothing is lost by not doing it.</b> The payload makes a genuine round trip
+    ///         regardless — <see cref="TransportInfoCarrierClient" /> serializes it and
+    ///         <see cref="InfoCarrierEnvelopeServer" /> deserializes it — which is where every
+    ///         wire-serializability failure this suite has ever caught was caught. What this
+    ///         transport adds is the envelope itself: the version is checked, the operation is
+    ///         dispatched by discriminator, and the response comes back wrapped.
+    ///     </para>
+    ///     <para>
+    ///         The envelope's own serializability is covered by <c>InMemorySmokeTest</c>, which
+    ///         uses the real <see cref="InProcessInfoCarrierTransport" /> on small payloads.
+    ///     </para>
+    /// </remarks>
+    private sealed class EnvelopeTransport(
+        Func<InfoCarrierEnvelope, Task<InfoCarrierEnvelope>> handler) : IInfoCarrierTransport
+    {
+        public Task<InfoCarrierEnvelope> SendAsync(
+            InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
+            => handler(request);
     }
 
     /// <summary>
@@ -155,10 +201,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         CancellationToken cancellationToken = default)
     {
         using var _ = WithClientContext(clientContext);
-        return await RoundTripAsync(
-            request,
-            (r, ct) => CreateServer().QueryDataAsync(r, ct),
-            cancellationToken).ConfigureAwait(false);
+        return await _client.QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -168,10 +211,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         CancellationToken cancellationToken = default)
     {
         using var _ = WithClientContext(clientContext);
-        return await RoundTripAsync(
-            request,
-            (r, ct) => CreateServer().SaveChangesAsync(r, ct),
-            cancellationToken).ConfigureAwait(false);
+        return await _client.SaveChangesAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -199,52 +239,38 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         public void Dispose() => onDispose();
     }
 
+    // The transaction operations go through the envelope too. They are the ones with no payload
+    // worth speaking of, which is exactly why they had never exercised the dispatch: a bug in the
+    // operation discriminator for `ReleaseSavepoint` would have been invisible.
+
     /// <inheritdoc />
-    public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => await CreateServer().BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+    public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
+        => _client.BeginTransactionAsync(cancellationToken);
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => CreateServer().CommitTransactionAsync(transactionId, cancellationToken);
+        => _client.CommitTransactionAsync(transactionId, cancellationToken);
 
     /// <inheritdoc />
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-        => CreateServer().RollbackTransactionAsync(transactionId, cancellationToken);
+        => _client.RollbackTransactionAsync(transactionId, cancellationToken);
 
     /// <inheritdoc />
     public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
-        => CreateServer().CreateSavepointAsync(transactionId, name, cancellationToken);
+        => _client.CreateSavepointAsync(transactionId, name, cancellationToken);
 
     /// <inheritdoc />
     public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
-        => CreateServer().RollbackToSavepointAsync(transactionId, name, cancellationToken);
+        => _client.RollbackToSavepointAsync(transactionId, name, cancellationToken);
 
     /// <inheritdoc />
     public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
-        => CreateServer().ReleaseSavepointAsync(transactionId, name, cancellationToken);
+        => _client.ReleaseSavepointAsync(transactionId, name, cancellationToken);
 
     /// <inheritdoc />
     public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
-        => CreateServer().SupportsSavepointsAsync(transactionId, cancellationToken);
+        => _client.SupportsSavepointsAsync(transactionId, cancellationToken);
 
     private IInfoCarrierServer CreateServer()
         => ServiceProvider.GetRequiredService<IInfoCarrierServer>();
-
-    private async Task<TResponse> RoundTripAsync<TRequest, TResponse>(
-        TRequest request,
-        Func<TRequest, CancellationToken, Task<TResponse>> invoke,
-        CancellationToken cancellationToken)
-    {
-        // Simulate the wire: serialize the request, deserialize a fresh copy, invoke the
-        // server, then round-trip the result back (v1 SimulateNetworkTransferJson).
-        TRequest simulatedRequest = await SimulateAsync(request, cancellationToken).ConfigureAwait(false);
-        TResponse result = await invoke(simulatedRequest, cancellationToken).ConfigureAwait(false);
-        return await SimulateAsync(result, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<T> SimulateAsync<T>(T value, CancellationToken cancellationToken)
-    {
-        byte[] payload = await _serializer.SerializeAsync(value, cancellationToken).ConfigureAwait(false);
-        return (await _serializer.DeserializeAsync<T>(payload, cancellationToken).ConfigureAwait(false))!;
-    }
 }

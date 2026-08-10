@@ -46,8 +46,13 @@ public class InMemorySmokeTest
 
         // The in-process client: ships operations to the in-process server over the transport.
         var server = new InProcessInfoCarrierServer(serverProvider);
+
+        // The product's own envelope server, not a hand-rolled dispatcher. This test used to
+        // carry one that handled `Query` and threw for the other eight operations, which is what
+        // hid the fact that the product had no server half of the envelope protocol at all (C45).
+        var envelopeServer = new InfoCarrierEnvelopeServer(server, new SystemTextJsonInfoCarrierSerializer());
         var transport = new InProcessInfoCarrierTransport(
-            (envelope, ct) => DispatchAsync(server, envelope, ct),
+            envelopeServer.DispatchAsync,
             new SystemTextJsonInfoCarrierSerializer());
         var client = new TransportInfoCarrierClient(transport, new SystemTextJsonInfoCarrierSerializer());
 
@@ -65,23 +70,4 @@ public class InMemorySmokeTest
         Assert.Equal("beta", blogs[1].Title);
     }
 
-    private static async Task<Common.InfoCarrierEnvelope> DispatchAsync(
-        IInfoCarrierServer server,
-        Common.InfoCarrierEnvelope envelope,
-        CancellationToken cancellationToken)
-    {
-        var serializer = new SystemTextJsonInfoCarrierSerializer();
-        switch (envelope.Operation)
-        {
-            case Common.InfoCarrierOperation.Query:
-            {
-                var request = serializer.Deserialize<Common.QueryDataRequest>(envelope.Payload)!;
-                Common.QueryDataResult result = await server.QueryDataAsync(request, cancellationToken);
-                return envelope with { Payload = serializer.Serialize(result) };
-            }
-
-            default:
-                throw new NotSupportedException($"Operation {envelope.Operation} not supported in smoke test.");
-        }
-    }
 }
