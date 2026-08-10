@@ -147,10 +147,24 @@ public class OwnedNavigationsCollectionQueryInfoCarrierTest(OwnedNavigationsQuer
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 base.Distinct_over_projected_filtered_nested_collection)).Message);
 
-    /// <inheritdoc cref="Distinct_over_projected_nested_collection" />
+    /// <summary>
+    ///     <c>OwnedNavigationsCollectionSqliteTest</c>'s, adopted whole in C57 including its
+    ///     <c>TrackAll</c> arm.
+    /// </summary>
+    /// <remarks>
+    ///     The <c>TrackAll</c> half used to go through <see cref="Distinct_projected" />'s APPLY
+    ///     assertion and failed <i>"expected InvalidOperationException, actual EqualException"</i>
+    ///     — because <c>AssertOwnedTrackingQuery</c> compares against <i>"A tracking query is
+    ///     attempting to project an owned entity…"</i> and gets <c>ApplyNotSupported</c> instead.
+    ///     That is EF's own comment word for word: <i>"Base test expects 'can't track owned
+    ///     entities' exception, but with SQLite we get 'no CROSS APPLY'"</i>. The reason matches,
+    ///     so the override does too (A63).
+    /// </remarks>
     public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
-        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
-            () => base.Distinct_projected(queryTrackingBehavior));
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Distinct_projected(queryTrackingBehavior));
 }
 
 public class OwnedNavigationsMiscellaneousQueryInfoCarrierTest(OwnedNavigationsQueryInfoCarrierFixture fixture)
@@ -189,22 +203,29 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(OwnedNavigationsQuer
 
     /// <summary>
     ///     SQLite has no <c>APPLY</c>, and <c>OwnedJsonProjectionSqliteTest</c> borrows the same
-    ///     limit. **Only for <c>NoTracking</c>.** EF no-ops the <c>TrackAll</c> half because on
-    ///     SQLite it reaches the APPLY refusal before the base's "can't track owned entities"
-    ///     assertion; here <c>TrackAll</c> fails on a string comparison instead, which is a
-    ///     different statement — so it is left red rather than silenced under a reason that is
-    ///     not ours (A63 cuts both ways).
+    ///     limit — <b>including its <c>TrackAll</c> arm, which C57 corrects.</b>
     /// </summary>
+    /// <remarks>
+    ///     C20 declined EF's no-op here on the ground that <i>"here <c>TrackAll</c> fails on a
+    ///     string comparison instead, which is a different statement"</i>. **It is the same
+    ///     statement, and reading the comparison says so**: <c>Expected: "A tracking query is
+    ///     attempting to project"</c>, <c>Actual: "Translating this query requires the SQL
+    ///     APPLY"</c> — which is EF's comment verbatim, <i>"Base test expects 'can't track owned
+    ///     entities' exception, but with SQLite we get 'no CROSS APPLY'"</i>. A63 applies; the
+    ///     decline rested on not having read the two strings.
+    ///     <c>OwnedNavigationsProjectionSqliteTest</c> itself is commented out in EF for an
+    ///     unrelated reason (issue #26708), so <c>OwnedJson</c>'s is the nearest statement of it.
+    /// </remarks>
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior)
+            ? Task.CompletedTask
             : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
                 () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_optional_related_FirstOrDefault" />
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior)
+            ? Task.CompletedTask
             : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
                 () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 }
@@ -218,11 +239,20 @@ public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(OwnedNavigationsQ
     ///     property as its own structural type even when the CLR type is shared, so a set operation
     ///     over two of them is a set operation over different types.
     /// </summary>
-    public override async Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
-        => Assert.Equal(
-            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Over_associate_collection_projected(queryTrackingBehavior))).Message);
+    /// <remarks>
+    ///     <b>C57: the first of the two is SQLite's limit, not the relational base's.</b> This
+    ///     asserted <c>InsufficientInformationToIdentifyElementOfCollectionJoin</c> — which is
+    ///     right for <c>Navigations</c>, where it passes — and got
+    ///     <c>ApplyNotSupported</c>. <c>OwnedNavigationsSetOperationsSqliteTest</c> says the same
+    ///     thing in the form its inheritance chain allows: <i>"SQL APPLY not supported in SQLite —
+    ///     different exception message from the one expected in the base class"</i>, wrapped as
+    ///     <c>Assert.ThrowsAsync&lt;EqualException&gt;</c> because <em>its</em> base is the
+    ///     relational one that makes the assertion. Ours is the core base, so the fact is stated
+    ///     directly instead of through a nested assertion failure.
+    /// </remarks>
+    public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Over_associate_collection_projected(queryTrackingBehavior));
 
     /// <inheritdoc cref="Over_associate_collection_projected" />
     public override async Task Over_different_collection_properties()

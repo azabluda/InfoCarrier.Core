@@ -3309,6 +3309,37 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       and watching it go red, and joined by one asserting that an ordinary materialized collection
       still is not refused.
 
+- [x] **C57. Five `OwnedNavigations` overrides had gone stale, and C20 declined three of them for
+      a reason the two strings refute.**
+      **`Total tests: 22356, Passed: 22024, Failed: 115, Skipped: 217`** (`c57`) —
+      **120 → 115, 5 fixed, 0 broken.** ✅ `<this commit>`
+
+      Test-only. All five are ours, none is an EF spec test, and each is replaced by what EF's own
+      SQLite suite says — A63, applied in the direction C46 and C52 established: **an override of
+      ours can go stale, and the check is whether its stated reason is still the reason.**
+
+      | Ours | Actual | EF's |
+      |---|---|---|
+      | `Distinct_projected(TrackAll)` asserts `ApplyNotSupported` | `EqualException` — the base compared *"A tracking query is attempting to project…"* against `ApplyNotSupported` | `OwnedNavigationsCollectionSqliteTest`: `TrackAll` → no-op, *"Base test expects 'can't track owned entities' exception, but with SQLite we get 'no CROSS APPLY'"* |
+      | `Select_subquery_{optional,required}_related_FirstOrDefault(TrackAll)` run the base | the same two strings | `OwnedJsonProjectionSqliteTest`: the same no-op, the same comment |
+      | `Over_associate_collection_projected` ×2 asserts `InsufficientInformationToIdentifyElementOfCollectionJoin` | `ApplyNotSupported` | `OwnedNavigationsSetOperationsSqliteTest`: *"SQL APPLY not supported in SQLite — different exception message from the one expected in the base class"* |
+
+      **C20's decline is the part worth recording.** It read: *"here `TrackAll` fails on a string
+      comparison instead, which is a different statement — so it is left red rather than silenced
+      under a reason that is not ours (A63 cuts both ways)."* The caution was right and the
+      conclusion was not: the string comparison **is** EF's statement, and the two strings say so
+      outright. `Expected: "A tracking query is attempting to project"` /
+      `Actual: "Translating this query requires the SQL APPLY"` is EF's comment in evidence form.
+      Corrected in place, in the override's own remarks, as C40's and C43's attributions were.
+
+      **The third one is a translation between inheritance chains rather than a copy.** EF's
+      `Over_associate_collection_projected` override wraps the base in
+      `Assert.ThrowsAsync<EqualException>` — because *its* base is the **relational** one, which
+      makes the message assertion EF then expects to fail. Ours derives from the **core** base, so
+      the same fact is stated directly as `ApplyNotSupported`. The tell that it was SQLite's limit
+      and not the relational base's: **the identical test passes on `Navigations`**, where the
+      query does not reach APPLY.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
