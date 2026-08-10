@@ -3436,6 +3436,37 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       another rule fitted to six tests. The six stay red and classified: **this provider answers a
       query EF refuses**, which is the A28 shape with the sign flipped.
 
+- [x] **C60. The singles and pairs, examined one at a time — one is A63, the rest are classified
+      with evidence.**
+      **`Total tests: 22356, Passed: 22025, Failed: 114, Skipped: 217`** (`c60`) —
+      **115 → 114, 1 fixed, 0 broken.** ✅ `<this commit>`
+
+      Nine failures across seven classes had never been looked at individually. Each was read out
+      of `c56.log`/`c57.log` — the assertion and the stack, not the count.
+
+      **One is a missing override, and it is A63's usual shape.**
+      `ComplexPropertiesStructuralEquality.Contains_with_nested_and_composed_operators` fails with
+      the server's own *"Translation of `EF.Property<int?>(CollectionResultExpression: …
+      RootEntity.AssociateCollection#AssociateType.NestedCollection …, "Id")` failed"*. EF states
+      the limit on `ComplexTableSplittingStructuralEqualityRelationalTestBase`: *"Collections are
+      not supported with table splitting, only JSON. Note that the exception is correct, since the
+      collections in the test data are null for table splitting."* **A complex property on a
+      relational store *is* table splitting**, so that base describes this fixture even though it
+      is not in the class's chain — the same reasoning C57 used to translate an override between
+      inheritance chains.
+
+      **The rest are classified, not fixed.**
+
+      | Failure | Reading |
+      |---|---|
+      | `ProxyGraphUpdates+LazyLoading` / `+LazyLoadingAndChangeTracking.Save_two_entity_cycle_with_lazy_loading` ×2 | The base branches on `context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"` and expects a `CircularDependency` throw otherwise. **Under this provider that name is the client's and the behaviour is the backend's** — the InMemory backend permits the cycle, so the test takes the branch its own store contradicts. B16's topology shape, in a new place. Tier B would make the branch true and costs moving a 1700-test base; not attempted. |
+      | `AdHocAdvancedMappingsQuery.Casts_are_removed_from_expression_tree_when_redundant` | Asserts `CoreStrings.TranslationFailed` against an **exactly printed** expression (`DbSet<MockEntity>()    .Cast<IDummyEntity>()    .Where(…)`). `IDummyEntity` is a type `MockEntity` does not implement, the cast lands on the client, and `Enumerable.Cast` throws `InvalidCastException`. Green would require reproducing EF's printer output byte for byte over a tree this provider has rewritten. |
+      | `OptimisticConcurrency.Nullable_client_side_concurrency_token_can_be_used` | `"Intercepted: Intercepted: New name"`. B16's two invocations, priced in C58. |
+      | `GearsOfWarQuery.Query_with_complex_let_containing_ordering_and_filter_projecting_firstOrDefault_element_of_let` ×2 | `NullReferenceException` in the client residual on `automaticWeapons.FirstOrDefault().Name` — a store propagates null through that and C# does not. C43's shape; **C53's lesson says probe the boundary verdict before calling it semantics**, and that probe has not been run on this one. |
+      | `CustomConverters.Composition_over_collection_of_complex_mapped_as_scalar` | EF refuses (`TranslationFailed`, again an exactly printed lambda) and this provider answers. **C59's family**, and C59 measured what a general rule for it costs. |
+      | `NonSharedPrimitiveCollectionsQuerySqlite.Array_of_TimeOnly` | *"Sequence contains no elements"* — the server matched no row. **Undiagnosed, and the clue is in its siblings**: `Array_of_TimeOnly_with_milliseconds` and `_with_microseconds` both pass, so whatever it is, it is specific to a `TimeOnly` with no sub-second part rather than to `TimeOnly` as such. |
+      | `Query.StringTranslations.Regex_IsMatch` ×2 | A46, a deliberate allowlist refusal. Unchanged. |
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

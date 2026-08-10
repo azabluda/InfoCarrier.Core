@@ -236,4 +236,20 @@ public class ComplexPropertiesSetOperationsQueryInfoCarrierTest(ComplexPropertie
 }
 
 public class ComplexPropertiesStructuralEqualityQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
-    : ComplexPropertiesStructuralEqualityTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);
+    : ComplexPropertiesStructuralEqualityTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture)
+{
+    /// <summary>
+    ///     <c>ComplexTableSplittingStructuralEqualityRelationalTestBase</c>'s, with EF's reason
+    ///     verbatim: <i>"Collections are not supported with table splitting, only JSON. Note that
+    ///     the exception is correct, since the collections in the test data are null for table
+    ///     splitting."</i>
+    /// </summary>
+    /// <remarks>
+    ///     A complex property on a relational store <em>is</em> table splitting, so that base is
+    ///     the one that describes this fixture even though it is not in this class's chain. The
+    ///     exception is the server's and says so —
+    ///     <c>Translation of 'EF.Property&lt;int?&gt;(CollectionResultExpression: … RootEntity.AssociateCollection#AssociateType.NestedCollection …, "Id")' failed</c>.
+    /// </remarks>
+    public override Task Contains_with_nested_and_composed_operators()
+        => Assert.ThrowsAsync<InvalidOperationException>(base.Contains_with_nested_and_composed_operators);
+}

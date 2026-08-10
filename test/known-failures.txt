@@ -46,5 +46,7 @@
 # stage ADR-006 means the client never runs.
 # 2026-08-10 (C57) — 120 -> 115. Five overrides of ours that had gone stale, replaced by what
 # EF's own SQLite suite says. Test-only; the total is unchanged.
-failed=115
+# 2026-08-10 (C60) — 115 -> 114. One more override of EF's own, adopted after reading the
+# exception rather than the count. Test-only; the total is unchanged.
+failed=114
 total=22356
