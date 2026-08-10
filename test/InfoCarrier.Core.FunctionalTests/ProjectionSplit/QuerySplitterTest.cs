@@ -312,18 +312,46 @@ public class QuerySplitterTest : IDisposable
         Assert.Empty((IEnumerable)rows[1]!);
     }
 
+    /// <summary>
+    ///     The caller declared the member <c>IQueryable&lt;Book&gt;</c>, so the queryable
+    ///     <em>is</em> the answer rather than an intermediate — and EF refuses that projection.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This used to assert that the queryable was shipped verbatim and <em>"left for EF to
+    ///         refuse"</em>, which was true only for a query that ships whole: the refusal comes
+    ///         from <c>QueryableMethodNormalizingExpressionVisitor</c> on the server, and a
+    ///         projection the split leaves on the client never reaches it. C56 raises it here
+    ///         instead, in EF's own words, for every query rather than for the shippable ones.
+    ///     </para>
+    ///     <para>
+    ///         A <c>MemberInit</c> rather than a bare body on purpose: EF's walk recurses through
+    ///         <c>New</c> and <c>MemberInit</c>, so a queryable hidden one level inside an
+    ///         anonymous type is found, and
+    ///         <c>Select_projecting_queryable_in_anonymous_projection_followed_by_Join</c> is
+    ///         exactly that shape.
+    ///     </para>
+    /// </remarks>
     [Fact]
-    public void A_collection_the_projection_returns_is_left_for_EF_to_refuse()
+    public void A_collection_the_projection_returns_is_refused()
     {
-        // The caller declared the member `IQueryable<Book>`, so the queryable *is* the answer
-        // rather than an intermediate. Materializing it here would suppress an error EF is
-        // supposed to raise — two spec tests assert exactly that error.
-        SplitQuery split = Split(
-            _context.Authors.Select(a => new QueryableRow { Books = a.Books.AsQueryable() }));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => Split(_context.Authors.Select(a => new QueryableRow { Books = a.Books.AsQueryable() })));
 
-        Assert.Equal(
-            typeof(ValueTuple<IQueryable<Book>>),
-            Assert.Single(split.ServerQueries).ElementType);
+        Assert.Contains("Collections in the final projection must be", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("IQueryable<Book>", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     And the refusal is EF's, not a wider one of ours: a projection that returns an ordinary
+    ///     materialized collection is untouched.
+    /// </summary>
+    [Fact]
+    public void A_materialized_collection_the_projection_returns_is_not_refused()
+    {
+        SplitQuery split = Split(_context.Authors.Select(a => new { Books = a.Books.ToList() }));
+
+        Assert.NotEmpty(split.ServerQueries);
     }
 
     [Fact]

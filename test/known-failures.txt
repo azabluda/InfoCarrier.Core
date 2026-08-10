@@ -41,5 +41,8 @@
 # 2026-08-10 (C46) — failures unchanged at 143; `total` 22312 -> 22327 for the 15 tests C45 and
 # C46 added (envelope protocol, fault fidelity). The total is raised deliberately: leaving it low
 # is what would let a crashed host lose fifteen tests unnoticed, which is the guard's whole job.
-failed=132
-total=22355
+# 2026-08-10 (C56) — 132 -> 120, and `total` 22355 -> 22356 for the one net new unit test.
+# The client now refuses a projection that is still a query, which EF refuses in a pipeline
+# stage ADR-006 means the client never runs.
+failed=120
+total=22356

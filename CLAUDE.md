@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22355, Passed: 22006, Failed: 132, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22356, Passed: 22019, Failed: 120, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -136,20 +136,28 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `ComplexTypeQuery`, `Spatial` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
-Tier B adoptions added, and Phase C's C1–C43 for the rest** — read out of `artifacts/measure/`,
-currently `c54`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
+Tier B adoptions added, and Phase C's C1–C56 for the rest** — read out of `artifacts/measure/`,
+currently `c56`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
 node-kind and payload-size controls, no movement in the failing count; C40 then took 145 to 144
 and C42 took it to 143. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
-A71), **20 `ComplexNavigations`**, **14 `Query.Associations`** (C20) and **9 `JsonTypes`** (7 of
-them A64's locale, not this provider). Only **4** are wrong answers
+A71), **8 `ComplexNavigations`**, **14 `Query.Associations`** (C20, and C55 corrects eight of
+them) and **9 `JsonTypes`** (7 of them A64's locale, not this provider). Only **4** are wrong answers
 (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
 — the latter diagnosed in full and reverted, B23) and
 **5** are undiagnosed exceptions — C42 diagnosed and closed one of the six, and its two probes
-are the worked example: metadata first, then read the row the store actually holds; **12** are the A28 shape — a spec test asserting a materialization
-limitation this provider does not have, whose query body is inline in a `protected static` assert
-helper so the assertion cannot be inverted from a derived class. The rest are a deliberate allowlist
-refusal (`Regex_IsMatch`, A46) or a known singleton.
+are the worked example: metadata first, then read the row the store actually holds. The rest are a
+deliberate allowlist refusal (`Regex_IsMatch`, A46) or a known singleton.
+
+**"The A28 family" was hiding a third instance of C40's mechanism, and the tell was in the failing
+list rather than in any test (C56).** Twelve `ComplexNavigations` failures were filed under
+`AssertInvalidMaterializationType` and called a decision — the assert helper is `protected static`,
+so the only route seemed to be duplicating EF's query bodies. But `NorthwindMiscellaneous` asserts
+*the same refusal six times and passes every one*. The difference is only where the boundary falls:
+EF raises it in `QueryableMethodNormalizingExpressionVisitor`, downstream of ADR-006's capture
+point, so a **wholly shippable query gets the refusal from the server and always has**, and the
+twelve are the ones the split leaves on the client. **Before calling a family of failures a design
+question, check whether a sibling of it is green.**
 
 **`Skipped` is 217, and was 217 in `c10b` too.** The number recorded against `c10b` was `208` —
 carried over from `b21b`, where it was right — and `Passed` was then derived from it rather than

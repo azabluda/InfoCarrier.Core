@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using System.Reflection;
@@ -76,16 +76,23 @@ public sealed class QuerySplitter
         // into a user-facing message. The check itself is syntactic and reads the same either way.
         Expression captured = query;
 
-        // Before anything else, and in particular before the `IsWhollyServerExecutable` return
-        // below. A bad *string* include path is a mistake in the caller's query, not a property
-        // of where the boundary falls, and `Set<Animal>().Include("Wheels")` is wholly shippable
-        // — so it took that early exit and travelled to the server unexamined.
+        // Three checks on the caller's own query, all of them before the
+        // `IsWhollyServerExecutable` return below, and all for one reason: what they refuse is a
+        // mistake in what the caller wrote, not a property of where the boundary falls. Each
+        // mirrors a diagnostic EF raises downstream of ADR-006's capture point, so the client
+        // never runs it — and a *shippable* query gets it from the server, which is why the gap
+        // only ever showed on queries the split leaves work on.
         //
-        // Both halves run here as of C47. The placement used to matter — C40 measured moving the
-        // lambda half up at **1 fixed, 18 broken**, and left it below the early return for that
-        // reason. The 18 were `IsEntity` failing to look through a collection type, not the
-        // strictness they were attributed to; with that fixed the check is safe everywhere, which
-        // is where a validity check on the caller's query belongs.
+        // In EF's order. `QueryableMethodNormalizingExpressionVisitor` opens
+        // `QueryTranslationPreprocessor` and refuses a projection that is still a query (C56);
+        // `NavigationExpandingExpressionVisitor` follows and validates includes (C40, C47).
+        //
+        // The placement used to matter — C40 measured moving the lambda include check up at
+        // **1 fixed, 18 broken**, and left it below the early return for that reason. The 18 were
+        // `IsEntity` failing to look through a collection type, not the strictness they were
+        // attributed to; with that fixed the checks are safe everywhere, which is where a
+        // validity check on the caller's query belongs.
+        QueryableProjectionValidator.Validate(captured);
         ValidateStringIncludePaths(captured);
         RejectInvalidIncludes(captured);
 

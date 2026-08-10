@@ -3258,6 +3258,57 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       model on this store. Overriding it back to `true` on our fixtures would assert an ordering
       nothing guarantees, so that route is closed rather than untried.
 
+- [x] **C56. A projection that is still a query — the third diagnostic ADR-006 skips, and the one
+      the "A28 family" was hiding.**
+      **`Total tests: 22356, Passed: 22019, Failed: 120, Skipped: 217`** (`c56`) — **132 → 120,
+      12 fixed, 0 broken.** ✅ `<this commit>`
+
+      Twelve of the twenty `ComplexNavigations` failures were filed under the
+      `AssertInvalidMaterializationType` family — the standing note called that family a decision,
+      because the assert helper is `protected static` and the only route seemed to be overriding
+      each test and duplicating EF's query body. **It was not a decision. It was C40's mechanism a
+      third time, and the tell was in the failing list rather than in any of the tests.**
+
+      `NorthwindMiscellaneous` has **six** tests asserting the same refusal —
+      `Select_correlated_subquery_filtered_returning_queryable_throws` and friends — and every one
+      of them **passes**. A refusal this provider supposedly does not have, asserted six times, all
+      green. The difference is only where the boundary falls: EF raises it in
+      `QueryableMethodNormalizingExpressionVisitor.VerifyReturnType`, the opening stage of
+      `QueryTranslationPreprocessor`, which is downstream of ADR-006's capture point. **A wholly
+      shippable query gets the refusal from the server and always has.** The twelve are the ones
+      where the split leaves the projection on the client, and then nobody asks.
+
+      Four shapes, four different wrong answers, all the same cause:
+
+      | Test | What this provider did instead |
+      |---|---|
+      | `Complex_query_with_let_collection_SelectMany` ×4 | ran, no exception |
+      | `Select_projecting_queryable_in_anonymous_projection_followed_by_Join` ×4 | ran, no exception |
+      | `Queryable_in_subquery_works_when_final_projection_is_List` ×4 | `ArgumentNullException: source` — `FirstOrDefault()` gave null and `ToList()` took it |
+
+      `QueryableProjectionValidator` mirrors EF's walk exactly: `Queryable.Select` only, recursing
+      through `New` and `MemberInit` so a queryable hidden in an anonymous type is found, EF's own
+      `CoreStrings.QueryInvalidMaterializationType`. It runs beside C40's include checks, before
+      the `IsWhollyServerExecutable` early return, in EF's own order.
+
+      **Adopting the refusal rather than the answer is right here, and this provider has a reason
+      EF does not: an `IQueryable<T>` cannot cross the wire.** What comes back for such a
+      projection is a materialized list, so the declared element type is a promise the provider
+      cannot keep — which is exactly what the fourth shape,
+      `Join_with_result_selector_returning_queryable_throws_validation_error` ×4, has been saying
+      all along as *"Unable to cast object of type `List<Level3>` to type `IQueryable<Level3>`"*.
+      **Those four stay red**, and faithfully so: EF's own check is `Select`-only and that query's
+      queryable comes out of a `Join` result selector, so EF misses it too and fails later, in
+      InMemory with `ArgumentException` and in SQLite with `ApplyNotSupported`. Widening the walk
+      past what EF does would be inventing a rule, not mirroring one.
+
+      **The unit test was seen to fail.** `A_collection_the_projection_returns_is_left_for_EF_to_refuse`
+      asserted the opposite — that the queryable ships verbatim — and its name was the whole
+      mistake in four words: *left for EF to refuse* is true only of a query that ships whole. It
+      is now `A_collection_the_projection_returns_is_refused`, checked by commenting the call out
+      and watching it go red, and joined by one asserting that an ordinary materialized collection
+      still is not refused.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
