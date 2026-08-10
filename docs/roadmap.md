@@ -226,7 +226,17 @@ server-inbound; capping what a client gets back is a page-size policy, and a dif
   reference the backend's driver, and `DbUpdateException.Entries` are the *server's* update
   entries, so the client is given its own. Both were previously hidden by client and server
   sharing a process.
-- Security review of the deserialization path.
+- Security review of the deserialization path. ✅ (C48, 2026-08-10 —
+  [`security-review.md`](security-review.md).)
+
+  The material finding is that the type allowlist's safety is a **conjunction, not a single
+  check**. `System.Type` is admitted and every enum is admitted, so a payload can legitimately
+  call `Type.GetType("System.Diagnostics.Process")` and hold, at run time on the server, a type
+  the allowlist never saw. That is not a hole only because every reflection entry point that would
+  turn it into a call is blocked by a *different* clause — `InvokeMember` needs a `Binder`,
+  `MethodInfo.Invoke` needs an unadmitted declaring type, `Activator` is not admitted. Adding any
+  one of those to the allowlist, none of which looks dangerous alone, breaks it. Asserted by
+  `DeserializationHardeningTest` rather than left in prose.
 
 ### M6 — Coverage expansion ← **in progress** (plan Phase C)
 

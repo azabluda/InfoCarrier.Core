@@ -71,6 +71,7 @@ here, and both are cheap to avoid:
 | `docs/implementation-plan.md` | **Rolling** checkbox detail for the *current* milestone only |
 | `docs/architecture.md` | Components, test strategy, open questions |
 | `docs/research-findings.md` | EF Core 10 pipeline findings backing the ADRs |
+| `docs/security-review.md` | **M5's review of the deserialization path** (C48). Read §2 before adding anything to `TypeAllowlist`: its safety is a conjunction across several clauses, and `Binder`/`MethodInfo`/`Activator` each break it alone. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
 in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
@@ -118,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22329, Passed: 21969, Failed: 143, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22347, Passed: 21987, Failed: 143, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -136,7 +137,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C43 for the rest** — read out of `artifacts/measure/`,
-currently `c47b`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
+currently `c48`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
 node-kind and payload-size controls, no movement in the failing count; C40 then took 145 to 144
 and C42 took it to 143. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by

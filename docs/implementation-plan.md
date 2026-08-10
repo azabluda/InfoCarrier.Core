@@ -3004,6 +3004,45 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       by removing the lookthrough and watching it fail. **A regression test nobody has seen fail is
       a regression test nobody has tested.**
 
+- [x] **C48. The security review — and the type allowlist's safety turns out to be a conjunction.**
+      **`Total tests: 22347, Passed: 21987, Failed: 143, Skipped: 217`** (`c48`) — **143 → 143,
+      0 fixed, 0 broken.** Total up 18 for the adversarial tests.
+      [`docs/security-review.md`](security-review.md). ✅ `<this commit>`
+
+      M5's last criterion. The review walks the ten stages from bytes to execution and says which
+      control governs each; the useful part is what reading `TypeAllowlist` adversarially turned
+      up.
+
+      **`System.Type` is admitted, and so is every enum** (`return type.IsEnum` is the closing
+      line). So a payload may legitimately call `Type.GetType("System.Diagnostics.Process")` — a
+      *public* method on an *admitted* type — and hold, **at run time on the server, after every
+      deserialization-time check has passed**, a type the allowlist never saw.
+
+      **It is not a hole, and the reason is the finding:** a `Type` obtained that way has nothing
+      to call. `Type.InvokeMember` takes a `System.Reflection.Binder`; `MethodInfo.Invoke` and
+      `ConstructorInfo.Invoke` live on declaring types that are not admitted; `Activator`,
+      `Assembly` and `AppDomain` are not admitted at all. And `ResolveMethod` resolves a method's
+      **parameter** types through the same allowlist, so an unadmitted parameter type fails the
+      signature lookup before `Admit` is reached.
+
+      **So stage 6's safety is a conjunction across several clauses, not one check** — and it
+      would be broken by adding any of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+      `PropertyInfo`, `Activator`, `Assembly` or `AppDomain`, none of which looks dangerous on its
+      own. That is precisely why it is now **asserted rather than written down**:
+      `DeserializationHardeningTest` builds the pivot end to end — `Type.GetType(…)` resolves,
+      `.InvokeMember(…)` does not — and pins each blocked type individually.
+
+      **One prediction the tests corrected.** `BindingFlags` was expected to be refused and is
+      admitted, because every enum is. Sound — an enum constructs nothing, it only completes a
+      *signature* — but the review says so explicitly, so that a later hardening pass does not
+      spend effort on enums when the bound is the `Binder` beside them.
+
+      Also recorded: five weaknesses accepted with reasons, what is **out of scope** (authn/authz,
+      transport security, and DoS beyond payload size — stated so nobody assumes otherwise), and
+      **a security consequence of W6 before it is built**: `CorrelationId` becomes a handle by
+      which one caller can affect another caller's in-flight request, so it must be unguessable
+      and connection-scoped.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
