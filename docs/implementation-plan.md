@@ -2500,6 +2500,54 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       context decides whether the wire can carry the result at all. A converted key exercises both,
       and fixing only the first moves the failure rather than closing it.
 
+- [x] **C36. M5's node-kind allowlist. Two of the three parts were already closed; the third was
+      the operator, and it was wide open.**
+      **`Total tests: 22300, Passed: 21938, Failed: 145, Skipped: 217`** (`c36`) — **145 → 145,
+      0 fixed, 0 broken, reasons unchanged.** Total is up 22 because this step adds 22 tests.
+      ✅ `<this commit>`
+
+      ADR-008 constraint 2 wants default-deny allowlists for node kinds, types and methods. Types
+      closed 2026-08-01, methods in C30. This is the last third, and it turned out to be three
+      separate questions with three different answers.
+
+      **The node kind is closed by construction, and the premise that it was not is wrong.**
+      `NodeToExpressionTranslator.TranslateNode` switches on the node's *CLR type*, not on
+      `node.Kind`, and `ExpressionNode.Kind` is `[JsonIgnore]` and abstract — every derived record
+      answers it with a literal. So `Kind` is **never wire-supplied**. What the wire carries is
+      System.Text.Json's `$kind` polymorphic discriminator, which selects among the fifteen
+      `[JsonDerivedType]`s registered on `ExpressionNode` and throws `JsonException` for anything
+      else, before a node object exists. The trailing `_ => throw new NotSupportedException` is
+      therefore **unreachable from a payload**; it guards a locally-constructed subclass and is
+      worth keeping, but it is not the control. Proved by three tests: an unregistered
+      discriminator is refused, a supplied `"kind"` member is ignored in favour of the CLR type,
+      and registration is checked against `NodeKind` in both directions so the two cannot drift.
+
+      **The operator was the real gap.** `BinaryNode.Operator`, `UnaryNode.Operator` and
+      `TypeBinaryNode.Operator` are free strings, parsed with
+      `Enum.TryParse(name, out ExpressionType)` — which admits far more than this wire emits:
+
+      | Admitted before | Why it matters |
+      |---|---|
+      | all 85 `ExpressionType` names | `Assign` and the twenty-six other assignment forms reach `Expression.MakeBinary`; `Throw` reaches `MakeUnary`. Both build a **mutation or a throw into a tree the server is about to compile and run**. |
+      | bare numeric strings — `"999"` | `TryParse` returns an undefined enum value; the failure is then a raw `ArgumentException` from `Expression`, not a stated refusal. |
+      | comma lists — `"Add, Not"` | `TryParse` parses these as flag combinations **whether or not the enum is `[Flags]`**. |
+
+      And `TranslateTypeBinary` read *"TypeEqual, else TypeIs"*, so all eighty-three other names
+      silently became a type test.
+
+      **The allowlist is derivable, not guessed** — which matters, because C30's lesson was that a
+      method allowlist could not be. The forward translator emits `node.NodeType.ToString()` off a
+      live `BinaryExpression`/`UnaryExpression`/`TypeBinaryExpression`, so the emitted set is
+      bounded by what a client can have *built*, and **a C# expression-tree lambda cannot contain
+      an assignment, a throw or a block** — the compiler refuses. So the admitted set is the pure
+      subset of each factory's domain (24 binary, 15 unary, 2 type-binary) and the excluded set is
+      exactly the mutating and control-flow forms. The zero in the diff is the confirmation: the
+      suite's every operator is in the pure subset, as the argument says it must be.
+
+      The DTO doc comments have claimed since they were written that the operator is *"an explicit
+      map, never an int-cast (expression-serialization §3.7)"*. It was an `Enum.TryParse` over the
+      whole enum. This is where that sentence becomes true.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

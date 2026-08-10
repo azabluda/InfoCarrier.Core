@@ -183,13 +183,23 @@ its own public API into those markers. C30's policy was then designed from an in
 method the deserializer actually binds across a full run: 362 methods over 84 declaring types,
 distributed almost exactly as this ADR words it.
 
-**The rest of M5 is still open**, and is now the whole of it: payload limits, the envelope,
-exception fidelity, cancellation, and the review.
+**All three allowlists are now closed** (type 2026-08-01, method 2026-08-10, node kind 2026-08-10).
+The third split into two questions with different answers, recorded in plan item C36. The **node
+kind** was never wire-supplied at all: `ExpressionNode.Kind` is `[JsonIgnore]` and answered by each
+record's CLR type, and what the wire carries is System.Text.Json's `$kind` discriminator over the
+fifteen registered `[JsonDerivedType]`s, which refuses anything else before a node exists — so that
+half was closed by construction, and C36 proves it rather than changing it. The **operator** name
+inside a binary, unary or type-binary node was the part genuinely open: a free string parsed by
+`Enum.TryParse`, which admits every `ExpressionType` name — `Assign` and `Throw` included — plus
+bare numbers and comma lists. C36 replaced it with a per-node-kind allowlist of the pure subset.
+
+**The rest of M5 is still open**: payload limits, the envelope, exception fidelity, cancellation,
+and the review.
 
 **Exit criteria**
 - Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,
   opt-in registration for model entities and declared projection types.
-  *Types* ✅ (`TypeAllowlist`, 2026-08-01) · *methods* ✅ (C30, 2026-08-10) · **node kinds still open**.
+  *Types* ✅ (`TypeAllowlist`, 2026-08-01) · *methods* ✅ (C30, 2026-08-10) · *node kinds* ✅ (C36, 2026-08-10).
 - Payload depth/size limits (v1 needed a 10 MB stack for >1 MB payloads).
 - `InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests — currently the
   backend test store implements `IInfoCarrierClient` directly and bypasses both.

@@ -356,7 +356,7 @@ public class NodeToExpressionTranslator
     {
         Expression left = TranslateNode(node.Left);
         Expression right = TranslateNode(node.Right);
-        ExpressionType op = ParseOperator(node.Operator);
+        ExpressionType op = ParseOperator(node.Operator, AllowedBinaryOperators, nameof(BinaryNode));
         MethodInfo? method = node.Method is null ? null : ResolveMethod(node.Method);
         return Expression.MakeBinary(op, left, right, node.IsLiftedToNull, method);
     }
@@ -364,7 +364,7 @@ public class NodeToExpressionTranslator
     private Expression TranslateUnary(UnaryNode node)
     {
         Expression operand = TranslateNode(node.Operand);
-        ExpressionType op = ParseOperator(node.Operator);
+        ExpressionType op = ParseOperator(node.Operator, AllowedUnaryOperators, nameof(UnaryNode));
         Type type = _typeResolver.Resolve(node.Type);
         MethodInfo? method = node.Method is null ? null : ResolveMethod(node.Method);
         return Expression.MakeUnary(op, operand, type, method);
@@ -374,7 +374,7 @@ public class NodeToExpressionTranslator
     {
         Expression operand = TranslateNode(node.Operand);
         Type typeOperand = _typeResolver.Resolve(node.TypeOperand);
-        return ParseOperator(node.Operator) == ExpressionType.TypeEqual
+        return ParseOperator(node.Operator, AllowedTypeBinaryOperators, nameof(TypeBinaryNode)) == ExpressionType.TypeEqual
             ? Expression.TypeEqual(operand, typeOperand)
             : Expression.TypeIs(operand, typeOperand);
     }
@@ -420,8 +420,110 @@ public class NodeToExpressionTranslator
             TranslateNode(node.Expression),
             node.Arguments.Select(TranslateNode).ToArray());
 
-    private static ExpressionType ParseOperator(string name)
-        => Enum.TryParse(name, out ExpressionType result)
-            ? result
-            : throw new NotSupportedException($"Unsupported operator '{name}'.");
+    /// <summary>
+    ///     The operator kinds a <see cref="BinaryNode" /> may name (ADR-008 constraint 2, the
+    ///     node-kind third of it).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Every value <see cref="Expression.MakeBinary(ExpressionType, Expression, Expression)" />
+    ///         accepts that is <em>pure</em> — the assignment forms (<c>Assign</c>, <c>AddAssign</c>
+    ///         and the twenty-five others) are the whole of what is left out, and they are left out
+    ///         because a C# expression-tree lambda cannot contain one. That restriction is what
+    ///         makes this list derivable rather than guessed: the forward translator emits
+    ///         <c>node.NodeType.ToString()</c> off a live <see cref="BinaryExpression" />, and the
+    ///         only live binary expressions a client can have built are the ones the compiler and
+    ///         EF's own query construction produce.
+    ///     </para>
+    /// </remarks>
+    private static readonly Dictionary<string, ExpressionType> AllowedBinaryOperators = ByName(
+    [
+        ExpressionType.Add, ExpressionType.AddChecked,
+        ExpressionType.Subtract, ExpressionType.SubtractChecked,
+        ExpressionType.Multiply, ExpressionType.MultiplyChecked,
+        ExpressionType.Divide, ExpressionType.Modulo, ExpressionType.Power,
+        ExpressionType.And, ExpressionType.AndAlso,
+        ExpressionType.Or, ExpressionType.OrElse,
+        ExpressionType.ExclusiveOr,
+        ExpressionType.LeftShift, ExpressionType.RightShift,
+        ExpressionType.Equal, ExpressionType.NotEqual,
+        ExpressionType.GreaterThan, ExpressionType.GreaterThanOrEqual,
+        ExpressionType.LessThan, ExpressionType.LessThanOrEqual,
+        ExpressionType.Coalesce, ExpressionType.ArrayIndex,
+    ]);
+
+    /// <summary>
+    ///     The operator kinds a <see cref="UnaryNode" /> may name. The pure subset again:
+    ///     <c>Throw</c> and the pre/post increment-assign forms are what is excluded, for the same
+    ///     reason — no expression-tree lambda can carry one.
+    /// </summary>
+    private static readonly Dictionary<string, ExpressionType> AllowedUnaryOperators = ByName(
+    [
+        ExpressionType.Negate, ExpressionType.NegateChecked, ExpressionType.UnaryPlus,
+        ExpressionType.Not, ExpressionType.OnesComplement,
+        ExpressionType.IsTrue, ExpressionType.IsFalse,
+        ExpressionType.Convert, ExpressionType.ConvertChecked,
+        ExpressionType.TypeAs, ExpressionType.Unbox,
+        ExpressionType.Quote, ExpressionType.ArrayLength,
+        ExpressionType.Increment, ExpressionType.Decrement,
+    ]);
+
+    /// <summary>
+    ///     The two operator kinds a <see cref="TypeBinaryNode" /> may name.
+    /// </summary>
+    /// <remarks>
+    ///     Naming them is what makes <see cref="TranslateTypeBinary" />'s two-way choice honest:
+    ///     it reads "TypeEqual, else TypeIs", which without this list would quietly turn any of
+    ///     the other eighty-three <see cref="ExpressionType" /> names into a <c>TypeIs</c>.
+    /// </remarks>
+    private static readonly Dictionary<string, ExpressionType> AllowedTypeBinaryOperators = ByName(
+    [
+        ExpressionType.TypeIs, ExpressionType.TypeEqual,
+    ]);
+
+    private static Dictionary<string, ExpressionType> ByName(ExpressionType[] operators)
+        => operators.ToDictionary(op => op.ToString(), StringComparer.Ordinal);
+
+    /// <summary>
+    ///     Parses and admits a wire-supplied operator name against the allowlist for the node kind
+    ///     that carries it (ADR-008 constraint 2, milestone M5).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The node <em>kinds</em> themselves are closed by construction — <c>$kind</c> is a
+    ///         System.Text.Json polymorphic discriminator over the fifteen
+    ///         <c>[JsonDerivedType]</c>s registered on <see cref="ExpressionNode" />, and an
+    ///         unregistered value fails deserialization before any node exists;
+    ///         <see cref="ExpressionNode.Kind" /> is <c>[JsonIgnore]</c> and answered by the CLR
+    ///         type, so it is never wire-supplied. The operator is the part that <em>was</em>
+    ///         open: it is a free string, and <see cref="Enum.TryParse{T}(string, out T)" /> admits
+    ///         far more than the names this wire emits — every one of the eighty-five
+    ///         <see cref="ExpressionType" /> members including <c>Assign</c> and <c>Throw</c>,
+    ///         bare numeric strings such as <c>"999"</c>, and comma-separated combinations, which
+    ///         it accepts whether or not the enum is <c>[Flags]</c>.
+    ///     </para>
+    ///     <para>
+    ///         <c>Assign</c> reaching <see cref="Expression.MakeBinary(ExpressionType, Expression, Expression)" />
+    ///         is the case that makes this more than tidiness: it builds a mutation into a tree the
+    ///         server is about to compile and run. The DTOs have claimed since they were written
+    ///         that the operator is "an explicit map, never an int-cast"; this is where that
+    ///         becomes true.
+    ///     </para>
+    /// </remarks>
+    private static ExpressionType ParseOperator(
+        string name, Dictionary<string, ExpressionType> allowed, string nodeKind)
+    {
+        // An ordinal name lookup in the allowlist, never Enum.TryParse against the whole enum:
+        // TryParse would accept "999" and "Add, Not" as readily as it accepts "Assign".
+        if (allowed.TryGetValue(name, out ExpressionType result))
+        {
+            return result;
+        }
+
+        throw new NotSupportedException(
+            $"Operator '{name}' is not on the deserialization operator allowlist for {nodeKind} "
+            + "(ADR-008 constraint 2). A payload may name a pure operator of that node kind; the "
+            + "assignment and control-flow forms are refused because no expression-tree lambda "
+            + "can contain one.");
+    }
 }
