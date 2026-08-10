@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22278, Passed: 21904, Failed: 157, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22278, Passed: 21907, Failed: 154, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -136,7 +136,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C20 for the rest** — read out of `artifacts/measure/`,
-currently `c20`. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
+currently `c24`. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
 A71), **20 `ComplexNavigations`**, **14 `Query.Associations`** (C20) and **9 `JsonTypes`** (7 of
 them A64's locale, not this provider). Only **4** are wrong answers
@@ -270,14 +270,17 @@ total is therefore **locale-dependent** — a machine with a `.` separator repor
 failures with no code change. Grep a run for *"cannot be converted to type"* and for
 `_as_GeoJson` before treating either as movement.
 
-**One intermittent is on watch — `SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity`.**
-It failed in `c10` and passed in `c10b` on the same commit; it passes in isolation and in every
-pairing tried, and only the full run reproduces it. The failure is an identity conflict on a
-*temporary* key, so two entities in one context got the same one. **One incident is recorded (C11)
-and that is deliberately all: watch for it, and act on a recurrence.** Chasing a
-single-occurrence intermittent costs more than it returns — but note the sighting in the plan when
-it happens, because the second one is what makes it a defect, and hold any fix to the three-run
-bar.
+**One intermittent is now a DEFECT, not a watch item —
+`SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity`.** It failed in `c10` and
+`c24` and passed in the six full runs between; it still passes in isolation, 12 of 12. Roughly one
+run in four. The failure is an identity conflict on a *temporary* key (`int.MinValue + 1002`) at
+`ServerSaveChangesExecutor.TrackOne`, and the two colliding rows are the test's own two `Blog`s,
+added in one `SaveChanges`. **Both sightings and the full analysis are in C11.**
+
+**Its probe is not written yet, and the obvious one does not work.** A probe that calls
+`File.AppendAllText` per tracked entry perturbs the suite badly — 154 → 348 under parallel test
+collections — so it measures nothing. Buffer per-process and flush once, or write to a
+thread-local file per collection, before spending another full run on it.
 
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
