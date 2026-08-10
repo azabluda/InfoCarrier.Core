@@ -81,15 +81,13 @@ public sealed class QuerySplitter
         // of where the boundary falls, and `Set<Animal>().Include("Wheels")` is wholly shippable
         // — so it took that early exit and travelled to the server unexamined.
         //
-        // Only the string half runs here. `RejectInvalidIncludes` below stays where it is, and
-        // that placement turns out to be load-bearing rather than incidental: moving it up too
-        // was measured at **1 fixed, 18 broken** (`c40`), every one of them a legitimate include
-        // its `IsPropertyPath` refuses —
-        // `Include(e => EF.Property<X>(e, "OneToOne_Optional_FK1"))` and
-        // `ThenInclude(g => ((Officer)g).Reports)`. Those queries are wholly shippable, so the
-        // check has never run on them and its strictness has never been tested. Widening it is
-        // its own change with its own measurement; this one does not need it.
+        // Both halves run here as of C47. The placement used to matter — C40 measured moving the
+        // lambda half up at **1 fixed, 18 broken**, and left it below the early return for that
+        // reason. The 18 were `IsEntity` failing to look through a collection type, not the
+        // strictness they were attributed to; with that fixed the check is safe everywhere, which
+        // is where a validity check on the caller's query belongs.
         ValidateStringIncludePaths(captured);
+        RejectInvalidIncludes(captured);
 
         // A C# collection expression is a constant whose *runtime* type is the compiler's
         // `<>z__ReadOnlyArray<T>` — a type the server's assembly does not have, and one the
@@ -136,7 +134,6 @@ public sealed class QuerySplitter
                 $"No part of the query can be executed on the server: '{query}'. {Diagnose(query)}");
         }
 
-        RejectInvalidIncludes(captured);
         RejectOpenFragments(analysis);
         RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
 
@@ -458,6 +455,17 @@ public sealed class QuerySplitter
         }
 
         private bool IsEntity(Type type)
+            => IsEntityType(type)
+                // **A `ThenInclude` after a collection navigation is rooted at the collection.**
+                // The lambda's parameter comes out as `ICollection<Gear>`, not `Gear`, so asking
+                // the model about it gets a flat no — and the include is then reported as being
+                // on a non-entity when it is nothing of the kind. Eighteen legitimate includes
+                // were refused this way the first time this check ran on a wholly-shippable query
+                // (C40 measured it; C47 found the cause with a probe, having wrongly blamed
+                // `IsPropertyPath`, which handles both shapes perfectly well).
+                || (ElementTypeOf(type) is { } element && IsEntityType(element));
+
+        private bool IsEntityType(Type type)
             => model.FindEntityType(type) is not null
                 // Shared-type and owned entity types are not reachable by CLR type alone — and
                 // an `Include` may be rooted at an *interface* the entity implements, which EF
@@ -465,6 +473,38 @@ public sealed class QuerySplitter
                 // identity: the question is whether the root can be an entity, not whether it is
                 // spelled as one.
                 || model.GetEntityTypes().Any(e => type.IsAssignableFrom(e.ClrType));
+
+        /// <summary>
+        ///     What a sequence type is a sequence of, or null if it is not one.
+        /// </summary>
+        /// <remarks>
+        ///     <see cref="string" /> is an <see cref="IEnumerable{T}" /> of <see cref="char" />
+        ///     and needs no special case: the caller asks the model whether the element is an
+        ///     entity, and <see cref="char" /> is not.
+        /// </remarks>
+        private static Type? ElementTypeOf(Type type)
+        {
+            if (type.IsArray)
+            {
+                return type.GetElementType();
+            }
+
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            {
+                return type.GetGenericArguments()[0];
+            }
+
+            foreach (Type candidate in type.GetInterfaces())
+            {
+                if (candidate.IsGenericType
+                    && candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                {
+                    return candidate.GetGenericArguments()[0];
+                }
+            }
+
+            return null;
+        }
 
         private static bool IsPropertyPath(Expression body)
             => body switch

@@ -2742,12 +2742,12 @@ ships a test on, and where both exist the tier that *translates* is the one whos
           Include(e => EF.Property<X>(e, "OneToOne_Optional_FK1"))
           ThenInclude(g => ((Officer)g).Reports)
 
-      **`IsPropertyPath` accepts neither an `EF.Property` call nor a cast, and has never had to:
-      those queries are all wholly shippable, so the check has never run on one.** A latent
-      over-strictness, invisible for as long as the placement hid it. So only the string half
-      moved up; `RejectInvalidIncludes` stays exactly where it was, and its placement is now
-      documented as load-bearing rather than incidental. Widening `IsPropertyPath` is its own
-      change with its own measurement, and is not needed for this one.
+      **Attributed to `IsPropertyPath` here, and that was wrong — see C47, which read the code and
+      probed it.** `IsPropertyPath` handles both shapes. The refusals came from the finder's other
+      branch, `IncludeOnNonEntity`, because a `ThenInclude` after a collection navigation is rooted
+      at `ICollection<T>` and `IsEntity` did not look through it. The observation that stands is
+      the one that matters: **a check that has never run has never been tested**, and this is how
+      that surfaced. Only the string half moved up in this step; C47 moved the rest.
 
 - [x] **C41. `ComplexTypesTracking.Can_track_entity_with_complex_property_bag_collections` ×2 is
       EF's, and the stack says so outright.** No code change; this is the classification. ✅
@@ -2962,6 +2962,47 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       running **server-side** whose assertion throws there. Its `XunitException` used to propagate;
       it now crosses as a fault with the message intact. Same tests, same substance, and a neat
       proof that the fault path is engaged inside user code on the far side.
+
+- [x] **C47. C40's 18 broken includes were not `IsPropertyPath`. They were a collection type.**
+      **`Total tests: 22329, Passed: 21969, Failed: 143, Skipped: 217`** (`c47b`) — **143 → 143,
+      0 fixed, 0 broken, reasons unchanged.** Total up 2 for the new tests. ✅ `<this commit>`
+
+      **C40's attribution was wrong and this corrects it.** It recorded that
+      `IsPropertyPath` "refuses neither an `EF.Property` call nor a cast". Reading it says
+      otherwise — it has a `Convert or TypeAs` arm and a `MethodCallExpression` arm, and both
+      shapes pass. The failures were the *other* branch of the same finder, `IncludeOnNonEntity`,
+      whose message differs from `InvalidIncludeExpression` and which nobody compared.
+
+      A probe named the cause in one filtered run:
+
+          rootType=System.Collections.Generic.ICollection`1[[…ComplexNavigationsModel.Level2…]]
+              findEntityType=<null> assignableFrom=
+          INVALID onNonEntity=True expr=e => Property(e, "OneToOne_Optional_FK2")
+          INVALID onNonEntity=True expr=g => Convert(g, Officer).Reports
+
+      **A `ThenInclude` after a collection navigation is rooted at the collection.** `EF.Property`
+      gives overload resolution nothing to infer from, so EF picks the reference `ThenInclude` and
+      the lambda's parameter is `ICollection<Gear>`, not `Gear`. `IsEntity` asked the model about
+      the collection type, got a flat no, and reported a perfectly ordinary include as being on a
+      non-entity. It now looks through a sequence type to its element — `string` needs no special
+      case, because `char` is not an entity either.
+
+      With that fixed, `RejectInvalidIncludes` moves above the `IsWhollyServerExecutable` early
+      return, where a validity check on the caller's query belongs, and the placement stops being
+      load-bearing.
+
+      **Two attempts at a regression test, and the first one was worthless — worth recording
+      because it is the failure mode `measure.sh`'s third level exists to catch.** A wholly-
+      shippable query with an invalid include turned out to be hard to construct: an invalid
+      *lambda* include almost always drags in an anonymous type, which makes the query non-
+      shippable, so the check reached it at the old position anyway. **Verified by putting the
+      move back and watching the test still pass.** So the honest statement about the move is that
+      it is safe and removes a fragile ordering dependency — *not* that it catches something new.
+      The string half (C40) remains the case that genuinely needed the earlier position.
+
+      The test that was kept pins the real defect: a `ThenInclude` rooted at a collection, checked
+      by removing the lookthrough and watching it fail. **A regression test nobody has seen fail is
+      a regression test nobody has tested.**
 
 ## Phase B — the tier audit, and the rework it found
 

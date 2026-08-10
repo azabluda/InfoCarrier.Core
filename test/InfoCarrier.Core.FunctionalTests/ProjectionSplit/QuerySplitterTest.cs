@@ -486,6 +486,52 @@ public class QuerySplitterTest : IDisposable
         Assert.Contains("silently", ex.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    ///     A <c>ThenInclude</c> whose lambda is rooted at a <em>collection</em> is a legitimate
+    ///     include, and the include check used to call it an include on a non-entity (C47).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>EF.Property</c> gives overload resolution nothing to infer from, so EF picks the
+    ///         reference <c>ThenInclude</c> and the lambda's parameter comes out
+    ///         <c>ICollection&lt;Book&gt;</c> rather than <c>Book</c>. Asking the model whether
+    ///         <c>ICollection&lt;Book&gt;</c> is an entity gets a flat no, and the include was
+    ///         reported as being on a non-entity when it is nothing of the kind.
+    ///     </para>
+    ///     <para>
+    ///         Invisible until C40 ran the check on wholly-shippable queries for the first time
+    ///         and 18 tests went red — `ComplexNavigationsCollections*` and
+    ///         `ThenInclude_collection_on_derived_after_derived_collection`, all of this shape.
+    ///         This is the unit-level version of those, so the cause has a test of its own rather
+    ///         than only a suite-wide count.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void A_ThenInclude_rooted_at_a_collection_is_a_valid_include()
+    {
+        IQueryable<Author> query = _context.Authors
+            .Include(a => a.Books)
+            .ThenInclude(b => EF.Property<Author>(b, nameof(Book.Author)));
+
+        // The check runs — and does not refuse it.
+        SplitQuery split = Split(query);
+
+        Assert.True(split.IsPassThrough);
+    }
+
+    /// <summary>
+    ///     The refusal itself still works, so the fix above widened the check rather than
+    ///     disabling it.
+    /// </summary>
+    [Fact]
+    public void An_include_that_is_not_a_property_path_is_still_refused()
+    {
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => Split(_context.Authors.Include(a => new { a.Books })));
+
+        Assert.Contains("does not represent a property access", ex.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_carrier_the_query_creates_and_consumes_is_re_carried_as_a_tuple()
     {
