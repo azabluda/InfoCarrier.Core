@@ -21,14 +21,14 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-Measured 2026-08-10 (`artifacts/measure/c20`): **`Total tests: 22278, Passed: 21904,
-Failed: 157, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
+Measured 2026-08-10 (`artifacts/measure/c30`): **`Total tests: 22278, Passed: 21911,
+Failed: 150, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
 scales by adopting bases, not by writing tests — M6 took the unadopted count from 41 to 1.
 
-The 157 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
-About 125 of them are already answered rather than open: 40 wait on the B12 decision, 26 are
-the `MaterializationInterception` topology B24 settled, 9 are a locale defect in EF's own test
-code, and the rest are spec tests asserting a limitation this provider does not have.
+The 150 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
+Most are already answered rather than open: 40 wait on the B12 decision, 26 are the
+`MaterializationInterception` topology B24 settled, 9 are a locale defect in EF's own test code,
+and the majority of the rest are spec tests asserting a limitation this provider does not have.
 
 ---
 
@@ -171,15 +171,25 @@ ADR-008 constraint 2 mandates strict allowlists on by default. Combined with `In
 an unconstrained resolver is a remote-code-execution vector in a product whose entire purpose is
 accepting serialized expression trees from remote clients.
 
-**Partly closed 2026-08-01.** The *type* allowlist is implemented and on by default
-(`TypeAllowlist`), so a payload can no longer name an arbitrary type for the deserializer to
-construct. **The method allowlist is still open**: `ResolveMethod` binds any method on an
-allowed declaring type, rather than the "Queryable / Enumerable / `EF.Functions` / model-bound
-members" restriction ADR-008 specifies. Narrower than before, not yet sufficient.
+**Both allowlists are now closed (type 2026-08-01, method 2026-08-10).** A payload can no
+longer name an arbitrary type for the deserializer to construct (`TypeAllowlist`), and as of
+plan item C30 it can no longer name an arbitrary *method* either: `ResolveMethod` admits a
+**public** method on an allowed declaring type, plus two named non-public markers EF's own query
+rewrites produce (`NotQuiteInclude`, `ExecuteUpdate`).
+
+That second list is short because it was measured, not guessed — C25 established that a plain
+"public only" rule costs 154 → 697, because ADR-006 captures the tree *after* EF has rewritten
+its own public API into those markers. C30's policy was then designed from an inventory of every
+method the deserializer actually binds across a full run: 362 methods over 84 declaring types,
+distributed almost exactly as this ADR words it.
+
+**The rest of M5 is still open**, and is now the whole of it: payload limits, the envelope,
+exception fidelity, cancellation, and the review.
 
 **Exit criteria**
 - Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,
   opt-in registration for model entities and declared projection types.
+  *Types* ✅ (`TypeAllowlist`, 2026-08-01) · *methods* ✅ (C30, 2026-08-10) · **node kinds still open**.
 - Payload depth/size limits (v1 needed a 10 MB stack for >1 MB payloads).
 - `InfoCarrierEnvelope` + `ProtocolVersion` actually exercised by tests — currently the
   backend test store implements `IInfoCarrierClient` directly and bypasses both.
