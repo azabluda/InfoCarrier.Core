@@ -26,5 +26,7 @@
 #
 # 2026-08-10 (C40) — 145 -> 144, the string-Include path validator. Lowered in the same commit
 # as the fix, which is what the header above asks for.
-failed=144
+#
+# 2026-08-10 (C42) — 144 -> 143, the composite-key-cycle store-generation fix.
+failed=143
 total=22312

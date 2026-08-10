@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22312, Passed: 21951, Failed: 144, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22312, Passed: 21952, Failed: 143, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -136,8 +136,9 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C20 for the rest** — read out of `artifacts/measure/`,
-currently `c40b`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
-node-kind and payload-size controls, no movement in the failing count; C40 then took 145 to 144. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
+currently `c42b`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
+node-kind and payload-size controls, no movement in the failing count; C40 then took 145 to 144
+and C42 took it to 143. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
 A71), **20 `ComplexNavigations`**, **14 `Query.Associations`** (C20) and **9 `JsonTypes`** (7 of
 them A64's locale, not this provider). Only **4** are wrong answers
@@ -193,7 +194,10 @@ Not yet implemented, in rough priority order:
 - **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
   `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
   which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
-  had drifted badly.
+  had drifted badly. **It is also the tripwire for over-returning on SaveChanges**: C42 measured a
+  rule that sent every propagated foreign key back to the client and two more parameterizations of
+  this same test went red. An ordinary FK is the client's own business; only a key it cannot
+  recover by fixup may be asserted at it.
 - **The remaining spec bases — 1** (Phase C, 2026-08-10: 41 adopted down to 1). Everything the
   compliance test used to list is in, including the four "infrastructure" bases, `Seeding` (C7) and
   **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`** — B3d's price

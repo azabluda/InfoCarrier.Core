@@ -100,10 +100,22 @@ public class ServerSaveChangesExecutor
                 object? clrValue = PrimitiveCoercion.FromWireValue(
                     property, _mapper.FromPropertyValue(value, PrimitiveCoercion.WireType(property)));
 
+                // "A key this store issues" is `ValueGenerated`, not "is not a foreign key".
+                // The two agree for every ordinary model, which is why the FK test stood in for
+                // it — but they part company on a **key cycle**, and there the FK test gives the
+                // wrong answer for a property that is both. `CompositePrincipal.Id` is
+                // `ValueGeneratedOnAdd()` *and* half of the foreign key `{Id, CurrentNumber}`
+                // back to its own dependent, so the old guard sent it down the ordinary-value
+                // path and the client's placeholder `-2147482646` was **written to the store as
+                // an explicit key** — confirmed by reading the row.
+                //
+                // A borrowed placeholder is still excluded, because a borrowed one is by
+                // definition not generated here: `CompositeDependent.PrincipalId` is
+                // `ValueGenerated.Never` and stays a reference, as it must.
                 if (isAdded
                     && clrValue is not null
                     && temporaryNames.Contains(property.Name)
-                    && !property.IsForeignKey())
+                    && property.ValueGenerated is ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate)
                 {
                     // The client's own placeholder for a key this store issues.
                     bool issuedAtSave = IssuedAtSave(property, entityType);
@@ -733,6 +745,24 @@ public class ServerSaveChangesExecutor
     ///         A deleted row generates nothing worth returning.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     The principal-key property that <paramref name="property" /> points at through
+    ///     <paramref name="foreignKey" />, matched by position — a composite foreign key's third
+    ///     column answers to the principal key's third column, not to its first.
+    /// </summary>
+    private static IProperty? PrincipalPropertyOf(IForeignKey foreignKey, IProperty property)
+    {
+        for (int i = 0; i < foreignKey.Properties.Count; i++)
+        {
+            if (foreignKey.Properties[i] == property)
+            {
+                return foreignKey.PrincipalKey.Properties[i];
+            }
+        }
+
+        return null;
+    }
+
     private GeneratedValues? ReadGenerated(
         int correlationId,
         EntityEntry entry,
@@ -751,6 +781,29 @@ public class ServerSaveChangesExecutor
             bool generated = state == EntityState.Added
                 ? property.ValueGenerated is ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate
                 : property.ValueGenerated is ValueGenerated.OnUpdate or ValueGenerated.OnAddOrUpdate;
+
+            // A store decides a value indirectly as well as directly. A foreign key onto a
+            // store-generated principal key is `ValueGenerated.Never` — nothing generates it —
+            // and yet it holds a number only the store knows, put there by EF's propagation.
+            //
+            // **Only when that FK is also part of this row's own key**, which is the case where
+            // the client cannot recover it any other way. `CompositeDependent.PrincipalId` is
+            // half of its own primary key, the client held a placeholder for it, and without this
+            // the read-back `Single(e => e.PrincipalId == id)` looked for the placeholder and
+            // found nothing.
+            //
+            // The wider rule — every propagated FK — is measured and wrong: **1 fixed, 2 broken**
+            // (`c42`), two `Save_optional_many_to_one_dependents` parameterizations. An ordinary
+            // FK is the client's *own* business, reached by EF's fixup from the principal key
+            // that does come back, and sending it re-asserts a relationship the client may have
+            // deliberately changed. A key is different: it identifies the row, and a row cannot
+            // disagree with the store about its own identity.
+            if (!generated && state == EntityState.Added && property.IsKey())
+            {
+                generated = property.GetContainingForeignKeys().Any(
+                    fk => PrincipalPropertyOf(fk, property) is
+                    { ValueGenerated: ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate });
+            }
 
             if (!generated)
             {

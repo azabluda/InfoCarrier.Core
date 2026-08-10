@@ -2772,6 +2772,52 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **Confirms A32 as written** and closes the queue's doubt: CLAUDE.md said it fails inside
       EF's `StructuralTypeMaterializerSource` and it does. Red, classified, not ours.
 
+- [x] **C42. A key cycle broke "a key this store issues", and the client's placeholder was
+      written to the store as a real key.**
+      **`Total tests: 22312, Passed: 21952, Failed: 143, Skipped: 217`** (`c42b`) — **144 → 143,
+      1 fixed, 0 broken.** ✅ `<this commit>`
+
+      `Store_generated_values_are_propagated_with_composite_key_cycles` failed with
+      *"Sequence contains no elements"* inside the server's read-back — the dependent's key never
+      received the value the store generated for its principal. S3c recorded it as undiagnosed.
+      **Two probes settled it, and the second was the one that mattered.**
+
+      The model is a genuine cycle:
+
+          CompositePrincipal.Id      HasKey + ValueGeneratedOnAdd, and half of the FK {Id, CurrentNumber}
+          CompositeDependent         HasKey {PrincipalId, Number}, PrincipalId FK -> CompositePrincipal.Id
+
+      The first probe dumped every property's metadata and value after `SaveChanges`:
+
+          CompositeDependent  PrincipalId  valueGenerated=Never  isKey=True isFk=True  current=-2147482646  principalGenerated=[OnAdd]
+          CompositePrincipal  Id           valueGenerated=OnAdd  isKey=True isFk=True  current=-2147482646  principalGenerated=[Never]
+
+      `-2147482646` is a *client* placeholder, and it survived the save. The second probe read the
+      row out of SQLite: `DB principal Id=-2147482646`. **The placeholder had been inserted as an
+      explicit key.** No amount of work on the return path would have helped; the store had
+      never generated anything.
+
+      **Cause: `!property.IsForeignKey()` was standing in for "a key this store issues".** The two
+      agree in every acyclic model, which is why the proxy held — but `CompositePrincipal.Id` is
+      store-generated *and* half a foreign key, so the guard sent it down the ordinary-value path.
+      The question was always `ValueGenerated`, and asking it directly costs nothing: a borrowed
+      placeholder is by definition not generated here, so `CompositeDependent.PrincipalId`
+      (`Never`) stays a reference exactly as before.
+
+      **The second half, and C34's rule again** — *"the wire cannot handle this" has two answers
+      and fixing one moves the failure.* With the store now generating, the client still had to
+      learn the dependent's `PrincipalId`, and `ReadGenerated` returns only `ValueGenerated`
+      properties. A propagated FK is `Never`-generated and yet holds a number only the store
+      knows.
+
+      **The wide version of that is measured and wrong: 1 fixed, 2 broken** (`c42`), two
+      `Save_optional_many_to_one_dependents` parameterizations, on
+      *"Assert.Contains() Failure: Item not found in set"*. An ordinary FK is the client's own
+      business — EF's fixup reaches it from the principal key that does come back — and asserting
+      it re-imposes a relationship the client may have deliberately changed. So the rule is
+      narrowed with `property.IsKey()`: **a row cannot disagree with the store about its own
+      identity**, and that is the only case where the client cannot recover the value itself.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
