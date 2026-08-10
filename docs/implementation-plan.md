@@ -2238,6 +2238,44 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       *throws*, so the question is which exception is correct, not whether the cast can be made to
       work. Worth one measured attempt, separately.
 
+- [ ] **C25. M5's method allowlist cannot be a visibility rule. Measured and reverted.** No code
+      change; this is the finding. `<this commit>`
+
+      M5 is the release blocker and its open half is the **method** allowlist: ADR-008 constraint 2
+      specifies default-deny with opt-in for "Queryable / Enumerable / `EF.Functions` /
+      model-bound members", and `NodeToExpressionTranslator.ResolveMethod` instead binds **any**
+      method on any type the *type* allowlist admits — with `BindingFlags.NonPublic` set. Since the
+      type allowlist admits every entity type, every mapped property type and every declaring type
+      in the model, the reachable set is large and includes methods no caller could have written.
+
+      The cheapest possible narrowing is one token: drop `NonPublic`. Measured —
+      **154 → 697, 544 broken** (`c25-publiconly-reverted`) — and the two causes are the whole
+      lesson:
+
+      | # | Method | What it is |
+      |---|---|---|
+      | 384 | `EntityFrameworkQueryableExtensions.NotQuiteInclude` | `internal`. EF's own rewrite target for a string-based `Include`. |
+      | 157 | `EntityFrameworkQueryableExtensions.ExecuteUpdate` | `private`. The marker overload C19 spent a whole step on. |
+
+      **EF's public query API rewrites itself into non-public marker methods, and those markers
+      have to cross this wire.** `Include("Orders")` is public and becomes `NotQuiteInclude`;
+      `ExecuteUpdate(Action<UpdateSettersBuilder<T>>)` is public and becomes the private
+      `IReadOnlyList<ITuple>` overload before the provider ever sees the tree. A remoting provider
+      captures the tree **after** those rewrites — that is ADR-006's capture point — so it
+      necessarily transports them.
+
+      **So the policy must name methods, not describe their visibility**, exactly as ADR-008
+      already words it. Visibility is not a proxy for "the caller could have written this", because
+      EF rewrites what the caller wrote into something the caller could not have. The allowlist
+      wants a set built from: `Queryable`, `Enumerable`, `EF`/`DbFunctions`, the model's own mapped
+      members, **plus an explicit, named set of EF's rewrite markers** — of which this run has
+      found two and there are certainly more. That set is discoverable the same way: deny by
+      default, run, and read the names out of the failures.
+
+      **Not attempted here.** Building that set is M5's work and wants its own plan; this entry
+      establishes the shape it must have and rules out the cheap version, which is what the
+      measurement was for.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
