@@ -21,14 +21,20 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-Measured 2026-08-10 (`artifacts/measure/c30`): **`Total tests: 22278, Passed: 21911,
-Failed: 150, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
+Measured 2026-08-10 (`artifacts/measure/c48`): **`Total tests: 22347, Passed: 21987,
+Failed: 143, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
 scales by adopting bases, not by writing tests — M6 took the unadopted count from 41 to 1.
 
-The 150 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
+The 143 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
 Most are already answered rather than open: 40 wait on the B12 decision, 26 are the
 `MaterializationInterception` topology B24 settled, 9 are a locale defect in EF's own test code,
 and the majority of the rest are spec tests asserting a limitation this provider does not have.
+
+**M5 is one criterion from done.** Node kinds (C36), payload size (C37), the envelope and protocol
+version (C45), exception fidelity (C46) and the security review (C48) all landed on 2026-08-10;
+**cancellation (W6) is the only thing left**, and `security-review.md` §6 already records what it
+must get right. The whole suite now runs through a real envelope with faults crossing as data,
+which is what makes the error behaviour testable at all.
 
 ---
 
@@ -204,7 +210,8 @@ directions broke four Northwind spec tests on results of 560 MB and 111 MB — c
 caller had asked for — while no request came close. The threat this milestone names is
 server-inbound; capping what a client gets back is a page-size policy, and a different question.
 
-**The rest of M5 is still open**: the envelope, exception fidelity, cancellation, and the review.
+**One thing is left in M5: cancellation (W6).** The envelope (C45), exception fidelity (C46) and
+the security review (C48) all closed on 2026-08-10.
 
 **Exit criteria**
 - Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,
