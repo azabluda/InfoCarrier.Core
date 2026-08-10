@@ -2380,6 +2380,46 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       (*"builds models; it has no server"*) rather than in the provider — a harness limitation, not
       a missing diagnostic.
 
+- [x] **C30. The method allowlist, closed to public + two named markers. M5's largest open half.**
+      **`Total tests: 22278, Passed: 21911, Failed: 150, Skipped: 217`** (`c30`) — **150 → 150,
+      0 fixed, 0 broken, reasons unchanged.** ✅ `<this commit>`
+
+      C25 ruled out the cheap version and said the policy must **name methods**. This is that
+      policy, and the zero in the diff is the result: the deserializer's reachable method surface
+      is now a small, stated set, and nothing the suite legitimately does was using the rest.
+
+      **The rule.** `ResolveMethod` still *looks up* non-public methods — the markers have to be
+      findable — and then `Admit` refuses any that is not public, unless it is one of:
+
+          EntityFrameworkQueryableExtensions::NotQuiteInclude
+          EntityFrameworkQueryableExtensions::ExecuteUpdate
+
+      Both were produced by C25's measurement, not guessed: without them, 384 and 157 failures.
+      They exist because **EF's public API rewrites itself into non-public markers** —
+      `Include("Orders")` becomes the first, `ExecuteUpdate(Action<…>)` becomes the second — and
+      ADR-006 captures the tree *after* those rewrites, so this wire necessarily carries them.
+
+      **The policy was designed from an inventory, not from intuition.** A gated, in-memory
+      recorder (one hash insert per resolve, written once at `ProcessExit` — never per-resolve
+      file I/O, which is what cost 194 failures in C11) collected every method the deserializer is
+      asked to bind across a full run: **362 distinct methods over 84 declaring types.** The
+      distribution is worth keeping, because it says ADR-008's wording was right:
+
+      | Declaring type | # | ADR-008's category |
+      |---|---|---|
+      | `Queryable` / `Enumerable` | 44 / 43 | named outright |
+      | `Math`, `MathF`, `String`, `DateTime`, `DateTimeOffset`, `Decimal`, `TimeOnly`, `Convert`, `DateOnly`, `TimeSpan`, … | ~130 | translatable BCL scalar functions |
+      | `NetTopologySuite.Geometries.Geometry` | 28 | a mapped property type — admitted by the *type* allowlist, and new since C18 |
+      | `EntityFrameworkQueryableExtensions`, `EF` | 11 / 3 | named outright |
+      | `List<T>` instantiations | ~14 | `Contains` / `get_Item` over local collections |
+      | model entity types | the rest | model-bound members |
+
+      **What is still open in M5**, so the next session does not read this as done: payload
+      depth/size limits, `InfoCarrierEnvelope` + `ProtocolVersion` actually being exercised (the
+      backend test store implements `IInfoCarrierClient` directly and bypasses both), exception
+      fidelity (W5), cancellation (W6), and the security review. **The type allowlist and now the
+      method allowlist are the two that were specified as default-deny, and both are in.**
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

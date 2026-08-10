@@ -156,6 +156,34 @@ public class NodeToExpressionTranslator
         return Expression.Call(instance, method, arguments);
     }
 
+    /// <summary>
+    ///     The non-public methods a payload may name, by declaring type and name (ADR-008
+    ///     constraint 2, milestone M5).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         **EF's public query API rewrites itself into non-public marker methods**, and a
+    ///         provider that captures the tree after those rewrites — which ADR-006 requires —
+    ///         necessarily transports them. So visibility alone cannot be the rule; C25 measured
+    ///         that at <b>154 → 697</b>. This is the exception list that makes a public-only rule
+    ///         workable, and both entries were produced by that measurement rather than guessed:
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item><c>NotQuiteInclude</c> — what <c>Include("Orders")</c> becomes. 384 failures without it.</item>
+    ///         <item><c>ExecuteUpdate</c> — the <c>IReadOnlyList&lt;ITuple&gt;</c> overload C19 spent a step on. 157 without it.</item>
+    ///     </list>
+    ///     <para>
+    ///         Keyed by name rather than by <see cref="MethodInfo" /> because both are generic
+    ///         definitions that arrive already constructed, and because a name is what the wire
+    ///         actually carries.
+    ///     </para>
+    /// </remarks>
+    private static readonly HashSet<(string DeclaringType, string Name)> AllowedNonPublicMethods =
+    [
+        (typeof(Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions).FullName!, "NotQuiteInclude"),
+        (typeof(Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions).FullName!, "ExecuteUpdate"),
+    ];
+
     private MethodInfo ResolveMethod(MethodNode node)
     {
         Type declaringType = _typeResolver.Resolve(node.DeclaringType);
@@ -219,14 +247,54 @@ public class NodeToExpressionTranslator
             // first signature match so a TypeNode we cannot resolve does not lose the method.
             if (method.ReturnType == returnType)
             {
-                return method;
+                return Admit(method, declaringType, node);
             }
 
             signatureMatch ??= method;
         }
 
-        return signatureMatch
-            ?? throw new InvalidOperationException($"Method '{node.Name}' not resolvable on '{declaringType}'.");
+        return signatureMatch is { } fallback
+            ? Admit(fallback, declaringType, node)
+            : throw new InvalidOperationException($"Method '{node.Name}' not resolvable on '{declaringType}'.");
+    }
+
+    /// <summary>
+    ///     The method allowlist gate (ADR-008 constraint 2, milestone M5): a payload may name a
+    ///     <b>public</b> method on an allowed type, or one of the few non-public methods EF's own
+    ///     query rewrites produce.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The type allowlist has always run first, and it is broad by necessity — every
+    ///         entity type, every mapped property type, every declaring type in the model. Binding
+    ///         with <see cref="BindingFlags.NonPublic" /> on top of that let a payload name any
+    ///         private method on any of them, which is a far larger surface than anything a caller
+    ///         could have written, in a component whose entire job is to deserialize expression
+    ///         trees from a remote client.
+    ///     </para>
+    ///     <para>
+    ///         Non-public methods are still <em>looked up</em> — the marker overloads have to be
+    ///         findable — and then refused here unless named. That ordering is what makes the rule
+    ///         expressible at all: C25 measured "just drop <c>NonPublic</c>" at <b>154 → 697</b>.
+    ///     </para>
+    /// </remarks>
+    private static MethodInfo Admit(MethodInfo method, Type declaringType, MethodNode node)
+    {
+        MethodInfo definition = method.IsGenericMethod && !method.IsGenericMethodDefinition
+            ? method.GetGenericMethodDefinition()
+            : method;
+
+        if (definition.IsPublic
+            || AllowedNonPublicMethods.Contains((declaringType.FullName ?? string.Empty, definition.Name)))
+        {
+            return method;
+        }
+
+        throw new InvalidOperationException(
+            $"Method '{node.Name}' on '{declaringType}' is not public and is not on the "
+            + "deserialization method allowlist (ADR-008 constraint 2). A payload may name a public "
+            + "method on an allowed type; the only non-public methods admitted are the marker "
+            + "overloads EF's own query rewrites produce.");
     }
 
     private Expression TranslateLambda(LambdaNode node)
