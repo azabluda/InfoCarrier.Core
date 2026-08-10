@@ -72,7 +72,7 @@ public class ServerSaveChangesExecutor
             // key and so cannot be modified" — because EF reads that as re-keying a row rather
             // than as describing one.
             var shadow = new List<(IProperty Property, object? Value)>();
-            var generatedKeys = new List<(IProperty Property, object ClientValue)>();
+            var generatedKeys = new List<(IProperty Property, object ClientValue, bool IssuedAtSave)>();
             var references = new List<(IProperty Property, object ClientValue)>();
             var values = new List<(IProperty Property, object? Value)>();
 
@@ -105,14 +105,30 @@ public class ServerSaveChangesExecutor
                     && temporaryNames.Contains(property.Name)
                     && !property.IsForeignKey())
                 {
-                    // The client's own placeholder for a key this store issues. Left unset,
-                    // because EF only runs value generation for a property still holding its
-                    // sentinel — and a backend that generates at `Add` time rather than at save
-                    // (EF's InMemory provider, whose
-                    // `InMemoryIntegerValueGenerator.GeneratesTemporaryValues` is `false`)
-                    // otherwise keeps the client's placeholder and hands it straight back.
-                    generatedKeys.Add((property, clrValue));
-                    continue;
+                    // The client's own placeholder for a key this store issues.
+                    bool issuedAtSave = IssuedAtSave(property, entityType);
+                    generatedKeys.Add((property, clrValue, issuedAtSave));
+
+                    if (!issuedAtSave)
+                    {
+                        // A backend that generates at `Add` time rather than at save (EF's
+                        // InMemory provider, whose
+                        // `InMemoryIntegerValueGenerator.GeneratesTemporaryValues` is `false`) has
+                        // a *real* value to offer, and it is better than the placeholder. EF only
+                        // runs value generation for a property still holding its sentinel, so the
+                        // property is left unset for it to fill in.
+                        continue;
+                    }
+
+                    // A store that issues the key at save time has nothing better to offer, and
+                    // letting EF generate here is the C11 defect: its temporary generator counts
+                    // down from `int.MinValue`, which is the same range the *client's* generator
+                    // drew this placeholder from, and the two counters advance independently. When
+                    // the client's is one ahead, EF hands the second entry of a request the very
+                    // value the first entry was then forced onto, and the identity map refuses it.
+                    // Putting the placeholder on the object here means generation never runs for
+                    // this property at all, so there is no second value to collide with anything.
+                    // `TrackOne` flags it temporary once the entry exists.
                 }
 
                 values.Add((property, clrValue));
@@ -416,22 +432,29 @@ public class ServerSaveChangesExecutor
             // find it. On a backend that generates at save time the value is itself temporary,
             // and that travels with it — every reference stays temporary too and EF replaces the
             // lot when the store answers.
-            foreach ((IProperty property, object clientValue) in replay.GeneratedKeys)
+            foreach ((IProperty property, object clientValue, bool issuedAtSave) in replay.GeneratedKeys)
             {
                 PropertyEntry generated = entry.Property(property.Name);
 
-                // No *real* value appeared, so this store issues the key during `SaveChanges`
-                // rather than at `Add` — every relational one does. There the client's
-                // placeholder is exactly what the original design wants: put it back, flag it,
-                // and let the store replace it and propagate to everything sharing it. Adopting
-                // EF's own temporary value instead would be a second placeholder doing the first
-                // one's job, and the join row of a many-to-many between two new entities came out
-                // pointing at neither.
+                // This store issues the key during `SaveChanges` rather than at `Add` — every
+                // relational one does — so the client's placeholder is exactly what the original
+                // design wants: it is already on the entity (put there before tracking, so EF's
+                // own temporary generator never ran — plan C11), and flagging it temporary is what
+                // lets the store replace it and propagate to everything sharing it. Adopting EF's
+                // temporary value instead would be a second placeholder doing the first one's job,
+                // and the join row of a many-to-many between two new entities came out pointing at
+                // neither.
                 //
                 // Only when the value is real — EF's InMemory provider assigns one from a value
                 // generator at `Add` — is there anything better to redirect references to.
-                if (generated.IsTemporary || Equals(generated.CurrentValue, property.Sentinel))
+                if (issuedAtSave)
                 {
+                    generated.IsTemporary = true;
+                }
+                else if (generated.IsTemporary || Equals(generated.CurrentValue, property.Sentinel))
+                {
+                    // The generator was asked for a real value and had none to give: this store
+                    // does generate at save after all, whatever its generator claimed.
                     generated.CurrentValue = clientValue;
                     generated.IsTemporary = true;
                 }
@@ -523,12 +546,33 @@ public class ServerSaveChangesExecutor
     }
 
     /// <summary>
+    ///     Whether this store issues the property's value when the row is saved rather than when
+    ///     it is added — which is what decides whether the client's placeholder goes onto the
+    ///     entity before tracking (plan C11).
+    /// </summary>
+    /// <remarks>
+    ///     The question the previous design asked <em>after</em> tracking, by looking at what EF
+    ///     had produced. Asking EF's own selector instead means the answer is in hand before
+    ///     anything is tracked, and — the point of the change — means EF's temporary value
+    ///     generator is never run for a property whose value we are about to overwrite. It counts
+    ///     down from <see cref="int.MinValue" />, which is the same range the client's generator
+    ///     drew the placeholder from.
+    /// </remarks>
+    private bool IssuedAtSave(IProperty property, IEntityType entityType)
+        => !_context.GetService<Microsoft.EntityFrameworkCore.ValueGeneration.IValueGeneratorSelector>()
+                .TrySelect(property, entityType, out Microsoft.EntityFrameworkCore.ValueGeneration.ValueGenerator? generator)
+            || generator is null
+            || generator.GeneratesTemporaryValues;
+
+    /// <summary>
     ///     One entry of the request, unpacked and waiting to be tracked.
     /// </summary>
     /// <param name="GeneratedKeys">
-    ///     Temporary keys the client made up that this store issues itself, deliberately left
-    ///     unset on <paramref name="Entity" />. The client's value is kept only so references to
-    ///     it can be redirected.
+    ///     Temporary keys the client made up that this store issues itself. Where the store
+    ///     issues at save time the client's placeholder is put straight onto
+    ///     <paramref name="Entity" /> and <c>IssuedAtSave</c> is true; where the store issues a
+    ///     real value at <c>Add</c> the property is left unset for it to fill in. Either way the
+    ///     client's value is kept so references to it can be redirected.
     /// </param>
     /// <param name="References">
     ///     Temporary foreign keys — placeholders belonging to some other entry.
@@ -538,7 +582,7 @@ public class ServerSaveChangesExecutor
         object Entity,
         IEntityType EntityType,
         List<(IProperty Property, object? Value)> Shadow,
-        List<(IProperty Property, object ClientValue)> GeneratedKeys,
+        List<(IProperty Property, object ClientValue, bool IssuedAtSave)> GeneratedKeys,
         List<(IProperty Property, object ClientValue)> References,
         bool IsAdded)
     {

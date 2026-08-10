@@ -1739,7 +1739,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       it would add lands on **B12**, which is still open. Worth doing after B12 is decided, and hard
       to justify before. Left reported.
 
-- [ ] **C11. Phase C measured whole — and it surfaced an intermittent. TOP PRIORITY next session.**
+- [x] **C11. Phase C measured whole — and it surfaced an intermittent. Diagnosed in full; fixed in C38.**
       **`Total tests: 22102, Passed: 21503, Failed: 382, Skipped: 217`** (`c10b`). No code change;
       this entry is the measurement and the flake. `<this commit>`
 
@@ -1859,6 +1859,42 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       (tag them, or namespace the client's range away from the server's). If they are disjoint,
       the cause is elsewhere and the dump still names every entry, its temporary flags and the
       key it landed on. **Hold any fix to the three-run bar.**
+
+      ---
+
+      **Sightings 3 and 4, 2026-08-10 (`c37` and `c37b`), and the instrument did its job.** Both
+      dumps are byte-identical and they close the question:
+
+          failing entry: Blog correlationId=1 state=Added temporaryProperties=[Id]
+          placeholders resolved so far: -2147482646->-2147482646(tmp=True)
+          placeholder values expected in this request: -2147482646, -2147482645
+          every entry in this request:
+            Blog correlationId=0 state=Added temporaryProperties=[Id] generatedKeys=[Id=-2147482646] borrowedReferences=[] keyValuesSent=[]
+            Blog correlationId=1 state=Added temporaryProperties=[Id] generatedKeys=[Id=-2147482645] borrowedReferences=[] keyValuesSent=[]
+          entries already tracked, with the keys they landed on:
+            Blog correlationId=0 state=Added key=[Id=-2147482646(tmp=True)]
+
+      **The range hypothesis is confirmed. The mechanism named alongside it is not, and the
+      difference is the whole fix.** `borrowedReferences=[]` on both entries: nothing was ever
+      misidentified as a borrowed placeholder, so *"compares them by value"* is not what fires.
+      The two counters coinciding is real; what it collides with is one step earlier.
+
+      **The sequence, read straight off the dump.** Entry 0 is tracked; `entry.State = Added` runs
+      EF's own temporary generator, which hands out `-2147482647`; `TrackOne` then overwrites the
+      key with the client's placeholder `-2147482646`. Entry 1 is tracked; `entry.State = Added`
+      runs the same generator, whose next value is **`-2147482646`** — the value entry 0 is now
+      sitting on. The identity map refuses it, and it throws *before* the line that would have
+      replaced it with `-2147482645`.
+
+      So the collision is between **EF's freshly generated temporary** and **a client placeholder
+      already forced onto a sibling entry**, and it needs the client's counter to be exactly one
+      ahead of the server's. A passing run has them level: CLAUDE.md's recorded passing dump shows
+      client placeholders `-2147482647`/`-2147482646`, and with those every forced value equals the
+      generated one and nothing moves. That is why it is roughly one run in four, why it always
+      passes in isolation — both counters start fresh and stay level — and why it needed ten
+      thousand tests of unrelated work to appear.
+
+      Fixed in **C38**.
 
 - [ ] **C14. "The spatial failures need SpatiaLite" is wrong, and has been for a while.** No code
       change; this is the correction. `<this commit>`
@@ -2590,6 +2626,41 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       through `ExpressionJsonContext` directly rather than through the configured
       `IInfoCarrierSerializer`. That is the same gap M5's envelope criterion already names, not a
       new one. An unconfigurable bound is worth more than no bound in the meantime.
+
+- [x] **C38. The C11 intermittent, closed. It was never about identifying placeholders by value.**
+      **`Total tests: 22312, Passed: 21950, Failed: 145, Skipped: 217`** — three consecutive
+      identical runs (`c38`, `c38b`, `c38c`), **0 fixed, 0 broken, reasons unchanged** against
+      `c36`. That is the three-run bar, and it is what this fix needed rather than what routine
+      work needs. ✅ `<this commit>`
+
+      C11 has the two dumps and the full reading. In one line: the server let **EF's own temporary
+      value generator** run for a key it was about to overwrite with the client's placeholder, and
+      both generators count down from `int.MinValue`. When the client's counter is one entry ahead,
+      the value EF hands the *second* row of a request is the value the *first* row was already
+      forced onto, and the identity map refuses it.
+
+      **The fix is to stop running the generator at all** for a key whose value is going to be
+      replaced. Where the store issues the key at save time — every relational one — the client's
+      placeholder now goes onto the entity **before** it is tracked, so EF's value generation never
+      runs for that property, there is no second number, and there is nothing for it to collide
+      with. `TrackOne` still flags it temporary afterwards, which is what makes the store replace
+      it and propagate.
+
+      **What told the two stores apart was the thing to change.** The old code left the property
+      unset and inferred the store's behaviour from what EF had produced *after* tracking —
+      necessarily after generation, which is the run it needed not to make. EF's own
+      `IValueGeneratorSelector` answers the same question before anything is tracked:
+      `GeneratesTemporaryValues` is `false` exactly for the Add-time case the original comment
+      named, `InMemoryIntegerValueGenerator`. That branch is unchanged — an InMemory store has a
+      real value to offer and it is still better than the placeholder — and its values are small
+      positive integers, so it was never in the colliding range.
+
+      **A guard is kept for the store that answers wrongly.** If the selector claims a real value
+      but the property comes back holding its sentinel or a temporary, the old path still runs. It
+      costs one comparison and it is the branch that would otherwise silently lose a key.
+
+      **The 22278 → 22312 growth across C36–C38 is 34 new tests, not movement.** The failing count
+      has been 145 throughout.
 
 ## Phase B — the tier audit, and the rework it found
 

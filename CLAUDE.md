@@ -118,7 +118,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22278, Passed: 21916, Failed: 145, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22312, Passed: 21950, Failed: 145, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -136,7 +136,8 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C20 for the rest** — read out of `artifacts/measure/`,
-currently `c34`. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
+currently `c38c`. The total grew from 22278 to 22312 across C36–C38: 34 tests added for the
+node-kind and payload-size controls, no movement in the failing count. The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **26
 `MaterializationInterception`** (16 are B16's topology, answered and classified; 10 blocked by
 A71), **20 `ComplexNavigations`**, **14 `Query.Associations`** (C20) and **9 `JsonTypes`** (7 of
 them A64's locale, not this provider). Only **4** are wrong answers
@@ -280,27 +281,31 @@ total is therefore **locale-dependent** — a machine with a `.` separator repor
 failures with no code change. Grep a run for *"cannot be converted to type"* and for
 `_as_GeoJson` before treating either as movement.
 
-**One intermittent is now a DEFECT, not a watch item —
-`SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity`.** It failed in `c10` and
-`c24` and passed in the six full runs between; it still passes in isolation, 12 of 12. Roughly one
-run in four. The failure is an identity conflict on a *temporary* key (`int.MinValue + 1002`) at
-`ServerSaveChangesExecutor.TrackOne`, and the two colliding rows are the test's own two `Blog`s,
-added in one `SaveChanges`. **Both sightings and the full analysis are in C11.**
+**The one intermittent is CLOSED (C38, 2026-08-10), and how it was closed is the reusable part.**
+`SqliteSmokeTest.A_store_generated_key_comes_back_on_the_client_entity` failed roughly one run in
+four and passed 12-of-12 in isolation. It was **instrumented rather than chased** — C27 makes
+`ServerSaveChangesExecutor` rethrow an identity conflict with the whole request appended, and
+writes nothing on the happy path, which is the design that matters: the previous attempt wrote a
+line per tracked entry and cost 194 extra failures through file I/O under parallel collections.
+Sightings 3 and 4 arrived already diagnosed, exactly as intended, and two dumps were enough.
 
-**It is instrumented rather than chased, and the instrument is already in.** C27 makes
-`ServerSaveChangesExecutor` rethrow an identity conflict with the whole request appended — every
-entry's temporary flags, generated keys and borrowed references, and every tracked entry's key.
-Nothing is written on the happy path, which matters: the previous attempt wrote a line per tracked
-entry and cost 194 extra failures through file I/O under parallel collections. **So do not hunt
-it. The next sighting arrives diagnosed** — read the dump, compare *"placeholder values expected"*
-against the tracked keys, and see C11 for what each answer means.
+**The cause, and note that the standing hypothesis had the right evidence and the wrong
+mechanism.** The range coincidence was real — client placeholders and EF's server-side temporaries
+both count down from `int.MinValue` — but nothing was ever misidentified as a borrowed placeholder
+(`borrowedReferences=[]` in both dumps). The server was letting **EF's own temporary generator**
+run for a key it was about to overwrite with the client's placeholder. Entry 0 takes EF's
+`-2147482647` and is forced to the client's `-2147482646`; entry 1 then takes EF's *next* value,
+`-2147482646`, and the identity map refuses it. It needs the client's counter to be exactly one
+ahead of the server's, which is why it was rare, order-dependent and never reproducible in
+isolation. The fix is to not run the generator at all where the value is going to be replaced —
+`IValueGeneratorSelector.GeneratesTemporaryValues` answers "does this store issue at save time"
+*before* anything is tracked. Full reading in C11, fix in C38.
 
-**The surviving hypothesis, evidenced.** Client placeholder values and server temporary values are
-drawn from two independent counters that both start near `int.MinValue`, so they occupy the *same
-numeric range* — a passing run shows the client's placeholders are `-2147482647`/`-2147482646`,
-exactly what the server issues. This executor identifies a borrowed placeholder **by bare value**,
-and its own comment calls a false positive improbable; that is only true while the ranges differ.
-Store isolation and parallelism-alone are ruled out by reading (C11).
+**The lesson worth keeping: an evidenced hypothesis can be right about the evidence and wrong
+about the mechanism.** "The ranges coincide" was correct and load-bearing. "Therefore a stored key
+is being mistaken for a borrowed placeholder" was one step too far, and the dump that confirmed the
+first half refuted the second in the same four lines. Read what the instrument prints, not what it
+was expected to print.
 
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
