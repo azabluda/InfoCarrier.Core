@@ -61,6 +61,30 @@ public class ServerSaveChangesExecutor
         // the client's has to be redirected at it.
         var placeholders = new Dictionary<object, (object? Value, bool IsTemporary)>();
 
+        // The same, qualified by the key property the placeholder belongs to — and it is what
+        // makes the redirection correct rather than merely usual.
+        //
+        // **A placeholder value is not unique across entity types.** The client draws them from
+        // EF's temporary generator, which counts down from `int.MinValue` *per key property*, so
+        // `Optional1.Id` and `Optional2.Id` hand out the very same numbers in the same request.
+        // Keyed by value alone the later registration wins, and a foreign key pointing at the
+        // first row resolves to the second:
+        //
+        //     REGISTER Optional1Derived.Id       client=-2147482643 -> 4
+        //     REGISTER Optional2.Id              client=-2147482643 -> 5     <- same number
+        //     RESOLVE  Optional2Derived.ParentId client=-2147482643 -> 5     <- wanted 4
+        //
+        // That is a **wrong foreign key written to the store**: `Optional2MoreDerived.ParentId`
+        // came out as 6, and no `Optional1` has key 6, so the row is unreachable from the graph
+        // that owns it. It is order-dependent — the collision only bites when the second
+        // registration lands before the borrower resolves — which is why one parameterization of
+        // `Save_optional_many_to_one_dependents` failed and the other thirty-five did not (C76).
+        //
+        // Qualified first, value-only as the fallback: a reference whose principal key property
+        // cannot be named (a key borrowed other than through a foreign key) keeps exactly the
+        // behaviour it had.
+        var qualifiedPlaceholders = new Dictionary<(IProperty Property, object Value), (object? Value, bool IsTemporary)>();
+
         foreach (ChangeEntry change in request.Entries)
         {
             IEntityType entityType = _context.Model.FindEntityType(change.EntityTypeName)
@@ -382,10 +406,37 @@ public class ServerSaveChangesExecutor
             // ordinary field on a detached object.
             foreach ((IProperty property, object clientValue) in replay.References)
             {
-                if (placeholders.TryGetValue(clientValue, out var principal))
+                if (Resolve(property, clientValue) is { } principal)
                 {
                     SetOnEntity(replay.Entity, property, principal.Value, replay.Shadow);
                 }
+            }
+
+            // The principal key property a placeholder held in `property` would belong to, asked
+            // of the model rather than guessed from the value.
+            (object? Value, bool IsTemporary)? Resolve(IProperty property, object clientValue)
+            {
+                foreach (IForeignKey foreignKey in property.GetContainingForeignKeys())
+                {
+                    int index = -1;
+                    for (int i = 0; i < foreignKey.Properties.Count; i++)
+                    {
+                        if (foreignKey.Properties[i] == property)
+                        {
+                            index = i;
+                            break;
+                        }
+                    }
+
+                    if (index >= 0
+                        && qualifiedPlaceholders.TryGetValue(
+                            (foreignKey.PrincipalKey.Properties[index], clientValue), out var qualified))
+                    {
+                        return qualified;
+                    }
+                }
+
+                return placeholders.TryGetValue(clientValue, out var principal) ? principal : null;
             }
 
             EntityEntry entry = Track(replay.EntityType, replay.Entity);
@@ -472,6 +523,7 @@ public class ServerSaveChangesExecutor
                 }
 
                 placeholders[clientValue] = (generated.CurrentValue, generated.IsTemporary);
+                qualifiedPlaceholders[(property, clientValue)] = (generated.CurrentValue, generated.IsTemporary);
             }
 
             // A reference is a placeholder exactly as long as what it points at is one. An
@@ -479,8 +531,13 @@ public class ServerSaveChangesExecutor
             // of this existed.
             foreach ((IProperty property, object clientValue) in replay.References)
             {
+                // Through the same `Resolve`, so both halves of a redirection read the same
+                // principal. Inert in every request the suite has: `IssuedAtSave` is a property of
+                // the store, so two colliding placeholders are both temporary or neither is. It
+                // stops being inert the moment one model mixes generation strategies, and a
+                // lookup that is right for the value and wrong for the row is what C76 was.
                 entry.Property(property.Name).IsTemporary =
-                    !placeholders.TryGetValue(clientValue, out var principal) || principal.IsTemporary;
+                    Resolve(property, clientValue) is not { } principal || principal.IsTemporary;
             }
 
             // The concurrency check's left-hand side, and the one thing here that cannot be

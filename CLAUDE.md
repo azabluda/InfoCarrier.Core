@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22366, Passed: 22082, Failed: 67, Skipped: 217`** (2026-08-11) across the
+**`Total tests: 22366, Passed: 22083, Failed: 66, Skipped: 217`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,7 +137,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c75`. C55–C75 took 132 to 67; `Query.Associations` is 336 of 336, and
+currently `c76b`. C55–C76 took 132 to 66; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **6 `BulkUpdates`** and
 **4 `Scaffolding.CompiledModel`**.
@@ -222,13 +222,28 @@ Not yet implemented, in rough priority order:
   spec tests asserting a limitation this provider does not have — they run and return the right
   answer, and the query bodies are `private` to the spec base, so the assertion cannot be inverted
   from a derived class.
-- **The `GraphUpdates` residual** — 1 of 1787, one parameterization of
-  `Save_optional_many_to_one_dependents`. Classified in `docs/implementation-plan.md` under S3c,
-  which is read out of `artifacts/measure/` rather than tallied by hand — the table it replaced
-  had drifted badly. **It is also the tripwire for over-returning on SaveChanges**: C42 measured a
-  rule that sent every propagated foreign key back to the client and two more parameterizations of
-  this same test went red. An ordinary FK is the client's own business; only a key it cannot
-  recover by fixup may be asserted at it.
+- **`GraphUpdates` is CLOSED — 1787 of 1787 (C76) — and the residual was never what it was filed
+  as.** For phases it read *"tracked-entry count off by one (26 vs 27)"*. Two probes in C42's order
+  — what the metadata says, then **read the row the store actually holds** — showed the principals
+  were byte-identical between a passing and the failing parameterization and only the *dependents'
+  foreign keys* differed: `Optional2MoreDerived#7->6`, and no `Optional1` has key 6. **A wrong
+  value written to the store.** The cause is that **a client placeholder is not unique across
+  entity types** — EF's temporary generator counts down from `int.MinValue` *per key property*, so
+  `Optional1.Id` and `Optional2.Id` issue the same numbers in one request, and the server's
+  placeholder map was keyed by the value alone. It is now keyed by `(key property, value)` and
+  resolved through `foreignKey.PrincipalKey`. **C34's rule in the SaveChanges direction**: a key
+  resolved by value rather than by what declares it. Order-dependence, not rarity, is why it was
+  1 of 36 parameterizations.
+  **It remains the tripwire for over-returning on SaveChanges**: C42 measured a rule that sent
+  every propagated foreign key back to the client and two more parameterizations of this same test
+  went red. An ordinary FK is the client's own business; only a key it cannot recover by fixup may
+  be asserted at it.
+  **One open finding came out of trying to pin C76 with a unit test** (recorded in C76, not in the
+  tree): an `Added` dependent whose foreign key is set to an `Added` principal's *temporary* key
+  **with no navigation set** fails on **Tier B** with `FOREIGN KEY constraint failed` — before and
+  after the fix alike, so it is a separate shape. The navigation route is green, and the same
+  FK-only shape is green on Tier A, so it is specific to a store that issues keys at save. The
+  reproduction is exact and is the next probe.
 - **The remaining spec bases — 1** (Phase C, 2026-08-10: 41 adopted down to 1). Everything the
   compliance test used to list is in, including the four "infrastructure" bases, `Seeding` (C7) and
   **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`** — B3d's price

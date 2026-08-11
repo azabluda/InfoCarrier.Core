@@ -4135,6 +4135,81 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       was expensive was one operator under it. **Before paying a recorded price, check what the
       price was for.**
 
+- [x] **C76. The `GraphUpdates` residual was never an entry count. It was a wrong foreign key in
+      the store, and the cause is that a client placeholder is not unique.**
+      **`Total tests: 22366, Passed: 22083, Failed: 66, Skipped: 217`** (`c76b`) — **67 → 66,
+      1 fixed, 0 broken.** `GraphUpdatesTestBase` is **1787 of 1787**. ✅ `<this commit>`
+
+      The standing classification, carried since S3c-9, read *"tracked-entry count off by one
+      (26 vs 27)"*. It is not that, and the way to find out was the one this repo keeps writing
+      down: **read the row the store actually holds.**
+
+      **Probe 1 — the store, after every parameterization.** 112 runs, three distinct results:
+
+          Optional1#1->1 Optional1#2->1 Optional1#3->1 Optional1Derived#4->1 Optional1MoreDerived#5->1
+              ||  … Optional2Derived#6->4 Optional2MoreDerived#7->5      × 55   (passing)
+              ||  … Optional2Derived#6->5 Optional2MoreDerived#7->6      × 1    (failing)
+
+      **The principals are byte-identical; only the dependents' foreign keys differ.** In the
+      failing run `Optional2MoreDerived#7` points at `5`… and then at **6**, and no `Optional1` has
+      key 6. The row is unreachable from the graph that owns it, which is why the third context's
+      `LoadOptionalGraphAsync` never finds it and `AssertEntries` reports it missing. **A wrong
+      value written to the store, not a bookkeeping artefact.**
+
+      **Probe 2 — what the server's placeholder map registered and resolved.** The failing request,
+      in order:
+
+          REGISTER Optional1.Id              client=-2147482644 -> 3
+          REGISTER Optional1Derived.Id       client=-2147482643 -> 4
+          REGISTER Optional1MoreDerived.Id   client=-2147482642 -> 5
+          REGISTER Optional2.Id              client=-2147482643 -> 5     <- same number as Optional1Derived
+          RESOLVE  Optional2Derived.ParentId client=-2147482643 -> 5     <- wanted 4
+          REGISTER Optional2Derived.Id       client=-2147482642 -> 6     <- same number as Optional1MoreDerived
+          RESOLVE  Optional2MoreDerived.ParentId client=-2147482642 -> 6 <- wanted 5
+
+      **A placeholder value is not unique across entity types.** EF's temporary generator counts
+      down from `int.MinValue` **per key property**, so `Optional1.Id` and `Optional2.Id` issue the
+      same numbers in the same request. `placeholders` was a `Dictionary<object, …>` keyed by the
+      value alone, so the later registration silently replaced the earlier one and every foreign
+      key resolved afterwards pointed at the wrong row.
+
+      **Which is also why it was one parameterization and not twelve.** The collision only bites
+      when the overwriting registration lands *before* the borrower resolves, and tracking is
+      principal-first — so the first dependent is safe and a later one is not. Order-dependence,
+      not rarity: it reproduces every run, and in isolation (112 tests filtered, same single
+      failure).
+
+      **The fix is to ask the model instead of the value.** A second map keyed by
+      `(IProperty, value)` is written beside the first, and a reference resolves through the
+      **principal key property its own foreign key names** —
+      `foreignKey.PrincipalKey.Properties[i]` for the `i` at which the reference sits in
+      `foreignKey.Properties`. Value-only remains the fallback, so a key borrowed other than
+      through a foreign key keeps exactly the behaviour it had. Both call sites go through it: the
+      pre-tracking redirect *and* the `IsTemporary` flagging, which is inert today —
+      `IssuedAtSave` is a property of the store, so two colliding placeholders are both temporary
+      or neither is — and stops being inert the moment a model mixes generation strategies.
+
+      **This is C34's rule in the SaveChanges direction.** *"A key value lands in
+      `EntityKeyNode.KeyValues`, declared `object` and resolved by runtime type"* — here it landed
+      in a dictionary declared `object` and resolved by **value**, which is the same mistake with a
+      different container. And it is the last unclosed piece of the C11/C38 family: those were
+      about the client's and the server's counters colliding, this is about **two of the client's
+      own** colliding with each other.
+
+      **The regression test is the spec test, and no unit-level pin was added — deliberately, and
+      with what was tried recorded.** A `SqliteSmokeTest` was written to force the collision
+      (two blogs and two posts added in one `SaveChanges`, each post's `BlogId` set to the *other*
+      blog's temporary key). It fails **identically with and without the fix**, on
+      `SQLite Error 19: 'FOREIGN KEY constraint failed'`, so it pins nothing — the same mistake
+      C75 caught and threw away. **It is left out of the tree and recorded here instead, because
+      it is a finding rather than a bad test**: an `Added` dependent whose foreign key is set to an
+      `Added` principal's temporary key **with no navigation set** does not survive the round trip
+      on **Tier B**. The navigation route is green
+      (`A_new_dependent_of_a_new_principal_gets_the_generated_foreign_key`), and the same
+      foreign-key-only shape is green on Tier A — `Save_optional_many_to_one_dependents` with
+      `changeMechanism: Fk` alone passes there — so it is specific to a store that issues keys at
+      save. **Not investigated; the reproduction above is exact and is the next probe.**
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
