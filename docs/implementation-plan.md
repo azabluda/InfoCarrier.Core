@@ -3733,6 +3733,41 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `security-review.md` §6 already states the constraints it must then meet (unguessable,
       connection-scoped), and is amended here to say which half now stands.
 
+- [x] **C67. An unshippable `ExecuteUpdate` was invoked rather than refused, because the finder
+      could not see the type it lives on.**
+      **`Total tests: 22362, Passed: 22031, Failed: 114, Skipped: 217`** (`c67`) — **114 → 114,
+      0 fixed, 0 broken**; the two `UnreachableException` reasons are gone and
+      `TranslationFailed` goes 2 → 4. ✅ `<this commit>`
+
+      C63 named this and priced it at zero tests. Taking it anyway, because what a caller saw was
+      an **internal EF sentinel**:
+
+          System.Diagnostics.UnreachableException : Can't call this overload directly
+             at EntityFrameworkQueryableExtensions.ExecuteUpdate[TSource](IQueryable, IReadOnlyList<…>)
+             at lambda_method633129(Closure, IQueryable`1)          <- the residual
+
+      `ClientEvaluationFinder` filtered on `Queryable` and `Enumerable`; `ExecuteUpdate` and
+      `ExecuteDelete` live on `EntityFrameworkQueryableExtensions`. So a bulk update whose setter
+      names an unshippable method was never examined, fell into the residual, and was **run** —
+      where EF's marker overload throws the sentinel it reserves for "this should have been
+      rewritten". Now it is refused with EF's own message:
+
+          The LINQ expression '….ExecuteUpdate(new [] {new Tuple`2(e => e.MaybeScalar(e => e.OrderID), …)})'
+          could not be translated. Additional information: Translation of method
+          'Microsoft.EntityFrameworkCore.TestUtilities.TestExtensions.MaybeScalar' failed.
+
+      **`Include` is on that type too, and C40 lost 18 tests to exactly this hazard**, so it was
+      checked before the run rather than after: `typeof(EF)` is on the allowlist, so an
+      `Include(e => EF.Property<X>(e, "…"))` walks clean — `NorthwindEFPropertyIncludeQueryInfoCarrierTest`
+      is **238 of 238** with the change in.
+
+      **Still 0 fixed, exactly as priced.** The two `Update_with_invalid_lambda_in_set_property_throws`
+      stay red: the relational base asserts `InvalidPropertyInSetProperty`, a statement about the
+      *property*, and this provider refuses one operator earlier and names the *method*. Both are
+      refusals and ours is arguably the more accurate one, but they are different sentences and
+      mirroring the base would mean asserting our own. **The value here is the error a real caller
+      gets, not the count** — and the count is what proves the change is confined.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

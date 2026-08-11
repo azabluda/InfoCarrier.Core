@@ -951,7 +951,15 @@ public sealed class QuerySplitter
                 && !serverSide.Contains(node)
                 && !reassemblies.Contains(node)
                 && node.Method.DeclaringType is { } declaring
-                && (declaring == typeof(Queryable) || declaring == typeof(Enumerable)))
+                && (declaring == typeof(Queryable)
+                    || declaring == typeof(Enumerable)
+                    // `ExecuteUpdate` and `ExecuteDelete` live here rather than on `Queryable`,
+                    // and leaving the type out meant an unshippable bulk update was never
+                    // examined for client code — it simply ran, and EF's marker overload answered
+                    // with `UnreachableException: Can't call this overload directly`, an internal
+                    // sentinel no caller should ever see (C63, C67). `Include` is here too; its
+                    // argument is a property path, so walking it finds nothing to refuse.
+                    || declaring == typeof(EntityFrameworkQueryableExtensions)))
             {
                 foreach (Expression argument in RowDecidingArguments(node))
                 {
