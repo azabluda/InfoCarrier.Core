@@ -50,10 +50,14 @@ public class JsonQuerySqliteInfoCarrierTest(
     ///         EF overrides seven more the same way and they are deliberately <em>not</em> taken:
     ///         they do not fail here for that reason, and an override whose reason is not ours
     ///         hides the real one (A63 adopted eight such and all eight failed with "Exception type
-    ///         was not an exact match"). One of ours goes the other way —
+    ///         was not an exact match").
+    ///     </para>
+    ///     <para>
+    ///         This paragraph used to end by naming
     ///         <c>Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution</c>
-    ///         raises <c>APPLY</c> here and EF does not override it — and is left red for the same
-    ///         reason in reverse: it is not EF's limitation, so it is not EF's override to borrow.
+    ///         as one that <em>"raises <c>APPLY</c> here and EF does not override"</em>. <b>EF does
+    ///         override it</b>, in this same file of EF's, and it is now the eighteenth below
+    ///         (C96). Seventeen became eighteen by grepping rather than by re-reading the note.
     ///     </para>
     /// </remarks>
     /// <summary>
@@ -181,6 +185,22 @@ public class JsonQuerySqliteInfoCarrierTest(
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
     public override async Task Json_nested_collection_filter_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_nested_collection_filter_in_projection(async));
+
+    /// <summary>
+    ///     The eighteenth, and the standing note above said EF did not override it (C96).
+    /// </summary>
+    /// <remarks>
+    ///     It does, in the same file as the other seventeen —
+    ///     <c>JsonQuerySqliteTest.cs</c>, <c>Assert.Equal(SqliteStrings.ApplyNotSupported, …)</c> —
+    ///     and this provider raises that message character for character. The claim that it did not
+    ///     was carried through C77 as a classification (*"SQLite has no APPLY"*) rather than
+    ///     checked, which is the one thing CLAUDE.md says to do before calling a Tier B failure
+    ///     ours. **Age is not evidence**, and neither is a note.
+    /// </remarks>
+    public override async Task Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution(
+        bool async)
+        => await AssertApplyNotSupported(
+            () => base.Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution(async));
 
     /// <summary>
     ///     Three the core base leaves to the provider, mirrored from

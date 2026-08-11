@@ -137,5 +137,11 @@
 # came back as ordinal 1 instead of 3. C87's reading of this as server-side query-tracked state
 # was wrong and is corrected in the plan: the server's tracker is empty on entry and the identity
 # conflict is raised on the client.
-failed=15
+# 2026-08-11 (C96) - 15 -> 13. Re-deriving C77's classification against the current run found that
+# EF's own JsonQuerySqliteTest DOES override
+# Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution
+# with Assert.Equal(SqliteStrings.ApplyNotSupported, ...) -- the class comment here had said for
+# four steps that it does not, and C77 carried that note forward as a classification instead of
+# grepping. A classification is not evidence. JsonQuery is now 0.
+failed=13
 total=22453

@@ -5089,6 +5089,56 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       of the row being written; the scan is gated on `GetContainerColumnName()` and does nothing at
       all on a model with no `ToJson()`. Measured: 0 broken across 22,453 tests.
 
+- [x] **C96. C77 re-derived against the current run, and re-deriving it found an override that had
+      been declined on a false premise.**
+      **`Total tests: 22453, Passed: 22219, Failed: 13, Skipped: 221`** (`c96`) — **15 → 13,
+      2 fixed, 0 broken.** ✅ `<this commit>`
+
+      C77 classified 66 failures. The tail is now **13**, and this re-derives every one of them
+      from `c96.log` — grouped by class *and* by first message line, with EF's own suites grepped
+      for each name, applied to old failures and not only to newly-red ones.
+
+      | # | Test | Verdict |
+      |---|---|---|
+      | 2 | `BulkUpdates.Update_with_invalid_lambda_in_set_property_throws` | **C67 stands.** Both sides refuse; this provider refuses one operator earlier and names the *method*, the relational base asserts `InvalidPropertyInSetProperty`. |
+      | 2 | `ComplexTypesTracking.Can_track_entity_with_complex_property_bag_collections(Added)` | **A32/C41 stands**, and the message is now specific enough to name the mechanism: `Incorrect number of arguments supplied for call to method 'System.Object get_Item(System.String)'` — the property bag's *indexer*, inside EF's own `StructuralTypeMaterializerSource`. |
+      | 2 | `GearsOfWar.Correlated_collection_with_distinct_3_levels` | **C64 stands, re-derived not restated.** EF's InMemory suite overrides it with `DistinctOnSubqueryNotSupported` (#24325) and every relational provider with `DistinctOnCollectionNotSupported`, so no EF provider reaches the comparison — and C64's second probe showed the base's *own expected query compared with itself* throws `EqualException`, because the projection's `Members` is a lazily-evaluated `IEnumerable<>` and the compiler-generated `Equals` compares it by reference. Unsatisfiable by construction. |
+      | 2 | `Query.StringTranslations.Regex_IsMatch`, `…_constant_input` | **A46 stands** — a deliberate allowlist refusal, reported as an untranslated LINQ expression, which is what a refusal looks like. |
+      | 2 | `Update.ProxyGraphUpdates.Save_two_entity_cycle_with_lazy_loading` | **C74 stands.** EF's InMemory suite overrides it *only* in its `ChangeTracking` variant, where `DoesLazyLoading` is false — which this project already mirrors. Our two are `LazyLoading` and `LazyLoadingAndChangeTracking`, where EF passes. Tier B was measured at 140 against 2. |
+      | 1 | `CustomConverters.Composition_over_collection_of_complex_mapped_as_scalar` | **A28 stands** (C77's own reclassification). **No EF provider overrides it at all** — re-grepped — so EF's InMemory suite passes it because InMemory *refuses* the query. |
+      | 1 | `PrimitiveCollections.Parameter_collection_null_Contains` | **B22 residual stands.** EF's SQLite override asserts SQL and passes, so this one is ours: a `null` collection parameter is a literal `null` constant and `null.Contains(x)` is not a thing to translate. |
+      | 1 | `AdHocAdvancedMappingsQuery.Casts_are_removed_from_expression_tree_when_redundant` | **CORRECTED — see below.** |
+      | 2 | `JsonQuery …_of_primitives_in_projection_NoTrackingWithIdentityResolution` | **FIXED HERE.** |
+
+      **The two that closed, and why they were open.** `JsonQuerySqliteInfoCarrierTest`'s class
+      comment said, of this exact test, *"raises `APPLY` here and **EF does not override it** — and
+      is left red for the same reason in reverse"*. **EF does override it**, in the same file of
+      EF's as the other seventeen, with `Assert.Equal(SqliteStrings.ApplyNotSupported, …)` — and
+      this provider raises that message character for character. C77 carried the note forward as a
+      classification (*"SQLite has no APPLY"*) instead of grepping. Seventeen overrides became
+      eighteen, and the note is corrected in place.
+
+      **The one that was classified wrongly.** C77 filed
+      `Casts_are_removed_from_expression_tree_when_redundant` as *"the base compares against an
+      **exactly printed** `DbSet<MockEntity>().Cast<IDummyEntity>()…`; green means reproducing EF's
+      printer"*. The run says otherwise, and it fails one step earlier than that:
+
+          Assert.Throws() Failure: Exception type was not an exact match
+          Expected: typeof(System.InvalidOperationException)
+          Actual:   typeof(System.InvalidCastException)
+          ---- Unable to cast object of type 'MockEntity' to type 'IDummyEntity'.
+
+      The printer text is never reached. The base asserts that the provider **refuses** a `Cast` to
+      an unrelated interface; this provider's split runs it on the client, where
+      `Enumerable.Cast<IDummyEntity>()` meets a real `MockEntity` and throws the CLR's own
+      exception. So it is **A28**, not a printer-fidelity question — the same verdict as its
+      neighbour in this table, reached the same way. Recorded so the next reader does not go
+      looking for EF's expression printer.
+
+      **The rule this step exists to restate.** *A classification is not evidence.* Three of the
+      thirteen had been carried on a sentence rather than on a grep — one of them for four steps —
+      and grepping cost seconds and closed two tests.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
