@@ -4196,19 +4196,15 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       about the client's and the server's counters colliding, this is about **two of the client's
       own** colliding with each other.
 
-      **The regression test is the spec test, and no unit-level pin was added — deliberately, and
-      with what was tried recorded.** A `SqliteSmokeTest` was written to force the collision
-      (two blogs and two posts added in one `SaveChanges`, each post's `BlogId` set to the *other*
-      blog's temporary key). It fails **identically with and without the fix**, on
-      `SQLite Error 19: 'FOREIGN KEY constraint failed'`, so it pins nothing — the same mistake
-      C75 caught and threw away. **It is left out of the tree and recorded here instead, because
-      it is a finding rather than a bad test**: an `Added` dependent whose foreign key is set to an
-      `Added` principal's temporary key **with no navigation set** does not survive the round trip
-      on **Tier B**. The navigation route is green
-      (`A_new_dependent_of_a_new_principal_gets_the_generated_foreign_key`), and the same
-      foreign-key-only shape is green on Tier A — `Save_optional_many_to_one_dependents` with
-      `changeMechanism: Fk` alone passes there — so it is specific to a store that issues keys at
-      save. **Not investigated; the reproduction above is exact and is the next probe.**
+      ~~**The regression test is the spec test, and no unit-level pin was added.** A
+      `SqliteSmokeTest` written to force the collision fails identically with and without the fix,
+      so it pins nothing… **recorded here as a finding rather than a bad test**: an `Added`
+      dependent whose foreign key is set to an `Added` principal's temporary key **with no
+      navigation set** does not survive the round trip on **Tier B**.~~ — **both halves of that
+      were wrong, and C79 closed them.** There is no Tier B gap: the test read `alpha.Id`, which EF
+      leaves at its sentinel `0` because a temporary key lives on the *entry* and not on the
+      instance, so it wrote `0` into a required foreign key. And a unit-level pin does exist, on
+      **Tier A**. Read C79.
 
 - [x] **C77. The 66, re-derived from the run and confirmed one at a time — and one of them was
       filed against a measurement that has since been overturned.** Docs only; no code, no test,
@@ -4334,6 +4330,66 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       and left to the decision it belongs to.** The spike is one commit's work to reproduce: copy
       `subrepos/efcore/src/EFCore.Relational/Metadata/Conventions/RelationalKeyDiscoveryConvention.cs`,
       change the base to the core `KeyDiscoveryConvention` and drop `RelationalDependencies`.
+
+- [x] **C79. C76's "open finding" was my own test misreading EF, and closing it produced the pin
+      C76 could not get.**
+      **`Total tests: 22368, Passed: 22085, Failed: 66, Skipped: 217`** (`c79`) — **66 → 66,
+      0 fixed, 0 broken**, reasons unchanged; total up 2 for the two new tests. Test-only; `src/`
+      is untouched. ✅ `<this commit>`
+
+      C76 recorded a suspected Tier B gap: *"an `Added` dependent whose foreign key is set to an
+      `Added` principal's temporary key with no navigation set does not survive the round trip"*,
+      failing `SQLite Error 19: 'FOREIGN KEY constraint failed'` before and after the fix alike.
+      **There is no gap.** Two probes, in the order this repo keeps writing down.
+
+      **Probe 1 — what the server was actually sent.** The minimal case is one blog and one post,
+      and the change entry answers it outright:
+
+          REPLAY Post state=Added temp=[Id] refs=[Id=-2147482647]
+                 values=[Id=-2147482647|BlogId=0|Heading=to-alpha]
+
+      **`BlogId=0`.** Not a placeholder the server mishandled — a zero the client sent. The server
+      wrote what it was given, and SQLite refused it, correctly.
+
+      **Probe 2 — what the client held.**
+
+          AFTER-ADD alpha.Id=0  entryIsTemporary=True  currentValue=-2147482647
+
+      **EF keeps a temporary key on the entry, not on the instance.** `alpha.Id` is still the
+      sentinel `0`; the placeholder is `Entry(alpha).Property(x => x.Id).CurrentValue`. That is
+      EF's behaviour on every provider, and it is exactly why `GraphUpdatesTestBase` writes
+      `new2d.ParentId = context.Entry(new1d).Property(e => e.Id).CurrentValue` rather than
+      `new1d.Id`. The test I wrote read the instance, put `0` into a required foreign key and got
+      the failure that deserved. **With EF's own idiom the shape passes.** Filed as a finding
+      because it failed identically with and without the fix — which was true, and which I read as
+      "pre-existing defect" when it meant "unrelated to the fix".
+
+      **The pin C76 wanted now exists, and where it lives is the reusable part.**
+      `InMemorySmokeTest.A_foreign_key_placeholder_resolves_against_its_own_principal_type` is
+      **seen to fail**: with the qualified lookup disabled it resolves `Post.BlogId` to `4` — a
+      *post's* key — and the blog ends with no posts.
+
+      **It has to be Tier A, and two facts had to be got right before it would fail at all.**
+
+      - **The store must issue keys at `Add`.** On Tier B every registration maps a placeholder to
+        *itself*, because a store that generates at save has nothing better to offer, so the
+        overwrite is harmless and EF's own fixup does the propagation. Three mutations on Tier B —
+        disabling the qualified lookup, disabling the reference redirect, refusing to classify a
+        foreign key as a reference — leave the Tier B test green. That is why the defect surfaced
+        in `GraphUpdates`, a **Tier A** base, and could never have surfaced in a SQLite smoke test.
+      - **The two key sequences must be apart.** In a fresh InMemory store `Blog.Id` and `Post.Id`
+        both start at `1`, so the wrong map entry happens to hold the right number and the defect
+        hides — the first Tier A attempt passed with the fix disabled for exactly that reason.
+        Three seeded posts put `Post.Id` ahead of `Blog.Id`, which is the state `GraphUpdates` is
+        in after its own seed, and then it fails.
+
+      **Both smoke tests are kept, and the Tier B one carries what it does *not* guard**, since
+      three mutations leave it green: it is a characterization of the round trip and the standing
+      refutation of C76's finding, not a guard on the redirect. **A test that cannot fail is not a
+      regression test — but one that documents why it cannot is still worth its lines**, which is
+      the distinction C75 did not need to draw and this one does.
+
+      C76's entry is corrected in place rather than left standing.
 
 ## Phase B — the tier audit, and the rework it found
 

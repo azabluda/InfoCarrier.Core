@@ -74,5 +74,8 @@
 # store rather than an entry count: a client placeholder is not unique across entity types, so
 # the server's value-keyed placeholder map resolved a foreign key to the wrong row. Keyed by
 # (key property, value) now. GraphUpdatesTestBase is 1787 of 1787.
+# 2026-08-11 (C79) - failures unchanged at 66; `total` 22366 -> 22368 for two smoke tests. C76's
+# suspected Tier B gap was a test that read `alpha.Id`, which EF leaves at 0 because a temporary
+# key lives on the entry. No gap; and C76's regression pin now exists, on Tier A.
 failed=66
-total=22366
+total=22368

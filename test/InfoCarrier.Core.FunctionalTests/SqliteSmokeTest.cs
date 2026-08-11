@@ -173,6 +173,52 @@ public class SqliteSmokeTest
     }
 
     [ConditionalFact]
+    public async Task A_foreign_key_set_from_a_principals_temporary_key_survives_the_round_trip()
+    {
+        // The dependent names its principal by *key* and not by navigation, which is the shape
+        // `GraphUpdatesTestBase`'s `ChangeMechanism.Fk` uses. What travels is the client's
+        // placeholder, so the server has to redirect it at the row the store actually issued.
+        //
+        // Note `Entry(...).Property(...).CurrentValue` rather than `alpha.Id`: EF keeps a
+        // temporary key on the *entry*, not on the instance, so `alpha.Id` is still `0` here. That
+        // is EF's behaviour on every provider and it is why the spec base reads the key this way
+        // too. C76 recorded this shape as a suspected Tier B gap on the strength of a test that
+        // read `alpha.Id`, wrote `0` into a required foreign key and got the `FOREIGN KEY
+        // constraint failed` that deserved; C79 established there is no gap, and this test is what
+        // says so.
+        //
+        // **What it guards, stated because it is less than it looks.** Three mutations were tried
+        // and none turns it red: disabling the qualified placeholder lookup, disabling the
+        // reference redirect entirely, and refusing to classify a foreign key as a reference at
+        // all. On a store that issues keys at *save* every placeholder maps to itself, so the
+        // redirect is a no-op and EF's own server-side fixup does the propagation. This is
+        // therefore a characterization test for the round trip, not a guard on the redirect — the
+        // guard on that is `InMemorySmokeTest`'s, on Tier A, where the store issues at `Add`.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            var alpha = new Blog { Title = "alpha" };
+            client.Add(alpha);
+            client.Add(
+                new Post
+                {
+                    Heading = "to-alpha",
+                    BlogId = client.Entry(alpha).Property(x => x.Id).CurrentValue,
+                });
+
+            Assert.Equal(2, await client.SaveChangesAsync());
+        }
+
+        using DbContext server = store.CreateDbContext();
+        Blog blog = await server.Set<Blog>().Include(x => x.Posts).SingleAsync();
+
+        Assert.NotEqual(0, blog.Id);
+        Assert.Equal(["to-alpha"], blog.Posts.Select(x => x.Heading));
+    }
+
+    [ConditionalFact]
     public async Task A_new_dependent_of_a_new_principal_gets_the_generated_foreign_key()
     {
         // The case the correlation id exists for. Blog.Id is store-generated, so on the client

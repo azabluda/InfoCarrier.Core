@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22366, Passed: 22083, Failed: 66, Skipped: 217`** (2026-08-11) across the
+**`Total tests: 22368, Passed: 22085, Failed: 66, Skipped: 217`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,7 +137,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c76b`. C55–C76 took 132 to 66; `Query.Associations` is 336 of 336, and
+currently `c79`. C55–C76 took 132 to 66; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **6 `BulkUpdates`** and
 **4 `Scaffolding.CompiledModel`**.
@@ -240,12 +240,16 @@ Not yet implemented, in rough priority order:
   every propagated foreign key back to the client and two more parameterizations of this same test
   went red. An ordinary FK is the client's own business; only a key it cannot recover by fixup may
   be asserted at it.
-  **One open finding came out of trying to pin C76 with a unit test** (recorded in C76, not in the
-  tree): an `Added` dependent whose foreign key is set to an `Added` principal's *temporary* key
-  **with no navigation set** fails on **Tier B** with `FOREIGN KEY constraint failed` — before and
-  after the fix alike, so it is a separate shape. The navigation route is green, and the same
-  FK-only shape is green on Tier A, so it is specific to a store that issues keys at save. The
-  reproduction is exact and is the next probe.
+  **C76 filed an open finding here and C79 closed it: there was no gap, and the test was wrong.**
+  `alpha.Id` reads `0` right after `Add` because **EF keeps a temporary key on the entry, not on
+  the instance** (`Entry(x).Property(p).CurrentValue` is the placeholder) — so the test wrote `0`
+  into a required foreign key and earned its `FOREIGN KEY constraint failed`. It failed with and
+  without the fix, which is true and which was read as "pre-existing defect" when it meant
+  "unrelated". **The pin C76 wanted now exists on Tier A**, and needing Tier A is the reusable
+  part: on Tier B every placeholder maps to *itself*, so three separate mutations leave a Tier B
+  test green. A collision is only observable where the store issues keys at `Add` **and** the two
+  key sequences have drifted apart — both InMemory counters start at 1, so an unseeded store hides
+  it too.
 - **The remaining spec bases — 1** (Phase C, 2026-08-10: 41 adopted down to 1). Everything the
   compliance test used to list is in, including the four "infrastructure" bases, `Seeding` (C7) and
   **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`** — B3d's price
