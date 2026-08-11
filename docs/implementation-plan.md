@@ -4497,6 +4497,48 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `UseTransaction`, so the client-relational test ADR-013 prescribes finds nothing against it.
       Re-derive the price before quoting it again.
 
+- [x] **C82. `AdHocJsonQuery` adopted — the last unadopted spec base, and
+      `InfoCarrierComplianceTest` is green.**
+      **`Total tests: 22448, Passed: 22197, Failed: 33, Skipped: 218`** (`c82`) — **30 → 33,
+      1 fixed, 4 broken**, and the four are one classified finding. ✅ `<this commit>`
+
+      B3d priced this at *"626 + 322 lines of relational mirror and seven abstract seeds only EF's
+      relational classes implement"*, C10 re-checked it and agreed, and both halves were priced
+      against the wrong obstacle. **The 626 + 322 was the cost of not referencing
+      `EFCore.Relational.Specification.Tests`** — ADR-013 (C81) does, so
+      `AdHocJsonQueryRelationalTestBase` is inherited and nothing is mirrored. **The seven abstract
+      seeds are ten raw-SQL `INSERT`s**, copied byte-for-byte out of `AdHocJsonQuerySqliteTest`
+      because the backing store *is* SQLite.
+
+      **The one thing that is not a copy is where the SQL runs.** A seed is handed the **client's**
+      context, which has no database and no `ExecuteSql`. These rows are a statement about what the
+      store already holds, so `ExecuteOnBackendAsync` runs them against the backend directly — the
+      same reasoning `GraphUpdatesInfoCarrierTest.ReseedAsync` uses.
+
+      **Copying seven of the ten cost a run, and the failure named it.** The first attempt took
+      only the seeds the compiler demanded — the abstract ones — and left `Seed21006`, `Seed29219`
+      and `Seed34960`, which are `virtual` and which EF's SQLite class *also* overrides to add
+      malformed rows. Result: **34 of 61**, with every failure in the missing-JSON tests and a probe
+      showing the seed helper had never been called at all. **"The compiler told me which ones are
+      required" is not the same question as "which ones does this store need".** With all ten:
+      **56 of 61**.
+
+      **The four that are left are one finding, and it is about exceptions rather than about JSON.**
+      `Bad_json_properties_null_scalars` / `_null_navigations` ×2 expect
+      `Assert.ThrowsAny<JsonException>` and get
+
+          InfoCarrier.Core.InfoCarrierServerException :
+              'n' is an invalid start of a property name. Expected a '"'. LineNumber: 1 …
+
+      The message is the store's, verbatim, and the type is not. `System.Text.Json` throws an
+      **`internal`** `JsonReaderException`, so `InfoCarrierFaultMapper.Resolve` finds the type and
+      `Invoke` then looks for a **public** constructor and finds none — the deliberate fallback in
+      W5's design. A caller writes `catch (JsonException)`, which is the public base it does have.
+      **Closed in C83.**
+
+      **`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` passes**, which is the
+      milestone: every base EF ships that this provider can host is adopted.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
@@ -5027,7 +5069,7 @@ constructor, so the backend store cannot build the server's copy.
       | 8 | `BadDataJsonDeserialization` | Spatial GeoJson. |
       | ~49 | the rest | The A54/A59/A61–A65 tables and the known singletons. |
 
-- [ ] **B3d. `AdHocJsonQuery` is not the seven-seed job it was filed as.** Re-examined, not started.
+- [x] **B3d. `AdHocJsonQuery` is not the seven-seed job it was filed as.** **Adopted in C82** — and the price it records was the price of not having the package ADR-013 now references.
       The plan assumed the work was `AdHocJsonQuerySqliteTest`'s ~200 lines of seed SQL rerouted
       through `((InfoCarrierTestStore)TestStore).Backend`, which is right as far as it goes. What it
       missed is that **the core base's `OnModelCreating*` methods do not map anything to JSON** —

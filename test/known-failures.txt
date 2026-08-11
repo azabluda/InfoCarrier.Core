@@ -84,5 +84,9 @@
 # 2026-08-11 (C81) - failures unchanged at 30; `total` 22369 -> 22387 for the 18 tests of
 # ComplexCollectionJsonUpdateTestBase, adopted under ADR-013. JsonUpdateTestBase was adopted,
 # measured at 142/142 failing on one harness sentence, and reverted.
-failed=30
-total=22387
+# 2026-08-11 (C82) - 30 -> 33, `total` 22387 -> 22448. AdHocJsonQuery, the last unadopted spec
+# base, is in and InfoCarrierComplianceTest is green: 61 tests, 56 passing. The rise of 3 is
+# net -- the compliance test goes green and the base brings 4 red, all one finding (an internal
+# JsonReaderException loses its type on the wire; closed in C83).
+failed=33
+total=22448
