@@ -204,6 +204,28 @@ public class NorthwindBulkUpdatesInfoCarrierTest(NorthwindBulkUpdatesInfoCarrier
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Update_with_cross_join_outer_apply_set_constant(async))).Message);
 
+    // --- EF's own open bug, adopted verbatim (C94). `NorthwindBulkUpdatesSqliteTest` carries
+    // `[ConditionalTheory(Skip = "Issue#28886")]` on exactly these two, and the SQL it records
+    // under the skip is the truncated `UPDATE` this provider produces character for character —
+    // `no such column: c.CustomerID` / `o.OrderID`. **Issue #28886 is SQLite's**: it appears
+    // nowhere in EF's SQL Server suite, and these classes are Tier B, so adopting the attribute
+    // here loses nothing when M7 brings a Tier C.
+    //
+    // A63's rule, which is the one that permits this at all: adopting EF's *own* override where
+    // the reason matches is not the suppression CLAUDE.md forbids. What is forbidden is inventing
+    // a skip; this is recording that the reference provider fails the same test for the same
+    // documented reason.
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
+    public override Task Update_with_cross_join_left_join_set_constant(bool async)
+        => base.Update_with_cross_join_left_join_set_constant(async);
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
+    public override Task Update_with_two_inner_joins(bool async)
+        => base.Update_with_two_inner_joins(async);
+
     /// <summary>
     ///     EF's helper, mirrored: a non-query translation failure wraps the provider's detail in
     ///     <c>CoreStrings.NonQueryTranslationFailedWithDetails</c>, whose first 21 characters are

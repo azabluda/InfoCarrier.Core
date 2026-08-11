@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Query;
 
@@ -44,6 +45,20 @@ public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFi
     /// </remarks>
     public override Task Array_of_byte()
         => AssertTranslationFailed(() => TestArray((byte)1, (byte)2));
+
+    /// <summary>
+    ///     EF's own skip, adopted verbatim (C94). <c>NonSharedPrimitiveCollectionsQuerySqliteTest</c>
+    ///     carries this attribute and this reason.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Issue #30730 is SQLite's</b> — EF's SQL Server suite skips it under a different
+    ///     issue and for a different reason, and this class is Tier B, so adopting the attribute
+    ///     here loses nothing when M7 brings a Tier C. C62 established the same conclusion by
+    ///     reading the row the store actually holds; this records it the way EF does.
+    /// </remarks>
+    [ConditionalFact(Skip = "Issue #30730: TODO: SQLite is not matching elements here.")]
+    public override Task Array_of_TimeOnly()
+        => base.Array_of_TimeOnly();
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(

@@ -127,7 +127,7 @@ found. **The standing price for all of it — "626 + 322 lines of relational mir
 abstract seeds" — was a price for a route nobody was going to take.**
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22455, Passed: 22215, Failed: 22, Skipped: 218`** (2026-08-11) across the
+**`Total tests: 22453, Passed: 22215, Failed: 17, Skipped: 221`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -145,11 +145,16 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c93`. C55–C93 took 132 to 22, and 2 of the 22 are C86's own new tests; `Query.Associations` is 336 of 336, and
+currently `c94`. C55–C94 took 132 to 17, and 2 of the 17 are C86's own new tests; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
-The largest block is now **6 `BulkUpdates`** — `JsonQuery`
+The largest blocks are now **2 `JsonQuery`**, **2 `GearsOfWar`** and **2 `ComplexTypesTracking`** — `JsonQuery`
 fell from 40 to 4 when C80 took B12, `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22,
-and `Scaffolding.CompiledModel` from 4 to **0** across C90–C93.
+`Scaffolding.CompiledModel` from 4 to **0** across C90–C93, and `BulkUpdates` from 6 to 2 when C94
+took EF's own #28886 skip.
+**`total` fell to 22453 in C94 and that was deliberate** — xUnit reports a *skipped theory* as one
+test rather than as its parameterizations, so two skipped theories turn 4 tests into 2. It is the
+only lowering `test/known-failures.txt` has, and it is written up there. A shrinking total with no
+such note is a crashed host.
 **Those four are also the standing example of why the count is the wrong instrument**: C90, C91
 and C92 each closed a real defect and each measured 26 → 26, because every fix moved the same four
 tests one stage further in. **Read the reasons diff, not the count.**
