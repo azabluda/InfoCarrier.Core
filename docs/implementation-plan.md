@@ -57,3 +57,12 @@ Detailed steps are in
   Passed: 9, Failed: 0, Total: 9 — confirmed again under
   `ASPNETCORE_ENVIRONMENT=Production DOTNET_ENVIRONMENT=Production`, filtered to the
   protocol-version test alone: Passed: 1, Failed: 0, Total: 1.
+- [x] **M8-5. A query over HTTP, end to end — the premise of the product, asserted.** `<this commit>`
+  `NorthwindOverHttpTest`: a filtered entity query, a projection that crosses as columns rather
+  than as entities, an aggregate answered by the server, and a navigation lazy-loaded via
+  `UseLazyLoadingProxies()` over a second HTTP round trip. All four passed on the first run — a
+  legitimate result, since the transport is thin by design and Tasks 2–4 already proved the two
+  models agree. Filtered: Passed: 4, Failed: 0, Total: 4. Whole project: Passed: 13, Failed: 0,
+  Total: 13 (Task 3's review round, M8-3a, added a fourth test to that task after the plan's
+  arithmetic was written, so every running total downstream of it is one higher than printed
+  there).

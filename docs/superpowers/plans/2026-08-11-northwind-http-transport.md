@@ -1233,7 +1233,7 @@ This is the task that proves the milestone's premise.
 - Consumes: everything from Tasks 2–4.
 - Produces: `NorthwindOverHttpTest`, and a private helper `NorthwindContext CreateClientContext(NorthwindServerFactory factory)` that later tasks reuse.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `test/InfoCarrier.Core.TransportTests/NorthwindOverHttpTest.cs`:
 
@@ -1321,7 +1321,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails, then to verify it passes**
+- [x] **Step 2: Run it to verify it fails, then to verify it passes**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --filter "FullyQualifiedName~NorthwindOverHttpTest"`
 
@@ -1334,13 +1334,18 @@ If it passes first time, that is a legitimate result — the transport is thin b
 
 Expected on the final run: `Passed: 4, Failed: 0` for this filter.
 
-- [ ] **Step 3: Run the whole test project**
+- [x] **Step 3: Run the whole test project**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`
 
 Expected: `Passed: 12, Failed: 0, Total: 12`.
 
-- [ ] **Step 4: Commit**
+**Actual: `Passed: 13, Failed: 0, Total: 13`.** Task 3's review round (Step M8-3a) added a fourth
+test to that task after this plan was written, so every downstream running total in this document
+is one higher than what is printed here — the arithmetic below (`Task 5 adds 4 (total 12)`) is
+stale for the same reason. Not a discrepancy to fix by trimming the suite.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add test/InfoCarrier.Core.TransportTests/ docs/implementation-plan.md
