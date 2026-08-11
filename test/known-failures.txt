@@ -48,5 +48,8 @@
 # EF's own SQLite suite says. Test-only; the total is unchanged.
 # 2026-08-10 (C60) — 115 -> 114. One more override of EF's own, adopted after reading the
 # exception rather than the count. Test-only; the total is unchanged.
+# 2026-08-10 (C66) — failures unchanged at 114; `total` 22356 -> 22362 for the six W6
+# cancellation tests. The harness transport was dropping the caller's CancellationToken, so the
+# whole suite reached the server with CancellationToken.None; fixing that changed no result.
 failed=114
-total=22356
+total=22362

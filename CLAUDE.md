@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22356, Passed: 22025, Failed: 114, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22362, Passed: 22031, Failed: 114, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,7 +137,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c64`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
+currently `c66`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
 B12, a decision), **26 `MaterializationInterception`** (B16's topology, and C58 priced the optional
 harness remedy — A71's ten are the same defect, not a separate one), **8 `Index_*`** across two
 `Query.Associations` classes (C55 — the server raises the warning and the harness does not

@@ -143,8 +143,15 @@ on first reading, so it is written down.
 - **Denial of service beyond payload size.** A well-formed query that is merely expensive is not
   distinguishable here from a legitimate one. Timeouts and quotas belong in the host.
 
-## 6. Cancellation (W6) — open, and it touches this path
+## 6. Cancellation (W6) — half landed, and the half that touches this path is the open one
 
+**Amended 2026-08-10 (C66).** The *cooperative* half is done and now tested: the caller's
+`CancellationToken` reaches every one of the nine server operations, and `CancellationTest` pins
+that plus the fault-filter behaviour below. It carries **no** security consequence — the token is
+an in-process object and never crosses the wire.
+
+What this section is about is the other half, and it is untouched: a **remote cancel signal**, by
+which a caller abandons a request already dispatched over a connection.
 `InfoCarrierEnvelope.CorrelationId` exists for it and nothing reads it. `InfoCarrierEnvelopeServer`
 deliberately lets `OperationCanceledException` escape rather than reporting it as a fault, because
 cancellation is the caller's own token rather than a server-side failure. **When W6 lands, a

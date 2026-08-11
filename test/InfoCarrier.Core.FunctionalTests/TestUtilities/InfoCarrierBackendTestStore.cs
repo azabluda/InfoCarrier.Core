@@ -111,8 +111,8 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // halves of the envelope protocol were unexercised — the M5 exit criterion.
         _client = new TransportInfoCarrierClient(
             new EnvelopeTransport(
-                envelope => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
-                    .DispatchAsync(envelope)),
+                (envelope, cancellationToken) => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
+                    .DispatchAsync(envelope, cancellationToken)),
             _serializer);
     }
 
@@ -143,12 +143,28 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///         uses the real <see cref="InProcessInfoCarrierTransport" /> on small payloads.
     ///     </para>
     /// </remarks>
+    /// <remarks>
+    ///     <para>
+    ///         The handler takes the <see cref="CancellationToken" /> as well as the envelope, and
+    ///         that is not decoration (C66). It used to be a
+    ///         <c>Func&lt;InfoCarrierEnvelope, Task&lt;InfoCarrierEnvelope&gt;&gt;</c>, so this
+    ///         transport <b>dropped the caller's token on the floor</b> and every server operation
+    ///         in the whole suite ran with <see cref="CancellationToken.None" /> — thousands of
+    ///         `…Async(cancellationToken)` calls whose token stopped here.
+    ///     </para>
+    ///     <para>
+    ///         The product was never wrong: <see cref="InProcessInfoCarrierTransport" /> has always
+    ///         taken the two-argument handler. This is the same shape as C45's finding — a wire
+    ///         concern that only the harness stood between the suite and — and it is why W6 could
+    ///         be threaded end to end and still be untested.
+    ///     </para>
+    /// </remarks>
     private sealed class EnvelopeTransport(
-        Func<InfoCarrierEnvelope, Task<InfoCarrierEnvelope>> handler) : IInfoCarrierTransport
+        Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler) : IInfoCarrierTransport
     {
         public Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
-            => handler(request);
+            => handler(request, cancellationToken);
     }
 
     /// <summary>

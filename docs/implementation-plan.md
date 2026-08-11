@@ -3687,6 +3687,52 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       and the block list C60 found two phases stale: **a number restated instead of re-derived.**
       The paragraph now carries the derivation with it.
 
+- [x] **C66. W6's cooperative half was threaded end to end and never once exercised — and the thing
+      that hid it was the harness, exactly as in C45.**
+      **`Total tests: 22362, Passed: 22031, Failed: 114, Skipped: 217`** (`c66`) — **114 → 114,
+      0 fixed, 0 broken, reasons unchanged.** Total up 6 for the new tests. ✅ `<this commit>`
+
+      M5's last open criterion is cancellation. Reading the product first, as C45's lesson says:
+      **every layer already takes a `CancellationToken` and passes it on** —
+      `QueryContext.CancellationToken` → `IInfoCarrierClient` → `TransportInfoCarrierClient` →
+      `IInfoCarrierTransport` → `InfoCarrierEnvelopeServer.DispatchAsync` → all nine
+      `IInfoCarrierServer` methods, with `InProcessInfoCarrierTransport` carrying it too. Nothing
+      needed building. **And nothing asserted that any of it worked.**
+
+      **The gap was one line of the harness.** `InfoCarrierBackendTestStore`'s transport took a
+      `Func<InfoCarrierEnvelope, Task<InfoCarrierEnvelope>>`:
+
+          public Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
+              => handler(request);          // the token stops here
+
+      So **every async query and every `SaveChangesAsync` in the entire suite reached the server
+      with `CancellationToken.None`**, whatever the caller passed. A parameter carried and never
+      read — the same species as the version field C45 found, and in the same file for the same
+      reason: the store stood between the suite and a wire concern.
+
+      **`CancellationTest`, six tests, and what each is for.**
+
+      | Test | Why it is not redundant |
+      |---|---|
+      | `Every_operation_hands_the_callers_token_to_the_server` | Identity twice over — the recorded token must *equal* the caller's **and** cancelling the source afterwards must be visible through every recorded one, because equality alone also holds between two default tokens. Counts against `Enum.GetValues<InfoCarrierOperation>().Length`, so an operation added without a token fails here. |
+      | `A_cancelled_operation_escapes_rather_than_becoming_a_fault` | Pins the deliberate exclusion in `DispatchAsync`'s catch filter: cancellation is the caller's own token, not a server-side failure to report as a fault. |
+      | `A_failure_that_is_not_cancellation_still_becomes_a_fault` | The contrast that gives the previous one meaning. If both escaped, the first would assert nothing *about cancellation*. |
+      | `The_in_process_transport_carries_the_token` | The reference transport for a real one. |
+      | `A_cancelled_token_cancels_a_query_end_to_end` / `…_SaveChanges_…` | Through the real client, transport and server; two different operations and two different executors. |
+
+      **Seen to fail.** Passing `default` instead of `cancellationToken` in `ExecuteAsync`'s
+      `Query` arm turns `Every_operation_hands_the_callers_token_to_the_server` red on its own,
+      with the other five still green.
+
+      **What is *not* done, stated so the criterion is not over-claimed.** This is cancellation of
+      an operation the caller is awaiting — the cooperative token path. It is **not** a remote
+      cancel *signal*: `InfoCarrierEnvelope.CorrelationId` is still written by nobody and read by
+      nobody, and a caller cannot yet abandon a request already dispatched over a connection. That
+      needs a `Cancel` operation keyed by correlation id, and it cannot be built or tested before a
+      network transport exists (M8) — over the in-process transport the token *is* the signal.
+      `security-review.md` §6 already states the constraints it must then meet (unguessable,
+      connection-scoped), and is amended here to say which half now stands.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

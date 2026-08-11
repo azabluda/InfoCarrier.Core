@@ -210,8 +210,18 @@ directions broke four Northwind spec tests on results of 560 MB and 111 MB — c
 caller had asked for — while no request came close. The threat this milestone names is
 server-inbound; capping what a client gets back is a page-size policy, and a different question.
 
-**One thing is left in M5: cancellation (W6).** The envelope (C45), exception fidelity (C46) and
-the security review (C48) all closed on 2026-08-10.
+**One thing is left in M5: the remote half of cancellation (W6).** The envelope (C45), exception
+fidelity (C46) and the security review (C48) all closed on 2026-08-10, and **C66 closed W6's
+cooperative half**: the caller's `CancellationToken` reaches all nine server operations, and six
+tests hold it there. Nothing in the product needed building — every layer already threaded the
+token — but nothing had ever asserted it, because the *harness* transport dropped it and the whole
+suite therefore ran with `CancellationToken.None`.
+
+**What remains is a remote cancel signal**, and it is deliberately not built: abandoning a request
+already dispatched needs a `Cancel` operation keyed by `InfoCarrierEnvelope.CorrelationId`, which
+no one writes or reads today, and it cannot be exercised before a network transport exists (M8) —
+over an in-process transport the token *is* the signal. `security-review.md` §6 states the
+constraints it must meet when it lands.
 
 **Exit criteria**
 - Allowlists for node kinds, resolvable types, and invocable methods — **default deny**,
@@ -224,7 +234,8 @@ the security review (C48) all closed on 2026-08-10.
   every request and **nothing that unwrapped one** — the only dispatcher was inline in a smoke
   test and handled one of nine operations. `InfoCarrierEnvelopeServer` is the missing half, and
   all 22321 tests now cross a real envelope with the version checked before dispatch.)
-- Exception fidelity across the wire (W5) ✅ (C46, 2026-08-10) and cancellation (W6).
+- Exception fidelity across the wire (W5) ✅ (C46, 2026-08-10) and cancellation (W6) —
+  **cooperative half ✅ (C66, 2026-08-10), remote cancel signal open.**
 
   W5 is `InfoCarrierFault`: a failure travels as data and is raised again on the client, keeping
   the type, the message and the inner chain — which is what EF's spec tests assert on, so the
