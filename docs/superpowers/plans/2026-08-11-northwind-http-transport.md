@@ -1361,6 +1361,29 @@ browser is involved.
 Passed: 12, Failed: 0, Total: 12."
 ```
 
+- [x] **Fix round 1 (review, Step M8-5a): the three value-only assertions.** Code review found
+  that three of the four tests asserted the values that came back but not the mechanism their
+  names claim, so each would still pass against a product defect it exists to catch: the
+  projection test could not tell "projected columns" from "whole entities fetched and projected
+  client-side"; the aggregate test could not tell "server-side `COUNT`" from "fetch every matching
+  row and count locally"; the lazy-loading test proved the navigations were populated *after*
+  being touched but not that touching them was *what* populated them -- an eager over-fetch during
+  the first `SingleAsync` would pass every assertion while falsifying the test's own name. Fixed by
+  adding `RecordingHandler`, a small reusable `DelegatingHandler` that records request count and
+  response bodies (a prototype of the wire-inspector panel a later phase needs), threaded through
+  a new `CreateClientContext(factory, out RecordingHandler)` overload -- the original
+  `CreateClientContext(factory)` still works, delegating to the new one, so Task 6 is unaffected.
+  The projection test now asserts none of the five seeded `OrderDate` values appear in the response
+  payload (the projection excludes that column; a whole-entity payload would carry it). The
+  aggregate test now asserts exactly one request and a response under 700 bytes (measured: 448
+  bytes for the scalar; a row-carrying response measures ~787 bytes/row on the same wire, so three
+  `OrderDetail` rows would run well past the bound). The lazy-loading test now asserts the request
+  count is 1 right after the initial query, increases after `order.Customer` is read, and increases
+  again after `order.OrderDetails` is enumerated. Deliberately broken and un-broken to confirm the
+  lazy-loading assertion can fail (asserting the count stayed at 1 after touching `order.Customer`
+  failed with `Assert.Equal() Failure: Expected: 1, Actual: 2` against the real, correct
+  implementation). Project total unchanged at 13 (no test added, three strengthened).
+
 ---
 
 ### Task 6: SaveChanges and a transaction over HTTP

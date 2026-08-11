@@ -66,3 +66,14 @@ Detailed steps are in
   Total: 13 (Task 3's review round, M8-3a, added a fourth test to that task after the plan's
   arithmetic was written, so every running total downstream of it is one higher than printed
   there).
+  Review found three of the four tests asserting values but not the mechanism their names claim —
+  a defect could pass every one of them. Closed in M8-5a `<this commit>`: a new `RecordingHandler`
+  (a small reusable `DelegatingHandler`, threaded through a `CreateClientContext(factory, out
+  RecordingHandler)` overload that leaves the original overload working for Task 6) now lets the
+  projection test assert the excluded `OrderDate` column never crosses the wire, the aggregate test
+  assert one request and a sub-700-byte response (measured: 448 bytes for the real scalar), and the
+  lazy-loading test — the one that matters most — assert the request count is 1 right after the
+  initial query and increases once after each navigation is touched. Deliberately broken and
+  restored to confirm that last assertion can fail: asserting the count stayed at 1 after touching
+  `order.Customer` failed with `Assert.Equal() Failure: Expected: 1, Actual: 2` against the
+  correct implementation. Total unchanged at 13 — three tests strengthened, none added.
