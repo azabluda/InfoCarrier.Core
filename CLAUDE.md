@@ -357,7 +357,13 @@ Not yet implemented, in rough priority order:
   virtual and calls `GetDbTransaction()`, so all **142** of its tests fail on *"Relational-specific
   methods can only be used when the context is using a relational database provider"* before
   reaching anything about JSON.
-  **C86 then covered it directly, and WRITING AN OWNED JSON COLLECTION DOES NOT WORK.** Five tests
+  **C86 covered it directly and C87 fixed half of it. Editing an element and the two-owner shape
+  now work; adding and removing do not.** C87's fix: `InfoCarrierDatabase.Expand` yields the
+  **ownership chain** of a JSON-mapped entry, because EF writes a JSON column by partial update of
+  the owning row and that row's entry is `Unchanged` and never travelled. What is left is a
+  *different* defect — `__synthesizedOrdinal` is **positional**, and it collides with an element the
+  **server** tracked from an earlier query inside the same transaction. The open question is whether
+  a server context should carry query-tracked state into a replay at all. Original diagnosis: Five tests
   on EF's own fixture: four fail, and the one that passes is the diagnosis. The client sends only
   the changed element — `ENTRIES: JsonEntityBasic.OwnedCollectionRoot#JsonOwnedRoot=Added` — and
   never its owner, so EF's `FindJsonPartialUpdateInfo` has no row whose JSON column to update and

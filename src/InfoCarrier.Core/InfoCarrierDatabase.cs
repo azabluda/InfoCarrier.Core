@@ -2,6 +2,7 @@
 
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
@@ -265,6 +266,7 @@ public class InfoCarrierDatabase : IDatabase
     private static IEnumerable<IUpdateEntry> Expand(IList<IUpdateEntry> entries)
     {
         var seen = new HashSet<IUpdateEntry>();
+        var sent = new HashSet<IUpdateEntry>(entries);
 
         foreach (IUpdateEntry entry in entries)
         {
@@ -274,9 +276,67 @@ public class InfoCarrierDatabase : IDatabase
             }
         }
 
+        // The owner of a JSON-mapped entry, and every owner above it. EF writes a JSON column by
+        // *partial update of the owning row*: `ModificationCommand.FindJsonPartialUpdateInfo`
+        // walks from the changed dependent up to the entry that holds the column, and builds the
+        // `UPDATE` from it. That entry is normally `Unchanged`, so it is not in `entries` and
+        // never travelled — and the server, replaying a change set that contained only the
+        // dependent, gave `NullReferenceException` from inside EF's own `ModificationCommand`
+        // (C86). Four tests failed on it, and the one that *passed* named the cause: adding a
+        // whole new entity works, because there the owner is `Added` and therefore already sent.
+        //
+        // Ownership order, principal first, which is the order the server's replay wants anyway.
+        //
+        // Restricted to JSON-mapped types on purpose. Every owned type has an owner, and widening
+        // this to all of them would put table-splitting dependents' owners on the wire for no
+        // reason — `SaveChanges` payload changes are the ones this provider has paid most for
+        // (C37, C42).
+        foreach (IUpdateEntry entry in entries)
+        {
+            foreach (IUpdateEntry owner in JsonColumnOwners(entry))
+            {
+                if (!sent.Contains(owner) && seen.Add(owner))
+                {
+                    yield return owner;
+                }
+            }
+        }
+
         foreach (IUpdateEntry entry in entries)
         {
             yield return entry;
+        }
+    }
+
+    /// <summary>
+    ///     The chain of owners above a JSON-mapped entry, nearest first, or nothing at all if the
+    ///     entry is not JSON-mapped.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GetContainerColumnName()</c> is the same question
+    ///     <see cref="InfoCarrierKeyDiscoveryConvention" /> asks, and it walks the ownership chain
+    ///     itself, so a nested owned type inherits the container from whichever ancestor declared
+    ///     it. Reading it costs nothing on a model with no <c>ToJson()</c>: it is null and this
+    ///     yields immediately.
+    /// </remarks>
+    private static IEnumerable<IUpdateEntry> JsonColumnOwners(IUpdateEntry entry)
+    {
+        if (entry.EntityType.GetContainerColumnName() is null)
+        {
+            yield break;
+        }
+
+        var current = entry as InternalEntityEntry;
+
+        while (current?.EntityType.FindOwnership() is { } ownership)
+        {
+            if (current.StateManager.FindPrincipal(current, ownership) is not { } owner)
+            {
+                yield break;
+            }
+
+            yield return owner;
+            current = owner;
         }
     }
 

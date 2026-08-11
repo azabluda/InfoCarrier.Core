@@ -100,5 +100,9 @@
 # update and throws NullReferenceException. Four fail; the fifth passes because adding a whole
 # new entity does send the owner, which is the control that proves the cause. The fix seam is
 # InfoCarrierDatabase.Expand. Lower this back to 27 when it lands.
-failed=31
+# 2026-08-11 (C87) - 31 -> 29. The owner of a JSON-mapped entry now travels, so EF can build the
+# partial update of the row holding the column. Editing an element and the two-owner shape pass.
+# Adding and removing still fail, on a different defect: __synthesizedOrdinal is positional and
+# collides with an element the server tracked from an earlier query in the same transaction.
+failed=29
 total=22455

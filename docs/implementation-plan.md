@@ -4667,6 +4667,51 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       worth more than an unmeasured silence — and they turn red into green the moment the fix
       lands, which is the only honest way to know it did.
 
+- [x] **C87. The owner of a JSON-mapped entry now travels, and two of C86's four close. The other
+      two are a different defect and the error message says so.**
+      **`Total tests: 22455, Passed: 22208, Failed: 29, Skipped: 218`** (`c87`) — **31 → 29,
+      2 fixed, 0 broken.** ✅ `<this commit>`
+
+      C86 named the cause and the seam. `InfoCarrierDatabase.Expand` — which already widens the
+      change set once, for `SharedIdentityEntry` — now also yields the **ownership chain** of any
+      entry whose type is JSON-mapped, principal first. EF writes a JSON column by partial update
+      of the owning row, and that row's entry is normally `Unchanged`, so it never travelled.
+
+      **Restricted to JSON-mapped types on purpose.** Every owned type has an owner;
+      widening this to all of them would put table-splitting dependents' owners on the wire for
+      nothing, and `SaveChanges` payload changes are what this provider has paid most for (C37 at
+      560 MB, C42 at 1 fixed / 2 broken). `GetContainerColumnName()` is the same question
+      `InfoCarrierKeyDiscoveryConvention` asks and costs nothing on a model with no `ToJson()`.
+
+      **Closed: editing an element, and the two-owner shape.** The second is B12's own question on
+      the write side — two owners, each with its own elements, written in one `SaveChanges` — and
+      it is the one that would have failed loudest before C80.
+
+      **Still red, and now a different failure:** adding and removing an element.
+
+          The instance of entity type 'JsonEntityBasic.OwnedCollectionRoot#JsonOwnedRoot' cannot be
+          tracked because another instance with the key value '{OwnerId: 1, __synthesizedOrdinal: 1}'
+          is already being tracked.
+
+      **Not the missing owner any more — a collision on the ordinal.** The evidence, and it is
+      enough to name the next probe rather than guess at a fix:
+
+      - the change set is exactly two entries and neither duplicates the other —
+        `JsonEntityBasic=Unchanged[Id:1] | JsonOwnedRoot=Added[OwnerId:1,__synthesizedOrdinal:-2147482647]`;
+      - `ChangeEntryMapper` sends **no navigations**, so the owner arrives bare and brings no
+        collection with it;
+      - so the instance already holding ordinal 1 is one the **server** was tracking before the
+        replay began — the test's own earlier query ran there, inside the same transaction, and
+        tracked the owner and its existing elements;
+      - and `__synthesizedOrdinal` is **positional**, assigned by EF from the array index, so the
+        client's placeholder and the server's existing element land on the same number.
+
+      **Editing passes for the same reason adding fails**: an edit reuses an ordinal the server
+      already tracks, so EF updates rather than adds. **The next question is whether a server
+      context should carry query-tracked state into a replay at all**, which is a statement about
+      the server's context lifetime and not about JSON. Left red with the evidence attached rather
+      than fixed by guessing at the end of a long session.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
