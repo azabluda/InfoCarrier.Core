@@ -4928,8 +4928,10 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **The pin is `BigModel` itself**, and it has been seen to move: `InvalidCastException` →
       reaching the baseline comparison. It goes green when the baselines land.
 
-- [ ] **C92. A complex value travels by reflective object shape, and the shape is not the model.**
-      `<this commit>`
+- [x] **C92. A complex value travels by reflective object shape, and the shape is not the model.**
+      **`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (`c92b`) — **26 → 26,
+      0 fixed, 0 broken.** `ComplexTypes` moves to the baselines, and the first version of this
+      measured **31**. ✅ `<this commit>`
 
       `ComplexTypes` fails *"Type 'Microsoft.EntityFrameworkCore.DbContext' is not on the
       deserialization allowlist"* inside `SaveChanges`. `OwnedType` — the complex type
@@ -4944,9 +4946,34 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       type"* — and this is the third face of the same thing: it carries a member the model does
       not map.
 
-      The route is to map a complex value through its `IComplexType` the way an entity is mapped
-      through its `IEntityType`, both directions. Not taken in C90 because it touches
-      `ComplexTypesTracking` (249 of 251) and every complex-type family, so it needs its own run.
+      **Forward only, and that is the whole reason it is small.** The reverse walk
+      (`RehydrateObject`) sets exactly the members that *arrived*, so dropping a member on the way
+      out needs no matching change on the way back. `ToComplexValue(value, complexProperty)` hands
+      the `IComplexType` to the object-shape walk, which then skips any name the complex type
+      neither declares as a property nor as a nested complex property. Only a complex type is
+      filtered: an anonymous type, a DTO or a constructed row has no model to ask, and there the
+      walk *is* the specification.
+
+      **The complex type has to descend, and it descends through three things that are not it.**
+      Each one cost a measured regression, and the first version of this step measured **31, five
+      worse than it started**:
+
+      | Shape reached carrying a complex type | What happened |
+      |---|---|
+      | Items of a complex **collection** | Right — the property is declared as the collection and mapped as its element, so the items must carry it. |
+      | `KeyValuePair<string, object>` inside a **property bag** | A property-bag complex type *is* a `Dictionary<string, object>`, so it goes down the collection branch and the items one level further down are key/value pairs. Filtering `Key` and `Value` away rebuilt the bag with a null key — *"Value cannot be null. (Parameter 'key')"* — in `Can_track_entity_with_complex_property_bag_collections`. |
+      | `Nullable<T>` for an **optional** complex property | Declared `ValueNestedType?`, so what is walked is `HasValue` and `Value`, which the complex type equally does not declare. Dropping them sent nothing at all: **five** `Query.Associations.ComplexProperties` tests answered `null` where a nested value belonged. |
+
+      So the filter applies only where the walked shape really is the complex type
+      (`ClrType.IsInstanceOfType(value)`), and `Nullable<>` is treated as transparent — its
+      members pass and the complex type is handed to `Value`, which is where the members it does
+      declare actually are.
+
+      **The probe is the reusable part, and it is one line.** Printing
+      `DROP <complexType>.<member> kept=[…]` at the point of refusal named the `Nullable<>` case
+      in a single filtered run — `ValueRootEntity.OptionalAssociate#ValueAssociateType.HasValue`
+      and `.Value` against a `kept` list containing neither — where reading the five test names
+      had suggested "something about value types".
 
 ## Phase B — the tier audit, and the rework it found
 

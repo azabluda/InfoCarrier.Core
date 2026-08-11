@@ -304,6 +304,19 @@ Not yet implemented, in rough priority order:
   two were `HasConversion<string>()` on an enum (a provider CLR type means the model asked for a
   *target*, not for a converter). The guard is `GetProviderClrType() is null && JsonForm(…) is
   null`: fall back only where the existing rule had no answer at all.
+- **A complex value travels by reflective object shape, and the shape is not the model (C92).**
+  `OwnedType` declares `public DbContext? Context` and its model says `Ignore(e => e.Context)`; the
+  walk sent it anyway. `ToComplexValue` hands the `IComplexType` down so the walk can drop what the
+  model does not map — **forward only**, because `RehydrateObject` sets exactly what arrived. The
+  hard part is that a complex type **descends through three shapes that are not it**, and the first
+  version measured **31, five worse than it started**: the items of a complex collection (right), a
+  `KeyValuePair` inside a **property bag** (a bag *is* a `Dictionary<string, object>`, so it takes
+  the collection branch), and `Nullable<T>` for an **optional** complex property (`ValueNestedType?`
+  presents `HasValue`/`Value`, which no complex type declares). Filter only where
+  `ClrType.IsInstanceOfType(value)`, and treat `Nullable<>` as transparent. **The probe was one
+  line** — print `DROP <complexType>.<member> kept=[…]` at the point of refusal — and it named the
+  `Nullable<>` case in one filtered run where reading the five test names had suggested only
+  "something about value types".
 - **Spatial works, and the shape of how is worth keeping.** Three pieces, landed and measured
   separately because C9's combined attempt aborted the host: the NetTopologySuite branch in
   `InfoCarrierTypeMappingSource` (C15, worth 19 on its own — the long-standing "needs SpatiaLite"

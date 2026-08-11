@@ -147,8 +147,11 @@ public static class ChangeEntryMapper
             properties.Add(new DynamicPropertyValue
             {
                 Name = complexProperty.Name,
-                Value = mapper.ToDynamicValue(
-                    entry.GetCurrentValue(complexProperty), complexProperty.ClrType),
+
+                // `ToComplexValue`, not `ToDynamicValue`: a complex value is walked reflectively
+                // and the CLR type is not the model, so the complex type has to travel with it or
+                // an `Ignore`d member goes on the wire (C92).
+                Value = mapper.ToComplexValue(entry.GetCurrentValue(complexProperty), complexProperty),
             });
         }
 

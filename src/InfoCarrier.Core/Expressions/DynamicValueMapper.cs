@@ -193,6 +193,28 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     members.
     /// </remarks>
     internal DynamicValueNode ToDynamicValue(object? value, Type type, ProjectionShape? declared)
+        => ToDynamicValue(value, type, declared, complexType: null);
+
+    /// <summary>
+    ///     Maps a <em>complex</em> value, whose <see cref="IComplexType" /> the caller knows.
+    /// </summary>
+    /// <remarks>
+    ///     A complex value has no identity, so it travels as an object shape rather than as a key
+    ///     — but the object shape is a <em>reflective</em> walk of the CLR type, and the CLR type
+    ///     is not the model. `CompiledModelTestBase.OwnedType` declares
+    ///     <c>public DbContext? Context</c> and its model says <c>Ignore(e =&gt; e.Context)</c>;
+    ///     the walk sent it anyway and the far side answered *"Type
+    ///     'Microsoft.EntityFrameworkCore.DbContext' is not on the deserialization allowlist"*
+    ///     (C92). Handing the complex type down lets the walk drop what the model does not map.
+    /// </remarks>
+    internal DynamicValueNode ToComplexValue(object? value, IComplexProperty complexProperty)
+        => ToDynamicValue(value, complexProperty.ClrType, declared: null, complexProperty.ComplexType);
+
+    private DynamicValueNode ToDynamicValue(
+        object? value,
+        Type type,
+        ProjectionShape? declared,
+        IComplexType? complexType)
     {
         if (value is not null && _toIds.TryGetValue(value, out int seenId))
         {
@@ -210,10 +232,15 @@ public class DynamicValueMapper : IDynamicValueMapper
             _toIds[value] = id;
         }
 
-        return MapToNode(value, type, id, declared);
+        return MapToNode(value, type, id, declared, complexType);
     }
 
-    private DynamicValueNode MapToNode(object? value, Type type, int id, ProjectionShape? declared)
+    private DynamicValueNode MapToNode(
+        object? value,
+        Type type,
+        int id,
+        ProjectionShape? declared,
+        IComplexType? complexType = null)
     {
         // Entity. Two modes: a query-tree constant travels as identity only (research-findings
         // §7); a result row travels with its data.
@@ -371,7 +398,9 @@ public class DynamicValueMapper : IDynamicValueMapper
             Type elementType = GetElementType(type);
             foreach (object? item in enumerable)
             {
-                items.Add(ToDynamicValue(item, item?.GetType() ?? elementType, declared));
+                // The complex type descends with the items, because a complex *collection*
+                // property is declared as the collection and mapped as its element.
+                items.Add(ToDynamicValue(item, item?.GetType() ?? elementType, declared, complexType));
             }
 
             return new DynamicValueNode { Id = id, Type = typeNode, Items = items };
@@ -384,9 +413,44 @@ public class DynamicValueMapper : IDynamicValueMapper
         var properties = new List<DynamicPropertyValue>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
+        // The complex type filters this walk only when the walk is actually *of* it, and two
+        // shapes that are not it reach here carrying one. Both cost a measured regression.
+        //
+        // A **property bag** complex type is a `Dictionary<string, object>`, which goes down the
+        // collection branch, so the items one level further down are
+        // `KeyValuePair<string, object>` — whose `Key` and `Value` no complex type declares.
+        // Filtering those away rebuilt the bag with a null key: *"Value cannot be null.
+        // (Parameter 'key')"*, twice, in `Can_track_entity_with_complex_property_bag_collections`.
+        //
+        // An **optional** complex property is declared `ValueNestedType?`, so what is walked here
+        // is `Nullable<>`'s own `HasValue` and `Value`, which the complex type equally does not
+        // declare. Dropping those sent nothing at all and five `Query.Associations.
+        // ComplexProperties` tests answered `null` where a nested value belonged. `Nullable<>` is
+        // a wrapper the model does not model: let its members through and hand the complex type
+        // to `Value`, which is where the members it *does* declare actually are.
+        bool nullableWrapper = complexType is not null && Nullable.GetUnderlyingType(type) == complexType.ClrType;
+        IComplexType? shapeOf = complexType is not null
+            && !nullableWrapper
+            && complexType.ClrType.IsInstanceOfType(value)
+                ? complexType
+                : null;
+
         void AddMember(string name, Type memberType, object? memberValue)
         {
             if (!seen.Add(name))
+            {
+                return;
+            }
+
+            // Where the model knows this shape, the model decides what it holds. A complex type
+            // is walked reflectively because it *is* its members — no identity, no navigations,
+            // no sharing — but "its members" is the model's list, not the CLR type's, and an
+            // `Ignore`d member is not one of them (C92). Only a complex type is filtered: an
+            // anonymous type, a DTO or a constructed row has no model to ask, and there the walk
+            // is the whole specification.
+            if (shapeOf is not null
+                && shapeOf.FindProperty(name) is null
+                && shapeOf.FindComplexProperty(name) is null)
             {
                 return;
             }
@@ -421,7 +485,13 @@ public class DynamicValueMapper : IDynamicValueMapper
                     : ToDynamicValue(
                         memberValue,
                         isPrimitive ? memberValue!.GetType() : memberType,
-                        declared?.Member(name)),
+                        declared?.Member(name),
+
+                        // Nested complex types are complex types too, and the filter has to reach
+                        // them or it only cleans the top level.
+                        nullableWrapper && name == nameof(Nullable<int>.Value)
+                            ? complexType
+                            : shapeOf?.FindComplexProperty(name)?.ComplexType),
             });
         }
 
@@ -497,8 +567,7 @@ public class DynamicValueMapper : IDynamicValueMapper
             members.Add(new DynamicPropertyValue
             {
                 Name = complexProperty.Name,
-                Value = ToDynamicValue(
-                    complexProperty.GetGetter().GetClrValue(value), complexProperty.ClrType),
+                Value = ToComplexValue(complexProperty.GetGetter().GetClrValue(value), complexProperty),
             });
         }
 
