@@ -162,6 +162,52 @@ keep the payload measurable in bytes before it is parsed, or the limit stops bei
 **Not urgent.** The wire is versioned (`ProtocolVersion`), so this can change behind a major
 version bump. Revisit when the HTTP transport is promoted out of the sample.
 
+### D2 — shared `DbContext` configuration, derived and augmented by each side
+
+**Raised 2026-08-11. A founding ICC idea, held since v1, never written down. Recorded now so it is
+returned to systematically. No hurry, no immediate action.**
+
+**The idea.** One shared model configuration that the backend and the frontend both *derive from*
+and augment with their own specifics. Not two configurations kept in step by discipline — one
+configuration, extended twice.
+
+**Why it is load-bearing rather than tidy.** Two rules in `CLAUDE.md` make model agreement a
+correctness property of this provider, not a convenience:
+
+- the wire carries entity type **names**, so the client's model and the server's must agree about
+  them (A49);
+- **anything the wire computes from a type mapping is computed twice, by two different providers,
+  and is only sound if the two agree.** B4 is the worked example: a `DateTime[]` written by
+  SQLite's JSON form and read by EF's core one, 106 failures in both directions.
+
+**Divergence is silent.** That is the whole danger. A property configured on one side only does not
+throw — it returns a wrong answer. B12 was the same shape: every element of a JSON collection
+shared one key, and the symptom was wrong data with no exception.
+
+**What each side legitimately augments** — and the boundary is not obvious, which is why this needs
+study rather than a quick answer:
+
+| Belongs to | Examples |
+|---|---|
+| **Shared** | entity types and their names, keys, relationships, query filters, value converters, `ToJson()` (B12 proved the client needs it), complex types, ownership |
+| **Server only** | column names and store types, indexes, sequences, computed columns, `rowversion`, anything a migration would emit |
+| **Client only** | nothing store-related. Possibly nothing at all. |
+
+**The expectation, which is worth testing rather than assuming:** the shared part should be *small*,
+because EF's conventions already produce most of it. The M8 sample is the first worked example — one
+`NorthwindContext` in a shared assembly, configured by provider at DI time — and it should be read
+as evidence about the size of that part.
+
+**Candidate mechanisms, none chosen:** one shared context class (what the sample does); a shared
+assembly of `IEntityTypeConfiguration<T>`; a shared `IModelConfiguration` seam this provider
+defines; or a convention set the provider ships so that the *default* is agreement.
+
+**The question to answer when this is picked up:** is the shared configuration merely a *pattern*
+this provider documents, or something it should **enforce** — for instance by refusing at start-up
+when the two models disagree about a name the wire will carry? The suite already has the shape of
+such a check: `JsonQuerySqliteInfoCarrierTest.The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`
+compares the client model with the server model directly.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query

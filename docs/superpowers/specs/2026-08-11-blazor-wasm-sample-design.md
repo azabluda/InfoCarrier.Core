@@ -72,15 +72,51 @@ The model is a trimmed Northwind — `Customer`, `Order`, `OrderDetail`, `Produc
 POCOs are **copied**, not taken from `Microsoft.EntityFrameworkCore.Specification.Tests`: a sample
 must not reference a test package.
 
-### 3.2 Lazy loading uses `ILazyLoader`, not proxies
+### 3.2 Lazy loading: **automatic (proxies) is the target**, `ILazyLoader` is the recorded fallback
 
-Proxy lazy loading needs Castle DynamicProxy, which needs `Reflection.Emit`, which the browser does
-not have. The entities therefore take an `ILazyLoader` in their constructor.
+**Revised 2026-08-11.** An earlier draft of this section chose `ILazyLoader` injection outright, on
+the grounds that Castle DynamicProxy needs `Reflection.Emit` and the browser has none. **That was
+stated with more confidence than the facts support**, and the demo is materially better with
+automatic loading — `order.Customer` as a plain navigation, no ceremony in the model.
 
-Both routes are already proven in the suite — `LoadInfoCarrierTest` and
-`LazyLoadProxyInfoCarrierTest`, 825 of 825 — so the non-proxy route is not a compromise.
+**What is actually true, and the distinction matters:**
 
-### 3.3 The server hosts the client
+| Blazor WASM build | Dynamic code | Proxies |
+|---|---|---|
+| default (Mono **interpreter**), including a trimmed release publish | supported | expected to work |
+| `RunAOTCompilation=true` | **not** supported | expected to fail |
+
+Trimming and AOT are separate axes, and a Blazor release publish trims **without** AOT by default.
+So proxies are likely fine for the target configuration, and the M8 criterion this sample serves is
+*trimming* verification.
+
+**Decision:** use `UseLazyLoadingProxies()`. Navigations are `virtual`. Verify it in the browser
+early in Phase 2 — this is an **experiment with a known answer if it fails**, not an assumption.
+
+**The fallback is cheap by construction.** `virtual` auto-properties are compatible with both
+routes; switching to `ILazyLoader` means adding a loader field and changing the getters inside
+`Northwind.Shared/Model/`, and nothing outside that folder moves. Both routes are proven in the
+suite — `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`, 825 of 825 — so neither is a
+compromise in correctness terms; only in how the model reads.
+
+`Microsoft.EntityFrameworkCore.Proxies` must be referenced **explicitly** by the sample. The
+functional test project gets it transitively through the spec-tests package, which a sample does
+not reference.
+
+### 3.3 Shared configuration is the point, not an implementation detail
+
+One shared `NorthwindContext` is the first worked example of a founding idea recorded as **D2** in
+[`architecture.md`](../../architecture.md) §6a: *one model configuration that both halves derive
+from and augment*.
+
+It is worth reading the sample as **evidence about D2's central expectation** — that the shared part
+is small, because EF's conventions already produce most of it. This sample's `OnModelCreating` is
+about a dozen lines for five entity types, two relationships and a composite key.
+
+Divergence between the two models is **silent** — it produces wrong answers rather than errors (A49,
+B4, B12). That is why the sample shares a context type rather than declaring the model twice.
+
+### 3.4 The server hosts the client
 
 ASP.NET Core serves the Blazor files. One process, one origin. That removes CORS, removes a second
 launch profile, and makes `dotnet run --project samples/Northwind.Server` the whole story. The
