@@ -22,10 +22,21 @@ public class ComplexNavigationsQueryInfoCarrierTest(ComplexNavigationsQueryInfoC
     : ComplexNavigationsQueryTestBase<ComplexNavigationsQueryInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
+    /// <remarks>
+    ///     The validation error the test is named for, which EF raises for a <c>Select</c> and not
+    ///     for a <c>Join</c> result selector (EF issue #23302). Every provider overrides this with
+    ///     whatever its own pipeline fails with instead — <c>ArgumentException</c> from InMemory's
+    ///     shaper, <c>ApplyNotSupported</c> from SQLite's translator — and this one used to carry
+    ///     EF's InMemory override, for a reason that had stopped being the reason (C57's shape):
+    ///     the split leaves this projection on the client, so InMemory's shaper never sees it and
+    ///     the failure was an <c>InvalidCastException</c> out of our own materializer. C73 states
+    ///     the refusal on the result element type instead, so the helper the base uses for its own
+    ///     sibling tests applies here unchanged.
+    /// </remarks>
     public override Task Join_with_result_selector_returning_queryable_throws_validation_error(bool async)
-        // Expression cannot be used for return type. EF issue #23302, and EF's InMemory test says so.
-        => Assert.ThrowsAsync<ArgumentException>(
-            () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async));
+        => AssertInvalidMaterializationType(
+            () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async),
+            "IQueryable<Level3>");
 
     /// <inheritdoc />
     public override Task Correlated_projection_with_first(bool async)

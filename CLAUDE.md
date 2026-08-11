@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22364, Passed: 22074, Failed: 73, Skipped: 217`** (2026-08-11) across the
+**`Total tests: 22365, Passed: 22079, Failed: 69, Skipped: 217`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,10 +137,10 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c72`. C55–C72 took 132 to 73; `Query.Associations` is 336 of 336, and
-`MaterializationInterception` and `OptimisticConcurrency` are clear. The largest blocks are **40
-`JsonQuery`** (38 of them B12, a decision), **4 `ComplexNavigations`** (C56, faithful to EF — C68
-closed the other four), **6 `BulkUpdates`** and **4 `GearsOfWar`**.
+currently `c73`. C55–C73 took 132 to 69; `Query.Associations` is 336 of 336, and
+`MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
+The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **6 `BulkUpdates`** and
+**4 `GearsOfWar`**.
 
 **No failure is an unexplained wrong answer, and that is checked rather than asserted (C65).** The
 run reports exactly **40** `Assert.Equal() Failure: Values differ`, and they are **38 `JsonQuery`

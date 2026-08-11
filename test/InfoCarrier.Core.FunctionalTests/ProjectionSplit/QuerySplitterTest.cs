@@ -343,6 +343,31 @@ public class QuerySplitterTest : IDisposable
     }
 
     /// <summary>
+    ///     The same refusal when the queryable comes out of a <em>result selector</em> rather than
+    ///     a <c>Select</c> — which EF's own walk does not reach.
+    /// </summary>
+    /// <remarks>
+    ///     EF inspects <c>Queryable.Select</c> only, so
+    ///     <c>Join_with_result_selector_returning_queryable_throws_validation_error</c> is named
+    ///     for an error EF does not raise, and every provider overrides it with whatever its
+    ///     pipeline fails with later. Here the failure was an <c>InvalidCastException</c> from a
+    ///     reflective <c>Invoke</c> in <c>QueryExecutor</c> — a materialized <c>List&lt;T&gt;</c>
+    ///     handed to a slot declared <c>IQueryable&lt;T&gt;</c>. C73 states the refusal on the
+    ///     query's own result element type, which is the sentence EF's message makes.
+    /// </remarks>
+    [Fact]
+    public void A_queryable_a_result_selector_returns_is_refused()
+    {
+        IQueryable<Book> books = _context.Books;
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => Split(_context.Authors.Join(_context.Books, a => a.Id, b => b.AuthorId, (a, b) => books)));
+
+        Assert.Contains("Collections in the final projection must be", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("IQueryable<Book>", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     And the refusal is EF's, not a wider one of ours: a projection that returns an ordinary
     ///     materialized collection is untouched.
     /// </summary>

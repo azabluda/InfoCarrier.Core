@@ -23,10 +23,15 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
     : ComplexNavigationsSharedTypeQueryTestBase<ComplexNavigationsSharedTypeQueryInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
+    /// <remarks>
+    ///     The same reading as <c>ComplexNavigationsQueryInfoCarrierTest</c>'s: EF issue #23302 is
+    ///     a validation error EF's own walk misses for a <c>Join</c> result selector, C73 states
+    ///     the refusal on the result element type, and the base's own helper then applies.
+    /// </remarks>
     public override Task Join_with_result_selector_returning_queryable_throws_validation_error(bool async)
-        // Expression cannot be used for return type. EF issue #23302.
-        => Assert.ThrowsAsync<ArgumentException>(
-            () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async));
+        => AssertInvalidMaterializationType(
+            () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async),
+            "IQueryable<Level3>");
 
     /// <inheritdoc />
     public override Task Correlated_projection_with_first(bool async)

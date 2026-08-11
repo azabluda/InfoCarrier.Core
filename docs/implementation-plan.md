@@ -3953,6 +3953,64 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       be dropped, ask which part of it the server is entitled to** — the answer was "the part the
       model demands", and the model said so in its own constructors.
 
+- [x] **C73. The four `ComplexNavigations` were faithful to EF's *implementation* and not to EF's
+      *test name*, and the test name is the specification.**
+      **`Total tests: 22365, Passed: 22079, Failed: 69, Skipped: 217`** (`c73`) — **73 → 69,
+      4 fixed, 0 broken.** ✅ `<this commit>`
+
+      C56 closed twelve of the sixteen `AssertInvalidMaterializationType` failures and left these
+      four, on an argument that was right about EF's code: EF's `VerifyReturnType` runs for
+      `Queryable.Select` and nothing else, this query's queryable comes out of a **`Join` result
+      selector**, so EF misses it too — `ArgumentException` from InMemory's shaper,
+      `ApplyNotSupported` from SQLite's translator — and *"widening the walk past what EF does
+      would be inventing a rule, not mirroring one."*
+
+      **What that reading skipped is the name.**
+      `Join_with_result_selector_returning_queryable_throws_validation_error` is named for a
+      validation error, and its body is a plain `AssertQuery` with no exception expected at all.
+      Every provider overrides it with whatever its own pipeline happens to fail with later. **The
+      base is aspirational and the overrides are the symptom** — C68's lesson one level out: when a
+      test's own name states a rule, that is the rule, not the code that fails to implement it.
+
+      **Ours had also gone stale in C57's sense.** It carried EF's InMemory override —
+      `Assert.ThrowsAsync<ArgumentException>`, *"Expression cannot be used for return type"* — and
+      that is not what happens here. The split leaves the projection on the client, so InMemory's
+      shaper never sees it; the actual failure was
+
+          Assert.Throws() Failure: Exception type was not an exact match
+          Expected: typeof(System.ArgumentException)
+          Actual:   typeof(System.InvalidCastException)
+          ---- Unable to cast object of type 'List`1[Level3]' to type 'IQueryable`1[Level3]'
+             at ClientResultMaterializer.Materialize[TElement](QueryDataResult result)
+             at QueryExecutor`1.Invoke(MethodInfo method, …)          <- a reflective Invoke
+
+      — a raw cast failure out of a reflection call, which is nobody's statement about anything.
+
+      **The refusal is stated on the result element type, not by widening the walk.** EF's own
+      message says *collections in the **final** projection must be an `IEnumerable<T>`*, so
+      `VerifyResultType` asks exactly that of the query's own element type and leaves the `Select`
+      walk alone. Widening the walk to `Join`/`GroupJoin`/`SelectMany` result selectors would also
+      refuse an `IOrderedEnumerable<T>` sitting in an **intermediate** transparent identifier,
+      which EF permits and a later `Select` is free to consume — that is the rule this would have
+      invented, and it is not this one.
+
+      And this provider has a reason EF does not, C56's own: **an `IQueryable<T>` cannot cross the
+      wire.** What comes back is a materialized list, so the declared element type is a promise the
+      provider cannot keep.
+
+      **With the refusal in place the base's own helper applies unchanged.**
+      `QueryTestBase.AssertInvalidMaterializationType` is `protected static` — the four overrides
+      now call it exactly as the base calls it for its own sibling tests, with EF's `CoreStrings`
+      message. Nothing of ours is asserted.
+
+      **Seen to fail.** `A_queryable_a_result_selector_returns_is_refused` — a `Join` whose result
+      selector returns `IQueryable<Book>` — was checked by commenting `VerifyResultType` out:
+      **40 tests, 1 failed, and it was that one.** Filtered first as well: `ComplexNavigations`
+      plus every `…returning_queryable…` test in the suite, **1866 of 1866**, before the
+      measurement was spent. The six Northwind `…returning_queryable_throws` tests that C56 notes
+      pass *through the server* still pass — they now get the same refusal one step earlier, in the
+      same words.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
