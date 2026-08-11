@@ -12,9 +12,11 @@
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
     <ProjectReference Include="..\..\samples\Northwind.Shared\Northwind.Shared.csproj" />
     <ProjectReference Include="..\..\samples\Northwind.Client.Transport\Northwind.Client.Transport.csproj" />
+    <ProjectReference Include="..\..\samples\Northwind.Server\Northwind.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />

@@ -889,7 +889,7 @@ Passed: 6, Failed: 0, Total: 6."
 - Consumes: `HttpInfoCarrierTransport` from Task 3; `NorthwindContext`, `NorthwindSeed` from Task 2.
 - Produces: `IEndpointRouteBuilder.MapInfoCarrier(string pattern = "infocarrier")`; a `public partial class Program` entry point usable as `WebApplicationFactory<Program>`; and `NorthwindServerFactory : WebApplicationFactory<Program>` exposing `HttpClient CreateInfoCarrierClient()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `test/InfoCarrier.Core.TransportTests/InfoCarrierEndpointTest.cs`:
 
@@ -943,13 +943,13 @@ public class InfoCarrierEndpointTest(NorthwindServerFactory factory) : IClassFix
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --filter "FullyQualifiedName~InfoCarrierEndpointTest"`
 
 Expected: FAIL to compile — `NorthwindServerFactory` does not exist.
 
-- [ ] **Step 3: Add the test-host package**
+- [x] **Step 3: Add the test-host package**
 
 In `Directory.Packages.props`, the entry added in Task 2 Step 1 covers this. Add to `test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`:
 
@@ -963,7 +963,7 @@ and a project reference:
 <ProjectReference Include="..\..\samples\Northwind.Server\Northwind.Server.csproj" />
 ```
 
-- [ ] **Step 4: Create the server project**
+- [x] **Step 4: Create the server project**
 
 `samples/Northwind.Server/Northwind.Server.csproj`:
 
@@ -990,7 +990,7 @@ and a project reference:
 </Project>
 ```
 
-- [ ] **Step 5: Write the endpoint**
+- [x] **Step 5: Write the endpoint**
 
 `samples/Northwind.Server/Transport/InfoCarrierEndpointExtensions.cs`:
 
@@ -1051,7 +1051,7 @@ public static class InfoCarrierEndpointExtensions
 }
 ```
 
-- [ ] **Step 6: Write `Program.cs`**
+- [x] **Step 6: Write `Program.cs`**
 
 `samples/Northwind.Server/Program.cs`:
 
@@ -1106,7 +1106,7 @@ app.Run();
 public partial class Program;
 ```
 
-- [ ] **Step 7: Write the test factory**
+- [x] **Step 7: Write the test factory**
 
 `test/InfoCarrier.Core.TransportTests/NorthwindServerFactory.cs`:
 
@@ -1157,7 +1157,7 @@ public sealed class NorthwindServerFactory : WebApplicationFactory<Program>
 }
 ```
 
-- [ ] **Step 8: Add the server to the solution**
+- [x] **Step 8: Add the server to the solution**
 
 Add to `InfoCarrier.Core.slnx`, in the `/samples/` folder:
 
@@ -1165,19 +1165,19 @@ Add to `InfoCarrier.Core.slnx`, in the `/samples/` folder:
 <Project Path="samples/Northwind.Server/Northwind.Server.csproj" />
 ```
 
-- [ ] **Step 9: Run the tests**
+- [x] **Step 9: Run the tests**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`
 
 Expected: `Passed: 8, Failed: 0, Total: 8`.
 
-- [ ] **Step 10: Run the server by hand once**
+- [x] **Step 10: Run the server by hand once**
 
 Run: `dotnet run --project samples/Northwind.Server`
 
 Expected: it starts, prints a listening URL, and creates `northwind.db` next to the binary. Stop it with Ctrl-C. This proves the seeding path outside the test host.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add samples/Northwind.Server/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx Directory.Packages.props docs/implementation-plan.md

@@ -23,3 +23,20 @@ Detailed steps are in
   `InfoCarrierTransportException`. Closed in M8-3a `<this commit>`: the deserialize call is now
   wrapped and rethrown via the exception type's two-argument constructor, `OperationCanceledException`
   passes through untouched, and a fourth test covers it.
+- [x] **M8-4. The server endpoint, and the first real HTTP hop in this repo.** `<this commit>`
+  One route (`MapInfoCarrier`), all nine operations — `InfoCarrierEnvelopeServer` already checks
+  the protocol version, dispatches, and turns a server-side failure into a fault carried in the
+  response, so the endpoint adds no policy of its own. `Program.cs` registers `DbContext` as well
+  as `NorthwindContext` (`InProcessInfoCarrierServer` resolves the base type) and calls
+  `AddInfoCarrierStandardValueMappers`, which a server must do for itself (C89). No sample types
+  in the endpoint file: promoting it to `InfoCarrier.Core.AspNetCore` is a file move.
+  `NorthwindServerFactory`'s given `Dispose(bool)` raced the host's async shutdown on Windows —
+  deleting the temp SQLite file before every native handle was released threw `IOException`
+  (`dotnet test` exit code 1 despite `Passed: 9, Failed: 0`); Linux tolerates deleting an open
+  file, which is why CI (`ubuntu-latest`) would never have seen it. Moved to an async
+  `DisposeAsync` override that awaits the base class first, clears
+  `Microsoft.Data.Sqlite`'s connection pool, and swallows a residual `IOException` best-effort: the
+  first test in this file opens a transaction and never ends it, which is intentional (Task 6
+  needs `InProcessInfoCarrierServer` to hold it open across requests), and that server is a
+  singleton that is not itself `IDisposable`, so nothing ends the transaction at host shutdown.
+  Passed: 9, Failed: 0, Total: 9.

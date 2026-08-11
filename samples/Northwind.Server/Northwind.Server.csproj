@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <Description>The InfoCarrier sample server: SQLite behind an HTTP endpoint that speaks the envelope protocol.</Description>
+    <RootNamespace>Northwind.Server</RootNamespace>
+    <AssemblyName>Northwind.Server</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+
+</Project>
