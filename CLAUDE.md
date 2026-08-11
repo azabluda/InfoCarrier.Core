@@ -137,14 +137,13 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C60 for the rest** — read out of `artifacts/measure/`,
-currently `c60`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
+currently `c64`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
 B12, a decision), **26 `MaterializationInterception`** (B16's topology, and C58 priced the optional
 harness remedy — A71's ten are the same defect, not a separate one), **8 `Index_*`** across two
 `Query.Associations` classes (C55 — the server raises the warning and the harness does not
 configure it as an error there), **8 `ComplexNavigations`** (4 classified in C56, 4 in C59), **6
-`BulkUpdates`** and **4 `GearsOfWar`**. Only **4** are wrong answers
-(`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
-— the latter diagnosed in full and reverted, B23) and
+`BulkUpdates`** and **4 `GearsOfWar`**. Only **2** are wrong answers
+(`Comparison_with_value_converted_subclass`, diagnosed in full and reverted, B23) and
 **the undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
 closed the last two outside it, and all three used the same two probes in the same order: what the
 metadata and the client say, then **read the row the store actually holds**. That second probe is

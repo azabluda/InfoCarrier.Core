@@ -76,12 +76,20 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
     // in those shapes lands in the residual, so the store never sees the subquery it refuses, and
     // the spec test runs and passes. An override of ours for a limitation this provider does not
     // have is a workaround, and the coverage is the point (ADR-004).
-
-    public override async Task Correlated_collection_with_distinct_3_levels(bool async)
-        // Distinct. Issue #24325.
-        => Assert.Equal(
-            InMemoryStrings.DistinctOnSubqueryNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Correlated_collection_with_distinct_3_levels(async))).Message);
+    //
+    // `Correlated_collection_with_distinct_3_levels` belongs to that list too, and carrying EF's
+    // override for it was the A39 mistake in the one place A39 did not look (C64). It is left
+    // **unoverridden and red**, and the red is not a wrong answer: the query runs and this
+    // provider's rows agree with the expected ones squad for squad, member for member, weapon
+    // count for weapon count. What fails is the base's own assertion, and it fails for a reason
+    // that has nothing to do with any provider — the projection is an anonymous type whose
+    // `Members` member is a lazily-evaluated `IEnumerable<>`, which the compiler-generated
+    // `Equals` compares with `EqualityComparer<T>.Default`, i.e. by reference. Running the base's
+    // *expected* query twice over the same in-memory data, with the same `Squad` instance in both
+    // results, fails the same assertion. **No correct answer can satisfy it**, which is why every
+    // EF provider refuses the query before reaching it: InMemory with
+    // `DistinctOnSubqueryNotSupported`, and every relational one with
+    // `DistinctOnCollectionNotSupported` on `GearsOfWarQueryRelationalTestBase`.
 
     public override async Task Projecting_correlated_collection_followed_by_Distinct(bool async)
         // Distinct. Issue #24325.

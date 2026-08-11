@@ -3595,6 +3595,62 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       and the filter also covers `Include`, whose lambdas would newly be walked. Recorded as a
       one-line candidate with its price.
 
+- [x] **C64. `Correlated_collection_with_distinct_3_levels` is not a wrong answer, and the base's
+      assertion cannot be satisfied by a correct one.**
+      **`Total tests: 22356, Passed: 22025, Failed: 114, Skipped: 217`** (`c64`) —
+      **114 → 114, 0 fixed, 0 broken**, and the reasons move exactly two: `Assert.Throws() Failure:
+      Exception type was not an exact match` 13 → 11, `Assert.Equal() Failure: Values differ`
+      38 → 40. ✅ `<this commit>`
+
+      CLAUDE.md listed these two among *"only **4** are wrong answers"*, which made them the
+      highest-value target left. **They are not wrong answers, and the tally is 2.**
+
+      **Probe 1 — dump both sides.** The base's own expected query and this provider's, side by
+      side:
+
+          ACTUAL squad=1 members=[Baird:2, Cole Train:2, Dom:2, Marcus:2]     ACTUAL rowCount=2
+          EXPECT squad=1 members=[Baird:2, Cole Train:2, Dom:2, Marcus:2]     EXPECT rowCount=2
+          ACTUAL squad=2 members=[Paduk:1]
+          EXPECT squad=2 members=[Paduk:1]
+
+      Identical, squad for squad, member for member, weapon count for weapon count. **So the
+      failure is in the comparison, not in the answer.**
+
+      **Probe 2 — is the comparison satisfiable at all?** Run the base's *expected* query a second
+      time over the same in-memory data and compare the two results with the assertion the base
+      uses. Nothing about this provider is involved:
+
+          EXPECTED-vs-ITSELF: EqualException
+          same Squad instance both times: True
+
+      **No correct answer can pass.** The projection is an anonymous type whose `Members` member is
+      a lazily-evaluated `IEnumerable<>`; the compiler-generated `Equals` compares members with
+      `EqualityComparer<T>.Default`, which for an enumerable is reference equality, and two
+      iterators are never the same reference. Even the same `Squad` instance on both sides does
+      not save it.
+
+      **Which is why no EF provider ever reaches it**, and that is the corroboration rather than
+      the argument: InMemory refuses the query with `DistinctOnSubqueryNotSupported`, and **every**
+      relational provider with `DistinctOnCollectionNotSupported`, stated once on
+      `GearsOfWarQueryRelationalTestBase`. A28 in its strongest form — a spec test asserting a
+      limitation this provider does not have, whose assertion is unreachable by construction for
+      anything that does not have it.
+
+      **The override is deleted, and that is the A39 mistake in the one place A39 did not look.**
+      The comment block directly above it already said EF's InMemory `Distinct` overrides are
+      *"deliberately not carried here … an override of ours for a limitation this provider does not
+      have is a workaround"* — and this one was carried anyway, four lines below. It asserted
+      `InMemoryStrings.DistinctOnSubqueryNotSupported` for a store exception that never happens,
+      exactly the staleness C57 found five times in `OwnedNavigations`. The proof now lives in that
+      comment block so the next reader does not re-file it as a wrong answer.
+
+      **Left red rather than made green, deliberately.** `Assert.ThrowsAsync<EqualException>` would
+      pass and is the shape EF itself uses elsewhere (C57 adopted one) — but here it would be green
+      *because the assertion is broken*, and it would keep passing if this provider's answer ever
+      became genuinely wrong. `Projecting_correlated_collection_followed_by_Distinct` keeps its
+      override and still passes: there the store really does refuse, which is what makes the pair
+      worth reading together.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
