@@ -40,7 +40,14 @@ dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.lo
 # `|| true`: a red suite is the normal state of this repo (ADR-004), so a non-zero exit from
 # `dotnet test` is data, not an error. A run that never produced a summary line *is* an error,
 # and is caught below.
-dotnet test "$root/InfoCarrier.Core.slnx" --no-build -v n --nologo > "$log" 2>&1 || true
+# The **project**, not the solution. This script measures the inherited spec suite, which is
+# one project; the summary block is parsed with `tail -n 1`, so a second test project in the
+# solution would silently make every measurement report the wrong run. Phase 1 of M8 adds
+# exactly such a project (InfoCarrier.Core.TransportTests), so this is scoped first and proved
+# neutral before that project exists. eng/ratchet.sh needs no equivalent change: CI has always
+# run `dotnet test $TEST_PROJECT`.
+dotnet test "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj" \
+    --no-build -v n --nologo > "$log" 2>&1 || true
 
 # `-v n` is required for the reasons below — the per-failure `Error Message:` detail is simply
 # absent at `-v q`. It also changes the summary from a `Failed! - Failed: N, Total: T` one-liner

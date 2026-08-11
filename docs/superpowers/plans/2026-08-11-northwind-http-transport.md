@@ -68,13 +68,13 @@ Adding a second test project to the solution makes `dotnet test` emit two summar
 - Consumes: nothing.
 - Produces: a project-scoped `eng/measure.sh`; `docs/implementation-plan.md` with an M8 section whose entries later tasks tick.
 
-- [ ] **Step 1: Record the current baseline number so the change can be proved neutral**
+- [x] **Step 1: Record the current baseline number so the change can be proved neutral**
 
 Run: `cat artifacts/measure/c96.txt | wc -l && tail -2 test/known-failures.txt`
 
 Expected: `13`, then `failed=13` and `total=22453`.
 
-- [ ] **Step 2: Scope `measure.sh` to the functional test project**
+- [x] **Step 2: Scope `measure.sh` to the functional test project**
 
 In `eng/measure.sh`, change the `dotnet test` line (currently line 43):
 
@@ -95,7 +95,7 @@ dotnet test "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.Functi
     --no-build -v n --nologo > "$log" 2>&1 || true
 ```
 
-- [ ] **Step 3: Prove the change is neutral**
+- [x] **Step 3: Prove the change is neutral**
 
 Run: `bash eng/measure.sh c97-instrument c96`
 
@@ -110,7 +110,7 @@ BROKEN (in c97-instrument, not in c96):
 
 The REASONS diff must be empty. **If any line differs, stop.** The instrument changed the reading, which means the old reading included something the new one does not, and that must be understood before anything is built on top of it.
 
-- [ ] **Step 4: Archive Phase C's plan and open M8's**
+- [x] **Step 4: Archive Phase C's plan and open M8's**
 
 ```bash
 git mv docs/implementation-plan.md docs/archive/implementation-plan-m6-phase-c.md
@@ -139,7 +139,7 @@ Detailed steps are in
 - [ ] **M8-1. The spec measurement is scoped to one project, and the M8 plan is open.** `<this commit>`
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add eng/measure.sh docs/implementation-plan.md docs/archive/implementation-plan-m6-phase-c.md
