@@ -3814,6 +3814,49 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **`ComplexNavigations` is down to the four C56 left**, which are faithful to EF, and
       `NorthwindNavigations` is clear.
 
+- [x] **C69. The eight `Index_*`: the warning the base contracts for, forwarded to the instance that
+      raises it — and the 26 that made it look impossible are all somewhere else.**
+      **`Total tests: 22364, Passed: 22047, Failed: 100, Skipped: 217`** (`c69`) — **108 → 100,
+      8 fixed, 0 broken.** ✅ `<this commit>`
+
+      C55 diagnosed these correctly and then priced the wrong remedy. Its two measurements stand:
+      forwarding the fixture's whole `ConfigureWarnings(Default(Throw))` to the server is **8 fixed,
+      626 broken**, and forwarding just `RowLimitingOperationWithoutOrderByWarning` *globally* was
+      recorded as 8 fixed and **26** others broken. C55 concluded that naming one event was
+      "choosing one event because six tests assert it" and left them red.
+
+      **The 26 were never re-read, and reading them is the whole step.** Grouping the broad
+      experiment's log by failure reason:
+
+          14  BulkUpdates.NorthwindBulkUpdatesInfoCarrierTest
+          10  Query.NorthwindWhereQuerySqliteInfoCarrierTest
+           2  Query.NorthwindSelectQuerySqliteInfoCarrierTest
+
+      **Not one is in the `Associations` families.** So the event does not have to be forwarded
+      globally at all — it belongs to the two fixtures whose base contracts for it, and there it
+      costs nothing.
+
+      **And the base does contract for it, in as many words.**
+      `AssociationsCollectionTestBase.AssertOrderedCollectionQuery` expects an
+      `InvalidOperationException` when `AreCollectionsOrdered` is false, with the event named in a
+      comment on the line above. `NavigationsFixtureBase` and
+      `OwnedNavigationsRelationalFixtureBase` both return false. Under one EF instance the
+      fixture's own `Default(Throw)` delivers that; under two it stops at the client, because the
+      diagnostic comes from the **backing store's** translator (C55's probe: the query ships whole
+      and unrewritten). Forwarding it is what makes the fixture mean the same thing on both sides.
+
+      **Why not the fixture's whole configuration, even scoped.** The 626 include ~80 inside these
+      same families — the server's model is built by `TestModelSource` and is not the caller's, and
+      the query warnings land on trees `ProjectionRewriter` and `GroupJoinFlattener` produced.
+      Neither is a statement the test author wrote. `AssociateCollection[0]` is.
+
+      **The counter-argument is recorded in the code rather than argued away** — see
+      `AssociationsWarnings`, which carries all of the above including the objection that naming
+      one event is a narrower knob than mirroring a fixture, so the trade can be re-judged.
+
+      **`Query.Associations` is now 336 of 336**, and `Query.Associations` leaves the failing list
+      entirely.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

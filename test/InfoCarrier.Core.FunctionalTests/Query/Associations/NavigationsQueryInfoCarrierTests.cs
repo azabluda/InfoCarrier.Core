@@ -50,6 +50,7 @@ public class NavigationsQueryInfoCarrierFixture : NavigationsFixtureBase
             InfoCarrierTestStoreFactory.Sqlite,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+            onAddOptions: AssociationsWarnings.ThrowOnUnorderedRowLimiting,
             configureConventions: ConfigureConventions);
 
     /// <inheritdoc />

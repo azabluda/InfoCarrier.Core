@@ -51,6 +51,7 @@ public class OwnedNavigationsQueryInfoCarrierFixture : OwnedNavigationsFixtureBa
             InfoCarrierTestStoreFactory.Sqlite,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+            onAddOptions: AssociationsWarnings.ThrowOnUnorderedRowLimiting,
             configureConventions: ConfigureConventions);
 
     /// <inheritdoc />
