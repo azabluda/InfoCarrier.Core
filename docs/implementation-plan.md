@@ -4210,6 +4210,56 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `changeMechanism: Fk` alone passes there — so it is specific to a store that issues keys at
       save. **Not investigated; the reproduction above is exact and is the next probe.**
 
+- [x] **C77. The 66, re-derived from the run and confirmed one at a time — and one of them was
+      filed against a measurement that has since been overturned.** Docs only; no code, no test,
+      no run. Everything below comes out of `c76b.log` and `c76b.txt`. ✅ `<this commit>`
+
+      **Grouped by class, then by first message line** — both, because the first alone hides which
+      failure is which and the second alone hides that two classes share a message:
+
+      | # | Class | Verdict |
+      |---|---|---|
+      | 40 | `Query.JsonQuerySqlite` | **B12, a decision, not this session's.** 38 `Values differ`, 2 `ApplyNotSupported`. |
+      | 6 | `BulkUpdates.NorthwindBulkUpdates` | **C63 confirmed.** 4 are EF's own `[ConditionalTheory(Skip = "Issue#28886")]`, and they still report the SQL EF records under that skip — `no such column: c.CustomerID` / `o.OrderID`. 2 are C67's: this provider refuses one operator earlier and names the *method*, the relational base asserts `InvalidPropertyInSetProperty`, and both are refusals. |
+      | 4 | `Scaffolding.CompiledModel` | **C8 confirmed**, verbatim: *"Unable to find expected assembly attribute `DesignTimeProviderServices`"*. M8 productization. |
+      | 4 | `Query.PrimitiveCollectionsQuerySqlite` | **B22 confirmed** — 3 × `no such column: p.Int`, 1 × an untranslated `DbSet<PrimitiveCollectionsEntity>()`. Needs a dated supersession in `docs/decisions.md`. |
+      | 2 | `Query.GearsOfWar` | **C64 confirmed and re-proved by the grouping**: they are 2 of the 40 `Values differ`, and C64 showed the base's assertion is unsatisfiable by any correct answer. |
+      | 2 | `ComplexTypesTracking` | **A32/C41 confirmed**: `ArgumentException: Incorrect number of arguments supplied for call to method 'System.Object…'`, raised inside EF's own `StructuralTypeMaterializerSource`. |
+      | 2 | `Query.StringTranslations.Regex_IsMatch` | **A46 confirmed** — a deliberate allowlist refusal, and it reports as an untranslated LINQ expression, which is what a refusal looks like. |
+      | 2 | `Update.ProxyGraphUpdates` ×2 flavours | **C60 confirmed and C74 priced it**: Tier B is 140 against 2 and does not buy them. |
+      | 1 | `AdHocAdvancedMappingsQuery.Casts_are_removed_…` | **C60 confirmed.** The base compares against an **exactly printed** `DbSet<MockEntity>()    .Cast<IDummyEntity>()    .Where(e => e.Id == @id)`; green means reproducing EF's printer over a tree this provider rewrote. |
+      | 1 | `NonSharedPrimitiveCollectionsQuerySqlite.Array_of_TimeOnly` | **C62 confirmed** — EF issue #30730, EF skips it in its own SQLite suite, *"Sequence contains no elements"* unchanged. |
+      | 1 | `InfoCarrierComplianceTest` | closes when B12 closes. |
+      | 1 | `CustomConverters.Composition_over_collection_of_complex_mapped_as_scalar` | **RECLASSIFIED — see below.** |
+
+      **C65's claim re-derives exactly, which is the point of stating it that way.** Grouping the
+      `[FAIL]` lines by first message line gives **40** `Assert.Equal() Failure: Values differ`,
+      and they are **38 `JsonQuery` + 2 `GearsOfWar`**. Nothing else in 22,366 tests returns data
+      that differs. Re-derived, not restated.
+
+      **The reclassification, and it is the third time C59 has had to be un-cited.**
+      `Composition_over_collection_of_complex_mapped_as_scalar` fails
+      `Assert.Throws() Failure: No exception was thrown` — EF refuses the query with
+      `TranslationFailed`, this provider answers it. C60 filed that as *"C59's family, and C59
+      measured what a general rule for it costs"*. **C59's rule was measured at 6 fixed and 18
+      broken and was replaced outright by C68's**, so citing its price says nothing about this
+      test, and under the rule that actually shipped it is not a candidate at all: C68 refuses an
+      operator that applies a **row-deciding lambda** to a client-computed projection, and here
+      nothing reads the projection — it *is* the result.
+
+      So this is **A28**: a spec test asserting a limitation this provider does not have.
+      Corroborated rather than argued — **no EF provider overrides it**, in InMemory or in SQLite,
+      which means EF's own InMemory suite runs it and passes *because InMemory refuses the query*.
+      This provider's split leaves the sub-projection on the client, where `d.Layouts` is a real
+      `List<Layout>` and `l => new { H = l.Height, W = l.Width }` is ordinary LINQ. Red, and
+      correct.
+
+      **The general form, since it has now cost three entries.** A classification that cites a
+      *measurement* inherits that measurement's fate. C55's 26 were re-read in C69, C58's two facts
+      were re-scoped in C71, and C59's 18 were re-read in C68 — and C60 was written between them,
+      citing C59 as settled. **When an entry classifies a failure by pointing at a number, the
+      number has to be re-checked before the classification is trusted.**
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

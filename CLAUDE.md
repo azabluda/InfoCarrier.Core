@@ -142,10 +142,12 @@ currently `c76b`. C55–C76 took 132 to 66; `Query.Associations` is 336 of 336, 
 The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **6 `BulkUpdates`** and
 **4 `Scaffolding.CompiledModel`**.
 
-**No failure is an unexplained wrong answer, and that is checked rather than asserted (C65).** The
-run reports exactly **40** `Assert.Equal() Failure: Values differ`, and they are **38 `JsonQuery`
-(B12, a decision) plus the 2 C64 proved are not wrong answers** — nothing else in the suite
-returns data that differs. Re-check it by grouping the `[FAIL]` lines of a run log by their first
+**No failure is an unexplained wrong answer, and that is checked rather than asserted (C65,
+re-derived in C77).** The run reports exactly **40** `Assert.Equal() Failure: Values differ`, and
+they are **38 `JsonQuery` (B12, a decision) plus the 2 C64 proved are not wrong answers** —
+nothing else in the suite returns data that differs. **Every one of the 66 is confirmed
+individually in C77**, grouped by class *and* by first message line, because either grouping alone
+hides something the other shows. Re-check it by grouping the `[FAIL]` lines of a run log by their first
 message line; the count and the split are the whole claim. The sentence this replaces named
 `Comparison_with_value_converted_subclass`, which **passes**, and
 `Correlated_collection_with_distinct_3_levels`, which C64 showed cannot pass for anyone; it had
