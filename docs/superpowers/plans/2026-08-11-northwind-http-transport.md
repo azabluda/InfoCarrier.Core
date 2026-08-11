@@ -1197,6 +1197,29 @@ InfoCarrier.Core.AspNetCore is a file move.
 Passed: 8, Failed: 0, Total: 8."
 ```
 
+- [x] **Fix round 1 (review, Step M8-4a): endpoint error handling, and two disposal leaks.** Code
+  review found the endpoint caught nothing: a body that does not deserialize to an
+  `InfoCarrierEnvelope`, and `NotSupportedException` from `DispatchAsync`'s protocol-version
+  refusal (deliberately outside its own fault-catching `try` — see that method's remarks), both
+  fell through to ASP.NET Core's default handling. Under Development that leaked a raw stack
+  trace with server file paths; under Production it answered no message at all. The reviewer
+  showed `An_unsupported_protocol_version_is_refused_by_number` passing only because the leaked
+  Development stack trace happened to contain the string "999" — proved by running the same test
+  with `ASPNETCORE_ENVIRONMENT=Production DOTNET_ENVIRONMENT=Production`, where it failed. Fixed
+  by catching both paths in the endpoint and answering a deliberate HTTP 400 whose body is only
+  the exception's message (no stack trace, no paths); the client's existing non-success path
+  turns that into `InfoCarrierTransportException` by design, so the assertion now passes for the
+  reason it claims to. `NorthwindServerFactory` pins `builder.UseEnvironment("Production")` so
+  the outcome no longer depends on ambient hosting configuration.
+  Same review found `NorthwindServerFactory.DisposeAsync` deleting only the main `.db`, leaking
+  its WAL-mode `-wal`/`-shm` sidecar files (and occasionally `-journal`) on every run; those three
+  paths are now deleted alongside the main file with the same best-effort semantics, and
+  `SqliteConnection.ClearAllPools()`'s process-wide scope is now a documented, deliberate choice
+  rather than a silent one.
+  Passed: 9, Failed: 0, Total: 9 — reconfirmed under
+  `ASPNETCORE_ENVIRONMENT=Production DOTNET_ENVIRONMENT=Production`, filtered to
+  `An_unsupported_protocol_version_is_refused_by_number` alone: Passed: 1, Failed: 0, Total: 1.
+
 ---
 
 ### Task 5: A query over HTTP, end to end

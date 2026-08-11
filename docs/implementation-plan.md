@@ -40,3 +40,20 @@ Detailed steps are in
   needs `InProcessInfoCarrierServer` to hold it open across requests), and that server is a
   singleton that is not itself `IDisposable`, so nothing ends the transaction at host shutdown.
   Passed: 9, Failed: 0, Total: 9.
+  Review found the endpoint itself catching nothing: a malformed request body and the protocol
+  version refusal (`NotSupportedException`, deliberately outside `DispatchAsync`'s own fault
+  handling — the two ends disagree about what an envelope is, so answering with one would be
+  optimistic) both fell through to ASP.NET Core's default handling, which under Development
+  leaked a stack trace and under Production returned no message at all — so
+  `An_unsupported_protocol_version_is_refused_by_number` passed only because the Development
+  stack trace happened to contain "999", not because the endpoint said so. Closed in
+  M8-4a `<this commit>`: the endpoint now catches both paths and answers a deliberate HTTP 400
+  whose body is only the exception's own message, `NorthwindServerFactory` pins
+  `UseEnvironment("Production")` so the test no longer depends on ambient hosting configuration,
+  and the client's existing non-success path turns that 400 into `InfoCarrierTransportException`
+  by design. Same review found `NorthwindServerFactory.DisposeAsync` deleting only the main
+  `.db` and leaking its `-wal`/`-shm` (and occasionally `-journal`) sidecar files on every run;
+  those three paths are now deleted alongside the main file with the same best-effort semantics.
+  Passed: 9, Failed: 0, Total: 9 — confirmed again under
+  `ASPNETCORE_ENVIRONMENT=Production DOTNET_ENVIRONMENT=Production`, filtered to the
+  protocol-version test alone: Passed: 1, Failed: 0, Total: 1.
