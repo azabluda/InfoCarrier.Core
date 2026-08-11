@@ -127,7 +127,7 @@ found. **The standing price for all of it — "626 + 322 lines of relational mir
 abstract seeds" — was a price for a route nobody was going to take.**
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22450, Passed: 22205, Failed: 27, Skipped: 218`** (2026-08-11) across the
+**`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -145,10 +145,10 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c85`. C55–C85 took 132 to 27; `Query.Associations` is 336 of 336, and
+currently `c88b`. C55–C88 took 132 to 26, and 2 of the 26 are C86's own new tests; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
-The largest blocks are now **6 `BulkUpdates`**, **4 `Scaffolding.CompiledModel`** and **4
-`PrimitiveCollectionsQuery`** — `JsonQuery` fell from 40 to 4 when C80 took B12.
+The largest blocks are now **6 `BulkUpdates`** and **4 `Scaffolding.CompiledModel`** — `JsonQuery`
+fell from 40 to 4 when C80 took B12, and `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22.
 
 **There are no unexplained wrong answers, and after C85 there are almost no wrong answers at all.**
 Group a run's `[FAIL]` lines by their first message line: `Assert.Equal() Failure: Values differ` is

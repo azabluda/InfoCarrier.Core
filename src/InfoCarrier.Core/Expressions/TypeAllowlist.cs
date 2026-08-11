@@ -64,6 +64,7 @@ public sealed class TypeAllowlist
 
     private static readonly HashSet<Type> BuiltInGenericDefinitions =
     [
+        typeof(ParameterBox<>),
         typeof(Nullable<>), typeof(List<>), typeof(IList<>), typeof(ICollection<>),
         typeof(IEnumerable<>), typeof(IEnumerator<>), typeof(IReadOnlyList<>), typeof(IReadOnlyCollection<>),
         typeof(IQueryable<>), typeof(IOrderedQueryable<>), typeof(IOrderedEnumerable<>),

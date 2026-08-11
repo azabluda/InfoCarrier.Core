@@ -641,34 +641,61 @@ internal sealed class QueryExecutor<TElement>
         ///         <c>Contains</c> either way.
         ///     </para>
         /// </remarks>
+        /// <summary>
+        ///     Substitutes one parameter value into the captured tree (§6, amended by B22).
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         A <b>scalar</b> is a plain constant, which is §6's rule and is unchanged.
+        ///     </para>
+        ///     <para>
+        ///         A <b>collection</b> is boxed, so that the server's own funcletizer lifts it back
+        ///         into a parameter. §6's 2026-08-02 amendment spelled a collection out as a
+        ///         <c>NewArrayExpression</c> instead, because relational EF recognises an inline
+        ///         collection from the expression's shape and <c>cities.Contains(c.City)</c> needs
+        ///         that shape. It is the right shape for <c>IN (x, y)</c> and the wrong one for
+        ///         everything that needs a real parameter — B22's four tests index a collection by a
+        ///         column, which as an inline collection becomes a correlated subquery whose
+        ///         <c>OFFSET</c> names a column out of scope. A parameter reaches SQLite as a JSON
+        ///         string indexed with <c>-&gt;&gt;</c>, which is what EF's own client produces.
+        ///     </para>
+        ///     <para>
+        ///         Boxing serves both, because EF re-derives the inline form itself once the value
+        ///         is a parameter. Measured in C88.
+        ///     </para>
+        /// </remarks>
         private Expression Substitute(object? value, Type parameterType)
         {
             if (_insideEFCall
-                || value is not System.Collections.IEnumerable sequence
+                || value is not System.Collections.IEnumerable
                 || value is string
                 || SequenceElementType(parameterType) is not { } elementType
-                // An `object` element type carries boxed values whose real types differ per
-                // element. Spelling those out as `Constant(x, typeof(object))` tells EF less
-                // than the collection itself did, and cost more than it gained.
-                || elementType == typeof(object))
+
+                // Box only where the wire can give the box's property back what it declares. A
+                // collection is materialized on the far side as a `List<T>`, so a parameter typed
+                // `IOrderedEnumerable<T>` cannot be handed one — the server rebuilt the value and
+                // then failed to assign it, eight `Contains_with_local_ordered_enumerable_*` deep.
+                // The same shape of guard the spelled-out array needed, for the same reason.
+                || !(parameterType.IsArray
+                    || parameterType.IsAssignableFrom(typeof(List<>).MakeGenericType(elementType))))
             {
                 return Expression.Constant(value, parameterType);
             }
 
-            var elements = new List<Expression>();
-            foreach (object? element in sequence)
-            {
-                elements.Add(Expression.Constant(element, elementType));
-            }
-
-            NewArrayExpression array = Expression.NewArrayInit(elementType, elements);
-
-            // Only when the array can stand in for the declared type; a parameter typed as a
-            // concrete List<T> cannot be handed one.
-            return parameterType.IsAssignableFrom(array.Type)
-                ? array
-                : Expression.Constant(value, parameterType);
+            return Boxed(value, parameterType);
         }
+
+        /// <summary>
+        ///     A collection parameter in the shape EF's own funcletizer lifts back into a
+        ///     parameter: a member read over a constant, which is what a captured variable is
+        ///     (B22).
+        /// </summary>
+        private static Expression Boxed(object? value, Type parameterType)
+            => Expression.Property(
+                Expression.Constant(
+                    Activator.CreateInstance(typeof(ParameterBox<>).MakeGenericType(parameterType), value),
+                    typeof(ParameterBox<>).MakeGenericType(parameterType)),
+                nameof(ParameterBox<object>.Value));
 
         private static Type? SequenceElementType(Type type)
             => type.IsArray

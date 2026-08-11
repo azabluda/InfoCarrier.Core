@@ -106,6 +106,30 @@ never produces): Block/Loop/Try/Goto/Switch/Label/DebugInfo/Throw/Dynamic. EF ex
 > Tier A could never have found this: EF's InMemory provider client-evaluates `Contains` either
 > way (ADR-009).
 
+> WARNING **Superseded for collections 2026-08-11 (plan C88, B22) - a wrapper is now used, and the
+> reason this section forbade one does not apply to it.** The rule below was derived from v1's
+> `ValueWrapper<T>`, and re-reading v1 is what settled it:
+> `infocarrier-v1/.../InfoCarrierDatabase.cs` declares `private struct ValueWrapper<T>` and emits
+> `Property(Constant(wrapper), "Value")`. **The wrapper was `private`** - a type the wire cannot
+> name and a deserializer cannot construct. `InfoCarrier.Core.Expressions.ParameterBox<T>` is a
+> **public class with a public property**, admitted by `TypeAllowlist` like any other built-in
+> generic and rebuilt by the ordinary member walk.
+>
+> **Why it is worth reversing.** The 2026-08-02 amendment above spells a collection out as a
+> `NewArrayExpression` so relational EF sees an inline collection. That is right for `IN (x, y)`
+> and wrong for everything needing a *real* parameter: indexing a collection by a column becomes a
+> correlated subquery whose `OFFSET` names a column out of scope, where a parameter reaches SQLite
+> as a JSON string indexed with `->>`. A member read over a constant is what EF's own funcletizer
+> treats as a captured variable, so the **server** parameterizes it and re-derives the inline form
+> itself when it needs one. **Measured: 3 fixed, 0 broken** (`c88b`).
+>
+> **Two guards, both measured.** Scalars are unchanged - boxing them would touch every
+> parameterized query in the suite for nothing. And a collection is boxed only where the wire can
+> give the box's property back what it declares: a collection materializes on the far side as a
+> `List<T>`, so a parameter typed `IOrderedEnumerable<T>` is left alone - boxing it broke eight
+> `Contains_with_local_ordered_enumerable_*` tests, server-side, on *"Object of type
+> 'List<String>' cannot be converted to type 'IOrderedEnumerable<String>'"*.
+
 v1's bug: wrapping parameter values in a custom generic struct `ValueWrapper<T>` as a tree
 constant broke translation. **Rule:** substitute compiled-query parameters as **plain
 `ConstantExpression` of the runtime value** (typed to the parameter's type), resolved from

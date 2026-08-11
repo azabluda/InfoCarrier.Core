@@ -4712,6 +4712,50 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       the server's context lifetime and not about JSON. Left red with the evidence attached rather
       than fixed by guessing at the end of a long session.
 
+- [x] **C88. B22 taken: a collection parameter is boxed so the server's own funcletizer lifts it
+      back into a parameter — and v1's trap was a `private` wrapper, not a wrapper.**
+      **`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (`c88b`) — **29 → 26,
+      3 fixed, 0 broken.** ✅ `<this commit>`
+
+      B22 specified this change and declined to make it, because it reverses research-findings §6
+      — *"no wrapper types"* — which needs an answer rather than a patch. **The answer came out of
+      v1's own source.** `infocarrier-v1/.../Client/Storage/Internal/InfoCarrierDatabase.cs`:
+
+          private struct ValueWrapper<T> { public T Value { get; set; } }
+          → Expression.Property(Expression.Constant(paramValue), nameof(ValueWrapper<object>.Value))
+
+      **`private`.** A type the wire cannot name and a deserializer cannot construct.
+      `ParameterBox<T>` is a public class with a public property, on `TypeAllowlist` like any other
+      built-in generic. §6's rule was derived from a wrapper that failed for a reason this one does
+      not have, and the supersession there says so with the file and the declaration.
+
+      **What it buys.** §6's 2026-08-02 amendment spells a collection out as a `NewArrayExpression`
+      so relational EF sees an inline collection — right for `IN (x, y)`, wrong for anything that
+      needs a real parameter. `Parameter_collection_index_Column_equal_Column` and its two siblings
+      index a collection **by a column**, which as an inline collection becomes a correlated
+      subquery whose `OFFSET` names a column out of scope (`no such column: p.Int`). Boxed, the
+      server parameterizes it and re-derives the inline form itself where it wants one — so
+      `Contains` keeps working and the indexing starts.
+
+      **Two guards, and both were found by measuring rather than by reasoning.**
+
+      - **Scalars are untouched.** Boxing them would change every parameterized query in the suite
+        for no test at all.
+      - **A collection is boxed only where the wire can give the property back what it declares.**
+        The first version boxed every collection: **3 fixed, 8 broken** (`c88`). A collection
+        materializes on the far side as a `List<T>`, so a parameter typed `IOrderedEnumerable<T>`
+        cannot be handed one, and the server said exactly that — *"Object of type 'List<String>'
+        cannot be converted to type 'IOrderedEnumerable<String>'"* — eight
+        `Contains_with_local_ordered_enumerable_*` deep. **The second version was wrong the other
+        way**: narrowed to `IsAssignableFrom(List<T>)` alone it put the three targets straight
+        back, because their parameters are **arrays**. The guard is
+        `IsArray || IsAssignableFrom(List<T>)`, and two filtered runs found it where reading the
+        types had not.
+
+      **`Parameter_collection_null_Contains` stays red**, exactly as B22 predicted: a `null`
+      collection parameter is still a literal `null` constant, and `null.Contains(x)` is not a
+      thing to translate. Same trade, different face, and not what this step was for.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
@@ -5551,7 +5595,7 @@ constructor, so the backend store cannot build the server's copy.
       Both are *composed* sequences. The rule is a **member read** and nothing else — the same
       distinction the tracking half needed, one layer down.
 
-- [ ] **B22. §6 substitution priced: it does not need a wire change, and that is the finding.**
+- [x] **B22. §6 substitution priced: it does not need a wire change, and that is the finding.** **TAKEN in C88.**
       Priced, **not started** — it reverses a stated decision (research-findings §6), so it needs
       an answer rather than a patch. No code change; this entry is the price.
 

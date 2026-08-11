@@ -104,5 +104,10 @@
 # partial update of the row holding the column. Editing an element and the two-owner shape pass.
 # Adding and removing still fail, on a different defect: __synthesizedOrdinal is positional and
 # collides with an element the server tracked from an earlier query in the same transaction.
-failed=29
+# 2026-08-11 (C88) - 29 -> 26. B22 taken: a collection query parameter is boxed in a public
+# ParameterBox<T> so the server's own funcletizer lifts it back into a parameter, instead of
+# being spelled out as an inline array. This reverses research-findings 6 for collections and
+# carries a dated supersession there: v1's trap was that its wrapper was `private`, not that it
+# was a wrapper.
+failed=26
 total=22455
