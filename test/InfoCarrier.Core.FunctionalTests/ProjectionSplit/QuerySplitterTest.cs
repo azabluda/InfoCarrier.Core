@@ -473,6 +473,45 @@ public class QuerySplitterTest : IDisposable
         Assert.Contains(nameof(Threshold), ex.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    ///     Client code in a projection is refused once a later operator applies a
+    ///     <em>row-deciding lambda</em> to what it produced — here a join key (C68).
+    /// </summary>
+    /// <remarks>
+    ///     EF's prose says "client evaluation is legal only in the final projection", and C59
+    ///     measured that reading at 6 fixed and 18 broken. The line EF actually draws is whether
+    ///     anything <em>reads</em> the projected value, and the pair of tests here is that
+    ///     distinction in miniature.
+    /// </remarks>
+    [Fact]
+    public void A_client_method_a_join_key_reads_is_refused()
+    {
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => Split(
+                _context.Authors
+                    .Select(a => Rename(a))
+                    .Join(_context.Books, a => a.Id, b => b.AuthorId, (a, b) => b.Title)));
+
+        Assert.Contains("could not be translated", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     And the same projection is allowed under operators that read only cardinality or
+    ///     position — which is what `Count_on_projection_with_client_eval` and
+    ///     `Client_eval_Union_FirstOrDefault` assert, and what C59's blunter rule broke.
+    /// </summary>
+    [Fact]
+    public void A_client_method_nothing_reads_is_allowed()
+    {
+        Assert.NotEmpty(Split(_context.Authors.Select(a => Rename(a))).ServerQueries);
+        Assert.NotEmpty(Split(_context.Authors.Select(a => Rename(a)).Take(2)).ServerQueries);
+        Assert.NotEmpty(
+            Split(_context.Authors.Select(a => Rename(a)).Union(_context.Authors)).ServerQueries);
+    }
+
+    private static Author Rename(Author author)
+        => author;
+
     [Fact]
     public void A_navigation_reached_through_one_other_navigation_is_carried()
     {

@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22362, Passed: 22031, Failed: 114, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22364, Passed: 22039, Failed: 108, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,11 +137,11 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c67`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
+currently `c68`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
 B12, a decision), **26 `MaterializationInterception`** (B16's topology, and C58 priced the optional
 harness remedy — A71's ten are the same defect, not a separate one), **8 `Index_*`** across two
 `Query.Associations` classes (C55 — the server raises the warning and the harness does not
-configure it as an error there), **8 `ComplexNavigations`** (4 classified in C56, 4 in C59), **6
+configure it as an error there), **4 `ComplexNavigations`** (C56, faithful to EF — C68 closed the other four), **6
 `BulkUpdates`** and **4 `GearsOfWar`**.
 
 **No failure is an unexplained wrong answer, and that is checked rather than asserted (C65).** The
@@ -177,15 +177,16 @@ read. Phase C's adoptions brought nine of EF's own skips with them. `Failed` and
 correct throughout, so nothing was judged wrongly, but **all four figures come out of the run's
 own summary block; none of them is arithmetic.**
 
-**Two spec-test failures are the A28 shape with the sign flipped, and C59 measured what it costs
-to close them.** EF refuses a query and this provider answers it — a client method in a projection
-that another operator composes over. Implementing EF's stated rule ("client evaluation is legal
-only in the final projection") fixes six and breaks **eighteen**, and every one of the eighteen has
-`client_eval` or `client_projection` in its name: **EF permits an operator over a client-evaluated
-projection in at least five named shapes** (`GroupJoin` in a subquery, `Count`, a `SelectMany`
-collection shaper, `Union` under `FirstOrDefault`). The line EF actually draws is narrower than its
-own prose, and finding it means reading `NavigationExpandingExpressionVisitor`, not fitting another
-rule to six tests.
+**EF's prose was not implementable and EF's own tests were (C59 → C68).** "Client evaluation is
+legal only in the final projection" measured **6 fixed, 18 broken** — and every one of the eighteen
+named `client_eval` or `client_projection`, which made them the specification rather than the
+obstacle. `Union`, `Count` and `FirstOrDefault` over a client projection are **allowed**; a
+**join key** over one is **refused**. So the line is not whether an operator composes over the
+projection but whether it *reads* it — `RowDecidingArguments` applied one level up. C59 missed it
+by two words: it walked **lambda bodies** as well as sources (so an outer `Where` "consumed" a
+subquery inside its own predicate — twelve of the eighteen), and it counted a constructed client
+**type** as client code. **When a rule breaks a named family of tests, read the family: it is
+usually stating the rule you actually want.**
 
 **A28 has a second face, and it is the one to check first when a spec test looks like a design
 question.** A28 proper is a spec test asserting a *materialization* limitation this provider does

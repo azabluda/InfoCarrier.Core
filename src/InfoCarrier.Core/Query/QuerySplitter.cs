@@ -933,15 +933,42 @@ public sealed class QuerySplitter
     {
         private (Expression Operator, string? Details)? _found;
 
+        private IReadOnlySet<Expression> _clientProjectedSources = new HashSet<Expression>();
+
         public static (Expression Operator, string? Details)? Find(
             Expression query,
             IReadOnlySet<Expression> serverSide,
             IReadOnlySet<Expression> reassemblies,
             TypeAllowlist allowlist)
         {
-            var finder = new ClientEvaluationFinder(serverSide, reassemblies, allowlist);
+            var finder = new ClientEvaluationFinder(serverSide, reassemblies, allowlist)
+            {
+                _clientProjectedSources = ClientProjectedSources(reassemblies, allowlist),
+            };
+
             finder.Visit(query);
             return finder._found;
+        }
+
+        /// <summary>
+        ///     The reassemblies that compute a value with client code — the projections a later
+        ///     operator may not apply a lambda to.
+        /// </summary>
+        private static IReadOnlySet<Expression> ClientProjectedSources(
+            IReadOnlySet<Expression> reassemblies, TypeAllowlist allowlist)
+        {
+            var found = new HashSet<Expression>(ReferenceEqualityComparer.Instance);
+            foreach (Expression reassembly in reassemblies)
+            {
+                if (reassembly is MethodCallExpression { Arguments.Count: > 1 } call
+                    && StripQuotes(call.Arguments[^1]) is LambdaExpression selector
+                    && ClientCodeFinder.Find(selector.Body, allowlist, methodsOnly: true) is not null)
+                {
+                    found.Add(reassembly);
+                }
+            }
+
+            return found;
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -971,7 +998,121 @@ public sealed class QuerySplitter
                 }
             }
 
+            if (_found is null && _clientProjectedSources.Count > 0)
+            {
+                RejectLambdaOverClientProjection(node);
+            }
+
             return _found is null ? base.VisitMethodCall(node) : node;
+        }
+
+        /// <summary>
+        ///     Refuses an operator that applies a row-deciding lambda to a sequence some earlier
+        ///     projection computed with client code.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         **This is EF's rule, read off its own tests rather than off its prose** (C68).
+        ///         "Client evaluation is legal only in the final projection" is what the docs say
+        ///         and it is not implementable — C59 measured that reading at 6 fixed and
+        ///         <b>18 broken</b>. The eighteen say what the real line is:
+        ///     </para>
+        ///     <list type="bullet">
+        ///         <item><c>Select(c =&gt; Client(c)).Union(…)</c> then <c>FirstOrDefault</c> — <b>allowed</b></item>
+        ///         <item><c>Select(o =&gt; Client(o)).Count()</c> — <b>allowed</b></item>
+        ///         <item><c>… select Client(l1_inner)).Count() &gt; 7</c> inside a <c>Where</c> — <b>allowed</b></item>
+        ///         <item><c>Join(root, Orders.Select(o =&gt; Client(o)), c =&gt; c.CustomerID, o =&gt; o.CustomerID, …)</c> — <b>refused</b></item>
+        ///         <item><c>(… select Client(l1)).Take(2).LeftJoin(root, x =&gt; x.Id, …)</c> — <b>refused</b></item>
+        ///     </list>
+        ///     <para>
+        ///         `Union`, `Count` and `FirstOrDefault` take **no lambda over the projected
+        ///         element**; the two refusals apply a **join key** to it. So the line is not
+        ///         whether something composes over the projection but whether it *reads* it, and
+        ///         "reads it" is already this class's own <see cref="RowDecidingArguments" />
+        ///         concept, applied one level up.
+        ///     </para>
+        ///     <para>
+        ///         <b>And it explains C59's failure exactly.</b> That attempt marked every
+        ///         argument of a consuming operator, including <em>lambda bodies</em> — so the
+        ///         outer <c>Where</c> of `GroupJoin_in_subquery_with_client_projection` "consumed"
+        ///         a reassembly sitting inside its predicate, when what actually consumes that
+        ///         subquery is the <c>Count()</c> within it. The walk therefore follows
+        ///         <b>source positions only</b>.
+        ///     </para>
+        /// </remarks>
+        private void RejectLambdaOverClientProjection(MethodCallExpression node)
+        {
+            if (serverSide.Contains(node)
+                || node.Method.DeclaringType is not { } declaring
+                || (declaring != typeof(Queryable) && declaring != typeof(Enumerable)))
+            {
+                return;
+            }
+
+            // No row-deciding lambda means nothing reads the projected value: cardinality
+            // (`Count`), set operations (`Union`) and row limiting all fall here, and EF allows
+            // every one of them over a client projection.
+            if (!RowDecidingArguments(node).Any(a => StripQuotes(a) is LambdaExpression))
+            {
+                return;
+            }
+
+            foreach (Expression source in SourceArguments(node))
+            {
+                if (ReachesClientProjection(source))
+                {
+                    _found = (node, null);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     An operator's <em>sequence</em> arguments — never its lambdas, which is the whole
+        ///     correction over C59.
+        /// </summary>
+        private static IEnumerable<Expression> SourceArguments(MethodCallExpression node)
+            => node.Arguments.Where(a => a is not LambdaExpression
+                && StripQuotes(a) is not LambdaExpression
+                && a.Type != typeof(string)
+                && typeof(System.Collections.IEnumerable).IsAssignableFrom(a.Type));
+
+        /// <summary>
+        ///     Whether a client-projecting reassembly is this source, or reaches it through
+        ///     operators that do not themselves read the projection.
+        /// </summary>
+        private bool ReachesClientProjection(Expression source)
+        {
+            while (true)
+            {
+                if (_clientProjectedSources.Contains(source))
+                {
+                    return true;
+                }
+
+                if (source is MethodCallExpression { Arguments.Count: > 0 } call
+                    && call.Method.DeclaringType is { } declaring
+                    && (declaring == typeof(Queryable)
+                        || declaring == typeof(Enumerable)
+                        || declaring == typeof(EntityFrameworkQueryableExtensions))
+                    && !RowDecidingArguments(call).Any(a => StripQuotes(a) is LambdaExpression))
+                {
+                    source = call.Arguments[0];
+                    continue;
+                }
+
+                return false;
+            }
+        }
+
+        private static Expression StripQuotes(Expression node)
+        {
+            while (node is UnaryExpression { NodeType: ExpressionType.Quote } quote)
+            {
+                node = quote.Operand;
+            }
+
+            return node;
         }
 
         /// <summary>
@@ -1018,13 +1159,21 @@ public sealed class QuerySplitter
     /// </summary>
     private readonly record struct ClientCodeReason(string? Details);
 
-    private sealed class ClientCodeFinder(TypeAllowlist allowlist) : ExpressionVisitor
+    private sealed class ClientCodeFinder(TypeAllowlist allowlist, bool methodsOnly = false)
+        : ExpressionVisitor
     {
         private ClientCodeReason? _found;
 
-        public static ClientCodeReason? Find(Expression expression, TypeAllowlist allowlist)
+        /// <param name="methodsOnly">
+        ///     Restricts the search to a method the server cannot run, skipping the client-only
+        ///     <em>type</em> clauses below. C68 needs that distinction: constructing a client type
+        ///     is the type boundary this milestone is about, and refusing it in the composed-over
+        ///     position cost 235 tests once.
+        /// </param>
+        public static ClientCodeReason? Find(
+            Expression expression, TypeAllowlist allowlist, bool methodsOnly = false)
         {
-            var finder = new ClientCodeFinder(allowlist);
+            var finder = new ClientCodeFinder(allowlist, methodsOnly);
             finder.Visit(expression);
             return finder._found;
         }
@@ -1043,6 +1192,7 @@ public sealed class QuerySplitter
         protected override Expression VisitBinary(BinaryExpression node)
         {
             if (_found is null
+                && !methodsOnly
                 && node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
                 && node.Method is null
                 && !node.Left.Type.IsValueType
@@ -1101,7 +1251,7 @@ public sealed class QuerySplitter
         /// </remarks>
         protected override Expression VisitMemberInit(MemberInitExpression node)
         {
-            if (_found is null && LacksValueEquality(node.Type))
+            if (_found is null && !methodsOnly && LacksValueEquality(node.Type))
             {
                 _found = new ClientCodeReason(null);
                 return node;
@@ -1112,7 +1262,7 @@ public sealed class QuerySplitter
 
         protected override Expression VisitNew(NewExpression node)
         {
-            if (_found is null && LacksValueEquality(node.Type))
+            if (_found is null && !methodsOnly && LacksValueEquality(node.Type))
             {
                 _found = new ClientCodeReason(null);
                 return node;

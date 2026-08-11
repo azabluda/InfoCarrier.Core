@@ -3768,6 +3768,52 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       mirroring the base would mean asserting our own. **The value here is the error a real caller
       gets, not the count** — and the count is what proves the change is confined.
 
+- [x] **C68. EF's client-evaluation line, read off its tests instead of its prose — and C59's
+      eighteen were the evidence, not the obstacle.**
+      **`Total tests: 22364, Passed: 22039, Failed: 108, Skipped: 217`** (`c68`) — **114 → 108,
+      6 fixed, 0 broken.** ✅ `<this commit>`
+
+      C59 implemented EF's stated rule — *client evaluation is legal only in the final projection*
+      — and measured **6 fixed, 18 broken**, every one of the eighteen named `client_eval` or
+      `client_projection`. It closed by saying the real line needed reading rather than another
+      rule fitted to six tests. **The eighteen turned out to be the reading.**
+
+      | EF **allows** | What composes over the client projection |
+      |---|---|
+      | `Select(c => Client(c)).Union(…)` → `FirstOrDefault` | `Union`, `FirstOrDefault` |
+      | `Select(o => Client(o)).Count()` | `Count` |
+      | `(… select Client(l1_inner)).Count() > 7` inside a `Where` | `Count` |
+
+      | EF **refuses** | |
+      |---|---|
+      | `Join(root, Orders.Select(o => Client(o)), c => c.CustomerID, o => o.CustomerID, …)` | a **join key** |
+      | `(… select Client(l1)).Take(2).LeftJoin(root, x => x.Id, …)` | a **join key** |
+
+      **`Union`, `Count` and `FirstOrDefault` apply no lambda to the projected element; both
+      refusals apply a join key to it.** So the line is not whether an operator *composes over* a
+      client projection but whether it *reads* it — which is exactly this class's own
+      `RowDecidingArguments` concept, applied one level up. An operator is refused when it has a
+      row-deciding lambda **and** its *source* reaches a reassembly whose selector contains client
+      code.
+
+      **Two corrections to C59 make it work, and both are one word each.**
+
+      - **Source positions only.** C59 marked every argument of a consuming operator, *including
+        lambda bodies* — so the outer `Where` of `GroupJoin_in_subquery_with_client_projection`
+        "consumed" a reassembly sitting inside its own predicate, when what consumes that subquery
+        is the `Count()` within it. Twelve of the eighteen were that single error.
+      - **Client *methods*, not client types.** Constructing a client-only type in a composed-over
+        projection is the type boundary this milestone exists for, and refusing it cost 235 tests
+        once; `ClientCodeFinder` gained a `methodsOnly` mode so the check means what it says.
+
+      **Filtered first, run second.** The six targets and the eighteen C59 broke were run together
+      before spending a measurement — **24 of 24** — and the full run then found nothing else in
+      22,364 tests. Two unit tests pin the pair: a client method a join key reads is refused, the
+      same projection under `Take` and `Union` is not.
+
+      **`ComplexNavigations` is down to the four C56 left**, which are faithful to EF, and
+      `NorthwindNavigations` is clear.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
