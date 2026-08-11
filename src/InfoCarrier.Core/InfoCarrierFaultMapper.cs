@@ -111,6 +111,43 @@ public static class InfoCarrierFaultMapper
             {
                 return withMessage;
             }
+
+            // A type the caller could not name anyway is worth trading for one it can. The runtime
+            // type of a failure is often `internal` — `System.Text.Json` reports malformed JSON as
+            // `JsonReaderException`, which is internal and derives from the public `JsonException` —
+            // and above the fallback below is the only route such a failure had, so a caller who
+            // wrote `catch (JsonException)` got an `InfoCarrierServerException` instead. C82 found it
+            // through four `AdHocJsonQuery` tests asserting `ThrowsAny<JsonException>`.
+            //
+            // Only for a type that is not visible: a **public** type that merely has no usable
+            // constructor keeps the fallback, because its name is something the caller can still act
+            // on and its own base may mean something quite different — `SqliteException` would
+            // otherwise become `ExternalException`, which says nothing about a store.
+            //
+            // And never `Exception` itself: degrading to that loses everything the fallback carries,
+            // including which type the server actually threw.
+            if (!type.IsVisible)
+            {
+                for (Type? candidate = type.BaseType;
+                     candidate is not null && candidate != typeof(Exception);
+                     candidate = candidate.BaseType)
+                {
+                    if (!candidate.IsVisible || candidate.IsAbstract)
+                    {
+                        continue;
+                    }
+
+                    if (Invoke(candidate, [typeof(string), typeof(Exception)], [fault.Message, inner]) is { } asBase)
+                    {
+                        return asBase;
+                    }
+
+                    if (inner is null && Invoke(candidate, [typeof(string)], [fault.Message]) is { } asBaseMessage)
+                    {
+                        return asBaseMessage;
+                    }
+                }
+            }
         }
 
         // The chain is never dropped: a type that cannot carry an inner exception loses the type,

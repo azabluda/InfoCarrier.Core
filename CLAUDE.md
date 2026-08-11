@@ -120,7 +120,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22387, Passed: 22140, Failed: 30, Skipped: 217`** (2026-08-11) across the
+**`Total tests: 22450, Passed: 22203, Failed: 29, Skipped: 218`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -138,7 +138,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c81`. C55–C81 took 132 to 30; `Query.Associations` is 336 of 336, and
+currently `c83`. C55–C83 took 132 to 29; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are now **6 `BulkUpdates`**, **4 `Scaffolding.CompiledModel`** and **4
 `PrimitiveCollectionsQuery`** — `JsonQuery` fell from 40 to 4 when C80 took B12.
@@ -253,14 +253,16 @@ Not yet implemented, in rough priority order:
   test green. A collision is only observable where the store issues keys at `Add` **and** the two
   key sequences have drifted apart — both InMemory counters start at 1, so an unseeded store hides
   it too.
-- **The remaining spec bases — 1** (Phase C, 2026-08-10: 41 adopted down to 1). Everything the
-  compliance test used to list is in, including the four "infrastructure" bases, `Seeding` (C7) and
-  **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`**, and **both
-  reasons it was declined are gone**: B12 is taken (C80), and C81 references
-  `Microsoft.EntityFrameworkCore.Relational.Specification.Tests`, which is where
-  `AdHocJsonQueryRelationalTestBase` lives — so B3d/C10's price of "626 + 322 lines of relational
-  mirror and seven abstract seeds only EF's relational classes implement" was a price for *not
-  having the package*. Re-price it before repeating it.
+- **The remaining spec bases — 0. `InfoCarrierComplianceTest` is GREEN (C82).** Every base EF
+  ships that this provider can host is adopted, `AdHocJsonQuery` last and **61 of 61**. B3d/C10
+  had priced it at *"626 + 322 lines of relational mirror and seven abstract seeds"*, and both
+  halves were priced against the wrong obstacle: the mirror was the cost of **not referencing**
+  `EFCore.Relational.Specification.Tests` (ADR-013 now does), and the seeds are ten raw-SQL
+  `INSERT`s copied byte-for-byte from `AdHocJsonQuerySqliteTest` and run against the **backend**,
+  because the client has no database. **Copying only the seven the compiler demanded cost a run** —
+  `Seed21006`, `Seed29219` and `Seed34960` are `virtual`, EF's SQLite class overrides them too, and
+  34 of 61 became 56 of 61 once all ten were taken. *"Which does the compiler require"* is not
+  *"which does this store need"*.
 - **Spatial works, and the shape of how is worth keeping.** Three pieces, landed and measured
   separately because C9's combined attempt aborted the host: the NetTopologySuite branch in
   `InfoCarrierTypeMappingSource` (C15, worth 19 on its own — the long-standing "needs SpatiaLite"

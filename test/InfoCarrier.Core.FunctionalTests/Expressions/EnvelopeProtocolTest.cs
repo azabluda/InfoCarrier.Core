@@ -1,6 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using System.Text.Json;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Expressions;
@@ -136,6 +137,73 @@ public class EnvelopeProtocolTest
         var server = Assert.IsType<InfoCarrierServerException>(rebuilt);
         Assert.Equal("Some.Backend.SpecificException", server.ServerExceptionTypeName);
         Assert.Equal("the store said no", server.Message);
+    }
+
+    /// <summary>
+    ///     A failure whose runtime type is <c>internal</c> comes back as the nearest type a caller
+    ///     can name (C83).
+    /// </summary>
+    /// <remarks>
+    ///     `System.Text.Json` reports malformed JSON as `JsonReaderException`, which is internal
+    ///     and derives from the public `JsonException`. Nobody can write
+    ///     `catch (JsonReaderException)`, so degrading to `InfoCarrierServerException` threw away
+    ///     the only name that was ever usable — which is what four `AdHocJsonQuery` tests
+    ///     asserting `ThrowsAny<JsonException>` found.
+    /// </remarks>
+    [Fact]
+    public void A_non_public_exception_type_degrades_to_the_nearest_public_base()
+    {
+        // Through `Utf8JsonReader` rather than `JsonSerializer`: the serializer catches and
+        // rethrows the public `JsonException`, and it is the reader — which is what EF uses to
+        // read a JSON column — that surfaces the internal one.
+        Exception thrown = Assert.ThrowsAny<JsonException>(ReadInvalidJson);
+
+        Assert.False(thrown.GetType().IsVisible, "the premise: the runtime type is not nameable");
+
+        Exception rebuilt = InfoCarrierFaultMapper.Rehydrate(InfoCarrierFaultMapper.Capture(thrown));
+
+        Assert.IsType<JsonException>(rebuilt);
+        Assert.Equal(thrown.Message, rebuilt.Message);
+    }
+
+    private static void ReadInvalidJson()
+    {
+        var reader = new Utf8JsonReader("{ n:1 }"u8);
+        while (reader.Read())
+        {
+        }
+    }
+
+    /// <summary>
+    ///     And a <em>public</em> type with no usable constructor still degrades to
+    ///     <see cref="InfoCarrierServerException" /> rather than to its base.
+    /// </summary>
+    /// <remarks>
+    ///     The narrowing that makes the rule above safe. A public name is something the caller can
+    ///     act on, and a base may mean something quite different: `SqliteException` derives from
+    ///     `ExternalException`, which says nothing about a store.
+    /// </remarks>
+    [Fact]
+    public void A_public_exception_type_with_no_usable_constructor_keeps_the_fallback()
+    {
+        Exception rebuilt = InfoCarrierFaultMapper.Rehydrate(new InfoCarrierFault
+        {
+            TypeName = typeof(PublicExceptionWithNoUsableConstructor).FullName!,
+            Message = "the store said no",
+        });
+
+        var server = Assert.IsType<InfoCarrierServerException>(rebuilt);
+        Assert.Equal(typeof(PublicExceptionWithNoUsableConstructor).FullName, server.ServerExceptionTypeName);
+    }
+
+    /// <summary>
+    ///     Public, derives from a constructible public base, and offers no constructor this mapper
+    ///     will use — the shape `SqliteException` has.
+    /// </summary>
+    public class PublicExceptionWithNoUsableConstructor(string message, int code)
+        : InvalidOperationException(message)
+    {
+        public int Code { get; } = code;
     }
 
     /// <summary>

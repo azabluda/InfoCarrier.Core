@@ -4539,6 +4539,41 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` passes**, which is the
       milestone: every base EF ships that this provider can host is adopted.
 
+- [x] **C83. A failure whose runtime type is `internal` now comes back as the nearest type a
+      caller can name.**
+      **`Total tests: 22450, Passed: 22203, Failed: 29, Skipped: 218`** (`c83`) — **33 → 29,
+      4 fixed, 0 broken.** `AdHocJsonQuery` is **61 of 61**. ✅ `<this commit>`
+
+      C82's four leftovers asserted `ThrowsAny<JsonException>` and got `InfoCarrierServerException`
+      carrying the store's message verbatim. The type was lost because
+      `System.Text.Json` reports malformed JSON as **`JsonReaderException`, which is `internal`**:
+      `Resolve` found it — it scans loaded assemblies, so an internal type is findable — and
+      `Invoke` then asked for a **public** constructor and found none. W5's deliberate fallback
+      took over, and it was the wrong answer here, because **nobody can write
+      `catch (JsonReaderException)` in the first place.**
+
+      **The rule: a type the caller could not name anyway is worth trading for one it can.** When
+      the resolved type is not visible, the nearest visible, non-abstract base is tried instead —
+      `JsonException`, which is exactly what a caller writes.
+
+      **Two narrowings, and both are what keep it from being a regression.** It applies **only to a
+      non-visible type**: a *public* type that merely lacks a usable constructor keeps the
+      fallback, because its name is something a caller can still act on and its base may mean
+      something quite different — `SqliteException` derives from `ExternalException`, which says
+      nothing about a store. And the walk **never reaches `Exception`**, which would throw away
+      everything the fallback carries, including the type name the server reported.
+
+      **Seen to fail, and the first version of the test was wrong in an instructive way.** It
+      reached for the internal type through `JsonSerializer.Deserialize`, and the premise assertion
+      caught it: the serializer *catches and rethrows* the public `JsonException`, so nothing
+      internal ever escapes. It is `Utf8JsonReader` — which is what EF uses to read a JSON column —
+      that surfaces `JsonReaderException`. **The test asserts its own premise**
+      (`Assert.False(thrown.GetType().IsVisible)`), which is the only reason that was caught rather
+      than shipped as a test that proved nothing.
+
+      A second test pins the narrowing: a public exception with no usable constructor still
+      degrades to `InfoCarrierServerException` and still names itself.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
