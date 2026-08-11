@@ -4011,6 +4011,60 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       pass *through the server* still pass — they now get the same refusal one step earlier, in the
       same words.
 
+- [x] **C74. `ProxyGraphUpdates` on Tier B, attempted and measured: it costs 138 and does not buy
+      the two tests it was proposed for.** No code change survives. ✅ `<this commit>`
+
+      C60 classified `Save_two_entity_cycle_with_lazy_loading` ×2 and added an untested aside:
+      *"Tier B would make the branch true and costs moving a 1700-test base; not attempted."* The
+      first half is the part worth checking, because the base branches on a **name**:
+
+          if (context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+              → the cycle is permitted, assert the swap took
+          else
+              → Assert.Throws<InvalidOperationException>, message starts with CoreStrings.CircularDependency
+
+      Under this provider the name is the **client's** and the behaviour is the **backend's**, so
+      on Tier A the test takes the `else` branch against a store that permits the cycle. Moving to
+      SQLite makes the branch *and* the store agree — which is why it looked like the answer.
+
+      **Three filtered runs, same 1710 tests.**
+
+      | Configuration | Passed | Failed | Skipped |
+      |---|---|---|---|
+      | Tier A, as shipped | **1669** | **2** | 39 |
+      | Tier B, factory switched + `UseInfoCarrierTransaction` | 4 | **1667** | 39 |
+      | Tier B, plus a recreate-based `ReseedAsync` | 1531 | **140** | 39 |
+
+      The first Tier B run is a harness artefact worth recording rather than the answer: the
+      fixture's `ReseedAsync` calls `CleanAsync` + `SeedAsync`, which on a **file-backed** store
+      leaves the previous seed in place — 1665 × `UNIQUE constraint failed: Root.AlternateId`, the
+      seed accumulating. `EnsureDeletedAsync`/`EnsureCreatedAsync` is what a Tier B fixture needs,
+      as `OptimisticConcurrency`'s does.
+
+      **With that fixed the honest price is 140 against 2, and the two targets are still red.**
+
+          Save_two_entity_cycle_with_lazy_loading
+          Expected: typeof(System.InvalidOperationException)
+          Actual:   typeof(Microsoft.EntityFrameworkCore.DbUpdateException)
+          ---- InfoCarrierServerException : SQLite Error 19: 'UNIQUE constraint failed: Car.fk_PersonId'
+
+      **So C60's aside is wrong, and not merely expensive.** The `else` branch expects EF's
+      *topological sort* to refuse the graph — `CoreStrings.CircularDependency`, raised by
+      `CommandBatchPreparer` before any SQL runs. The server never sees a cycle to sort: what
+      reaches it is two independent foreign-key modifications, and SQLite rejects them at the
+      unique index instead. Changing tier changes which store answers, not which sort runs.
+
+      And the 140 is a *favourable* accounting: the thirteen InMemory skips (`Issue #2166`,
+      `Issue #3924`) were left in place, and they are precisely the FK-constraint and
+      cascade-delete tests SQLite would run. The remaining 138 are `FOREIGN KEY constraint failed`
+      out of the same families.
+
+      **Reclassified.** These two are not a tier question and not a pricing question. They are
+      B16's shape a third time — **a spec test whose branch reads `ProviderName` to decide what the
+      store does**, which under two EF instances is a question with no single answer. The name
+      belongs to the client and the behaviour to the backend, and no configuration of this
+      provider makes one predict the other. Red and classified.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
