@@ -4715,11 +4715,26 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       - and `__synthesizedOrdinal` is **positional**, assigned by EF from the array index, so the
         client's placeholder and the server's existing element land on the same number.
 
-      **Editing passes for the same reason adding fails**: an edit reuses an ordinal the server
+      ~~**Editing passes for the same reason adding fails**: an edit reuses an ordinal the server
       already tracks, so EF updates rather than adds. **The next question is whether a server
       context should carry query-tracked state into a replay at all**, which is a statement about
-      the server's context lifetime and not about JSON. Left red with the evidence attached rather
-      than fixed by guessing at the end of a long session.
+      the server's context lifetime and not about JSON.~~ Left red with the evidence attached
+      rather than fixed by guessing at the end of a long session.
+
+      **CORRECTED 2026-08-11 (C95). The third bullet above is wrong, and so is the question it
+      raised.** The server's change tracker is **empty** when the replay begins — probed directly —
+      and the identity conflict is raised on the **client**, inside
+      `InfoCarrierDatabase.ApplyGeneratedValues`, applying the ordinal the server sent back. There
+      is no query-tracked server state and therefore no question about the server context's
+      lifetime. The first, second and fourth bullets were right: the ordinal is positional, the
+      owner arrives bare, and that is exactly why — its collection is empty on the server, so a
+      document holding two elements is numbered as one. The remedy is the rest of the document,
+      not a different context lifetime. See C95.
+
+      **The general form, and it has now cost two entries.** *"Something already holds this key"*
+      names a **collision**, not a **side**. C87 read the message and assumed the other instance
+      was the server's, because the server is where the replay happens; it was the client's own,
+      one call further on. The stack trace said so all along and was not read.
 
 - [x] **C88. B22 taken: a collection parameter is boxed so the server's own funcletizer lifts it
       back into a parameter — and v1's trap was a `private` wrapper, not a wrapper.**
@@ -5032,6 +5047,47 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **`[MemberData(nameof(IsAsyncData))]` has to be repeated on the override**, which EF's own
       SQLite class does not need and we do: the analyzer here raises `xUnit1003` for a
       `ConditionalTheory` with no data, and attributes do not come along with the `override`.
+
+- [x] **C95. The rest of the JSON document travels, and C87's diagnosis of what was left was
+      wrong in a way worth recording.**
+      **`Total tests: 22453, Passed: 22217, Failed: 15, Skipped: 221`** (`c95`) — **17 → 15,
+      2 fixed, 0 broken.** `JsonOwnedCollectionUpdate` is **5 of 5**. ✅ `<this commit>`
+
+      **C87 said the collision came from the server, and it did not.** Its reading was:
+      *"the instance already holding ordinal 1 is one the **server** was tracking before the
+      replay began — the test's own earlier query ran there, inside the same transaction"*, and
+      the open question it left was whether a server context should carry query-tracked state into
+      a replay at all — *"a statement about the server's context lifetime"*. Two probes closed
+      that in one filtered run:
+
+          SERVER-TRACKED-ON-ENTRY:                 <- empty. Nothing was carried over.
+          at InfoCarrier.Core.InfoCarrierDatabase.ApplyGeneratedValues(...)   <- the CLIENT's tracker
+
+      The server's change tracker is **empty** when the replay begins, and the identity conflict is
+      raised on the **client**, applying the value the server sent back. No question about the
+      server's context lifetime arises, and the entry that framed one is corrected.
+
+      **What it actually is.** `__synthesizedOrdinal` is positional — EF numbers a JSON array from
+      the owner's collection navigation — and `ChangeEntryMapper` sends **no navigations**, so the
+      owner C87 made travel arrives *bare*. A document holding two elements looked like a document
+      holding one:
+
+          RETURN corr=1 JsonOwnedRoot state=Added __synthesizedOrdinal:1     <- should be 3
+
+      The client already had elements 1 and 2, so `1` collided in its own identity map. **The
+      identity conflict is the symptom; the wrong ordinal is the defect** — the partial update
+      would have overwritten an existing element instead of appending. C76's shape exactly, one
+      level along: *a wrong value written to the store, surfacing as something else*.
+
+      **The fix: once the owner is going, the rest of its document goes with it**, as `Unchanged`,
+      which is what those elements are. `JsonDocumentMembers` reads them off the **client's change
+      tracker** rather than off the owner's navigations, because a *removed* element is no longer
+      in its collection and still has to travel — that is the whole of the remove case.
+
+      **This is not the "send the whole graph" that C37 and C42 each paid for.** A JSON column is
+      written by partial update of one document, and the other elements of that document are part
+      of the row being written; the scan is gated on `GetContainerColumnName()` and does nothing at
+      all on a model with no `ToJson()`. Measured: 0 broken across 22,453 tests.
 
 ## Phase B — the tier audit, and the rework it found
 

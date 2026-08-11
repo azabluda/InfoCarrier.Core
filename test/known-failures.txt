@@ -130,5 +130,12 @@
 # rather than as its parameterizations: the two theories were 4 tests and are now 2. Nothing
 # stopped running. If the total ever drops again without a line like this one, it is a crashed
 # host and not a decision.
-failed=17
+# 2026-08-11 (C95) - 17 -> 15, and C86's deliberate rise of 27 -> 31 is now fully repaid:
+# JsonOwnedCollectionUpdate is 5 of 5. Once the owner of a JSON-mapped entry travels, the rest of
+# its document travels with it as Unchanged -- __synthesizedOrdinal is positional and the owner
+# arrived bare, so a document holding two elements was numbered as one and the appended element
+# came back as ordinal 1 instead of 3. C87's reading of this as server-side query-tracked state
+# was wrong and is corrected in the plan: the server's tracker is empty on entry and the identity
+# conflict is raised on the client.
+failed=15
 total=22453

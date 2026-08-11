@@ -127,7 +127,7 @@ found. **The standing price for all of it — "626 + 322 lines of relational mir
 abstract seeds" — was a price for a route nobody was going to take.**
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22453, Passed: 22215, Failed: 17, Skipped: 221`** (2026-08-11) across the
+**`Total tests: 22453, Passed: 22217, Failed: 15, Skipped: 221`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -145,7 +145,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c94`. C55–C94 took 132 to 17, and 2 of the 17 are C86's own new tests; `Query.Associations` is 336 of 336, and
+currently `c95`. C55–C95 took 132 to 15, and none of the 15 is C86's own new tests — those are 5 of 5; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are now **2 `JsonQuery`**, **2 `GearsOfWar`** and **2 `ComplexTypesTracking`** — `JsonQuery`
 fell from 40 to 4 when C80 took B12, `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22,
@@ -425,21 +425,26 @@ Not yet implemented, in rough priority order:
   virtual and calls `GetDbTransaction()`, so all **142** of its tests fail on *"Relational-specific
   methods can only be used when the context is using a relational database provider"* before
   reaching anything about JSON.
-  **C86 covered it directly and C87 fixed half of it. Editing an element and the two-owner shape
-  now work; adding and removing do not.** C87's fix: `InfoCarrierDatabase.Expand` yields the
-  **ownership chain** of a JSON-mapped entry, because EF writes a JSON column by partial update of
-  the owning row and that row's entry is `Unchanged` and never travelled. What is left is a
-  *different* defect — `__synthesizedOrdinal` is **positional**, and it collides with an element the
-  **server** tracked from an earlier query inside the same transaction. The open question is whether
-  a server context should carry query-tracked state into a replay at all. Original diagnosis: Five tests
-  on EF's own fixture: four fail, and the one that passes is the diagnosis. The client sends only
-  the changed element — `ENTRIES: JsonEntityBasic.OwnedCollectionRoot#JsonOwnedRoot=Added` — and
-  never its owner, so EF's `FindJsonPartialUpdateInfo` has no row whose JSON column to update and
-  throws `NullReferenceException`. **The control**: adding a whole *new* entity passes, because
-  there the owner is in the change set as `Added`. The seam is `InfoCarrierDatabase.Expand`, which
-  already widens the set once for `SharedIdentityEntry` and must also yield the ownership chain of
-  a JSON-mapped entry — **a change to what `SaveChanges` sends**, which is why C86 stopped at the
-  diagnosis. The ratchet was raised 27 → 31 for it, deliberately.
+  **C86 covered it directly, C87 fixed half and C95 closed it — `JsonOwnedCollectionUpdate` is
+  5 of 5.** `InfoCarrierDatabase.Expand` now yields, for a JSON-mapped entry, both the **ownership
+  chain** (C87 — EF writes a JSON column by partial update of the owning row, whose entry is
+  `Unchanged` and never travelled) and **the rest of that owner's document** (C95), as `Unchanged`,
+  read off the client's change tracker rather than off the owner's navigations because a *removed*
+  element is no longer in its collection.
+  **C87's account of what was left was wrong, and the way it was wrong is the lesson.** It read the
+  message *"another instance with the key value '{OwnerId: 1, __synthesizedOrdinal: 1}' is already
+  being tracked"* as the **server** holding a query-tracked element, and raised "should a server
+  context carry query-tracked state into a replay at all" as a design question about context
+  lifetime. Two probes refuted it in one filtered run: the server's tracker is **empty** on entry,
+  and the conflict is raised on the **client**, in `ApplyGeneratedValues`, applying what the server
+  sent back. **"Something already holds this key" names a collision, not a side** — and the stack
+  trace had said which side all along. The real defect: `__synthesizedOrdinal` is **positional**,
+  `ChangeEntryMapper` sends no navigations, so the owner arrived with an empty collection and EF
+  numbered the appended element `1` instead of `3`. **The identity conflict was the symptom; a
+  wrong ordinal written into the document was the defect** — C76's shape one level along. This is
+  not the "send the whole graph" C37 and C42 each paid for: a JSON column is written as one
+  document, and the scan is gated on `GetContainerColumnName()`, so a model with no `ToJson()` pays
+  nothing. 0 broken across 22,453.
 - **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
   they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all

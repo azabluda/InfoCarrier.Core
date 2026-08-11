@@ -291,6 +291,24 @@ public class InfoCarrierDatabase : IDatabase
         // this to all of them would put table-splitting dependents' owners on the wire for no
         // reason — `SaveChanges` payload changes are the ones this provider has paid most for
         // (C37, C42).
+        // …and, once the owner is going, the rest of its JSON document (C95).
+        //
+        // C87 sent the owner and stopped there, which was enough for an *edit* and wrong for an
+        // add or a remove. `__synthesizedOrdinal` is **positional**: EF numbers a JSON array from
+        // the owner's collection navigation, and the server's owner arrives bare, because
+        // `ChangeEntryMapper` sends no navigations. So a document that holds two elements looked
+        // like a document that holds one, and the element appended to it came back numbered `1`
+        // instead of `3` — a value the client already had, which is why the client's own change
+        // tracker raised *"another instance with the key value '{OwnerId: 1,
+        // __synthesizedOrdinal: 1}' is already being tracked"*. The identity conflict was the
+        // symptom; **the wrong ordinal written into the document was the defect**, and it would
+        // have overwritten an existing element rather than appending.
+        //
+        // The siblings go as `Unchanged`, which is what they are. This is not the general
+        // "send the whole graph" that C37 and C42 each paid for: a JSON column is written by
+        // partial update of one document, and the other elements of that document are part of the
+        // row being written. The scan is bounded by `GetContainerColumnName()` — nothing happens
+        // at all on a model with no `ToJson()`.
         foreach (IUpdateEntry entry in entries)
         {
             foreach (IUpdateEntry owner in JsonColumnOwners(entry))
@@ -299,12 +317,47 @@ public class InfoCarrierDatabase : IDatabase
                 {
                     yield return owner;
                 }
+
+                foreach (IUpdateEntry sibling in JsonDocumentMembers(owner))
+                {
+                    if (!sent.Contains(sibling) && seen.Add(sibling))
+                    {
+                        yield return sibling;
+                    }
+                }
             }
         }
 
         foreach (IUpdateEntry entry in entries)
         {
             yield return entry;
+        }
+    }
+
+    /// <summary>
+    ///     Every tracked JSON-mapped entry that lives in <paramref name="owner" />'s document.
+    /// </summary>
+    /// <remarks>
+    ///     Read off the client's change tracker rather than off the navigations, because a
+    ///     removed element is no longer in its owner's collection and still has to travel — that
+    ///     is the whole of the remove case. An element the client never materialized is not here
+    ///     and cannot be: the client can only send what it knows.
+    /// </remarks>
+    private static IEnumerable<IUpdateEntry> JsonDocumentMembers(IUpdateEntry owner)
+    {
+        if (owner is not InternalEntityEntry ownerEntry)
+        {
+            yield break;
+        }
+
+        foreach (InternalEntityEntry candidate in ownerEntry.StateManager.Entries)
+        {
+            if (!ReferenceEquals(candidate, ownerEntry)
+                && candidate.EntityType.GetContainerColumnName() is not null
+                && JsonColumnOwners(candidate).Any(o => ReferenceEquals(o, ownerEntry)))
+            {
+                yield return candidate;
+            }
         }
     }
 
