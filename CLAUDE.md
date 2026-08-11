@@ -127,7 +127,7 @@ found. **The standing price for all of it — "626 + 322 lines of relational mir
 abstract seeds" — was a price for a route nobody was going to take.**
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22450, Passed: 22203, Failed: 29, Skipped: 218`** (2026-08-11) across the
+**`Total tests: 22450, Passed: 22205, Failed: 27, Skipped: 218`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -145,24 +145,19 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c83`. C55–C83 took 132 to 29; `Query.Associations` is 336 of 336, and
+currently `c85`. C55–C85 took 132 to 27; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are now **6 `BulkUpdates`**, **4 `Scaffolding.CompiledModel`** and **4
 `PrimitiveCollectionsQuery`** — `JsonQuery` fell from 40 to 4 when C80 took B12.
 
-**No failure is an unexplained wrong answer, and that is checked rather than asserted (C65,
-re-derived in C77, and re-derive it again — C80 changed it).** Before C80 the run reported **40**
-`Assert.Equal() Failure: Values differ`: 38 `JsonQuery` and the 2 C64 proved are not wrong answers.
-B12 accounted for **36** of the 38; the other 2 are `Json_predicate_on_byte_array`, which shared a
-message line and had been counted into B12 by mistake. Nothing else in the suite returns data that
-differs. **Every one of the 66 is confirmed
-individually in C77**, grouped by class *and* by first message line, because either grouping alone
-hides something the other shows. Re-check it by grouping the `[FAIL]` lines of a run log by their first
-message line; the count and the split are the whole claim. The sentence this replaces named
-`Comparison_with_value_converted_subclass`, which **passes**, and
-`Correlated_collection_with_distinct_3_levels`, which C64 showed cannot pass for anyone; it had
-been stale in both directions for some time, so **do not restate a taxonomy without re-deriving it
-from the run.**
+**There are no unexplained wrong answers, and after C85 there are almost no wrong answers at all.**
+Group a run's `[FAIL]` lines by their first message line: `Assert.Equal() Failure: Values differ` is
+**2**, and both are C64's `Correlated_collection_with_distinct_3_levels`, whose assertion no correct
+answer can satisfy. **Re-derive it; do not restate it.** It has been wrong in both directions twice —
+C65 found a green test counted as a wrong answer, and C85 found two that were EF's own documented
+SQLite limitation (#33522) counted into B12 because they shared a message line. **Grep
+`EFCore.Sqlite.FunctionalTests` for the name before calling a Tier B `Values differ` ours — and
+apply that to old failures, not only to newly-red ones. Age is not evidence.**
 
 **The undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
 closed the last two outside it, and all three used the same two probes in the same order: what the

@@ -4574,6 +4574,48 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       A second test pins the narrowing: a public exception with no usable constructor still
       degrades to `InfoCarrierServerException` and still names itself.
 
+- [x] **C85. The two "unexplained wrong answers" were EF's own documented SQLite limitation, and
+      the rule that would have said so is written in CLAUDE.md.**
+      **`Total tests: 22450, Passed: 22205, Failed: 27, Skipped: 218`** (`c85`) — **29 → 27,
+      2 fixed, 0 broken.** ✅ `<this commit>`
+
+      After C83 the suite reported **4** `Assert.Equal() Failure: Values differ`: two that C64
+      proved no correct answer can satisfy, and `Json_predicate_on_byte_array` ×2. The second pair
+      was ranked as the highest-value work left, on the ground that a wrong answer is the most
+      expensive kind of failure to find late. **They were not wrong answers, and finding that out
+      took one grep that should have come first.**
+
+      **The probe went first and was right about the mechanism.** `x.Reference.TestByteArray !=
+      new byte[] { 1, 2, 3 }` looked like client evaluation — `!=` on a `byte[]` is reference
+      comparison in C#, which would match every row, and the test returns 2 where it wants 1. It is
+      not:
+
+          CAPTURED:  [EntityQueryRootExpression].Where(x => (x.Reference.TestByteArray != value(System.Byte[])))
+          REWRITTEN: <identical>
+          wholly=True shippable=1
+
+      The query ships whole. So the answer is the **store's**, and the store is SQLite.
+
+      **EF's own suite had it written down.**
+
+          // #33522
+          public override Task Json_predicate_on_byte_array(bool async)
+              => Assert.ThrowsAsync<EqualException>(() => base.Json_predicate_on_byte_array(async));
+
+      `Assert.ThrowsAsync<EqualException>` says *the base's assertion is expected to fail here* — a
+      `byte[]` inside a JSON document is not comparable by value in SQLite. Our failure was that
+      `EqualException`, exactly. A63 applies and the override is adopted verbatim.
+
+      **The rule that was skipped is not a new one.** CLAUDE.md: *"A newly-red SQLite test is not
+      automatically a regression. Grep `EFCore.Sqlite.FunctionalTests` for the name first."* It was
+      applied to *newly*-red tests and not to one that had been red for a long time under a
+      different heading — B12's, which counted these two into its 38 because they shared a message
+      line, and C80 then separated them without asking what they were. **Age is not evidence.**
+
+      **The taxonomy is now cleaner than it has been.** `Values differ` is **2**, both C64's, both
+      proved unsatisfiable by any provider. **There are no unexplained wrong answers in 22,450
+      tests** — not "none we have not classified", none at all.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

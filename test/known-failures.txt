@@ -91,5 +91,8 @@
 # 2026-08-11 (C83) - 33 -> 29, `total` 22448 -> 22450 for two fault-mapper tests. A failure whose
 # runtime type is internal now rehydrates as the nearest public base, so a caller who wrote
 # catch (JsonException) gets one. AdHocJsonQuery is 61 of 61.
-failed=29
+# 2026-08-11 (C85) - 29 -> 27. Json_predicate_on_byte_array x2: EF's own SQLite suite asserts the
+# base fails there (issue #33522, a byte[] in a JSON document is not comparable by value), and
+# our failure was exactly that EqualException. EF's override adopted. Values differ is now 2.
+failed=27
 total=22450

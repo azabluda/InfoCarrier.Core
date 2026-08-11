@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestModels.JsonQuery;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
+using Xunit.Sdk;
 
 namespace InfoCarrier.Core.FunctionalTests.Query;
 
@@ -95,6 +96,24 @@ public class JsonQuerySqliteInfoCarrierTest(
         // The corpus really does contain them — a silent zero would assert nothing at all.
         Assert.Equal(18, compared);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own <c>JsonQuerySqliteTest</c> override, verbatim: it asserts that the base's
+    ///     comparison <em>fails</em> on this store, under EF issue #33522. A <c>byte[]</c> inside a
+    ///     JSON document is not comparable by value in SQLite, so the query returns both rows where
+    ///     the base expects one, and `EqualException` is what the base then throws.
+    ///     <para>
+    ///         Adopted rather than diagnosed (A63). C84 had this pair listed as the last two
+    ///         <em>unexplained wrong answers</em> in the suite, which it never was — the probe put
+    ///         the query wholly on the server (<c>wholly=True shippable=1</c>), and EF's suite had
+    ///         the reason written down all along. **Grep EF's SQLite suite before calling a
+    ///         `Values differ` on Tier B a wrong answer**; that is a standing rule in CLAUDE.md and
+    ///         it was not applied here until after the ranking was published.
+    ///     </para>
+    /// </remarks>
+    public override Task Json_predicate_on_byte_array(bool async)
+        => Assert.ThrowsAsync<EqualException>(() => base.Json_predicate_on_byte_array(async));
 
     public override async Task Json_branch_collection_distinct_and_other_collection(bool async)
         => await AssertApplyNotSupported(() => base.Json_branch_collection_distinct_and_other_collection(async));
