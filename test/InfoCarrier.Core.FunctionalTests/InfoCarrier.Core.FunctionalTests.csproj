@@ -6,6 +6,14 @@
     <AssemblyName>InfoCarrier.Core.FunctionalTests</AssemblyName>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!--
+      CompiledModelTestBase compiles the model it scaffolds, in-process, against this assembly's
+      own compilation references. Without this it cannot resolve `netstandard` and says so by
+      name. Every EF test project that hosts this base sets it — InMemory, Sqlite, SqlServer,
+      Cosmos and Design all do.
+    -->
+    <PreserveCompilationContext>true</PreserveCompilationContext>
   </PropertyGroup>
 
   <ItemGroup>

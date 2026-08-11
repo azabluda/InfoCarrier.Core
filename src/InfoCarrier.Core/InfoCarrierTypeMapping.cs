@@ -11,6 +11,26 @@ namespace InfoCarrier.Core;
 public class InfoCarrierTypeMapping : CoreTypeMapping
 {
     /// <summary>
+    ///     The instance a compiled model clones every other mapping from.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Required by <c>CSharpRuntimeAnnotationCodeGenerator.CreateDefaultTypeMapping</c>,
+    ///         which emits <c>InfoCarrierTypeMapping.Default.Clone(…)</c> rather than a
+    ///         constructor call and refuses outright — <i>"the mapping type must have a
+    ///         'public static readonly …Default' property"</i> — when there is none. It is looked
+    ///         up by <c>GetProperty("Default")</c>, so a field will not do; EF's own
+    ///         <c>InMemoryTypeMapping</c> declares exactly this line.
+    ///     </para>
+    ///     <para>
+    ///         <c>typeof(object)</c> because it is never used as a mapping: it is the receiver of
+    ///         a <c>Clone</c> that replaces the CLR type, and the generator emits an explicit
+    ///         <c>clrType:</c> argument for every mapping whose type differs from this one's.
+    ///     </para>
+    /// </remarks>
+    public static InfoCarrierTypeMapping Default { get; } = new(typeof(object));
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierTypeMapping" /> class.
     /// </summary>
     /// <param name="clrType">The CLR type being mapped.</param>

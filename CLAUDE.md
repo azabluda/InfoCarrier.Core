@@ -149,6 +149,9 @@ currently `c88b`. C55–C88 took 132 to 26, and 2 of the 26 are C86's own new te
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are now **6 `BulkUpdates`** and **4 `Scaffolding.CompiledModel`** — `JsonQuery`
 fell from 40 to 4 when C80 took B12, and `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22.
+The four `Scaffolding.CompiledModel` are still four after C90, and that is the *point* of that
+step: they now fail on **three different things**, each one further in than the last, where before
+they shared one sentence. **Read the reasons diff, not the count.**
 
 **There are no unexplained wrong answers, and after C85 there are almost no wrong answers at all.**
 Group a run's `[FAIL]` lines by their first message line: `Assert.Equal() Failure: Values differ` is
@@ -265,6 +268,26 @@ Not yet implemented, in rough priority order:
   `Seed21006`, `Seed29219` and `Seed34960` are `virtual`, EF's SQLite class overrides them too, and
   34 of 61 became 56 of 61 once all ten were taken. *"Which does the compiler require"* is not
   *"which does this store need"*.
+- **This provider has design-time services now (C90), and the standing price for them was for a
+  package that was never needed.** C8 filed `Scaffolding.CompiledModel` as *"needs
+  `Microsoft.EntityFrameworkCore.Design` on the product"* — but `IDesignTimeServices`,
+  `DesignTimeProviderServicesAttribute` and `EntityFrameworkDesignServicesBuilder` all live in
+  `Microsoft.EntityFrameworkCore` itself. **The namespace is not the assembly.** What shipped is
+  one attribute and one class; the tests are about `dotnet ef dbcontext optimize`, not schema, and
+  registering nothing schema-related keeps migrate and scaffold-from-database unavailable without
+  having to refuse them. Four further obstacles came out behind it, each named by its own error
+  and each real: a `Default` property on `InfoCarrierTypeMapping` (a compiled model *clones* a
+  mapping, it does not construct one), `<PreserveCompilationContext>`, the product assembly in
+  `AddReferences`, and the server's model — `CompiledModelTestBase.Test` builds the context factory
+  **twice** and the second call carries no model customization, so the harness carries the last one
+  forward. **Two genuine defects are left and both are filed with probe evidence**: C91, where
+  `property.GetValueConverter()` is `null` under a compiled model because EF's generator puts the
+  converter on the *type mapping* for a converter configured by instance; and C92, where a complex
+  value travels by reflective object shape and so carries a member the model says `Ignore` to. The
+  baselines are the third, and they are not a defect — C8 read `AssertBaseline` as returning early
+  when the **baselines** directory is missing, and it returns early when the **test source**
+  directory is missing. It *creates* the baselines directory. C0's "112 generated files" was right
+  in kind; `EF_TEST_REWRITE_BASELINES=1` is how EF writes them.
 - **Spatial works, and the shape of how is worth keeping.** Three pieces, landed and measured
   separately because C9's combined attempt aborted the host: the NetTopologySuite branch in
   `InfoCarrierTypeMappingSource` (C15, worth 19 on its own — the long-standing "needs SpatiaLite"

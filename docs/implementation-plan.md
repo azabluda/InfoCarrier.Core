@@ -1650,10 +1650,19 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       can scaffold its model into source — which for a provider whose entire job is moving models
       across a wire is a pointed omission, and one no other base in the suite was asking about.
 
-      **Not fixed here, because it is a dependency decision.** `IDesignTimeServices` lives in
+      ~~**Not fixed here, because it is a dependency decision.** `IDesignTimeServices` lives in
       `Microsoft.EntityFrameworkCore.Design`, and `InfoCarrier.Core.csproj` references only
       `Microsoft.EntityFrameworkCore` and `…Relational`. Adding a third package reference to the
-      **product** assembly belongs with M8's productization work, not smuggled into a test adoption.
+      **product** assembly belongs with M8's productization work, not smuggled into a test adoption.~~
+
+      **CORRECTED 2026-08-11 (C90). There is no dependency decision, because there is no third
+      package.** `IDesignTimeServices`, `DesignTimeProviderServicesAttribute` and
+      `EntityFrameworkDesignServicesBuilder` are all in
+      `subrepos/efcore/src/EFCore/Design/` — that is, in `Microsoft.EntityFrameworkCore` itself,
+      which this project has always referenced. `Microsoft.EntityFrameworkCore.Design` is what the
+      *tool* loads; it finds a provider through the attribute, not the other way round. The
+      paragraph above was written from the namespace (`Microsoft.EntityFrameworkCore.Design`) and
+      the namespace is not the assembly. Landed in C90.
 
 - [ ] **C9. The two spatial bases: attempted, measured, reverted. The blocker is the wire, not the
       package.** No code change; this is the finding. `<this commit>`
@@ -4793,6 +4802,121 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **Nothing moved, which is the point.** Same 26 failures, same reasons byte for byte: the
       mappers were already in the chain on both halves, and this only changes who puts them there.
       The value is entirely outside the suite.
+
+- [x] **C90. This provider has design-time services and can be compiled into a model — and the
+      standing price for it was for a package it never needed.**
+      **`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (`c90`) — **26 → 26,
+      0 fixed, 0 broken**, and the reasons diff is the whole result. ✅ `<this commit>`
+
+      C8 filed the four `Scaffolding.CompiledModel` failures as *"needs
+      `Microsoft.EntityFrameworkCore.Design` on the product assembly, therefore M8"*. **That was
+      reading a namespace as an assembly.** `IDesignTimeServices`,
+      `DesignTimeProviderServicesAttribute` and `EntityFrameworkDesignServicesBuilder` are all in
+      `Microsoft.EntityFrameworkCore` itself. C8 is corrected in place.
+
+      **What shipped, and it is small.** `InfoCarrier.Core.Design.InfoCarrierDesignTimeServices`
+      plus the assembly attribute that names it. It registers this provider's own services and
+      calls `TryAddCoreServices()` — **core's** `CSharpRuntimeAnnotationCodeGenerator`, not the
+      relational one, because the client is never a relational context (ADR-013) and its model
+      carries no relational annotations to generate.
+
+      **These tests are about `dotnet ef dbcontext optimize`, not about schema.** A client with no
+      database must never migrate and never scaffold *from* a database, and both stay unavailable
+      for the ordinary reason: nothing schema-related is registered, so `IMigrationsScaffolder`
+      and `IDatabaseModelFactory` have no implementation to resolve. Not offering them is the
+      mechanism; refusing them is not needed.
+
+      **Three more things the base wanted, each named by its own error, and each one step further
+      in.** This is the shape of the whole step — every fix moved the failure to the next stage
+      rather than closing the test, which is why the **reasons diff** is the result and the count
+      is not:
+
+      1. *"The mapping type must have a `public static readonly InfoCarrierTypeMapping.Default`
+         property."* A compiled model does not construct a type mapping, it clones one — so
+         `CSharpRuntimeAnnotationCodeGenerator` emits `InfoCarrierTypeMapping.Default.Clone(…)`
+         and refuses outright when there is no such member. `GetProperty("Default")`, so a field
+         will not do. One line, copied from `InMemoryTypeMapping`.
+      2. *"Assembly 'netstandard' not found. You may be missing `<PreserveCompilationContext>`."*
+         The base compiles the scaffolded source in-process against this assembly's own
+         compilation references. Every EF test project that hosts this base sets that property.
+      3. **CS0103 on `InfoCarrierTypeMapping`, and it is worth knowing why it is CS0103.** The
+         product assembly was not among the references the generated model is compiled against —
+         `AddReferences` is where each provider adds its own. A missing reference usually gives
+         CS0246 on the `using`; here the generated `using InfoCarrier.Core;` resolves anyway,
+         because the *test* assembly is `InfoCarrier.Core.FunctionalTests` and contributes that
+         namespace itself. The using compiles and only the type is missing.
+
+      **And then the harness, which is the part that generalizes.** `CompiledModelTestBase.Test`
+      builds the context factory **twice**: once with the test's model customization, and once
+      with only `onConfiguring: o => o.UseModel(compiledModel)`, because the client does not need
+      `OnModelCreating` any more. The **server** still does — it has no compiled model — so the
+      class carries the last customization it saw forward. Without that, every test answered
+      *"… is not in the server model"*. `onConfiguring` is deliberately **not** forwarded, which
+      is the opposite of the A49 default and for a reason specific to this base: on the second
+      call it *is* `UseModel(compiledModel)`, and that model was generated for **this** provider,
+      `InfoCarrierTypeMapping` on every property. Handing it to the InMemory server would replace
+      the model the server is meant to build for itself.
+
+      **Where the four tests now stand, and two of the three reasons are real findings.** Nothing
+      is worse and nothing is masked — the ratchet is unchanged at 26/22455:
+
+      | Test | Now fails on |
+      |---|---|
+      | `SimpleModel`, `No_NativeAOT` | **Baselines.** They reach the end and compare the generated source against `Scaffolding/Baselines/<test>/`, which does not exist yet. **C8's other claim was also wrong**: `AssertBaseline` returns early when the *test source directory* is missing (a deterministic-paths build), not when the baselines directory is — it *creates* that one. So on any developer machine or CI checkout the baselines are mandatory, and C0's "112 generated files" price was right in kind. `EF_TEST_REWRITE_BASELINES=1` is how EF generates them. |
+      | `BigModel` | **C91.** `property.GetValueConverter()` is not the effective converter under a compiled model. |
+      | `ComplexTypes` | **C92.** A complex value travels by reflective object shape, which sends members the model ignores. |
+
+- [ ] **C91. `GetValueConverter()` is not the effective converter, and a compiled model is where
+      the two part company.** `<this commit>`
+
+      `BigModel` fails `InvalidCastException: Invalid cast from 'System.String' to
+      'System.Byte[]'` inside `SaveChanges`. Three probes — what the client says, what the server
+      says, and every property where the two disagree — name it exactly:
+
+          TOWIRE   ManyTypes.BoolToStringConverterProperty  conv=<none>              mappingconv=ValueConverter`2
+          FROMWIRE ManyTypes.BoolToStringConverterProperty  conv=BoolToStringConverter  wiretype=System.String  value=Boolean
+          FROMWIRE ManyTypes.BoolToTwoValuesConverterProperty conv=BoolToTwoValuesConverter`1 wiretype=System.Byte value=Boolean
+          FROMWIRE ManyTypes.StringToBytesConverterProperty conv=StringToBytesConverter wiretype=System.Byte[] value=String
+
+      **Exactly three properties of the sixty-odd `ManyTypes` declares, and what they have in
+      common is how they were configured** — `HasConversion(new BoolToStringConverter("A", "B"))`,
+      by **instance**, where every other one is `HasConversion<TConverter>()`, by **type**.
+
+      **Why that matters, and it is EF's generator rather than anything here.**
+      `CSharpRuntimeModelCodeGenerator` emits `valueConverter:` as a constructor argument only
+      when it can name a converter *type*; with `ForNativeAot` (which `BigModel` sets, and which
+      `dotnet ef dbcontext optimize` defaults to) it puts the converter on the property's **type
+      mapping** instead. So on a compiled model `property.GetValueConverter()` is `null` while
+      `property.FindTypeMapping().Converter` is not — and `PrimitiveCoercion` asks the first.
+      The client sends the **model** value where the server expects the **provider** value.
+
+      **The fix has to be narrower than `?? FindTypeMapping()?.Converter`**, and CLAUDE.md says
+      why: a type mapping is computed twice, by two providers, and a *store's* mapping may carry
+      a converter the model never asked for (SQLite maps `DateTimeOffset` through one). Falling
+      back to the mapping on the **server** would newly apply a store conversion the client never
+      applied. The fallback is sound only where the mapping is an `InfoCarrierTypeMapping`, whose
+      converter can only have come from the model, because this provider's type mapping source
+      never adds one of its own.
+
+- [ ] **C92. A complex value travels by reflective object shape, and the shape is not the model.**
+      `<this commit>`
+
+      `ComplexTypes` fails *"Type 'Microsoft.EntityFrameworkCore.DbContext' is not on the
+      deserialization allowlist"* inside `SaveChanges`. `OwnedType` — the complex type
+      `PrincipalBase.Owned` is mapped to — declares `public DbContext? Context`, and
+      `BuildComplexTypesModel` says `eb.Ignore(e => e.Context)`.
+
+      **The model ignores it and the wire sends it anyway.** `DynamicValueMapper.MapScalars`
+      hands a complex value to `ToDynamicValue(value, complexProperty.ClrType)`, which falls
+      through to the reflective member walk because a complex type is an `IComplexType` and not
+      an `IEntityType`. The comment on that branch already admits the shape of the gap — *"the one
+      thing it does not carry is a value converter or a shadow property declared inside a complex
+      type"* — and this is the third face of the same thing: it carries a member the model does
+      not map.
+
+      The route is to map a complex value through its `IComplexType` the way an entity is mapped
+      through its `IEntityType`, both directions. Not taken in C90 because it touches
+      `ComplexTypesTracking` (249 of 251) and every complex-type family, so it needs its own run.
 
 ## Phase B — the tier audit, and the rework it found
 
