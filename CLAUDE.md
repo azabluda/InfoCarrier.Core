@@ -127,7 +127,7 @@ found. **The standing price for all of it — "626 + 322 lines of relational mir
 abstract seeds" — was a price for a route nobody was going to take.**
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (2026-08-11) across the
+**`Total tests: 22455, Passed: 22215, Failed: 22, Skipped: 218`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -145,13 +145,14 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c88b`. C55–C88 took 132 to 26, and 2 of the 26 are C86's own new tests; `Query.Associations` is 336 of 336, and
+currently `c93`. C55–C93 took 132 to 22, and 2 of the 22 are C86's own new tests; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
-The largest blocks are now **6 `BulkUpdates`** and **4 `Scaffolding.CompiledModel`** — `JsonQuery`
-fell from 40 to 4 when C80 took B12, and `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22.
-The four `Scaffolding.CompiledModel` are still four after C90, and that is the *point* of that
-step: they now fail on **three different things**, each one further in than the last, where before
-they shared one sentence. **Read the reasons diff, not the count.**
+The largest block is now **6 `BulkUpdates`** — `JsonQuery`
+fell from 40 to 4 when C80 took B12, `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22,
+and `Scaffolding.CompiledModel` from 4 to **0** across C90–C93.
+**Those four are also the standing example of why the count is the wrong instrument**: C90, C91
+and C92 each closed a real defect and each measured 26 → 26, because every fix moved the same four
+tests one stage further in. **Read the reasons diff, not the count.**
 
 **There are no unexplained wrong answers, and after C85 there are almost no wrong answers at all.**
 Group a run's `[FAIL]` lines by their first message line: `Assert.Equal() Failure: Values differ` is
@@ -268,6 +269,12 @@ Not yet implemented, in rough priority order:
   `Seed21006`, `Seed29219` and `Seed34960` are `virtual`, EF's SQLite class overrides them too, and
   34 of 61 became 56 of 61 once all ten were taken. *"Which does the compiler require"* is not
   *"which does this store need"*.
+- **`Scaffolding.CompiledModel` is CLOSED — 4 of 4 (C93)**, and its 42 baselines live in
+  `test/InfoCarrier.Core.FunctionalTests/Scaffolding/Baselines/`, written by EF's own
+  `EF_TEST_REWRITE_BASELINES=1`. They need `<Compile Remove="Scaffolding\Baselines\**\*" />` and
+  its `<None Include>` partner — the same `TestNamespace.DbContextModel` is generated once per
+  test, so building them gives **125** duplicate-definition errors. They are the only assertion in
+  the suite over the *source* this provider contributes to a compiled model.
 - **This provider has design-time services now (C90), and the standing price for them was for a
   package that was never needed.** C8 filed `Scaffolding.CompiledModel` as *"needs
   `Microsoft.EntityFrameworkCore.Design` on the product"* — but `IDesignTimeServices`,

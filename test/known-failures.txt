@@ -113,5 +113,14 @@
 # test project into the product and are registered by default on both halves; the geometry one
 # stays test-side so no NetTopologySuite dependency enters the package. Reasons byte-identical:
 # the chain was already the same, only who registers it changed.
-failed=26
+# 2026-08-11 (C90-C92) - unchanged at 26/22455 across three steps, and deliberately so. The four
+# Scaffolding.CompiledModel failures shared one sentence and now fail on three different things,
+# each further in than the last: design-time services (C90), a value converter a compiled model
+# keeps on the type mapping rather than on the property (C91), and a complex value that travels
+# by reflective object shape and so carried a member the model ignores (C92). The reasons diff is
+# what these steps moved; the count is not.
+# 2026-08-11 (C93) - 26 -> 22. The compiled-model baselines, written by EF's own
+# EF_TEST_REWRITE_BASELINES=1 as every EF provider maintains its own. Scaffolding.CompiledModel is
+# 4 of 4, and nothing is skipped: the four had been seen to fail against these very files.
+failed=22
 total=22455

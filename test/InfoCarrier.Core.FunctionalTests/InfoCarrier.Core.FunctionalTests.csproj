@@ -17,6 +17,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The compiled-model baselines are *expected output*, not source: the same
+      `TestNamespace.DbContextModel` is generated once per test, so compiling them gives 125
+      duplicate-definition errors. EF's own InMemory and Sqlite test projects carry these two
+      lines verbatim.
+    -->
+    <Compile Remove="Scaffolding\Baselines\**\*" />
+    <None Include="Scaffolding\Baselines\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
   </ItemGroup>
 
