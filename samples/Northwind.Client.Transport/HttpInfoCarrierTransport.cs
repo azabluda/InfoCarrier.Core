@@ -62,8 +62,24 @@ public sealed class HttpInfoCarrierTransport : IInfoCarrierTransport
         byte[] responseBody =
             await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 
-        return await _serializer.DeserializeAsync<InfoCarrierEnvelope>(responseBody, cancellationToken)
-                .ConfigureAwait(false)
+        InfoCarrierEnvelope? envelope;
+        try
+        {
+            envelope = await _serializer.DeserializeAsync<InfoCarrierEnvelope>(responseBody, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A malformed body -- e.g. a misconfigured proxy or captive portal returning HTML on
+            // a 200 -- deserializes as a raw JsonException otherwise, which is a lie about where
+            // the fault is: this is a transport failure, not something the server reported.
+            throw new InfoCarrierTransportException(
+                $"The InfoCarrier server at '{_requestUri}' answered 200 with a body that is not an "
+                + $"envelope ({responseBody.Length} bytes).",
+                ex);
+        }
+
+        return envelope
             ?? throw new InfoCarrierTransportException(
                 $"The InfoCarrier server at '{_requestUri}' answered 200 with a body that is not an "
                 + $"envelope ({responseBody.Length} bytes).");

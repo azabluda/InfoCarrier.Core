@@ -864,6 +864,15 @@ No sample types: promoting this to InfoCarrier.Core.Http is a file move.
 Passed: 6, Failed: 0, Total: 6."
 ```
 
+- [x] **Fix round 1 (review, Step M8-3a): the malformed-body path.** Code review found that
+  `SendAsync` only wrapped the case where `DeserializeAsync` returned `null`, not the case where
+  it *threw* -- a non-JSON 200 body (misconfigured proxy, captive portal) surfaced a raw
+  `JsonException` instead of the documented `InfoCarrierTransportException`. Fixed by wrapping the
+  deserialize call and rethrowing via the exception type's previously-unused two-argument
+  constructor, explicitly letting `OperationCanceledException` pass through uncaught. Covered by a
+  fourth test, `A_200_body_that_is_not_an_envelope_is_reported_as_a_transport_failure`. Project
+  total 6 -> 7.
+
 ---
 
 ### Task 4: The server endpoint

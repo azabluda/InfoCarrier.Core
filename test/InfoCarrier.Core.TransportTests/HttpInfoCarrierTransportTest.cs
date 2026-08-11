@@ -69,6 +69,23 @@ public class HttpInfoCarrierTransportTest
         Assert.Contains("upstream is down", exception.Message);
     }
 
+    [Fact]
+    public async Task A_200_body_that_is_not_an_envelope_is_reported_as_a_transport_failure()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html>not json</html>"),
+        });
+
+        var transport = new HttpInfoCarrierTransport(
+            new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
+
+        InfoCarrierTransportException exception =
+            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transport.SendAsync(AnEnvelope()));
+
+        Assert.NotNull(exception.InnerException);
+    }
+
     private static HttpResponseMessage Respond(InfoCarrierEnvelope envelope)
         => new(HttpStatusCode.OK) { Content = new ByteArrayContent(Serializer.Serialize(envelope)) };
 
