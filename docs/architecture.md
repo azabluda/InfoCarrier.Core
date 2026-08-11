@@ -129,6 +129,39 @@ Concrete subclass mapping is an open research task (§6 Q-T1).
 | T2 | Does `ComplianceTestBase` still exist in EF Core 10 and what does it require? | `subrepos/efcore` | Test strategy |
 | A4 | DI shape for the provider: which EF Core `IDatabaseProvider` services do we replace vs wrap? | `subrepos/efcore` provider-building docs/src | Component design |
 
+## 6a. Open design questions (raised during implementation)
+
+### D1 — `InfoCarrierEnvelope.Payload` is `byte[]`, and the outer envelope is JSON
+
+**Raised 2026-08-11, during the M8 sample-app design. No decision, no action; recorded so it is
+not lost.**
+
+`InfoCarrierEnvelope.Payload` is declared `byte[]` so that the envelope stays independent of
+whichever `IInfoCarrierSerializer` produced the body — the envelope can be JSON while the payload
+is MessagePack, say. That independence is real and it was deliberate.
+
+**What it costs today, when both are JSON.** The body is base64-encoded inside the outer JSON
+document: roughly **33% larger**, and opaque to anyone reading the wire. For a provider whose
+entire proposition is *"your LINQ expression ran over there"*, an unreadable blob is a poor
+showing. It is not only cosmetic — the M8 sample's wire-inspector panel has to base64-decode
+before it can display anything, which is the concrete symptom that raised this.
+
+**Four candidate answers, none chosen:**
+
+| # | Answer | Cost |
+|---|---|---|
+| a | Keep `byte[]` | Serializer-agnostic; base64 overhead and opacity stay. |
+| b | Payload as raw JSON (`JsonElement` / `RawValue`) | Honest and readable, no base64; couples the envelope to JSON. |
+| c | Generic `InfoCarrierEnvelope<TPayload>` | Type-safe; complicates a dispatcher that is deliberately one method. |
+| d | Keep bytes, add a serializer/content-type id | A reader can decode without guessing; does not remove the base64 overhead. |
+
+**Constraint on any answer:** `InfoCarrierPayloadLimits` bounds the *request* direction in bytes
+(C37, and the asymmetry there is measured rather than stylistic). Whatever replaces `byte[]` must
+keep the payload measurable in bytes before it is parsed, or the limit stops being a limit.
+
+**Not urgent.** The wire is versioned (`ProtocolVersion`), so this can change behind a major
+version bump. Revisit when the HTTP transport is promoted out of the sample.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
