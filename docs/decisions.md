@@ -367,3 +367,51 @@ Registration is the application's on **both** halves, and a value mapped on one 
 fail asymmetrically — that is inherent, and it is why the interface documents it rather than
 guessing a default. This is new public API and so is `ApiConsistencyTestBase`'s business; it is
 also the general answer to "a CLR type the wire cannot walk", which is the shape B23 left open.
+
+---
+
+## ADR-013 — The test project may reference `EFCore.Relational.Specification.Tests` — LOCKED (2026-08-11)
+
+**Context.** ADR-004 adopts `EFCore.Specification.Tests`, the *core* spec suite, and the test
+project referenced only that. Several bases this provider needs live one package along, in
+`Microsoft.EntityFrameworkCore.Relational.Specification.Tests`, and the standing reading was that
+"a non-relational provider has no business referencing" it. That reading priced two adoptions out
+of reach: B3d/C10 put `AdHocJsonQuery` at *"626 + 322 lines of relational mirror and seven
+abstract seeds only EF's relational classes implement"*, and there was no route at all to any
+coverage of **writing** a JSON-mapped collection.
+
+The reading confused two different things. This provider's **client** is not relational — but its
+**Tier B backing store is** (ADR-009), and a spec base that describes JSON mapping is describing
+what that store does. Mirroring such a base by hand is transcription with a chance of error, and
+it is transcription of the very file the package already contains.
+
+**Decision.** The **test** project references
+`Microsoft.EntityFrameworkCore.Relational.Specification.Tests`. The **product** does not change:
+`src/InfoCarrier.Core` referenced `Microsoft.EntityFrameworkCore.Relational` before this and
+still references nothing else.
+
+A relational spec base is adopted on the same terms as any other (ADR-004, ADR-009 Tier B) with
+one extra test applied first: **does the base assume the *client* is relational?** Two outcomes,
+both measured in C81:
+
+- `ComplexCollectionJsonUpdateTestBase` — `UseTransaction` is `protected virtual`, so the
+  provider supplies its own. Adopted, **18 of 18**.
+- `JsonUpdateTestBase` — `UseTransaction` is `public void`, not virtual, and calls
+  `facade.UseTransaction(transaction.GetDbTransaction())`. A derived class cannot replace it, and
+  the client holds an `InfoCarrierTransaction` with no `DbTransaction` behind it. **142 of 142**
+  fail on *"Relational-specific methods can only be used when the context is using a relational
+  database provider"* before reaching anything the base is about. **Not adopted** — 142 identical
+  harness failures are not information about this provider, which is the A70/A77 mistake in
+  another costume.
+
+**Rationale.** The package is reference material for a store this provider genuinely has, and the
+alternative is hand-copying it. The non-virtual `UseTransaction` is a real limit and it is a
+property of the *base*, not of this provider — recording which bases have it is cheaper than
+rediscovering it.
+
+**Consequences.** `AdHocJsonQuery`'s price must be re-derived before it is quoted again: B3d/C10
+priced the *absence of this package*, and `AdHocJsonQueryRelationalTestBase` contains no
+`ExecuteSqlRaw`, no `GetDbTransaction` and no `UseTransaction`. Also,
+`InfoCarrierTestStoreFactory.CreateListLoggerFactory` now returns a `TestSqlLoggerFactory` — which
+derives from `ListLoggerFactory` — because relational fixtures expose it through a non-virtual
+cast. On a client with no database it records no SQL and nothing in this suite asserts any.

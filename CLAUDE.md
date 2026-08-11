@@ -71,6 +71,7 @@ here, and both are cheap to avoid:
 | `docs/implementation-plan.md` | **Rolling** checkbox detail for the *current* milestone only |
 | `docs/architecture.md` | Components, test strategy, open questions |
 | `docs/research-findings.md` | EF Core 10 pipeline findings backing the ADRs |
+| `docs/decisions.md` **ADR-013** | The test project may reference `EFCore.Relational.Specification.Tests`. **Before adopting a relational spec base, check whether it assumes the *client* is relational** — a non-virtual `UseTransaction` calling `GetDbTransaction()` makes a base unreachable here, and cost 142 tests to discover. |
 | `docs/security-review.md` | **M5's review of the deserialization path** (C48). Read §2 before adding anything to `TypeAllowlist`: its safety is a conjunction across several clauses, and `Binder`/`MethodInfo`/`Activator` each break it alone. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
@@ -119,7 +120,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22369, Passed: 22122, Failed: 30, Skipped: 217`** (2026-08-11) across the
+**`Total tests: 22387, Passed: 22140, Failed: 30, Skipped: 217`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,7 +138,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c80`. C55–C80 took 132 to 30; `Query.Associations` is 336 of 336, and
+currently `c81`. C55–C81 took 132 to 30; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
 The largest blocks are now **6 `BulkUpdates`**, **4 `Scaffolding.CompiledModel`** and **4
 `PrimitiveCollectionsQuery`** — `JsonQuery` fell from 40 to 4 when C80 took B12.
@@ -345,7 +346,14 @@ Not yet implemented, in rough priority order:
   the same answer as the server.* Nothing relational is resolved from the container, and the
   product already referenced `Microsoft.EntityFrameworkCore.Relational`. **A Cosmos backend would
   need its own clause** — Cosmos recognises an ordinal key by the property's *shape*, not by this
-  name. **Reads only**: `JsonQueryTestBase` has zero `SaveChanges`, which is what C81 is for.
+  name. **Reads only** — `JsonQueryTestBase` has zero `SaveChanges`. C81 answered the write half as far
+  as it can be answered: `ComplexCollectionJsonUpdateTestBase` is adopted and **18 of 18**, so a
+  JSON-mapped collection does survive being written; but `JsonUpdateTestBase`, the base that covers
+  **owned** JSON collections, is **unreachable** — its `UseTransaction` is `public void` rather than
+  virtual and calls `GetDbTransaction()`, so all **142** of its tests fail on *"Relational-specific
+  methods can only be used when the context is using a relational database provider"* before
+  reaching anything about JSON. Owned JSON collections therefore have read coverage and no write
+  coverage.
 - **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
   they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all

@@ -4444,6 +4444,59 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       relational container annotation at all, so a Cosmos backend would need its own clause. Every
       backend in scope is relational (ADR-009 Tier B) or InMemory, which cannot map to JSON.
 
+- [x] **C81. Writing a JSON-mapped collection is now covered, and the base that covers it best is
+      the one this provider cannot use.**
+      **`Total tests: 22387, Passed: 22140, Failed: 30, Skipped: 217`** (`c81`) — **30 → 30,
+      0 fixed, 0 broken**, reasons unchanged; total up 18 for the adopted base. ✅ `<this commit>`
+
+      C80 closed B12 and said plainly what it did not cover: `JsonQueryTestBase` contains **zero**
+      `SaveChanges` calls, so all 36 of its wins are *reads*. The decision was **take it and prove
+      the writes too**. This is that, and it produced one adoption and one refusal.
+
+      **The package.** ADR-013 records it: the **test** project now references
+      `Microsoft.EntityFrameworkCore.Relational.Specification.Tests`. The product is unchanged.
+      The standing objection — *"a non-relational provider has no business referencing it"* —
+      confused the client with the store: the client is not relational, the **Tier B backing store
+      is** (ADR-009), and a base describing JSON mapping is describing what that store does.
+
+      **The refusal, measured rather than argued.** `JsonUpdateTestBase` is the larger base (136
+      tests) and covers owned JSON collections directly. It was adopted, run, and reverted:
+
+          Total tests: 142   Failed: 142
+          142  System.InvalidOperationException : Relational-specific methods can only be used
+               when the context is using a relational database provider
+
+      Its `UseTransaction` is `public void`, **not** `virtual`, and calls
+      `facade.UseTransaction(transaction.GetDbTransaction())`. The delegate is taken inside the
+      base, so a derived class cannot replace it; and `GetDbTransaction()` requires the
+      `IDbContextTransaction` to be `IInfrastructure<DbTransaction>`, which an
+      `InfoCarrierTransaction` is not and should not be — the real transaction is on the server,
+      behind the wire. **Every one of the 142 fails before reaching anything about writing JSON**,
+      which is 142 identical harness failures rather than information: the A70/A77 mistake in
+      another costume. Not adopted.
+
+      **The adoption.** `ComplexCollectionJsonUpdateTestBase`'s `UseTransaction` *is*
+      `protected virtual`, so the same override `OptimisticConcurrency` uses applies. **18 of 18**:
+      add, remove, move, replace and clear an element, set the collection to null and back, a
+      nested complex type inside one, and a primitive collection inside that. **So a JSON-mapped
+      collection survives being written**, which is the question C80 left open — for complex
+      collections. Owned JSON collections keep the read coverage of `JsonQuery` and no write
+      coverage, because the base that has it cannot be reached.
+
+      **One harness change, and it is a widening.**
+      `InfoCarrierTestStoreFactory.CreateListLoggerFactory` returns a `TestSqlLoggerFactory`
+      instead of a bare `ListLoggerFactory`, which it derives from. Relational fixtures expose it
+      through a **non-virtual** property that simply casts, and the base reads it —
+      `SuspendRecordingEvents()` did, and all 18 failed on `InvalidCastException` before this. It
+      records no SQL on a client with no database, and the full run confirms it changed nothing:
+      **0 fixed, 0 broken, reasons byte-identical.**
+
+      **And it re-prices the last unadopted base.** B3d/C10 put `AdHocJsonQuery` at 626 + 322 lines
+      of relational mirror — a price for *not having this package*.
+      `AdHocJsonQueryRelationalTestBase` contains no `ExecuteSqlRaw`, no `GetDbTransaction` and no
+      `UseTransaction`, so the client-relational test ADR-013 prescribes finds nothing against it.
+      Re-derive the price before quoting it again.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

@@ -113,6 +113,14 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierUriValueMapper>();
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     A <see cref="TestSqlLoggerFactory" /> rather than a bare
+    ///     <see cref="ListLoggerFactory" />, which it derives from. Several spec fixtures expose
+    ///     <c>TestSqlLoggerFactory</c> as a non-virtual property that simply casts this one, and
+    ///     their bases read it — `ComplexCollectionJsonUpdateTestBase.SuspendRecordingEvents()`
+    ///     does, and failed all 18 of its tests on the cast before this. On a client with no
+    ///     database it records no SQL and costs nothing; nothing in this suite asserts SQL.
+    /// </remarks>
     public ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
-        => new(shouldLogCategory);
+        => new TestSqlLoggerFactory(shouldLogCategory);
 }
