@@ -4065,6 +4065,18 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       belongs to the client and the behaviour to the backend, and no configuration of this
       provider makes one predict the other. Red and classified.
 
+      **v1 checked, because it had the same two tiers and chose the other one.**
+      `infocarrier-v1/test/…/SqlServer/ProxyGraphUpdatesInfoCarrierTest.cs` runs this base against
+      **SQL Server**, with no test override and no `[Skip]` — v1's 60 skips are all under its
+      `InMemory/` folder. That agrees with EF's own `ProxyGraphUpdatesSqliteTest`, which carries no
+      overrides either. **It is not evidence for the move here, for two reasons that are checkable
+      rather than arguable**: v1 pins EF Core **3.1.3**, whose shipped
+      `Microsoft.EntityFrameworkCore.Specification.Tests.dll` contains
+      `Save_two_entity_cycle_with_lazy_loading` **0 times** and the literal
+      `"Microsoft.EntityFrameworkCore.InMemory"` **0 times** — the branch this entry is about is a
+      later EF addition and v1 never met it — and v1 runs the **`LazyLoading` flavour alone**,
+      about a third of the 1710 measured above. The 140 stands.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
