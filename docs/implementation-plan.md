@@ -3651,6 +3651,42 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       override and still passes: there the store really does refuse, which is what makes the pair
       worth reading together.
 
+- [x] **C65. The "wrong answers" tally was stale in both directions, and there are none.** Docs
+      only; no code, no test, no run — the numbers below are re-derived from `c64.log`. ✅
+      `<this commit>`
+
+      CLAUDE.md's taxonomy sentence read *"Only **4** are wrong answers
+      (`Correlated_collection_with_distinct_3_levels`, `Comparison_with_value_converted_subclass`
+      — the latter diagnosed in full and reverted, B23)"*. C64 corrected the first to 2 by proving
+      one of the two named tests is not a wrong answer. Checking the other finished the job:
+
+          Passed … GearsOfWarQueryInfoCarrierTest.Comparison_with_value_converted_subclass(async: False)
+          Passed … GearsOfWarQueryInfoCarrierTest.Comparison_with_value_converted_subclass(async: True)
+
+      **It passes, with no override of ours anywhere.** So the sentence named one test that had
+      been green for some unknown number of phases and one whose assertion no correct answer can
+      satisfy.
+
+      **Replaced with a claim that is checked.** Group a run log's `[FAIL]` lines by their first
+      message line:
+
+      | Failures reporting `Assert.Equal() Failure: Values differ` | 40 |
+      |---|---|
+      | `Query.JsonQuerySqliteInfoCarrierTest` | **38** — B12, a recorded decision |
+      | `Query.GearsOfWarQueryInfoCarrierTest` | **2** — C64, the base's unsatisfiable assertion |
+
+      **Nothing else in the suite returns data that differs.** Every other failure is an exception,
+      a missing exception, or an exception of the wrong type — categories whose classification is
+      already written down. So the honest statement is *no unexplained wrong answers*, which is
+      both stronger and cheaper to re-verify than a list of names.
+
+      **Why this is worth a step of its own.** A wrong answer is the most expensive kind of failure
+      to discover late, so the tally is the one figure in that paragraph a reader would act on —
+      and it had drifted in *both* directions at once, over-counting a green test and mis-counting
+      a broken assertion. The same failure mode as the `Skipped` figure carried over from `b21b`
+      and the block list C60 found two phases stale: **a number restated instead of re-derived.**
+      The paragraph now carries the derivation with it.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

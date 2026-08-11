@@ -136,15 +136,25 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `ComplexTypeQuery`, `Spatial` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
-Tier B adoptions added, and Phase C's C1–C60 for the rest** — read out of `artifacts/measure/`,
+Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
 currently `c64`. C55–C60 took 132 to 114. The largest blocks are **40 `JsonQuery`** (38 of them
 B12, a decision), **26 `MaterializationInterception`** (B16's topology, and C58 priced the optional
 harness remedy — A71's ten are the same defect, not a separate one), **8 `Index_*`** across two
 `Query.Associations` classes (C55 — the server raises the warning and the harness does not
 configure it as an error there), **8 `ComplexNavigations`** (4 classified in C56, 4 in C59), **6
-`BulkUpdates`** and **4 `GearsOfWar`**. Only **2** are wrong answers
-(`Comparison_with_value_converted_subclass`, diagnosed in full and reverted, B23) and
-**the undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
+`BulkUpdates`** and **4 `GearsOfWar`**.
+
+**No failure is an unexplained wrong answer, and that is checked rather than asserted (C65).** The
+run reports exactly **40** `Assert.Equal() Failure: Values differ`, and they are **38 `JsonQuery`
+(B12, a decision) plus the 2 C64 proved are not wrong answers** — nothing else in the suite
+returns data that differs. Re-check it by grouping the `[FAIL]` lines of a run log by their first
+message line; the count and the split are the whole claim. The sentence this replaces named
+`Comparison_with_value_converted_subclass`, which **passes**, and
+`Correlated_collection_with_distinct_3_levels`, which C64 showed cannot pass for anyone; it had
+been stale in both directions for some time, so **do not restate a taxonomy without re-deriving it
+from the run.**
+
+**The undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
 closed the last two outside it, and all three used the same two probes in the same order: what the
 metadata and the client say, then **read the row the store actually holds**. That second probe is
 what turned `Array_of_TimeOnly` from "ours" into EF issue #30730 in one run. The rest are a
