@@ -16,3 +16,4 @@ Detailed steps are in
 **That document is the "how"; this one is the record of what landed and what it measured.**
 
 - [x] **M8-1. The spec measurement is scoped to one project, and the M8 plan is open.** `<this commit>`
+- [x] **M8-2. The shared Northwind model, and a test project of its own.** `<this commit>`

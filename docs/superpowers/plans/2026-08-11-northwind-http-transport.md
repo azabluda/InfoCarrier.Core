@@ -174,7 +174,7 @@ M6's plan is archived and docs/implementation-plan.md is reopened for M8."
 - Consumes: nothing.
 - Produces: `NorthwindContext : DbContext` with `DbSet<Customer> Customers`, `DbSet<Order> Orders`, `DbSet<OrderDetail> OrderDetails`, `DbSet<Product> Products`, `DbSet<Category> Categories`; and `static void NorthwindSeed.Seed(NorthwindContext context)`.
 
-- [ ] **Step 1: Add package versions**
+- [x] **Step 1: Add package versions**
 
 In `Directory.Packages.props`, inside the existing `<ItemGroup>`:
 
@@ -183,7 +183,7 @@ In `Directory.Packages.props`, inside the existing `<ItemGroup>`:
 <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.0" />
 ```
 
-- [ ] **Step 2: Create the shared project**
+- [x] **Step 2: Create the shared project**
 
 `samples/Northwind.Shared/Northwind.Shared.csproj`:
 
@@ -211,7 +211,7 @@ In `Directory.Packages.props`, inside the existing `<ItemGroup>`:
 </Project>
 ```
 
-- [ ] **Step 3: Write the POCOs**
+- [x] **Step 3: Write the POCOs**
 
 `samples/Northwind.Shared/Model/Category.cs`:
 
@@ -304,7 +304,7 @@ public class OrderDetail
 }
 ```
 
-- [ ] **Step 4: Write the context**
+- [x] **Step 4: Write the context**
 
 `samples/Northwind.Shared/NorthwindContext.cs`:
 
@@ -358,7 +358,7 @@ public class NorthwindContext(DbContextOptions<NorthwindContext> options) : DbCo
 }
 ```
 
-- [ ] **Step 5: Write the seed**
+- [x] **Step 5: Write the seed**
 
 `samples/Northwind.Shared/NorthwindSeed.cs`:
 
@@ -422,7 +422,7 @@ public static class NorthwindSeed
 }
 ```
 
-- [ ] **Step 6: Create the test project**
+- [x] **Step 6: Create the test project**
 
 `test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`:
 
@@ -452,7 +452,7 @@ public static class NorthwindSeed
 </Project>
 ```
 
-- [ ] **Step 7: Write the failing test**
+- [x] **Step 7: Write the failing test**
 
 `test/InfoCarrier.Core.TransportTests/NorthwindModelTest.cs`:
 
@@ -520,7 +520,7 @@ public class NorthwindModelTest
 }
 ```
 
-- [ ] **Step 8: Add both projects to the solution**
+- [x] **Step 8: Add both projects to the solution**
 
 Replace `InfoCarrier.Core.slnx` with:
 
@@ -540,19 +540,19 @@ Replace `InfoCarrier.Core.slnx` with:
 </Solution>
 ```
 
-- [ ] **Step 9: Run the tests**
+- [x] **Step 9: Run the tests**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`
 
 Expected: `Passed: 3, Failed: 0, Total: 3`.
 
-- [ ] **Step 10: Prove the spec measurement is untouched**
+- [x] **Step 10: Prove the spec measurement is untouched**
 
 Run: `bash eng/measure.sh m8-2 c96`
 
 Expected: `FAILING: 13  TOTAL: 22453`, with empty FIXED, BROKEN and REASONS diffs. This is the check that Task 1 was worth doing.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add samples/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx Directory.Packages.props docs/implementation-plan.md

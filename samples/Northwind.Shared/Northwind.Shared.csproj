@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Shared Northwind model and DbContext for the InfoCarrier sample. Used by BOTH halves: the wire carries entity type names, so the two models must agree (A49).</Description>
+    <RootNamespace>Northwind.Shared</RootNamespace>
+    <AssemblyName>Northwind.Shared</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+
+    <!--
+      Automatic lazy loading (spec 3.2). Referenced explicitly: the functional test project gets
+      this transitively through the spec-tests package, which a sample must not reference.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" />
+  </ItemGroup>
+
+</Project>

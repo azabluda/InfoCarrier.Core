@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Tests for the HTTP transport and the sample's shared model. Deliberately NOT part of InfoCarrier.Core.FunctionalTests: that project is what eng/ratchet.sh counts and what test/known-failures.txt describes, and its number must keep meaning "inherited spec tests failing".</Description>
+    <RootNamespace>InfoCarrier.Core.TransportTests</RootNamespace>
+    <AssemblyName>InfoCarrier.Core.TransportTests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\..\samples\Northwind.Shared\Northwind.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+</Project>

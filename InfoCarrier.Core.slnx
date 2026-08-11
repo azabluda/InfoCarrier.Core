@@ -3,7 +3,11 @@
     <Project Path="src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj" />
     <Project Path="src/InfoCarrier.Core/InfoCarrier.Core.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Northwind.Shared/Northwind.Shared.csproj" />
+  </Folder>
   <Folder Name="/test/">
     <Project Path="test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj" />
+    <Project Path="test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj" />
   </Folder>
 </Solution>
