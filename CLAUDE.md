@@ -356,8 +356,16 @@ Not yet implemented, in rough priority order:
   **owned** JSON collections, is **unreachable** — its `UseTransaction` is `public void` rather than
   virtual and calls `GetDbTransaction()`, so all **142** of its tests fail on *"Relational-specific
   methods can only be used when the context is using a relational database provider"* before
-  reaching anything about JSON. Owned JSON collections therefore have read coverage and no write
-  coverage.
+  reaching anything about JSON.
+  **C86 then covered it directly, and WRITING AN OWNED JSON COLLECTION DOES NOT WORK.** Five tests
+  on EF's own fixture: four fail, and the one that passes is the diagnosis. The client sends only
+  the changed element — `ENTRIES: JsonEntityBasic.OwnedCollectionRoot#JsonOwnedRoot=Added` — and
+  never its owner, so EF's `FindJsonPartialUpdateInfo` has no row whose JSON column to update and
+  throws `NullReferenceException`. **The control**: adding a whole *new* entity passes, because
+  there the owner is in the change set as `Added`. The seam is `InfoCarrierDatabase.Expand`, which
+  already widens the set once for `SharedIdentityEntry` and must also yield the ownership chain of
+  a JSON-mapped entry — **a change to what `SaveChanges` sends**, which is why C86 stopped at the
+  diagnosis. The ratchet was raised 27 → 31 for it, deliberately.
 - **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
   they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all
