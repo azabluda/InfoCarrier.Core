@@ -1395,7 +1395,7 @@ Passed: 12, Failed: 0, Total: 12."
 - Consumes: `NorthwindOverHttpTest.CreateClientContext` from Task 5.
 - Produces: nothing later tasks depend on.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `test/InfoCarrier.Core.TransportTests/NorthwindWritesOverHttpTest.cs`:
 
@@ -1496,21 +1496,29 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
 }
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --filter "FullyQualifiedName~NorthwindWritesOverHttpTest"`
 
 Expected: `Passed: 4, Failed: 0`.
 
+**Actual: `Passed: 4, Failed: 0` on the first run** — no transaction-token failure, so `Program.cs`'s
+`AddSingleton<IInfoCarrierServer, …>` registration (already in place from M8-4) needed no change.
+
 **If the transaction tests fail with "transaction not found":** the transaction token (W3) keys a server-side context that must survive between requests. `InProcessInfoCarrierServer` holds it in a `ConcurrentDictionary`, so `IInfoCarrierServer` must be a **singleton** — check that `Program.cs` used `AddSingleton` and not `AddScoped`.
 
-- [ ] **Step 3: Run the whole test project**
+- [x] **Step 3: Run the whole test project**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`
 
 Expected: `Passed: 16, Failed: 0, Total: 16`.
 
-- [ ] **Step 4: Commit**
+**Actual: `Passed: 17, Failed: 0, Total: 17`.** As with Task 5's Step 3, the running total in this
+document is stale by one: M8-3a's review round added a fourth test to Task 3 after this plan's
+arithmetic was written, so every downstream total here undercounts by one. Not a discrepancy to
+fix by trimming the suite.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add test/InfoCarrier.Core.TransportTests/ docs/implementation-plan.md

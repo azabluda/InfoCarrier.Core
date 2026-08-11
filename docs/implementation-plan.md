@@ -77,3 +77,16 @@ Detailed steps are in
   restored to confirm that last assertion can fail: asserting the count stayed at 1 after touching
   `order.Customer` failed with `Assert.Equal() Failure: Expected: 1, Actual: 2` against the
   correct implementation. Total unchanged at 13 — three tests strengthened, none added.
+- [x] **M8-6. `SaveChanges` and a transaction over HTTP — the write half.** `<this commit>`
+  `NorthwindWritesOverHttpTest`: several edits crossing as one save (2 `OrderDetail.Quantity`
+  changes, one `SaveChangesAsync`), an insert getting its store-generated key back by correlation
+  id, a rolled-back transaction leaving the store untouched, and a committed one visible to a
+  later context. `IInfoCarrierServer` was already a singleton (M8-4), so the transaction pair
+  passed against the existing registration with no product change. Every test verifies through a
+  **second, freshly constructed `NorthwindContext`** rather than re-reading the first context's own
+  change tracker, so a client that merely echoed its local state back to itself could not satisfy
+  any of the four. All four passed on the first run: Passed: 4, Failed: 0, Total: 4. Whole project:
+  Passed: 17, Failed: 0, Total: 17 (the M8-5 arithmetic note applies again — M8-3a's review round
+  added a fourth test to Task 3 after the plan's running totals were written, so this project's
+  true count has been one higher than the plan's printed figures since that round; 16 was the
+  plan's stale figure, 17 is correct).
