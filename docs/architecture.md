@@ -208,6 +208,52 @@ when the two models disagree about a name the wire will carry? The suite already
 such a check: `JsonQuerySqliteInfoCarrierTest.The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`
 compares the client model with the server model directly.
 
+### D3 — why does `InfoCarrier.Core` reference `Microsoft.EntityFrameworkCore.Relational`?
+
+**Raised 2026-08-11. Ideally the reference should not be there. Recorded with the facts so the
+investigation starts from evidence rather than from the question. No action now.**
+
+**It is used for exactly one question**, asked at four call sites in three files — *"is this entity
+type mapped to a JSON column?"*:
+
+| File | Call | Why |
+|---|---|---|
+| `InfoCarrierKeyDiscoveryConvention.cs:82, 95` | `GetContainerColumnName()` | B12/C80: the client must give a JSON-mapped owned collection the same synthesized-ordinal key its backing store gives it, or every element shares one key and EF's fixup gives each of them to all of them. |
+| `InfoCarrierKeyDiscoveryConvention.cs:173` | `RelationalAnnotationNames.ContainerColumnName` | The annotation name the clause keys on. |
+| `InfoCarrierDatabase.cs:356, 377` | `GetContainerColumnName()` | C87/C95: a JSON-mapped entry's owner, and the rest of that owner's document, must travel with it. |
+
+Nothing else in the product touches a relational API. There is no `GetTableName`, no
+`GetColumnName`, no `IRelationalConnection`, no `DbTransaction`.
+
+**Why it is uncomfortable, and it is more than aesthetics.** The client is **never** a relational
+context — that is ADR-013, and it is what makes `JsonUpdateTestBase` unreachable (142 tests). So the
+package is referenced by a component that is, by construction, not relational. Two concrete costs:
+
+- **Download size in a browser.** The M8 sample puts this provider in WebAssembly, where every
+  referenced assembly is bytes over the network. That cost was theoretical before the sample and is
+  not any more.
+- **It is already known to be store-flavoured.** CLAUDE.md records the limit next to B12: *"A Cosmos
+  backend would need its own clause — Cosmos recognises an ordinal key by the property's shape, not
+  by this name."* So the current clause is not provider-neutral, only relational-shaped.
+
+**Candidate answers, none chosen:**
+
+| # | Answer | Cost |
+|---|---|---|
+| a | Keep it | Zero work; the smell and the WASM bytes stay. |
+| b | Read the annotation by its **string** name and drop the package | Small; loses the compile-time constant, and an EF rename becomes a silent behaviour change rather than a build error. |
+| c | Define a provider-neutral seam — *"is this type mapped to a document?"* — that a backend answers | The principled answer, and the one that also serves Cosmos. Largest. |
+| d | Move the JSON clause into an optional `InfoCarrier.Core.Relational` package | Keeps the core clean; splits a convention across two packages, which is its own trap. |
+
+**Related to D2**, and worth taking together: both are the same question at different levels —
+*which part of a model is the store's business, and which is shared?* D2 asks it about the
+application's configuration; this asks it about the provider's own.
+
+**The regression pin already exists.** Any change here must keep `JsonQuery` at 0 failures and
+`JsonOwnedCollectionUpdate` at 5 of 5, plus
+`The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`. B12's own symptom was
+**wrong data with no exception**, so a green build is not evidence here — the measurement is.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
