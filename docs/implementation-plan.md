@@ -4077,6 +4077,64 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       later EF addition and v1 never met it — and v1 runs the **`LazyLoading` flavour alone**,
       about a third of the 1710 measured above. The 140 stands.
 
+- [x] **C75. The sequence-slot guard was priced at 107 and costs 0 — the number was never the
+      question, the *consumer* was.**
+      **`Total tests: 22366, Passed: 22082, Failed: 67, Skipped: 217`** (`c75`) — **69 → 67,
+      2 fixed, 0 broken.** ✅ `<this commit>`
+
+      C61 traced `Query_with_complex_let_containing_ordering_and_filter_projecting_firstOrDefault_element_of_let`
+      ×2 to `CarrierFinder.Register`'s guard and closed with *"anyone tempted to relax that guard
+      should read spec §4 first and expect to pay 107."* Phase Z had already written down that the
+      107 deserved re-testing — *"the guard exists because a **queryable** in a slot asks SQL to
+      navigate back out of a projected tuple … Untested — the guard cost 107 failures once, so it
+      gets its own experiment"* — and nobody ran it. **It is 8, not 107, and they are all one
+      family.**
+
+      **Three filtered runs of `GearsOfWarQuery`, 1175 tests.**
+
+      | Guard | Passed | Failed |
+      |---|---|---|
+      | unconditional (as shipped) | 1167 | **4** — the `let` pair + C64's unsatisfiable pair |
+      | removed entirely | 1161 | **10** — the `let` pair fixed, **8 broken** |
+      | narrowed (this step) | 1169 | **2** — only C64's pair |
+
+      **The eight name the rule.** Every one is
+      `Projecting_…_correlated_collection_followed_by_Distinct`, and every one fails with
+      `InMemoryStrings.DistinctOnSubqueryNotSupported` — *the store* refusing `Distinct` over a
+      projection containing a subquery. So the guard is not about navigating out of a tuple in
+      general; it is about `Distinct`. C68's lesson exactly: **the family that breaks is stating
+      the rule.**
+
+      **The line, and it is a statement about equality rather than about SQL.** A slot holding a
+      sequence is fine when something *reads* it — `t.Item2.FirstOrDefault().Name` — and not fine
+      when an operator compares the **whole row** it is part of, because no store can compare two
+      rows containing a subquery. EF's InMemory provider says so in as many words, and every
+      relational provider says it as `DistinctOnCollectionNotSupported`. That is Z6's argument
+      about a client-only join key with no value equality, one level along.
+
+      So `Register` records such a carrier in `_sequenceSlotted` instead of disqualifying it,
+      `VisitMethodCall` records the element type of every `Distinct`/`DistinctBy`/`Union`/
+      `Intersect`/`Except`/`Contains`/`SequenceEqual`, and `Find` disqualifies the **intersection**
+      — before `elementCarrier` is decided, which matters: computing it first left a disqualified
+      carrier named as the element and rebuilt at the root anyway.
+
+      **Seen to fail, and one unit test deleted for failing to.**
+      `A_carrier_holding_a_sequence_is_left_alone` asserted the *old* rule and went red on its
+      own; it is now `A_carrier_holding_a_sequence_the_query_only_reads_ships`, asserting the new
+      one, and both it and the new
+      `A_carrier_holding_a_sequence_is_re_carried_when_the_sequence_is_read` go red again when the
+      guard is forced back to unconditional. **A third unit test was written for the `Distinct`
+      half and thrown away**: it stayed green with `Distinct` removed from the operator set,
+      because in that synthetic shape the anonymous type is the *result* element and
+      `ProjectionRewriter` tuples it regardless — the carrier re-carry is never consulted. It
+      would have been a regression test for nothing. The real coverage is the eight spec tests,
+      measured red with the guard off and green with it narrowed.
+
+      **And the standing lesson gets a third instance.** C58 priced a route and not a goal, C55
+      priced a global change and not a scoped one, and this priced *a guard's existence* when what
+      was expensive was one operator under it. **Before paying a recorded price, check what the
+      price was for.**
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

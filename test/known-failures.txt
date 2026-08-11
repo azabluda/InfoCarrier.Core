@@ -66,5 +66,9 @@
 # ComplexNavigations Join_with_result_selector_returning_queryable tests: the refusal EF's own
 # test name asks for, stated on the query's result element type rather than by widening EF's
 # Select-only walk.
-failed=69
-total=22365
+# 2026-08-11 (C75) - 69 -> 67, and `total` 22365 -> 22366 for the one net new unit test. The
+# sequence-slot guard in the carrier re-carry, narrowed from "any sequence in a slot" to "a
+# sequence in a slot an operator compares whole". Its recorded price of 107 re-measured as 8,
+# all Distinct, and the narrowed form costs 0.
+failed=67
+total=22366

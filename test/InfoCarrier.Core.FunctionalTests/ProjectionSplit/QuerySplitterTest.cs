@@ -368,6 +368,26 @@ public class QuerySplitterTest : IDisposable
     }
 
     /// <summary>
+    ///     A carrier holding a sequence is re-carried when the sequence is <em>read</em>.
+    /// </summary>
+    /// <remarks>
+    ///     The sequence-slot guard used to refuse every one of these, which left the whole chain
+    ///     on the client — and there <c>FirstOrDefault()</c> over an author with no matching book
+    ///     is <see langword="null" />, so <c>.Title</c> is a <c>NullReferenceException</c> where a
+    ///     store propagates the null. That is the `GearsOfWar` `let` pair (C61, C75).
+    /// </remarks>
+    [Fact]
+    public void A_carrier_holding_a_sequence_is_re_carried_when_the_sequence_is_read()
+    {
+        SplitQuery split = Split(
+            _context.Authors
+                .Select(a => new { a, books = a.Books.Where(b => b.Id < 5) })
+                .Select(x => new { x.a.Name, Title = x.books.FirstOrDefault().Title }));
+
+        Assert.Equal(typeof(ValueTuple<string, string>), Assert.Single(split.ServerQueries).ElementType);
+    }
+
+    /// <summary>
     ///     And the refusal is EF's, not a wider one of ours: a projection that returns an ordinary
     ///     materialized collection is untouched.
     /// </summary>
@@ -706,14 +726,20 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
-    public void A_carrier_holding_a_sequence_is_left_alone()
+    public void A_carrier_holding_a_sequence_the_query_only_reads_ships()
     {
-        // The guard the reassembly deferral violated: a slot holding a sequence asks SQL to
-        // navigate out of a projected tuple back into a correlated collection.
+        // This asserted `Assert.False(split.IsPassThrough)` until C75, on the guard the reassembly
+        // deferral violated: *any* slot holding a sequence disqualified the carrier, because
+        // `t.Item2.DefaultIfEmpty()` asks SQL to navigate out of a projected tuple back into a
+        // correlated collection. Re-measured, that guard costs exactly one family — the eight
+        // `Projecting_…_followed_by_Distinct`, where the *store* refuses `Distinct` over a row
+        // containing a subquery — and nothing else. Reading a member of the row, as here, asks
+        // for none of that, and refusing it left the whole chain on the client where
+        // `FirstOrDefault().Name` is a `NullReferenceException`.
         SplitQuery split = Split(
             _context.Authors.Select(a => new { a.Name, Books = a.Books }).Select(x => x.Name));
 
-        Assert.False(split.IsPassThrough);
+        Assert.True(split.IsPassThrough);
         Assert.Equal(["Austen", "Woolf"], (IEnumerable<string?>)Run(split)!);
     }
 

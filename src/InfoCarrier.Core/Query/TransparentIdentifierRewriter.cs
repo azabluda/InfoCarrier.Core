@@ -131,6 +131,38 @@ internal static class TransparentIdentifierRewriter
         private readonly HashSet<Type> _referenceTyped = [];
 
         /// <summary>
+        ///     Carriers holding a sequence in a slot, and the types of rows an operator compares
+        ///     whole. A carrier in both is disqualified; a carrier in only the first is not.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         The guard used to be unconditional — <em>any</em> sequence in a slot
+        ///         disqualified the carrier — because <c>t.Item2.DefaultIfEmpty()</c> asks SQL to
+        ///         navigate out of a projected tuple back into a correlated collection, and 107
+        ///         translation failures followed (spec §4). Re-measured in C75 the whole cost is
+        ///         **eight tests in one family**, all of them
+        ///         <c>Projecting_…_correlated_collection_followed_by_Distinct</c>, and all of them
+        ///         failing on `InMemoryStrings.DistinctOnSubqueryNotSupported` — the *store*
+        ///         refusing `Distinct` over a projection containing a subquery.
+        ///     </para>
+        ///     <para>
+        ///         So the line is not "a sequence is in a slot" but "a sequence in a slot is part
+        ///         of a row something compares". <c>FirstOrDefault()</c> on the slot reads it and
+        ///         is fine; <c>Distinct</c> and the set operators compare the whole row, and no
+        ///         store can compare one containing a subquery. That is the same argument Z6 made
+        ///         for a client-only join key with no value equality, one level along.
+        ///     </para>
+        ///     <para>
+        ///         A slot holding a <em>literal null</em> is neither, and never was: it is what
+        ///         the group-join flattener leaves behind for a grouping nothing reads, and
+        ///         refusing it costs the whole flattening.
+        ///     </para>
+        /// </remarks>
+        private readonly HashSet<Type> _sequenceSlotted = [];
+
+        private readonly HashSet<Type> _rowCompared = [];
+
+        /// <summary>
         ///     Carriers found inside another carrier's construction, and the carrier they sit in.
         /// </summary>
         /// <remarks>
@@ -151,6 +183,16 @@ internal static class TransparentIdentifierRewriter
             var finder = new CarrierFinder(allowlist);
             finder.Visit(query);
             referenceTyped = finder._referenceTyped;
+
+            // The narrowed sequence-slot guard: a carrier holding a sequence is refused only
+            // where an operator compares the whole row it is part of. See `_sequenceSlotted`.
+            foreach (Type slotted in finder._sequenceSlotted)
+            {
+                if (finder._rowCompared.Contains(slotted))
+                {
+                    finder.Disqualify(slotted);
+                }
+            }
 
             // Any queryable, not the exact `IQueryable<>`. A query ending in `OrderBy(…).ThenBy(…)`
             // is an `IOrderedQueryable<>`, and testing the generic definition said "no element
@@ -325,6 +367,24 @@ internal static class TransparentIdentifierRewriter
             _disqualified.UnionWith(types);
         }
 
+        /// <summary>
+        ///     Operators whose semantics are row equality: they compare elements to each other
+        ///     rather than reading a member out of one.
+        /// </summary>
+        private static readonly HashSet<string> RowComparing =
+        [
+            nameof(Queryable.Distinct),
+            nameof(Queryable.DistinctBy),
+            nameof(Queryable.Union),
+            nameof(Queryable.UnionBy),
+            nameof(Queryable.Intersect),
+            nameof(Queryable.IntersectBy),
+            nameof(Queryable.Except),
+            nameof(Queryable.ExceptBy),
+            nameof(Queryable.Contains),
+            nameof(Queryable.SequenceEqual),
+        ];
+
         private static readonly HashSet<string> AbsenceProducing =
         [
             nameof(Queryable.FirstOrDefault),
@@ -347,6 +407,17 @@ internal static class TransparentIdentifierRewriter
                 && node.Arguments.Count > 0)
             {
                 _referenceTyped.Add(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
+            }
+
+            // Operators that compare a whole row rather than reading a member of it. Recorded
+            // rather than acted on: whether it matters depends on whether the row turns out to be
+            // a carrier with a sequence in a slot, which `Find` resolves once the walk is done.
+            if (node.Method.DeclaringType is { } comparer
+                && (comparer == typeof(Queryable) || comparer == typeof(Enumerable))
+                && RowComparing.Contains(node.Method.Name)
+                && node.Arguments.Count > 0)
+            {
+                CollectTypes(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type), _rowCompared);
             }
 
             // The same escape as a conversion, spelled as an operator.
@@ -473,8 +544,7 @@ internal static class TransparentIdentifierRewriter
 
                 if (assignments.Any(a => IsSequence(a.Expression.Type) && !IsNull(a.Expression)))
                 {
-                    _disqualified.Add(initializer.Type);
-                    return;
+                    _sequenceSlotted.Add(initializer.Type);
                 }
 
                 _candidates[initializer.Type] = [.. assignments.Select(a => a.Member)];
@@ -506,8 +576,7 @@ internal static class TransparentIdentifierRewriter
             // the whole flattening.
             if (construction.Arguments.Any(a => IsSequence(a.Type) && !IsNull(a)))
             {
-                _disqualified.Add(construction.Type);
-                return;
+                _sequenceSlotted.Add(construction.Type);
             }
 
             _candidates[construction.Type] = [.. members];
