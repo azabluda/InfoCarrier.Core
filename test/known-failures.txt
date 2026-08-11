@@ -94,5 +94,11 @@
 # 2026-08-11 (C85) - 29 -> 27. Json_predicate_on_byte_array x2: EF's own SQLite suite asserts the
 # base fails there (issue #33522, a byte[] in a JSON document is not comparable by value), and
 # our failure was exactly that EqualException. EF's override adopted. Values differ is now 2.
-failed=27
-total=22450
+# 2026-08-11 (C86) - 27 -> 31, `total` 22450 -> 22455. A DELIBERATE RISE. Five new tests of our
+# own document that writing an *owned* JSON collection does not work: the client sends only the
+# added/edited element and never its owner, so EF's FindJsonPartialUpdateInfo has no row to
+# update and throws NullReferenceException. Four fail; the fifth passes because adding a whole
+# new entity does send the owner, which is the control that proves the cause. The fix seam is
+# InfoCarrierDatabase.Expand. Lower this back to 27 when it lands.
+failed=31
+total=22455

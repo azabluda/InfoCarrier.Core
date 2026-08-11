@@ -4616,6 +4616,57 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       proved unsatisfiable by any provider. **There are no unexplained wrong answers in 22,450
       tests** — not "none we have not classified", none at all.
 
+- [x] **C86. Writing an owned JSON collection is broken, and now it is provable in five lines: the
+      owner never travels.**
+      **`Total tests: 22455, Passed: 22206, Failed: 31, Skipped: 218`** (`c86`) — **27 → 31,
+      0 fixed, 4 broken**, and the four are new tests of ours that document a real gap.
+      **Ratchet raised deliberately.** ✅ `<this commit>`
+
+      C80 made 36 `JsonQuery` reads correct and said plainly that `JsonQueryTestBase` has no
+      `SaveChanges`. C81 reached the write half for *complex* collections (18 of 18) and could not
+      reach it for *owned* ones, because `JsonUpdateTestBase` is unreachable (ADR-013). This closes
+      that hole the only way left: five tests of our own, on **EF's fixture** — EF's model, EF's
+      seed, EF's `ToJson()` — with only the bodies ours, so the transaction is ours to enlist.
+
+      **Four fail, one passes, and which one passes is the whole diagnosis.**
+
+      | Test | |
+      |---|---|
+      | `A_new_entity_carrying_an_owned_JSON_collection_reaches_the_store` | **passes** |
+      | add / edit / remove an element of an *existing* owner, and the two-owner shape | **fail**, all four `NullReferenceException` |
+
+      **The server stack names EF's own code:**
+
+          System.NullReferenceException
+            at ModificationCommand.<GenerateColumnModifications>g__FindJsonPartialUpdateInfo|40_6(IUpdateEntry entry, List`1 processedEntries)
+            at ModificationCommand.<GenerateColumnModifications>g__HandleJson|40_8(…)
+            at ModificationCommand.GenerateColumnModifications()
+
+      **And the change set says why.** A probe on `request.Entries` for the failing add:
+
+          ENTRIES: JsonEntityBasic.OwnedCollectionRoot#JsonOwnedRoot=Added
+
+      **One entry. The owner is not in it.** EF writes a JSON column by *partial update* of the
+      owning row, so `FindJsonPartialUpdateInfo` walks from the dependent up to the entry holding
+      the column — and there is none, because the client's owner is `Unchanged` and an unchanged
+      entry never travels. The test that passes is exactly the one where the owner *is* in the
+      change set, as `Added`. **The passing case is the control.**
+
+      **The fix, specified but not taken.** `InfoCarrierDatabase.Expand` is the seam — it already
+      widens the change set once, for `SharedIdentityEntry`. It would additionally have to yield
+      the **ownership chain** of any entry whose type is JSON-mapped, up to the entity that owns
+      the column, so the server can track it. That is a change to what `SaveChanges` **sends**,
+      which is the most sensitive payload in the provider, and it is deliberately not being made at
+      the end of a long session — C42 is the standing reminder of what a widened SaveChanges
+      payload can cost, on the returning side.
+
+      **Why the four are committed red rather than held back.** They are not a spec base and no
+      guardrail requires them, so the choice is real. Before this, "does writing an owned JSON
+      collection work?" had no answer anywhere in 22,455 tests, and C80 could be read as claiming
+      it did. Four red tests with a named cause, a control that passes, and the seam identified are
+      worth more than an unmeasured silence — and they turn red into green the moment the fix
+      lands, which is the only honest way to know it did.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
