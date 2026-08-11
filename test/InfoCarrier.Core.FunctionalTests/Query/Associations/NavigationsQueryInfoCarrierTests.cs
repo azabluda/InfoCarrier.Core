@@ -100,12 +100,12 @@ public class NavigationsQueryInfoCarrierFixture : NavigationsFixtureBase
 // The overrides below are all EF's own, from `Navigations*RelationalTestBase` and
 // `Navigations*SqliteTest`, and each was matched by *reason* before being taken (A63): every one
 // of them is a limit of the backing store or of relational translation generally, raised here from
-// the same place with the same message. Nothing else is overridden — the four `Index_*` failures
-// left red are classified in docs/implementation-plan.md under C55, which corrects C1 twice over:
-// there are four here and four more on `OwnedNavigations`, and they are not this provider's. The
-// server raises `RowLimitingOperationWithoutOrderByWarning` exactly where a relational provider
-// does; the harness does not configure warnings-as-error on that side, and forwarding the
-// fixture's configuration so that it does was measured at 8 fixed, 626 broken.
+// the same place with the same message. Nothing else is overridden, and nothing here is red:
+// the four `Index_*` (and four more on `OwnedNavigations`) were closed by C69, which forwards the
+// one warning `AssertOrderedCollectionQuery` contracts for to the server that raises it — see
+// `AssociationsWarnings`. C55 had diagnosed them and left them red on the belief that the event
+// could only be forwarded globally, at 26 broken; all 26 turned out to be in Northwind and
+// BulkUpdates classes, none in these families.
 
 public class NavigationsCollectionQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
     : NavigationsCollectionTestBase<NavigationsQueryInfoCarrierFixture>(fixture)

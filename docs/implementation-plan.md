@@ -3246,9 +3246,12 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       eight tests assert a diagnostic that this provider *does* raise, in the half of itself that
       knows about it, and that the harness does not configure as an error there. Making them green
       means either forwarding the whole configuration (626) or naming
-      `RowLimitingOperationWithoutOrderByWarning` on its own, which is choosing one event because
-      six tests assert it — test-tuning wearing a configuration's clothes. **Left red and
-      classified.** If a real deployment configures warnings-as-error on its server, its callers
+      `RowLimitingOperationWithoutOrderByWarning` on its own, ~~which is choosing one event because
+      six tests assert it — test-tuning wearing a configuration's clothes~~ — **and that second
+      judgement was wrong; C69 closed all eight.** The 26 this entry prices the narrow option at
+      are every one of them in `NorthwindBulkUpdates`, `NorthwindWhere` and `NorthwindSelect`, so
+      the event never needed forwarding globally: it belongs to the two fixtures whose base names
+      it, and there it costs nothing. **Left red and classified** ~~here~~ *until C69*. If a real deployment configures warnings-as-error on its server, its callers
       get the exception these tests expect; that is the arrangement being reproduced, not a
       missing feature.
 
@@ -3429,12 +3432,14 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       actually refuses in the six is narrower than "the projection is not final", and reading its
       test names is what says so.
 
-      **Left as a negative result rather than narrowed by guessing.** Narrowing it to "a `Join`
-      whose source is a client-computed sequence" is contradicted by
-      `GroupJoin_in_subquery_with_client_projection` in the same run. Finding the real line means
-      reading what `NavigationExpandingExpressionVisitor` does with a client-evaluated shaper, not
-      another rule fitted to six tests. The six stay red and classified: **this provider answers a
-      query EF refuses**, which is the A28 shape with the sign flipped.
+      **Left as a negative result rather than narrowed by guessing** — and **C68 then found the
+      line in these eighteen rather than in EF's source.** They are not a wall; they are the
+      specification: `Union`, `Count` and `FirstOrDefault` apply no lambda to the projected
+      element and are allowed, a **join key** does and is refused. This entry's two mistakes were
+      walking **lambda bodies** as well as source positions (twelve of the eighteen) and counting a
+      constructed client **type** as client code. With both corrected the same rule measures
+      **6 fixed, 0 broken**. The standing lesson is the opposite of the one recorded here: **when a
+      rule breaks a named family of tests, read the family.**
 
 - [x] **C60. The singles and pairs, examined one at a time — one is A63, the rest are classified
       with evidence.**
@@ -3593,7 +3598,8 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       `InvalidPropertyInSetProperty`, a statement about the *property*, so it stays red either way.
       **Not taken here**: it is a product change with a full-run cost and no test to show for it,
       and the filter also covers `Include`, whose lambdas would newly be walked. Recorded as a
-      one-line candidate with its price.
+      one-line candidate with its price. **Taken in C67**, which measured it at 0 fixed and
+      0 broken exactly as priced — the value being the error a real caller gets.
 
 - [x] **C64. `Correlated_collection_with_distinct_3_levels` is not a wrong answer, and the base's
       assertion cannot be satisfied by a correct one.**
