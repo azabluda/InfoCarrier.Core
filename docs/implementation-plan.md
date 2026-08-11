@@ -4756,6 +4756,44 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       collection parameter is still a literal `null` constant, and `null.Contains(x)` is not a
       thing to translate. Same trade, different face, and not what this step was for.
 
+- [x] **C89. The two BCL value mappers ship; the geometry one does not, and that asymmetry is the
+      decision.**
+      **`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (`c89`) — **26 → 26,
+      0 fixed, 0 broken, reasons byte-identical.** ✅ `<this commit>`
+
+      C23 and C34 each recorded the same open question and neither took it: all three ADR-012
+      mappers were registered **test-side**, so the suite was green and a real application using
+      any of the three was not. Decided 2026-08-11.
+
+      **`IPAddress` and `Uri` move into the product** as
+      `InfoCarrier.Core.ValueMapping.IPAddressValueMapper` / `UriValueMapper`, registered by
+      `AddInfoCarrierStandardValueMappers()` — which `AddEntityFrameworkInfoCarrier` calls for the
+      client and which is **public because a server has to call it too**. Both halves must agree:
+      a value mapped on one side only is worse than one mapped on neither, because the two models
+      then disagree about what a wire value means.
+
+      **The geometry mapper stays test-side, and it is not an oversight.** Shipping it would put a
+      NetTopologySuite dependency in this package for a type most callers never use; v1 kept NTS
+      out of its product assembly for the same reason (C12). An application that wants one
+      registers its own beside the standard two, and
+      `InfoCarrierNetTopologySuiteValueMapper` — still in the test project — is the worked example.
+
+      **What made the two different from the third.** Both are **BCL** types whose members throw
+      for perfectly ordinary instances: `IPAddress.ScopeId` for an IPv4 address,
+      `Uri.AbsolutePath` for a relative URI. An application storing one has opted into nothing. The
+      argument for leaving them out was that ADR-012 says registration is the application's — which
+      stayed literally true while the failure it describes was real, and that is the wrong side of
+      the trade. ADR-012 carries a dated amendment rather than being quietly contradicted.
+
+      **`TryAddEnumerable`, not `AddSingleton`**, and the reason is written above the line it sits
+      on: the chain is consumed as an `IEnumerable<T>`, so a repeated registration is *visible* —
+      the same trap that once made
+      `Repeated_calls_to_add_do_not_modify_collection` fail at *Expected 121, Actual 126*.
+
+      **Nothing moved, which is the point.** Same 26 failures, same reasons byte for byte: the
+      mappers were already in the chain on both halves, and this only changes who puts them there.
+      The value is entirely outside the suite.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

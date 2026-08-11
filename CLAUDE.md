@@ -292,11 +292,15 @@ Not yet implemented, in rough priority order:
   consumers.** A geometry's members recurse (C18), `IPAddress.ScopeId` throws for an IPv4 address
   (C23), and `Uri.AbsolutePath` throws for a relative URI (C34). Three unrelated CLR types, one
   mechanism, all reached by the same reflective object-shape walk.
-  **A DECISION IS WAITING on the back of that**: all three mappers are registered *test-side*, so
-  the suite is green and a real application hitting any of them is not. v1 shipped
-  `StandardValueMappers` in its product assembly; ADR-012 says registration is the application's.
-  Two of the three are BCL types. **Recorded in C23 and C34; not taken, because it is a scope
-  call.**
+  **DECIDED 2026-08-11 (C89).** `IPAddress` and `Uri` now ship in the product and are registered
+  by `AddInfoCarrierStandardValueMappers()`, which `AddEntityFrameworkInfoCarrier` calls for the
+  client and which is **public because the server must call it too** — a value mapped on one side
+  only is worse than one mapped on neither. Both are BCL types whose members throw for ordinary
+  instances, so an application storing one has opted into nothing. **The geometry mapper stays
+  test-side**: shipping it would put a NetTopologySuite dependency in this package, which v1 also
+  refused (C12). An application registers its own beside the standard two, and the test project's
+  `InfoCarrierNetTopologySuiteValueMapper` is the worked example. ADR-012 carries a dated
+  amendment.
 - **"The wire cannot handle this type" has two answers and they are not interchangeable** (C34).
   The seam decides how a value is *written*; `ExpressionJsonContext` decides whether the wire can
   carry the result at all — a key value lands in `EntityKeyNode.KeyValues`, declared `object` and

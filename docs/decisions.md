@@ -363,6 +363,26 @@ exactly that, so `declaredType` is what a mapper matches on and nothing else is 
 
 **Consequences.** Spatial support stays *out* of the product assembly, as it was in v1: a WKT
 geometry mapper is ~30 lines and belongs to whoever already depends on NetTopologySuite.
+> **Amended 2026-08-11 (plan C89) — the provider now ships two mappers and registers them by
+> default.** `IPAddressValueMapper` and `UriValueMapper` are in
+> `InfoCarrier.Core.ValueMapping`, and `AddEntityFrameworkInfoCarrier` calls
+> `AddInfoCarrierStandardValueMappers()`. A server builds its own service collection, so it must
+> call that method itself — the method is public for exactly that reason, and a value mapped on
+> one side only is worse than one mapped on neither.
+>
+> **Why these two and not the third.** Both are **BCL** types whose members throw for perfectly
+> ordinary instances — `IPAddress.ScopeId` for an IPv4 address, `Uri.AbsolutePath` for a relative
+> URI. An application that stores one has opted into nothing and should not have to discover this
+> seam to make it work; leaving them out kept this ADR's sentence literally true while a real
+> application failed, which is the wrong side of that trade. A **geometry** is still not shipped:
+> it would put a NetTopologySuite dependency in this package for a type most callers never use,
+> and v1 kept NTS out of its product assembly for the same reason. An application that wants one
+> registers its own mapper beside the standard two — that is the documented route, and
+> `InfoCarrierNetTopologySuiteValueMapper` in the test project is a worked example of it.
+>
+> `TryAddEnumerable`, so a repeated call does not put a mapper in the chain twice; the chain is
+> consumed as an `IEnumerable<T>`, where a duplicate is visible.
+
 Registration is the application's on **both** halves, and a value mapped on one side only will
 fail asymmetrically — that is inherent, and it is why the interface documents it rather than
 guessing a default. This is new public API and so is `ApiConsistencyTestBase`'s business; it is

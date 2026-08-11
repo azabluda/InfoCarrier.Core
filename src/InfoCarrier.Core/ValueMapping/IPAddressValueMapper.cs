@@ -2,9 +2,8 @@
 
 using System.Net;
 using System.Text.Json;
-using InfoCarrier.Core.ValueMapping;
 
-namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
+namespace InfoCarrier.Core.ValueMapping;
 
 /// <summary>
 ///     Carries a <see cref="IPAddress" /> across the wire as its text form (ADR-012).
@@ -26,13 +25,16 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         entity, and would otherwise be walked reflectively.
 ///     </para>
 ///     <para>
-///         Registered test-side, like the geometry mapper, so the statement ADR-012 makes stays
-///         true: the provider knows nothing about which CLR types an application carries. See
-///         C23 in <c>docs/implementation-plan.md</c> for why a product default was <em>not</em>
-///         taken here and what it would cost.
+///         <b>Shipped, and registered by default</b> (C89, ADR-012 amended). C23 recorded the
+///         opposite — that a product default was not taken, so that ADR-012's statement "the
+///         provider knows nothing about which CLR types an application carries" stayed literally
+///         true. It stayed true and it left the suite green while a real application storing an
+///         <see cref="IPAddress" /> failed, which is the wrong side of that trade for a BCL type.
+///         The geometry mapper is still not shipped: it would put a NetTopologySuite dependency in
+///         this package.
 ///     </para>
 /// </remarks>
-public sealed class InfoCarrierIPAddressValueMapper : IInfoCarrierValueMapper
+public sealed class IPAddressValueMapper : IInfoCarrierValueMapper
 {
     /// <inheritdoc />
     public bool TryMapToWire(object value, Type declaredType, out object? wireValue)

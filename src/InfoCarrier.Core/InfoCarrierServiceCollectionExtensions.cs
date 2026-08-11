@@ -67,11 +67,54 @@ public static class InfoCarrierServiceCollectionExtensions
         // the visible behaviour is unchanged — but every one of these is `Scoped`, and an
         // `IEnumerable<T>` resolve would yield the service twice, which is exactly how the
         // value-mapper chain of ADR-012 is consumed.
+        services.AddInfoCarrierStandardValueMappers();
+
         services.TryAddScoped<TypeNodeMapper>();
         services.TryAddScoped<TypeNodeResolver>();
         services.TryAddScoped<IDynamicValueMapper, DynamicValueMapper>();
         services.TryAddScoped<ExpressionToNodeTranslator>();
         services.TryAddScoped<IExpressionSerializer, ExpressionSerializer>();
+
+        return services;
+    }
+
+    /// <summary>
+    ///     Registers the value mappers this provider ships for BCL types the wire cannot walk
+    ///     (ADR-012, amended 2026-08-11).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Called for you by <see cref="AddEntityFrameworkInfoCarrier" />, which is the
+    ///         <em>client</em> half. **A server has to call it too**, and that is the whole reason
+    ///         it is public: a value mapped on one side only is worse than one mapped on neither,
+    ///         because the two models then disagree about what a wire value means. The server's
+    ///         service collection is the application's to build, so this is the one line it needs.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="System.Net.IPAddress" /> and <see cref="Uri" /> only. Both are BCL types
+    ///         whose members throw for perfectly ordinary instances — <c>ScopeId</c> for an IPv4
+    ///         address, <c>AbsolutePath</c> for a relative URI — so an application that stores one
+    ///         has opted into nothing and should not have to discover this seam. A **geometry** is
+    ///         deliberately absent: shipping it would put a NetTopologySuite dependency in this
+    ///         package for a type most callers never use, and an application that wants one
+    ///         registers its own mapper here alongside these.
+    ///     </para>
+    ///     <para>
+    ///         <c>TryAddEnumerable</c>, so calling this twice does not put a mapper in the chain
+    ///         twice — the chain is consumed as an <c>IEnumerable&lt;T&gt;</c>, where a duplicate
+    ///         registration is visible.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The collection to register in.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierStandardValueMappers(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ValueMapping.IInfoCarrierValueMapper, ValueMapping.IPAddressValueMapper>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ValueMapping.IInfoCarrierValueMapper, ValueMapping.UriValueMapper>());
 
         return services;
     }

@@ -1,9 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.Json;
-using InfoCarrier.Core.ValueMapping;
 
-namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
+namespace InfoCarrier.Core.ValueMapping;
 
 /// <summary>
 ///     Carries a <see cref="Uri" /> across the wire as its original string (ADR-012).
@@ -23,13 +22,15 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         throws for exactly the instances this exists to carry.
 ///     </para>
 ///     <para>
-///         Test-side, like the other two. **Whether the product should ship standard mappers for
-///         BCL types like this one is an open decision** — see C23 and C34 in
-///         `docs/implementation-plan.md`. Three instances now argue for it; the counter-argument
-///         is that ADR-012 states registration is the application's.
+///         <b>Shipped, and registered by default</b> (C89, ADR-012 amended). A <see cref="Uri" />
+///         is a BCL type: an application that stores one has not opted into anything exotic and
+///         should not have to discover this seam to make it work. The geometry mapper is
+///         <em>not</em> shipped, and that asymmetry is the decision rather than an oversight — it
+///         would put a NetTopologySuite dependency in this package for a type most callers never
+///         use. See <c>docs/decisions.md</c> ADR-012 for how an application registers one.
 ///     </para>
 /// </remarks>
-public sealed class InfoCarrierUriValueMapper : IInfoCarrierValueMapper
+public sealed class UriValueMapper : IInfoCarrierValueMapper
 {
     /// <inheritdoc />
     public bool TryMapToWire(object value, Type declaredType, out object? wireValue)

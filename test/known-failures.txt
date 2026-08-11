@@ -109,5 +109,9 @@
 # being spelled out as an inline array. This reverses research-findings 6 for collections and
 # carries a dated supersession there: v1's trap was that its wrapper was `private`, not that it
 # was a wrapper.
+# 2026-08-11 (C89) - unchanged at 26/22455. The IPAddress and Uri value mappers moved from the
+# test project into the product and are registered by default on both halves; the geometry one
+# stays test-side so no NetTopologySuite dependency enters the package. Reasons byte-identical:
+# the chain was already the same, only who registers it changed.
 failed=26
 total=22455
