@@ -4260,6 +4260,81 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       citing C59 as settled. **When an entry classifies a failure by pointing at a number, the
       number has to be re-checked before the classification is trusted.**
 
+- [x] **C78. B12 priced, not decided: the route is 36 fixed, 0 broken, one new file and no new
+      dependency — and it is still a decision.** Spiked and **reverted; no code change survives.**
+      Measured as `b12-spike` against `c76b`. ✅ `<this commit>`
+
+      B12 has stood open since Phase B as *"it needs a decision about what the client's model is,
+      and that is not mine to make"*, with two routes named and neither costed. The standing offer
+      was to **price them without taking the decision**. This is that, and the price is much lower
+      than the entry's framing implies.
+
+      **What the probe found first, and it is the load-bearing fact.** B12 reads *"replacing a
+      JSON-mapped owned collection's key with a synthesized ordinal is relational, and this
+      provider is not"*, which suggests the client lacks the information. It does not. Dumping both
+      models side by side:
+
+          CLIENT JsonOwnedRoot  container=OwnedCollectionRoot  ownershipUnique=False  pk=[OwnerId,Id]
+          SERVER JsonOwnedRoot  container=OwnedCollectionRoot  ownershipUnique=False  pk=[OwnerId,__synthesizedOrdinal]
+
+      **The client model already carries `Relational:ContainerColumnName`** — both sides run the
+      same `OnModelCreating`, `ToJson()` included, and `ToJson()` is an annotation. What the client
+      lacks is only the *convention* that reads it. And the two keys already have the **same
+      arity**, at every depth, which is why the wire's `KeyValues` line up positionally and only
+      the client's interpretation of the second slot differs.
+
+      **The route, in full, because it is short enough to state.**
+
+      - One new file: a convention deriving from the **core, public** `KeyDiscoveryConvention`,
+        whose body is `RelationalKeyDiscoveryConvention`'s JSON branch — `DiscoverKeyProperties`
+        returning `[]` for a JSON-mapped owned collection, `ProcessKeyProperties` building
+        `[…ownership FK properties…, …app keys…, __synthesizedOrdinal]`, `ProcessPropertyAdded`
+        skipping the synthesized name, and `ProcessEntityTypeAnnotationChanged` re-running on
+        `ContainerColumnName`. Plus a `ProviderConventionSetBuilder` doing exactly what
+        `RelationalConventionSetBuilder` does: `conventionSet.Replace<KeyDiscoveryConvention>(…)`.
+      - One line: `.TryAdd<IProviderConventionSetBuilder, InfoCarrierConventionSetBuilder>()`.
+      - **No new dependency.** `Microsoft.EntityFrameworkCore.Relational` is *already* a
+        `PackageReference` of `src/InfoCarrier.Core`, so `GetContainerColumnName()`,
+        `RelationalAnnotationNames.ContainerColumnName` and EF's own
+        `SynthesizedOrdinalPropertyName` constant are all directly callable. Nothing relational is
+        *resolved from the container* — no `RelationalConventionSetBuilderDependencies`, which is
+        the piece a non-relational provider genuinely cannot get.
+
+      **The measurement.** **`Total tests: 22366, Failed: 30`** (`b12-spike`) against `c76b`'s 66 —
+      **36 fixed, 0 broken.**
+
+      | | before | after |
+      |---|---|---|
+      | `Query.JsonQuerySqlite` | 40 | **4** |
+      | `Query.Associations.*` (the other `ToJson()` consumer, 336 tests) | 0 | **0** |
+      | everything else | 26 | 26 |
+
+      **`Associations` is the containment argument and it is checked rather than assumed.**
+      `ToJson()` appears in exactly three test files —
+      `JsonQuerySqliteInfoCarrierTest`, `OwnedNavigationsQueryInfoCarrierTests` and
+      `ComplexPropertiesQueryInfoCarrierTests` — and the latter two are the 336 that C69 took to
+      green. The convention is inert everywhere else, because `GetContainerColumnName()` is null
+      there.
+
+      **What is left in `JsonQuery` afterwards, so the 4 are not mistaken for the same thing.**
+      2 are the `ApplyNotSupported` pair that was never B12's, and 2 are
+      `Json_predicate_on_byte_array` — still `Values differ`, and now the *only* wrong answers in
+      the class. A byte-array predicate is a different question from a key.
+
+      **And it unblocks the last unadopted base.** B3d/C10 priced `AdHocJsonQuery` at ~950 lines of
+      relational mirror and declined *"because the corpus is owned JSON collections throughout, so
+      most of what it would add lands on B12"*. With B12 closed that objection goes, and
+      `AdHocJsonQuery` is the one thing between here and **M6 closing**.
+
+      **Why this is still not taken.** The route makes the *client* provider act on a **relational
+      annotation** and adopt a **relational convention's** key shape. That is precisely the
+      question B12 names — *"the client honours relational annotations, narrowed to keys"* — and
+      B6 asked the same one and was answered without needing it. It is a statement about what this
+      provider's client model **is**, not a bug fix, and it is a scope call. **Priced, reverted,
+      and left to the decision it belongs to.** The spike is one commit's work to reproduce: copy
+      `subrepos/efcore/src/EFCore.Relational/Metadata/Conventions/RelationalKeyDiscoveryConvention.cs`,
+      change the base to the core `KeyDiscoveryConvention` and drop `RelationalDependencies`.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
@@ -4765,6 +4840,14 @@ constructor, so the backend store cannot build the server's copy.
         This is "the client honours relational annotations" again, narrowed to keys.
       - Accept that the two models key these types differently, and leave the 38 red — which also
         means owned JSON collections stay unusable under tracking.
+
+      **PRICED IN C78, still not decided.** The first route measures **36 fixed, 0 broken**
+      (`b12-spike` vs `c76b`, 66 → 30), and costs one new file plus one registration line with
+      **no new dependency** — `Microsoft.EntityFrameworkCore.Relational` is already referenced by
+      the product, and the client model already carries `Relational:ContainerColumnName` because
+      both sides run the same `ToJson()`. What was missing was only the convention that reads it.
+      Read C78 before re-arguing this entry: two of its premises — that the client lacks the
+      information, and that the two keys disagree in shape — are wrong.
 
 - [x] **B13. The rest of the 179, classified.** No code change; read out of `artifacts/measure/b12`.
       ✅ `<this commit>`

@@ -326,12 +326,19 @@ Not yet implemented, in rough priority order:
   through options and half through the server's service collection, which the options route does
   not touch at all. A71's ten `AddInterceptors` failures are the **server's** and the same defect
   as the twelve `Assert.Same`, not a separate one.
-- **JSON-mapped owned collections need a decision (B12).** The server keys an element by its
-  ordinal in the array; the client keys it by the CLR `Id`, which the document does not carry and
-  which is `0` for every element — so EF's fixup gives every element to every owner. Both sides
-  run the same `OnModelCreating`; only the *convention* that rewrites such a key is relational.
-  38 failures, and no client-side route that does not either invent the ordinal or overwrite a
-  property a query can project.
+- **JSON-mapped owned collections need a decision (B12) — and it is now PRICED (C78).** The
+  server keys an element by its ordinal in the array; the client keys it by the CLR `Id`, which
+  the document does not carry and which is `0` for every element — so EF's fixup gives every
+  element to every owner. Both sides run the same `OnModelCreating`; only the *convention* that
+  rewrites such a key is relational.
+  **C78 spiked the fix and reverted it: 36 fixed, 0 broken (66 → 30), one new file plus one
+  registration line, and no new dependency** — the product already references
+  `Microsoft.EntityFrameworkCore.Relational`, the client model already carries
+  `Relational:ContainerColumnName`, and the two keys already have the same arity at every depth.
+  `Query.Associations` (the other `ToJson()` consumer, 336 tests) is untouched, and it unblocks
+  `AdHocJsonQuery`, the last unadopted base. **Not taken**: it makes the client model act on a
+  relational annotation, which is a scope call, not a bug fix. B12's own text has two premises
+  C78 disproves — read C78 before re-arguing it.
 - **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
   they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all
