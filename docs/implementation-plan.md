@@ -3903,6 +3903,56 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       materialization interception properly on its own. B16 listed that as evidence; this is the
       experiment.
 
+- [x] **C72. The 27th of B16's family — and here the server genuinely needs the interceptor, so
+      C71's move does not apply and a narrower one does.**
+      **`Total tests: 22364, Passed: 22074, Failed: 73, Skipped: 217`** (`c72`) — **74 → 73,
+      1 fixed, 0 broken.** ✅ `<this commit>`
+
+      `OptimisticConcurrency.Nullable_client_side_concurrency_token_can_be_used` fails
+      `Expected: "Intercepted: New name"` / `Actual: "Intercepted: Intercepted: New name"` — the
+      double invocation B16 named, the one C71 left behind. C71's remedy was *stop forwarding*,
+      safe because for `MaterializationInterception` the forwarded payload is nothing but the
+      caller's interceptors.
+
+      **Here it is not, and the first thing done was to measure that rather than argue it.**
+      Removing the fixture's server-side `onAddServices` outright:
+
+          Total tests: 45   Passed: 12   Failed: 21   Skipped: 12
+          13  InfoCarrierServerException : Assert.True() Failure
+           8  InfoCarrierServerException : Assert.IsType() Failure: Value is not the exact type
+
+      **Every F1 entity's parameterized constructor is private and ends in an assertion that it is
+      being constructed as a proxy** — `Assert.IsType<TeamProxy>(this)`, and `Driver`'s
+      `Assert.True(this is DriverProxy || this is TestDriver)`, which is the 13. EF's constructor
+      binding picks that constructor, so the model **cannot be materialized at all** without an
+      `IMaterializationInterceptor` supplying the proxy from `CreatingInstance`. The server carries
+      this model; the server needs that half. The queue's own condition — *if the payload carries
+      anything the server's model needs, do not forward-strip it* — is met, and the target test
+      passed in that run only because everything around it had stopped working.
+
+      **The other three members are not model requirements.** `InitializingInstance` rewrites
+      `Sponsor.Name` to `"Intercepted: " + name`; that transform is the only non-idempotent thing
+      `F1MaterializationInterceptor` does, and it is the observable behaviour of a hook the *caller*
+      registered. `CreatedInstance` and `InitializedInstance` set flags and wrap in
+      `SponsorDoubleProxy`, neither of which crosses the wire — the client builds its own instances
+      from property values, so the server's CLR type is invisible to it.
+
+      So the server is given the construction half and nothing else:
+      `ServerSideF1MaterializationInterceptor` derives from EF's class and **re-implements** the
+      interface (the base's methods are not virtual), forwarding `CreatingInstance` to the base's
+      hundred-line switch and returning the identity for the other three. The caller's transform is
+      then observable exactly once, on the instance the test registered it against.
+
+      **Two things it is not.** Not a product change — nothing in `src/` forwards or suppresses an
+      interceptor, and B16 stands that a deployment may hook either side or both. And not a
+      weakening of the base: the base's assertion is unchanged and the value it asserts is now
+      produced by the client's own materializer, which is B15's fix under test again.
+
+      **The general form, worth keeping beside C71's.** C71: *when a remedy is priced as expensive,
+      check whether the price is for the route rather than the goal.* C72: **when the payload cannot
+      be dropped, ask which part of it the server is entitled to** — the answer was "the part the
+      model demands", and the model said so in its own constructors.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's

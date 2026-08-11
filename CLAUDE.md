@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22364, Passed: 22073, Failed: 74, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22364, Passed: 22074, Failed: 73, Skipped: 217`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,10 +137,10 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c71`. C55–C71 took 132 to 74; `Query.Associations` is 336 of 336 and
-`MaterializationInterception` is clear. The largest blocks are **40 `JsonQuery`** (38 of them
-B12, a decision), **4 `ComplexNavigations`** (C56, faithful to EF — C68 closed the other four), **6
-`BulkUpdates`** and **4 `GearsOfWar`**.
+currently `c72`. C55–C72 took 132 to 73; `Query.Associations` is 336 of 336, and
+`MaterializationInterception` and `OptimisticConcurrency` are clear. The largest blocks are **40
+`JsonQuery`** (38 of them B12, a decision), **4 `ComplexNavigations`** (C56, faithful to EF — C68
+closed the other four), **6 `BulkUpdates`** and **4 `GearsOfWar`**.
 
 **No failure is an unexplained wrong answer, and that is checked rather than asserted (C65).** The
 run reports exactly **40** `Assert.Equal() Failure: Values differ`, and they are **38 `JsonQuery`
@@ -284,8 +284,14 @@ Not yet implemented, in rough priority order:
   `onConfiguring`/`addServices` it sets carry nothing but interceptors. 26 fixed, 0 broken, product
   untouched, and `PropertyValues` still green because it registers its server-side interceptor
   itself. **When a remedy is priced as expensive, check whether the price is for the route rather
-  than the goal.** The design answer below is unchanged and still the reason the product forwards
-  nothing: This
+  than the goal.** **The 27th member closed in C72, and it needed the opposite question.**
+  `OptimisticConcurrency`'s fixture registers `F1MaterializationInterceptor` on the server *on
+  purpose*: every F1 entity's private constructor ends in `Assert.IsType<…Proxy>(this)`, so the
+  model cannot be materialized without one — dropping it measured **21 of 33 failing**, all
+  server-side. Only `InitializingInstance`'s `Sponsor.Name` rewrite is non-idempotent, so the
+  server gets the **construction half** and not the caller's transform. **When the payload cannot
+  be dropped, ask which part of it the server is entitled to.** The design answer below is
+  unchanged and still the reason the product forwards nothing: This
   provider is **two EF instances**, and a real deployment must be free to define materialization
   hooks on either side or both — so the three routes B16 measured, each of which suppresses one
   side, may none of them be taken. Nothing in `src/` forwards an interceptor: the server sees the

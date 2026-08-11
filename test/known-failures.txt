@@ -59,5 +59,8 @@
 # globally at 26 broken; all 26 are in Northwind/BulkUpdates classes, none in these families.
 # 2026-08-10 (C71) — 100 -> 74. B16's optional harness remedy: this one test class stops
 # forwarding its interceptors to the server, which is all its onConfiguring/addServices carry.
-failed=74
+# 2026-08-11 (C72) - 74 -> 73. The 27th of B16's family: the F1 fixture gives the server the
+# construction half of EF's materialization interceptor and not the value transform, so the
+# caller's hook is observable exactly once. Test-only; the total is unchanged.
+failed=73
 total=22364
