@@ -4866,8 +4866,11 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       | `BigModel` | **C91.** `property.GetValueConverter()` is not the effective converter under a compiled model. |
       | `ComplexTypes` | **C92.** A complex value travels by reflective object shape, which sends members the model ignores. |
 
-- [ ] **C91. `GetValueConverter()` is not the effective converter, and a compiled model is where
-      the two part company.** `<this commit>`
+- [x] **C91. `GetValueConverter()` is not the effective converter, and a compiled model is where
+      the two part company.**
+      **`Total tests: 22455, Passed: 22211, Failed: 26, Skipped: 218`** (`c91`) — **26 → 26,
+      0 fixed, 0 broken.** `BigModel` moves from the cast to the baselines, and nothing else in
+      the suite moves at all, which is what the two guards below are for. ✅ `<this commit>`
 
       `BigModel` fails `InvalidCastException: Invalid cast from 'System.String' to
       'System.Byte[]'` inside `SaveChanges`. Three probes — what the client says, what the server
@@ -4897,6 +4900,33 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       applied. The fallback is sound only where the mapping is an `InfoCarrierTypeMapping`, whose
       converter can only have come from the model, because this provider's type mapping source
       never adds one of its own.
+
+      **That was still two guards short, and the probe that found them is the reusable part.** The
+      first version measured **23 disagreements where it meant to close 3**. The instrument was to
+      print, from `WireType`, *what each side computes for every property* — tagged `CLIENT` or
+      `SERVER` by whether the mapping is an `InfoCarrierTypeMapping`, which is the only side
+      marker needed — and then diff the two sets by property name:
+
+          ManyTypes.BoolToStringConverterProperty   C: wire=String  S: wire=String            <- closed
+          ManyTypes.BoolArray                       C: wire=String  S: wire=string(json)      <- new
+          … 20 more collections …
+
+      Twenty-one of the twenty-three were **primitive collections**, where a compiled model's
+      mapping carries EF's `CollectionToJsonStringConverter<T>`. That is the mapping's own
+      business rather than model configuration, and `CollectionForm` exists precisely so a
+      collection's JSON form is derived store-independently — B4's 106 failures are what happens
+      when it is not. The twenty-second and twenty-third were `HasConversion<string>()` on an
+      enum, which sets `ProviderClrType` and **no** converter annotation: a *built* model answers
+      "no converter" and sends the raw enum, so taking the mapping's converter on the client alone
+      made the server read `"Enum8"` as a number.
+
+      So the fallback fires only when **`GetProviderClrType()` is null and `JsonForm(property)` is
+      null** — that is, only where the existing rule had no answer at all. Stated the other way:
+      *a provider CLR type means the model asked for a target, not for a converter; and a
+      primitive collection belongs to `JsonForm`, not to a converter.*
+
+      **The pin is `BigModel` itself**, and it has been seen to move: `InvalidCastException` →
+      reaching the baseline comparison. It goes green when the baselines land.
 
 - [ ] **C92. A complex value travels by reflective object shape, and the shape is not the model.**
       `<this commit>`

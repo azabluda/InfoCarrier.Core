@@ -288,6 +288,22 @@ Not yet implemented, in rough priority order:
   when the **baselines** directory is missing, and it returns early when the **test source**
   directory is missing. It *creates* the baselines directory. C0's "112 generated files" was right
   in kind; `EF_TEST_REWRITE_BASELINES=1` is how EF writes them.
+- **`property.GetValueConverter()` is not the effective converter, and a compiled model is where
+  the two part company (C91).** EF's generator emits a `valueConverter:` argument only when it can
+  name a converter *type*; under `ForNativeAot` — what `dotnet ef dbcontext optimize` produces —
+  it puts the converter on the property's **type mapping**, so a converter configured by
+  *instance* (`HasConversion(new BoolToStringConverter("A", "B"))`) vanishes from
+  `GetValueConverter()` while one configured by *type* survives. `PrimitiveCoercion` falls back to
+  `(FindTypeMapping() as InfoCarrierTypeMapping)?.Converter` — the client's own mapping, where a
+  converter can only have come from the model. **The first version of that fallback measured 23
+  disagreements where it meant to close 3**, and the instrument that found them is the one to
+  reach for whenever the two models might disagree: print, from `WireType`, what *each side*
+  computes for *every* property — tagged by whether the mapping is an `InfoCarrierTypeMapping`,
+  which is the only side marker needed — and diff the two by name. Twenty-one were primitive
+  collections (the mapping's `CollectionToJsonStringConverter` is `JsonForm`'s business, B4) and
+  two were `HasConversion<string>()` on an enum (a provider CLR type means the model asked for a
+  *target*, not for a converter). The guard is `GetProviderClrType() is null && JsonForm(…) is
+  null`: fall back only where the existing rule had no answer at all.
 - **Spatial works, and the shape of how is worth keeping.** Three pieces, landed and measured
   separately because C9's combined attempt aborted the host: the NetTopologySuite branch in
   `InfoCarrierTypeMappingSource` (C15, worth 19 on its own — the long-standing "needs SpatiaLite"

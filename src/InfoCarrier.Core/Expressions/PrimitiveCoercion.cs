@@ -59,7 +59,7 @@ internal static class PrimitiveCoercion
     /// </remarks>
     public static object? ToWireValue(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
     {
-        if (property.GetValueConverter() is { } converter)
+        if (EffectiveConverter(property) is { } converter)
         {
             return Normalize(converter.ConvertToProvider(value));
         }
@@ -73,7 +73,7 @@ internal static class PrimitiveCoercion
     ///     The type a value of <paramref name="property" /> travels as.
     /// </summary>
     public static Type WireType(Microsoft.EntityFrameworkCore.Metadata.IProperty property)
-        => property.GetValueConverter()?.ProviderClrType
+        => EffectiveConverter(property)?.ProviderClrType
             ?? (JsonForm(property) is not null ? typeof(string) : property.ClrType);
 
     /// <summary>
@@ -81,7 +81,7 @@ internal static class PrimitiveCoercion
     /// </summary>
     public static object? FromWireValue(Microsoft.EntityFrameworkCore.Metadata.IProperty property, object? value)
     {
-        if (property.GetValueConverter() is { } converter)
+        if (EffectiveConverter(property) is { } converter)
         {
             return converter.ConvertFromProvider(Coerce(value, converter.ProviderClrType));
         }
@@ -90,6 +90,70 @@ internal static class PrimitiveCoercion
             ? reader.FromJsonString(json)
             : Coerce(value, property.ClrType);
     }
+
+    /// <summary>
+    ///     The value converter that actually applies to <paramref name="property" /> — which is
+    ///     <em>not</em> always the one <c>GetValueConverter()</c> returns.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A compiled model is where the two part company (C91).</b>
+    ///         <c>CSharpRuntimeModelCodeGenerator</c> emits a <c>valueConverter:</c> constructor
+    ///         argument only when it can name a converter <em>type</em>. Under
+    ///         <c>ForNativeAot</c> — which is what <c>dotnet ef dbcontext optimize</c> generates —
+    ///         it puts the converter on the property's <b>type mapping</b> instead, so
+    ///         <c>GetValueConverter()</c> is <see langword="null" /> for every property configured
+    ///         with a converter <em>instance</em>: <c>HasConversion(new BoolToStringConverter("A",
+    ///         "B"))</c> loses it where <c>HasConversion&lt;BoolToZeroOneConverter&lt;short&gt;&gt;()</c>
+    ///         keeps it. The client then sends the <em>model</em> value where the server expects
+    ///         the <em>provider</em> value, and `BigModel` said so as
+    ///         <c>Invalid cast from 'System.String' to 'System.Byte[]'</c>.
+    ///     </para>
+    ///     <para>
+    ///         <b>Guarded by the mapping's own type, and a plain <c>?? FindTypeMapping()?.Converter</c>
+    ///         would be wrong.</b> A type mapping is computed twice, by two different providers,
+    ///         and a <em>store's</em> mapping may carry a converter the model never asked for —
+    ///         SQLite maps <see cref="DateTimeOffset" /> through one. Falling back to the mapping
+    ///         on the server would newly apply a store conversion the client never applied, in
+    ///         both directions. An <see cref="InfoCarrierTypeMapping" /> is safe because it is the
+    ///         <em>client's</em>, and this provider's type mapping source never composes a
+    ///         converter of its own: one is there only if the model put it there.
+    ///     </para>
+    ///     <para>
+    ///         <b>Two more guards, and a probe found both by printing what each side computes for
+    ///         every property and diffing the two.</b> The first version of this measured 23
+    ///         disagreements where it meant to close 3.
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <b>A provider CLR type means the model asked for a target, not for a
+    ///             converter.</b> <c>HasConversion&lt;string&gt;()</c> on an enum sets
+    ///             <c>ProviderClrType</c> and no converter annotation, so a <em>built</em> model —
+    ///             which is what the server has — answers <c>GetValueConverter() == null</c> and
+    ///             sends the raw enum. The mapping on either side does hold a converter; taking it
+    ///             on the client alone made the server read <c>"Enum8"</c> as a number.
+    ///         </item>
+    ///         <item>
+    ///             <b>A primitive collection is <see cref="JsonForm" />'s, not a converter's.</b>
+    ///             A compiled model's mapping carries EF's <c>CollectionToJsonStringConverter</c>,
+    ///             and that is the mapping's own business rather than model configuration —
+    ///             <see cref="CollectionForm" /> exists precisely so a collection's JSON form is
+    ///             derived store-independently (B4). Twenty-one of the twenty-three disagreements
+    ///             were this.
+    ///         </item>
+    ///     </list>
+    ///     <para>
+    ///         So this changes nothing for a model that was built rather than compiled — there
+    ///         <c>GetValueConverter()</c> is non-null whenever a converter exists and the fallback
+    ///         never fires.
+    ///     </para>
+    /// </remarks>
+    private static Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter? EffectiveConverter(
+        Microsoft.EntityFrameworkCore.Metadata.IProperty property)
+        => property.GetValueConverter()
+            ?? (property.GetProviderClrType() is null && JsonForm(property) is null
+                ? (property.FindTypeMapping() as InfoCarrierTypeMapping)?.Converter
+                : null);
 
     /// <summary>
     ///     Whether a property with no value converter still holds something the wire has no
