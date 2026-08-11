@@ -22,3 +22,6 @@ subrepos/
 test_results*.txt
 test_failures*.txt
 MIGRATION_STATUS.md
+
+# Subagent-driven-development scratch: ledgers, briefs, review packages. Regenerable.
+.superpowers/
