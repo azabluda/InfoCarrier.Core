@@ -119,6 +119,13 @@ from the **CLR type alone**, through a service no provider replaces.
 
 ## Current state
 
+**M6 is CLOSED (2026-08-11).** Every spec base EF ships that this provider can host is adopted —
+`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is green, `AdHocJsonQuery` last and
+61 of 61. It closed in four steps once B12 was decided: C80 took B12 (36 fixed), C81 added ADR-013
+and the JSON *write* coverage, C82 adopted the last base, C83 fixed the exception-fidelity gap C82
+found. **The standing price for all of it — "626 + 322 lines of relational mirror and seven
+abstract seeds" — was a price for a route nobody was going to take.**
+
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
 **`Total tests: 22450, Passed: 22203, Failed: 29, Skipped: 218`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,

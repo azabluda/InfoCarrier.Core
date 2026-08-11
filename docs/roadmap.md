@@ -1,6 +1,6 @@
 ﻿# Roadmap
 
-Status: **M6 in progress** · Milestone-level plan for the whole project.
+Status: **M6 done (2026-08-11); M5 has one open criterion, M7/M8 next** · Milestone-level plan for the whole project.
 
 This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
 only when scope changes.
@@ -256,7 +256,7 @@ constraints it must meet when it lands.
   one of those to the allowlist, none of which looks dangerous alone, breaks it. Asserted by
   `DeserializationHardeningTest` rather than left in prose.
 
-### M6 — Coverage expansion ← **in progress** (plan Phase C)
+### M6 — Coverage expansion — ✅ **DONE 2026-08-11** (plan Phase C)
 
 Work the M1 compliance inventory down. Every spec base ends up either implemented or in
 `IgnoredTestBases` **with a stated reason** — nothing silently forgotten.
@@ -266,8 +266,9 @@ Work the M1 compliance inventory down. Every spec base ends up either implemente
 that `EFCore.InMemory.FunctionalTests` ships neither family at all. The per-base tier verdict is
 plan item C0 and is not re-derived per batch.
 
-**State 2026-08-10: 41 adopted down to 1.** `AdHocJsonQueryTestBase` is the only base the
-compliance test still reports.
+**State 2026-08-10: 41 adopted down to 1.** `AdHocJsonQueryTestBase` was the only base the
+compliance test still reported. **Closed 2026-08-11 (plan C82): it is adopted, 61 of 61, and
+`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is green.**
 
 **Exit criteria**
 - Relationships, owned types, table splitting, TPH/TPT inheritance (requirements §2.7). ✅
@@ -282,11 +283,20 @@ spatial bases reported rather than ignored, on the ground that "not built yet" d
 `AdHocJsonQuery` is also merely not built yet. **So M6 closes by adopting it, and by nothing
 else.**
 
-**And that adoption sits behind [B12](implementation-plan.md).** The corpus is owned JSON
-collections throughout, so most of what it adds lands on the undecided question of how a
-JSON-mapped owned collection is keyed. Plan item C21 records the price and the decision not to pay
-it yet: 626 + 322 lines of relational mirror plus seven abstract seeds that only EF's relational
-classes implement. **M6 is therefore blocked on a decision, not on work.**
+~~**And that adoption sits behind [B12](implementation-plan.md)** … 626 + 322 lines of relational
+mirror plus seven abstract seeds … **M6 is therefore blocked on a decision, not on work.**~~
+
+**Both halves of that were true and neither survived contact.** B12 *was* the blocker, it was
+decided on 2026-08-11, and taking it cost **two files and one registration line** — the client
+model already carried the annotation and the price quoted in C78 was 36 fixed, 0 broken (C80). The
+626 + 322 lines were the cost of **not referencing**
+`Microsoft.EntityFrameworkCore.Relational.Specification.Tests`; ADR-013 now does, so the base is
+inherited rather than mirrored, and the seven abstract seeds are ten raw-SQL `INSERT`s copied
+verbatim and executed against the backend (C82).
+
+**What the milestone actually cost, for the next time a price like that is quoted:** C80 + C81 +
+C82 + C83, four steps, ~40 fixed and one new ADR. **A price is only ever a price for the route
+that was in mind at the time.**
 
 ### M7 — SQL Server (Tier C) + spatial *(spatial half already complete)*
 
