@@ -57,5 +57,7 @@
 # 2026-08-10 (C69) — 108 -> 100. The eight Index_*: the one warning the Associations bases
 # contract for, forwarded to the server for those two fixtures only. C55 had priced this
 # globally at 26 broken; all 26 are in Northwind/BulkUpdates classes, none in these families.
-failed=100
+# 2026-08-10 (C71) — 100 -> 74. B16's optional harness remedy: this one test class stops
+# forwarding its interceptors to the server, which is all its onConfiguring/addServices carry.
+failed=74
 total=22364

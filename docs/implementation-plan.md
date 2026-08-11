@@ -3863,6 +3863,46 @@ ships a test on, and where both exist the tier that *translates* is the one whos
       **`Query.Associations` is now 336 of 336**, and `Query.Associations` leaves the failing list
       entirely.
 
+- [x] **C71. B16's optional remedy, at last — and it was one argument, not a rebuilt
+      `CoreOptionsExtension`.**
+      **`Total tests: 22364, Passed: 22073, Failed: 74, Skipped: 217`** (`c71`) — **100 → 74,
+      26 fixed, 0 broken.** ✅ `<this commit>`
+
+      B16 diagnosed this family in 2026-08-09 and called the remedy optional; C58 then priced it and
+      declined, on two facts that are both still true: no subclass of `CoreOptionsExtension` can
+      replace it (`WithExtension` keys on the runtime type), and the interceptors arrive on **two**
+      channels because `SingletonInterceptorsTestBase` passes `useServiceProvider: inject`.
+
+      **Both facts are about intercepting the forwarding. Neither applies to not forwarding.**
+      C69's move — configure the fixture rather than the plumbing — asked the question the other
+      way round, and the answer is one argument in this class's own `CreateContextFactory`:
+
+          _harness.Prepare(typeof(TContext), onModelCreating, addServices: null, onConfiguring: null, configureConventions);
+
+      **What makes it safe is that for this base those two parameters carry nothing else.**
+      `SingletonInterceptorsTestBase.CreateContext` is the only route into the family — all seven
+      test methods go through it — and it sets `onConfiguring` to
+      `o => o.AddInterceptors(interceptors)` or null, `addServices` to the matching registrations
+      or null. So declining to forward them is exactly "do not forward the interceptors", with no
+      model configuration lost: `onModelCreating` still goes to the server, which is what A49's
+      forwarding was for.
+
+      **This closes both halves C58 said would need separate work** — the twelve `Assert.Same`, the
+      four `Assert.All`, and A71's ten `AddInterceptors` refusals, `inject: True` and `False` alike
+      — because neither channel is forwarded rather than one being filtered.
+
+      **Two things it is not.** It is **not a product change**: nothing in `src/` forwards an
+      interceptor, and B16's answer stands that a deployment may hook either side or both. And it
+      does **not** drop coverage of server-side interception — `PropertyValuesFixtureBase`
+      registers an `ISingletonInterceptor` on the backend on purpose and its seed asserts the
+      result, and `PropertyValues` is still **0 failures** in this run. That fixture is untouched
+      because the change is scoped to the one class whose forwarded payload is only interceptors.
+
+      **And it retro-proves B15.** With the server's hook gone, the family's `Assert.Same` and
+      `CalledCount` assertions pass — which they could only do if the **client** raises
+      materialization interception properly on its own. B16 listed that as evidence; this is the
+      experiment.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
@@ -4447,7 +4487,7 @@ constructor, so the backend store cannot build the server's copy.
       `ValidatingMaterializationInterceptor` — the value reaching user code, read back. They are red
       again now for the reason below, which is why this step measures neutral.
 
-- [ ] **B16. A user's `IMaterializationInterceptor` sees the server's context too, and both fixtures
+- [x] **B16. A user's `IMaterializationInterceptor` sees the server's context too, and both fixtures
       that care want opposite things.** Diagnosed, **not fixed — it is a decision.** Worth 12 in
       `MaterializationInterception`; 4 more there are the same question about
       `IInstantiationBindingInterceptor`, and the remaining 10 are A71.
@@ -4511,12 +4551,15 @@ constructor, so the backend store cannot build the server's copy.
       **What remains is a harness question, not a product one, and it is optional.** The 27 would go
       green if the harness stopped forwarding the *interceptors* while still forwarding everything
       else `onConfiguring` carries — then the client's context is the only one registered on and
-      `Assert.Same` holds. Two obstacles, both real: A71's wall means they cannot be *subtracted*
-      (`CoreOptionsExtension.WithInterceptors` concatenates, `Clone` is protected), so the server's
-      `CoreOptionsExtension` would have to be **replaced wholesale** with one rebuilt by hand from
-      its public `With*` setters; and `PropertyValuesFixtureBase`'s seed genuinely wants an
-      interceptor server-side, which under "both sides are allowed" is answered by registering it on
-      the backend *additively* rather than by forwarding. Neither is required for correctness.
+      `Assert.Same` holds. ~~Two obstacles, both real: A71's wall means they cannot be *subtracted*
+      … so the server's `CoreOptionsExtension` would have to be **replaced wholesale**; and
+      `PropertyValuesFixtureBase`'s seed genuinely wants an interceptor server-side.~~
+
+      **Done in C71, and neither obstacle applied.** Both were about *intercepting* the forwarding;
+      the answer was to *not forward* — one argument in this class's `CreateContextFactory`, because
+      `SingletonInterceptorsTestBase.CreateContext` is the family's only entry point and the two
+      parameters it sets carry nothing but interceptors. `PropertyValuesFixtureBase` is untouched
+      and still green, because the change is scoped to the one class. **26 fixed, 0 broken.**
 
 - [x] **B17. Three overrides EF leaves to the provider, and the keyless type A1 left open.**
       **`Total tests: 21351, Passed: 20981, Failed: 162, Skipped: 208`** — 171 → 162, **FIXED 9,

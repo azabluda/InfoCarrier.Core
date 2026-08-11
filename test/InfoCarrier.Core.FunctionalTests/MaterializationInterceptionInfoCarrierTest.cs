@@ -44,7 +44,21 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
         bool useServiceProvider = true)
     {
         Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions);
+
+        // The model goes to the server; the interceptors do not (C71). `AddProviderOptions`
+        // forwards the test's `onConfiguring` and `addServices` so the two models match (A49) —
+        // and for *this* base those two parameters carry nothing but interceptors:
+        // `SingletonInterceptorsTestBase.CreateContext` sets `onConfiguring` to
+        // `o => o.AddInterceptors(interceptors)` or null, and `addServices` to the matching
+        // registrations or null, and every test in the family goes through it. So forwarding them
+        // registers the caller's hook on *both* EF instances, which is what B16's twelve
+        // `Assert.Same` failures and A71's ten `AddInterceptors` refusals are.
+        //
+        // Not a statement about the product, which correctly lets a deployment hook either side
+        // or both (B16): it is this harness declining to make a one-context spec base look like
+        // two. Scoped to this class because only here is the forwarded payload *only* interceptors
+        // — `PropertyValuesFixtureBase` registers one server-side on purpose and keeps it.
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices: null, onConfiguring: null, configureConventions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,

@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22364, Passed: 22047, Failed: 100, Skipped: 217`** (2026-08-10) across the
+**`Total tests: 22364, Passed: 22073, Failed: 74, Skipped: 217`** (2026-08-10) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,9 +137,9 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c69`. C55–C69 took 132 to 100, and `Query.Associations` is 336 of 336. The largest blocks are **40 `JsonQuery`** (38 of them
-B12, a decision), **26 `MaterializationInterception`** (B16's topology, and C58 priced the optional
-harness remedy — A71's ten are the same defect, not a separate one), **4 `ComplexNavigations`** (C56, faithful to EF — C68 closed the other four), **6
+currently `c71`. C55–C71 took 132 to 74; `Query.Associations` is 336 of 336 and
+`MaterializationInterception` is clear. The largest blocks are **40 `JsonQuery`** (38 of them
+B12, a decision), **4 `ComplexNavigations`** (C56, faithful to EF — C68 closed the other four), **6
 `BulkUpdates`** and **4 `GearsOfWar`**.
 
 **No failure is an unexplained wrong answer, and that is checked rather than asserted (C65).** The
@@ -275,8 +275,17 @@ Not yet implemented, in rough priority order:
 - **C18's `GeometryCollection` gap turned out not to need the type-level probe** it proposed (C24).
   `ProjectionRewriter` was substituting a `List<T>` for a declared type a `List<T>` does not
   satisfy; one clause fixed it and ADR-012 needed no amendment.
-- **`MaterializationInterception` is 26 and is *not* a decision (B16, answered 2026-08-09; the
-  optional remedy priced in C58).** This
+- **`MaterializationInterception` is CLEAR (C71), and the route in is the reusable part.** B16
+  answered the design question in 2026-08-09 and C58 priced the optional remedy at "a hand-rebuilt
+  `CoreOptionsExtension` plus a per-fixture DI change, reaching at most half". Both of C58's facts
+  were true and both were about *intercepting* the forwarding; the answer was to **not forward** —
+  one argument in the test class's own `CreateContextFactory`, safe because
+  `SingletonInterceptorsTestBase.CreateContext` is the family's only entry point and the
+  `onConfiguring`/`addServices` it sets carry nothing but interceptors. 26 fixed, 0 broken, product
+  untouched, and `PropertyValues` still green because it registers its server-side interceptor
+  itself. **When a remedy is priced as expensive, check whether the price is for the route rather
+  than the goal.** The design answer below is unchanged and still the reason the product forwards
+  nothing: This
   provider is **two EF instances**, and a real deployment must be free to define materialization
   hooks on either side or both — so the three routes B16 measured, each of which suppresses one
   side, may none of them be taken. Nothing in `src/` forwards an interceptor: the server sees the
