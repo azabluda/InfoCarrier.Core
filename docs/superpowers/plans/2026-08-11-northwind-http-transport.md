@@ -22,7 +22,8 @@ Every task's requirements implicitly include these.
 - **No NuGet dependency on Remote.Linq or Aqua** (ADR-001).
 - **EF1001 warnings are expected and allowed.** Do not suppress them repo-wide.
 - **The two transport files carry no sample types.** `HttpInfoCarrierTransport.cs` and `InfoCarrierEndpointExtensions.cs` must not mention Northwind, so that promoting them to packages later is a file move (spec §4.1). A reviewer checks this by reading their `using` lines.
-- **One task per commit.** Commit message prefixed `Step M8-<n>:`. Tick this plan's checkboxes and add the matching entry to `docs/implementation-plan.md` **in the same commit** — the repo has been bitten by those two drifting apart.
+- **One task per commit.** Commit message prefixed `Step M8-<n>:`. Tick this plan's checkboxes and add the matching entry to `docs/implementation-plan.md` **in the same commit** — the repo has been bitten by those two drifting apart. **Stage this plan file as well as `implementation-plan.md`**; the per-task `git add` lines below name the source files and do not repeat these two.
+- **Do not run the full spec suite unless a task says to.** It takes 6–9 minutes. Only Tasks 1, 2 and 7 call for `eng/measure.sh`, and each states the exact expected output.
 - **Report test results as `Passed: N, Failed: M, Total: T` read from actual output.** Never estimate or infer a count.
 
 ---
