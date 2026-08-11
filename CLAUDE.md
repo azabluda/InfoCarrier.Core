@@ -119,7 +119,7 @@ from the **CLR type alone**, through a service no provider replaces.
 ## Current state
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22368, Passed: 22085, Failed: 66, Skipped: 217`** (2026-08-11) across the
+**`Total tests: 22369, Passed: 22122, Failed: 30, Skipped: 217`** (2026-08-11) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -137,15 +137,17 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C65 for the rest** — read out of `artifacts/measure/`,
-currently `c79`. C55–C76 took 132 to 66; `Query.Associations` is 336 of 336, and
+currently `c80`. C55–C80 took 132 to 30; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
-The largest blocks are **40 `JsonQuery`** (38 of them B12, a decision), **6 `BulkUpdates`** and
-**4 `Scaffolding.CompiledModel`**.
+The largest blocks are now **6 `BulkUpdates`**, **4 `Scaffolding.CompiledModel`** and **4
+`PrimitiveCollectionsQuery`** — `JsonQuery` fell from 40 to 4 when C80 took B12.
 
 **No failure is an unexplained wrong answer, and that is checked rather than asserted (C65,
-re-derived in C77).** The run reports exactly **40** `Assert.Equal() Failure: Values differ`, and
-they are **38 `JsonQuery` (B12, a decision) plus the 2 C64 proved are not wrong answers** —
-nothing else in the suite returns data that differs. **Every one of the 66 is confirmed
+re-derived in C77, and re-derive it again — C80 changed it).** Before C80 the run reported **40**
+`Assert.Equal() Failure: Values differ`: 38 `JsonQuery` and the 2 C64 proved are not wrong answers.
+B12 accounted for **36** of the 38; the other 2 are `Json_predicate_on_byte_array`, which shared a
+message line and had been counted into B12 by mistake. Nothing else in the suite returns data that
+differs. **Every one of the 66 is confirmed
 individually in C77**, grouped by class *and* by first message line, because either grouping alone
 hides something the other shows. Re-check it by grouping the `[FAIL]` lines of a run log by their first
 message line; the count and the split are the whole claim. The sentence this replaces named
@@ -252,10 +254,12 @@ Not yet implemented, in rough priority order:
   it too.
 - **The remaining spec bases — 1** (Phase C, 2026-08-10: 41 adopted down to 1). Everything the
   compliance test used to list is in, including the four "infrastructure" bases, `Seeding` (C7) and
-  **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`** — B3d's price
-  re-checked in C10 and it holds: 626 + 322 lines of relational mirror and seven abstract seeds only
-  EF's relational classes implement, and the corpus is owned JSON collections throughout so most of
-  what it adds lands on **B12**, which is undecided.
+  **both spatial bases, 169 of 173** (C18). The one left is **`AdHocJsonQuery`**, and **both
+  reasons it was declined are gone**: B12 is taken (C80), and C81 references
+  `Microsoft.EntityFrameworkCore.Relational.Specification.Tests`, which is where
+  `AdHocJsonQueryRelationalTestBase` lives — so B3d/C10's price of "626 + 322 lines of relational
+  mirror and seven abstract seeds only EF's relational classes implement" was a price for *not
+  having the package*. Re-price it before repeating it.
 - **Spatial works, and the shape of how is worth keeping.** Three pieces, landed and measured
   separately because C9's combined attempt aborted the host: the NetTopologySuite branch in
   `InfoCarrierTypeMappingSource` (C15, worth 19 on its own — the long-standing "needs SpatiaLite"
@@ -330,19 +334,18 @@ Not yet implemented, in rough priority order:
   through options and half through the server's service collection, which the options route does
   not touch at all. A71's ten `AddInterceptors` failures are the **server's** and the same defect
   as the twelve `Assert.Same`, not a separate one.
-- **JSON-mapped owned collections need a decision (B12) — and it is now PRICED (C78).** The
-  server keys an element by its ordinal in the array; the client keys it by the CLR `Id`, which
-  the document does not carry and which is `0` for every element — so EF's fixup gives every
-  element to every owner. Both sides run the same `OnModelCreating`; only the *convention* that
-  rewrites such a key is relational.
-  **C78 spiked the fix and reverted it: 36 fixed, 0 broken (66 → 30), one new file plus one
-  registration line, and no new dependency** — the product already references
-  `Microsoft.EntityFrameworkCore.Relational`, the client model already carries
-  `Relational:ContainerColumnName`, and the two keys already have the same arity at every depth.
-  `Query.Associations` (the other `ToJson()` consumer, 336 tests) is untouched, and it unblocks
-  `AdHocJsonQuery`, the last unadopted base. **Not taken**: it makes the client model act on a
-  relational annotation, which is a scope call, not a bug fix. B12's own text has two premises
-  C78 disproves — read C78 before re-arguing it.
+- **JSON-mapped owned collections work (B12, TAKEN in C80).** A JSON document carries no key for
+  its array elements, so every store synthesizes an ordinal. The client kept the CLR `Id` instead —
+  a property the document does not contain — so it was `0` for every element and EF's fixup gave
+  each of them to all of them. **Wrong data, no exception.** `InfoCarrierKeyDiscoveryConvention`
+  now gives the client the same synthesized-ordinal key, which is `RelationalKeyDiscoveryConvention`'s
+  JSON branch over the same public core base. **36 fixed, 0 broken**; `JsonQuery` went 40 → 4.
+  The rule it states, and it is narrower than "the client is relational": *where a key shape is
+  decided by the caller's own model configuration rather than by the store, the client has to reach
+  the same answer as the server.* Nothing relational is resolved from the container, and the
+  product already referenced `Microsoft.EntityFrameworkCore.Relational`. **A Cosmos backend would
+  need its own clause** — Cosmos recognises an ordinal key by the property's *shape*, not by this
+  name. **Reads only**: `JsonQueryTestBase` has zero `SaveChanges`, which is what C81 is for.
 - **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
   they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all

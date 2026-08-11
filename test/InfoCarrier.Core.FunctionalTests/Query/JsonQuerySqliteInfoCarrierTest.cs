@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestModels.JsonQuery;
@@ -54,6 +55,47 @@ public class JsonQuerySqliteInfoCarrierTest(
     ///         reason in reverse: it is not EF's limitation, so it is not EF's override to borrow.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     The two models agree about what identifies an element of a JSON-mapped owned
+    ///     collection (B12, C80).
+    /// </summary>
+    /// <remarks>
+    ///     Stated on the model rather than on a query result, because that is where the defect
+    ///     lived and because it is the one thing the 36 query tests below all depend on. A JSON
+    ///     document carries no key for its array elements, so every store synthesizes an ordinal;
+    ///     the client kept the CLR `Id` instead, which the document does not contain, so every
+    ///     element of every owner shared one key and EF's fixup gave each of them to all of them.
+    /// </remarks>
+    [ConditionalFact]
+    public void The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection()
+    {
+        using DbContext client = Fixture.CreateContext();
+        using DbContext server = ((InfoCarrierTestStore)Fixture.TestStore).Backend.CreateDbContext();
+
+        var compared = 0;
+
+        foreach (IEntityType clientType in client.Model.GetEntityTypes())
+        {
+            if (clientType.FindOwnership() is not { IsUnique: false }
+                || clientType.GetContainerColumnName() is null)
+            {
+                continue;
+            }
+
+            IEntityType serverType = Assert.IsAssignableFrom<IEntityType>(
+                server.Model.FindEntityType(clientType.Name));
+
+            Assert.Equal(
+                serverType.FindPrimaryKey()!.Properties.Select(p => p.Name),
+                clientType.FindPrimaryKey()!.Properties.Select(p => p.Name));
+
+            compared++;
+        }
+
+        // The corpus really does contain them — a silent zero would assert nothing at all.
+        Assert.Equal(18, compared);
+    }
+
     public override async Task Json_branch_collection_distinct_and_other_collection(bool async)
         => await AssertApplyNotSupported(() => base.Json_branch_collection_distinct_and_other_collection(async));
 

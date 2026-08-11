@@ -77,5 +77,9 @@
 # 2026-08-11 (C79) - failures unchanged at 66; `total` 22366 -> 22368 for two smoke tests. C76's
 # suspected Tier B gap was a test that read `alpha.Id`, which EF leaves at 0 because a temporary
 # key lives on the entry. No gap; and C76's regression pin now exists, on Tier A.
-failed=66
-total=22368
+# 2026-08-11 (C80) - 66 -> 30, and `total` 22368 -> 22369 for one model test. B12 taken: the
+# client model gives a JSON-mapped owned collection the synthesized-ordinal key its backing
+# store gives it, so the two models agree about what identifies an element. Two files, one
+# registration line, no new dependency. JsonQuery goes 40 -> 4.
+failed=30
+total=22369

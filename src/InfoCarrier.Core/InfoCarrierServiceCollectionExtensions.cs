@@ -38,6 +38,11 @@ public static class InfoCarrierServiceCollectionExtensions
             .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
             .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
 
+            // The client's model has to agree with the backing store's, and one key shape is
+            // decided by the caller's own `ToJson()` rather than by the store — see
+            // `InfoCarrierKeyDiscoveryConvention`.
+            .TryAdd<IProviderConventionSetBuilder, InfoCarrierConventionSetBuilder>()
+
             // Required of every provider by `EntityFrameworkServicesBuilder.CoreServices`, and
             // deliberately unimplementable here — see `InfoCarrierQueryPipelineFactories`. Both
             // throw with the reason. Registering them replaces EF's generic "no service has been

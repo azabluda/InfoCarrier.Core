@@ -4391,6 +4391,59 @@ ships a test on, and where both exist the tier that *translates* is the one whos
 
       C76's entry is corrected in place rather than left standing.
 
+- [x] **C80. B12 taken: the client model now agrees with the backing store about what identifies
+      an element of a JSON-mapped owned collection.**
+      **`Total tests: 22369, Passed: 22122, Failed: 30, Skipped: 217`** (`c80`) — **66 → 30,
+      36 fixed, 0 broken.** ✅ `<this commit>`
+
+      C78 priced this and left it; the decision came back **take it, and prove the writes too** —
+      the second half is C81. This is the first half, and it lands exactly as measured.
+
+      **The rule, stated as narrowly as it is true.** *Where a key shape is decided by the
+      caller's own model configuration rather than by the store, the client has to reach the same
+      answer as the server.* A JSON document carries no key for its array elements, so every store
+      that maps an owned collection to JSON synthesizes an ordinal. The client kept the CLR `Id`
+      instead — a property the document does not contain — so it was `0` for every element, every
+      element of every owner shared one key, and EF's fixup gave each of them to all of them.
+      **Wrong data, and no exception.**
+
+      **Two files and one registration line, and no new dependency.**
+      `InfoCarrierKeyDiscoveryConvention` is `RelationalKeyDiscoveryConvention`'s JSON branch over
+      the same public core base; `InfoCarrierConventionSetBuilder` replaces `KeyDiscoveryConvention`
+      with it, which is the one replacement EF's own relational builder makes for the same reason.
+      `Microsoft.EntityFrameworkCore.Relational` was **already** a `PackageReference` of the
+      product, so `GetContainerColumnName()`, `RelationalAnnotationNames.ContainerColumnName` and
+      EF's `SynthesizedOrdinalPropertyName` are read directly. **Nothing relational is resolved
+      from the container** — `RelationalConventionSetBuilderDependencies` is the piece a
+      non-relational provider genuinely cannot get, and it is not needed.
+
+      **Seen to fail, and the assertion is the rule rather than a symptom.**
+      `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection` walks both models and
+      compares the primary key of all **18** JSON-mapped owned collection types. Without the
+      registration:
+
+          Assert.Equal() Failure: Collections differ
+          Expected: ["JsonEntityAllTypesId", "__synthesizedOrdinal"]
+          Actual:   ["JsonEntityAllTypesId", "Id"]
+
+      It counts what it compared, because a silent zero would assert nothing — and the count was
+      wrong on the first try (7 guessed, 18 measured), which is the whole argument for asserting it.
+
+      **`JsonQuery` goes 40 → 4, and the 4 were never B12.** Two are
+      `Json_nested_collection_…_NoTrackingWithIdentityResolution`, which reach `APPLY` and SQLite
+      has none; two are `Json_predicate_on_byte_array`, still `Values differ` and now the only
+      wrong answers in the class. **So B12 was 36, not the 38 its own entry claimed** — the two
+      byte-array failures had been counted into it because they shared a message line.
+
+      **What this does not cover, recorded so it is not over-claimed.** `JsonQueryTestBase`
+      contains **zero** `SaveChanges` calls: it is a pure query base, so every one of the 36 is a
+      *read*. Whether a JSON-mapped owned collection survives being written is a separate question
+      with separate coverage — EF's `JsonUpdateTestBase`, 136 tests — and that is C81. And a store
+      that maps to JSON by some other route synthesizes its ordinal by its own convention: Cosmos
+      recognises one by the property's **shape** rather than by this name and does not use the
+      relational container annotation at all, so a Cosmos backend would need its own clause. Every
+      backend in scope is relational (ADR-009 Tier B) or InMemory, which cannot map to JSON.
+
 ## Phase B — the tier audit, and the rework it found
 
 **Why this phase exists.** A70 and A77 each reverted a spec base after establishing that EF's
@@ -4867,7 +4920,7 @@ constructor, so the backend store cannot build the server's copy.
       the expected shape: the tracked path already did this, so no tracked test could have been
       relying on the omission.
 
-- [ ] **B12. A JSON-mapped owned collection is keyed differently on the two sides.** Diagnosed,
+- [x] **B12. A JSON-mapped owned collection is keyed differently on the two sides.** **CLOSED in C80.** Diagnosed,
       **not fixed — it needs a decision about what the client's model is, and that is not mine to
       make.** It is the whole of `JsonQuery`'s remaining **38 `Values differ`**, and B10 is what
       made it visible: the collections could not be wrong before they travelled at all.
