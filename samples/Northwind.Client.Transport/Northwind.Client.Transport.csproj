@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>An IInfoCarrierTransport over HttpClient. Contains no sample types: this is written to be promoted into an InfoCarrier.Core.Http package, at which point the move is a file move. System.Net.Http only, so it is safe in WebAssembly.</Description>
+    <RootNamespace>Northwind.Client.Transport</RootNamespace>
+    <AssemblyName>Northwind.Client.Transport</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+  </ItemGroup>
+
+</Project>

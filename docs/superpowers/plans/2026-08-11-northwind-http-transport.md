@@ -592,7 +592,7 @@ Tested against a stub `HttpMessageHandler`, so no server is needed yet.
 - Consumes: `IInfoCarrierTransport`, `InfoCarrierEnvelope`, `IInfoCarrierSerializer` from `InfoCarrier.Core`.
 - Produces: `HttpInfoCarrierTransport(HttpClient httpClient, IInfoCarrierSerializer serializer, string requestUri = "infocarrier")` implementing `Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope, CancellationToken)`; and `InfoCarrierTransportException : Exception`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `test/InfoCarrier.Core.TransportTests/HttpInfoCarrierTransportTest.cs`:
 
@@ -680,13 +680,13 @@ public class HttpInfoCarrierTransportTest
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --filter "FullyQualifiedName~HttpInfoCarrierTransportTest"`
 
 Expected: FAIL to compile — `The type or namespace name 'Northwind' could not be found` (the transport project does not exist yet).
 
-- [ ] **Step 3: Create the transport project**
+- [x] **Step 3: Create the transport project**
 
 `samples/Northwind.Client.Transport/Northwind.Client.Transport.csproj`:
 
@@ -708,7 +708,7 @@ Expected: FAIL to compile — `The type or namespace name 'Northwind' could not 
 </Project>
 ```
 
-- [ ] **Step 4: Write the exception type**
+- [x] **Step 4: Write the exception type**
 
 `samples/Northwind.Client.Transport/InfoCarrierTransportException.cs`:
 
@@ -739,7 +739,7 @@ public sealed class InfoCarrierTransportException : Exception
 }
 ```
 
-- [ ] **Step 5: Write the transport**
+- [x] **Step 5: Write the transport**
 
 `samples/Northwind.Client.Transport/HttpInfoCarrierTransport.cs`:
 
@@ -817,7 +817,7 @@ public sealed class HttpInfoCarrierTransport : IInfoCarrierTransport
 }
 ```
 
-- [ ] **Step 6: Reference the transport from the test project and the solution**
+- [x] **Step 6: Reference the transport from the test project and the solution**
 
 Add to `test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`, in the `ProjectReference` group:
 
@@ -831,19 +831,19 @@ Add to `InfoCarrier.Core.slnx`, in the `/samples/` folder:
 <Project Path="samples/Northwind.Client.Transport/Northwind.Client.Transport.csproj" />
 ```
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Run: `dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`
 
 Expected: `Passed: 6, Failed: 0, Total: 6`.
 
-- [ ] **Step 8: Verify the promotion constraint by hand**
+- [x] **Step 8: Verify the promotion constraint by hand**
 
 Run: `grep -n "^using" samples/Northwind.Client.Transport/*.cs`
 
 Expected: no `using` mentions `Northwind.Shared`, ASP.NET, or EF Core. Only `System.Net.Http.Headers`, `InfoCarrier.Core` and `InfoCarrier.Core.Common`. **If any sample type appears, fix it now** — the constraint is cheap to hold and expensive to restore.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add samples/Northwind.Client.Transport/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx docs/implementation-plan.md

@@ -17,3 +17,4 @@ Detailed steps are in
 
 - [x] **M8-1. The spec measurement is scoped to one project, and the M8 plan is open.** `<this commit>`
 - [x] **M8-2. The shared Northwind model, and a test project of its own.** `<this commit>`
+- [x] **M8-3. `HttpInfoCarrierTransport`, the client half of the wire.** `<this commit>`

@@ -4,6 +4,7 @@
     <Project Path="src/InfoCarrier.Core/InfoCarrier.Core.csproj" />
   </Folder>
   <Folder Name="/samples/">
+    <Project Path="samples/Northwind.Client.Transport/Northwind.Client.Transport.csproj" />
     <Project Path="samples/Northwind.Shared/Northwind.Shared.csproj" />
   </Folder>
   <Folder Name="/test/">
