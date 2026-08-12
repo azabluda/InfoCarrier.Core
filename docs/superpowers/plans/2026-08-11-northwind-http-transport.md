@@ -1533,6 +1533,25 @@ separate HTTP requests.
 Passed: 16, Failed: 0, Total: 16."
 ```
 
+- [x] **Fix round 1 (review, Step M8-6a): three value-only assertions.** Code review found the
+  same shape as M8-5a's: `Several_edits_cross_as_one_save` never proved *one* save (two round
+  trips, one per changed row, would report the same `written == 2` and end state);
+  `An_insert_gets_its_store_generated_key_back` proved the placeholder was gone but not that the
+  right row came back (any positive integer — a row count, a stale id from a broken
+  correlation-id lookup — would also satisfy `> 0`); and
+  `A_rolled_back_transaction_leaves_the_store_untouched` never asserted the insert reached the
+  store before rolling it back, so a `SaveChangesAsync` that was a silent no-op inside the open
+  transaction would pass under the same name. Fixed by reusing `RecordingHandler` (via
+  `CreateClientContext(factory, out RecordingHandler recorder)`, exactly as `NorthwindOverHttpTest`
+  already does) to assert the request count rises by exactly one across `SaveChangesAsync`; by
+  re-reading the inserted `Category` by its returned id through a fresh context and asserting its
+  `Name`; and by querying `context.Products.CountAsync()` on the same, still-open-transaction
+  context immediately after `SaveChangesAsync` and asserting `before + 1`, before calling
+  `RollbackAsync`. That last assertion was deliberately broken (asserted `before` instead of
+  `before + 1`) and observed to fail with `Assert.Equal() Failure: Values differ / Expected: 6 /
+  Actual: 7`, then restored. No test added — three strengthened. Filtered: Passed: 4, Failed: 0,
+  Total: 4. Whole project unchanged: Passed: 17, Failed: 0, Total: 17.
+
 ---
 
 ### Task 7: CI, and the honest record of what Phase 1 did not close

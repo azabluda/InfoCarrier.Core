@@ -90,3 +90,19 @@ Detailed steps are in
   added a fourth test to Task 3 after the plan's running totals were written, so this project's
   true count has been one higher than the plan's printed figures since that round; 16 was the
   plan's stale figure, 17 is correct).
+  Review found three of the four tests asserting values but not the mechanism their names claim —
+  the same shape as M8-5a's review, and this task's own report had already flagged one of the
+  three. Closed in M8-6a `<this commit>`: `Several_edits_cross_as_one_save` now uses
+  `CreateClientContext(factory, out RecordingHandler recorder)` and asserts the request count rose
+  by exactly one across `SaveChangesAsync`, so two edits shipped as two separate round trips can no
+  longer pass under the name "one save". `An_insert_gets_its_store_generated_key_back` now re-reads
+  the inserted row by its returned id through a fresh context and asserts its `Name`, closing the
+  gap where any positive integer — a row count, a stale id from a broken correlation-id lookup —
+  would have satisfied the old `> 0` check alone. `A_rolled_back_transaction_leaves_the_store_untouched`
+  now asserts `before + 1` on the same context immediately after `SaveChangesAsync` and before
+  `RollbackAsync`, so a `SaveChangesAsync` that was a silent no-op inside an open transaction can no
+  longer pass under this test's name — deliberately broken (asserted `before` instead) and observed
+  to fail with `Assert.Equal() Failure: Values differ / Expected: 6 / Actual: 7` before being
+  restored. Every transaction still ends on every path (rollback or commit) inside its own `using`
+  block. No test added: Passed: 4, Failed: 0, Total: 4 filtered; whole project unchanged at
+  Passed: 17, Failed: 0, Total: 17.
