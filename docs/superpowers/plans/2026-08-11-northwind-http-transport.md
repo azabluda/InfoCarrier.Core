@@ -1665,10 +1665,19 @@ Spec suite unchanged at 13/22453."
   inconsistent: the corrected `Failed: 13` sentence was immediately followed by the old "Most are
   already answered rather than open: 40 wait on the B12 decision, 26 are the
   `MaterializationInterception` topology B24 settled, 9 are a locale defect…" sentence, which
-  summed to 75 and named three categories `CLAUDE.md` already records as fully resolved. Closed
-  in M8-7a `<this commit>`: that sentence removed, folded into a single paragraph stating only
-  the current count and its classification. No code change; no test run needed beyond confirming
-  the paragraph reads consistently.
+  summed to 75 and named three categories `CLAUDE.md` already records as fully resolved. M8-7a
+  `<this commit>` removed that sentence, but the replacement wording it used instead introduced
+  two new claims that were themselves unsourced — see Fix round 2.
+
+- [x] **Fix round 2 (re-review, Step M8-7b): the replacement text carried unsupported claims of
+  its own.** M8-7a's replacement sentence — "none of them blocks M8: ten are permanent by design
+  or upstream, and the other three are single-shape gaps" — added an M8-blocking judgment nothing
+  asked for, and coined a "single-shape gaps" characterization for the remaining three that a
+  careful reader could misread against C96's own table (two of the three singletons it would name
+  are A28 verdicts, i.e. permanent, not gaps). Closed in M8-7b `<this commit>`: reverted to the
+  brief's own step-2 text verbatim — "All 13 are classified in the archived plan's C96; ten are
+  permanent by design or upstream." — the measured figure, where the classification lives, and how
+  many are permanent, nothing else. No code change; no test run needed.
 
 ---
 

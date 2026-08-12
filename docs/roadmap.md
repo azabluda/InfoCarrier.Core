@@ -22,9 +22,8 @@ EF execute → client materialization with identity resolution. The **projection
 rather than hidden by the in-process harness.
 
 Measured 2026-08-11 (`artifacts/measure/c96`): **`Total tests: 22453, Passed: 22219,
-Failed: 13, Skipped: 221`**. All 13 are classified one at a time in the archived plan's C96, and
-none of them blocks M8: ten are permanent by design or upstream, and the other three are
-single-shape gaps.
+Failed: 13, Skipped: 221`**. All 13 are classified in the archived plan's C96; ten are permanent
+by design or upstream.
 
 **M5 is one criterion from done.** Node kinds (C36), payload size (C37), the envelope and protocol
 version (C45), exception fidelity (C46) and the security review (C48) all landed on 2026-08-10;

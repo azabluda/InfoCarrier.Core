@@ -118,8 +118,13 @@ Detailed steps are in
   B12 decision, 26 are the `MaterializationInterception` topology B24 settled, 9 are a locale
   defect" — that summed to 75 and named three categories CLAUDE.md already records as resolved
   (B12 taken in C80, `MaterializationInterception` clear since C71, the locale defect fixed by
-  C50). Closed in M8-7a `<this commit>`: that sentence is gone, folded into one paragraph that
-  states only the current count and its classification. No code change; no test run needed.
+  C50). M8-7a `<this commit>` removed that sentence, but its replacement added two claims sourced
+  nowhere in `docs/`: "none of them blocks M8", and a coined "the other three are single-shape
+  gaps" breakdown that a careful reader could misread against C96's own table (two of the three
+  singletons it would name are A28 verdicts — permanent, not gaps). Closed in
+  M8-7b `<this commit>`: reverted to the brief's own step-2 text verbatim — the measured figure,
+  where the classification lives, and how many are permanent, nothing more. No code change; no
+  test run needed.
 
 - **`SystemTextJsonInfoCarrierSerializer` uses reflection-based `JsonSerializer`.** Its
   `JsonSerializerOptions` sets no `TypeInfoResolver`, so the envelope and the request/response
