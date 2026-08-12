@@ -113,8 +113,13 @@ Detailed steps are in
   to the current measurement (`c96`: 22453 total, 13 failing) and a stale CI note describing the
   workflow before `51f4684` deleted. Passed: 17, Failed: 0, Total: 17 (`InfoCarrier.Core.TransportTests`);
   spec suite unchanged at `FAILING: 13  TOTAL: 22453`.
-
-**Three things Phase 1 leaves open, stated so Phase 2 does not rediscover them.**
+  Review found the correction left `roadmap.md`'s "Where we are" paragraph contradicting itself:
+  the new `Failed: 13` sentence was immediately followed by a leftover breakdown — "40 wait on the
+  B12 decision, 26 are the `MaterializationInterception` topology B24 settled, 9 are a locale
+  defect" — that summed to 75 and named three categories CLAUDE.md already records as resolved
+  (B12 taken in C80, `MaterializationInterception` clear since C71, the locale defect fixed by
+  C50). Closed in M8-7a `<this commit>`: that sentence is gone, folded into one paragraph that
+  states only the current count and its classification. No code change; no test run needed.
 
 - **`SystemTextJsonInfoCarrierSerializer` uses reflection-based `JsonSerializer`.** Its
   `JsonSerializerOptions` sets no `TypeInfoResolver`, so the envelope and the request/response

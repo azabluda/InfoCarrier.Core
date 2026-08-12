@@ -1660,6 +1660,16 @@ criterion stays formally open until the two files are promoted to packages.
 Spec suite unchanged at 13/22453."
 ```
 
+- [x] **Fix round 1 (review, Step M8-7a): a self-contradicting roadmap paragraph.** Code review
+  found that the Step 2 correction left `roadmap.md`'s "Where we are" paragraph internally
+  inconsistent: the corrected `Failed: 13` sentence was immediately followed by the old "Most are
+  already answered rather than open: 40 wait on the B12 decision, 26 are the
+  `MaterializationInterception` topology B24 settled, 9 are a locale defect…" sentence, which
+  summed to 75 and named three categories `CLAUDE.md` already records as fully resolved. Closed
+  in M8-7a `<this commit>`: that sentence removed, folded into a single paragraph stating only
+  the current count and its classification. No code change; no test run needed beyond confirming
+  the paragraph reads consistently.
+
 ---
 
 ## Self-Review
