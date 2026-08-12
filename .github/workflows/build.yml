@@ -39,6 +39,13 @@ jobs:
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --filter "FullyQualifiedName~ExpressionRoundTripTest|FullyQualifiedName~InMemorySmokeTest"
 
+      # Phase 1 of M8. A separate project on purpose: InfoCarrier.Core.FunctionalTests is what
+      # the spec ratchet counts, and these are not spec tests.
+      - name: Test (HTTP transport)
+        run: >
+          dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
+          --no-build --configuration Release
+
   # The inherited EFCore.Specification.Tests suite is legitimately red during build-out
   # (CLAUDE.md forbids skipping tests to force green), so this job gates on the *direction*
   # of the failure count, not its value. See roadmap.md §CI strategy.

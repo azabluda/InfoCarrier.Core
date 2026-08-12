@@ -106,3 +106,29 @@ Detailed steps are in
   restored. Every transaction still ends on every path (rollback or commit) inside its own `using`
   block. No test added: Passed: 4, Failed: 0, Total: 4 filtered; whole project unchanged at
   Passed: 17, Failed: 0, Total: 17.
+- [x] **M8-7. CI, and the honest record of what Phase 1 did not close.** `<this commit>`
+  `InfoCarrier.Core.TransportTests` now runs as a second step in the fast-gate job, kept separate
+  from `InfoCarrier.Core.FunctionalTests` because the spec ratchet's number means "inherited spec
+  tests failing" and must not absorb transport tests. Two stale figures in `roadmap.md` corrected
+  to the current measurement (`c96`: 22453 total, 13 failing) and a stale CI note describing the
+  workflow before `51f4684` deleted. Passed: 17, Failed: 0, Total: 17 (`InfoCarrier.Core.TransportTests`);
+  spec suite unchanged at `FAILING: 13  TOTAL: 22453`.
+
+**Three things Phase 1 leaves open, stated so Phase 2 does not rediscover them.**
+
+- **`SystemTextJsonInfoCarrierSerializer` uses reflection-based `JsonSerializer`.** Its
+  `JsonSerializerOptions` sets no `TypeInfoResolver`, so the envelope and the request/response
+  records are serialized reflectively. That is fine untrimmed and **will fail in a trimmed Blazor
+  WASM build**, where the SDK sets `JsonSerializerIsReflectionEnabledByDefault=false`. Note that
+  the *expression tree* is already safe — it goes through the source-generated
+  `ExpressionJsonContext`. So the fix is bounded: a source-generated context for the envelope and
+  the nine operation payloads. **This is Phase 2's first task.**
+- **The response direction is bounded by `MaxRequestBytes`.** `InfoCarrierEnvelope` implements
+  `IInfoCarrierRequest`, and `InfoCarrierPayloadLimits.Guard<T>` picks its bound from that
+  interface — so a client deserializing a *response* envelope applies the 64 MiB **request**
+  bound. The envelope's own doc comment already says the two legs are not distinguished and that
+  fixing it is part of M5's envelope criterion. Harmless for Northwind; a large result would fail
+  confusingly.
+- **M8's HTTP transport criterion is formally still open**, because the two transport files live
+  in `samples/` rather than in packages. Both are free of sample types, so the promotion is a
+  file move; see the spec §4.1.

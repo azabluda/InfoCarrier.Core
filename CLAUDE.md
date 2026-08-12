@@ -227,6 +227,13 @@ Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825
 `LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
 
 Not yet implemented, in rough priority order:
+- **The HTTP transport works and is tested (M8 Phase 1).** A `DbContext` with no database answers
+  queries, saves and runs transactions against a SQLite-backed ASP.NET Core server over a real
+  HTTP hop — `test/InfoCarrier.Core.TransportTests`, 17 of 17. **That project is deliberately not
+  `InfoCarrier.Core.FunctionalTests`**: the ratchet counts the latter and its number must keep
+  meaning "inherited spec tests failing". `eng/measure.sh` was scoped to one project in the same
+  phase, because it parses the *last* `Total tests:` block and a second test project in the
+  solution would have silently corrupted every measurement.
 - **Complex types work** (A32) — `ComplexTypesTrackingTestBase` is **249 of 251**, and the two
   left are one shape of one feature: a property-bag complex *collection* on an `Added` entity,
   which fails inside EF's own `StructuralTypeMaterializerSource`. A complex value cannot ride in

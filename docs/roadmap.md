@@ -21,11 +21,10 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-Measured 2026-08-10 (`artifacts/measure/c54`): **`Total tests: 22355, Passed: 22006,
-Failed: 132, Skipped: 217`**. The suite inherits Microsoft's spec tests (ADR-004), so coverage
-scales by adopting bases, not by writing tests — M6 took the unadopted count from 41 to 1.
+Measured 2026-08-11 (`artifacts/measure/c96`): **`Total tests: 22453, Passed: 22219,
+Failed: 13, Skipped: 221`**. All 13 are classified in the archived plan's C96; ten are permanent
+by design or upstream.
 
-The 132 are classified in [`implementation-plan.md`](implementation-plan.md); none is masked.
 Most are already answered rather than open: 40 wait on the B12 decision, 26 are the
 `MaterializationInterception` topology B24 settled, 9 are a locale defect in EF's own test code,
 and the majority of the rest are spec tests asserting a limitation this provider does not have.
@@ -348,10 +347,6 @@ baseline in `test/known-failures.txt`. **Fail only if failures increase.** Nothi
 or hidden, progress is monotonic, and the baseline drops as milestones land.
 
 Tier C (Docker SQL Server) runs nightly from M7, never on the per-commit path.
-
-**Known defects to fix in M1:** `build.yml` restores `InfoCarrier.Core.sln` but the repo has
-`InfoCarrier.Core.slnx`; its `~InMemory` / `~SqlServer` filters match no current test class, so
-it would run zero tests even after the restore is fixed.
 
 ---
 

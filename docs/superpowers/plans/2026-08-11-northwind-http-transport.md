@@ -1566,7 +1566,7 @@ Passed: 16, Failed: 0, Total: 16."
 - Consumes: everything.
 - Produces: nothing.
 
-- [ ] **Step 1: Add the transport tests to the fast gate**
+- [x] **Step 1: Add the transport tests to the fast gate**
 
 In `.github/workflows/build.yml`, in the `fast-gate` job, after the existing `Test (round-trip + smoke)` step:
 
@@ -1579,14 +1579,14 @@ In `.github/workflows/build.yml`, in the `fast-gate` job, after the existing `Te
           --no-build --configuration Release
 ```
 
-- [ ] **Step 2: Correct the two stale roadmap items**
+- [x] **Step 2: Correct the two stale roadmap items**
 
 In `docs/roadmap.md`:
 
 - Replace the `Measured 2026-08-10 (artifacts/measure/c54): Total tests: 22355, Passed: 22006, Failed: 132, Skipped: 217` paragraph and the sentence beginning `The 132 are classified` with the current figure: `Measured 2026-08-11 (artifacts/measure/c96): Total tests: 22453, Passed: 22219, Failed: 13, Skipped: 221. All 13 are classified in the archived plan's C96; ten are permanent by design or upstream.`
 - Delete the `**Known defects to fix in M1:** build.yml restores InfoCarrier.Core.sln …` paragraph in §CI strategy. It described the workflow before `51f4684`; C39 fixed it on 2026-08-10 and CI has been correct since.
 
-- [ ] **Step 3: Record what Phase 1 did *not* close**
+- [x] **Step 3: Record what Phase 1 did *not* close**
 
 Append to `docs/implementation-plan.md` under Phase H:
 
@@ -1611,7 +1611,7 @@ Append to `docs/implementation-plan.md` under Phase H:
   file move; see the spec §4.1.
 ```
 
-- [ ] **Step 4: Update CLAUDE.md's Current state**
+- [x] **Step 4: Update CLAUDE.md's Current state**
 
 Add to the `Not yet implemented` list, as the first bullet:
 
@@ -1625,7 +1625,7 @@ Add to the `Not yet implemented` list, as the first bullet:
   solution would have silently corrupted every measurement.
 ```
 
-- [ ] **Step 5: Verify the whole build and both suites**
+- [x] **Step 5: Verify the whole build and both suites**
 
 Run:
 
@@ -1637,7 +1637,7 @@ bash eng/measure.sh m8-phase1 c96
 
 Expected: build succeeds; `Passed: 16, Failed: 0, Total: 16`; and `FAILING: 13  TOTAL: 22453` with empty FIXED, BROKEN and REASONS diffs.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github/workflows/build.yml CLAUDE.md docs/roadmap.md docs/implementation-plan.md
