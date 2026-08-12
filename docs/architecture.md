@@ -162,6 +162,39 @@ keep the payload measurable in bytes before it is parsed, or the limit stops bei
 **Not urgent.** The wire is versioned (`ProtocolVersion`), so this can change behind a major
 version bump. Revisit when the HTTP transport is promoted out of the sample.
 
+**EVIDENCE, added 2026-08-12 (M8 phase 1, step M8-8). The opacity is not one layer deep, it is two,
+and it made a test vacuous for four review rounds.**
+
+`A_projection_crosses_as_columns_rather_than_as_entities` asserted that an excluded column never
+crossed the wire, by searching the recorded HTTP response body for the excluded date:
+
+```csharp
+Assert.DoesNotContain("2026-01-05", allRecordedBodies);   // could never fail
+```
+
+**A tautology.** The payload is base64 inside the outer JSON, and the base64 alphabet contains no
+`-`, so a hyphenated date can never appear in that body whatever the payload holds. The final
+whole-branch review found it with a probe rather than by reading.
+
+**And the first fix was still a tautology.** Decoding `InfoCarrierEnvelope.Payload` is not enough:
+for a query, that deserializes to `QueryDataResult`, whose `SerializedResults` is **itself** a
+`byte[]` and therefore base64 **again**. Both the reviewer's proposed fix and the controller's
+stopped at one layer; only the implementer's own check caught it. The assertion is now genuinely
+failable, proved by deliberately projecting the whole entity and observing
+`Assert.DoesNotContain() Failure … Found: "2026-01-05"`.
+
+**What this adds to the decision above.** Answer (a) — keep `byte[]` — now has a cost that is not
+merely cosmetic: **two nested base64 layers make wire-level assertions hard to write correctly, and
+easy to write in a form that cannot fail.** Anything asserting on payload content has to know the
+nesting depth, and getting it wrong is silent. That argues for (b) or (d) more strongly than the
+size overhead did. It also means the phase-2 wire inspector must decode two layers to show anything
+useful, not one.
+
+**The transferable lesson, which is about method rather than about this field:** of the several
+mechanism assertions strengthened in this phase, exactly one was never deliberately broken to
+confirm it could fail — and that was the vacuous one. **The assertion you did not watch fail is the
+one to distrust.**
+
 ### D2 — shared `DbContext` configuration, derived and augmented by each side
 
 **Raised 2026-08-11. A founding ICC idea, held since v1, never written down. Recorded now so it is
