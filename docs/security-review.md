@@ -182,3 +182,41 @@ reading any single part of it, and it is now pinned by tests rather than by this
 
 No change is recommended before a network transport ships. §2's recommendation and §6's
 correlation-id requirement should be revisited when one does.
+
+## 8a. Amendment — the trigger fired
+
+Amended **2026-08-12**, as part of the M8-8 fix wave (`docs/implementation-plan.md`), because §8's
+own condition — "before a network transport ships" — has now been met: `test/InfoCarrier.Core.TransportTests`
+and the samples under `samples/` add a real HTTP transport, previously in-process only. This
+amendment records what changed character as a result. It recommends no fix; it records that two
+properties this review's earlier sections did not need to weigh now carry a cost they did not carry
+in process, and that §5's authn/authz exclusion was a decision made against an unreachable path and
+should be made again, not inherited.
+
+- **`InProcessInfoCarrierServer._transactions`** (`src/InfoCarrier.Core/InProcessInfoCarrierServer.cs`)
+  is an unbounded `ConcurrentDictionary`, keyed by transaction token, with no expiry. In process,
+  an abandoned entry died with the test host that created it. Behind HTTP, a client that opens a
+  transaction and then vanishes — closes its connection, crashes, never calls commit or rollback —
+  pins a service scope, a `DbContext` and a store connection for as long as the server process
+  runs. There is no eviction, no timeout, and no check that the caller replaying a transaction
+  token is the caller who created it. The one SQLite file triplet leaked per test run (noted
+  elsewhere in this repo as a test-cleanup nuisance) is the observable symptom of exactly this
+  mechanism, not a separate defect.
+- **`InfoCarrierEndpointExtensions.MapInfoCarrier`**
+  (`samples/Northwind.Server/Transport/InfoCarrierEndpointExtensions.cs`) reads the request body
+  with an unbounded `http.Request.Body.CopyToAsync(buffer, …)` and then copies it again with
+  `buffer.ToArray()`, before `InfoCarrierPayloadLimits.Guard` (§1, stage 1 of this document) ever
+  sees a length. Kestrel's 30 MB default request-body limit bounds this in a real host, but that
+  bound is Kestrel's, not this endpoint's, and it sits *below* the product's own deliberate 64 MiB
+  `MaxRequestBytes` — so the limit stage 1 of this review calls out, and the message it produces,
+  are unreachable behind a default-configured Kestrel. An application that raises Kestrel's limit,
+  or hosts behind a server with no such default, gets none of the bound §1 describes.
+- **§5's exclusion of authentication and authorization** was written when nothing in this repo
+  could reach the deserialization path over a network. That is no longer true. The exclusion is not
+  reversed by this amendment — it is flagged as a decision that was made under a precondition which
+  no longer holds, and so should be made again, deliberately, rather than carried forward as if
+  network-reachability had already been weighed.
+
+No code change accompanies this amendment. Both properties are recorded in
+`docs/implementation-plan.md`'s Phase H "what Phase 1 leaves open" list alongside the three items
+already there.

@@ -1,3 +1,5 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Northwind.Shared;
@@ -64,7 +66,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
         // from a broken correlation-id lookup) -- both would also be > 0. Re-reading the row by
         // that id through a fresh context, over a fresh HTTP round trip, and checking it is the
         // *same* row (its Name is what this test wrote) excludes a mis-correlated key: a wrong id
-        // would either fetch nothing (FirstOrDefaultAsync returns null) or fetch a different row
+        // would either fetch nothing (SingleOrDefaultAsync returns null) or fetch a different row
         // whose Name is not "Seafood".
         using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(factory);
         Category? roundTripped = await verify.Categories.SingleOrDefaultAsync(c => c.Id == category.Id);

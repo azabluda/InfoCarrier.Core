@@ -1679,6 +1679,38 @@ Spec suite unchanged at 13/22453."
   permanent by design or upstream." — the measured figure, where the classification lives, and how
   many are permanent, nothing else. No code change; no test run needed.
 
+- [x] **Fix round 3 (final whole-branch review, Step M8-8): a tautological mechanism assertion,
+  the security review's own trigger, and cleanup.** `<this commit>` `A_projection_crosses_as_columns_rather_than_as_entities`
+  (`NorthwindOverHttpTest`) searched the raw recorded HTTP response body for a plaintext ISO date
+  fragment, but `InfoCarrierEnvelope.Payload` is a `byte[]` System.Text.Json renders as base64 — an
+  alphabet with no `-`, so no hyphenated date could ever appear in the raw body and the assertion
+  could not fail regardless of what the payload carried. Decoding `Payload` alone was still not
+  enough: a Query response's payload is itself `QueryDataResult`, whose `SerializedResults` is
+  *again* a `byte[]` — the row data sits two base64 layers past the recorded bytes, not one, and
+  the first (one-layer) fix passed unchanged under a deliberately broken query that should have
+  failed it. The test now decodes both layers and was proved failable: temporarily projecting
+  `OrderDate` alongside the two columns the test names (reverted after) failed with
+  `Assert.DoesNotContain() Failure: Sub-string found ... Found: "2026-01-05"`. The comment above the
+  assertion, which had claimed the search did not depend on the wire's envelope shape, now says
+  plainly that it is base64 two layers deep and both must be decoded.
+  `docs/security-review.md` §8 gained a dated amendment (§8a, 2026-08-12): the network transport
+  its closing paragraph named as the trigger for revisiting §2 and §6 has now shipped in this
+  branch, and two properties record what changed character as a result —
+  `InProcessInfoCarrierServer._transactions` (unbounded, no expiry, now reachable by a caller that
+  can vanish mid-transaction over HTTP) and `InfoCarrierEndpointExtensions.MapInfoCarrier`'s
+  unbounded body read (below the product's own `MaxRequestBytes`, so that limit is unreachable
+  behind a default Kestrel host) — plus a note that §5's authn/authz exclusion was decided against
+  an unreachable path and should be decided again now, not inherited. Both properties are also
+  recorded in `docs/implementation-plan.md`'s Phase H "leaves open" list. `CLAUDE.md`'s two
+  `dotnet test` commands, still pointed at `InfoCarrier.Core.slnx`, re-pointed at
+  `test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj` — the scope
+  `eng/measure.sh` already uses and for the same reason: the solution also contains
+  `InfoCarrier.Core.TransportTests`, and a hand run against the `.slnx` reports a `Total` 17 higher
+  than `test/known-failures.txt` was written against. A stale `FirstOrDefaultAsync` in a comment in
+  `NorthwindWritesOverHttpTest` corrected to `SingleOrDefaultAsync`. License headers added to the
+  seventeen new `.cs` files under `samples/` and `test/InfoCarrier.Core.TransportTests/` that
+  shipped without them. Passed: 17, Failed: 0, Total: 17.
+
 ---
 
 ## Self-Review

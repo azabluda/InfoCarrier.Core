@@ -1,4 +1,7 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
 using InfoCarrier.Core;
+using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Northwind.Client.Transport;
 using Northwind.Shared;
@@ -45,13 +48,26 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         // Every seeded Order has a distinct date (NorthwindSeed.cs), so its ISO date part is a
         // concrete, falsifiable fingerprint: it appears in the payload if and only if OrderDate
         // rode along. System.Text.Json's default DateTime converter always emits the date part in
-        // "yyyy-MM-dd" form, so this does not depend on the wire's exact envelope shape.
+        // "yyyy-MM-dd" form -- but the recorded response body is not that JSON directly, and is
+        // base64 two layers deep. The recorded bytes are the *outer* InfoCarrierEnvelope; its
+        // Payload is itself a byte[], which System.Text.Json (with no converter registered for it
+        // here) renders as base64. Decoding that yields the JSON for a QueryDataResult, whose
+        // SerializedResults is *again* a byte[] -- the row data actually lives one base64 layer
+        // further in than the envelope. The base64 alphabet contains no '-', so a hyphenated date
+        // can never appear at either outer layer regardless of what the rows carry; both layers
+        // must be decoded before the search means anything.
         string[] seededOrderDates = ["2026-01-05", "2026-02-11", "2026-02-18", "2026-03-02", "2026-03-20"];
-        string allBodies = string.Concat(
-            recorder.ResponseBodies.Select(bytes => System.Text.Encoding.UTF8.GetString(bytes)));
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        string allRowData = string.Concat(
+            recorder.ResponseBodies
+                .Select(bytes => serializer.Deserialize<InfoCarrierEnvelope>(bytes))
+                .Where(envelope => envelope is not null)
+                .Select(envelope => serializer.Deserialize<QueryDataResult>(envelope!.Payload))
+                .Where(result => result is not null)
+                .Select(result => System.Text.Encoding.UTF8.GetString(result!.SerializedResults)));
         foreach (string orderDate in seededOrderDates)
         {
-            Assert.DoesNotContain(orderDate, allBodies);
+            Assert.DoesNotContain(orderDate, allRowData);
         }
     }
 

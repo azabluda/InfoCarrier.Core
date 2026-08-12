@@ -125,6 +125,33 @@ Detailed steps are in
   M8-7b `<this commit>`: reverted to the brief's own step-2 text verbatim — the measured figure,
   where the classification lives, and how many are permanent, nothing more. No code change; no
   test run needed.
+- [x] **M8-8. The final fix wave — a tautological mechanism assertion, the security review's own
+  trigger, and cleanup.** `<this commit>`
+  `A_projection_crosses_as_columns_rather_than_as_entities` searched the raw HTTP response body
+  for a plaintext ISO date, but the recorded body is `InfoCarrierEnvelope`, whose `Payload` is a
+  `byte[]` System.Text.Json renders as base64 — an alphabet with no `-`, so the assertion could not
+  fail regardless of what the payload carried. Deserializing `Payload` alone was still not enough:
+  a Query response's payload is itself `QueryDataResult`, whose `SerializedResults` is *again* a
+  `byte[]` — the row data lives two base64 layers past the recorded bytes, not one. The test now
+  decodes both. Proved failable: projecting `OrderDate` alongside the two existing columns (a
+  temporary, reverted change) failed with
+  `Assert.DoesNotContain() Failure: Sub-string found ... Found: "2026-01-05"` against the corrected
+  assertion; the original one-layer fix passed unchanged under the same broken query, which is why
+  the second layer had to be found rather than assumed. `docs/security-review.md` §8 amended
+  (2026-08-12): the network transport its final paragraph named as the trigger for revisiting §2
+  and §6 has now shipped, and two properties recorded there changed character as a result —
+  `InProcessInfoCarrierServer._transactions`, an unbounded, unexpiring registry now reachable by a
+  caller that can vanish mid-transaction, and `InfoCarrierEndpointExtensions.MapInfoCarrier`'s
+  unbounded body read, which sits below the product's own `MaxRequestBytes` and makes that limit
+  unreachable behind a default Kestrel host. Both are also recorded above, in this same list.
+  `CLAUDE.md`'s two `dotnet test` commands re-pointed from `InfoCarrier.Core.slnx` to
+  `test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj`, matching the
+  scope `eng/measure.sh` already uses, with a note explaining why — the solution now also contains
+  `InfoCarrier.Core.TransportTests`, and running both together reports a `Total` that
+  `test/known-failures.txt` was not written against. A stale `FirstOrDefaultAsync` in a comment
+  corrected to `SingleOrDefaultAsync`, matching the code beside it. License headers added to the
+  seventeen new `.cs` files under `samples/` and `test/InfoCarrier.Core.TransportTests/` that
+  shipped without them. Passed: 17, Failed: 0, Total: 17.
 
 - **`SystemTextJsonInfoCarrierSerializer` uses reflection-based `JsonSerializer`.** Its
   `JsonSerializerOptions` sets no `TypeInfoResolver`, so the envelope and the request/response
@@ -142,3 +169,16 @@ Detailed steps are in
 - **M8's HTTP transport criterion is formally still open**, because the two transport files live
   in `samples/` rather than in packages. Both are free of sample types, so the promotion is a
   file move; see the spec §4.1.
+- **`InProcessInfoCarrierServer._transactions` is an unbounded registry with no expiry.** In
+  process, an abandoned entry died with the test host. Behind HTTP, a client that vanishes
+  mid-transaction pins a service scope, a `DbContext` and a store connection indefinitely — there
+  is no eviction, no timeout, and no binding of a transaction token to the caller who created it.
+  The one SQLite file triplet leaked per test run, previously filed only as a test-cleanup
+  nuisance, is the observable symptom of exactly this. Recorded in `docs/security-review.md` §8
+  (2026-08-12 amendment).
+- **`InfoCarrierEndpointExtensions.MapInfoCarrier` reads the request body with an unbounded
+  `CopyToAsync` and copies it again with `ToArray()` before `InfoCarrierPayloadLimits.Guard` ever
+  sees a length.** Kestrel's 30 MB default bounds it in a real host, but that is accidental, and it
+  sits below the product's own 64 MiB `MaxRequestBytes` — so the product's deliberate limit and its
+  deliberate message are unreachable behind a default Kestrel. Recorded in
+  `docs/security-review.md` §8 (2026-08-12 amendment).

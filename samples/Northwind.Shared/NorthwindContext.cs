@@ -1,3 +1,5 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
 using Microsoft.EntityFrameworkCore;
 using Northwind.Shared.Model;
 

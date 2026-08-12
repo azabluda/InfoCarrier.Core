@@ -1,3 +1,5 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;

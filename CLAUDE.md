@@ -7,9 +7,16 @@ protocol. Client `DbContext` has no database; the server executes against a real
 
 ```powershell
 dotnet build InfoCarrier.Core.slnx                       # note: .slnx, not .sln
-dotnet test  InfoCarrier.Core.slnx                       # full suite
-dotnet test  InfoCarrier.Core.slnx --filter "FullyQualifiedName~NorthwindWhere"
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # full suite
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 ```
+
+Point test runs at the `.csproj`, not the `.slnx` — the solution also contains
+`test/InfoCarrier.Core.TransportTests` (17 tests), and running both together inflates `Total`
+past what `test/known-failures.txt` was written against. `eng/measure.sh` was scoped to the
+`.csproj` for the same reason; a hand run must be scoped the same way or its count is not
+comparable. The transport tests are a separate project, run separately:
+`dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`.
 
 Report test results as `Passed: N, Failed: M, Total: T` from actual output — never estimate
 or infer a count.

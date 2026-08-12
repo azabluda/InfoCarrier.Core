@@ -1,3 +1,5 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
 namespace InfoCarrier.Core.TransportTests;
 
 /// <summary>
