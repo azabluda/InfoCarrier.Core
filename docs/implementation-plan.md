@@ -153,6 +153,26 @@ Detailed steps are in
   seventeen new `.cs` files under `samples/` and `test/InfoCarrier.Core.TransportTests/` that
   shipped without them. Passed: 17, Failed: 0, Total: 17.
 
+- [x] **M8-9. A console demo, and the first query over a real TCP socket.** `<this commit>`
+  `samples/Northwind.Demo`, plus a launch profile pinning the server to `http://localhost:5199` so
+  both halves run with a bare `dotnet run`. It exercises the six things Phase 1 built — a filtered
+  query, a projection, an aggregate, lazy loading, one save for two edits, and a rolled-back
+  transaction — and prints the **round-trip count** beside each, which is the part worth seeing.
+  **It closes a gap in the assurance, not only in the demo:** the 17 transport tests use
+  `WebApplicationFactory`, whose `TestServer` is an **in-memory** pipeline, so they exercise the
+  envelope, routing, serialization and the endpoint but no query had ever crossed a real TCP
+  socket. This does, and the observed behaviour matches the tests exactly — 14 round trips, a lazy
+  load costing one each when the navigation is touched, two edits costing one save. **The byte
+  counter was removed rather than made to look right**: the first end-to-end run printed
+  `0 bytes received`, because the endpoint writes to the response stream without setting
+  `Content-Length`, and measuring it would mean reading the body out from under the transport
+  about to read it. A demo printing a wrong number is worse than one printing no number.
+  `samples/README.md` documents both commands, the expected output, and which two files must stay
+  free of Northwind types. No product code changed and no spec test was added or removed, so the
+  suite is untouched at `Failed: 13, Total: 22453` — and `eng/measure.sh` needed no attention
+  despite a fourth project joining the solution, which is M8-1 paying for itself.
+  Passed: 17, Failed: 0, Total: 17.
+
 - **`SystemTextJsonInfoCarrierSerializer` uses reflection-based `JsonSerializer`.** Its
   `JsonSerializerOptions` sets no `TypeInfoResolver`, so the envelope and the request/response
   records are serialized reflectively. That is fine untrimmed and **will fail in a trimmed Blazor

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>A console client for the InfoCarrier sample. Its DbContext has no database: every query, save and transaction crosses a real TCP socket to Northwind.Server.</Description>
+    <RootNamespace>Northwind.Demo</RootNamespace>
+    <AssemblyName>Northwind.Demo</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\Northwind.Client.Transport\Northwind.Client.Transport.csproj" />
+    <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
