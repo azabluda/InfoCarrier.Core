@@ -18,12 +18,11 @@
 
 <p class="page-lede">
     <strong>The loads here are <code>LoadAsync</code> rather than a bare
-    <code>order.Customer</code>, and in a browser that is forced.</strong> A property getter is
-    synchronous, so an automatic lazy load has to block on the HTTP round trip &mdash; and a
-    single-threaded WebAssembly runtime cannot block, so it fails with
-    <code>Cannot wait on monitors on this runtime</code> <em>after</em> the request has gone out.
-    Proxies themselves are fine here (the Customers page shows <code>CustomerProxy</code>); it is
-    the waiting that is not.
+    <code>order.Customer</code>, and in a browser that is forced.</strong> A navigation property
+    getter is synchronous, so automatic lazy loading would have to block on the HTTP round trip
+    &mdash; and a single-threaded WebAssembly runtime cannot block. This client therefore does not
+    enable lazy-loading proxies at all, so an unloaded navigation is simply <code>null</code>
+    rather than an exception from inside a proxy. The server does enable them; it is not a browser.
 </p>
 
 @if (_error is { } error)
@@ -166,20 +165,18 @@
     // ---------------------------------------------------------------------------------------
     // **Explicit async loading, and in a browser it is not a style choice.**
     //
-    // Reading `_order.Customer` would be the prettier demo, and it is what the lazy-loading
-    // proxy is for -- but a property getter is synchronous, so it has to BLOCK on the HTTP round
-    // trip, and a single-threaded WebAssembly runtime cannot block. It fails with
-    // `PlatformNotSupportedException: Cannot wait on monitors on this runtime` *after* the
-    // request has already gone out, which is what makes it confusing: the panel shows the round
-    // trip, and the value never arrives.
+    // Reading `_order.Customer` would be the prettier demo, and with lazy-loading proxies on a
+    // desktop client that is exactly what you would write. It cannot work here: a property getter
+    // is synchronous, so the load has to BLOCK on the HTTP round trip, and a single-threaded
+    // WebAssembly runtime cannot block. With proxies enabled it failed with
+    // `PlatformNotSupportedException: Cannot wait on monitors on this runtime` *after* the request
+    // had already gone out -- the panel showed the round trip and the value never arrived.
+    // `ILazyLoader.Load()` is synchronous too, so injecting a loader instead fails identically.
     //
-    // Note this is NOT the risk spec §3.2 was watching for. That one was Reflection.Emit under
-    // AOT, and it does not apply: proxies are created fine here (the Customers page reports
-    // `CustomerProxy`). The blocker is the browser's threading model, and it would defeat
-    // `ILazyLoader.Load()` -- §3.2's recorded fallback -- in exactly the same way.
-    //
-    // `LoadAsync` is the same lazy load with the await made visible: the navigation is still not
-    // fetched by the original query, and touching it still costs one round trip.
+    // Program.cs therefore does not enable proxies on the client at all, which turns that
+    // confusing failure into a plain `null`. `LoadAsync` is the same lazy load with the await made
+    // visible: the navigation is still not fetched by the original query, and asking for it still
+    // costs exactly one round trip -- which is the point this page exists to make.
     // ---------------------------------------------------------------------------------------
     private async Task TouchCustomer()
         => await Guard(async () =>

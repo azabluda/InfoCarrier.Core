@@ -25,18 +25,6 @@
 
     <!-- UseBlazorFrameworkFiles(), which maps _framework/* out of the referenced WASM project. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
-
-    <!--
-      Design-time only, and it is the `dotnet ef` TOOL that requires it in a startup project, not
-      this provider. C90's finding stands: InfoCarrier's own design-time services live in
-      Microsoft.EntityFrameworkCore itself, so the product needs no dependency here.
-      PrivateAssets="all" keeps it out of anything that references this project.
-
-      This project is the startup project for `dotnet ef dbcontext optimize` because the client is
-      a Blazor WebAssembly app and the SDK emits no deps.json for one, so the tool cannot load it.
-      See samples/README.md for the exact command.
-    -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

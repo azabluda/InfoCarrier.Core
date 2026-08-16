@@ -254,8 +254,17 @@ Not yet implemented, in rough priority order:
     `ILazyLoader.Load()` is synchronous too, so the spec's recorded fallback fails identically; use
     `Entry(x).Reference(…).LoadAsync()`. Separately, **a compiled model cannot even be loaded**
     without `AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)`, because EF
-    initializes it on a 10 MB-stack `Thread`. Proxies themselves are fine: Castle DynamicProxy
-    emits types there, which is what the Customers page's `CustomerProxy` line exists to show.
+    initializes it on a 10 MB-stack `Thread`. Proxies themselves are fine — Castle DynamicProxy
+    emits types there — but the client no longer enables them (M8-18), because
+    configured-but-unusable turns an unloaded navigation into an exception instead of a `null`.
+  - **`dotnet ef dbcontext optimize` uses the STARTUP app's DbContext configuration and silently
+    ignores an `IDesignTimeDbContextFactory` in the target project (M8-18).** A Blazor WASM project
+    emits no `deps.json` and cannot be a startup project, so the server was one — and the
+    "client's" compiled model came out annotated `Relational:TableName` and
+    `Proxies:LazyLoading`. The browser ran on the **server's** model for two steps and looked fine,
+    which is the silent-divergence shape A49/B4/B12 warn about. **A one-GUID regeneration diff is
+    the tell that the factory was never consulted**, and it was misread once as "proxies do not
+    affect the model". The compiled model is removed; the sample builds its model at start-up.
   - **Trimming: 86 IL warnings are ours and spec §9's "none of ours" criterion is NOT met.** They
     are the premise showing through — the wire carries a type's *name* — so
     `[DynamicallyAccessedMembers]` cannot express them. Gated by direction in `eng/trim-ratchet.sh`

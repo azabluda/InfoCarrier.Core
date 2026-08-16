@@ -390,6 +390,9 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   No product code changed, so the spec suite is untouched.
 
 - [x] **M8-16. The compiled model — and a second thing WebAssembly will not do.** `<this commit>`
+  **SUPERSEDED BY M8-18 (2026-08-16): the compiled model is REMOVED, and this entry's central
+  claim — that it was generated against the client's configuration — is false.** It was the
+  server's. Read M8-18 before anything here.
   `dotnet ef dbcontext optimize` output in `samples/Northwind.Client/CompiledModel/`, wired with
   `options.UseModel(...)`, so the browser builds no model by reflection at start-up (spec §7
   step 2). `dotnet-ef` is pinned in `.config/dotnet-tools.json`; the exact command is in
@@ -491,3 +494,42 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   built as a decorator specifically to keep that true — so promoting them is still a file move.
 - **`InProcessInfoCarrierServer._transactions` is still unbounded**, and the Transfer page is now a
   second way to reach it. Recorded in `docs/security-review.md` §8 and unchanged by this phase.
+
+- [x] **M8-18. Remove what a browser cannot use — and the compiled model was the server's all
+  along.** `<this commit>`
+  Asked to keep the sample as clean as possible now that WebAssembly's limits are known. Two
+  removals, and the second turned out to close a real defect rather than only tidy up.
+  **1. Lazy-loading proxies are gone from the client** (`Program.cs`), because automatic lazy
+  loading cannot work there at all (M8-14). Configured-but-unusable was the worst of both: it made
+  an unloaded navigation throw `Cannot wait on monitors on this runtime` from inside a proxy
+  instead of simply being `null`. The **server keeps them** — it is not a browser — and the
+  asymmetry was checked rather than assumed: all three pages run green against a proxied server.
+  `Order.Customer` stays `virtual`, which costs a client nothing and is what the server needs.
+  **2. The compiled model is gone, and the reason is a defect, not tidiness.**
+  `dotnet ef dbcontext optimize` **never called `NorthwindDesignTimeFactory`.** A Blazor WASM
+  project emits no `deps.json`, so the server had to be the `--startup-project` — and EF's tooling
+  then takes its configuration from the **startup application's own service provider**, silently
+  ignoring an `IDesignTimeDbContextFactory` in the target project. **The generated model was the
+  server's**: `Relational:TableName = "Customers"`, `Relational:Schema`, `Relational:SqlQuery`,
+  `Proxies:LazyLoading = true`. Since M8-16 the browser had been running on a **relational, proxied
+  model**, and it worked — which is the dangerous shape, because divergence between the two models
+  is silent and yields wrong answers rather than errors (A49, B4, B12).
+  **The evidence that named it was the removal of proxies.** Dropping
+  `UseLazyLoadingProxies()` from the client broke every page with
+  `ArgumentException: PropertyNotDefinedForType … ILazyLoader LazyLoader … Order` — the compiled
+  model declared an `IProxyLazyLoader.LazyLoader` service property that a client without the
+  Proxies extension cannot bind. **M8-16's regeneration had also been a no-op**: its diff was one
+  GUID, which should have been the tell that the factory was not being consulted, and was read at
+  the time as "proxies do not affect the model".
+  Removed with it: `NorthwindDesignTimeFactory`, the eight generated files, the `Issue31751`
+  `AppContext` switch (needed only to load a compiled model), `Microsoft.EntityFrameworkCore.Design`
+  from the server, and `.config/dotnet-tools.json`. **The EF-issue-31751 finding stands and is kept
+  in `samples/README.md`** — a compiled model *can* be used in WebAssembly with that switch; this
+  sample simply has no correct way to generate one, short of a console project existing purely to
+  be a startup project.
+  Verified in headless Edge after both removals: Customers renders rows, the Order page goes
+  1 → 2 → 3 round trips and then saves two edits in **one** `SaveChanges` envelope (4 total), and
+  the Transfer page commits. Trim ratchet unchanged at **86 ours / 1129 total** — a compiled model
+  never affected static trim analysis. `samples/README.md` rewritten around both constraints.
+  M8-16's entry is marked superseded rather than edited, since its measurements were real and only
+  its conclusion was wrong. No product code changed, so the spec suite is untouched.

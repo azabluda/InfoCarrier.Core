@@ -20,40 +20,56 @@ Three pages, and a **wire inspector** down the right-hand side showing every rou
 operation, the size each way, how long it took, and the **decoded** payload — including the
 expression tree, which the panel expands out of the base64 it travels in.
 
-The Customers page prints the runtime type of the rows it loaded. It says `CustomerProxy`, so
-Castle DynamicProxy does emit types inside WebAssembly.
+### Two things WebAssembly will not do
 
-### Two things WebAssembly will not do, and what the sample does instead
+Both were found by running this app. **Neither is this provider's constraint** — they are the
+browser's, and the console demo below has neither.
 
-Both were found by running this app, and both are the browser's constraints rather than this
-provider's — a console or desktop client of InfoCarrier has neither.
+#### 1. Automatic lazy loading
 
-| What fails | Why | What the sample does |
-|---|---|---|
-| **Automatic lazy loading.** `order.Customer` throws `PlatformNotSupportedException: Cannot wait on monitors on this runtime` — *after* the request has gone out. | A navigation property getter is synchronous, so it must **block** on the HTTP round trip. A single-threaded runtime cannot block. `ILazyLoader.Load()` is synchronous too, so it fails identically. | `Entry(x).Reference(…).LoadAsync()` and `Entry(x).Collection(…).LoadAsync()` on the Order page. The navigation is still not fetched by the original query, and asking for it still costs exactly one round trip. |
-| **A compiled model, out of the box.** Reading `NorthwindContextModel.Instance` throws `TypeInitializationException` wrapping `PlatformNotSupportedException` from `Thread.Start`, and the app never renders. | EF's generated model initializes itself on a `new Thread(…, 10 MB)` to avoid stack overflow on large models (EF issue 31751). WebAssembly has no threads. | `AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)` as the first line of `Program.cs` — EF's own escape hatch, emitted into the generated file. It initializes inline instead. |
+`order.Customer` throws `PlatformNotSupportedException: Cannot wait on monitors on this runtime`,
+and throws it *after* the request has already gone out — so the inspector shows the round trip
+while the value never arrives.
 
-### Regenerating the compiled model
+A navigation property getter is **synchronous**, so a lazy load has to *block* on the HTTP round
+trip, and a single-threaded runtime cannot block. `ILazyLoader.Load()` is synchronous too, so
+injecting a loader instead fails identically.
 
-`dotnet ef` is pinned in `.config/dotnet-tools.json`; run `dotnet tool restore` once.
+**What the sample does:** the browser client does not enable lazy-loading proxies at all, so an
+unloaded navigation is simply `null` rather than a confusing exception from inside a proxy. The
+Order page loads navigations explicitly:
 
-```bash
-dotnet ef dbcontext optimize \
-  --project samples/Northwind.Client/Northwind.Client.csproj \
-  --startup-project samples/Northwind.Server/Northwind.Server.csproj \
-  --context NorthwindContext \
-  --output-dir CompiledModel \
-  --namespace Northwind.Client.CompiledModel
+```csharp
+await context.Entry(order).Reference(o => o.Customer).LoadAsync();
+await context.Entry(order).Collection(o => o.OrderDetails).LoadAsync();
 ```
 
-**The server is the startup project because the client cannot be one**: the SDK emits no
-`deps.json` for a Blazor WebAssembly project, so `dotnet ef` cannot load it. The server already
-references the client (it hosts it), so the client's assembly — and its
-`IDesignTimeDbContextFactory` — are reachable from the server's output.
+Nothing about the demonstration is lost: the navigation is still not fetched by the original query,
+and asking for it still costs exactly one round trip.
 
-The model is generated against the **client's** configuration, not the server's. Both halves
-describe the same entities, but only the client's model is an InfoCarrier one, and it is the
-client that uses it.
+The **server** still calls `UseLazyLoadingProxies()` — it is not a browser. That asymmetry is safe:
+proxies change how an entity is constructed on the side that enables them, and the wire carries
+entity type *names*.
+
+#### 2. A compiled model
+
+`dotnet ef dbcontext optimize` output cannot be loaded in WebAssembly as generated: EF initializes
+the model on a `new Thread(…, 10 MB)` to avoid stack overflow on large models
+([EF issue 31751](https://github.com/dotnet/efcore/issues/31751)), and WebAssembly has no threads.
+Reading `Instance` throws `TypeInitializationException` wrapping `PlatformNotSupportedException`
+from `Thread.Start`, and the app never renders at all. EF's own escape hatch —
+`AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)` — makes it initialize
+inline, and that does work.
+
+**The sample no longer uses one anyway, for a second and better reason.** `dotnet ef dbcontext
+optimize` needs a startup project it can load, and a Blazor WebAssembly project emits no
+`deps.json` — so the server has to be the startup project. But EF's tooling then takes the
+configuration from the **startup application's own service provider**, silently ignoring the
+client's `IDesignTimeDbContextFactory`. The generated model was the *server's*: annotated
+`Relational:TableName` and `Proxies:LazyLoading = true`. The browser was running on a relational,
+proxied model and appeared to work — which is the dangerous shape, because model divergence between
+the two halves produces wrong answers rather than errors. It is removed rather than made almost
+right.
 
 ## Run it in a console
 
@@ -132,10 +148,30 @@ var options = new DbContextOptionsBuilder<NorthwindContext>().UseInfoCarrier(cli
 
 No connection string, no provider for a store, no database.
 
+## Publishing trimmed
+
+```bash
+dotnet publish samples/Northwind.Client -c Release
+```
+
+The client publishes with `PublishTrimmed=true` **and runs** — all three pages were driven against
+the published output. It reports **86 IL trim warnings owned by `InfoCarrier.Core`**, and that is a
+known, recorded number rather than a clean bill of health: the wire carries a type's *name* and the
+far end resolves it, so `Assembly.GetType(string)` and `MakeGenericMethod` are what this provider is
+made of, and `[DynamicallyAccessedMembers]` cannot describe them. The warnings mean the trimmer
+cannot *prove* the reflection safe for an arbitrary model, not that it broke this one.
+
+`eng/trim-ratchet.sh` gates the direction of that count against `eng/trim-baseline.txt`, exactly as
+`eng/ratchet.sh` gates the spec suite. Everyone else's warnings are reported but not gated — EF Core
+alone contributes 864 of the 1129 total.
+
 ## What is not here yet
 
-The **Blazor WebAssembly client** — three pages, Fluent UI and a wire-inspector panel — is phase 2
-of this milestone. See
-[`docs/superpowers/specs/2026-08-11-blazor-wasm-sample-design.md`](../docs/superpowers/specs/2026-08-11-blazor-wasm-sample-design.md).
-Phase 1 deliberately stopped at the transport so that a trimming problem in the browser could not
-stall it.
+- **No automated test of the pages.** The 17 tests in `test/InfoCarrier.Core.TransportTests` cover
+  the protocol over a real HTTP hop; the three pages were verified by driving a real browser, and
+  that harness is not in the repository. CI would not notice a page breaking — only that the
+  client still builds and publishes.
+- **The two transport files still live here**, in `samples/`, rather than in packages. Both are
+  deliberately free of Northwind types — `HttpInfoCarrierTransport.cs` and
+  `InfoCarrierEndpointExtensions.cs` — so promoting them is a file move. The wire inspector is an
+  `IInfoCarrierTransport` **decorator** in the client project precisely to keep that true.

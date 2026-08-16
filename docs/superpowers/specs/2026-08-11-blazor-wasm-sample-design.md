@@ -262,10 +262,22 @@ The Transfer page's forced failure is what tests all of this.
 
 ## 7. Trimming and AOT plan
 
-1. Generate a compiled model for `NorthwindContext` (`dotnet ef dbcontext optimize`, available
-   since C90).
-2. The client calls `options.UseModel(NorthwindContextModel.Instance)`, so no model is built by
-   reflection at start-up.
+> **AMENDED 2026-08-16 (M8-18). Steps 1 and 2 are withdrawn: the sample has no compiled model.**
+> Not because one cannot work in WebAssembly — it can, with
+> `AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)`, since EF otherwise
+> initializes the model on a 10 MB-stack `Thread` — but because **this sample has no correct way to
+> generate one.** `dotnet ef dbcontext optimize` needs a startup project it can load, a Blazor WASM
+> project emits no `deps.json`, and with the *server* as startup project EF takes the configuration
+> from the startup application's own service provider and silently ignores the client's
+> `IDesignTimeDbContextFactory`. The generated "client" model came out carrying
+> `Relational:TableName` and `Proxies:LazyLoading = true` — it was the server's. The browser ran on
+> it and appeared to work, which is precisely the silent model divergence A49 exists to prevent.
+> Steps 3 and 4 stand and were carried out; see M8-17.
+
+1. ~~Generate a compiled model for `NorthwindContext` (`dotnet ef dbcontext optimize`, available
+   since C90).~~ Withdrawn — see the amendment above.
+2. ~~The client calls `options.UseModel(NorthwindContextModel.Instance)`, so no model is built by
+   reflection at start-up.~~ Withdrawn.
 3. Publish with `PublishTrimmed=true` and **treat IL2xxx warnings as errors**.
 4. Fix what is ours. Document what is EF Core's.
 

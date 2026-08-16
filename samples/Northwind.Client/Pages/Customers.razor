@@ -37,16 +37,6 @@
     <FluentPaginator State="@_pagination" />
 </div>
 
-@if (_runtimeType is { } runtimeType)
-{
-    <p class="page-note">
-        A whole <code>Customer</code> loaded separately materializes as <code>@runtimeType</code>:
-        Castle DynamicProxy emits types <em>inside WebAssembly</em>, which is worth knowing because
-        it is often assumed not to work. It does not follow that automatic lazy loading works here
-        &mdash; a property getter is synchronous and a browser cannot block on a round trip. See the
-        Order page, where navigations are loaded with <code>LoadAsync</code> for that reason.
-    </p>
-}
 
 @code {
     // Client-only, and never named on the wire. ProjectionRewriter splits the Select below into a
@@ -62,18 +52,17 @@
 
     private string _country = string.Empty;
     private string _sort = "Id";
-    private string? _runtimeType;
     private string? _error;
 
     // **A context per load, not one for the page**, and that is a correction rather than a
     // preference. A page-scoped context failed on the first run with EF's own
     // "A second operation was started on this context instance before a previous operation
-    // completed": the grid's provider and the probe below both ran against it, because Blazor
-    // renders between the awaits of OnInitializedAsync. A DbContext is not thread-safe and a grid
-    // is entitled to ask again before the last answer arrives. This page is read-only, so it has
-    // no unit of work to preserve and nothing to gain from holding one -- which is exactly what
-    // IDbContextFactory is for. The Order page keeps a page-scoped context because it genuinely
-    // needs one, and it is single-threaded by construction.
+    // completed": two operations overlapped on it, because Blazor renders between awaits and the
+    // grid's provider is free to ask again before the previous answer lands. A DbContext is not
+    // thread-safe. This page is read-only, so it has no unit of work to preserve and nothing to
+    // gain from holding one -- which is exactly what IDbContextFactory is for. The Order page
+    // keeps a page-scoped context because it genuinely needs one, and every operation there is
+    // started by a button.
     private async ValueTask<GridItemsProviderResult<CustomerRow>> LoadAsync(
         GridItemsProviderRequest<CustomerRow> request)
     {
@@ -127,25 +116,6 @@
         // result, which shows an empty grid over data that is there.
         await _pagination.SetCurrentPageIndexAsync(0);
         StateHasChanged();
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            // Its own context, and a whole entity rather than a projection. Spec §3.2 chose
-            // automatic lazy loading over ILazyLoader injection on the reasoning that Castle
-            // DynamicProxy needs Reflection.Emit, which the Mono interpreter has and an AOT build
-            // does not. Printing the runtime type is how that stops being a reasonable
-            // expectation and becomes something the page shows.
-            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
-            Customer? first = await context.Customers.OrderBy(c => c.Id).FirstOrDefaultAsync();
-            _runtimeType = first?.GetType().Name;
-        }
-        catch (Exception exception)
-        {
-            _error = Describe(exception);
-        }
     }
 
     private static string Describe(Exception exception)
