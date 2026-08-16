@@ -71,12 +71,16 @@ async Task RunAsync()
         {
             using var context = new NorthwindContext(options);
 
+            // Take(8) because the store holds hundreds and this is a console: the Take is part of
+            // the expression tree, so the server returns eight rows rather than the client
+            // trimming a list it already paid to receive.
             var rows = await context.Orders
                 .OrderBy(o => o.Id)
                 .Select(o => new { o.Id, o.CustomerId })
+                .Take(8)
                 .ToListAsync();
 
-            Console.WriteLine($"      {rows.Count} orders, as Id + CustomerId pairs:");
+            Console.WriteLine($"      the first {rows.Count} orders, as Id + CustomerId pairs:");
             Console.WriteLine("      " + string.Join("  ", rows.Select(r => $"{r.Id}:{r.CustomerId}")));
         });
 

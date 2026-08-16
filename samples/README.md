@@ -100,13 +100,20 @@ Expected output:
 
   A filtered query — the Where runs on the server
       ALFKI  Alfreds Futterkiste  (Berlin)
+      BLAUS  Blauer See Delikatessen  (Mannheim)
+      DRACD  Drachenblut Delikatessen  (Aachen)
+      FRANK  Frankenversand  (München)
+      KOENE  Königlich Essen  (Brandenburg)
+      LEHMS  Lehmanns Marktstand  (Frankfurt a.M.)
+      OTTIK  Ottilies Käseladen  (Köln)
+      WANDK  Die Wandernde Kuh  (Stuttgart)
 
   A projection — only the selected columns cross the wire
-      5 orders, as Id + CustomerId pairs:
-      1:ALFKI  2:ALFKI  3:ANATR  4:AROUT  5:BERGS
+      the first 8 orders, as Id + CustomerId pairs:
+      1:ALFKI  2:ALFKI  3:ANATR  4:AROUT  5:BERGS  6:LETSS  7:OTTIK  8:SPECD
 
   An aggregate — the server answers with a number, not with rows
-      order lines with quantity >= 10: 3
+      order lines with quantity >= 10: 330
 
   Lazy loading — touching a navigation costs another round trip
       order 1 loaded          (round trips so far: 4)
@@ -117,14 +124,23 @@ Expected output:
       2 lines edited, 2 rows written, 1 round trip for the save
 
   A transaction — rolled back, and the store never sees it
-      inside the transaction: 7 products
-      after the rollback:     6 products (was 6)
+      inside the transaction: 31 products
+      after the rollback:     30 products (was 30)
 
   Done. 14 round trips, none of which touched a database in this process.
 ```
 
 The round-trip counts are the interesting part. Lazy loading costs a request *when the navigation is
-touched*, and two edits cost **one** save.
+touched*, and two edits cost **one** save. The projection takes only the first eight orders, and the
+`Take` is part of the expression tree — the server returns eight rows rather than the client
+trimming a list it already paid to receive.
+
+**The console client lazy-loads normally**, unlike the browser: it is not WebAssembly, so a
+synchronous navigation getter can block on the round trip. That is the same asymmetry described
+above, seen from the other side.
+
+Run it against a **fresh** store if you want these exact numbers — the browser pages write to the
+same `northwind.db`, and the Transfer page in particular moves order 1 to another customer.
 
 ## The projects
 
