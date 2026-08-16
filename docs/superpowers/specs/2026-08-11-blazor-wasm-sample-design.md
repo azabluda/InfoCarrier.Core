@@ -93,6 +93,36 @@ So proxies are likely fine for the target configuration, and the M8 criterion th
 **Decision:** use `UseLazyLoadingProxies()`. Navigations are `virtual`. Verify it in the browser
 early in Phase 2 — this is an **experiment with a known answer if it fails**, not an assumption.
 
+> **AMENDED 2026-08-16 (M8-14). The experiment ran, and both this section and its fallback were
+> wrong — about the mechanism, not about the risk.**
+>
+> The table above is correct as far as it goes: proxies *are* created under the interpreter. The
+> Customers page reports a runtime type of `CustomerProxy`, so Castle DynamicProxy emits types
+> inside WebAssembly and `RunAOTCompilation` is not the obstacle here.
+>
+> **Automatic lazy loading still does not work in the browser, for an unrelated reason.** A
+> navigation property getter is **synchronous**, so a lazy load has to *block* on the HTTP round
+> trip — and a single-threaded WebAssembly runtime cannot block. Touching `order.Customer` throws
+> `PlatformNotSupportedException: Cannot wait on monitors on this runtime`, and it throws *after*
+> the request has already gone out, so the panel shows the round trip while the value never
+> arrives.
+>
+> **The recorded fallback does not help either**, which is the part worth carrying forward:
+> `ILazyLoader.Load()` is synchronous too, so it fails identically. The fallback was cheap for the
+> wrong reason — the cost was never in the model, and switching to it would have bought nothing.
+>
+> **What works is explicit async loading**: `Entry(x).Reference(…).LoadAsync()` and
+> `Entry(x).Collection(…).LoadAsync()`. The demonstration is unharmed — the navigation is still
+> not fetched by the original query, and asking for it still costs exactly one round trip, which
+> is the point the Order page makes. Verified in headless Edge: 1 round trip to load the order, 2
+> after the customer, 3 after the lines.
+>
+> `UseLazyLoadingProxies()` stays configured on **both** halves. It is not load-bearing for the
+> browser any more, but the two models must agree about what the wire names (A49), and the server
+> genuinely uses it. **This constraint is the browser's, not this provider's**: any EF provider
+> whose store is reached over the network has it, and a desktop or server client of this provider
+> can lazy-load normally.
+
 **The fallback is cheap by construction.** `virtual` auto-properties are compatible with both
 routes; switching to `ILazyLoader` means adding a loader field and changing the getters inside
 `Northwind.Shared/Model/`, and nothing outside that folder moves. Both routes are proven in the

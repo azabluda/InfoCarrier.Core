@@ -158,9 +158,11 @@ projection plus a client-side reassembly.
 Lazy loading and unit of work. Touching `Customer` and `OrderDetails` issues further envelopes;
 several quantity edits then save as **one** `SaveChanges`.
 
-- [ ] **Step 1:** The page.
-- [ ] **Step 2:** Confirm in the browser: extra envelopes on touch, exactly one on save.
-- [ ] **Step 3:** Commit.
+- [x] **Step 1:** The page.
+- [x] **Step 2:** Confirm in the browser: extra envelopes on touch, exactly one on save.
+      **This step is what refuted spec §3.2**, and it needed real clicks — `--dump-dom` renders a
+      page but cannot press a button, so the check moved to the DevTools protocol.
+- [x] **Step 3:** Commit.
 
 ---
 

@@ -326,3 +326,39 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   it genuinely needs one.
   Verified in headless Edge: no error bar, 4 round trips (all `Query`), page one showing
   ALFKI/ANATR/AROUT with BERGS correctly on page two, and `CustomerProxy` still reported.
+
+- [x] **M8-14. The Order page — and automatic lazy loading does not work in a browser, for a
+  reason nobody had written down.** `<this commit>`
+  Unit of work end to end, observed with real clicks: **1** round trip loads the order, **2** after
+  asking for its `Customer` (*"Alfreds Futterkiste — Berlin"*), **3** after its lines, and **4**
+  after saving — where the panel shows a single `#4 SaveChanges` carrying **both** edited
+  quantities, and the page reports *"Last save: 2 entries, in 1 SaveChanges envelope."* The pending
+  count is read off `ChangeTracker.Entries()` rather than counted by hand, so setting a value back
+  to its original correctly un-counts it.
+  **THE FINDING. Spec §3.2 is refuted, and its recorded fallback would not have helped.** §3.2
+  decided on `UseLazyLoadingProxies()` and named one risk: Castle DynamicProxy needs
+  `Reflection.Emit`, which AOT removes. **That risk does not apply** — proxies are created fine
+  here, which is why the Customers page can report `CustomerProxy`. The actual blocker is
+  unrelated: **a navigation property getter is synchronous, so a lazy load must BLOCK on the HTTP
+  round trip, and a single-threaded WebAssembly runtime cannot block.** `order.Customer` throws
+  `PlatformNotSupportedException: Cannot wait on monitors on this runtime` — and throws *after* the
+  request has already gone out, so the panel shows the round trip while the value never arrives,
+  which is what makes it confusing to diagnose. **`ILazyLoader.Load()` is synchronous too**, so
+  §3.2's "cheap by construction" fallback fails identically; it was cheap for the wrong reason,
+  because the cost was never in the model. What works is `Entry(x).Reference(…).LoadAsync()` and
+  `Entry(x).Collection(…).LoadAsync()`, and the demonstration is unharmed: the navigation is still
+  not fetched by the original query and still costs exactly one round trip. **The constraint is the
+  browser's, not this provider's** — any EF provider reaching its store over a network has it, and
+  a desktop client of this provider lazy-loads normally. `UseLazyLoadingProxies()` stays on both
+  halves for model parity (A49). Spec §3.2 carries a dated amendment; the Customers page note,
+  which had claimed proxies were "what lets a navigation load itself on demand", is corrected.
+  **Two verification lessons, both cheap and both reusable.** `--dump-dom` renders a page but
+  **cannot click anything**, and the first run of this page therefore reported nothing at all — the
+  check moved to the **DevTools protocol** (`--remote-debugging-port` plus `Runtime.evaluate`),
+  which is what made the finding above observable rather than theoretical. And the page now loads
+  order 1 on arrival instead of waiting for a button, which is better design independently of the
+  test: a page that shows nothing until you press something hides what it is there to show.
+  A naming collision worth remembering: the component had to be `OrderPage`, not `Order` — a
+  component named `Order` shadows `Northwind.Shared.Model.Order` inside its own markup and every
+  reference to the entity fails to compile. The route is unaffected.
+  No product code changed, so the spec suite is untouched.

@@ -1,0 +1,239 @@
+@* Licensed under the MIT license. See license.txt file in the project root for license information. *@
+@page "/order"
+@* Named OrderPage, not Order: a component named Order would shadow Northwind.Shared.Model.Order inside its own markup, and every reference to the entity fails to compile. The route is unaffected. *@
+@implements IAsyncDisposable
+@inject IDbContextFactory<NorthwindContext> Contexts
+@inject WireLog Log
+
+<PageTitle>Order</PageTitle>
+
+<FluentLabel Typo="Typography.H1">One order, one unit of work</FluentLabel>
+
+<p class="page-lede">
+    The query below asks for an order and nothing else. Its <code>Customer</code> and its lines are
+    <em>not</em> loaded &mdash; until you ask for them, which costs a round trip each. Then edit as
+    many quantities as you like and save: <strong>one</strong> <code>SaveChanges</code> carries all
+    of them, because the context has been tracking them the whole time.
+</p>
+
+<p class="page-lede">
+    <strong>The loads here are <code>LoadAsync</code> rather than a bare
+    <code>order.Customer</code>, and in a browser that is forced.</strong> A property getter is
+    synchronous, so an automatic lazy load has to block on the HTTP round trip &mdash; and a
+    single-threaded WebAssembly runtime cannot block, so it fails with
+    <code>Cannot wait on monitors on this runtime</code> <em>after</em> the request has gone out.
+    Proxies themselves are fine here (the Customers page shows <code>CustomerProxy</code>); it is
+    the waiting that is not.
+</p>
+
+@if (_error is { } error)
+{
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
+}
+
+<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom">
+    <FluentNumberField @bind-Value="_orderId" Label="Order id" Min="1" Max="5" Style="width: 8rem;" />
+    <FluentButton Appearance="Appearance.Accent" OnClick="LoadAsync">Load order</FluentButton>
+</FluentStack>
+
+@if (_order is { } order)
+{
+    <div class="uow">
+        <FluentCard Class="uow-card">
+            <h3>Order @order.Id</h3>
+            <div class="kv"><span>Placed</span><span>@order.OrderDate.ToString("yyyy-MM-dd")</span></div>
+            <div class="kv"><span>Customer id</span><span>@order.CustomerId</span></div>
+
+            <div class="kv">
+                <span>Customer</span>
+                <span>
+                    @if (_customerText is { } customerText)
+                    {
+                        @customerText
+                    }
+                    else
+                    {
+                        <FluentButton OnClick="TouchCustomer">not loaded &mdash; touch it</FluentButton>
+                    }
+                </span>
+            </div>
+
+            <div class="kv">
+                <span>Lines</span>
+                <span>
+                    @if (_lines is not null)
+                    {
+                        @($"{_lines.Count} loaded")
+                    }
+                    else
+                    {
+                        <FluentButton OnClick="TouchLines">not loaded &mdash; touch them</FluentButton>
+                    }
+                </span>
+            </div>
+        </FluentCard>
+
+        @if (_lines is { } lines)
+        {
+            <FluentCard Class="uow-card">
+                <h3>Lines</h3>
+                @foreach (OrderDetail line in lines)
+                {
+                    <div class="kv">
+                        <span>product @line.ProductId &mdash; @line.UnitPrice.ToString("0.00")</span>
+                        <FluentNumberField Value="@line.Quantity" Min="0" Style="width: 7rem;"
+                                           ValueChanged="@(value => SetQuantity(line, value))"
+                                           TValue="int" Immediate="true" />
+                    </div>
+                }
+
+                <div class="uow-actions">
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(_pending == 0)" OnClick="SaveAsync">
+                        Save @_pending change@(_pending == 1 ? "" : "s")
+                    </FluentButton>
+                    <span class="page-note">
+                        @if (_saved is { } saved)
+                        {
+                            @($"Last save: {saved} entries, in 1 SaveChanges envelope.")
+                        }
+                        else
+                        {
+                            @("Change a quantity or two. The button counts what the change tracker is holding.")
+                        }
+                    </span>
+                </div>
+            </FluentCard>
+        }
+    </div>
+
+    <p class="page-note">
+        Round trips so far: <strong>@Log.Sequence</strong>. Loading the order was one. Touching the
+        customer was one more, touching the lines one more &mdash; and saving is one, however many
+        quantities changed.
+    </p>
+}
+
+@code {
+    private NorthwindContext? _context;
+    private Order? _order;
+    private List<OrderDetail>? _lines;
+    private string? _customerText;
+    private int _orderId = 1;
+    private int _pending;
+    private int? _saved;
+    private string? _error;
+
+    // **One context for this page, unlike Customers, and here it is the point rather than a
+    // habit.** The unit of work IS the demonstration: several edits accumulate in one change
+    // tracker and leave as one SaveChanges. Safe to hold because every operation below is started
+    // by a button — there is no provider polling it, which is exactly what made a page-scoped
+    // context wrong on Customers.
+    protected override async Task OnInitializedAsync()
+        // Loads order 1 straight away. A page that shows nothing until a button is pressed hides
+        // the very thing it is here to show, and the lazy-loading point is unaffected: the
+        // navigations are still untouched afterwards.
+        => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        // A fresh context per load, so a second "Load order" does not inherit the last one's
+        // tracked edits — that would make the pending count a lie.
+        if (_context is not null)
+        {
+            await _context.DisposeAsync();
+        }
+
+        _context = await Contexts.CreateDbContextAsync();
+
+        _order = null;
+        _lines = null;
+        _customerText = null;
+        _pending = 0;
+        _saved = null;
+
+        await Guard(async () =>
+        {
+            // No Include, and that is the whole point: what comes back is one order.
+            _order = await _context.Orders.SingleOrDefaultAsync(o => o.Id == _orderId);
+
+            if (_order is null)
+            {
+                _error = $"No order with id {_orderId}.";
+            }
+        });
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // **Explicit async loading, and in a browser it is not a style choice.**
+    //
+    // Reading `_order.Customer` would be the prettier demo, and it is what the lazy-loading
+    // proxy is for -- but a property getter is synchronous, so it has to BLOCK on the HTTP round
+    // trip, and a single-threaded WebAssembly runtime cannot block. It fails with
+    // `PlatformNotSupportedException: Cannot wait on monitors on this runtime` *after* the
+    // request has already gone out, which is what makes it confusing: the panel shows the round
+    // trip, and the value never arrives.
+    //
+    // Note this is NOT the risk spec §3.2 was watching for. That one was Reflection.Emit under
+    // AOT, and it does not apply: proxies are created fine here (the Customers page reports
+    // `CustomerProxy`). The blocker is the browser's threading model, and it would defeat
+    // `ILazyLoader.Load()` -- §3.2's recorded fallback -- in exactly the same way.
+    //
+    // `LoadAsync` is the same lazy load with the await made visible: the navigation is still not
+    // fetched by the original query, and touching it still costs one round trip.
+    // ---------------------------------------------------------------------------------------
+    private async Task TouchCustomer()
+        => await Guard(async () =>
+        {
+            await _context!.Entry(_order!).Reference(o => o.Customer).LoadAsync();
+
+            Customer? customer = _order!.Customer;
+            _customerText = customer is null ? "(none)" : $"{customer.CompanyName} — {customer.City}";
+        });
+
+    private async Task TouchLines()
+        => await Guard(async () =>
+        {
+            await _context!.Entry(_order!).Collection(o => o.OrderDetails).LoadAsync();
+            _lines = [.. _order!.OrderDetails];
+        });
+
+    private void SetQuantity(OrderDetail line, int quantity)
+    {
+        line.Quantity = quantity;
+
+        // Read off the change tracker rather than counted by hand: it is the same number
+        // SaveChanges is about to act on, and setting a value back to its original removes it
+        // again — which a hand-rolled counter would get wrong.
+        _pending = _context!.ChangeTracker.Entries().Count(e => e.State == EntityState.Modified);
+        _saved = null;
+    }
+
+    private async Task SaveAsync()
+        => await Guard(async () =>
+        {
+            _saved = await _context!.SaveChangesAsync();
+            _pending = _context.ChangeTracker.Entries().Count(e => e.State == EntityState.Modified);
+        });
+
+    private async Task Guard(Func<Task> action)
+    {
+        try
+        {
+            _error = null;
+            await action();
+        }
+        catch (Exception exception)
+        {
+            // Visible, never swallowed (spec §6). The panel on the right carries the detail.
+            _error = $"{exception.GetType().Name}: {exception.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_context is not null)
+        {
+            await _context.DisposeAsync();
+        }
+    }
+}

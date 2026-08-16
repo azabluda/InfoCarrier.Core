@@ -145,3 +145,42 @@ html, body {
 .grid-wrap {
     margin-top: 1rem;
 }
+
+.uow {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.uow-card {
+    padding: 1rem;
+    min-width: 22rem;
+}
+
+.uow-card h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+}
+
+.kv {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+}
+
+.kv > span:first-child {
+    opacity: 0.7;
+    font-size: 0.85rem;
+}
+
+.uow-actions {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}

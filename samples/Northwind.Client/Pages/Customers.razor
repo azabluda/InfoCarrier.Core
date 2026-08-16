@@ -40,10 +40,11 @@
 @if (_runtimeType is { } runtimeType)
 {
     <p class="page-note">
-        A whole <code>Customer</code> loaded separately materializes as <code>@runtimeType</code>.
-        A name ending in <code>Proxy</code> is Castle DynamicProxy emitting a type <em>inside
-        WebAssembly</em> &mdash; which is what lets a navigation load itself on demand, with no
-        <code>ILazyLoader</code> in the model.
+        A whole <code>Customer</code> loaded separately materializes as <code>@runtimeType</code>:
+        Castle DynamicProxy emits types <em>inside WebAssembly</em>, which is worth knowing because
+        it is often assumed not to work. It does not follow that automatic lazy loading works here
+        &mdash; a property getter is synchronous and a browser cannot block on a round trip. See the
+        Order page, where navigations are loaded with <code>LoadAsync</code> for that reason.
     </p>
 }
 
