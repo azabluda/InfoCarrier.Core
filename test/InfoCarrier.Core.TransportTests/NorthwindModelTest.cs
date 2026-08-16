@@ -57,7 +57,7 @@ public class NorthwindModelTest
 
         NorthwindSeed.Seed(context);
 
-        Assert.Equal(4, afterFirst);
+        Assert.Equal(65, afterFirst);
         Assert.Equal(afterFirst, context.Customers.Count());
     }
 }

@@ -26,7 +26,11 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             .OrderBy(c => c.Id)
             .ToListAsync();
 
-        Assert.Equal(["ALFKI"], customers.Select(c => c.Id));
+        // Every German customer the seed defines, in id order. An exact set rather than a count:
+        // a Where that silently matched everything would still produce a plausible number.
+        Assert.Equal(
+            ["ALFKI", "BLAUS", "DRACD", "FRANK", "KOENE", "LEHMS", "OTTIK", "WANDK"],
+            customers.Select(c => c.Id));
     }
 
     [Fact]
@@ -39,7 +43,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             .Select(o => new { o.Id, o.CustomerId })
             .ToListAsync();
 
-        Assert.Equal(5, rows.Count);
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal("ALFKI", rows[0].CustomerId);
 
         // A defect that shipped whole Order entities and projected client-side would produce the
@@ -48,7 +52,9 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         // Every seeded Order has a distinct date (NorthwindSeed.cs), so its ISO date part is a
         // concrete, falsifiable fingerprint: it appears in the payload if and only if OrderDate
         // rode along. System.Text.Json's default DateTime converter always emits the date part in
-        // "yyyy-MM-dd" form -- but the recorded response body is not that JSON directly, and is
+        // "yyyy-MM-dd" form. The five anchor orders are enough to detect it: if OrderDate rode
+        // along at all it rode along for every row, so catching any one of them is catching all.
+        // The recorded response body is not that JSON directly, though, and is
         // base64 two layers deep. The recorded bytes are the *outer* InfoCarrierEnvelope; its
         // Payload is itself a byte[], which System.Text.Json (with no converter registered for it
         // here) renders as base64. Decoding that yields the JSON for a QueryDataResult, whose
@@ -78,19 +84,17 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         int count = await context.OrderDetails.CountAsync(d => d.Quantity >= 10);
 
-        Assert.Equal(3, count);
+        Assert.Equal(330, count);
 
         // A client-side count (fetch every matching OrderDetail, then Count() locally) would reach
         // the same answer as a server-side COUNT -- the value alone cannot tell them apart. Two
         // things a client-side count cannot avoid: a second request to fetch the rows, and a
         // payload big enough to carry them. One request proves the query was not first materialized
         // and then re-queried; response size distinguishes "returned a number" from "returned rows".
-        // Bound chosen empirically: the envelope carrying one int measures 448 bytes. For
-        // comparison, the projection test below measures ~787 bytes per row for a two-column
-        // projection (5 rows, 3936 bytes total); three OrderDetail rows carry four columns each
-        // (OrderId/ProductId/UnitPrice/Quantity) and would cost well over 700 on the same basis.
-        // 700 sits above the measured scalar size with headroom, and far below what three full
-        // rows would cost.
+        // Bound chosen empirically: the envelope carrying one int measures 448 bytes. The
+        // alternative is 330 matching OrderDetail rows of four columns each, which is orders of
+        // magnitude past this bound -- so 700 sits above the measured scalar size with headroom
+        // and far below anything row-shaped.
         Assert.Equal(1, recorder.RequestCount);
         Assert.Single(recorder.ResponseBodies);
         Assert.True(

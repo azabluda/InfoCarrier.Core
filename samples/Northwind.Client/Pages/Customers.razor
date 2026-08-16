@@ -22,7 +22,7 @@
     </div>
     <FluentButton Appearance="Appearance.Accent" OnClick="RefreshAsync">Run</FluentButton>
     <span class="toolbar-spacer"></span>
-    <span class="toolbar-note">page size 3, so paging is visible</span>
+    <span class="toolbar-note">12 per page &mdash; every page change is a new query</span>
 </div>
 
 @if (_error is { } error)
@@ -54,7 +54,7 @@
 
     private static readonly string[] SortOptions = ["Id", "Company", "City", "Country"];
 
-    private readonly PaginationState _pagination = new() { ItemsPerPage = 3 };
+    private readonly PaginationState _pagination = new() { ItemsPerPage = 12 };
 
     private string _country = string.Empty;
     private string _sort = "Id";

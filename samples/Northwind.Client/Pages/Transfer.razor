@@ -69,7 +69,8 @@ else if (_ok is { } ok)
     private const int OrderId = 1;
     private const int ProductId = 1;
 
-    private static readonly string[] _customerIds = ["ALFKI", "ANATR", "AROUT", "BERGS"];
+    // Read from the store rather than hard-coded, so the list cannot drift from the seed.
+    private string[] _customerIds = [];
 
     private string _target = "ANATR";
     private bool _forceFailure;
@@ -80,7 +81,19 @@ else if (_ok is { } ok)
     private int? _actualStock;
 
     protected override async Task OnInitializedAsync()
-        => await ReadBackAsync();
+    {
+        try
+        {
+            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
+            _customerIds = await context.Customers.OrderBy(c => c.Id).Take(12).Select(c => c.Id).ToArrayAsync();
+        }
+        catch (Exception exception)
+        {
+            _fault = Describe(exception);
+        }
+
+        await ReadBackAsync();
+    }
 
     private async Task TransferAsync()
     {

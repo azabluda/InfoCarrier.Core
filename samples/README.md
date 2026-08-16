@@ -20,6 +20,11 @@ Three pages, and a **wire inspector** down the right-hand side showing every rou
 operation, the size each way, how long it took, and the **decoded** payload — including the
 expression tree, which the panel expands out of the base64 it travels in.
 
+The store is seeded with **65 customers, 240 orders, 476 order lines, 30 products and 8
+categories** — enough that the grid pages properly and each page change is visibly its own query.
+The data is generated from row indices rather than from `Random`, so it is byte-identical on every
+machine: `InfoCarrier.Core.TransportTests` asserts exact counts against it.
+
 ### Two things WebAssembly will not do
 
 Both were found by running this app. **Neither is this provider's constraint** — they are the

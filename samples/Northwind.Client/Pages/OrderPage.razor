@@ -26,7 +26,7 @@
 
 <div class="toolbar">
     <div class="field">
-        <FluentNumberField @bind-Value="_orderId" Label="Order id" Min="1" Max="5" Style="width: 7rem;" />
+        <FluentNumberField @bind-Value="_orderId" Label="Order id" Min="1" Max="@NorthwindSeed.OrderCount.ToString()" Style="width: 7rem;" />
     </div>
     <FluentButton Appearance="Appearance.Accent" OnClick="LoadAsync">Load order</FluentButton>
     <span class="toolbar-spacer"></span>

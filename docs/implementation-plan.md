@@ -568,3 +568,28 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   the app did not — and the layout was therefore verified by **measuring geometry** rather than by
   looking at pixels. The user confirmed the result visually.
   No product code changed, so the spec suite is untouched.
+
+- [x] **M8-20. A store worth paging through.** `<this commit>`
+  The seed was four customers and five orders — enough to prove a wire, not enough to look like an
+  application. Now **65 customers, 240 orders, 476 order lines, 30 products, 8 categories**, so the
+  Customers grid pages twelve at a time across six pages and every page change is visibly its own
+  query (observed: round trips 2 → 4 on **Next**, page one holding ALFKI and page two CHOPS).
+  **Generated from row indices, not from `Random`.** A seeded `Random` is reproducible in practice
+  but ties exact-count assertions to a runtime implementation detail; index arithmetic is stable by
+  construction. The multipliers are coprime with the row counts so the spread looks unpatterned,
+  and the second and third line of an order step by 11 and 22 — distinct modulo 30, so no order can
+  name a product twice and violate the `(OrderId, ProductId)` primary key.
+  **The anchors did not move, and that was the constraint that shaped the change.** The transport
+  tests address rows by identity — order 1 belongs to ALFKI and has two lines of 12 and 3, product 1
+  is Chai at 18.00 — so customers ALFKI/ANATR/AROUT/BERGS, orders 1–5, their seven lines and
+  products 1–6 are byte-identical to before; everything generated starts after them. Only the
+  count-based expectations moved, and each was **measured** rather than estimated, with a throwaway
+  probe that seeded a scratch SQLite file and printed them: customers 4 → 65, `Quantity >= 10`
+  3 → 330, and the Germany filter from `["ALFKI"]` to the eight ids the seed now defines. That last
+  one stayed an **exact set** rather than becoming a count, because a `Where` that silently matched
+  everything would still produce a plausible number.
+  Pages adjusted to suit: 12 rows per page, the order-id spinner bounded by
+  `NorthwindSeed.OrderCount` instead of a hard-coded 5, and the Transfer page's target list read
+  from the store rather than hard-coded so it cannot drift from the seed again.
+  `InfoCarrier.Core.TransportTests`: Passed: 17, Failed: 0, Total: 17. No product code changed, so
+  the spec suite is untouched.
