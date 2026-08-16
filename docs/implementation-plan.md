@@ -173,6 +173,10 @@ Detailed steps are in
   despite a fourth project joining the solution, which is M8-1 paying for itself.
   Passed: 17, Failed: 0, Total: 17.
 
+### What Phase 1 left open
+
+Recorded by M8-7 and M8-8 as findings rather than absorbed. Each names where it is picked up.
+
 - **`SystemTextJsonInfoCarrierSerializer` uses reflection-based `JsonSerializer`.** Its
   `JsonSerializerOptions` sets no `TypeInfoResolver`, so the envelope and the request/response
   records are serialized reflectively. That is fine untrimmed and **will fail in a trimmed Blazor
@@ -202,3 +206,24 @@ Detailed steps are in
   sits below the product's own 64 MiB `MaxRequestBytes` — so the product's deliberate limit and its
   deliberate message are unreachable behind a default Kestrel. Recorded in
   `docs/security-review.md` §8 (2026-08-12 amendment).
+
+## Phase I — the browser (spec: `superpowers/specs/2026-08-11-blazor-wasm-sample-design.md` §10 phase 2)
+
+Detailed steps are in
+[`superpowers/plans/2026-08-16-northwind-blazor-wasm.md`](superpowers/plans/2026-08-16-northwind-blazor-wasm.md).
+**That document is the "how"; this one is the record of what landed and what it measured.**
+
+Phase 1 proved the wire, so a failure in this phase is a failure of the browser rather than of the
+protocol — which is the reason the spec split the phases here. Only two tasks touch anything the
+spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it.
+
+- [x] **M8-10. The Phase 2 plan is open.** `<this commit>`
+  Two environment facts were probed before planning rather than assumed, because each would have
+  changed the plan's shape. `dotnet new blazorwasm` exists on this SDK; and a trimmed publish
+  **does not need the `wasm-tools` workload**, which is not installed here — ILLink runs and the
+  publish succeeds, the workload buying AOT and native relinking, which spec §3.2 explicitly does
+  not want. That second fact is load-bearing: §3.2 chose `UseLazyLoadingProxies()` over
+  `ILazyLoader` on the reasoning that trimming and AOT are separate axes and a Blazor release
+  publish trims without AOT, and the toolchain agrees — the publish's
+  `Publishing without optimizations … recommend wasm-tools` line is about AOT, while ILLink's own
+  `Optimizing assemblies for size` line shows trimming ran.
