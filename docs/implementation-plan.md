@@ -267,3 +267,37 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   instance into a `$ref`. That was wrong for exactly the reason the same comment gives two
   paragraphs later — a context carries its own options, and these nodes never serialized through
   the transport serializer's.
+
+- [x] **M8-12. The browser runs, and `UseLazyLoadingProxies()` works in WebAssembly.** `<this commit>`
+  `samples/Northwind.Client`: a Blazor WASM app whose `DbContext` has no database, served by
+  `Northwind.Server` from the same origin (`UseBlazorFrameworkFiles` + `MapFallbackToFile`), so
+  `dotnet run --project samples/Northwind.Server` is the whole story and there is no CORS. The
+  wire inspector is an **`IInfoCarrierTransport` decorator** (`InspectingTransport`), not a change
+  to `HttpInfoCarrierTransport` — that file must stay free of sample types for its promotion to
+  remain a file move (spec §4.1) — and it doubles as a demonstration of what the seam is for.
+  **Spec §3.2's open question is answered, in a browser, with evidence.** It had recorded automatic
+  lazy loading as *"an experiment with a known answer if it fails"*. The Customers page prints the
+  runtime type of the rows it loaded and it reads **`CustomerProxy`**: Castle DynamicProxy emits
+  types under the Mono interpreter, so the `ILazyLoader` fallback is not needed and the model stays
+  clean. That leaves `RunAOTCompilation` as the only configuration where it would not hold, which
+  a Blazor release publish does not use.
+  **Verified by executing the app, not by serving it.** `dotnet run` plus headless Edge
+  (`--headless=new --virtual-time-budget --dump-dom`) renders the real WASM app and dumps the DOM,
+  which is a materially stronger check than curling `index.html` — the 17 transport tests already
+  cover the protocol, and what was unproven here was the *browser*. The dump shows the rows
+  (`ALFKI`, `Alfreds Futterkiste`), the runtime type, one round trip, and no error bar.
+  **It earned its keep immediately by catching a defect of mine.** The first run rendered an error
+  bar reading `InvalidOperationException: NodeAlreadyHasParent` and **no data at all**: `WireDecoder`
+  assigned an already-parented `JsonNode` back into its own slot, and because the decode runs inside
+  the transport decorator, *the inspector broke the query it was observing*. Two changes, and the
+  second is not a substitute for the first: the walk now returns a **replacement or null** so an
+  in-place expansion is never reassigned; and `Describe` catches broadly and renders the failure as
+  text, because a debugging aid must not be able to fail the operation it observes.
+  One packaging note: `Components.WebAssembly` floors
+  `Microsoft.Extensions.DependencyInjection` at 10.0.9, above the 10.0.0 that
+  `CentralPackageTransitivePinningEnabled` pins repo-wide (NU1109). Resolved with a
+  `VersionOverride` **in the sample**, deliberately not by raising the central version — that one is
+  the product's dependency floor and a sample must not move it.
+  No product code changed, so the spec suite is untouched. No `FluentIcon` anywhere: Fluent UI
+  ships its icon set as a separate large package, and a sample about the wire should not pull one
+  in to decorate a nav menu.

@@ -39,7 +39,16 @@ using (IServiceScope scope = app.Services.CreateScope())
     NorthwindSeed.Seed(context);
 }
 
+// Serve the Blazor client from this same host (spec §3.4). One origin removes CORS, removes a
+// second launch profile, and makes `dotnet run --project samples/Northwind.Server` the whole
+// story. MapFallbackToFile is what lets the client's own router own every path that is not the
+// InfoCarrier endpoint or a static file.
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
 app.MapInfoCarrier();
+
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

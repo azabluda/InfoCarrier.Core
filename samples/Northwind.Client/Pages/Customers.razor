@@ -1,0 +1,81 @@
+@* Licensed under the MIT license. See license.txt file in the project root for license information. *@
+@page "/"
+@implements IAsyncDisposable
+@inject IDbContextFactory<NorthwindContext> Contexts
+
+<PageTitle>Customers</PageTitle>
+
+<FluentLabel Typo="Typography.H1">Customers</FluentLabel>
+
+<p class="page-lede">
+    This page holds a <code>DbContext</code> with no database. The LINQ below became an expression
+    tree, crossed HTTP, ran against SQLite on the server, and came back as rows &mdash; watch the
+    panel on the right.
+</p>
+
+@if (_error is { } error)
+{
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
+}
+else if (_customers is null)
+{
+    <FluentProgressRing />
+}
+else
+{
+    <FluentDataGrid Items="@_customers.AsQueryable()" GridTemplateColumns="1fr 3fr 2fr 2fr">
+        <PropertyColumn Property="@(c => c.Id)" Title="Id" />
+        <PropertyColumn Property="@(c => c.CompanyName)" Title="Company" />
+        <PropertyColumn Property="@(c => c.City)" Title="City" />
+        <PropertyColumn Property="@(c => c.Country)" Title="Country" />
+    </FluentDataGrid>
+
+    @if (_runtimeType is { } runtimeType)
+    {
+        <p class="page-note">
+            These rows materialized as <code>@runtimeType</code>. A name ending in
+            <code>Proxy</code> is Castle DynamicProxy emitting a type <em>inside WebAssembly</em>
+            &mdash; which is what lets a navigation load itself on demand, with no
+            <code>ILazyLoader</code> in the model.
+        </p>
+    }
+}
+
+@code {
+    private NorthwindContext? _context;
+    private List<Customer>? _customers;
+    private string? _runtimeType;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // One context for the page: its own unit of work. The Order page is where that starts to
+        // matter; here it is simply the same shape.
+        _context = await Contexts.CreateDbContextAsync();
+
+        try
+        {
+            _customers = await _context.Customers.OrderBy(c => c.Id).ToListAsync();
+
+            // Spec §3.2 chose automatic lazy loading over ILazyLoader injection on the reasoning
+            // that Castle DynamicProxy needs Reflection.Emit, which the Mono interpreter has and
+            // an AOT build does not. Printing the runtime type is how that stops being a
+            // reasonable expectation and becomes something the page demonstrates.
+            _runtimeType = _customers.FirstOrDefault()?.GetType().Name;
+        }
+        catch (Exception exception)
+        {
+            // A transport failure must be visible, not swallowed (spec §6). No stack trace on
+            // screen: the panel on the right carries the detail.
+            _error = $"{exception.GetType().Name}: {exception.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_context is not null)
+        {
+            await _context.DisposeAsync();
+        }
+    }
+}

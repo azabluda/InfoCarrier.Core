@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <Description>The InfoCarrier sample client: a Blazor WebAssembly app whose DbContext has no database. Every query, save and transaction crosses HTTP to Northwind.Server.</Description>
+    <RootNamespace>Northwind.Client</RootNamespace>
+    <AssemblyName>Northwind.Client</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Northwind.Client.Transport, not Northwind.Server. The browser must not depend on the server
+      assembly, which is exactly why the transport was given a project of its own in Phase 1: it
+      is a plain class library over System.Net.Http, which is what makes it WebAssembly-safe.
+    -->
+    <ProjectReference Include="..\Northwind.Client.Transport\Northwind.Client.Transport.csproj" />
+    <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
+
+    <!--
+      Components.WebAssembly 10.0.0 pulls Components.Web 10.0.9, which floors
+      Microsoft.Extensions.DependencyInjection at 10.0.9, above the 10.0.0 that
+      CentralPackageTransitivePinningEnabled pins repo-wide, so the restore fails with NU1109.
+      Overridden HERE rather than raising the central version, because that one is the product's
+      dependency floor and a sample must not move it. Program.cs uses this package directly
+      (AddSingleton, AddDbContextFactory), so a direct reference is honest as well as convenient.
+    -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="10.0.9" />
+  </ItemGroup>
+
+</Project>

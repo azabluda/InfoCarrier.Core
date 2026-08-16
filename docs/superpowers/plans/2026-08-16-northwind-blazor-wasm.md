@@ -123,20 +123,20 @@ verification. A missing type cannot pass it.
 The first task with a browser in it. It ends with an app that loads, shows the inspector, and has
 one working page proving the wire reaches the browser — the rest are content.
 
-- [ ] **Step 1:** Package versions for `Microsoft.AspNetCore.Components.WebAssembly`, its
+- [x] **Step 1:** Package versions for `Microsoft.AspNetCore.Components.WebAssembly`, its
       `.DevServer`, and `Microsoft.FluentUI.AspNetCore.Components`.
-- [ ] **Step 2:** The project, referencing `Northwind.Shared` and `Northwind.Client.Transport`.
-- [ ] **Step 3:** `WireLog` + `InspectingTransport`. Ring buffer of 20, per spec §5.2: operation
+- [x] **Step 2:** The project, referencing `Northwind.Shared` and `Northwind.Client.Transport`.
+- [x] **Step 3:** `WireLog` + `InspectingTransport`. Ring buffer of 20, per spec §5.2: operation
       kind, envelope size, round-trip time, decoded payload.
-- [ ] **Step 4:** `Program.cs` — the whole client wiring, and short enough to read as the sample's
+- [x] **Step 4:** `Program.cs` — the whole client wiring, and short enough to read as the sample's
       centrepiece.
-- [ ] **Step 5:** The shell: Fluent UI layout, nav, and the inspector panel on the right.
-- [ ] **Step 6:** `Northwind.Server` serves it (`UseBlazorFrameworkFiles`, `UseStaticFiles`,
+- [x] **Step 5:** The shell: Fluent UI layout, nav, and the inspector panel on the right.
+- [x] **Step 6:** `Northwind.Server` serves it (`UseBlazorFrameworkFiles`, `UseStaticFiles`,
       `MapFallbackToFile`) so there is one origin and one command (spec §3.4).
-- [ ] **Step 7:** Run it and confirm in a browser that a query returns rows and the inspector shows
+- [x] **Step 7:** Run it and confirm in a browser that a query returns rows and the inspector shows
       the envelope. **This is where spec §3.2's proxy question gets its answer** — an experiment
       with a known fallback, not an assumption.
-- [ ] **Step 8:** Commit, recording what the proxy experiment showed.
+- [x] **Step 8:** Commit, recording what the proxy experiment showed.
 
 ---
 

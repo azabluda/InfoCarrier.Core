@@ -1,0 +1,33 @@
+@* Licensed under the MIT license. See license.txt file in the project root for license information. *@
+@inherits LayoutComponentBase
+
+@*
+    No FluentIcon anywhere in this app. Fluent UI ships its icon set as a separate, large package
+    (Microsoft.FluentUI.AspNetCore.Components.Icons), and a sample whose point is the wire should
+    not pull one in to decorate a nav menu.
+*@
+
+<FluentLayout>
+    <FluentHeader>
+        <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="12">
+            <span class="app-title">InfoCarrier.Core &mdash; Northwind</span>
+            <span class="app-subtitle">This browser has no database.</span>
+        </FluentStack>
+    </FluentHeader>
+
+    <FluentStack Class="app-body" Orientation="Orientation.Horizontal" HorizontalGap="0"
+                 VerticalAlignment="VerticalAlignment.Stretch">
+        <div class="app-nav">
+            <FluentNavMenu Width="180" Title="Pages" Expanded="true">
+                <FluentNavLink Href="/" Match="NavLinkMatch.All">Customers</FluentNavLink>
+            </FluentNavMenu>
+        </div>
+
+        <FluentBodyContent Class="app-content">
+            @Body
+        </FluentBodyContent>
+
+        @* Always present, on the right (spec §5.2). It is what makes this more than a CRUD demo. *@
+        <WireInspector />
+    </FluentStack>
+</FluentLayout>

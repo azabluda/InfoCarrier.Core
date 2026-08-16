@@ -1,0 +1,143 @@
+/* Licensed under the MIT license. See license.txt file in the project root for license information. */
+
+/*
+ * Deliberately small. Fluent UI brings the look; this file only lays out the three regions the
+ * spec asks for -- nav, content, and the inspector panel that is always on the right -- and
+ * styles the JSON dump, which no component library has an opinion about.
+ */
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+.app-title {
+    font-weight: 600;
+}
+
+.app-subtitle {
+    opacity: 0.75;
+    font-size: 0.85rem;
+}
+
+.app-body {
+    height: calc(100vh - 50px);
+    align-items: stretch;
+}
+
+.app-nav {
+    border-right: 1px solid var(--neutral-stroke-divider-rest);
+    flex: 0 0 auto;
+}
+
+.app-content {
+    padding: 1.25rem 1.5rem;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* ----- the inspector ----- */
+
+.wire-panel {
+    flex: 0 0 26rem;
+    max-width: 26rem;
+    border-left: 1px solid var(--neutral-stroke-divider-rest);
+    overflow-y: auto;
+    padding: 0.75rem;
+    background: var(--neutral-layer-2);
+}
+
+.wire-head {
+    margin-bottom: 0.5rem;
+}
+
+.wire-count,
+.wire-hint {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.wire-hint {
+    margin-top: 0.35rem;
+}
+
+.wire-empty {
+    padding: 1rem 0.25rem;
+    font-size: 0.85rem;
+    opacity: 0.6;
+}
+
+.wire-meta {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-bottom: 0.4rem;
+}
+
+.wire-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0.5rem 0 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+}
+
+.wire-json {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.7rem;
+    line-height: 1.35;
+    max-height: 18rem;
+    overflow: auto;
+    margin: 0;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background: var(--neutral-layer-1);
+    white-space: pre;
+}
+
+.wire-fault {
+    font-size: 0.78rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 4px;
+    background: var(--error-base-color, #b10e1c);
+    color: white;
+}
+
+/* ----- pages ----- */
+
+.page-lede {
+    max-width: 46rem;
+    opacity: 0.85;
+    margin-bottom: 1rem;
+}
+
+.loading {
+    padding: 2rem;
+    font-family: system-ui, sans-serif;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.75rem 1.25rem;
+    background: #ffe4b5;
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+}
+
+#blazor-error-ui .reload {
+    margin-left: 1rem;
+}
+
+.page-note {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    opacity: 0.8;
+    max-width: 46rem;
+}

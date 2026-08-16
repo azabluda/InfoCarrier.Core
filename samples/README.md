@@ -2,7 +2,29 @@
 
 A client whose `DbContext` has **no database**, talking to a SQLite-backed server over HTTP.
 
-## Run it
+There are two clients, and they are the same client twice: a **browser** (Blazor WebAssembly) and
+a **console**. Both build the same `NorthwindContext` from `Northwind.Shared`, both wire it with
+`UseInfoCarrier`, and neither has a connection string.
+
+## Run it in a browser
+
+One terminal, one command. The server hosts the client's files, so there is one origin and no CORS.
+
+```bash
+dotnet run --project samples/Northwind.Server
+```
+
+Then open <http://localhost:5199>.
+
+Three pages, and a **wire inspector** down the right-hand side showing every round trip: the
+operation, the size each way, how long it took, and the **decoded** payload — including the
+expression tree, which the panel expands out of the base64 it travels in.
+
+The Customers page prints the runtime type of the rows it loaded. It says `CustomerProxy`:
+Castle DynamicProxy emits types inside WebAssembly, which is what makes automatic lazy loading
+work there with no `ILazyLoader` in the model.
+
+## Run it in a console
 
 Two terminals, no arguments.
 

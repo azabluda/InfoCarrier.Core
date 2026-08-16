@@ -11,10 +11,20 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
     <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
+
+    <!--
+      The browser client, served from this host (spec §3.4): one process, one origin, no CORS and
+      one launch profile. This is a hosting reference, not a code one: nothing in this project
+      names a type from Northwind.Client.
+    -->
+    <ProjectReference Include="..\Northwind.Client\Northwind.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+
+    <!-- UseBlazorFrameworkFiles(), which maps _framework/* out of the referenced WASM project. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
   </ItemGroup>
 
 </Project>

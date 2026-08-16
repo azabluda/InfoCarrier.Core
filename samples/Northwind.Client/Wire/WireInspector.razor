@@ -1,0 +1,63 @@
+@* Licensed under the MIT license. See license.txt file in the project root for license information. *@
+@namespace Northwind.Client.Wire
+@implements IDisposable
+@inject WireLog Log
+
+<div class="wire-panel">
+    <div class="wire-head">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
+            <strong>Wire</strong>
+            <FluentSpacer />
+            <span class="wire-count">@Log.Sequence round trips</span>
+            <FluentButton Appearance="Appearance.Stealth" OnClick="@(() => Log.Clear())" Title="Clear the panel">Clear</FluentButton>
+        </FluentStack>
+        <div class="wire-hint">
+            Every entry below left this browser as an expression tree and came back as rows.
+        </div>
+    </div>
+
+    @if (Log.Entries.Count == 0)
+    {
+        <div class="wire-empty">Nothing yet. Load a page, or touch a navigation.</div>
+    }
+
+    <FluentAccordion>
+        @foreach (WireEntry entry in Log.Entries)
+        {
+            <FluentAccordionItem Heading="@($"#{entry.Sequence}  {entry.Operation}")">
+                <div class="wire-meta">
+                    <span>@entry.RequestBytes B out</span>
+                    <span>@entry.ResponseBytes B in</span>
+                    <span>@entry.Duration.TotalMilliseconds.ToString("F0") ms</span>
+                </div>
+
+                @if (entry.Fault is { } fault)
+                {
+                    <div class="wire-fault">@fault</div>
+                }
+
+                <div class="wire-label">Request</div>
+                <pre class="wire-json">@entry.RequestPayload</pre>
+
+                @if (entry.ResponsePayload.Length > 0)
+                {
+                    <div class="wire-label">Response</div>
+                    <pre class="wire-json">@entry.ResponsePayload</pre>
+                }
+            </FluentAccordionItem>
+        }
+    </FluentAccordion>
+</div>
+
+@code {
+    protected override void OnInitialized()
+        => Log.Changed += OnChanged;
+
+    public void Dispose()
+        => Log.Changed -= OnChanged;
+
+    // InvokeAsync, because the log is written from whichever continuation the transport completed
+    // on rather than from an event handler Blazor already owns.
+    private void OnChanged()
+        => InvokeAsync(StateHasChanged);
+}
