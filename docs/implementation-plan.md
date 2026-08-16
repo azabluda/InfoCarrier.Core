@@ -295,9 +295,13 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   text, because a debugging aid must not be able to fail the operation it observes.
   One packaging note: `Components.WebAssembly` floors
   `Microsoft.Extensions.DependencyInjection` at 10.0.9, above the 10.0.0 that
-  `CentralPackageTransitivePinningEnabled` pins repo-wide (NU1109). Resolved with a
-  `VersionOverride` **in the sample**, deliberately not by raising the central version — that one is
-  the product's dependency floor and a sample must not move it.
+  `CentralPackageTransitivePinningEnabled` pins repo-wide (NU1109). Resolved at the time with a
+  `VersionOverride` **in the sample**, on the stated grounds that the central entry was "the
+  product's dependency floor". **That reasoning was wrong and M8-16 corrected it** — no project
+  declares a `PackageReference` to that package, so the entry is a *transitive pin* and raising it
+  changes no declared dependency of `InfoCarrier.Core`, which references only
+  `Microsoft.EntityFrameworkCore` and `.Relational`. The override is gone and the central version
+  is 10.0.9.
   No product code changed, so the spec suite is untouched. No `FluentIcon` anywhere: Fluent UI
   ships its icon set as a separate large package, and a sample about the wire should not pull one
   in to decorate a nav menu.
@@ -384,3 +388,46 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   `#3 BeginTransaction` → `#4/#5 Query` → `#6 SaveChanges` → `#7 CommitTransaction`, then two more
   queries for the read-back.
   No product code changed, so the spec suite is untouched.
+
+- [x] **M8-16. The compiled model — and a second thing WebAssembly will not do.** `<this commit>`
+  `dotnet ef dbcontext optimize` output in `samples/Northwind.Client/CompiledModel/`, wired with
+  `options.UseModel(...)`, so the browser builds no model by reflection at start-up (spec §7
+  step 2). `dotnet-ef` is pinned in `.config/dotnet-tools.json`; the exact command is in
+  `samples/README.md`.
+  **THE FINDING, and it is EF's rather than ours.** A compiled model **cannot be used in Blazor
+  WebAssembly as generated**: EF's generated `NorthwindContextModel` initializes itself on a
+  `new Thread(…, 10 * 1024 * 1024)` — a deliberately large stack, because a big model can overflow
+  the default one (EF issue 31751) — and WebAssembly has no threads. Merely *reading*
+  `Instance` throws `TypeInitializationException` wrapping
+  `PlatformNotSupportedException: Arg_PlatformNotSupported` from `Thread.Start`, and **the app
+  never renders at all**. EF ships the escape hatch in the generated file itself:
+  `AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)` initializes inline
+  instead, and the large stack buys nothing for five entity types. Set as the first line of
+  `Program.cs`. **This is the second WASM threading constraint this phase has found** — M8-14's was
+  the synchronous lazy load — and they are the same shape: something in the stack assumes it may
+  block or fork, and a browser may do neither.
+  **Two things about generating it that the plan had wrong.** The plan said "generate against the
+  **server's** configuration"; that is backwards — the compiled model is the *client's*, because the
+  two halves build their models with different providers and only the client's is an InfoCarrier
+  model. What the server provides is the `--startup-project`, and it has to, because **the SDK emits
+  no `deps.json` for a Blazor WebAssembly project** and `dotnet ef` cannot load one. The server
+  already references the client (it hosts it), so the client's assembly and its
+  `IDesignTimeDbContextFactory` are reachable from the server's output. `UseModel` is called
+  explicitly rather than relying on auto-discovery, because that keys off an assembly attribute in
+  the *DbContext's own* assembly and `NorthwindContext` lives in `Northwind.Shared` — `dotnet ef`
+  warns about exactly this and offers `UseModel` as the answer.
+  `Microsoft.EntityFrameworkCore.Design` is referenced by the **server**, `PrivateAssets="all"`. That
+  is the `dotnet ef` *tool's* requirement for a startup project; C90's finding stands, and the
+  product still needs no Design dependency.
+  **A pre-existing break was found and fixed on the way, and it was not caused by this work.**
+  The solution stopped restoring with NU1109: `Microsoft.Extensions.DependencyInjection` pinned at
+  10.0.0 against a transitive floor of 10.0.9 reached through
+  `EFCore.Sqlite → Microsoft.Extensions.Logging 10.0.9`. Verified pre-existing by building
+  `InfoCarrier.Core.TransportTests` against **HEAD's own** `Directory.Packages.props`, where it fails
+  identically — so CI would have hit it regardless. Raised to 10.0.9, which changes no declared
+  dependency because **no project references that package** except the Blazor sample: with
+  `CentralPackageTransitivePinningEnabled`, the entry is a transitive pin. M8-12's `VersionOverride`
+  and its stated reasoning are removed; that entry above is corrected.
+  Verified in headless Edge with the compiled model in place: Customers renders rows and still
+  reports `CustomerProxy`, the Order page goes 1 → 2 → 3 round trips across its two loads, and the
+  Transfer page commits. Spec suite unchanged.

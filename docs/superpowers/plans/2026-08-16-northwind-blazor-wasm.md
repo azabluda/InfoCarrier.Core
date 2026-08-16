@@ -184,12 +184,14 @@ action.
 `dotnet ef dbcontext optimize` for `NorthwindContext` (available since C90), and
 `options.UseModel(...)` on the client so no model is built by reflection at start-up.
 
-- [ ] **Step 1:** Generate it against the **server's** configuration and check where it lands.
-- [ ] **Step 2:** Wire `UseModel` on the client; confirm the app still works.
-- [ ] **Step 3:** `bash eng/measure.sh m8-16 m8-11` — expected unchanged. This touches only
-      `samples/`, but C90–C93 are recent enough that a compiled model earning a regression is
-      worth ruling out rather than assuming.
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** Generate it. **Amended during the work:** the step said "against the server's
+      configuration", which was wrong — the compiled model is the *client's*, and must be generated
+      against the client's provider. The server is only the `--startup-project`, because a Blazor
+      WASM project emits no `deps.json` and `dotnet ef` cannot load one.
+- [x] **Step 2:** Wire `UseModel` on the client; confirm the app still works. **It did not, at
+      first** — see the `Issue31751` finding in `docs/implementation-plan.md`.
+- [x] **Step 3:** `bash eng/measure.sh m8-16 m8-11` — expected unchanged.
+- [x] **Step 4:** Commit.
 
 ---
 

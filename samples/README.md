@@ -20,9 +20,40 @@ Three pages, and a **wire inspector** down the right-hand side showing every rou
 operation, the size each way, how long it took, and the **decoded** payload — including the
 expression tree, which the panel expands out of the base64 it travels in.
 
-The Customers page prints the runtime type of the rows it loaded. It says `CustomerProxy`:
-Castle DynamicProxy emits types inside WebAssembly, which is what makes automatic lazy loading
-work there with no `ILazyLoader` in the model.
+The Customers page prints the runtime type of the rows it loaded. It says `CustomerProxy`, so
+Castle DynamicProxy does emit types inside WebAssembly.
+
+### Two things WebAssembly will not do, and what the sample does instead
+
+Both were found by running this app, and both are the browser's constraints rather than this
+provider's — a console or desktop client of InfoCarrier has neither.
+
+| What fails | Why | What the sample does |
+|---|---|---|
+| **Automatic lazy loading.** `order.Customer` throws `PlatformNotSupportedException: Cannot wait on monitors on this runtime` — *after* the request has gone out. | A navigation property getter is synchronous, so it must **block** on the HTTP round trip. A single-threaded runtime cannot block. `ILazyLoader.Load()` is synchronous too, so it fails identically. | `Entry(x).Reference(…).LoadAsync()` and `Entry(x).Collection(…).LoadAsync()` on the Order page. The navigation is still not fetched by the original query, and asking for it still costs exactly one round trip. |
+| **A compiled model, out of the box.** Reading `NorthwindContextModel.Instance` throws `TypeInitializationException` wrapping `PlatformNotSupportedException` from `Thread.Start`, and the app never renders. | EF's generated model initializes itself on a `new Thread(…, 10 MB)` to avoid stack overflow on large models (EF issue 31751). WebAssembly has no threads. | `AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)` as the first line of `Program.cs` — EF's own escape hatch, emitted into the generated file. It initializes inline instead. |
+
+### Regenerating the compiled model
+
+`dotnet ef` is pinned in `.config/dotnet-tools.json`; run `dotnet tool restore` once.
+
+```bash
+dotnet ef dbcontext optimize \
+  --project samples/Northwind.Client/Northwind.Client.csproj \
+  --startup-project samples/Northwind.Server/Northwind.Server.csproj \
+  --context NorthwindContext \
+  --output-dir CompiledModel \
+  --namespace Northwind.Client.CompiledModel
+```
+
+**The server is the startup project because the client cannot be one**: the SDK emits no
+`deps.json` for a Blazor WebAssembly project, so `dotnet ef` cannot load it. The server already
+references the client (it hosts it), so the client's assembly — and its
+`IDesignTimeDbContextFactory` — are reachable from the server's output.
+
+The model is generated against the **client's** configuration, not the server's. Both halves
+describe the same entities, but only the client's model is an InfoCarrier one, and it is the
+client that uses it.
 
 ## Run it in a console
 

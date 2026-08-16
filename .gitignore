@@ -25,3 +25,9 @@ MIGRATION_STATUS.md
 
 # Subagent-driven-development scratch: ledgers, briefs, review packages. Regenerable.
 .superpowers/
+
+# The Blazor client's generated launch profile. Deliberately NOT shipped: it starts the client on
+# its own DevServer with no Northwind.Server behind it, so every query fails. The sample is run
+# from the server, which hosts these files (samples/README.md). The server's own profile IS
+# tracked, because it pins the port both halves agree on.
+samples/Northwind.Client/Properties/launchSettings.json

@@ -23,15 +23,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
     <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
 
-    <!--
-      Components.WebAssembly 10.0.0 pulls Components.Web 10.0.9, which floors
-      Microsoft.Extensions.DependencyInjection at 10.0.9, above the 10.0.0 that
-      CentralPackageTransitivePinningEnabled pins repo-wide, so the restore fails with NU1109.
-      Overridden HERE rather than raising the central version, because that one is the product's
-      dependency floor and a sample must not move it. Program.cs uses this package directly
-      (AddSingleton, AddDbContextFactory), so a direct reference is honest as well as convenient.
-    -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="10.0.9" />
+    <!-- Program.cs uses this directly: AddSingleton, AddDbContextFactory. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 
 </Project>
