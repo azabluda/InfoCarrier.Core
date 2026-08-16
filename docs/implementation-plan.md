@@ -362,3 +362,25 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   component named `Order` shadows `Northwind.Shared.Model.Order` inside its own markup and every
   reference to the entity fails to compile. The route is unaffected.
   No product code changed, so the spec suite is untouched.
+
+- [x] **M8-15. The Transfer page — a rollback that is checked against the store, not against the
+  change tracker.** `<this commit>`
+  Two saves inside one `BeginTransactionAsync`: move order 1 to another customer, and take a unit
+  off a product's stock. A checkbox gives the second save a customer id no row has, so **the
+  server's** database refuses it. Both paths driven in headless Edge.
+  **Happy path:** committed; order 1 moved to `ANATR` and stock fell 38 → 37.
+  **Forced failure:** the fault arrives with its chain intact —
+  `DbUpdateException ← DbUpdateException ← InfoCarrierServerException: SQLite Error 19:
+  'FOREIGN KEY constraint failed'` — and **the store is untouched**: order 1 is still `ANATR`
+  rather than the requested `AROUT`, and stock is still 37, so the rollback undid the stock
+  decrement as well as the customer change. That is W5 and M4 in one action, and it is C83's
+  degradation rule visible in a sample: a browser has never heard of SQLite, so the server's
+  `SqliteException` arrives as the nearest type the client can actually construct, carrying the
+  message rather than losing it.
+  **Every assertion here is read back through a freshly created context**, so a client that merely
+  echoed its own change tracker could not satisfy any of them — the same discipline M8-6 used for
+  the write tests, for the same reason.
+  The panel shows the whole shape, which is what spec §5.1 asked of this page:
+  `#3 BeginTransaction` → `#4/#5 Query` → `#6 SaveChanges` → `#7 CommitTransaction`, then two more
+  queries for the read-back.
+  No product code changed, so the spec suite is untouched.

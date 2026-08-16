@@ -1,0 +1,153 @@
+@* Licensed under the MIT license. See license.txt file in the project root for license information. *@
+@page "/transfer"
+@inject IDbContextFactory<NorthwindContext> Contexts
+@inject WireLog Log
+
+<PageTitle>Transfer</PageTitle>
+
+<FluentLabel Typo="Typography.H1">A transaction, and a failure that travels</FluentLabel>
+
+<p class="page-lede">
+    Two saves inside one <code>BeginTransactionAsync</code>: move an order to another customer, and
+    take one unit off a product's stock. Tick the box and the second save is given a customer id
+    that does not exist, so the <em>server's</em> database refuses it. Either way the panel shows
+    the whole shape &mdash; <code>BeginTransaction</code>, <code>SaveChanges</code>, then
+    <code>Commit</code> or <code>Rollback</code>.
+</p>
+
+<p class="page-lede">
+    The exception you see below was raised on the server and rebuilt here from data in the response
+    (wire-protocol W5). A <code>SqliteException</code> cannot be rebuilt by a browser that has never
+    heard of SQLite, so it arrives as its nearest public base &mdash; stated rather than worked
+    around.
+</p>
+
+<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom">
+    <FluentSelect TOption="string" Items="@_customerIds" @bind-Value="_target" Label="Move order 1 to" />
+    <FluentCheckbox @bind-Value="_forceFailure" Label="Force a failure part-way" />
+    <FluentButton Appearance="Appearance.Accent" OnClick="TransferAsync" Disabled="@_running">Transfer</FluentButton>
+</FluentStack>
+
+@if (_fault is { } fault)
+{
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false" Title="Rolled back">
+        @fault
+    </FluentMessageBar>
+}
+else if (_ok is { } ok)
+{
+    <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@ok</FluentMessageBar>
+}
+
+<FluentCard Class="uow-card" Style="margin-top: 1rem;">
+    <h3>What the store holds now</h3>
+    <div class="kv"><span>Order 1 belongs to</span><span>@(_actualCustomer ?? "…")</span></div>
+    <div class="kv"><span>Chai (product 1) units in stock</span><span>@(_actualStock?.ToString() ?? "…")</span></div>
+    <p class="page-note">
+        Read back through a <strong>freshly created context</strong> after every attempt, so this is
+        the server's answer and not the local change tracker agreeing with itself.
+    </p>
+</FluentCard>
+
+<p class="page-note">Round trips so far: <strong>@Log.Sequence</strong>.</p>
+
+@code {
+    private const int OrderId = 1;
+    private const int ProductId = 1;
+
+    private static readonly string[] _customerIds = ["ALFKI", "ANATR", "AROUT", "BERGS"];
+
+    private string _target = "ANATR";
+    private bool _forceFailure;
+    private bool _running;
+    private string? _fault;
+    private string? _ok;
+    private string? _actualCustomer;
+    private int? _actualStock;
+
+    protected override async Task OnInitializedAsync()
+        => await ReadBackAsync();
+
+    private async Task TransferAsync()
+    {
+        _running = true;
+        _fault = null;
+        _ok = null;
+
+        try
+        {
+            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
+
+            // The transaction is the client's, held open across several round trips on the server
+            // side. Every operation below carries its id, which is what makes them one unit.
+            await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync();
+
+            try
+            {
+                Order order = await context.Orders.SingleAsync(o => o.Id == OrderId);
+                Product product = await context.Products.SingleAsync(p => p.Id == ProductId);
+
+                order.CustomerId = _target;
+                product.UnitsInStock -= 1;
+                await context.SaveChangesAsync();
+
+                if (_forceFailure)
+                {
+                    // A customer id no row has. The client cannot know that; the *server's*
+                    // database is what refuses it, which is the point -- the failure has to
+                    // travel back as data and be raised again here (W5).
+                    order.CustomerId = "ZZZZZ";
+                    await context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
+                _ok = $"Committed. Order {OrderId} now belongs to {_target}, and stock fell by one.";
+            }
+            catch (Exception exception)
+            {
+                await transaction.RollbackAsync();
+
+                // Type first, then message, then the inner chain -- the three things W5 carries.
+                // No stack trace on screen (spec §6); the panel holds the detail.
+                _fault = Describe(exception);
+            }
+        }
+        catch (Exception exception)
+        {
+            // Could not even open the transaction: a transport failure, not a server one.
+            _fault = Describe(exception);
+        }
+        finally
+        {
+            _running = false;
+            await ReadBackAsync();
+        }
+    }
+
+    private async Task ReadBackAsync()
+    {
+        try
+        {
+            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
+
+            _actualCustomer = (await context.Orders.SingleAsync(o => o.Id == OrderId)).CustomerId;
+            _actualStock = (await context.Products.SingleAsync(p => p.Id == ProductId)).UnitsInStock;
+        }
+        catch (Exception exception)
+        {
+            _fault ??= Describe(exception);
+        }
+    }
+
+    private static string Describe(Exception exception)
+    {
+        var text = new System.Text.StringBuilder($"{exception.GetType().Name}: {exception.Message}");
+
+        for (Exception? inner = exception.InnerException; inner is not null; inner = inner.InnerException)
+        {
+            text.Append($" ← {inner.GetType().Name}: {inner.Message}");
+        }
+
+        return text.ToString();
+    }
+}

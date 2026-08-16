@@ -172,10 +172,10 @@ Transactions and error fidelity together. Move an order to another customer insi
 `BeginTransactionAsync`; a checkbox forces a failure part-way, which shows rollback and W5 in one
 action.
 
-- [ ] **Step 1:** The page, with a `FluentMessageBar` for the fault. No stack trace on screen.
-- [ ] **Step 2:** Confirm both paths in the browser, and that the inspector shows
-      `BeginTransaction` → `SaveChanges` → `Commit`/`Rollback`.
-- [ ] **Step 3:** Commit.
+- [x] **Step 1:** The page, with a `FluentMessageBar` for the fault. No stack trace on screen.
+- [x] **Step 2:** Confirm both paths in the browser, and that the inspector shows
+      `BeginTransaction` → `SaveChanges` → `Commit`/`Rollback`. Observed exactly that.
+- [x] **Step 3:** Commit.
 
 ---
 
