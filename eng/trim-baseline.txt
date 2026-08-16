@@ -1,0 +1,29 @@
+# Trim-warning ratchet baseline — see eng/trim-ratchet.sh and the M8-17 entry in
+# docs/implementation-plan.md.
+#
+# `ours` counts UNIQUE IL2xxx diagnostics whose declaring member is an InfoCarrier.Core type, from
+# a `dotnet publish -c Release` of samples/Northwind.Client with PublishTrimmed=true.
+#
+# THE SPEC CRITERION IS NOT MET AND THIS FILE IS THE RECORD OF THAT. The Blazor sample design
+# (docs/superpowers/specs/2026-08-11-blazor-wasm-sample-design.md §9, criterion 4) asked for "no IL
+# warning attributable to InfoCarrier.Core". There are 86. They are not sloppiness: the wire carries
+# a type's NAME and the far end resolves it, so `Assembly.GetType(string)`, `MakeGenericMethod`,
+# `MakeGenericType` and a reflective object walk are what this provider is made of.
+# `[DynamicallyAccessedMembers]` cannot say "whatever type the caller's model names".
+#
+# THE APP RUNS TRIMMED ANYWAY. `PublishTrimmed=true` produces a working client -- M8-17 drove all
+# three pages against the published output: queries, the projection split, both async navigation
+# loads, a unit of work, and a committed transaction. These warnings mean the trimmer cannot PROVE
+# the reflection is safe for an arbitrary model, not that it broke this one.
+#
+# 2026-08-16 (M8-17) — first measurement. 86 ours, 1129 total across all assemblies. The other
+# 1043 are EF Core (864), Castle.Core (127), BCL (22), Fluent UI (11), the sample itself (8),
+# ASP.NET Core (4) and a handful else; none of them is this repo's to fix, so only `ours` is gated.
+# Distribution of ours by declaring type: DynamicValueMapper 12, NodeToExpressionTranslator 7,
+# TransparentIdentifierRewriter 6, PrimitiveCoercion 5, TupleCarrier 5, ProjectionRewriter 5+2,
+# TypeNodeResolver 3, QuerySplitter 3, ServerQueryExecutor 3, QueryExecutor 3+2, and the rest
+# singletons. By cause: 45 are DynamicallyAccessedMembers mismatches (mostly `Type.GetInterfaces()`
+# on a type the model named), 15 are MakeGenericMethod/MakeGenericType, 17 are IL2026 calls into
+# APIs already marked RequiresUnreferencedCode.
+ours=86
+total=1129

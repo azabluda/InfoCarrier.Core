@@ -431,3 +431,63 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   Verified in headless Edge with the compiled model in place: Customers renders rows and still
   reports `CustomerProxy`, the Order page goes 1 → 2 → 3 round trips across its two loads, and the
   Transfer page commits. Spec suite unchanged.
+
+- [x] **M8-17. The trimmed publish gate — and spec §9's fourth criterion is NOT met.** `<this commit>`
+  **The app publishes trimmed and works.** `PublishTrimmed=true`, driven end to end against the
+  *published* output in headless Edge: Customers renders rows and reports `CustomerProxy`, the Order
+  page goes 1 → 2 → 3 round trips across both async loads, and the Transfer page commits. That is
+  spec §9's criteria 1, 2 and 3.
+  **Criterion 4 — "no IL warning attributable to `InfoCarrier.Core`" — is not met. There are 86**,
+  out of 1129 across all assemblies (EF Core 864, Castle.Core 127, the rest small). Spec §7 said a
+  residue of ours "is not acceptable" and that a large result must be "reported with evidence
+  rather than absorbed silently", so it is reported. **They are the provider's premise showing
+  through, not sloppiness**: the wire carries a type's *name* and the far end resolves it, so
+  `Assembly.GetType(string)`, `MakeGenericMethod`, `MakeGenericType` and a reflective object walk
+  are what this provider is made of. `[DynamicallyAccessedMembers]` cannot say *"whatever type the
+  caller's model happens to name"*. By cause: 45 are DAM mismatches (mostly `Type.GetInterfaces()`
+  on a model-named type), 15 `MakeGeneric*`, 17 `IL2026` calls into APIs already marked
+  `RequiresUnreferencedCode`. By type, the top four are `DynamicValueMapper` 12,
+  `NodeToExpressionTranslator` 7, `TransparentIdentifierRewriter` 6, `PrimitiveCoercion` 5 — which
+  is spec §7's own prediction, confirmed. **The honest fix is `[RequiresUnreferencedCode]` on the
+  public query API**, telling callers the truth; that is a product decision and a milestone of its
+  own, not a sample's to take.
+  **So the gate is a ratchet, which is this repo's established answer to legitimately-not-green**
+  (`eng/ratchet.sh` for the spec suite, now `eng/trim-ratchet.sh` for this). Ours must not rise;
+  everyone else's is reported and not gated. Baseline and the full reasoning in
+  `eng/trim-baseline.txt`. Wired into the fast gate. Nothing is suppressed:
+  `SuppressTrimAnalysisWarnings=false` and `TrimmerSingleWarn=false` are set precisely so the
+  warnings are *visible*, which the Blazor SDK otherwise hides by default.
+  **Two traps the script itself fell into, both now guarded, and both instances of "establish that
+  the code ran".** It reported **`OURS: 0`** on its first run — an *incremental* publish does not
+  re-run ILLink, so the log had no diagnostics at all and the gate would have passed forever while
+  regressions sailed through. It now deletes `obj/Release` and `bin/Release` first **and** refuses
+  to believe a log with no ILLink banner in it. Separately, the first triage attributed **all 1129**
+  warnings to this product, because ILLink appends `[C:\…\Northwind.Client.csproj]` to every line
+  and **this repository's own path contains the string "InfoCarrier"** — classification is by
+  *declaring member*, never by the path. Both mistakes inverted the conclusion, in opposite
+  directions, and both were caught by looking at the actual lines.
+  Proved failable: with the baseline lowered by one, the script exits 1 and names the rise; at
+  baseline it exits 0.
+
+### What Phase 2 left open
+
+- **Spec §9 criterion 4 is not met: 86 IL warnings are ours.** Full reasoning in M8-17 above and in
+  `eng/trim-baseline.txt`. The honest remedy is `[RequiresUnreferencedCode]` on the public query
+  API — it tells a caller the truth instead of implying a guarantee this provider cannot give — and
+  a source-generated type registry for the cases where the model *is* known ahead of time. That is
+  a milestone, not a follow-up.
+- **WebAssembly cannot block, and that fact reaches further than lazy loading.** Two independent
+  instances turned up in this phase — the synchronous navigation getter (M8-14) and EF's
+  thread-based compiled-model initializer (M8-16). Any other place this stack blocks or forks will
+  fail the same way. **Neither is this provider's defect**, and neither affects a desktop or server
+  client.
+- **The sample has no automated test of its own.** The three pages were verified by driving a real
+  browser over the DevTools protocol, and that harness lives in a scratch directory rather than in
+  the repository. The 17 transport tests cover the protocol; nothing in CI would notice a page
+  breaking. A Playwright project is the obvious shape, and the trim ratchet already proves the
+  publish still *builds*.
+- **The two transport files are still in `samples/`**, so M8's HTTP-transport criterion remains
+  formally open, exactly as M8-7 recorded. Both remain free of sample types — the inspector was
+  built as a decorator specifically to keep that true — so promoting them is still a file move.
+- **`InProcessInfoCarrierServer._transactions` is still unbounded**, and the Transfer page is now a
+  second way to reach it. Recorded in `docs/security-review.md` §8 and unchanged by this phase.

@@ -8,6 +8,20 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <!--
+    The trimming gate (spec §7). A Blazor release publish trims anyway; what these add is
+    VISIBILITY. The Blazor SDK sets SuppressTrimAnalysisWarnings=true by default, so a plain
+    publish reports nothing at all and a trim hole in this provider would ship unnoticed.
+
+    TrimmerSingleWarn=false expands the per-assembly summary into individual IL2xxx warnings, which
+    is the difference between "InfoCarrier.Core has trim warnings" and knowing which call site.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishTrimmed>true</PublishTrimmed>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       Northwind.Client.Transport, not Northwind.Server. The browser must not depend on the server

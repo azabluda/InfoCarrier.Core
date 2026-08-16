@@ -241,6 +241,31 @@ Not yet implemented, in rough priority order:
   meaning "inherited spec tests failing". `eng/measure.sh` was scoped to one project in the same
   phase, because it parses the *last* `Total tests:` block and a second test project in the
   solution would have silently corrupted every measurement.
+- **The Blazor WebAssembly client works too (M8 Phase 2, M8-10…M8-17).** `dotnet run --project
+  samples/Northwind.Server` serves a browser client whose `DbContext` has no database: three pages,
+  a wire inspector that decodes the expression tree out of its base64 layers, a compiled model, and
+  a trimmed publish that runs. **Verified by executing it** — headless Edge over the **DevTools
+  protocol**, because `--dump-dom` renders a page but cannot press a button, and two of the three
+  pages are about what happens when you do.
+  **Three things that phase established, all of them about the browser rather than this provider:**
+  - **WebAssembly cannot block, and it bit twice.** Automatic lazy loading is impossible there — a
+    navigation getter is *synchronous*, so it must block on the round trip, and `order.Customer`
+    throws `Cannot wait on monitors on this runtime` **after the request has gone out**.
+    `ILazyLoader.Load()` is synchronous too, so the spec's recorded fallback fails identically; use
+    `Entry(x).Reference(…).LoadAsync()`. Separately, **a compiled model cannot even be loaded**
+    without `AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true)`, because EF
+    initializes it on a 10 MB-stack `Thread`. Proxies themselves are fine: Castle DynamicProxy
+    emits types there, which is what the Customers page's `CustomerProxy` line exists to show.
+  - **Trimming: 86 IL warnings are ours and spec §9's "none of ours" criterion is NOT met.** They
+    are the premise showing through — the wire carries a type's *name* — so
+    `[DynamicallyAccessedMembers]` cannot express them. Gated by direction in `eng/trim-ratchet.sh`
+    against `eng/trim-baseline.txt`, exactly as `eng/ratchet.sh` gates the spec suite. **The app
+    runs trimmed regardless**; the warnings mean unprovable, not broken.
+  - **`eng/trim-ratchet.sh` publishes CLEAN on purpose.** An incremental publish does not re-run
+    ILLink, and the script's first version reported `OURS: 0` — a gate that would have passed
+    forever. It now wipes `obj/Release` and refuses a log with no ILLink banner. **And classify
+    trim warnings by declaring member, never by file path: this repository's own path contains the
+    string "InfoCarrier", so a naive grep attributes all 1129 to this product.**
 - **Complex types work** (A32) — `ComplexTypesTrackingTestBase` is **249 of 251**, and the two
   left are one shape of one feature: a property-bag complex *collection* on an `Added` entity,
   which fails inside EF's own `StructuralTypeMaterializerSource`. A complex value cannot ride in

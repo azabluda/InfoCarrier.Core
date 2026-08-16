@@ -197,14 +197,15 @@ action.
 
 ### Task M8-17: The trimmed publish gate, CI, and the honest record
 
-- [ ] **Step 1:** `PublishTrimmed=true`, IL warnings as errors.
-- [ ] **Step 2:** Publish. **Triage every warning by which assembly owns it.** Spec §7: a residue
+- [x] **Step 1:** `PublishTrimmed=true`, and **not** warnings-as-errors — see step 3.
+- [x] **Step 2:** Publish. **Triage every warning by which assembly owns it.** Spec §7: a residue
       of EF-owned warnings is acceptable; a residue of ours is not. Expected sites are
       `TypeNodeResolver` and `DynamicValueMapper`'s reflective walk, both of which resolve types
       from strings.
-- [ ] **Step 3:** Fix what is ours, with `[DynamicallyAccessedMembers]` or — where it is honest —
-      `[RequiresUnreferencedCode]`.
-- [ ] **Step 4:** Add the publish to CI's fast gate.
-- [ ] **Step 5:** Record what Phase 2 did **not** close, in `docs/implementation-plan.md`, with the
+- [x] **Step 3:** **Not done, and reported instead.** 86 are ours and they are the provider's
+      premise rather than an oversight; the honest annotation would be `[RequiresUnreferencedCode]`
+      on the public query API, which is a product decision. Gated by `eng/trim-ratchet.sh`.
+- [x] **Step 4:** Add the publish to CI's fast gate.
+- [x] **Step 5:** Record what Phase 2 did **not** close, in `docs/implementation-plan.md`, with the
       same candour Phase 1's M8-7 used.
-- [ ] **Step 6:** Final measurement and commit.
+- [x] **Step 6:** Final measurement and commit.
