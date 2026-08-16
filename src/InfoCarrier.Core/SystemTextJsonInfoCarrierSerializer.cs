@@ -6,8 +6,14 @@ namespace InfoCarrier.Core;
 
 /// <summary>
 ///     Default <see cref="IInfoCarrierSerializer" /> backed by System.Text.Json
-///     (requirements §4.1, §4.5). Reference handling is enabled so entity graphs with
-///     circular navigation references round-trip (wire-protocol §3).
+///     (requirements §4.1, §4.5), reflection-free through <see cref="InfoCarrierJsonContext" />.
+///     <para>
+///         This layer sees only flat records: an entity graph reaches it already reduced to a
+///         <c>byte[]</c> by <see cref="Expressions.ExpressionJsonContext" />, which carries the
+///         node model's own repeat handling. It therefore enables no reference handling of its
+///         own — see <see cref="InfoCarrierJsonContext" /> for why it cannot, and why that costs
+///         nothing.
+///     </para>
 /// </summary>
 /// <remarks>
 ///     Initializes a new instance of the <see cref="SystemTextJsonInfoCarrierSerializer" />
@@ -23,12 +29,20 @@ namespace InfoCarrier.Core;
 /// </param>
 public sealed class SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits limits) : IInfoCarrierSerializer
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
-    };
+    // The source-generated context's own options, not a hand-built instance, and the three
+    // settings that used to be written here now live on it as [JsonSourceGenerationOptions].
+    //
+    // A context carries its own options -- ExpressionJsonContext states the same thing twice, for
+    // MaxDepth and for NumberHandling, both of which did nothing when they were tried on this
+    // class first. Building options here and merely *pointing* TypeInfoResolver at the context
+    // would work, but it would put the wire format in two places that have to agree; taking the
+    // context's options makes the context the single statement of it.
+    //
+    // Why a resolver at all: without one, System.Text.Json serializes reflectively. That is fine
+    // on a server and fails outright in a trimmed WebAssembly build, where the SDK sets
+    // JsonSerializerIsReflectionEnabledByDefault=false (M8's Phase 2). The expression tree was
+    // already covered by ExpressionJsonContext; this closes the envelope half.
+    private static readonly JsonSerializerOptions Options = InfoCarrierJsonContext.Default.Options;
 
     private readonly InfoCarrierPayloadLimits _limits = limits;
 

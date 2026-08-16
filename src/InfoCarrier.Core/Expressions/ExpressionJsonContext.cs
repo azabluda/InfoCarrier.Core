@@ -21,10 +21,15 @@ namespace InfoCarrier.Core.Expressions;
     // `ManyToManyTracking` tests failed with "a possible object cycle was detected … or if the
     // object depth is larger than the maximum allowed depth of 64".
     //
-    // Depth, not a cycle, despite what the message offers: the transport serializer already
-    // sets `ReferenceHandler.Preserve`, which is exactly the fix it suggests, so a repeated
-    // instance becomes a `$ref` rather than recursion. What is left is the longest path of
-    // *distinct* entities, which is a property of the caller's graph.
+    // Depth, not a cycle, despite what the message offers. This context sets no
+    // `ReferenceHandler` and never has; the node model carries its own `Ref` mechanism for a
+    // repeated instance, so recursion is not what runs out of depth here. What is left is the
+    // longest path of *distinct* entities, which is a property of the caller's graph.
+    //
+    // (This comment used to credit `ReferenceHandler.Preserve` on the transport serializer. That
+    // was wrong for exactly the reason the next paragraph gives -- a context carries its own
+    // options, and these nodes never serialize through the transport serializer's. The setting
+    // was removed from that class in M8-11 with no effect on anything here.)
     //
     // It belongs here rather than on `SystemTextJsonInfoCarrierSerializer`, which is where it
     // was tried first and did nothing: these nodes serialize through this source-generated

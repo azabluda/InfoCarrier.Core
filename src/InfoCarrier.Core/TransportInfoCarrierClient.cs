@@ -35,8 +35,14 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
 
     /// <inheritdoc />
     public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => await RoundTripAsync<object, TransactionResult>(
-            InfoCarrierOperation.BeginTransaction, new { }, cancellationToken).ConfigureAwait(false);
+        // `null`, not `new { }`. BeginTransaction takes no arguments, so the payload is a
+        // placeholder either way and the server never reads it -- but an anonymous type declared
+        // as `object` is serialized by its RUNTIME type, which a source-generated context cannot
+        // have metadata for. It failed outright once the resolver was set:
+        // "JsonTypeInfo metadata for type '<>f__AnonymousType0' was not provided". `null` is what
+        // every other void operation already puts there.
+        => await RoundTripAsync<object?, TransactionResult>(
+            InfoCarrierOperation.BeginTransaction, null, cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
     public async Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)

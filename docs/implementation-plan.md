@@ -227,3 +227,43 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   publish trims without AOT, and the toolchain agrees — the publish's
   `Publishing without optimizations … recommend wasm-tools` line is about AOT, while ILLink's own
   `Optimizing assemblies for size` line shows trimming ran.
+
+- [x] **M8-11. The envelope is source-generated, and `ReferenceHandler.Preserve` turned out to be
+  dead weight.** `<this commit>`
+  `InfoCarrierJsonContext` covers the envelope and every operation payload, so with
+  `ExpressionJsonContext` beside it nothing this provider puts on the wire is serialized
+  reflectively. **The type set was read off the call sites rather than guessed** — every generic
+  argument `IInfoCarrierSerializer` is instantiated with — and **the spec suite is what proves the
+  set is closed**: once a resolver is set, System.Text.Json does not silently fall back to
+  reflection for an undeclared type, it throws `"JsonTypeInfo metadata for type 'X' was not
+  provided"` and names it. 22,453 tests drive this serializer and none of them hit that. Suite
+  unchanged: `Total tests: 22453, Passed: 22219, Failed: 13, Skipped: 221`, with **identical name
+  lists and identical reasons** against `c96`. `InfoCarrier.Core.TransportTests`: Passed: 17,
+  Failed: 0, Total: 17.
+  **Two things the enumeration got wrong, and both were found by running it rather than by reading
+  it.** First, `BeginTransactionAsync` sent `new { }` — an *anonymous type*, declared as `object`
+  and therefore serialized by its **runtime** type, which no source-generated context can have
+  metadata for (`'<>f__AnonymousType0' was not provided`). It is now `null`, which is what every
+  other void operation already puts there and which the server never reads either way.
+  Second, and larger: **`ReferenceHandler.Preserve` cannot be carried onto a source-generated
+  context here, and did not need to be.** A generator cannot call an `init` accessor after
+  construction, so it sets `required`/`init` members through an object initializer, which
+  System.Text.Json treats as parameterized construction — and reference handling is unsupported
+  there. **The refusal is structural, not data-dependent**, which a probe settled in one run: an
+  envelope carrying a fault serializes to `"fault":{"$id":"2",…}` with **no `$ref` anywhere in the
+  document**, and then fails to read back with `"Reference metadata is not supported when
+  deserializing constructor parameters … Path: $.fault.$ref"`. Reading that message as a statement
+  about the data would have sent the fix in the wrong direction.
+  **Dropping it costs nothing because nothing at this layer was using it**, and that is checkable
+  rather than hopeful: every nested graph — expression tree, dynamic values, query results — is
+  serialized through `ExpressionJsonContext.Default.<TypeInfo>`, whose own options set no reference
+  handler, and arrives here already reduced to a `byte[]` (`SerializedQuery`, `SerializedResults`,
+  `SerializedValues`). What this serializer sees is flat records with no repeated instance in them.
+  The node model handles its own repeats with its own `Ref` mechanism.
+  **It is still a wire change** — `$id` no longer appears on an envelope — and both ends change
+  together, so protocol version 1 is unaffected.
+  A stale claim was corrected on the way: `ExpressionJsonContext`'s `MaxDepth` comment credited
+  *"the transport serializer already sets `ReferenceHandler.Preserve`"* for turning a repeated
+  instance into a `$ref`. That was wrong for exactly the reason the same comment gives two
+  paragraphs later — a context carries its own options, and these nodes never serialized through
+  the transport serializer's.

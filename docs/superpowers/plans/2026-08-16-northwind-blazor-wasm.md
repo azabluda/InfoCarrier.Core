@@ -104,15 +104,17 @@ record it working: a type absent from a context whose resolver is set fails hard
 reflection. So the 22,453-test spec suite, which drives this serializer on every hop, is the
 verification. A missing type cannot pass it.
 
-- [ ] **Step 1:** Add `InfoCarrierJsonContext`, `GenerationMode = JsonSourceGenerationMode.Metadata`
-      (the fast path does not support `ReferenceHandler`), with the source-gen options carrying the
-      three settings `Options` sets today: camelCase, `ReferenceHandler.Preserve`, no indenting.
-- [ ] **Step 2:** Point `SystemTextJsonInfoCarrierSerializer` at `InfoCarrierJsonContext.Default.Options`.
-- [ ] **Step 3:** Build; run `test/InfoCarrier.Core.TransportTests`.
-- [ ] **Step 4:** `bash eng/measure.sh m8-11 c96`. **Expected: `FAILING: 13  TOTAL: 22453`, with
+- [x] **Step 1:** Add `InfoCarrierJsonContext`, `GenerationMode = JsonSourceGenerationMode.Metadata`.
+      **Amended during the work:** the step as written said to carry over all three settings the
+      old `Options` had, including `ReferenceHandler.Preserve`. That one **cannot** come along, and
+      it turned out not to have been doing anything — see M8-11's entry in
+      `docs/implementation-plan.md`.
+- [x] **Step 2:** Point `SystemTextJsonInfoCarrierSerializer` at `InfoCarrierJsonContext.Default.Options`.
+- [x] **Step 3:** Build; run `test/InfoCarrier.Core.TransportTests`.
+- [x] **Step 4:** `bash eng/measure.sh m8-11 c96`. **Expected: `FAILING: 13  TOTAL: 22453`, with
       empty FIXED, BROKEN and REASONS diffs.** Anything else means the type set is not closed, and
       the failure message names the missing type outright.
-- [ ] **Step 5:** Commit.
+- [x] **Step 5:** Commit.
 
 ---
 
