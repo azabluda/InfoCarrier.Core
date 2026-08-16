@@ -533,3 +533,38 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   never affected static trim analysis. `samples/README.md` rewritten around both constraints.
   M8-16's entry is marked superseded rather than edited, since its measurements were real and only
   its conclusion was wrong. No product code changed, so the spec suite is untouched.
+
+- [x] **M8-19. The browser UI, and one line of `index.html` that silently disabled every layout
+  style.** `<this commit>`
+  Reported as "looks very unprofessional": bare links, misaligned controls, the inspector stacked
+  under the content instead of docked.
+  **Root cause was a missing `<link>`, not styling.** `index.html` never referenced
+  **`Northwind.Client.styles.css`**, Blazor's scoped-CSS bundle — which carries every `b-xxxxxxx`
+  rule belonging to this app *and* to referenced Razor class libraries. Without it the Fluent web
+  components still render (they carry their own shadow-DOM styling from JavaScript, so buttons and
+  fields looked fine) but **nothing lays out**: `FluentStack`'s `.stack-horizontal` has no
+  definition, so every stack fell back to block flow. Confirmed by `document.styleSheets` listing
+  only `reboot.css` and `app.css`.
+  The shell is now a **CSS grid** (`header` / `nav` / `main` / `wire`) rather than nested stacks —
+  three regions that must hold their proportions cannot collapse into block flow. The inspector is
+  docked right, full height, with its header fixed and only its list scrolling. Pages gained a
+  toolbar + card vocabulary, and `FluentDesignTheme` supplies light/dark from the OS.
+  **Two alignment defects, and the geometry named both.** A labelled Fluent field is taller than a
+  bare button, so `align-items: end` is needed to share a baseline; and Fluent renders a field's
+  `Label` as a **sibling** of the input, so each label became its own column in the flex row — a
+  `.field` wrapper makes label+input one item. Measured before/after: controls now share
+  `bottom=299`. A later pass added the vertical rhythm between stacked panels (toolbar → cards was
+  a 0px seam; now 16px) — and **that pass introduced a third defect and had to be corrected**: it
+  gave the message bar `display: block`, which overrode the component's own grid layout and threw
+  its intent icon above the text instead of beside it. **Position a Fluent component; never restyle
+  its box.** Margin only now, and the success message dropped the ✅ it carried, which had been a
+  second tick beside the one the component draws itself.
+  Emoji instead of `FluentIcon`, which keeps the separate multi-megabyte icon package out.
+  **A verification lesson worth more than the fix.** The headless browser served a **cached**
+  `index.html` and `app.css` after both had been rewritten, which looks exactly like "the CSS does
+  not work" and produced one round of confident wrong diagnosis. The harness now sends
+  `Network.setCacheDisabled` before navigating. Separately, headless Edge **would not rasterize**
+  this app for `Page.captureScreenshot` — a trivial page captured fine, so the pipeline worked and
+  the app did not — and the layout was therefore verified by **measuring geometry** rather than by
+  looking at pixels. The user confirmed the result visually.
+  No product code changed, so the spec suite is untouched.

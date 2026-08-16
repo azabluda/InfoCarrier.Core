@@ -3,16 +3,32 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InfoCarrier.Core — Northwind</title>
     <base href="/" />
+
     <link rel="stylesheet" href="_content/Microsoft.FluentUI.AspNetCore.Components/css/reboot.css" />
+
+    <!--
+        Blazor's scoped-CSS bundle, and it is not optional. Every `b-xxxxxxx` style belonging to
+        this app AND to referenced Razor class libraries lives here -- which for Fluent UI means
+        FluentStack's `.stack-horizontal`, the data grid, the nav menu, the layout regions. Without
+        this line the web components still render (they carry their own shadow DOM styling from
+        JavaScript, so buttons and text fields look right) but NOTHING lays out: stacks fall back to
+        block flow and the page looks like unstyled HTML with a few smart controls in it. That is
+        exactly how this sample looked until it was added.
+    -->
+    <link rel="stylesheet" href="Northwind.Client.styles.css" />
+
     <link rel="stylesheet" href="css/app.css" />
 </head>
 
 <body>
     <div id="app">
-        <div class="loading">Loading the client…</div>
+        <div class="startup">
+            <div class="startup-spinner"></div>
+            <p>Starting the client…</p>
+        </div>
     </div>
 
     <div id="blazor-error-ui">

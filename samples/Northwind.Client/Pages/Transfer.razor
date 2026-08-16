@@ -5,7 +5,7 @@
 
 <PageTitle>Transfer</PageTitle>
 
-<FluentLabel Typo="Typography.H1">A transaction, and a failure that travels</FluentLabel>
+<h1>🔄 A transaction, and a failure that travels</h1>
 
 <p class="page-lede">
     Two saves inside one <code>BeginTransactionAsync</code>: move an order to another customer, and
@@ -15,18 +15,17 @@
     <code>Commit</code> or <code>Rollback</code>.
 </p>
 
-<p class="page-lede">
-    The exception you see below was raised on the server and rebuilt here from data in the response
-    (wire-protocol W5). A <code>SqliteException</code> cannot be rebuilt by a browser that has never
-    heard of SQLite, so it arrives as its nearest public base &mdash; stated rather than worked
-    around.
-</p>
-
-<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom">
-    <FluentSelect TOption="string" Items="@_customerIds" @bind-Value="_target" Label="Move order 1 to" />
-    <FluentCheckbox @bind-Value="_forceFailure" Label="Force a failure part-way" />
+<div class="toolbar">
+    <div class="field">
+        <FluentSelect TOption="string" Items="@_customerIds" @bind-Value="_target" Label="Move order 1 to" />
+    </div>
+    <div class="field field-inline">
+        <FluentCheckbox @bind-Value="_forceFailure" Label="Force a failure part-way" />
+    </div>
     <FluentButton Appearance="Appearance.Accent" OnClick="TransferAsync" Disabled="@_running">Transfer</FluentButton>
-</FluentStack>
+    <span class="toolbar-spacer"></span>
+    <span class="toolbar-note">@Log.Sequence round trips so far</span>
+</div>
 
 @if (_fault is { } fault)
 {
@@ -39,17 +38,32 @@ else if (_ok is { } ok)
     <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@ok</FluentMessageBar>
 }
 
-<FluentCard Class="uow-card" Style="margin-top: 1rem;">
-    <h3>What the store holds now</h3>
-    <div class="kv"><span>Order 1 belongs to</span><span>@(_actualCustomer ?? "…")</span></div>
-    <div class="kv"><span>Chai (product 1) units in stock</span><span>@(_actualStock?.ToString() ?? "…")</span></div>
-    <p class="page-note">
-        Read back through a <strong>freshly created context</strong> after every attempt, so this is
-        the server's answer and not the local change tracker agreeing with itself.
-    </p>
-</FluentCard>
+<div class="card-row">
+    <div class="card">
+        <p class="card-title">🗄️ What the store holds now</p>
 
-<p class="page-note">Round trips so far: <strong>@Log.Sequence</strong>.</p>
+        <div class="kv">
+            <span class="kv-key">Order 1 belongs to</span>
+            <span class="kv-value">@(_actualCustomer ?? "…")</span>
+        </div>
+        <div class="kv">
+            <span class="kv-key">Chai (product 1) units in stock</span>
+            <span class="kv-value">@(_actualStock?.ToString() ?? "…")</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <p class="card-title">🔎 Why this is trustworthy</p>
+        <p class="page-note" style="margin-top: 0;">
+            Both figures are read back through a <strong>freshly created context</strong> after every
+            attempt, so they are the server's answer and not the local change tracker agreeing with
+            itself. The exception below, when there is one, was raised on the server and rebuilt here
+            from data in the response (wire-protocol W5) &mdash; a <code>SqliteException</code>
+            cannot be reconstructed by a browser that has never heard of SQLite, so it arrives as its
+            nearest public base, carrying the message rather than losing it.
+        </p>
+    </div>
+</div>
 
 @code {
     private const int OrderId = 1;
@@ -101,6 +115,9 @@ else if (_ok is { } ok)
                 }
 
                 await transaction.CommitAsync();
+
+                // No emoji in the text: FluentMessageBar draws its own icon for the intent, and a
+                // second tick beside it reads as a mistake.
                 _ok = $"Committed. Order {OrderId} now belongs to {_target}, and stock fell by one.";
             }
             catch (Exception exception)

@@ -1,122 +1,484 @@
 /* Licensed under the MIT license. See license.txt file in the project root for license information. */
 
 /*
- * Deliberately small. Fluent UI brings the look; this file only lays out the three regions the
- * spec asks for -- nav, content, and the inspector panel that is always on the right -- and
- * styles the JSON dump, which no component library has an opinion about.
+ * Layout and page chrome only. Fluent UI styles the controls; this file arranges the three regions
+ * of the shell and gives the pages the card/toolbar structure that CRUD screens are expected to
+ * have. Colours are taken from Fluent's design tokens (--neutral-*, --accent-*) rather than
+ * hard-coded, so light and dark both work and the accent stays consistent with the controls.
  */
 
-html, body {
+html,
+body {
     height: 100%;
     margin: 0;
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--neutral-layer-2);
+    color: var(--neutral-foreground-rest);
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.app-shell {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr) 30rem;
+    grid-template-rows: 52px minmax(0, 1fr);
+    grid-template-areas:
+        "header header header"
+        "nav    main   wire";
+    height: 100vh;
+}
+
+.app-header {
+    grid-area: header;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0 1.25rem;
+    background: var(--neutral-layer-1);
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+}
+
+.app-logo {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.app-mark {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.app-mark-dim {
+    opacity: 0.55;
+    font-weight: 400;
+}
+
+.app-sep {
+    opacity: 0.35;
 }
 
 .app-title {
-    font-weight: 600;
+    font-weight: 500;
 }
 
-.app-subtitle {
-    opacity: 0.75;
-    font-size: 0.85rem;
+.app-badge {
+    margin-left: auto;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--neutral-layer-3);
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    opacity: 0.85;
 }
 
-.app-body {
-    height: calc(100vh - 50px);
-    align-items: stretch;
-}
+/* ------------------------------------------------------------------ nav */
 
 .app-nav {
+    grid-area: nav;
+    padding: 0.75rem 0.5rem;
+    background: var(--neutral-layer-1);
     border-right: 1px solid var(--neutral-stroke-divider-rest);
-    flex: 0 0 auto;
+    overflow-y: auto;
 }
 
-.app-content {
-    padding: 1.25rem 1.5rem;
+.nav-item {
+    display: block;
+    padding: 0.5rem 0.7rem;
+    margin-bottom: 0.15rem;
+    border-radius: 6px;
+    text-decoration: none;
+    color: inherit;
+    border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+    background: var(--neutral-fill-secondary-hover, rgba(128, 128, 128, 0.12));
+}
+
+.nav-item.active {
+    background: var(--neutral-fill-secondary-rest, rgba(128, 128, 128, 0.08));
+    border-left-color: var(--accent-fill-rest);
+}
+
+.nav-label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.nav-hint {
+    display: block;
+    font-size: 0.72rem;
+    opacity: 0.6;
+}
+
+/* ----------------------------------------------------------------- main */
+
+.app-main {
+    grid-area: main;
     overflow-y: auto;
+    padding: 1.5rem 1.75rem 3rem;
+}
+
+.app-main h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.35rem;
+}
+
+.page-lede {
+    max-width: 62ch;
+    margin: 0 0 0.75rem;
+    line-height: 1.55;
+    opacity: 0.85;
+    font-size: 0.9rem;
+}
+
+.page-note {
+    max-width: 62ch;
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+    opacity: 0.75;
+    line-height: 1.5;
+}
+
+code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85em;
+    padding: 0.05em 0.3em;
+    border-radius: 4px;
+    background: var(--neutral-layer-3);
+}
+
+/* ---------------------------------------------------------------- cards */
+
+.card {
+    background: var(--neutral-layer-1);
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    border-radius: 8px;
+    padding: 1rem 1.15rem;
+    margin-top: 1rem;
+}
+
+.card-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.6;
+    margin: 0 0 0.75rem;
+}
+
+/*
+ * Vertical rhythm between stacked panels. Every block in the content column -- toolbar, message
+ * bar, grid, card row -- carries the same 1rem top margin, so a page reads as separated panels
+ * rather than one seam-to-seam slab.
+ */
+.card-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.card-row > .card {
+    flex: 1 1 20rem;
+    margin-top: 0;
+}
+
+/*
+ * The toolbar. `align-items: end` puts every control on one baseline: a labelled field is taller
+ * than a bare button, so a row aligned to the top leaves the button floating above the inputs.
+ * The `.field` wrapper below is the other half of the fix.
+ */
+.toolbar {
+    display: flex;
+    gap: 0.85rem;
+    align-items: end;
+    flex-wrap: wrap;
+    padding: 0.9rem 1rem;
+    background: var(--neutral-layer-1);
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    border-radius: 8px;
+    margin: 1rem 0 0;
+}
+
+/*
+ * One flex item per control. Fluent renders a field's Label as a SIBLING of the input rather than
+ * wrapping it, so without this each label became its own column in the toolbar row and sat beside
+ * its input instead of above it -- visible as controls that do not line up.
+ */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.field-inline {
+    padding-bottom: 0.45rem;
+}
+
+.toolbar-spacer {
     flex: 1 1 auto;
-    min-width: 0;
 }
 
-/* ----- the inspector ----- */
+.toolbar-note {
+    font-size: 0.78rem;
+    opacity: 0.65;
+    padding-bottom: 0.4rem;
+}
 
-.wire-panel {
-    flex: 0 0 26rem;
-    max-width: 26rem;
+/* ----------------------------------------------------------------- grid */
+
+.grid-wrap {
+    margin-top: 1rem;
+    background: var(--neutral-layer-1);
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    border-radius: 8px;
+    padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.grid-foot {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.4rem 0.5rem 0.2rem;
+}
+
+/* ------------------------------------------------------- key/value rows */
+
+.kv {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+}
+
+.kv:last-child {
+    border-bottom: none;
+}
+
+.kv-key {
+    opacity: 0.65;
+    font-size: 0.82rem;
+}
+
+.kv-value {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.kv-value.muted {
+    font-weight: 400;
+    opacity: 0.6;
+}
+
+/*
+ * The message bar needs the rhythm stated explicitly, but MARGIN ONLY. An earlier version also set
+ * `display: block` here, which overrode the component's own flex layout and threw its intent icon
+ * out of line -- it floated above the text instead of sitting beside it. Never restyle a Fluent
+ * component's box; position it.
+ */
+.app-main fluent-message-bar,
+.app-main .fluent-messagebar {
+    margin-top: 1rem;
+}
+
+.actions {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------ inspector */
+
+.app-wire {
+    grid-area: wire;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--neutral-layer-1);
     border-left: 1px solid var(--neutral-stroke-divider-rest);
-    overflow-y: auto;
-    padding: 0.75rem;
-    background: var(--neutral-layer-2);
 }
 
 .wire-head {
-    margin-bottom: 0.5rem;
+    padding: 0.85rem 1rem 0.7rem;
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
 }
 
-.wire-count,
-.wire-hint {
-    font-size: 0.8rem;
+.wire-head-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.wire-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.wire-count {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
     opacity: 0.7;
 }
 
 .wire-hint {
-    margin-top: 0.35rem;
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    line-height: 1.45;
+}
+
+/* The only scrolling region in the panel, so the header stays put. */
+.wire-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.5rem;
 }
 
 .wire-empty {
-    padding: 1rem 0.25rem;
-    font-size: 0.85rem;
+    padding: 1.25rem 0.5rem;
+    font-size: 0.83rem;
+    opacity: 0.55;
+}
+
+.wire-entry {
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    border-radius: 6px;
+    margin-bottom: 0.4rem;
+    background: var(--neutral-layer-2);
+    overflow: hidden;
+}
+
+.wire-entry > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.5rem 0.65rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.wire-entry > summary::-webkit-details-marker {
+    display: none;
+}
+
+.wire-seq {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.5;
+    font-size: 0.75rem;
+}
+
+.wire-op {
+    font-weight: 600;
+}
+
+.wire-op-tag {
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    background: var(--neutral-layer-3);
+}
+
+.wire-op-tag.op-save {
+    background: var(--accent-fill-rest);
+    color: var(--foreground-on-accent-rest, #fff);
+}
+
+.wire-op-tag.op-tx {
+    background: var(--neutral-foreground-rest);
+    color: var(--neutral-layer-1);
+}
+
+.wire-ms {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
     opacity: 0.6;
+    font-size: 0.75rem;
+}
+
+.wire-body {
+    padding: 0 0.65rem 0.6rem;
 }
 
 .wire-meta {
     display: flex;
     gap: 0.75rem;
-    font-size: 0.75rem;
-    opacity: 0.8;
-    margin-bottom: 0.4rem;
+    font-size: 0.72rem;
+    opacity: 0.65;
+    padding: 0.15rem 0 0.5rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.wire-fault {
+    font-size: 0.76rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background: rgba(180, 20, 30, 0.12);
+    border: 1px solid rgba(180, 20, 30, 0.35);
 }
 
 .wire-label {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    margin: 0.5rem 0 0.2rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.7;
+    letter-spacing: 0.05em;
+    opacity: 0.55;
+    margin: 0.4rem 0 0.2rem;
 }
 
 .wire-json {
     font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-    font-size: 0.7rem;
-    line-height: 1.35;
-    max-height: 18rem;
+    font-size: 0.68rem;
+    line-height: 1.4;
+    max-height: 15rem;
     overflow: auto;
     margin: 0;
-    padding: 0.5rem;
+    padding: 0.5rem 0.6rem;
     border-radius: 4px;
-    background: var(--neutral-layer-1);
+    background: var(--neutral-layer-3);
     white-space: pre;
 }
 
-.wire-fault {
-    font-size: 0.78rem;
-    padding: 0.4rem 0.5rem;
-    border-radius: 4px;
-    background: var(--error-base-color, #b10e1c);
-    color: white;
-}
+/* ------------------------------------------------------------- start-up */
 
-/* ----- pages ----- */
-
-.page-lede {
-    max-width: 46rem;
-    opacity: 0.85;
-    margin-bottom: 1rem;
-}
-
-.loading {
-    padding: 2rem;
+.startup {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
     font-family: system-ui, sans-serif;
+    color: #666;
+}
+
+.startup-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid #d0d0d0;
+    border-top-color: #0f6cbd;
+    border-radius: 50%;
+    animation: startup-spin 0.9s linear infinite;
+}
+
+@keyframes startup-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 #blazor-error-ui {
@@ -127,6 +489,7 @@ html, body {
     right: 0;
     padding: 0.75rem 1.25rem;
     background: #ffe4b5;
+    color: #222;
     box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.3);
     z-index: 1000;
 }
@@ -135,52 +498,18 @@ html, body {
     margin-left: 1rem;
 }
 
-.page-note {
-    margin-top: 1rem;
-    font-size: 0.85rem;
-    opacity: 0.8;
-    max-width: 46rem;
-}
+/* --------------------------------------------------------- narrow view */
 
-.grid-wrap {
-    margin-top: 1rem;
-}
+@media (max-width: 1200px) {
+    .app-shell {
+        grid-template-columns: 200px minmax(0, 1fr);
+        grid-template-areas:
+            "header header"
+            "nav    main";
+    }
 
-.uow {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-}
-
-.uow-card {
-    padding: 1rem;
-    min-width: 22rem;
-}
-
-.uow-card h3 {
-    margin: 0 0 0.75rem;
-    font-size: 1rem;
-}
-
-.kv {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.3rem 0;
-    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
-}
-
-.kv > span:first-child {
-    opacity: 0.7;
-    font-size: 0.85rem;
-}
-
-.uow-actions {
-    margin-top: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    /* Docking a 30rem panel on a narrow screen squeezes the content it exists to explain. */
+    .app-wire {
+        display: none;
+    }
 }

@@ -3,32 +3,49 @@
 @implements IDisposable
 @inject WireLog Log
 
-<div class="wire-panel">
-    <div class="wire-head">
-        <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
-            <strong>Wire</strong>
-            <FluentSpacer />
-            <span class="wire-count">@Log.Sequence round trips</span>
-            <FluentButton Appearance="Appearance.Stealth" OnClick="@(() => Log.Clear())" Title="Clear the panel">Clear</FluentButton>
-        </FluentStack>
-        <div class="wire-hint">
-            Every entry below left this browser as an expression tree and came back as rows.
-        </div>
-    </div>
+@*
+    Native <details> rather than FluentAccordion: an accordion animates height, and twenty of them
+    inside a scrolling panel that repaints on every round trip is more distracting than useful. A
+    <details> opens instantly, keeps its own state, and costs no component.
+*@
 
+<div class="wire-head">
+    <div class="wire-head-row">
+        <span class="wire-title">📡 Wire</span>
+        <span class="wire-count">@Log.Sequence round trip@(Log.Sequence == 1 ? "" : "s")</span>
+        <FluentButton Appearance="Appearance.Stealth" OnClick="@(() => Log.Clear())" Title="Clear the panel">
+            Clear
+        </FluentButton>
+    </div>
+    <div class="wire-hint">
+        Every entry left this browser as an expression tree and came back as rows. Nested payloads
+        are decoded, so the query itself is readable.
+    </div>
+</div>
+
+<div class="wire-list">
     @if (Log.Entries.Count == 0)
     {
-        <div class="wire-empty">Nothing yet. Load a page, or touch a navigation.</div>
+        <div class="wire-empty">💤 Nothing yet. Load a page, or ask for a navigation.</div>
     }
 
-    <FluentAccordion>
-        @foreach (WireEntry entry in Log.Entries)
-        {
-            <FluentAccordionItem Heading="@($"#{entry.Sequence}  {entry.Operation}")">
+    @foreach (WireEntry entry in Log.Entries)
+    {
+        <details class="wire-entry">
+            <summary>
+                <span class="wire-seq">#@entry.Sequence</span>
+                <span class="wire-op-tag @TagClass(entry)">@Emoji(entry) @entry.Operation</span>
+                @if (entry.Fault is not null)
+                {
+                    <span class="wire-op">⚠️ fault</span>
+                }
+                <span class="wire-ms">@entry.Duration.TotalMilliseconds.ToString("F0") ms</span>
+            </summary>
+
+            <div class="wire-body">
                 <div class="wire-meta">
                     <span>@entry.RequestBytes B out</span>
                     <span>@entry.ResponseBytes B in</span>
-                    <span>@entry.Duration.TotalMilliseconds.ToString("F0") ms</span>
                 </div>
 
                 @if (entry.Fault is { } fault)
@@ -44,9 +61,9 @@
                     <div class="wire-label">Response</div>
                     <pre class="wire-json">@entry.ResponsePayload</pre>
                 }
-            </FluentAccordionItem>
-        }
-    </FluentAccordion>
+            </div>
+        </details>
+    }
 </div>
 
 @code {
@@ -60,4 +77,25 @@
     // on rather than from an event handler Blazor already owns.
     private void OnChanged()
         => InvokeAsync(StateHasChanged);
+
+    // Emoji rather than an icon package: one glyph per operation kind makes twenty rows scannable
+    // at a glance, which is the panel's whole job.
+    private static string Emoji(WireEntry entry)
+        => entry.Operation switch
+        {
+            InfoCarrier.Core.Common.InfoCarrierOperation.Query => "🔍",
+            InfoCarrier.Core.Common.InfoCarrierOperation.SaveChanges => "💾",
+            InfoCarrier.Core.Common.InfoCarrierOperation.BeginTransaction => "🔓",
+            InfoCarrier.Core.Common.InfoCarrierOperation.CommitTransaction => "✔️",
+            InfoCarrier.Core.Common.InfoCarrierOperation.RollbackTransaction => "↩️",
+            _ => "📍",
+        };
+
+    private static string TagClass(WireEntry entry)
+        => entry.Operation switch
+        {
+            InfoCarrier.Core.Common.InfoCarrierOperation.SaveChanges => "op-save",
+            InfoCarrier.Core.Common.InfoCarrierOperation.Query => "",
+            _ => "op-tx",
+        };
 }

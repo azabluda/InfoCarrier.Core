@@ -4,21 +4,26 @@
 
 <PageTitle>Customers</PageTitle>
 
-<FluentLabel Typo="Typography.H1">Customers</FluentLabel>
+<h1>👥 Customers</h1>
 
 <p class="page-lede">
     Everything you change below becomes part of a LINQ query that leaves this browser as an
-    expression tree. The filter is a <code>Where</code>, the sort an <code>OrderBy</code>, the pager
-    a <code>Skip</code>/<code>Take</code> &mdash; and the grid's columns are a
-    <code>Select</code>. Watch the panel on the right: the server is asked for four columns, never
-    for a <code>Customer</code>.
+    expression tree: the filter is a <code>Where</code>, the sort an <code>OrderBy</code>, the pager
+    a <code>Skip</code>/<code>Take</code>, and the grid's columns a <code>Select</code>. Watch the
+    panel on the right &mdash; the server is asked for four columns, never for a <code>Customer</code>.
 </p>
 
-<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom">
-    <FluentTextField @bind-Value="_country" @bind-Value:after="RefreshAsync" Label="Country" Placeholder="all" />
-    <FluentSelect TOption="string" Items="@SortOptions" @bind-Value="_sort" @bind-Value:after="RefreshAsync" Label="Sort by" />
+<div class="toolbar">
+    <div class="field">
+        <FluentTextField @bind-Value="_country" @bind-Value:after="RefreshAsync" Label="Country" Placeholder="all" />
+    </div>
+    <div class="field">
+        <FluentSelect TOption="string" Items="@SortOptions" @bind-Value="_sort" @bind-Value:after="RefreshAsync" Label="Sort by" />
+    </div>
     <FluentButton Appearance="Appearance.Accent" OnClick="RefreshAsync">Run</FluentButton>
-</FluentStack>
+    <span class="toolbar-spacer"></span>
+    <span class="toolbar-note">page size 3, so paging is visible</span>
+</div>
 
 @if (_error is { } error)
 {
@@ -27,16 +32,17 @@
 
 <div class="grid-wrap">
     <FluentDataGrid ItemsProvider="@LoadAsync" TGridItem="CustomerRow" Pagination="@_pagination"
-                    GridTemplateColumns="1fr 3fr 2fr 2fr">
+                    GridTemplateColumns="0.8fr 2.4fr 1.2fr 1fr">
         <PropertyColumn Property="@(r => r.Id)" Title="Id" />
         <PropertyColumn Property="@(r => r.Company)" Title="Company" />
         <PropertyColumn Property="@(r => r.City)" Title="City" />
         <PropertyColumn Property="@(r => r.Country)" Title="Country" />
     </FluentDataGrid>
 
-    <FluentPaginator State="@_pagination" />
+    <div class="grid-foot">
+        <FluentPaginator State="@_pagination" />
+    </div>
 </div>
-
 
 @code {
     // Client-only, and never named on the wire. ProjectionRewriter splits the Select below into a

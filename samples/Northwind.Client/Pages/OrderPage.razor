@@ -7,108 +7,112 @@
 
 <PageTitle>Order</PageTitle>
 
-<FluentLabel Typo="Typography.H1">One order, one unit of work</FluentLabel>
+<h1>🧾 One order, one unit of work</h1>
 
 <p class="page-lede">
-    The query below asks for an order and nothing else. Its <code>Customer</code> and its lines are
-    <em>not</em> loaded &mdash; until you ask for them, which costs a round trip each. Then edit as
-    many quantities as you like and save: <strong>one</strong> <code>SaveChanges</code> carries all
-    of them, because the context has been tracking them the whole time.
+    The query asks for an order and nothing else. Its <code>Customer</code> and its lines are
+    <em>not</em> loaded until you ask for them, which costs a round trip each. Then edit as many
+    quantities as you like and save: <strong>one</strong> <code>SaveChanges</code> carries all of
+    them, because one context has been tracking them the whole time.
 </p>
 
-<p class="page-lede">
-    <strong>The loads here are <code>LoadAsync</code> rather than a bare
-    <code>order.Customer</code>, and in a browser that is forced.</strong> A navigation property
-    getter is synchronous, so automatic lazy loading would have to block on the HTTP round trip
-    &mdash; and a single-threaded WebAssembly runtime cannot block. This client therefore does not
-    enable lazy-loading proxies at all, so an unloaded navigation is simply <code>null</code>
-    rather than an exception from inside a proxy. The server does enable them; it is not a browser.
+<p class="page-note">
+    The loads here are <code>LoadAsync</code> rather than a bare <code>order.Customer</code>, and in
+    a browser that is forced: a navigation getter is synchronous, so automatic lazy loading would
+    have to block on the round trip, and a single-threaded WebAssembly runtime cannot block. This
+    client therefore does not enable lazy-loading proxies at all, so an unloaded navigation is
+    simply <code>null</code>. The server does enable them; it is not a browser.
 </p>
+
+<div class="toolbar">
+    <div class="field">
+        <FluentNumberField @bind-Value="_orderId" Label="Order id" Min="1" Max="5" Style="width: 7rem;" />
+    </div>
+    <FluentButton Appearance="Appearance.Accent" OnClick="LoadAsync">Load order</FluentButton>
+    <span class="toolbar-spacer"></span>
+    <span class="toolbar-note">@Log.Sequence round trips so far</span>
+</div>
 
 @if (_error is { } error)
 {
     <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
 }
 
-<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom">
-    <FluentNumberField @bind-Value="_orderId" Label="Order id" Min="1" Max="5" Style="width: 8rem;" />
-    <FluentButton Appearance="Appearance.Accent" OnClick="LoadAsync">Load order</FluentButton>
-</FluentStack>
-
 @if (_order is { } order)
 {
-    <div class="uow">
-        <FluentCard Class="uow-card">
-            <h3>Order @order.Id</h3>
-            <div class="kv"><span>Placed</span><span>@order.OrderDate.ToString("yyyy-MM-dd")</span></div>
-            <div class="kv"><span>Customer id</span><span>@order.CustomerId</span></div>
+    <div class="card-row">
+        <div class="card">
+            <p class="card-title">📋 Order @order.Id</p>
 
             <div class="kv">
-                <span>Customer</span>
-                <span>
-                    @if (_customerText is { } customerText)
-                    {
-                        @customerText
-                    }
-                    else
-                    {
-                        <FluentButton OnClick="TouchCustomer">not loaded &mdash; touch it</FluentButton>
-                    }
-                </span>
+                <span class="kv-key">Placed</span>
+                <span class="kv-value">@order.OrderDate.ToString("yyyy-MM-dd")</span>
             </div>
-
             <div class="kv">
-                <span>Lines</span>
-                <span>
-                    @if (_lines is not null)
-                    {
-                        @($"{_lines.Count} loaded")
-                    }
-                    else
-                    {
-                        <FluentButton OnClick="TouchLines">not loaded &mdash; touch them</FluentButton>
-                    }
-                </span>
+                <span class="kv-key">Customer id</span>
+                <span class="kv-value">@order.CustomerId</span>
             </div>
-        </FluentCard>
+            <div class="kv">
+                <span class="kv-key">Customer</span>
+                @if (_customerText is { } customerText)
+                {
+                    <span class="kv-value">@customerText</span>
+                }
+                else
+                {
+                    <FluentButton OnClick="TouchCustomer">not loaded &mdash; load it</FluentButton>
+                }
+            </div>
+            <div class="kv">
+                <span class="kv-key">Lines</span>
+                @if (_lines is { } loaded)
+                {
+                    <span class="kv-value">@loaded.Count loaded</span>
+                }
+                else
+                {
+                    <FluentButton OnClick="TouchLines">not loaded &mdash; load them</FluentButton>
+                }
+            </div>
+        </div>
 
         @if (_lines is { } lines)
         {
-            <FluentCard Class="uow-card">
-                <h3>Lines</h3>
+            <div class="card">
+                <p class="card-title">✏️ Lines &mdash; edit any quantity</p>
+
                 @foreach (OrderDetail line in lines)
                 {
                     <div class="kv">
-                        <span>product @line.ProductId &mdash; @line.UnitPrice.ToString("0.00")</span>
-                        <FluentNumberField Value="@line.Quantity" Min="0" Style="width: 7rem;"
+                        <span class="kv-key">product @line.ProductId &nbsp;&middot;&nbsp; @line.UnitPrice.ToString("0.00")</span>
+                        <FluentNumberField Value="@line.Quantity" Min="0" Style="width: 6.5rem;"
                                            ValueChanged="@(value => SetQuantity(line, value))"
                                            TValue="int" Immediate="true" />
                     </div>
                 }
 
-                <div class="uow-actions">
+                <div class="actions">
                     <FluentButton Appearance="Appearance.Accent" Disabled="@(_pending == 0)" OnClick="SaveAsync">
                         Save @_pending change@(_pending == 1 ? "" : "s")
                     </FluentButton>
-                    <span class="page-note">
+                    <span class="toolbar-note">
                         @if (_saved is { } saved)
                         {
                             @($"Last save: {saved} entries, in 1 SaveChanges envelope.")
                         }
                         else
                         {
-                            @("Change a quantity or two. The button counts what the change tracker is holding.")
+                            @("The button counts what the change tracker is holding.")
                         }
                     </span>
                 </div>
-            </FluentCard>
+            </div>
         }
     </div>
 
     <p class="page-note">
-        Round trips so far: <strong>@Log.Sequence</strong>. Loading the order was one. Touching the
-        customer was one more, touching the lines one more &mdash; and saving is one, however many
-        quantities changed.
+        Loading the order was one round trip. Loading the customer was one more, the lines one more
+        &mdash; and saving is one, however many quantities changed.
     </p>
 }
 

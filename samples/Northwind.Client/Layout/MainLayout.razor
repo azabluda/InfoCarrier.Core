@@ -2,34 +2,46 @@
 @inherits LayoutComponentBase
 
 @*
-    No FluentIcon anywhere in this app. Fluent UI ships its icon set as a separate, large package
-    (Microsoft.FluentUI.AspNetCore.Components.Icons), and a sample whose point is the wire should
-    not pull one in to decorate a nav menu.
+    The shell is a CSS grid rather than nested FluentStacks. Three regions that must hold their
+    proportions independently -- nav rail, content, docked inspector -- are what grid is for, and
+    a grid cannot collapse into block flow the way stacked flex containers can.
+
+    Emoji rather than FluentIcon: Fluent UI ships its icon set as a separate, large package, and a
+    sample about the wire should not pull one in to decorate a nav menu. Emoji cost nothing.
 *@
 
-<FluentLayout>
-    <FluentHeader>
-        <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="12">
-            <span class="app-title">InfoCarrier.Core &mdash; Northwind</span>
-            <span class="app-subtitle">This browser has no database.</span>
-        </FluentStack>
-    </FluentHeader>
+<FluentDesignTheme Mode="DesignThemeModes.System" StorageName="infocarrier-theme" />
 
-    <FluentStack Class="app-body" Orientation="Orientation.Horizontal" HorizontalGap="0"
-                 VerticalAlignment="VerticalAlignment.Stretch">
-        <div class="app-nav">
-            <FluentNavMenu Width="180" Title="Pages" Expanded="true">
-                <FluentNavLink Href="/" Match="NavLinkMatch.All">Customers</FluentNavLink>
-                <FluentNavLink Href="/order">Order</FluentNavLink>
-                <FluentNavLink Href="/transfer">Transfer</FluentNavLink>
-            </FluentNavMenu>
-        </div>
+<div class="app-shell">
+    <header class="app-header">
+        <span class="app-logo">📡</span>
+        <span class="app-mark">InfoCarrier<span class="app-mark-dim">.Core</span></span>
+        <span class="app-sep">/</span>
+        <span class="app-title">Northwind</span>
+        <span class="app-badge">🚫🗄️ this browser has no database</span>
+    </header>
 
-        <FluentBodyContent Class="app-content">
-            @Body
-        </FluentBodyContent>
+    <nav class="app-nav">
+        <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+            <span class="nav-label">👥 Customers</span>
+            <span class="nav-hint">querying</span>
+        </NavLink>
+        <NavLink class="nav-item" href="order">
+            <span class="nav-label">🧾 Order</span>
+            <span class="nav-hint">loading &amp; unit of work</span>
+        </NavLink>
+        <NavLink class="nav-item" href="transfer">
+            <span class="nav-label">🔄 Transfer</span>
+            <span class="nav-hint">transactions &amp; errors</span>
+        </NavLink>
+    </nav>
 
-        @* Always present, on the right (spec §5.2). It is what makes this more than a CRUD demo. *@
+    <main class="app-main">
+        @Body
+    </main>
+
+    @* Docked right, full height, its own scroll (spec §5.2). *@
+    <aside class="app-wire">
         <WireInspector />
-    </FluentStack>
-</FluentLayout>
+    </aside>
+</div>
