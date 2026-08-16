@@ -231,6 +231,29 @@ because EF's conventions already produce most of it. The M8 sample is the first 
 `NorthwindContext` in a shared assembly, configured by provider at DI time — and it should be read
 as evidence about the size of that part.
 
+**What the sample does NOT yet show, and it is the half this question is named after.** Both halves
+use that one `OnModelCreating` *verbatim*. Nothing is derived, and nothing is augmented: the
+differences between the two sides are options-level (`UseSqlite` vs `UseInfoCarrier`,
+`UseLazyLoadingProxies` on the server only), not model-level. So the sample is evidence for
+"sharing works and is small", and no evidence at all for "each side augments it safely". A worked
+example of the augmenting half is the obvious next step whenever this is picked up.
+
+**A new instance of the silent-divergence danger, 2026-08-16 (M8-18), and it is the sharpest one
+yet** — because the two models diverged *without anyone writing a second configuration*.
+`dotnet ef dbcontext optimize` cannot load a Blazor WebAssembly project (no `deps.json`), so the
+server had to be the `--startup-project` — and EF's tooling then takes its configuration from the
+**startup application's own service provider**, silently ignoring the client's
+`IDesignTimeDbContextFactory`. The compiled model handed to the browser was therefore the
+*server's*: annotated `Relational:TableName`, `Relational:Schema` and `Proxies:LazyLoading = true`.
+**The browser ran on it for two steps and looked completely healthy.** It only surfaced when
+lazy-loading proxies were removed from the client and every page died on
+`PropertyNotDefinedForType … ILazyLoader LazyLoader`, because the compiled model still declared a
+service property the client could not bind.
+Two lessons for D2. First, **tooling is a divergence source**, not just a hand-written second
+configuration — any mechanism chosen here has to say which side generates artefacts and how that is
+verified. Second, it is further evidence for the enforcement question below: a start-up check
+comparing the two models would have caught this on the first page load instead of two steps later.
+
 **Candidate mechanisms, none chosen:** one shared context class (what the sample does); a shared
 assembly of `IEntityTypeConfiguration<T>`; a shared `IModelConfiguration` seam this provider
 defines; or a convention set the provider ships so that the *default* is agreement.
