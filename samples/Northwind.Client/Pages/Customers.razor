@@ -1,6 +1,5 @@
 @* Licensed under the MIT license. See license.txt file in the project root for license information. *@
 @page "/"
-@implements IAsyncDisposable
 @inject IDbContextFactory<NorthwindContext> Contexts
 
 <PageTitle>Customers</PageTitle>
@@ -8,74 +7,146 @@
 <FluentLabel Typo="Typography.H1">Customers</FluentLabel>
 
 <p class="page-lede">
-    This page holds a <code>DbContext</code> with no database. The LINQ below became an expression
-    tree, crossed HTTP, ran against SQLite on the server, and came back as rows &mdash; watch the
-    panel on the right.
+    Everything you change below becomes part of a LINQ query that leaves this browser as an
+    expression tree. The filter is a <code>Where</code>, the sort an <code>OrderBy</code>, the pager
+    a <code>Skip</code>/<code>Take</code> &mdash; and the grid's columns are a
+    <code>Select</code>. Watch the panel on the right: the server is asked for four columns, never
+    for a <code>Customer</code>.
 </p>
+
+<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom">
+    <FluentTextField @bind-Value="_country" @bind-Value:after="RefreshAsync" Label="Country" Placeholder="all" />
+    <FluentSelect TOption="string" Items="@SortOptions" @bind-Value="_sort" @bind-Value:after="RefreshAsync" Label="Sort by" />
+    <FluentButton Appearance="Appearance.Accent" OnClick="RefreshAsync">Run</FluentButton>
+</FluentStack>
 
 @if (_error is { } error)
 {
     <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
 }
-else if (_customers is null)
-{
-    <FluentProgressRing />
-}
-else
-{
-    <FluentDataGrid Items="@_customers.AsQueryable()" GridTemplateColumns="1fr 3fr 2fr 2fr">
-        <PropertyColumn Property="@(c => c.Id)" Title="Id" />
-        <PropertyColumn Property="@(c => c.CompanyName)" Title="Company" />
-        <PropertyColumn Property="@(c => c.City)" Title="City" />
-        <PropertyColumn Property="@(c => c.Country)" Title="Country" />
+
+<div class="grid-wrap">
+    <FluentDataGrid ItemsProvider="@LoadAsync" TGridItem="CustomerRow" Pagination="@_pagination"
+                    GridTemplateColumns="1fr 3fr 2fr 2fr">
+        <PropertyColumn Property="@(r => r.Id)" Title="Id" />
+        <PropertyColumn Property="@(r => r.Company)" Title="Company" />
+        <PropertyColumn Property="@(r => r.City)" Title="City" />
+        <PropertyColumn Property="@(r => r.Country)" Title="Country" />
     </FluentDataGrid>
 
-    @if (_runtimeType is { } runtimeType)
-    {
-        <p class="page-note">
-            These rows materialized as <code>@runtimeType</code>. A name ending in
-            <code>Proxy</code> is Castle DynamicProxy emitting a type <em>inside WebAssembly</em>
-            &mdash; which is what lets a navigation load itself on demand, with no
-            <code>ILazyLoader</code> in the model.
-        </p>
-    }
+    <FluentPaginator State="@_pagination" />
+</div>
+
+@if (_runtimeType is { } runtimeType)
+{
+    <p class="page-note">
+        A whole <code>Customer</code> loaded separately materializes as <code>@runtimeType</code>.
+        A name ending in <code>Proxy</code> is Castle DynamicProxy emitting a type <em>inside
+        WebAssembly</em> &mdash; which is what lets a navigation load itself on demand, with no
+        <code>ILazyLoader</code> in the model.
+    </p>
 }
 
 @code {
-    private NorthwindContext? _context;
-    private List<Customer>? _customers;
+    // Client-only, and never named on the wire. ProjectionRewriter splits the Select below into a
+    // server-side ValueTuple projection plus a client-side reassembly (ADR-010), so the server is
+    // asked for four columns and this record is constructed in the browser. The inspector shows
+    // the tuple, which is the clearest single illustration of the projection split the sample can
+    // offer.
+    private sealed record CustomerRow(string Id, string Company, string? City, string? Country);
+
+    private static readonly string[] SortOptions = ["Id", "Company", "City", "Country"];
+
+    private readonly PaginationState _pagination = new() { ItemsPerPage = 3 };
+
+    private string _country = string.Empty;
+    private string _sort = "Id";
     private string? _runtimeType;
     private string? _error;
 
-    protected override async Task OnInitializedAsync()
+    // **A context per load, not one for the page**, and that is a correction rather than a
+    // preference. A page-scoped context failed on the first run with EF's own
+    // "A second operation was started on this context instance before a previous operation
+    // completed": the grid's provider and the probe below both ran against it, because Blazor
+    // renders between the awaits of OnInitializedAsync. A DbContext is not thread-safe and a grid
+    // is entitled to ask again before the last answer arrives. This page is read-only, so it has
+    // no unit of work to preserve and nothing to gain from holding one -- which is exactly what
+    // IDbContextFactory is for. The Order page keeps a page-scoped context because it genuinely
+    // needs one, and it is single-threaded by construction.
+    private async ValueTask<GridItemsProviderResult<CustomerRow>> LoadAsync(
+        GridItemsProviderRequest<CustomerRow> request)
     {
-        // One context for the page: its own unit of work. The Order page is where that starts to
-        // matter; here it is simply the same shape.
-        _context = await Contexts.CreateDbContextAsync();
-
         try
         {
-            _customers = await _context.Customers.OrderBy(c => c.Id).ToListAsync();
+            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
 
-            // Spec §3.2 chose automatic lazy loading over ILazyLoader injection on the reasoning
-            // that Castle DynamicProxy needs Reflection.Emit, which the Mono interpreter has and
-            // an AOT build does not. Printing the runtime type is how that stops being a
-            // reasonable expectation and becomes something the page demonstrates.
-            _runtimeType = _customers.FirstOrDefault()?.GetType().Name;
+            IQueryable<Customer> query = context.Customers;
+
+            if (!string.IsNullOrWhiteSpace(_country))
+            {
+                // Composed onto the IQueryable, so it crosses as part of the expression tree
+                // rather than filtering a list that already arrived.
+                query = query.Where(c => c.Country == _country);
+            }
+
+            // Its own round trip, and deliberately so: the pager needs a total the page has not
+            // fetched. The inspector shows the server answering with a number rather than rows.
+            int total = await query.CountAsync(request.CancellationToken);
+
+            List<CustomerRow> rows = await Sorted(query)
+                .Skip(request.StartIndex)
+                .Take(request.Count ?? _pagination.ItemsPerPage)
+                .Select(c => new CustomerRow(c.Id, c.CompanyName, c.City, c.Country))
+                .ToListAsync(request.CancellationToken);
+
+            _error = null;
+            return GridItemsProviderResult.From(rows, total);
         }
         catch (Exception exception)
         {
-            // A transport failure must be visible, not swallowed (spec §6). No stack trace on
-            // screen: the panel on the right carries the detail.
-            _error = $"{exception.GetType().Name}: {exception.Message}";
+            // A transport or server failure must be visible, not swallowed (spec §6). No stack
+            // trace on screen; the panel on the right carries the detail.
+            _error = Describe(exception);
+            return GridItemsProviderResult.From<CustomerRow>([], 0);
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_context is not null)
+    private IQueryable<Customer> Sorted(IQueryable<Customer> query)
+        => _sort switch
         {
-            await _context.DisposeAsync();
+            "Company" => query.OrderBy(c => c.CompanyName),
+            "City" => query.OrderBy(c => c.City),
+            "Country" => query.OrderBy(c => c.Country).ThenBy(c => c.Id),
+            _ => query.OrderBy(c => c.Id),
+        };
+
+    private async Task RefreshAsync()
+    {
+        // Back to page one: a narrower filter can leave the current page past the end of the
+        // result, which shows an empty grid over data that is there.
+        await _pagination.SetCurrentPageIndexAsync(0);
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Its own context, and a whole entity rather than a projection. Spec §3.2 chose
+            // automatic lazy loading over ILazyLoader injection on the reasoning that Castle
+            // DynamicProxy needs Reflection.Emit, which the Mono interpreter has and an AOT build
+            // does not. Printing the runtime type is how that stops being a reasonable
+            // expectation and becomes something the page shows.
+            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
+            Customer? first = await context.Customers.OrderBy(c => c.Id).FirstOrDefaultAsync();
+            _runtimeType = first?.GetType().Name;
+        }
+        catch (Exception exception)
+        {
+            _error = Describe(exception);
         }
     }
+
+    private static string Describe(Exception exception)
+        => $"{exception.GetType().Name}: {exception.Message}";
 }

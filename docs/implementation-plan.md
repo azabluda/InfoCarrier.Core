@@ -301,3 +301,28 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   No product code changed, so the spec suite is untouched. No `FluentIcon` anywhere: Fluent UI
   ships its icon set as a separate large package, and a sample about the wire should not pull one
   in to decorate a nav menu.
+
+- [x] **M8-13. The Customers page, and the projection split is visible rather than asserted.**
+  `<this commit>`
+  Country filter, sort selector and pager become `Where`, `OrderBy`, `Skip` and `Take` on one
+  `IQueryable`; the grid's four columns become a `Select` into a **client-only** `CustomerRow`
+  record. **The panel shows the split doing its work**, and the contrast is on screen in the same
+  session: the projection's response payload carries `System.ValueTuple`4` with `Item1`…`Item4`
+  (`"ALFKI"`, `"Alfreds Futterkiste"`, `"Berlin"`, `"Germany"`) and **zero `Customer` entities**,
+  while the *whole-entity* probe beside it does carry one. `CustomerRow` is never named on the wire
+  at all — ADR-010 splits the `Select` into a server-side tuple projection plus a client-side
+  reassembly, which is why a client-only type in a projection needs nothing from
+  `TypeAllowlist.ForModel`'s unused `registeredTypes` parameter (spec §5.1's observation, now
+  confirmed by running it). The pager's total is its own `CountAsync`, so the panel also shows the
+  server answering with a number rather than rows.
+  **The browser found a second real defect, and the fix was a design correction rather than a
+  guard.** The page first held one `DbContext` for its lifetime and died on
+  `InvalidOperationException: A second operation was started on this context instance before a
+  previous operation completed` — Blazor renders between the awaits of `OnInitializedAsync`, so the
+  grid's provider started while the proxy probe was still in flight. A `DbContext` is not
+  thread-safe and a grid is entitled to ask again before the previous answer lands. This page is
+  read-only, so it has no unit of work to hold: it now takes a context per load from the factory,
+  which is what `IDbContextFactory` exists for. The Order page keeps a page-scoped context because
+  it genuinely needs one.
+  Verified in headless Edge: no error bar, 4 round trips (all `Query`), page one showing
+  ALFKI/ANATR/AROUT with BERGS correctly on page two, and `CustomerProxy` still reported.

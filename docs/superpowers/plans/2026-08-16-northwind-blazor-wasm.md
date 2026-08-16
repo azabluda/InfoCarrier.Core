@@ -146,10 +146,10 @@ Querying, and the projection split made visible. Grid state becomes `Where`/`Ord
 the page projects to a client-only row record, which the split turns into a server-side tuple
 projection plus a client-side reassembly.
 
-- [ ] **Step 1:** The page.
-- [ ] **Step 2:** Confirm in the browser that the inspector's decoded payload carries the projected
+- [x] **Step 1:** The page.
+- [x] **Step 2:** Confirm in the browser that the inspector's decoded payload carries the projected
       columns and no `Customer`.
-- [ ] **Step 3:** Commit.
+- [x] **Step 3:** Commit.
 
 ---
 

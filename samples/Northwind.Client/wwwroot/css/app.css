@@ -141,3 +141,7 @@ html, body {
     opacity: 0.8;
     max-width: 46rem;
 }
+
+.grid-wrap {
+    margin-top: 1rem;
+}
