@@ -493,7 +493,16 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   formally open, exactly as M8-7 recorded. Both remain free of sample types — the inspector was
   built as a decorator specifically to keep that true — so promoting them is still a file move.
 - **`InProcessInfoCarrierServer._transactions` is still unbounded**, and the Transfer page is now a
-  second way to reach it. Recorded in `docs/security-review.md` §8 and unchanged by this phase.
+  second way to reach it. **Scoped 2026-08-16 and it is the LIBRARY's, not the sample's** — see
+  `roadmap.md` §M8, which splits it into an idle timeout (a sample can demonstrate this through the
+  existing `IInfoCarrierServer` seam, but every consumer inherits the unbounded registry, so the
+  library should own it), token ownership (needs the protocol to carry caller identity — impossible
+  outside the library), and multi-instance survival (the registry is process-local).
+  **The consequence was measured rather than reasoned about**: against an abandoned transaction
+  that had already written, a second client still read correctly — isolation holds, it saw the
+  pre-write value — but its **write blocked until the probe's own timeout**, because the abandoned
+  transaction holds SQLite's write lock. One abandoned browser tab wedges writes for the whole
+  server until the process restarts. Full detail in `docs/security-review.md` §8.
 
 - [x] **M8-18. Remove what a browser cannot use — and the compiled model was the server's all
   along.** `<this commit>`

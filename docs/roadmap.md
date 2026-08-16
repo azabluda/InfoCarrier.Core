@@ -320,6 +320,56 @@ Both spatial bases are adopted on **Tier A**, 169 of 173.
 
 ### M8 — Productization
 
+**Server-held transaction lifetime — OPEN, and it is the library's, not the sample's.**
+Recorded 2026-08-16 after the Blazor sample made it reachable. `InProcessInfoCarrierServer`
+holds an open transaction — a DI scope, a `DbContext` and a store connection — in an unbounded
+`ConcurrentDictionary` keyed by the wire-protocol W3 token, with **no timeout, no eviction and no
+binding of a token to the caller who created it**. A client that opens a transaction and then
+vanishes (tab closed, network dropped, process crashed) pins all three until the server process
+exits. The client's own `DisposeAsync` rolls back and covers every ordinary path, including
+exceptions; it cannot cover a client that never runs again.
+
+**Measured, not assumed:** with an abandoned transaction that had already written, a second client
+still *read* correctly (isolation holds — it saw the pre-write value), but its **write blocked
+until the test's own timeout**. Once such a transaction has written, it holds SQLite's write lock,
+so one abandoned browser tab wedges writes for the whole server. Full detail in
+[`security-review.md`](security-review.md) §8.
+
+**DEPRIORITIZED 2026-08-16, and the reason is that the pattern it protects is not the recommended
+one.** Holding a store transaction open across client round trips is pessimistic locking over a
+network, which is discouraged for exactly the failure this gap exhibits: the lock's lifetime becomes
+the client's, and clients vanish. The recommended shape is **optimistic concurrency** — a
+concurrency token, a short server-side transaction inside a single `SaveChanges`, and a
+`DbUpdateConcurrencyException` the caller resolves and retries.
+
+**Optimistic concurrency is supported, and that was checked rather than assumed** before
+deprioritizing:
+
+- `OptimisticConcurrencyInfoCarrierTest`, `ConcurrencyDetectorInfoCarrierTest` and
+  `ConcurrencyTokenTest` are adopted and **67 pass, 0 fail**; none appears among the suite's 13
+  known failures.
+- The mechanism is genuinely end-to-end: `ChangeEntry.SerializedOriginalValues` carries the
+  original values the store compares against, and `InfoCarrierDatabase` rebuilds a
+  `DbUpdateConcurrencyException` **with its conflicting entries** on the client.
+- The 11 skipped `..._can_be_resolved_with_...` tests are **EF's own SQLite skips**
+  (`Optimistic Offline Lock #2195`), mirrored one for one from
+  `OptimisticConcurrencySqliteTestBase` — verified against `subrepos/efcore`, not inferred from
+  our own comment. Any EF application on SQLite has the same gap, and M7's SQL Server tier would
+  run them.
+
+**The risk does not vanish, it shrinks.** A transaction is still the right tool for atomicity
+across several `SaveChanges` calls — the sample's Transfer page uses one for that, not for locking
+— and such a transaction still leaks if the client dies mid-flight. The exposure window is just
+seconds rather than unbounded, which is what makes this a hardening item rather than a blocker.
+
+Three separable pieces, and only the first can be done outside the library:
+
+| Piece | Scope | Note |
+|---|---|---|
+| Idle timeout that rolls back and disposes | **sample can demonstrate it; the library should own it** | Doable today as a decorator over `IInfoCarrierServer`: the interface exposes the token from `BeginTransactionAsync` and accepts it in `RollbackTransactionAsync`, and the request records expose `TransactionId` to refresh liveness. But every consumer of `InProcessInfoCarrierServer` inherits the unbounded registry, so a sample-only fix leaves the defect shipped. |
+| Binding a token to its creator | **library + protocol** | The envelope carries no caller identity, so today any caller who knows a token can join the transaction. Nothing outside the library can enforce this. |
+| Surviving more than one server instance | **library / deployment** | The registry is process-local, so a token only resolves on the instance that created it — horizontal scaling needs affinity or a shared registry. The sample is single-instance and does not hit this. |
+
 **Exit criteria**
 - HTTP and gRPC transport bindings (only in-process exists today).
 - Streaming results as `IAsyncEnumerable<T>` (requirements §4.4, wire-protocol W4) — the
@@ -358,4 +408,5 @@ From wire-protocol §5 and research-findings §10 — resolved in the milestone 
 | W5 exception fidelity · W6 cancellation | M5 |
 | Q5 canonical form + compiled-query cache · Q10 server delegate cache | M8 |
 | Q6/W4 streaming vs identity resolution | M8 |
+| Server-held transaction lifetime: idle timeout, token ownership, multi-instance (see M8 above) | M8 |
 | ~~Q7 spatial Z/M via WKT~~ ✅ **done 2026-08-10** (C15/C17/C18, landed in M6) | ~~M7~~ |
