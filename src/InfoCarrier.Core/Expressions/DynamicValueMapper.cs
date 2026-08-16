@@ -15,12 +15,30 @@ namespace InfoCarrier.Core.Expressions;
 ///     preserved per message via reference maps (aqua §2.3 — mandatory for EF identity
 ///     resolution and circular nav refs).
 /// </summary>
-public class DynamicValueMapper : IDynamicValueMapper
+/// <remarks>
+///     Initializes a new instance of the <see cref="DynamicValueMapper" /> class.
+/// </remarks>
+/// <param name="model">The EF model, or <see langword="null" /> when none is available.</param>
+/// <param name="typeMapper">Writes wire type identities.</param>
+/// <param name="typeResolver">Resolves them back, through the ADR-008 allowlist.</param>
+/// <param name="valueMappers">
+///     The application's <see cref="ValueMapping.IInfoCarrierValueMapper" /> chain, in
+///     registration order — first claim wins. Empty by default, and an empty chain is
+///     exactly today's behaviour: the hooks below are two loops that do not run.
+/// </param>
+public class DynamicValueMapper(
+    IModel? model,
+    TypeNodeMapper typeMapper,
+    TypeNodeResolver typeResolver,
+    IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null) : IDynamicValueMapper
 {
-    private readonly IModel? _model;
-    private readonly TypeNodeMapper _typeMapper;
-    private readonly TypeNodeResolver _typeResolver;
-    private readonly IReadOnlyList<ValueMapping.IInfoCarrierValueMapper> _valueMappers;
+    private readonly IModel? _model = model;
+    private readonly TypeNodeMapper _typeMapper = typeMapper;
+    private readonly TypeNodeResolver _typeResolver = typeResolver;
+    private readonly IReadOnlyList<ValueMapping.IInfoCarrierValueMapper> _valueMappers
+        = valueMappers as IReadOnlyList<ValueMapping.IInfoCarrierValueMapper>
+            ?? valueMappers?.ToList()
+            ?? [];
 
     // Per-message reference maps (aqua ToContext/FromContext), ReferenceEqualityComparer-keyed.
     // The forward map holds wire ids, not nodes: identity has to survive serialization.
@@ -49,31 +67,6 @@ public class DynamicValueMapper : IDynamicValueMapper
     ///     from its loaded navigations dangled.
     /// </remarks>
     public virtual Func<DynamicValueNode, object?>? EntityMaterializer { get; set; }
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="DynamicValueMapper" /> class.
-    /// </summary>
-    /// <param name="model">The EF model, or <see langword="null" /> when none is available.</param>
-    /// <param name="typeMapper">Writes wire type identities.</param>
-    /// <param name="typeResolver">Resolves them back, through the ADR-008 allowlist.</param>
-    /// <param name="valueMappers">
-    ///     The application's <see cref="ValueMapping.IInfoCarrierValueMapper" /> chain, in
-    ///     registration order — first claim wins. Empty by default, and an empty chain is
-    ///     exactly today's behaviour: the hooks below are two loops that do not run.
-    /// </param>
-    public DynamicValueMapper(
-        IModel? model,
-        TypeNodeMapper typeMapper,
-        TypeNodeResolver typeResolver,
-        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null)
-    {
-        _model = model;
-        _typeMapper = typeMapper;
-        _typeResolver = typeResolver;
-        _valueMappers = valueMappers as IReadOnlyList<ValueMapping.IInfoCarrierValueMapper>
-            ?? valueMappers?.ToList()
-            ?? [];
-    }
 
     /// <summary>
     ///     The type mapper this value mapper writes wire type identities with.

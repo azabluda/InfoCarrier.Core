@@ -9,7 +9,19 @@ namespace InfoCarrier.Core;
 ///     (requirements §4.1, §4.5). Reference handling is enabled so entity graphs with
 ///     circular navigation references round-trip (wire-protocol §3).
 /// </summary>
-public sealed class SystemTextJsonInfoCarrierSerializer : IInfoCarrierSerializer
+/// <remarks>
+///     Initializes a new instance of the <see cref="SystemTextJsonInfoCarrierSerializer" />
+///     class.
+/// </remarks>
+/// <param name="limits">
+///     The size bounds applied to what this serializer deserializes (milestone M5).
+///     Default-on for the request direction: the parameterless constructor uses
+///     <see cref="InfoCarrierPayloadLimits.Default" />, and opting out means constructing an
+///     <see cref="InfoCarrierPayloadLimits" /> with a null maximum. Which bound applies to a
+///     given call is decided by whether the type is an <see cref="Common.IInfoCarrierRequest" />
+///     — see that interface for why the two directions are not the same question.
+/// </param>
+public sealed class SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits limits) : IInfoCarrierSerializer
 {
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -18,7 +30,7 @@ public sealed class SystemTextJsonInfoCarrierSerializer : IInfoCarrierSerializer
         WriteIndented = false,
     };
 
-    private readonly InfoCarrierPayloadLimits _limits;
+    private readonly InfoCarrierPayloadLimits _limits = limits;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SystemTextJsonInfoCarrierSerializer" />
@@ -28,21 +40,6 @@ public sealed class SystemTextJsonInfoCarrierSerializer : IInfoCarrierSerializer
         : this(InfoCarrierPayloadLimits.Default)
     {
     }
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SystemTextJsonInfoCarrierSerializer" />
-    ///     class.
-    /// </summary>
-    /// <param name="limits">
-    ///     The size bounds applied to what this serializer deserializes (milestone M5).
-    ///     Default-on for the request direction: the parameterless constructor uses
-    ///     <see cref="InfoCarrierPayloadLimits.Default" />, and opting out means constructing an
-    ///     <see cref="InfoCarrierPayloadLimits" /> with a null maximum. Which bound applies to a
-    ///     given call is decided by whether the type is an <see cref="Common.IInfoCarrierRequest" />
-    ///     — see that interface for why the two directions are not the same question.
-    /// </param>
-    public SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits limits)
-        => _limits = limits;
 
     /// <summary>
     ///     The payload limits this serializer applies.

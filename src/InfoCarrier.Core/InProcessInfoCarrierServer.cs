@@ -20,20 +20,17 @@ namespace InfoCarrier.Core;
 ///     inside a transaction, which pins one context across several requests; see
 ///     <see cref="BeginTransactionAsync" />.
 /// </remarks>
-public sealed class InProcessInfoCarrierServer : IInfoCarrierServer
+/// <remarks>
+///     Initializes a new instance of the <see cref="InProcessInfoCarrierServer" /> class.
+/// </remarks>
+public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider) : IInfoCarrierServer
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     /// <summary>
     ///     The transactions this server is holding open, by token (wire-protocol W3).
     /// </summary>
     private readonly ConcurrentDictionary<string, OpenTransaction> _transactions = new(StringComparer.Ordinal);
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InProcessInfoCarrierServer" /> class.
-    /// </summary>
-    public InProcessInfoCarrierServer(IServiceProvider serviceProvider)
-        => _serviceProvider = serviceProvider;
 
     /// <summary>
     ///     The server half of the application's value-mapper chain

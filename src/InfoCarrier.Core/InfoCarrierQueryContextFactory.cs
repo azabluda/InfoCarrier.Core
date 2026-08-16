@@ -9,15 +9,12 @@ namespace InfoCarrier.Core;
 ///     Creates the client-side <see cref="QueryContext" />. InfoCarrier remotes queries, so the
 ///     query context carries no provider-specific state beyond the core dependencies.
 /// </summary>
-public class InfoCarrierQueryContextFactory : IQueryContextFactory
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierQueryContextFactory" /> class.
+/// </remarks>
+public class InfoCarrierQueryContextFactory(QueryContextDependencies dependencies) : IQueryContextFactory
 {
-    private readonly QueryContextDependencies _dependencies;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierQueryContextFactory" /> class.
-    /// </summary>
-    public InfoCarrierQueryContextFactory(QueryContextDependencies dependencies)
-        => _dependencies = dependencies;
+    private readonly QueryContextDependencies _dependencies = dependencies;
 
     /// <inheritdoc />
     public virtual QueryContext Create()

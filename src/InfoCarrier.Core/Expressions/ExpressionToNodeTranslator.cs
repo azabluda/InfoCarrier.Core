@@ -15,10 +15,13 @@ namespace InfoCarrier.Core.Expressions;
 ///     and dynamic constants land in B3; until then those node kinds raise
 ///     <see cref="NotSupportedException" />.
 /// </remarks>
-public class ExpressionToNodeTranslator : ExpressionVisitor
+/// <remarks>
+///     Initializes a new instance of the <see cref="ExpressionToNodeTranslator" /> class.
+/// </remarks>
+public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValueMapper valueMapper) : ExpressionVisitor
 {
-    private readonly TypeNodeMapper _typeMapper;
-    private readonly IDynamicValueMapper _valueMapper;
+    private readonly TypeNodeMapper _typeMapper = typeMapper;
+    private readonly IDynamicValueMapper _valueMapper = valueMapper;
 
     // Parameter identity for the message being translated (requirements §2.3). Expression does
     // not override Equals/GetHashCode, so this dictionary already keys on reference identity —
@@ -26,15 +29,6 @@ public class ExpressionToNodeTranslator : ExpressionVisitor
     private readonly Dictionary<ParameterExpression, int> _parameterIds = [];
     private int _depth;
     private ExpressionNode? _result;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="ExpressionToNodeTranslator" /> class.
-    /// </summary>
-    public ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValueMapper valueMapper)
-    {
-        _typeMapper = typeMapper;
-        _valueMapper = valueMapper;
-    }
 
     /// <summary>
     ///     Translates an expression to its node DTO.

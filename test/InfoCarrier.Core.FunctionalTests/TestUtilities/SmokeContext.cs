@@ -51,13 +51,8 @@ public class Tag
 /// <summary>
 ///     A minimal context usable on both client (InfoCarrier) and server (InMemory) sides.
 /// </summary>
-public class SmokeContext : DbContext
+public class SmokeContext(DbContextOptions<SmokeContext> options) : DbContext(options)
 {
-    public SmokeContext(DbContextOptions<SmokeContext> options)
-        : base(options)
-    {
-    }
-
     public DbSet<Blog> Blogs => Set<Blog>();
 
     public DbSet<Post> Posts => Set<Post>();

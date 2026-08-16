@@ -9,19 +9,13 @@ namespace InfoCarrier.Core;
 ///     seam. Wraps each operation's payload in a versioned <see cref="InfoCarrierEnvelope" />,
 ///     sends it, and unwraps the response payload.
 /// </summary>
-public sealed class TransportInfoCarrierClient : IInfoCarrierClient
+/// <remarks>
+///     Initializes a new instance of the <see cref="TransportInfoCarrierClient" /> class.
+/// </remarks>
+public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, IInfoCarrierSerializer serializer) : IInfoCarrierClient
 {
-    private readonly IInfoCarrierTransport _transport;
-    private readonly IInfoCarrierSerializer _serializer;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="TransportInfoCarrierClient" /> class.
-    /// </summary>
-    public TransportInfoCarrierClient(IInfoCarrierTransport transport, IInfoCarrierSerializer serializer)
-    {
-        _transport = transport;
-        _serializer = serializer;
-    }
+    private readonly IInfoCarrierTransport _transport = transport;
+    private readonly IInfoCarrierSerializer _serializer = serializer;
 
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(

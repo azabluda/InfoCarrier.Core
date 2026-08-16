@@ -12,16 +12,12 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     context is configured with <c>UseInfoCarrier(backend)</c> so all operations remote
 ///     through the backend-as-client.
 /// </summary>
-public class InfoCarrierTestStore : TestStore
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierTestStore" /> class.
+/// </remarks>
+public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend) : TestStore(backend.Name, shared: false)
 {
-    private readonly InfoCarrierBackendTestStore _backend;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierTestStore" /> class.
-    /// </summary>
-    public InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
-        : base(backend.Name, shared: false)
-        => _backend = backend;
+    private readonly InfoCarrierBackendTestStore _backend = backend;
 
     /// <summary>
     ///     The backend store this client remotes to.

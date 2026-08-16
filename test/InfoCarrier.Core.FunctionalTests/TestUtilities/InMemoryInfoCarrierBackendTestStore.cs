@@ -14,18 +14,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     (architecture §5: InMemory first, then SQL Server). The server context runs against
 ///     EF Core's InMemory provider.
 /// </summary>
-public class InMemoryInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
+/// <remarks>
+///     Initializes a new instance of the <see cref="InMemoryInfoCarrierBackendTestStore" /> class.
+/// </remarks>
+public class InMemoryInfoCarrierBackendTestStore(
+    string name,
+    bool shared,
+    SharedTestStoreProperties testStoreProperties) : InfoCarrierBackendTestStore(name, shared, testStoreProperties)
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InMemoryInfoCarrierBackendTestStore" /> class.
-    /// </summary>
-    public InMemoryInfoCarrierBackendTestStore(
-        string name,
-        bool shared,
-        SharedTestStoreProperties testStoreProperties)
-        : base(name, shared, testStoreProperties)
-    {
-    }
 
     /// <inheritdoc />
     protected override IServiceCollection AddServices(IServiceCollection serviceCollection)

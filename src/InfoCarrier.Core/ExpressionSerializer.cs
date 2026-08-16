@@ -11,24 +11,17 @@ namespace InfoCarrier.Core;
 ///     translators together behind the DI seam. Query-root rebinding on the reverse path is
 ///     supplied per-call by the server; the client-side reverse path is unused for roots.
 /// </summary>
-public class ExpressionSerializer : IExpressionSerializer
+/// <remarks>
+///     Initializes a new instance of the <see cref="ExpressionSerializer" /> class.
+/// </remarks>
+public class ExpressionSerializer(
+    ExpressionToNodeTranslator forward,
+    TypeNodeResolver typeResolver,
+    IDynamicValueMapper valueMapper) : IExpressionSerializer
 {
-    private readonly ExpressionToNodeTranslator _forward;
-    private readonly TypeNodeResolver _typeResolver;
-    private readonly IDynamicValueMapper _valueMapper;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="ExpressionSerializer" /> class.
-    /// </summary>
-    public ExpressionSerializer(
-        ExpressionToNodeTranslator forward,
-        TypeNodeResolver typeResolver,
-        IDynamicValueMapper valueMapper)
-    {
-        _forward = forward;
-        _typeResolver = typeResolver;
-        _valueMapper = valueMapper;
-    }
+    private readonly ExpressionToNodeTranslator _forward = forward;
+    private readonly TypeNodeResolver _typeResolver = typeResolver;
+    private readonly IDynamicValueMapper _valueMapper = valueMapper;
 
     /// <summary>
     ///     The value mapper backing this serializer. Exposed so the server and client result

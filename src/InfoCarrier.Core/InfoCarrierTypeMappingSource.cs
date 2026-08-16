@@ -9,15 +9,11 @@ namespace InfoCarrier.Core;
 ///     needed for model building and change tracking on the client — it uses the standard CLR
 ///     type mappings, not a store-specific mapping.
 /// </summary>
-public class InfoCarrierTypeMappingSource : TypeMappingSource
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierTypeMappingSource" /> class.
+/// </remarks>
+public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependencies) : TypeMappingSource(dependencies)
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierTypeMappingSource" /> class.
-    /// </summary>
-    public InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependencies)
-        : base(dependencies)
-    {
-    }
 
     /// <inheritdoc />
     protected override CoreTypeMapping? FindMapping(in TypeMappingInfo mappingInfo)

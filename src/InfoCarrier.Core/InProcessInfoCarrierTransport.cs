@@ -15,23 +15,17 @@ namespace InfoCarrier.Core;
 ///     proving serializability) and returns a response envelope, which is itself
 ///     round-tripped before being handed back to the caller.
 /// </remarks>
-public sealed class InProcessInfoCarrierTransport : IInfoCarrierTransport
+/// <remarks>
+///     Initializes a new instance of the <see cref="InProcessInfoCarrierTransport" /> class.
+/// </remarks>
+/// <param name="handler">The in-process handler standing in for the network server.</param>
+/// <param name="serializer">The serializer used to simulate the wire.</param>
+public sealed class InProcessInfoCarrierTransport(
+    Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler,
+    IInfoCarrierSerializer serializer) : IInfoCarrierTransport
 {
-    private readonly Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> _handler;
-    private readonly IInfoCarrierSerializer _serializer;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InProcessInfoCarrierTransport" /> class.
-    /// </summary>
-    /// <param name="handler">The in-process handler standing in for the network server.</param>
-    /// <param name="serializer">The serializer used to simulate the wire.</param>
-    public InProcessInfoCarrierTransport(
-        Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler,
-        IInfoCarrierSerializer serializer)
-    {
-        _handler = handler;
-        _serializer = serializer;
-    }
+    private readonly Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> _handler = handler;
+    private readonly IInfoCarrierSerializer _serializer = serializer;
 
     /// <inheritdoc />
     public async Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)

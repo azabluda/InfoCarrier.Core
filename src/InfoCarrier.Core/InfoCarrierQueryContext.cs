@@ -8,13 +8,9 @@ namespace InfoCarrier.Core;
 ///     The client-side <see cref="QueryContext" />. InfoCarrier remotes queries, so this carries
 ///     no provider-specific state beyond the core dependencies.
 /// </summary>
-public class InfoCarrierQueryContext : QueryContext
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierQueryContext" /> class.
+/// </remarks>
+public class InfoCarrierQueryContext(QueryContextDependencies dependencies) : QueryContext(dependencies)
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierQueryContext" /> class.
-    /// </summary>
-    public InfoCarrierQueryContext(QueryContextDependencies dependencies)
-        : base(dependencies)
-    {
-    }
 }

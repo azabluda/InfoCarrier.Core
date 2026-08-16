@@ -18,36 +18,27 @@ namespace InfoCarrier.Core;
 ///     (research-findings §6), serializes the tree, and ships it to the server. SaveChanges
 ///     lands in Step 10.
 /// </summary>
-public class InfoCarrierDatabase : IDatabase
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierDatabase" /> class.
+/// </remarks>
+public class InfoCarrierDatabase(
+    IDbContextOptions options,
+    IExpressionSerializer expressionSerializer,
+    ICurrentDbContext currentContext,
+    IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger,
+    IDiagnosticsLogger<DbLoggerCategory.Query> queryLogger) : IDatabase
 {
     private static readonly System.Reflection.MethodInfo ExecuteQueryMethod
         = typeof(InfoCarrierDatabase).GetMethod(nameof(ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
-    private readonly IInfoCarrierClient _client;
-    private readonly IExpressionSerializer _expressionSerializer;
-    private readonly ICurrentDbContext _currentContext;
-    private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger;
-    private readonly IDiagnosticsLogger<DbLoggerCategory.Query> _queryLogger;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierDatabase" /> class.
-    /// </summary>
-    public InfoCarrierDatabase(
-        IDbContextOptions options,
-        IExpressionSerializer expressionSerializer,
-        ICurrentDbContext currentContext,
-        IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger,
-        IDiagnosticsLogger<DbLoggerCategory.Query> queryLogger)
-    {
-        _currentContext = currentContext;
-        _updateLogger = updateLogger;
-        _queryLogger = queryLogger;
-        _client = options.Extensions
+    private readonly IInfoCarrierClient _client = options.Extensions
             .OfType<InfoCarrierOptionsExtension>()
             .First()
             .InfoCarrierClient!;
-        _expressionSerializer = expressionSerializer;
-    }
+    private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
+    private readonly ICurrentDbContext _currentContext = currentContext;
+    private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger = updateLogger;
+    private readonly IDiagnosticsLogger<DbLoggerCategory.Query> _queryLogger = queryLogger;
 
     /// <summary>
     ///     The client used to ship operations to the server.

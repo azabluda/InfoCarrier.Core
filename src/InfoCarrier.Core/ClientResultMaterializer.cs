@@ -24,34 +24,25 @@ namespace InfoCarrier.Core;
 ///     generation that would otherwise fire for store-generated keys (the server owns key
 ///     generation; the client never suppresses it in the shared model).
 /// </remarks>
-public class ClientResultMaterializer
+/// <remarks>
+///     Initializes a new instance of the <see cref="ClientResultMaterializer" /> class.
+/// </remarks>
+public class ClientResultMaterializer(
+    DbContext context,
+    IExpressionSerializer serializer,
+    QueryTrackingBehavior trackingBehavior,
+    bool deferTracking = false)
 {
-    private readonly DbContext _context;
-    private readonly IStateManager _stateManager;
-    private readonly ExpressionSerializer _serializer;
-    private readonly QueryTrackingBehavior _trackingBehavior;
-    private readonly bool _deferTracking;
+    private readonly DbContext _context = context;
+    private readonly IStateManager _stateManager = context.GetService<IStateManager>();
+    private readonly ExpressionSerializer _serializer = (ExpressionSerializer)serializer;
+    private readonly QueryTrackingBehavior _trackingBehavior = trackingBehavior;
+    private readonly bool _deferTracking = deferTracking;
 
     // Identity map for entities materialized but not yet attached. The state manager's own map
     // only holds tracked entries, so while tracking is deferred it cannot answer "have I already
     // built this one?" — and two rows naming the same customer would become two instances.
     private readonly Dictionary<(IEntityType Type, string Key), (object Instance, InternalEntityEntry Entry)> _deferredIdentity = [];
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="ClientResultMaterializer" /> class.
-    /// </summary>
-    public ClientResultMaterializer(
-        DbContext context,
-        IExpressionSerializer serializer,
-        QueryTrackingBehavior trackingBehavior,
-        bool deferTracking = false)
-    {
-        _context = context;
-        _stateManager = context.GetService<IStateManager>();
-        _serializer = (ExpressionSerializer)serializer;
-        _trackingBehavior = trackingBehavior;
-        _deferTracking = deferTracking;
-    }
 
     /// <summary>
     ///     Entities materialized but not yet attached, when tracking is deferred

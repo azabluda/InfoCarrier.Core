@@ -30,19 +30,13 @@ namespace InfoCarrier.Core;
 ///         correlation id exists.
 ///     </para>
 /// </remarks>
-public class ServerSaveChangesExecutor
+/// <remarks>
+///     Initializes a new instance of the <see cref="ServerSaveChangesExecutor" /> class.
+/// </remarks>
+public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper)
 {
-    private readonly DbContext _context;
-    private readonly DynamicValueMapper _mapper;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="ServerSaveChangesExecutor" /> class.
-    /// </summary>
-    public ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper)
-    {
-        _context = context;
-        _mapper = mapper;
-    }
+    private readonly DbContext _context = context;
+    private readonly DynamicValueMapper _mapper = mapper;
 
     /// <summary>
     ///     Applies the request and returns the store-generated values.

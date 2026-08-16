@@ -13,17 +13,12 @@ namespace InfoCarrier.Core;
 ///     store-generated keys during replay and they flow back (requirements §2.2). This mirrors
 ///     v1 — the client never suppresses key generation in the shared model.
 /// </summary>
-public class InfoCarrierValueGeneratorSelector : ValueGeneratorSelector
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierValueGeneratorSelector" /> class.
+/// </remarks>
+public class InfoCarrierValueGeneratorSelector(ValueGeneratorSelectorDependencies dependencies) : ValueGeneratorSelector(dependencies)
 {
     private readonly TemporaryNumberValueGeneratorFactory _numberFactory = new();
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierValueGeneratorSelector" /> class.
-    /// </summary>
-    public InfoCarrierValueGeneratorSelector(ValueGeneratorSelectorDependencies dependencies)
-        : base(dependencies)
-    {
-    }
 
     /// <inheritdoc />
     public override bool TryCreate(IProperty property, ITypeBase typeBase, out ValueGenerator? valueGenerator)

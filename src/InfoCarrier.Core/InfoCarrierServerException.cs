@@ -15,21 +15,18 @@ namespace InfoCarrier.Core;
 ///     losing the type name from a <c>catch</c> clause. It is still in
 ///     <see cref="ServerExceptionTypeName" /> and in the message.
 /// </remarks>
-public sealed class InfoCarrierServerException : Exception
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierServerException" /> class.
+/// </remarks>
+/// <param name="serverExceptionTypeName">The CLR type name the server reported.</param>
+/// <param name="message">The server's message, verbatim.</param>
+/// <param name="innerException">The rebuilt inner failure, if there was one.</param>
+public sealed class InfoCarrierServerException(
+    string serverExceptionTypeName, string message, Exception? innerException = null) : Exception(message, innerException)
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierServerException" /> class.
-    /// </summary>
-    /// <param name="serverExceptionTypeName">The CLR type name the server reported.</param>
-    /// <param name="message">The server's message, verbatim.</param>
-    /// <param name="innerException">The rebuilt inner failure, if there was one.</param>
-    public InfoCarrierServerException(
-        string serverExceptionTypeName, string message, Exception? innerException = null)
-        : base(message, innerException)
-        => ServerExceptionTypeName = serverExceptionTypeName;
 
     /// <summary>
     ///     The CLR type name of the exception the server actually threw.
     /// </summary>
-    public string ServerExceptionTypeName { get; }
+    public string ServerExceptionTypeName { get; } = serverExceptionTypeName;
 }

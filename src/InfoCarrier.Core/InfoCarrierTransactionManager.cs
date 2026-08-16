@@ -32,19 +32,16 @@ namespace InfoCarrier.Core;
 ///         request. Savepoints are the nesting mechanism and are a separate interface.
 ///     </para>
 /// </remarks>
-public class InfoCarrierTransactionManager : IDbContextTransactionManager
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierTransactionManager" /> class.
+/// </remarks>
+public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbContextTransactionManager
 {
-    private readonly IInfoCarrierClient _client;
-    private InfoCarrierTransaction? _current;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierTransactionManager" /> class.
-    /// </summary>
-    public InfoCarrierTransactionManager(IDbContextOptions options)
-        => _client = options.Extensions
+    private readonly IInfoCarrierClient _client = options.Extensions
             .OfType<InfoCarrierOptionsExtension>()
             .First()
             .InfoCarrierClient!;
+    private InfoCarrierTransaction? _current;
 
     /// <inheritdoc />
     public virtual IDbContextTransaction? CurrentTransaction => _current;

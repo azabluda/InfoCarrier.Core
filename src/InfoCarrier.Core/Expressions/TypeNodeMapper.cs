@@ -13,17 +13,14 @@ namespace InfoCarrier.Core.Expressions;
 ///     <see cref="TypeNode.EntityTypeName" /> so entity types carry model identity
 ///     (research-findings §7).
 /// </summary>
-public class TypeNodeMapper
+/// <remarks>
+///     Initializes a new instance of the <see cref="TypeNodeMapper" /> class.
+/// </remarks>
+/// <param name="model">The EF model used to tag entity types; null when no model is in scope
+///     (e.g. pure client-side value mapping).</param>
+public class TypeNodeMapper(IModel? model = null)
 {
-    private readonly IModel? _model;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="TypeNodeMapper" /> class.
-    /// </summary>
-    /// <param name="model">The EF model used to tag entity types; null when no model is in scope
-    ///     (e.g. pure client-side value mapping).</param>
-    public TypeNodeMapper(IModel? model = null)
-        => _model = model;
+    private readonly IModel? _model = model;
 
     /// <summary>
     ///     The nearest type the wire can <em>name</em> for a value of <paramref name="type" />:

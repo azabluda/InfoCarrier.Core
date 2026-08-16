@@ -24,16 +24,13 @@ namespace InfoCarrier.Core.Query;
 ///         client-side projection; see <see cref="OpenFragments" />.
 ///     </para>
 /// </remarks>
-public sealed class ServerBoundaryAnalyzer
+/// <remarks>
+///     Initializes a new instance of the <see cref="ServerBoundaryAnalyzer" /> class.
+/// </remarks>
+/// <param name="allowlist">The types the server will accept. Must match the server's.</param>
+public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
 {
-    private readonly TypeAllowlist _allowlist;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="ServerBoundaryAnalyzer" /> class.
-    /// </summary>
-    /// <param name="allowlist">The types the server will accept. Must match the server's.</param>
-    public ServerBoundaryAnalyzer(TypeAllowlist allowlist)
-        => _allowlist = allowlist;
+    private readonly TypeAllowlist _allowlist = allowlist;
 
     /// <summary>
     ///     Analyzes a captured query tree.

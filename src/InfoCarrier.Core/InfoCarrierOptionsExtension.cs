@@ -48,13 +48,8 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
         }
     }
 
-    private sealed class ExtensionInfo : DbContextOptionsExtensionInfo
+    private sealed class ExtensionInfo(InfoCarrierOptionsExtension extension) : DbContextOptionsExtensionInfo(extension)
     {
-        public ExtensionInfo(InfoCarrierOptionsExtension extension)
-            : base(extension)
-        {
-        }
-
         public override bool IsDatabaseProvider => true;
 
         public override string LogFragment => "using InfoCarrier ";

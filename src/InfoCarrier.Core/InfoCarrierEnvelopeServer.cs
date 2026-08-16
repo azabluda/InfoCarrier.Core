@@ -27,24 +27,18 @@ namespace InfoCarrier.Core;
 ///         shape it no longer shares.
 ///     </para>
 /// </remarks>
-public sealed class InfoCarrierEnvelopeServer
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierEnvelopeServer" /> class.
+/// </remarks>
+/// <param name="server">The server the operations run against.</param>
+/// <param name="serializer">
+///     The serializer for payloads. This is the deserializing side of a remote caller's bytes,
+///     so it is where <see cref="InfoCarrierPayloadLimits" /> earns its keep.
+/// </param>
+public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCarrierSerializer serializer)
 {
-    private readonly IInfoCarrierServer _server;
-    private readonly IInfoCarrierSerializer _serializer;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierEnvelopeServer" /> class.
-    /// </summary>
-    /// <param name="server">The server the operations run against.</param>
-    /// <param name="serializer">
-    ///     The serializer for payloads. This is the deserializing side of a remote caller's bytes,
-    ///     so it is where <see cref="InfoCarrierPayloadLimits" /> earns its keep.
-    /// </param>
-    public InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCarrierSerializer serializer)
-    {
-        _server = server;
-        _serializer = serializer;
-    }
+    private readonly IInfoCarrierServer _server = server;
+    private readonly IInfoCarrierSerializer _serializer = serializer;
 
     /// <summary>
     ///     Handles one request envelope and produces the response envelope.

@@ -25,19 +25,16 @@ namespace InfoCarrier.Core.Query;
 ///         actually checked, and §4 of the spec for what deliberately is not.
 ///     </para>
 /// </remarks>
-public sealed class RewriteVerifier
+/// <remarks>
+///     Initializes a new instance of the <see cref="RewriteVerifier" /> class.
+/// </remarks>
+/// <param name="analyzer">
+///     The same analyzer the split uses, so a rewrite is judged by the boundary that will
+///     actually be applied to it rather than by a second opinion.
+/// </param>
+public sealed class RewriteVerifier(ServerBoundaryAnalyzer analyzer)
 {
-    private readonly ServerBoundaryAnalyzer _analyzer;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="RewriteVerifier" /> class.
-    /// </summary>
-    /// <param name="analyzer">
-    ///     The same analyzer the split uses, so a rewrite is judged by the boundary that will
-    ///     actually be applied to it rather than by a second opinion.
-    /// </param>
-    public RewriteVerifier(ServerBoundaryAnalyzer analyzer)
-        => _analyzer = analyzer;
+    private readonly ServerBoundaryAnalyzer _analyzer = analyzer;
 
     /// <summary>
     ///     Judges <paramref name="candidate" /> against the tree it would replace.

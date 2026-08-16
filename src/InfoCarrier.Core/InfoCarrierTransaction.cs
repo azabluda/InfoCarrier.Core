@@ -24,48 +24,40 @@ namespace InfoCarrier.Core;
 ///         scope, a context and an open store transaction indefinitely.
 ///     </para>
 /// </remarks>
-public class InfoCarrierTransaction : IDbContextTransaction
+/// <remarks>
+///     Initializes a new instance of the <see cref="InfoCarrierTransaction" /> class.
+/// </remarks>
+/// <param name="onFinished">
+///     Told when this transaction ends, however it ends. A caller may commit through the
+///     transaction object rather than through the manager —
+///     <c>using (var tx = context.Database.BeginTransaction()) { … tx.Commit(); }</c> is the
+///     ordinary shape — and the manager still has to stop reporting it as current. EF's
+///     relational transaction notifies its manager the same way.
+/// </param>
+/// <param name="owned">
+///     Whether ending this object ends the server's transaction. False for one *enlisted* in a
+///     transaction another context began: several contexts may share a server transaction —
+///     that is what a token is for — and only the one that opened it may end it. An enlisted
+///     transaction still names the token, which is its whole job, so requests from this
+///     context run inside it.
+/// </param>
+public class InfoCarrierTransaction(
+    IInfoCarrierClient client,
+    string serverTransactionId,
+    Action onFinished,
+    bool owned = true) : IDbContextTransaction
 {
-    private readonly IInfoCarrierClient _client;
-    private readonly Action _onFinished;
-    private readonly bool _owned;
+    private readonly IInfoCarrierClient _client = client;
+    private readonly Action _onFinished = onFinished;
+    private readonly bool _owned = owned;
     private bool _finished;
     private bool? _supportsSavepoints;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="InfoCarrierTransaction" /> class.
-    /// </summary>
-    /// <param name="onFinished">
-    ///     Told when this transaction ends, however it ends. A caller may commit through the
-    ///     transaction object rather than through the manager —
-    ///     <c>using (var tx = context.Database.BeginTransaction()) { … tx.Commit(); }</c> is the
-    ///     ordinary shape — and the manager still has to stop reporting it as current. EF's
-    ///     relational transaction notifies its manager the same way.
-    /// </param>
-    /// <param name="owned">
-    ///     Whether ending this object ends the server's transaction. False for one *enlisted* in a
-    ///     transaction another context began: several contexts may share a server transaction —
-    ///     that is what a token is for — and only the one that opened it may end it. An enlisted
-    ///     transaction still names the token, which is its whole job, so requests from this
-    ///     context run inside it.
-    /// </param>
-    public InfoCarrierTransaction(
-        IInfoCarrierClient client,
-        string serverTransactionId,
-        Action onFinished,
-        bool owned = true)
-    {
-        _client = client;
-        _onFinished = onFinished;
-        _owned = owned;
-        ServerTransactionId = serverTransactionId;
-    }
 
     /// <summary>
     ///     The server's token for this transaction (wire-protocol W3). Every request that must
     ///     run inside it carries this value.
     /// </summary>
-    public virtual string ServerTransactionId { get; }
+    public virtual string ServerTransactionId { get; } = serverTransactionId;
 
     /// <inheritdoc />
     public virtual Guid TransactionId { get; } = Guid.NewGuid();

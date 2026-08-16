@@ -14,25 +14,19 @@ namespace InfoCarrier.Core.Expressions;
 ///     (3) EF entity types via the model using <see cref="TypeNode.EntityTypeName" />
 ///     (research-findings §3/§7 — entities resolve through model identity, never shape).
 /// </remarks>
-public class TypeNodeResolver
+/// <remarks>
+///     Initializes a new instance of the <see cref="TypeNodeResolver" /> class.
+/// </remarks>
+/// <param name="model">The EF model used to resolve entity types by model identity.</param>
+/// <param name="allowlist">
+///     The types a payload may name (ADR-008 constraint 2). Defaults to one derived from
+///     <paramref name="model" /> — the allowlist is <em>on by default</em>, never opt-in.
+/// </param>
+public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = null)
 {
-    private readonly IModel? _model;
-    private readonly TypeAllowlist _allowlist;
+    private readonly IModel? _model = model;
+    private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="TypeNodeResolver" /> class.
-    /// </summary>
-    /// <param name="model">The EF model used to resolve entity types by model identity.</param>
-    /// <param name="allowlist">
-    ///     The types a payload may name (ADR-008 constraint 2). Defaults to one derived from
-    ///     <paramref name="model" /> — the allowlist is <em>on by default</em>, never opt-in.
-    /// </param>
-    public TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = null)
-    {
-        _model = model;
-        _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
-    }
 
     /// <summary>
     ///     Resolves a type node to its CLR type.

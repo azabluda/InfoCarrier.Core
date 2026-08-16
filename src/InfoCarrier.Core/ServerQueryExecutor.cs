@@ -21,19 +21,13 @@ namespace InfoCarrier.Core;
 ///     (shared-type entities resolved by name), executes the entity-typed portion, and maps
 ///     results to the wire format.
 /// </summary>
-public class ServerQueryExecutor
+/// <remarks>
+///     Initializes a new instance of the <see cref="ServerQueryExecutor" /> class.
+/// </remarks>
+public class ServerQueryExecutor(DbContext context, IExpressionSerializer expressionSerializer)
 {
-    private readonly DbContext _context;
-    private readonly IExpressionSerializer _expressionSerializer;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="ServerQueryExecutor" /> class.
-    /// </summary>
-    public ServerQueryExecutor(DbContext context, IExpressionSerializer expressionSerializer)
-    {
-        _context = context;
-        _expressionSerializer = expressionSerializer;
-    }
+    private readonly DbContext _context = context;
+    private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
 
     /// <summary>
     ///     Executes the query described by <paramref name="request" /> and returns the wire result.

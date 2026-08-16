@@ -20,13 +20,8 @@ namespace Northwind.Demo;
 ///         counter was removed rather than made to look right.
 ///     </para>
 /// </remarks>
-internal sealed class CountingHandler : DelegatingHandler
+internal sealed class CountingHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
 {
-    public CountingHandler(HttpMessageHandler inner)
-        : base(inner)
-    {
-    }
-
     public int Requests { get; private set; }
 
     protected override Task<HttpResponseMessage> SendAsync(

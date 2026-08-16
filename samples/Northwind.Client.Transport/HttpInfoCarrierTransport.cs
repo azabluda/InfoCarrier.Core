@@ -21,21 +21,14 @@ namespace Northwind.Client.Transport;
 ///         Northwind, and nothing here needs ASP.NET.
 ///     </para>
 /// </remarks>
-public sealed class HttpInfoCarrierTransport : IInfoCarrierTransport
+public sealed class HttpInfoCarrierTransport(
+    HttpClient httpClient,
+    IInfoCarrierSerializer serializer,
+    string requestUri = "infocarrier") : IInfoCarrierTransport
 {
-    private readonly HttpClient _httpClient;
-    private readonly IInfoCarrierSerializer _serializer;
-    private readonly string _requestUri;
-
-    public HttpInfoCarrierTransport(
-        HttpClient httpClient,
-        IInfoCarrierSerializer serializer,
-        string requestUri = "infocarrier")
-    {
-        _httpClient = httpClient;
-        _serializer = serializer;
-        _requestUri = requestUri;
-    }
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly IInfoCarrierSerializer _serializer = serializer;
+    private readonly string _requestUri = requestUri;
 
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,

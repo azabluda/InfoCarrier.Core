@@ -15,29 +15,22 @@ namespace InfoCarrier.Core.Expressions;
 ///     <c>DbSet&lt;T&gt;</c> from its own context and model (research-findings §2). Parameter
 ///     identity is remapped by name + position (requirements §2.3).
 /// </remarks>
-public class NodeToExpressionTranslator
+/// <remarks>
+///     Initializes a new instance of the <see cref="NodeToExpressionTranslator" /> class.
+/// </remarks>
+/// <param name="typeResolver">Resolves <see cref="TypeNode" /> → CLR type.</param>
+/// <param name="valueMapper">Materializes dynamic constants.</param>
+/// <param name="queryRootFactory">Rebuilds a query root from a stub + element type.</param>
+public class NodeToExpressionTranslator(
+    TypeNodeResolver typeResolver,
+    IDynamicValueMapper valueMapper,
+    Func<QueryRootStubNode, Type, Expression> queryRootFactory)
 {
-    private readonly TypeNodeResolver _typeResolver;
-    private readonly IDynamicValueMapper _valueMapper;
-    private readonly Func<QueryRootStubNode, Type, Expression> _queryRootFactory;
+    private readonly TypeNodeResolver _typeResolver = typeResolver;
+    private readonly IDynamicValueMapper _valueMapper = valueMapper;
+    private readonly Func<QueryRootStubNode, Type, Expression> _queryRootFactory = queryRootFactory;
     // Keyed by ParameterNode.Id, never by name — see ParameterNode.Id for why.
     private readonly Dictionary<int, ParameterExpression> _parameters = [];
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="NodeToExpressionTranslator" /> class.
-    /// </summary>
-    /// <param name="typeResolver">Resolves <see cref="TypeNode" /> → CLR type.</param>
-    /// <param name="valueMapper">Materializes dynamic constants.</param>
-    /// <param name="queryRootFactory">Rebuilds a query root from a stub + element type.</param>
-    public NodeToExpressionTranslator(
-        TypeNodeResolver typeResolver,
-        IDynamicValueMapper valueMapper,
-        Func<QueryRootStubNode, Type, Expression> queryRootFactory)
-    {
-        _typeResolver = typeResolver;
-        _valueMapper = valueMapper;
-        _queryRootFactory = queryRootFactory;
-    }
 
     /// <summary>
     ///     Translates a node DTO to a live expression.

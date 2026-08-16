@@ -510,12 +510,9 @@ internal sealed class QueryExecutor<TElement>
     ///     <see cref="QueryContext.Parameters" /> by the same name it gives the node, so a
     ///     single lookup serves both.
     /// </remarks>
-    private sealed class SubstituteParametersExpressionVisitor : ExpressionVisitor
+    private sealed class SubstituteParametersExpressionVisitor(QueryContext queryContext) : ExpressionVisitor
     {
-        private readonly QueryContext _queryContext;
-
-        public SubstituteParametersExpressionVisitor(QueryContext queryContext)
-            => _queryContext = queryContext;
+        private readonly QueryContext _queryContext = queryContext;
 
         /// <summary>
         ///     Set while inside a call to a method on <see cref="EF" />, where a collection must
