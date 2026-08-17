@@ -1512,28 +1512,106 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 | `Regex_IsMatch`, `Regex_IsMatch_constant_input` | 2 | LINQ not translated | **Ours, by design** — A46's deliberate allowlist refusal. **Not upstream**, which the earlier summary got wrong. |
 | `Can_insert_and_read_back_with_enumerable_class_key…` | 1 | `InvalidCastException` | **Upstream**, and the only one: EF's own `EnumerableClassKey.Equals` casts to `IntClassKey` (J9). |
 | `Parameter_collection_null_Contains` | 1 | LINQ not translated | SQLite-tier; the 1 that survived `PrimitiveCollectionsQuery` going 4 → 1 in C88. |
-| `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Newly understood — see below.** |
-| `Casts_are_removed_from_expression_tree_when_redundant` | 1 | `Assert.Throws: Exception type was not an exact match` | **Newly understood — see below.** |
+| `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Settled by J16, no code.** Right type, right verdict, EF's wording of a different true fact. Three siblings green. |
+| `Casts_are_removed_from_expression_tree_when_redundant` | 1 | `Assert.Throws: Exception type was not an exact match` | **Re-diagnosed by J17; the entry below it used to carry was wrong.** Not cast elision — a type-argument boundary. |
 | `Collection_enum_as_string_Contains` | 1 | `Assert.Throws: No exception was thrown` | **A28, verified** by probe in J2's triage: `Seller` → 1/1, `Customer` → 0/0, so the server really filters. |
 | `Composition_over_collection_of_complex_mapped_as_scalar` | 1 | `Assert.Throws: No exception was thrown` | ~~**NOT verifiable here**~~ — **A28, verified by J15.** |
 
-**`Casts_are_removed_from_expression_tree_when_redundant` is a mechanism, not a singleton.**
+- [x] **J16. `Update_with_invalid_lambda_in_set_property_throws` — settled, and the sibling check
+      settled it.** `<this commit>` Docs only; no code, no gate.
 
-```
-Expected: InvalidOperationException     Actual: InvalidCastException
----- Unable to cast object of type 'MockEntity' to type 'IDummyEntity'
-```
+      **Three siblings of the same shape are green, and one is red.** Read off `j8b`, and this is
+      the whole finding:
 
-EF **removes a redundant cast** during translation; ADR-006 captures the tree *before* that, so the
-cast survives, reaches the client residual, and executes. The test asks for EF's translation
-refusal and gets a real cast failure instead. This is the same shape as C56 one level down — a
-diagnostic EF raises downstream of the capture point — except here what is missing is not a
-*refusal* but a *simplification*.
+      | Test | `j8b` |
+      |---|---|
+      | `Update_without_property_to_set_throws` | Passed ×2 |
+      | `Update_multiple_tables_throws` | Passed ×2 |
+      | `Update_unmapped_property_throws` | Passed ×2 |
+      | `Update_with_invalid_lambda_in_set_property_throws` | **Failed ×2** |
 
-**`Update_with_invalid_lambda_in_set_property_throws` fails at our own boundary.** The stack is
-`QuerySplitter.RejectClientEvaluation`, so the exception type is right and the *message* is ours
-rather than EF's. C56's family precisely: the split refuses first, and EF never gets to produce
-the specific diagnostic the base asserts.
+      All four are `AssertTranslationFailed` over a specific relational diagnostic. The three green
+      ones ship whole, and the **server** produces EF's message, which round-trips. So this is not a
+      family-level design question — C56's rule, applied before pricing anything.
+
+      **The one difference is what the invalid lambda contains.** It calls
+      `TestUtilities.TestExtensions.MaybeScalar`. `ClientCodeFinder.VisitMethodCall` refuses a call
+      whose **declaring type is not on the `TypeAllowlist`**, and `TestExtensions` is not on it, so
+      `RejectClientEvaluation` refuses before the query can leave. The exception **type** is right,
+      the **verdict** is right, and the message is `CoreStrings.TranslationFailedWithDetails` —
+      EF's own wording of a different fact that is also true.
+
+      **Deferring to the server does not work, and there are two independent reasons.**
+
+      - `TypeNodeResolver` resolves against `TypeAllowlist.ForModel(model)` — **the same allowlist**.
+        Ship the call and the server refuses the same type at deserialization: same verdict, worse
+        message (*"not on the deserialization allowlist"*). Making the server accept it means
+        admitting `TestExtensions` to `TypeAllowlist`, which is ADR-008 constraint 2 and which
+        `security-review.md` §2 forbids on a conjunction argument.
+      - The message the base asserts is `RelationalStrings.InvalidPropertyInSetProperty`. **J5
+        removed the product's reference to `Microsoft.EntityFrameworkCore.Relational`**, so the
+        product cannot name that string without reinstating a dependency this milestone deleted.
+
+      **DECIDED: leave it red.** Both routes to the message cost more than the message is worth, and
+      one of them is a security regression. Red and classified.
+
+- [x] **J17. `Casts_are_removed_from_expression_tree_when_redundant` — the diagnosis above was
+      wrong, and the correction is the deliverable.** `<this commit>` Docs only; no code, no gate.
+
+      ```
+      Expected: InvalidOperationException     Actual: InvalidCastException
+      ---- Unable to cast object of type 'MockEntity' to type 'IDummyEntity'
+      ```
+
+      **What this entry used to say:** *"EF removes a redundant cast during translation; ADR-006
+      captures the tree before that, so the cast survives, reaches the client residual, and
+      executes… what is missing is not a refusal but a simplification."* The first clause is true.
+      The conclusion does not explain this failure, and EF's own source says why.
+
+      `NavigationExpandingExpressionVisitor.ProcessCastOfType` elides a cast **only** when
+      `castType.IsAssignableFrom(source.PendingSelector.Type) || castType == typeof(object)`.
+      The test has three blocks:
+
+      | Block | Cast | EF | Us |
+      |---|---|---|---|
+      | 1 | `Cast<IDomainEntity>()` | redundant → **elided** | passes |
+      | 2 | `Cast<object>()` | redundant → **elided** | passes |
+      | 3 | `Cast<IDummyEntity>()` | **not** redundant → kept, then `TranslateCast` fails | **fails** |
+
+      `MockEntity` implements `IDomainEntity` and does not implement `IDummyEntity`. So EF does not
+      elide the cast that fails. **Implementing EF's elision in the residual would change nothing
+      here** — it applies to exactly the two blocks that already pass.
+
+      **The real cause is the type boundary, and it is C53's mechanism again.**
+      `TypeAllowlist.AddSupertypes` admits every interface an entity CLR type implements, so
+      `IDomainEntity` is allowed. Nothing implements `IDummyEntity`, and `Evaluate` has no other
+      clause that would admit it, so it is refused. The `Cast` therefore cannot ship, stays in the
+      residual, and `Enumerable.Cast` runs on the client. The stack trace says exactly that:
+      `Enumerable.CastICollectionIterator` inside `SplitQuery.Apply`.
+
+      **The general gap, and it is worth more than this test:
+      `RejectClientEvaluation` examines an operator's *value* arguments and never its *type*
+      arguments.** `Cast<T>` carries no lambda and no client code, so nothing looks at `T` at all;
+      `TransparentIdentifierRewriter` is the only place in `src/` that names `Cast`/`OfType`, and it
+      is about re-carry disqualification, not refusal.
+
+      **`OfType<T>` is the reason to care.** A refused `Cast<T>` throws, which is loud. A refused
+      `OfType<T>` returns **zero rows with no error** — the silent-plausible-answer shape that
+      `ClientCodeFinder`'s own anonymous-`==` remark calls the one thing worse than a refusal.
+      **Stated as a hypothesis with a named check, not as a fact:** write one query with an
+      interface no entity type implements and read what `OfType` returns. That is J18.
+
+      **Pricing, so nobody re-prices it later.** A guard that refuses a residual `Cast`/`OfType`
+      whose type argument is off the allowlist gives the right exception **type**. The test stays
+      red, because the base asserts EF's *whole printed message*, and that message is EF's rendering
+      of the tree **after** EF normalizes and parameterizes it — `.Where(e => e.Id == @id)`, not the
+      `FirstOrDefault(x => x.Id == id)` ADR-006 captures. **So the count will not move**, and this
+      is C90–C93's situation: judge it on the reasons diff.
+
+      **This *is* the "downstream of the capture point" family after all** — C56's shape — but the
+      thing missing downstream is EF's *printing and normalization* of the query, not its cast
+      elision. Getting that one word wrong pointed the remedy at code that would have measured
+      neutral.
 
 **`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
 and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same
