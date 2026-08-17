@@ -118,7 +118,9 @@ dotnet run --project samples/Northwind.Demo
 The server's launch profile pins `http://localhost:5199`; the demo defaults to the same address and
 takes an override as its first argument.
 
-Expected output:
+Expected output **against a freshly seeded store**, which is what the caveat below the transcript
+is about — the browser pages write to the same `northwind.db`, and the Transfer page in particular
+moves order 1 to another customer, so a store that has been clicked through answers differently:
 
 ```
   InfoCarrier.Core — Northwind demo
@@ -166,15 +168,20 @@ trimming a list it already paid to receive.
 synchronous navigation getter can block on the round trip. That is the same asymmetry described
 above, seen from the other side.
 
-Run it against a **fresh** store if you want these exact numbers — the browser pages write to the
-same `northwind.db`, and the Transfer page in particular moves order 1 to another customer.
+**Delete `northwind.db` beside the server binary if you want these exact numbers.** The transcript
+above is a fresh store: order 1 belongs to `ALFKI` and 330 order lines have a quantity of 10 or
+more, both of which `InfoCarrier.Core.TransportTests` asserts against the same seed. Click through
+the browser pages first and the same run prints `1:BERGS` and a different count — the Transfer page
+moved the order and the Order page edited quantities, which is the demonstration working rather
+than the numbers being wrong.
 
 ## The projects
 
 | Project | What it is |
 |---|---|
 | `Northwind.Shared` | The model and **one** `NorthwindContext`, used by both halves. The wire carries entity type *names*, so the two models must agree; sharing the type makes that true by construction rather than by discipline. |
-| `Northwind.Server` | ASP.NET Core + SQLite. One route, `POST /infocarrier`, which hands the envelope to the product's `InfoCarrierEnvelopeServer`. There is no UI — a `GET /` is a 404. |
+| `Northwind.Server` | ASP.NET Core + SQLite. `app.MapInfoCarrier()` is the one route it owns; everything else is the browser client's, which this host also serves, so there is one origin and no CORS. Creates and seeds `northwind.db` at start-up. |
+| `Northwind.Client` | The Blazor WebAssembly client: three pages, the wire inspector, and no database. |
 | `Northwind.Demo` | The console client above. |
 
 **`Northwind.Client.Transport` and `Northwind.Server/Transport/` are gone, and that is the plan
@@ -208,7 +215,7 @@ dotnet publish samples/Northwind.Client -c Release
 ```
 
 The client publishes with `PublishTrimmed=true` **and runs** — all three pages were driven against
-the published output. It reports **86 IL trim warnings owned by `InfoCarrier.Core`**, and that is a
+the published output. It reports **88 IL trim warnings owned by `InfoCarrier.Core`**, and that is a
 known, recorded number rather than a clean bill of health: the wire carries a type's *name* and the
 far end resolves it, so `Assembly.GetType(string)` and `MakeGenericMethod` are what this provider is
 made of, and `[DynamicallyAccessedMembers]` cannot describe them. The warnings mean the trimmer
@@ -216,7 +223,13 @@ cannot *prove* the reflection safe for an arbitrary model, not that it broke thi
 
 `eng/trim-ratchet.sh` gates the direction of that count against `eng/trim-baseline.txt`, exactly as
 `eng/ratchet.sh` gates the spec suite. Everyone else's warnings are reported but not gated — EF Core
-alone contributes 864 of the 1129 total.
+alone contributes 585 of the 853 total.
+
+Both numbers have moved since they were first measured, in opposite directions and for unrelated
+reasons, which is why `eng/trim-baseline.txt` records each one rather than only the current value.
+`ours` rose 86 → 88 deliberately, for a `GroupBy` fix that needs exactly the two reflection shapes
+this provider is built on; `total` fell 1129 → 853 because EF Core's own count dropped, and none of
+that improvement is this repository's.
 
 ## What is not here yet
 
@@ -224,7 +237,3 @@ alone contributes 864 of the 1129 total.
   the protocol over a real HTTP hop; the three pages were verified by driving a real browser, and
   that harness is not in the repository. CI would not notice a page breaking — only that the
   client still builds and publishes.
-- **The two transport files still live here**, in `samples/`, rather than in packages. Both are
-  deliberately free of Northwind types — `HttpInfoCarrierTransport.cs` and
-  `InfoCarrierEndpointExtensions.cs` — so promoting them is a file move. The wire inspector is an
-  `IInfoCarrierTransport` **decorator** in the client project precisely to keep that true.

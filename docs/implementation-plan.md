@@ -1196,8 +1196,38 @@ rather than staying silent about it.
       `src/`, no `test/`. CLAUDE.md's table says `docs/` text needs neither `eng/measure.sh` nor
       `eng/trim-ratchet.sh`.
 
-- [ ] **N2. `samples/README.md`: three stale numbers and one section that contradicted itself.**
+- [x] **N2. `samples/README.md`: three stale numbers and one section that contradicted itself.**
       `<this commit>`
+
+      **The trim numbers were all three wrong**, and they were wrong in different directions:
+      `ours` 86 → **88** (J8's `WireGrouping` fix, a deliberate rise), `total` 1129 → **853** and
+      EF Core's share 864 → **585** (the package/SDK movement, none of it ours). Read out of
+      `eng/trim-baseline.txt`, which records each measurement rather than only the current value —
+      which is why the direction of each could be stated rather than guessed.
+
+      **The file contradicted itself about the transports.** *The projects* says they were promoted
+      in M8-22 and that no sample-owned transport is left; *What is not here yet* still listed
+      "the two transport files still live here". The stale bullet is deleted rather than rewritten:
+      the promotion is already described where it belongs, and a "this is done now" entry under a
+      heading about what is missing is worse than no entry.
+
+      **The projects table was missing `Northwind.Client` altogether**, and described the server as
+      having no UI — *"a `GET /` is a 404"*. It serves the Blazor client (`UseBlazorFrameworkFiles`
+      plus `MapFallbackToFile`), which is the whole reason there is one origin and no CORS, and the
+      same table's own first sentence about the browser says so.
+
+      **The console transcript is not stale — its caveat was in the wrong place.** The numbers
+      (`1:ALFKI`, 330 lines of quantity ≥ 10) are a *fresh* store's, and
+      `InfoCarrier.Core.TransportTests` asserts both against the same seed. The note saying so was
+      below the transcript; a reader comparing output line by line meets it after concluding the
+      sample is broken. It now leads the transcript, and the note itself says what a clicked-through
+      store prints instead and why that is the demonstration working.
+
+      Verified unchanged by counting the seed rather than trusting it: **65 customers, 240 orders,
+      476 order lines, 30 products, 8 categories** — the orders and lines arithmetic re-run over
+      `NorthwindSeed`'s own generator, the others counted out of its literal arrays.
+
+      **Gates: none.** Markdown only.
 
 - [ ] **N3. `docs/nuget-readme.md`: honest about where the packages actually are.** `<this commit>`
 
