@@ -13,6 +13,12 @@ env:
   SOLUTION: InfoCarrier.Core.slnx
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
+  # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
+  # fails the build on the server while local development keeps them as warnings. GitHub Actions
+  # already sets CI=true; it is stated explicitly so the gate is visible in the workflow rather
+  # than depending on a runner's implicit environment. See docs/build-warnings.md.
+  CI: true
+
 jobs:
   # Must be green. Build plus the two suites that are expected to pass unconditionally:
   # serializer round-trip and the end-to-end vertical slice.

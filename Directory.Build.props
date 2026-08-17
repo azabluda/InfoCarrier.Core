@@ -8,10 +8,45 @@
 
     <!--
       Runs the IDE#### code-style analyzers as part of the build instead of only in an editor, so
-      CI sees them. Which of them are on is decided in .editorconfig, where all but IDE0005
-      (unnecessary using directive) are switched off.
+      CI sees them. Which of them are on is decided in .editorconfig; today that is IDE0005
+      (unnecessary using directive) and nothing else.
     -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!--
+      WARNINGS ARE ERRORS IN CI, AND ONLY IN CI.
+
+      The build is clean (0 warnings), and this is what keeps it clean: a new warning fails the
+      build on the server. Locally it stays a warning, because half-finished work with an unused
+      variable in it is a normal state to be in and a gate that punishes experimentation gets
+      switched off by the people it is meant to help.
+
+      `CI` is set to `true` by GitHub Actions, and by Azure Pipelines, GitLab and Travis. MSBuild
+      reads environment variables as properties, so nothing has to be passed on the command line.
+      To reproduce a CI failure locally:  CI=true dotnet build InfoCarrier.Core.slnx
+
+      There is deliberately no `WarningsNotAsErrors`. EF1001 was the one code that needed an
+      exemption, and since M8-30 it needs none: the 19 files that use EF Core internals carry a
+      file-scoped `#pragma warning disable EF1001`, which is what EF Core's own providers do, so
+      the build emits none. A NEW file reaching for an internal API still warns, and in CI now
+      fails, which is the tripwire, working as intended. Do not add a NoWarn to silence it.
+    -->
+    <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
+
+    <!--
+      ILLink's own warnings are never errors. The trimmed Blazor publish reports 88 IL2xxx
+      warnings owned by InfoCarrier.Core, unfixable by design: the wire carries a type's NAME, so
+      Assembly.GetType(string) and MakeGenericMethod are what this provider is made of, and
+      [DynamicallyAccessedMembers] cannot describe them. eng/trim-ratchet.sh gates their
+      DIRECTION against eng/trim-baseline.txt.
+
+      This property covers the ILLink TASK only. It is NOT what keeps the trim ratchet green, and
+      believing it was cost a run: most IL2xxx findings come from the trim ROSLYN ANALYZER during
+      compilation (they carry a source line), so plain TreatWarningsAsErrors turns those into
+      errors and this property never sees them. eng/trim-ratchet.sh therefore passes
+      -p:TreatWarningsAsErrors=false on its own publish, and says why.
+    -->
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <Company>InfoCarrier.Core</Company>
     <Product>InfoCarrier.Core</Product>
     <Description>Entity Framework Core database provider that remotes LINQ queries and change-tracking over a wire protocol.</Description>

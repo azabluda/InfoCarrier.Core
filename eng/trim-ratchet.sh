@@ -34,9 +34,24 @@ log="$out/publish.log"
 # pass forever while regressions sailed through. The count must come from a trimmer that RAN.
 rm -rf "$root/samples/Northwind.Client/obj/Release" "$root/samples/Northwind.Client/bin/Release"
 
+# TreatWarningsAsErrors is FORCED OFF for this publish, and it is not a loophole.
+#
+# Directory.Build.props turns warnings into errors when CI=true. The trim analyzer emits its
+# IL2xxx findings as ordinary compiler warnings — they carry a source line, unlike the ILLink
+# step's own output — so under CI they became errors and the publish failed. The gate that
+# exists to MEASURE these warnings was the one thing that could not tolerate them.
+#
+# ILLinkTreatWarningsAsErrors does not help: it feeds the ILLink task, not the Roslyn analyzer.
+# NoWarn would be worse than useless — this script COUNTS these warnings, so silencing them
+# reports OURS: 0 and passes for ever, which is exactly the failure the clean-publish rule below
+# exists to prevent.
+#
+# So the two axes stay separate: warnings-as-errors gates the ordinary build, and the DIRECTION
+# of the trim count gates this one.
+
 echo "trim-ratchet: publishing samples/Northwind.Client (Release, trimmed, clean)…"
 dotnet publish "$root/samples/Northwind.Client/Northwind.Client.csproj" \
-    -c Release --nologo > "$log" 2>&1
+    -c Release --nologo -p:TreatWarningsAsErrors=false > "$log" 2>&1
 status=$?
 
 if [ $status -ne 0 ]; then

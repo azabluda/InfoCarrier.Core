@@ -1097,3 +1097,56 @@ warning ratchet to replace.
       12 `CS1574` and 4 `CS1570`** — 1254 warnings, which is exactly why those projects had
       documentation generation switched off in the first place. In `src/` the same four rules stay
       **on**, and M8-28 answered all 22 sites there.
+
+- [x] **M8-32. The gate: warnings are errors in CI, and only in CI.** `<this commit>`
+      `eng/measure.sh m8-32 m8-31`: `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` —
+      **0 fixed, 0 broken, `REASONS: unchanged`**. `eng/trim-ratchet.sh` **under `CI=true`**:
+      `OURS: 88 <= 88`. `InfoCarrier.Core.TransportTests`: **17 of 17**.
+
+      ```xml
+      <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
+      ```
+
+      Local development keeps warnings as warnings, because half-finished work with an unused
+      variable in it is a normal state and a gate that punishes experimentation gets switched off
+      by the people it is for. `CI` is set by GitHub Actions and MSBuild reads environment
+      variables as properties, so nothing is passed on a command line; `build.yml` states
+      `CI: true` explicitly anyway, so the gate is visible in the workflow rather than inherited
+      from a runner. Policy is written up in **`docs/build-warnings.md`**, registered in
+      `CLAUDE.md`'s authority table.
+
+      **There is no `WarningsNotAsErrors`, and that is a consequence of M8-30 rather than an
+      omission.** `EF1001` was the one code the story expected to exempt; since it is pragma'd per
+      file it emits nothing, so there is nothing to exempt. A *new* file reaching for an internal
+      API warns locally and **fails CI**, which is the tripwire working.
+
+      **The gate was driven in both directions, because one that has only been seen to pass is not
+      known to work.** With a deliberately unused `using` in `TypeNode.cs`: plain `dotnet build`
+      exits **0** with `warning IDE0005`; `CI=true dotnet build` exits **1** with
+      `error IDE0005`.
+
+      **The trap the story flagged was real, and the fix the story proposed does not work.**
+      `<ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>` was set first and the
+      trimmed publish **still failed** under `CI=true`, with five `IL2110`/`IL2111` errors. That
+      property feeds the ILLink **task**; most `IL2xxx` findings come from the trim **Roslyn
+      analyzer** during compilation — they carry a source line — so plain `TreatWarningsAsErrors`
+      turns those into errors and the property never sees them. **The gate that exists to measure
+      trim warnings was the one thing that could not tolerate them.**
+
+      `NoWarn` would be worse than useless: `eng/trim-ratchet.sh` **counts** them, so silencing
+      them reports `OURS: 0` and passes for ever — the failure its own clean-publish rule exists to
+      prevent. The two axes are separated instead: the script passes
+      `-p:TreatWarningsAsErrors=false` on its own publish and says why. The property stays for the
+      ILLink task, with a comment correcting what it does.
+
+      **Two instruments were wrong before the code was, again.** `ratchet exit=0` on a failed
+      publish was `tail`'s exit status, not the script's — the script fails correctly. And a build
+      failure read as XML damage was `NETSDK1124` from a stale `obj/Release` the trim publish left
+      behind. Both were resolved by reading the actual output rather than the expected one.
+
+### Phase M closed
+
+`dotnet build InfoCarrier.Core.slnx` → **`0 Warning(s), 0 Error(s)`**, from 18 distinct warning
+texts. Nine security advisories closed by a version floor, 22 XML-doc defects fixed, 23 nullability
+sites answered, 36 unused usings removed, `EF1001` handled the way EF Core's own providers handle
+it, and a new warning now fails CI.
