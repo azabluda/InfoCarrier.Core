@@ -240,5 +240,5 @@
 # records that HasDefaultValue(true) makes a bool sentinel true on the server and false on the client
 # unless it is configured once in the shared OnModelCreating (A49, D2). 22654 / 22461 / 16 / 177
 # (`j14`).
-failed=15
-total=22654
+failed=13
+total=22655

@@ -47,6 +47,19 @@ public class DocumentMappingPinTest
             RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName,
             AnnotationDocumentMapping.SynthesizedOrdinal);
 
+    // `InfoCarrierValueGenerationConvention`'s two, pinned here for the same reason and in the same
+    // place: every relational annotation the product names by string rather than by constant.
+    [ConditionalFact]
+    public void The_default_value_annotation_names_are_still_EFs()
+    {
+        Assert.Equal(
+            RelationalAnnotationNames.DefaultValue,
+            InfoCarrierValueGenerationConvention.DefaultValueAnnotation);
+        Assert.Equal(
+            RelationalAnnotationNames.DefaultValueSql,
+            InfoCarrierValueGenerationConvention.DefaultValueSqlAnnotation);
+    }
+
     [ConditionalFact]
     public void The_walk_agrees_with_EF_for_every_type_including_nested_ones()
     {

@@ -738,7 +738,25 @@ Measured one at a time, because a combined move cannot tell which base moved the
       `ChangeEntryMapper`'s `SentinelProperties` comment is where to start, because it already
       describes a value the wire cannot distinguish from unset. Filed as J14.
 
-- [ ] **J14. The sentinel/default-value family on a real store** — 10 failures, 5 tests × async.
+- [x] **J14 (rest). A store default now makes the CLIENT call a property store-generated.** `<this commit>`
+      `Total tests: 22655, Passed: 22465, Failed: 13, Skipped: 177` (`j14b`): **2 fixed, 0 broken**,
+      `total` +1 for the new pin assertion. **`GraphUpdates` is now fully green.**
+
+      **B6's divergence, on the way out, where it is fatal rather than lossy.** `ValueGenerated` is
+      inferred by a convention, and the one that reads `HasDefaultValue` is
+      `RelationalValueGenerationConvention` — which the server runs and this provider does not. B6
+      recorded what that costs for values coming *back*: no store-generated slot. Outbound it is
+      worse: `SomethingOfCategoryB.CategoryId` has `HasDefaultValue(2)` and is half of a composite
+      foreign key, so the client believed nothing would ever supply it and **EF's own change tracker
+      refused the save before the wire was reached** — `InternalEntryBase.PrepareToSave`, with not one
+      frame of this provider in the stack, which is how it was identified.
+
+      `InfoCarrierValueGenerationConvention` is the same shape and the same argument as
+      `InfoCarrierKeyDiscoveryConvention`: where the answer is decided by the caller's own model
+      configuration rather than by the store, the client has to reach it too. The annotations are
+      named **by string**, as J5 decided, and pinned beside the other two.
+
+- [x] ~~**J14. The sentinel/default-value family on a real store**~~ — 10 failures, 5 tests × async.
       Three groups, classified in J12b. **Start with the four `Cruiser`-not-in-model ones**: an
       entity type missing from the model is a fixture or convention fault, cannot be a store
       limitation, is the cheapest of the three to settle, and may explain the others.

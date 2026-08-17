@@ -28,6 +28,12 @@ public class InfoCarrierConventionSetBuilder(
         conventionSet.Replace<KeyDiscoveryConvention>(
             new InfoCarrierKeyDiscoveryConvention(Dependencies, documentMapping));
 
+        // A property the caller gave a store default is store-generated, and only a relational
+        // convention says so — which this provider does not run. Same reason as the key convention
+        // above: where the answer is decided by the caller's own model configuration rather than by
+        // the store, the client has to reach it too.
+        conventionSet.ModelFinalizingConventions.Add(new InfoCarrierValueGenerationConvention());
+
         return conventionSet;
     }
 }
