@@ -5,6 +5,17 @@
     <RootNamespace>InfoCarrier.Core</RootNamespace>
     <AssemblyName>InfoCarrier.Core</AssemblyName>
     <IsPackable>true</IsPackable>
+
+    <!--
+      Transitive pinning is OFF for the shipped packages, and only for them (M8-21).
+      `CentralPackageTransitivePinningEnabled` in Directory.Packages.props promotes a pin into the
+      nuspec, so `InfoCarrier.Core` declared `Microsoft.Extensions.DependencyInjection >= 10.0.9`
+      although no project references it — a constraint nobody chose, imposed on every consumer.
+      The pin exists for the TEST AND SAMPLE restore graph (EF Core's SQLite package floors
+      Microsoft.Extensions.Logging at 10.0.9, and without the pin those projects fail NU1109), and
+      those projects keep it. A package should declare what it references and nothing else.
+    -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>

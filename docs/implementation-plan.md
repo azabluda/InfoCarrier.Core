@@ -677,5 +677,49 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
       stripped so the file starts as `build.yml` does — but **the first tag is the test**, and that
       is worth knowing before relying on it.
 
+- [x] **M8-21. Three cleanups, each of which was checked before it was believed.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`j24` against `j23`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+
+      **1. `InProcessInfoCarrierTransport` moved out of the product into the test project.**
+      Referenced by three test files and by nothing in `src/` or `samples/` for its whole life, and
+      its own docstring says what it is: v1's `SimulateNetworkTransferJson`, which **double-
+      serializes on purpose** — request *and* response — so that wire-serializability failures
+      surface in tests. That is right for a harness and wrong for any deployment. **A real
+      in-process deployment needs no transport at all**: `InfoCarrierEnvelopeServer.DispatchAsync`
+      is already a delegate a caller can hand to `IInfoCarrierTransport` directly, which is exactly
+      what `InfoCarrierBackendTestStore` does — and its comment explains that it avoids this type
+      because double-serializing the suite's largest payload would cost about 750 MB of JSON.
+
+      **2. `AssemblyMarker` deleted — the only genuinely dead type in `src/`.** An `internal static
+      class` with an empty body, zero references anywhere, and a docstring citing *"the build order
+      in ADR-003"*. Scaffolding from the first commit.
+
+      **The audit that found it is worth keeping, and so is its first wrong answer.** A sweep of
+      every `src/` file for "referenced anywhere outside its own file" returned **five** candidates.
+      Three were false: `InfoCarrierDatabaseFacadeExtensions`, `InfoCarrierServiceCollectionExtensions`
+      and their methods are used by 11, 11 and 3 files respectively — **a static extension class is
+      referenced through its methods, never through its type name**, so a name-based sweep cannot
+      see it. The fifth, `Design/InfoCarrierDesignTimeServices`, is referenced by nothing **and must
+      stay**: it carries `[assembly: DesignTimeProviderServices(…)]` and `dotnet ef` finds it by
+      name at run time. **An unreferenced type is a question, not a verdict** — two of the five
+      would have been deleted wrongly.
+
+      **3. The nuspecs no longer declare a dependency nobody chose.**
+      `CentralPackageTransitivePinningEnabled` is now **off for the two shipped projects only**, so
+      `Microsoft.Extensions.DependencyInjection >= 10.0.9` is gone from both packages. Read back
+      rather than assumed:
+
+      ```
+      InfoCarrier.Core              -> InfoCarrier.Core.Abstractions 10.0.0-preview.1
+                                       Microsoft.EntityFrameworkCore 10.0.0
+      InfoCarrier.Core.Abstractions -> Microsoft.EntityFrameworkCore 10.0.0
+      ```
+
+      The pin stays everywhere else, because the NU1109 it prevents is in the **test and sample**
+      restore graph (EF Core's SQLite package floors `Microsoft.Extensions.Logging` at 10.0.9) and
+      those projects still need it. A package declares what it references; a repository pins what it
+      restores. Conflating the two put a constraint on every future consumer.
+
 ---
 

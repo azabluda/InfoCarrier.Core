@@ -5,6 +5,9 @@
     <RootNamespace>InfoCarrier.Core</RootNamespace>
     <AssemblyName>InfoCarrier.Core.Abstractions</AssemblyName>
     <IsPackable>true</IsPackable>
+
+    <!-- See the note in InfoCarrier.Core.csproj: a package declares what it references. -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>

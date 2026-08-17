@@ -2,7 +2,7 @@
 
 using InfoCarrier.Core.Common;
 
-namespace InfoCarrier.Core;
+namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
 /// <summary>
 ///     In-process <see cref="IInfoCarrierTransport" /> that round-trips every envelope
@@ -10,6 +10,14 @@ namespace InfoCarrier.Core;
 ///     modernized to the <see cref="IInfoCarrierSerializer" /> seam). Wire-serializability
 ///     failures surface in tests exactly as they would over a network.
 /// </summary>
+/// <remarks>
+///     <b>Moved out of the product 2026-08-17 (M8-21), because it is a test harness rather than a
+///     transport.</b> It double-serializes on purpose — request and response both — which is right
+///     for proving serializability and wrong for any deployment. It was referenced by three test
+///     files and by nothing in <c>src/</c> or <c>samples/</c> for its whole life. A real in-process
+///     deployment needs no transport at all: <c>InfoCarrierEnvelopeServer.DispatchAsync</c> is
+///     already a delegate the caller can hand to <see cref="IInfoCarrierTransport" /> directly.
+/// </remarks>
 /// <remarks>
 ///     The handler receives the <em>deserialized</em> request envelope (a fresh instance,
 ///     proving serializability) and returns a response envelope, which is itself
