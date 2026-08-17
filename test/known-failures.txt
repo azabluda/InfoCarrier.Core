@@ -240,5 +240,13 @@
 # records that HasDefaultValue(true) makes a bool sentinel true on the server and false on the client
 # unless it is configured once in the shared OnModelCreating (A49, D2). 22654 / 22461 / 16 / 177
 # (`j14`).
+# 2026-08-17 (J15) - failed unchanged at 13; `total` 22655 -> 22656 for one new test. The
+# CustomConverters fixture now seeds the Dashboard set EF's own leaves empty, and a test of ours
+# runs the query of Composition_over_collection_of_complex_mapped_as_scalar against it and asserts
+# the ANSWER. It passes, so that spec test is A28 proper -- a limitation this provider does not
+# have -- and it had been called that WITHOUT evidence: the base only ever asserted a throw, so the
+# "no exception was thrown" everyone read was observed over an EMPTY TABLE. An Assert.Throws test
+# that never needed data is a vacuous control. FIXED and BROKEN both empty, REASONS unchanged.
+# Figures read off the run's own summary block: 22656 / 22466 / 13 / 177 (`j15`).
 failed=13
-total=22655
+total=22656

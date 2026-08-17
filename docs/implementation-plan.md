@@ -1515,7 +1515,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 | `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Newly understood — see below.** |
 | `Casts_are_removed_from_expression_tree_when_redundant` | 1 | `Assert.Throws: Exception type was not an exact match` | **Newly understood — see below.** |
 | `Collection_enum_as_string_Contains` | 1 | `Assert.Throws: No exception was thrown` | **A28, verified** by probe in J2's triage: `Seller` → 1/1, `Customer` → 0/0, so the server really filters. |
-| `Composition_over_collection_of_complex_mapped_as_scalar` | 1 | `Assert.Throws: No exception was thrown` | **NOT verifiable here — see below.** |
+| `Composition_over_collection_of_complex_mapped_as_scalar` | 1 | `Assert.Throws: No exception was thrown` | ~~**NOT verifiable here**~~ — **A28, verified by J15.** |
 
 **`Casts_are_removed_from_expression_tree_when_redundant` is a mechanism, not a singleton.**
 
@@ -1553,6 +1553,44 @@ which is a deliberate piece of work rather than a classification.
 control. `Collection_enum_as_string_Contains` had one seeded row and the probe was strengthened
 until a non-matching value proved the filter ran; this one has none, and no amount of reading the
 failure would have revealed that.
+
+- [x] **J15. `Composition_over_collection_of_complex_mapped_as_scalar` is A28, and now with an
+      answer behind it.** `<this commit>`
+      `Total tests: 22656, Passed: 22466, Failed: 13, Skipped: 177` (`j15` against `j8b`): **0 fixed,
+      0 broken, `REASONS: unchanged`**, `total` +1 for the new assertion. The base test stays red,
+      which is the point — seeding cannot make a query that answers start refusing.
+
+      `CustomConvertersInfoCarrierFixture.SeedAsync` now seeds the `Dashboard` set EF's own fixture
+      leaves empty, and `Composition_over_collection_of_complex_mapped_as_scalar_returns_the_right_answer`
+      runs the base's query body **byte-for-byte** against it. It **passes**: the provider returns
+
+      ```
+      [{ Id = 4001, Layouts = [{ H = 11, W = 12 }, { H = 13, W = 14 }],                     Name = "Dashboard one" },
+       { Id = 4002, Layouts = [{ H = 21, W = 22 }, { H = 23, W = 24 }, { H = 25, W = 26 }], Name = "Dashboard two" }]
+      ```
+
+      which is the right answer. So this is A28 proper — a spec test asserting a limitation this
+      provider does not have — and it is now the *only* member of the residual 13 with a positive
+      answer recorded rather than a refusal.
+
+      **The seed is on the server, and that matters.** `InfoCarrierTestStore.InitializeAsync` hands
+      the fixture's seed the **backend's** context, so the rows are written through the backing
+      store's own model and its `List<Layout>`-to-string converter. The read side is then the only
+      thing under test, which is what the question asked. Nothing else in `CustomConvertersTestBase`
+      reads `Dashboard`, so one otherwise-unused set gains data and no other result can move —
+      `REASONS: unchanged` across 22,656 is that claim measured rather than argued.
+
+      **Non-vacuity was established by watching the assertion fail** (D1's rule), not by reading it.
+      One expected pair was transposed to `(22, 21)` and the run printed the whole actual collection
+      in its failure message — which is how the answer above is quoted here. Four distinct wrong
+      answers are separable: a row lost, one row's layouts given to the other, a truncated list
+      (the two rows deliberately hold **different numbers** of layouts), and `H`/`W` transposed (the
+      serializer writes `(Height,Width)`, so a transposition is silent unless the two differ).
+
+      **What this closes and what it costs.** The residual 13 now has **no member of unknown
+      standing**. The cost is one fixture that no longer matches EF's byte-for-byte — worth stating,
+      because that is the kind of divergence A49/B4 warn about; it is confined to a set EF seeds not
+      at all, and the direction is *more* data rather than different data.
 
 ### J8's trim cost — caught by CI, reduced from 5 to 2 (2026-08-17)
 

@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -45,6 +46,68 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     public override Task Can_insert_and_read_back_with_case_insensitive_string_key()
         => Task.CompletedTask;
 
+    /// <summary>
+    ///     Runs the query of <see cref="Composition_over_collection_of_complex_mapped_as_scalar" />
+    ///     against seeded data and asserts the <em>answer</em>, which that test never could.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The base test is an <c>Assert.Throws</c> over an empty table.</b> EF's fixture
+    ///         seeds no <c>Dashboard</c> at all — the base only ever asserted that the query is
+    ///         refused, so EF never needed a row. A probe measured
+    ///         <c>rows=0 expectedRows=0 REMOTED=(empty) EXPECTED=(empty)</c>, which means "no
+    ///         exception was thrown" was being observed over nothing and said nothing about
+    ///         whether this provider's answer is right. Classifying it as A28 — a spec test
+    ///         asserting a limitation this provider does not have — requires evidence that the
+    ///         answer <em>is</em> right, and there was no answer to check.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="CustomConvertersInfoCarrierFixture.SeedAsync" /> now seeds two
+    ///         dashboards with <b>different numbers of layouts</b> and no two integers alike, so
+    ///         four distinct wrong answers are distinguishable from the right one: a row lost, the
+    ///         layouts of one row given to the other, a truncated list, and <c>H</c>/<c>W</c>
+    ///         transposed (the serializer writes <c>(Height,Width)</c>, so a transposition is
+    ///         silent unless the two differ). That is the non-vacuity bar
+    ///         <c>Collection_enum_as_string_Contains</c> was held to in J2.
+    ///     </para>
+    ///     <para>
+    ///         The query body is copied byte-for-byte from the base and <b>not</b> ordered inside
+    ///         the query — ordering is applied to the materialized result — so what crosses the
+    ///         wire is exactly the tree the base builds.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public virtual void Composition_over_collection_of_complex_mapped_as_scalar_returns_the_right_answer()
+    {
+        using DbContext context = CreateContext();
+
+        var result = context.Set<Dashboard>().AsNoTracking().Select(d => new
+        {
+            d.Id,
+            d.Name,
+            Layouts = d.Layouts.Select(l => new { H = l.Height, W = l.Width }).ToList()
+        }).ToList();
+
+        Assert.Collection(
+            result.OrderBy(r => r.Id),
+            first =>
+            {
+                Assert.Equal(CompositionSeedFirstId, first.Id);
+                Assert.Equal("Dashboard one", first.Name);
+                Assert.Equal([(11, 12), (13, 14)], first.Layouts.Select(l => (l.H, l.W)));
+            },
+            second =>
+            {
+                Assert.Equal(CompositionSeedSecondId, second.Id);
+                Assert.Equal("Dashboard two", second.Name);
+                Assert.Equal([(21, 22), (23, 24), (25, 26)], second.Layouts.Select(l => (l.H, l.W)));
+            });
+    }
+
+    private const int CompositionSeedFirstId = 4001;
+
+    private const int CompositionSeedSecondId = 4002;
+
     // `Value_conversion_on_enum_collection_contains` is EF's other behavioural SQLite override and
     // is deliberately NOT taken. Adopting it measured `Assert.Throws() Failure: No exception was
     // thrown`: the query this provider ships is answered rather than refused, so EF's assertion
@@ -80,5 +143,54 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
         public override DateTime DefaultDateTime => new();
 
         public override bool PreservesDateTimeKind => true;
+
+        /// <summary>
+        ///     Seeds the <c>Dashboard</c> set EF's own fixture leaves empty.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         Nothing in <c>CustomConvertersTestBase</c> reads <c>Dashboard</c> except
+        ///         <see cref="Composition_over_collection_of_complex_mapped_as_scalar" /> and the
+        ///         test above, so this adds data to one otherwise-unused set and can change no
+        ///         other result. It runs against the <b>server</b> context — <see cref="TestStore" />
+        ///         hands the seed the backend's context, not the client's — so the rows are written
+        ///         through the backing store's own model and the converter, and the read side is
+        ///         then the only thing under test.
+        ///     </para>
+        ///     <para>
+        ///         The base test still fails, and its message is unchanged: it asserts a throw, and
+        ///         seeding cannot make a query that answers start refusing. What seeding changes is
+        ///         that the <em>answer</em> is now observable.
+        ///     </para>
+        /// </remarks>
+        protected override async Task SeedAsync(PoolableDbContext context)
+        {
+            await base.SeedAsync(context);
+
+            context.Set<Dashboard>().AddRange(
+                new Dashboard
+                {
+                    Id = CompositionSeedFirstId,
+                    Name = "Dashboard one",
+                    Layouts =
+                    [
+                        new Layout { Height = 11, Width = 12 },
+                        new Layout { Height = 13, Width = 14 },
+                    ],
+                },
+                new Dashboard
+                {
+                    Id = CompositionSeedSecondId,
+                    Name = "Dashboard two",
+                    Layouts =
+                    [
+                        new Layout { Height = 21, Width = 22 },
+                        new Layout { Height = 23, Width = 24 },
+                        new Layout { Height = 25, Width = 26 },
+                    ],
+                });
+
+            await context.SaveChangesAsync();
+        }
     }
 }
