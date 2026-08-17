@@ -692,6 +692,32 @@ Measured one at a time, because a combined move cannot tell which base moved the
       | `Value_conversion_is_appropriately_used_for_join_condition` | The `Join` over two converted columns is not translated. |
       | `Collection_enum_as_string_Contains` | `Assert.Throws() Failure: No exception was thrown` — and the base's body is `Assert.Throws<InvalidOperationException>(…)` around the query. **A28 family**: the spec test asserts a limitation this provider does not have, and it returns the right answer. |
 
+- [ ] **J12. `GraphUpdates` to Tier B — assessed 2026-08-17, now the obvious next adoption.**
+      1787 tests, and **the reason not to move it has just gone**. The assessment, not a guess:
+
+      | Fact | Value |
+      |---|---|
+      | Skips in `GraphUpdatesInfoCarrierTest` today | **0** — so nothing is being retired; this is coverage, not cleanup |
+      | Uses `ExecuteWithStrategyInTransactionAsync` | **yes** — so it needs J3's `UseTransaction` override, which is now a known one-liner |
+      | Skips in EF's `GraphUpdatesSqliteTestBase` | **6** — mirror them, and read each one first |
+      | EF's SQLite `UseTransaction` | `facade.UseTransaction(transaction.GetDbTransaction())` — ADR-013's call, so ours is `facade.UseInfoCarrierTransaction(transaction)` as in J3 |
+
+      **Why it is worth doing and why it was not before.** `GraphUpdates` is the same corpus as
+      `ProxyGraphUpdates` without proxies, and on Tier A it has never met a store that enforces a
+      foreign key — which is exactly the blind spot J11 was hiding in. J11's defect was live for
+      every one of those 1787 tests and none of them could see it. **The move is now expected to be
+      largely green rather than reckless**, because the one mechanism that made J3 explode is fixed.
+
+      **Do it in this order, and do not shortcut it:** the `UseTransaction` override *first* and in
+      the same change as the store switch — J3 proved that omitting it costs two hours of 30-second
+      lock timeouts rather than a fast failure. Then adopt EF's six skips, each checked against
+      `subrepos/efcore` rather than assumed. Then measure; expect a rise, and classify it before
+      committing.
+
+      **The `ReseedAsync` override should be kept** (it reseeds through the backend, not the client)
+      and the `ExecuteWithStrategyInTransactionAsync` override should be **deleted** — that is the
+      ConferencePlanner precedent J3 followed, and it held there.
+
 - [ ] **J2b. `BuiltInDataTypes` and `ConvertToProviderTypes` to Tier B.**
       No skips to retire, so this is not J2's argument. What it *would* retire is the silent
       `Optional_datetime_reading_null_from_database() => Task.CompletedTask` in each — a test that
