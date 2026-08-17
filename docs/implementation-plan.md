@@ -659,7 +659,46 @@ Measured one at a time, because a combined move cannot tell which base moved the
 
       Left red and classified, as CLAUDE.md requires. Neither is a reason to go back to Tier A:
       on Tier A they were unreported.
-- [ ] **J2. `BuiltInDataTypes` to Tier B.**
+- [x] **J2. `CustomConverters` to Tier B.** `<this commit>`
+      `Total tests: 22453, Passed: 22225, Failed: 18, Skipped: 210` (`j2b`), against
+      `22453 / 22224 / 15 / 214` (`j1b`). Four skips gone, `failed` rises 15 → 18 deliberately.
+
+      **The four #17050 skips are all in `CustomConverters`, not in `BuiltInDataTypes`**, which is
+      why this step is named for the class rather than for the file. `BuiltInDataTypes` and
+      `ConvertToProviderTypes` share the file and carry no skips at all; they are J2b below.
+
+      Three of the four now pass — `Value_conversion_with_property_named_value`,
+      `Collection_property_as_scalar_Any`, `Collection_property_as_scalar_Count_member` — and every
+      one of them is a **collection property behind a value converter**, which is B4's subject and
+      the shape this wire has paid most for. They had never once been executed.
+
+      **Two InMemory statements went with the skips**, and both turned out to be real coverage:
+      a non-composed `GroupBy` is no longer refused by the store, and
+      `Optional_datetime_reading_null_from_database` is no longer a silent `Task.CompletedTask` —
+      SQLite has a null to read.
+
+      **An override adopted from EF was disproved by measurement and deleted.**
+      `CustomConvertersSqliteTest` overrides `Value_conversion_on_enum_collection_contains` to
+      assert a translation failure; taking it measured `Assert.Throws() Failure: No exception was
+      thrown`, because the query this provider ships is *answered*. Kept out, with the reason in
+      the class. This is CLAUDE.md's rule read in the other direction: an override of ours that EF
+      does not need is a workaround, and so is one of EF's that we do not need.
+
+      **Three residual failures, all new information and none of them the store's:**
+
+      | Test | What it says |
+      |---|---|
+      | `GroupBy_converted_enum` | `GroupBySingleQueryingEnumerable+InternalGrouping<…>` **is not on the deserialization allowlist**. An EF-internal grouping type reaches the wire. |
+      | `Value_conversion_is_appropriately_used_for_join_condition` | The `Join` over two converted columns is not translated. |
+      | `Collection_enum_as_string_Contains` | `Assert.Throws() Failure: No exception was thrown` — and the base's body is `Assert.Throws<InvalidOperationException>(…)` around the query. **A28 family**: the spec test asserts a limitation this provider does not have, and it returns the right answer. |
+
+- [ ] **J2b. `BuiltInDataTypes` and `ConvertToProviderTypes` to Tier B.**
+      No skips to retire, so this is not J2's argument. What it *would* retire is the silent
+      `Optional_datetime_reading_null_from_database() => Task.CompletedTask` in each — a test that
+      does nothing at all, because the InMemory store has no null to read. **Priced before
+      starting:** `BuiltInDataTypesSqliteTest` is **2201 lines**, so the adoption surface is large
+      even though most of it is `AssertSql` this provider cannot use. Worth doing, worth doing on
+      its own, and worth measuring in halves.
 - [ ] **J3. `ProxyGraphUpdates` to Tier B.**
 
 ### J4 — the test project organised by backend store

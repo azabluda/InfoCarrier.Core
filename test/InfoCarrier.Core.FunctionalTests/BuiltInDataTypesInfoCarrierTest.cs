@@ -2,10 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.InMemory.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -111,48 +108,49 @@ public class ConvertToProviderTypesInfoCarrierTest(
 }
 
 /// <summary>
-///     <c>CustomConvertersTestBase</c> on Tier A — user-written converters rather than the
+///     <c>CustomConvertersTestBase</c> on ADR-009 Tier B — user-written converters rather than the
 ///     provider's own.
 /// </summary>
 /// <remarks>
-///     The overrides are EF's <c>CustomConvertersInMemoryTest</c>'s, one for one: a case-sensitive
-///     store, EF issue #17050, and the non-composed <c>GroupBy</c> the backing store cannot do.
+///     <para>
+///         <b>Tier B, and it was Tier A until J2.</b> Tier A brought <b>four</b> skips with it —
+///         EF issue #17050, from <c>CustomConvertersInMemoryTest</c> — and each one is a
+///         <em>collection</em> property behind a converter, which is the shape B4 records as the
+///         most dangerous thing this wire carries. <c>CustomConvertersSqliteTest</c> skips
+///         <b>none</b> of them. It also drops two more InMemory statements: the store is no longer
+///         case-sensitive by construction, and a non-composed <c>GroupBy</c> is no longer refused.
+///     </para>
+///     <para>
+///         The fixture's capability flags are <c>CustomConvertersSqliteFixture</c>'s, because they
+///         describe the backing store and the backing store is now SQLite. Three of the eight
+///         change value, and they are not cosmetic: <c>StrictEquality</c> and
+///         <c>SupportsDecimalComparisons</c> become <c>false</c> and <c>SupportsBinaryKeys</c>
+///         becomes <c>true</c>, which turns assertions on and off inside the base.
+///     </para>
+///     <para>
+///         EF's nine <c>AssertSql</c> overrides are deliberately <em>not</em> taken: they exist to
+///         pin generated SQL, which is the backend's business and not observable here. Its two
+///         behavioural overrides are.
+///     </para>
 /// </remarks>
 public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.CustomConvertersInfoCarrierFixture fixture)
     : CustomConvertersTestBase<CustomConvertersInfoCarrierTest.CustomConvertersInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
-    public override Task Optional_datetime_reading_null_from_database()
-        => Task.CompletedTask;
-
-    /// <inheritdoc />
-    /// <remarks>The InMemory store is case-sensitive.</remarks>
+    /// <remarks>
+    ///     <c>CustomConvertersSqliteTest</c>'s, unchanged in substance — SQLite has no
+    ///     case-insensitive comparison for this key either. Only the reason moves: it was
+    ///     "the InMemory store is case-sensitive" and it is now the reference provider's own
+    ///     override for the same test.
+    /// </remarks>
     public override Task Can_insert_and_read_back_with_case_insensitive_string_key()
         => Task.CompletedTask;
 
-    [ConditionalFact(Skip = "Issue#17050")]
-    public override void Value_conversion_with_property_named_value()
-    {
-    }
-
-    [ConditionalFact(Skip = "Issue#17050")]
-    public override void Collection_property_as_scalar_Any()
-        => base.Collection_property_as_scalar_Any();
-
-    [ConditionalFact(Skip = "Issue#17050")]
-    public override void Collection_property_as_scalar_Count_member()
-        => base.Collection_property_as_scalar_Count_member();
-
-    [ConditionalFact(Skip = "Issue#17050")]
-    public override void Collection_enum_as_string_Contains()
-        => base.Collection_enum_as_string_Contains();
-
-    /// <inheritdoc />
-    /// <remarks>A non-composed <c>GroupBy</c> is a backing-store limitation, and the store is InMemory.</remarks>
-    public override void GroupBy_converted_enum()
-        => Assert.Contains(
-            CoreStrings.TranslationFailedWithDetails("", InMemoryStrings.NonComposedGroupByNotSupported)[21..],
-            Assert.Throws<InvalidOperationException>(base.GroupBy_converted_enum).Message);
+    // `Value_conversion_on_enum_collection_contains` is EF's other behavioural SQLite override and
+    // is deliberately NOT taken. Adopting it measured `Assert.Throws() Failure: No exception was
+    // thrown`: the query this provider ships is answered rather than refused, so EF's assertion
+    // that SQLite cannot translate it is not true of this arrangement. An override that measurement
+    // disproves is a workaround, and CLAUDE.md says to delete it rather than keep it for symmetry.
 
     public class CustomConvertersInfoCarrierFixture : CustomConvertersFixtureBase
     {
@@ -163,12 +161,12 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
 
-        public override bool StrictEquality => true;
+        public override bool StrictEquality => false;
 
         public override bool SupportsAnsi => false;
 
@@ -176,9 +174,9 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
 
         public override bool SupportsLargeStringComparisons => true;
 
-        public override bool SupportsBinaryKeys => false;
+        public override bool SupportsBinaryKeys => true;
 
-        public override bool SupportsDecimalComparisons => true;
+        public override bool SupportsDecimalComparisons => false;
 
         public override DateTime DefaultDateTime => new();
 

@@ -153,5 +153,15 @@
 # construct a nested generic test type with no parameterless constructor. Both classified in J1 of
 # docs/implementation-plan.md. Figures read off the run's own summary block, never by arithmetic:
 # 22453 / 22224 / 15 / 214 (`j1b`).
-failed=15
+# 2026-08-16 (J2) - 15 -> 18, A DELIBERATE RISE, and `skipped` 214 -> 210. CustomConverters moved
+# from Tier A to Tier B. Its four skips were EF's own CustomConvertersInMemoryTest refusing issue
+# #17050; CustomConvertersSqliteTest skips none of them. Three now pass and every one is a
+# collection property behind a value converter -- B4's subject, never once executed before. Two
+# further InMemory statements went with them: a non-composed GroupBy is no longer refused, and
+# Optional_datetime_reading_null_from_database is no longer a silent no-op. The three that fail are
+# new information: an EF-internal GroupBy grouping type reaching the deserialization allowlist, an
+# untranslated Join over converted columns, and one A28-family test whose base asserts a limitation
+# this provider does not have. Classified in J2 of docs/implementation-plan.md.
+# Figures read off the run's own summary block: 22453 / 22225 / 18 / 210 (`j2b`).
+failed=18
 total=22453
