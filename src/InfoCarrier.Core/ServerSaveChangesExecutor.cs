@@ -430,6 +430,30 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                     }
                 }
 
+                // **The value-only fallback is refused for a property that is itself a key (J13).**
+                // C76 added the qualified map and kept this fallback for "a key borrowed other than
+                // through a foreign key", explicitly leaving its behaviour unchanged. This is the
+                // case where that behaviour is wrong, and it was probed rather than argued:
+                //
+                //     RESOLVE OwnerRoot.Id        client=-2147482647 -> FALLBACK -2147482647 isKey=True
+                //     RESOLVE OwnedOptional1.Id   client=-2147482647 -> FALLBACK -2147482647 isKey=True
+                //
+                // `OwnedOptional1.Id` is an owned collection's own shadow key. It is nobody's
+                // reference, so the qualified lookup above cannot match — and the fallback then
+                // hands it **`OwnerRoot.Id`'s** registration, because EF's temporary generator
+                // counts down per key property and both rows drew `-2147482647`. C76's premise,
+                // one step further along: a placeholder is not unique across entity types, so a
+                // lookup by value alone is only ever right by luck.
+                //
+                // A key identifies *this* row. If no foreign key names it, there is nothing to
+                // redirect it at, and leaving it alone is the answer — `generatedKeys` has already
+                // put the client's placeholder on the entity and flagged it temporary, which is
+                // exactly what the store replaces.
+                if (property.IsKey() && !property.IsForeignKey())
+                {
+                    return null;
+                }
+
                 return placeholders.TryGetValue(clientValue, out var principal) ? principal : null;
             }
 

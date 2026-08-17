@@ -781,10 +781,29 @@ Measured one at a time, because a combined move cannot tell which base moved the
       own. That would explain the conflict exactly, and it is a **hypothesis with a named suspect**,
       not a conclusion.
 
-      **Next probe:** print each `(property, value) → resolved` decision in the reference loop, and
-      whether it came from the qualified map or the fallback. One filtered run. If it is the
-      fallback, the question C76 deferred is now due: whether the value-only path should exist at
-      all for a property that *is* a key.
+      ## DONE `<this commit>` — 1 fixed, 0 broken, `16 -> 15`
+
+      **The probe confirmed the fallback, and the FIRST fix was measured worse.** Refusing the
+      value-only path for every key property measured **0 fixed, 1 broken** — it broke
+      `Save_changed_owned_one_to_one`, which J14 had just fixed. That refutation is what found the
+      answer: an owned *single*'s key genuinely **is** its owner's, so it is a real reference and the
+      fallback is rescuing it when the qualified lookup misses.
+
+      The condition is therefore `property.IsKey() && !property.IsForeignKey()` — refuse the
+      fallback only where **no foreign key names the property at all**. Then there is nothing to
+      redirect it at, and leaving it alone is correct: `generatedKeys` has already put the client's
+      placeholder on the entity and flagged it temporary, which is exactly what the store replaces.
+
+      **C76's deferred question is now answered, and narrowly.** Its fallback was kept for *"a key
+      borrowed other than through a foreign key"*; the case it did not foresee is a key that is
+      **borrowed by nobody** — an owned collection's own shadow key, which no foreign key names, so
+      the qualified lookup cannot match and the fallback hands it another entity type's
+      registration:
+
+      ```
+      RESOLVE OwnerRoot.Id      client=-2147482647 -> FALLBACK -2147482647 isKey=True
+      RESOLVE OwnedOptional1.Id client=-2147482647 -> FALLBACK -2147482647 isKey=True   <- OwnerRoot's
+      ```
 
 - [x] ~~**J12. `GraphUpdates` to Tier B — assessed 2026-08-17.**~~ Split into J12a/J12b above.
       **Original assessment:**
