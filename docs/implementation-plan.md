@@ -802,17 +802,77 @@ Measured one at a time, because a combined move cannot tell which base moved the
          `alternate_key` correlation precisely: the primary-key FK is nulled, the alternate-key FK
          is not.
 
-      **What is NOT yet established, and must be before any fix.** Whether the client is wrong to
-      leave `ParentAlternateId` set, or the server is wrong in what it does with it. `explicit=True`
-      and `modified=True` on a *non-null* value means the client's change tracker deliberately wrote
-      it — so this may be correct client behaviour that the server then applies in the wrong order
-      or against the wrong row. The server-side half of the probe was not run.
+      **The "offending row" reading above was itself wrong, and the model says so.**
+      `OptionalComposite2.ParentAlternateId` is a **non-nullable `Guid`**, and its foreign key to
+      `OptionalAk1` is **composite** — `(ParentAlternateId, ParentId)`. A composite foreign key with
+      any NULL component is not enforced, so leaving `ParentAlternateId` set while nulling
+      `ParentId` is *correct*, and the client is right. Read the model before blaming a value.
 
-      **The next probe, precisely.** Instrument `ServerSaveChangesExecutor` to print, per replayed
-      entry, the state it tracks and the value it sets for `ParentAlternateId`, then read the row
-      the store actually holds — C42's order, which is the order that has resolved every wrong-value
-      defect in this file. Compare against EF's own `ProxyGraphUpdatesSqliteTest`, which passes the
-      same test on one context; the difference between one tracker and two is where the answer is.
+      ## ROOT CAUSE — established 2026-08-17, three probes, no theory left
+
+      **1. EF names the entry it blames.** Catching the failure inside
+      `ServerSaveChangesExecutor` and printing `DbUpdateException.Entries`:
+
+      ```
+      SAVE-FAILED DbUpdateException   BLAMED OptionalAk1 state=Deleted
+      TRACKER: OptionalAk2 Modified ×2, OptionalComposite2 Modified ×2, OptionalAk1 Deleted
+      ```
+
+      So the `DELETE` of the principal is what the store refuses, while its dependents are present
+      and correctly nulled. The replay is **faithful** — the server tracks exactly the five entries
+      the client sent, with the same states and the same values.
+
+      **2. The server's ORIGINAL values are the defect.**
+
+      ```
+      SERVER OptionalAk2 state=Modified | Id=1 orig=1 | ParentId=<null> orig=<null> mod=True
+      ```
+
+      `ParentId` is `<null>` **and its original is `<null>` too** — while the row in the store holds
+      `1`, pointing at `OptionalAk1`. **The server believes this foreign key was always null.**
+
+      **3. Why, and it is written in the code as a deliberate fact.** `ChangeEntryMapper` sends
+      original values for **concurrency tokens only** — `if (carriesOriginals && property.IsConcurrencyToken)` —
+      and its comment states the reasoning: *"the server rebuilds the entity from the current
+      values, attaches it and sets `Modified`, so every original it has equals its current one by
+      construction"*. That is true, and for the concurrency check it is right. For **command
+      ordering it is wrong**: EF's `CommandBatchPreparer` builds its dependency graph from
+      *original* foreign-key values, because that is what tells it a dependent is *releasing* a
+      principal. With `original == current == null` there is no edge from `OptionalAk2` to
+      `OptionalAk1`, EF has no reason to order the `UPDATE` before the `DELETE`, and the `DELETE`
+      meets a row that still points at it.
+
+      **Why this could only ever surface here.** Tier A cannot show it — InMemory enforces no
+      foreign keys, which is exactly what EF's #2166 and #3924 skips say. A single-context EF has
+      the true originals from the moment it loaded the row. **Only a two-context provider against a
+      store that enforces constraints can lose them**, so 1787 `GraphUpdates` tests have never
+      exercised this and neither had anything else.
+
+      ## THE WAY FORWARD
+
+      **Send original values for foreign-key properties of a `Modified` entry**, alongside the
+      concurrency tokens already sent. The channel exists on both halves —
+      `ChangeEntry.SerializedOriginalValues`, applied by `ServerSaveChangesExecutor` to
+      `entry.Property(...).OriginalValue` — so this widens *what* is put in it, and adds no wire
+      shape and no protocol change.
+
+      **Three constraints on the implementation, all already documented in the code it touches:**
+
+      - **Order matters within the payload.** The originals are mapped *after* the current values,
+        because a `byte[]` travels as a referenceable object and the definition must precede the
+        back-reference (*"Dangling wire reference 1"*). Keep that order.
+      - **Apply originals last on the server.** Setting the state re-snapshots originals from the
+        entity, so anything written earlier is undone. The existing block is already last.
+      - **Do not widen beyond foreign keys.** C42 measured "send every propagated foreign key back"
+        at 1 fixed / 2 broken; the symmetric temptation here is to send every original. Send
+        exactly the foreign-key properties, and only for `Modified` entries.
+
+      **The one thing still unexplained, and it is the check on any fix**: why the *primary-key*
+      variants of these same tests pass. The mechanism above is not specific to alternate keys, so
+      either those pass for an unrelated reason — a plausible candidate is that EF declares
+      `ON DELETE SET NULL` for the simple optional FK and SQLite then repairs it whatever the order
+      — or something narrows it. **Confirm that before believing the fix is complete**: a fix that
+      closes 162 and leaves the mechanism half-understood is how a wrong revert starts.
 
       **The 5 that are not alternate-key are separate and small**:
       `Avoid_nulling_shared_FK_property_when_deleting` (×3) and
