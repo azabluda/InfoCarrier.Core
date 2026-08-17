@@ -1327,9 +1327,52 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       from the wrong entity type is the remaining shape, which would make it a
       **result-serialization** defect rather than a constant-mapping one.
 
-      **Next probe:** log `(entityType, property, value.GetType())` at every
-      `PrimitiveCoercion.ToWireValue` call on the server's result path, and find the pair that
-      disagrees. One filtered run.
+      ## CLOSED as an UPSTREAM DEFECT, 2026-08-17. Nothing here to fix.
+
+      The server's own stack, once a probe inside `InfoCarrierFaultMapper.Rehydrate` finally printed
+      it, names EF's test model:
+
+      ```
+      FAULT System.InvalidCastException: Unable to cast object of type 'EnumerableClassKey[…]'
+                                         to type 'IntClassKey[…]'
+        at KeysWithConvertersTestBase`1.EnumerableClassKey.Equals(Object obj)
+        at Query.ExpressionEqualityComparer.ExpressionComparer.CompareConstant(…)
+      ```
+
+      And the type says it outright — `KeysWithConvertersTestBase.EnumerableClassKey`:
+
+      ```csharp
+      public override bool Equals(object obj)
+          => obj == this
+              || obj?.GetType() == GetType()
+                  && Equals((IntClassKey)obj);      // <- should be (EnumerableClassKey)obj
+      ```
+
+      **A copy-paste bug in EF's own test type.** The guard `obj?.GetType() == GetType()` passes —
+      both objects really are `EnumerableClassKey` — and the cast to `IntClassKey` then throws. Any
+      caller that compares two of these by `Equals(object)` gets an `InvalidCastException`.
+
+      **Why only this provider reaches it.** The caller is EF's `ExpressionEqualityComparer`, which
+      builds the compiled-query cache key and compares `ConstantExpression`s by `Equals`. Under
+      ADR-006 the key value survives in the tree **as a constant**; EF's own providers parameterize
+      it before the cache key is taken, so they never call `Equals` and never see the bug.
+
+      **Left red and classified**, which is what CLAUDE.md prescribes. EF ships no override for it —
+      the test passes for them — so there is none to adopt, and `subrepos/` must not be edited.
+      Same family as #30730 and #33522: someone else's defect, reached by a legitimate route.
+
+      ## The method lesson, and it cost three wrong conclusions in a row
+
+      Three successive "NOTHING LOGGED" results were read as evidence. **All three were a stale
+      binary**: the fault-mapper probe named `fault.ExceptionType`, which does not exist
+      (`TypeName` does), so every build after it failed — and the runs used the previous assembly.
+      The build output was checked with `Select-Object -Last 2`, which showed `Time Elapsed` and hid
+      `1 Error(s)`.
+
+      That is CLAUDE.md's oldest rule — *establish that the code ran* — broken three times in one
+      sitting, and it produced two confident false clearances (`Rehydrate` "never called", request
+      serialization "cleared"). **A probe that prints nothing is only evidence once the build is
+      known green.** Check the error count, never the elapsed time.
       Closes both `KeysWithConverters` failures, which are one defect with two faces (above).
 
       **The natural mechanism already exists and the contract forbids using it.** ADR-012's

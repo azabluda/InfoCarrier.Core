@@ -57,6 +57,14 @@ here, and both are cheap to avoid:
   to exactly one tier** — three Northwind bases ran on both, green on both, 906 tests of pure
   duplication (A81). When a base could go either way, the tier that *translates* is the one whose
   green means more.
+- **A probe that prints nothing is evidence only once the build is known green — check the error
+  count, never the elapsed time.** M9's J9 read three successive "nothing logged" results as
+  clearances. All three were a **stale binary**: the probe named a property that does not exist
+  (`InfoCarrierFault.ExceptionType`; it is `TypeName`), so every build after it failed and every run
+  used the previous assembly. `dotnet build ... | Select-Object -Last 2` shows `Time Elapsed` and
+  hides `1 Error(s)`, which is how it survived three attempts. It produced two confident false
+  clearances before the real cause — an upstream bug in EF's own test type — was found. This is the
+  standing "establish that the code *ran*" rule, in the one form it had not yet been broken in.
 - **Before moving a base to Tier B, grep it for `ExecuteWithStrategyInTransactionAsync`.** That
   helper opens **one** transaction and then requires **every other context** to enlist in it via
   `UseTransaction`, and the only way a relational suite does that is
