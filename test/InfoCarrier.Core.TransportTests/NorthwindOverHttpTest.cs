@@ -3,7 +3,6 @@
 using InfoCarrier.Core;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
-using Northwind.Client.Transport;
 using Northwind.Shared;
 using Northwind.Shared.Model;
 using Xunit;

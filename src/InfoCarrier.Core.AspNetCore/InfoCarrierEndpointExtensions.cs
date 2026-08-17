@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Northwind.Server.Transport;
+namespace InfoCarrier.Core.AspNetCore;
 
 /// <summary>
 ///     Maps the InfoCarrier envelope endpoint.

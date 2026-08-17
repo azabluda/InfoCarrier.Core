@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core;
 using Microsoft.EntityFrameworkCore;
-using Northwind.Client.Transport;
 using Northwind.Demo;
 using Northwind.Shared;
 using Northwind.Shared.Model;

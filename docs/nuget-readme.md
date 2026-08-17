@@ -35,17 +35,20 @@ await context.SaveChangesAsync();   // a unit of work, executed on the server
 That query is not evaluated on the client. It crosses the wire as an expression tree and the server
 runs it against SQL Server, SQLite, PostgreSQL — whatever your server-side provider is.
 
-## The transport is yours
+## Two packages
 
-Three pieces, and only the middle one is yours to choose:
+| Package | What it is for | Cost |
+|---|---|---|
+| **`InfoCarrier.Core`** | The provider, the wire contracts, and `HttpInfoCarrierTransport` | one dependency: `Microsoft.EntityFrameworkCore` |
+| **`InfoCarrier.Core.AspNetCore`** | `app.MapInfoCarrier()` — the server endpoint | a framework reference to `Microsoft.AspNetCore.App` |
 
-| Piece | Who provides it |
-|---|---|
-| `IInfoCarrierClient` — turns EF operations into requests | this package |
-| `IInfoCarrierTransport` — carries an envelope to the server and back | **you** (an HTTP binding is in the repository samples) |
-| `IInfoCarrierServer` — replays a request against a real `DbContext` | this package |
+**A client references only `InfoCarrier.Core`.** The HTTP transport is in it because it costs
+nothing — `System.Net.Http` is in the shared framework, so it is safe in Blazor WebAssembly. The
+ASP.NET Core endpoint is a separate package precisely because it is *not* free: a WPF, MAUI or
+WebAssembly client must not have to be an ASP.NET Core app to restore its data-access library.
 
-HTTP, gRPC, WCF, a message bus, in-process — the library does not care.
+`IInfoCarrierTransport` is one method, so HTTP is a default rather than a requirement. gRPC, WCF,
+a message bus or a direct in-process call are all a small class.
 
 ## Status — preview
 

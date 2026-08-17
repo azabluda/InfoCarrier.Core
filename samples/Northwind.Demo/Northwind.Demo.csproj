@@ -11,7 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
-    <ProjectReference Include="..\Northwind.Client.Transport\Northwind.Client.Transport.csproj" />
     <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
   </ItemGroup>
 

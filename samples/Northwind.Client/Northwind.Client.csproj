@@ -24,11 +24,13 @@
 
   <ItemGroup>
     <!--
-      Northwind.Client.Transport, not Northwind.Server. The browser must not depend on the server
-      assembly, which is exactly why the transport was given a project of its own in Phase 1: it
-      is a plain class library over System.Net.Http, which is what makes it WebAssembly-safe.
+      InfoCarrier.Core alone, and NOT InfoCarrier.Core.AspNetCore. The browser must not depend on
+      the server binding. `HttpInfoCarrierTransport` now ships in the core package (M8-22) because
+      it costs nothing to put there — `System.Net.Http` is in the shared framework, which is what
+      makes it WebAssembly-safe. The ASP.NET Core endpoint is the half that has a real dependency,
+      and it is the half that is a separate package.
     -->
-    <ProjectReference Include="..\Northwind.Client.Transport\Northwind.Client.Transport.csproj" />
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
     <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
   </ItemGroup>
 

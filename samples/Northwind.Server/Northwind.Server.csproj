@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\..\src\InfoCarrier.Core.AspNetCore\InfoCarrier.Core.AspNetCore.csproj" />
     <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
 
     <!--

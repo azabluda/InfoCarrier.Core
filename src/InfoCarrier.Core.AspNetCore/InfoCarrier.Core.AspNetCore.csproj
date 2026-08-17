@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>ASP.NET Core server binding for InfoCarrier.Core: one endpoint that hands an InfoCarrier envelope to the server. Separate from InfoCarrier.Core because it needs a framework reference to Microsoft.AspNetCore.App, which a WPF, MAUI or Blazor WebAssembly client must not carry.</Description>
+    <RootNamespace>InfoCarrier.Core.AspNetCore</RootNamespace>
+    <AssemblyName>InfoCarrier.Core.AspNetCore</AssemblyName>
+    <IsPackable>true</IsPackable>
+
+    <!-- See the note in InfoCarrier.Core.csproj: a package declares what it references. -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\docs\nuget-readme.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
+  <!--
+    A FrameworkReference, not a PackageReference. `Microsoft.AspNetCore.App` is a shared framework:
+    referencing it this way adds no package dependency and no files to the output — the host
+    already has it. This is the whole reason the endpoint is a separate package: fold it into
+    InfoCarrier.Core and every client that only wants a DbContext would have to be an ASP.NET Core
+    app to restore it.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+  </ItemGroup>
+
+</Project>

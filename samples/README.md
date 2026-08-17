@@ -148,12 +148,17 @@ same `northwind.db`, and the Transfer page in particular moves order 1 to anothe
 |---|---|
 | `Northwind.Shared` | The model and **one** `NorthwindContext`, used by both halves. The wire carries entity type *names*, so the two models must agree; sharing the type makes that true by construction rather than by discipline. |
 | `Northwind.Server` | ASP.NET Core + SQLite. One route, `POST /infocarrier`, which hands the envelope to the product's `InfoCarrierEnvelopeServer`. There is no UI — a `GET /` is a 404. |
-| `Northwind.Client.Transport` | `HttpInfoCarrierTransport`, an `IInfoCarrierTransport` over `HttpClient`. |
 | `Northwind.Demo` | The console client above. |
 
-**`Northwind.Client.Transport` and `Northwind.Server/Transport/` contain no Northwind types**, on
-purpose: they are written to be promoted into `InfoCarrier.Core.Http` and
-`InfoCarrier.Core.AspNetCore` packages later. Keep it that way when editing them.
+**`Northwind.Client.Transport` and `Northwind.Server/Transport/` are gone, and that is the plan
+working.** Both were written free of Northwind types so they could be promoted into packages, and
+in M8-22 they were — as a file move, exactly as intended. `HttpInfoCarrierTransport` is now in
+**`InfoCarrier.Core`** (it costs nothing: `System.Net.Http` is in the shared framework, which is
+what makes it WebAssembly-safe), and `MapInfoCarrier` is in **`InfoCarrier.Core.AspNetCore`** (a
+framework reference to `Microsoft.AspNetCore.App`, which is why it is not in the client package).
+
+So the samples now reference the product the way an application would, and there is no
+sample-owned transport left to keep honest.
 
 ## The whole client wiring
 

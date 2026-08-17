@@ -3,14 +3,12 @@
 # THIS WORKFLOW DOES NOT PUBLISH TO NUGET.ORG, and that is a decision rather than an omission
 # (M8-20). A pushed NuGet version is immutable: it can be deprecated or unlisted, never truly
 # withdrawn. So the irreversible step is left to a human with the packages in hand, and no
-# NUGET_API_KEY lives in this repository's secrets. The push is one command, printed in the
-# release body:
+# NUGET_API_KEY lives in this repository's secrets.
 #
-#     dotnet nuget push InfoCarrier.Core.Abstractions.<version>.nupkg --source nuget.org --api-key ...
-#     dotnet nuget push InfoCarrier.Core.<version>.nupkg             --source nuget.org --api-key ...
-#
-# ORDER MATTERS: Abstractions first. InfoCarrier.Core declares a dependency on it at the same
-# version, and nuget.org rejects a package whose dependency does not resolve.
+# ORDER MATTERS: InfoCarrier.Core first, then InfoCarrier.Core.AspNetCore, which declares a
+# dependency on it at the same version — nuget.org rejects a package whose dependency does not
+# resolve. (Before M8-22 the order was the other way round, because Abstractions was its own
+# package; it is now merged into InfoCarrier.Core.)
 name: Release
 
 on:
@@ -121,17 +119,18 @@ jobs:
             Packages are attached. Publishing to nuget.org is deliberately manual — a pushed
             version is immutable, so no API key lives in this repository.
 
-            **Push Abstractions first:** `InfoCarrier.Core` declares a dependency on it at the
-            same version, and nuget.org rejects a package whose dependency does not resolve.
+            **Push `InfoCarrier.Core` first:** `InfoCarrier.Core.AspNetCore` declares a
+            dependency on it at the same version, and nuget.org rejects a package whose
+            dependency does not resolve.
 
             ```bash
-            # Exact filenames, not globs: `InfoCarrier.Core.*.nupkg` also matches the
-            # Abstractions package, which is the sort of thing that is only noticed afterwards.
+            # Exact filenames, not globs: `InfoCarrier.Core.*.nupkg` also matches
+            # InfoCarrier.Core.AspNetCore, which is the sort of thing only noticed afterwards.
             V=${{ github.ref_name }}; V=${V#v}
             SRC=https://api.nuget.org/v3/index.json
 
-            dotnet nuget push "InfoCarrier.Core.Abstractions.$V.nupkg" --source $SRC --api-key "$NUGET_API_KEY"
-            dotnet nuget push "InfoCarrier.Core.$V.nupkg"              --source $SRC --api-key "$NUGET_API_KEY"
+            dotnet nuget push "InfoCarrier.Core.$V.nupkg"            --source $SRC --api-key "$NUGET_API_KEY"
+            dotnet nuget push "InfoCarrier.Core.AspNetCore.$V.nupkg" --source $SRC --api-key "$NUGET_API_KEY"
             ```
 
             Known limitations for this release: [`docs/limitations.md`](docs/limitations.md).

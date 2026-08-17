@@ -36,7 +36,9 @@ navigation fixup, identity resolution all work transparently.
 
 | Component | Responsibility | Notes |
 |---|---|---|
-| `InfoCarrier.Core.Abstractions` | Public interfaces only (`IInfoCarrierClient`, `IInfoCarrierServer`, `IInfoCarrierSerializer`, `IInfoCarrierTransport`) | DI-first; testability seam |
+| ~~`InfoCarrier.Core.Abstractions`~~ | **Merged into `InfoCarrier.Core` 2026-08-17 (M8-22).** The interfaces are unchanged and so are their namespaces; only the assembly moved. The package earned nothing: `IInfoCarrierClient` takes a `DbContext`, so it referenced `Microsoft.EntityFrameworkCore` and was never the lightweight contracts package that would have justified the split. | |
+| `InfoCarrier.Core` (root) | Public interfaces (`IInfoCarrierClient`, `IInfoCarrierServer`, `IInfoCarrierSerializer`, `IInfoCarrierTransport`) and `HttpInfoCarrierTransport` | DI-first; testability seam |
+| `InfoCarrier.Core.AspNetCore` | `app.MapInfoCarrier()` — the server endpoint | **Separate package on purpose**: it needs a framework reference to `Microsoft.AspNetCore.App`, and a WPF/MAUI/WebAssembly client must not carry that |
 | `InfoCarrier.Core/Common` | Shared DTOs: wire envelope, Query/SaveChanges request/result | See wire-protocol §4 |
 | `InfoCarrier.Core/Client` | `IDatabase.CompileQuery` capture, expression→wire translation, result materialization, identity/nav fixup | Capture point per ADR-006 |
 | `InfoCarrier.Core/Server` | Stub→`QueryRootExpression` rebinding, query execution, entity→wire mapping, `SaveChanges` replay, store-generated value return | Shared-type entity handling per requirements §2.7 |

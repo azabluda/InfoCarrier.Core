@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Northwind.Client;
-using Northwind.Client.Transport;
 using Northwind.Client.Wire;
 using Northwind.Shared;
 

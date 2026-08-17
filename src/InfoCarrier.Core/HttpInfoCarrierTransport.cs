@@ -1,10 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Net.Http.Headers;
-using InfoCarrier.Core;
 using InfoCarrier.Core.Common;
 
-namespace Northwind.Client.Transport;
+namespace InfoCarrier.Core;
 
 /// <summary>
 ///     Carries an <see cref="InfoCarrierEnvelope" /> to a server over HTTP.

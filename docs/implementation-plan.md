@@ -721,5 +721,61 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
       those projects still need it. A package declares what it references; a repository pins what it
       restores. Conflating the two put a constraint on every future consumer.
 
+- [x] **M8-22. Two packages, split on the only line that costs anything.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`j25` against `j24`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `InfoCarrier.Core.TransportTests`: **17 of 17**.
+
+      | Before | After |
+      |---|---|
+      | `InfoCarrier.Core` + `InfoCarrier.Core.Abstractions` | **`InfoCarrier.Core`** |
+      | `samples/Northwind.Client.Transport` | folded into `InfoCarrier.Core` |
+      | `samples/Northwind.Server/Transport/` | **`InfoCarrier.Core.AspNetCore`** |
+
+      **`Abstractions` was merged away because the case for it does not survive checking.** A
+      contracts package earns its keep when someone can reference it *without* the heavy
+      dependency. This one referenced `Microsoft.EntityFrameworkCore` — `IInfoCarrierClient`
+      takes a `DbContext` — so it dragged all of EF Core anyway, and **only `InfoCarrier.Core`
+      ever referenced it**. `decisions.md` names it once, in a build-order list, with no rationale.
+      Namespaces are unchanged (`InfoCarrier.Core`, `InfoCarrier.Core.Common`), so no consumer code
+      moves; nothing is published, so this was the last free moment.
+
+      **The transport split is asymmetric, and that is the finding.** The two halves look alike and
+      are not:
+
+      | Half | Needs | Verdict |
+      |---|---|---|
+      | `HttpInfoCarrierTransport` | `System.Net.Http` — **in the shared framework** | costs nothing → ships **in** `InfoCarrier.Core`, and stays WebAssembly-safe |
+      | `MapInfoCarrier` | `Microsoft.AspNetCore.Builder`/`Http`/`Routing` | a **`FrameworkReference` to `Microsoft.AspNetCore.App`** → separate package |
+
+      Folding the endpoint into the core package would make every WPF, MAUI and Blazor WebAssembly
+      client an ASP.NET Core app in order to restore its data-access library. **A `FrameworkReference`
+      is the right shape for the server half** — it adds no package dependency and no files,
+      because the host already has the framework.
+
+      **The promotion was a file move, exactly as predicted.** Both sample transport projects were
+      written free of Northwind types *so that this would be true*, and their own comments said so
+      — `Northwind.Client.Transport.csproj`'s description said "written to be promoted into an
+      InfoCarrier.Core.Http package, at which point the move is a file move". It was: two `git mv`s
+      and a namespace line each.
+
+      **Verified by reading the nuspecs, which is the only thing that proves the split landed
+      where it was claimed:**
+
+      ```
+      InfoCarrier.Core             -> Microsoft.EntityFrameworkCore 10.0.0
+      InfoCarrier.Core.AspNetCore  -> InfoCarrier.Core 10.0.0-preview.1
+                                      frameworkReference: Microsoft.AspNetCore.App
+      ```
+
+      One dependency on the package a client installs. **The trim breakdown corroborates it**:
+      `InfoCarrier.Core` stayed at 88 and `Northwind` at 8, so the promoted transport brings no
+      warnings of its own — a rise in one with a fall in the other would have meant it did.
+
+      **The push order reversed and `release.yml` was updated with it.** It was "Abstractions
+      first"; it is now "`InfoCarrier.Core` first, then `InfoCarrier.Core.AspNetCore`", which
+      depends on it. A release workflow that names packages goes stale the moment the layout moves,
+      which is why it changed in this commit rather than the next one.
+
 ---
 

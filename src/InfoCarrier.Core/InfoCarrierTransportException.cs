@@ -1,6 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-namespace Northwind.Client.Transport;
+namespace InfoCarrier.Core;
 
 /// <summary>
 ///     A failure of the transport itself, as opposed to a failure the server reported.

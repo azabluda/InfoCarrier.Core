@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core;
 using InfoCarrier.Core.Common;
-using Northwind.Client.Transport;
 using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;

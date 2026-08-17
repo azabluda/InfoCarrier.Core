@@ -85,13 +85,20 @@ production-blessed — see below.
 
 ## How it fits together
 
-Three pieces, and only the middle one is yours to choose.
+Two packages, split on the only line that costs anything.
 
-| Piece | Who provides it |
-|---|---|
-| `IInfoCarrierClient` — turns EF operations into requests | **This library** |
-| `IInfoCarrierTransport` — carries an envelope to the server and back | **You** (an HTTP binding is in [`samples/`](samples)) |
-| `IInfoCarrierServer` — replays a request against a real `DbContext` | **This library** |
+| Package | What it is for | Cost |
+|---|---|---|
+| **`InfoCarrier.Core`** | The provider, the wire contracts, and `HttpInfoCarrierTransport` | one dependency: `Microsoft.EntityFrameworkCore` |
+| **`InfoCarrier.Core.AspNetCore`** | `app.MapInfoCarrier()` — the server endpoint | a framework reference to `Microsoft.AspNetCore.App` |
+
+**A client references only `InfoCarrier.Core`.** The HTTP transport lives there because it costs
+nothing — `System.Net.Http` is in the shared framework, so it is safe in Blazor WebAssembly. The
+ASP.NET Core endpoint is separate precisely because it is *not* free: a WPF, MAUI or WebAssembly
+client should not have to be an ASP.NET Core app to restore its data-access library.
+
+`IInfoCarrierTransport` is a single method, so HTTP is the default rather than a requirement —
+gRPC, WCF, a message bus or a direct in-process call are each a small class.
 
 ### Client
 
@@ -100,7 +107,7 @@ var serializer = new SystemTextJsonInfoCarrierSerializer();
 using var httpClient = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
 
 IInfoCarrierClient client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(httpClient, serializer),   // your transport
+    new HttpInfoCarrierTransport(httpClient, serializer),
     serializer);
 
 var options = new DbContextOptionsBuilder<NorthwindContext>()
@@ -119,9 +126,7 @@ builder.Services
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
     .AddInfoCarrierStandardValueMappers();
 
-// Then expose one endpoint that hands the payload to `InfoCarrierEnvelopeServer`.
-// `MapInfoCarrier` is ~50 lines and lives in the sample, not in the package — the transport
-// is deliberately yours. Copy it, or write the equivalent for gRPC or WCF.
+// One endpoint, from InfoCarrier.Core.AspNetCore.
 app.MapInfoCarrier();
 ```
 

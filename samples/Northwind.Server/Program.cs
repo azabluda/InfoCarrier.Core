@@ -2,7 +2,7 @@
 
 using InfoCarrier.Core;
 using Microsoft.EntityFrameworkCore;
-using Northwind.Server.Transport;
+using InfoCarrier.Core.AspNetCore;
 using Northwind.Shared;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
