@@ -602,3 +602,81 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
   from the store rather than hard-coded so it cannot drift from the seed again.
   `InfoCarrier.Core.TransportTests`: Passed: 17, Failed: 0, Total: 17. No product code changed, so
   the spec suite is untouched.
+
+---
+
+## Phase J — provider neutrality and store coverage (M9)
+
+Scope lives in [`roadmap.md`](roadmap.md) §M9. **M8 is not closed**, so this plan holds two
+milestones at once for the first time; Phase J is appended rather than replacing Phases H and I,
+and the whole file is rewritten when M8 closes.
+
+The audit that opened this phase is in [`architecture.md`](architecture.md) §6a, D3 (amended) and
+D4 (new). Two things it established are worth restating here because they shape the order below:
+the package reference is a **symptom**, and the **fixed query-boundary allowlist** is the
+assumption nobody had recorded.
+
+### J1–J3 — the tier moves
+
+CLAUDE.md's A79/A80 rule: a base belongs to exactly one tier, and *the tier that translates is the
+one whose green means more*. Three bases sit on Tier A only because that is where they were first
+adopted, and each carries skips that are **EF's InMemory limits, not this provider's**. EF's own
+SQLite suite skips **zero** of them, which is the whole argument:
+
+| Base | Skips today | EF InMemory | EF SQLite | EF SqlServer |
+|---|---|---|---|---|
+| `KeysWithConverters` (#26238) | 7 | 8 | **0** | **0** |
+| `BuiltInDataTypes` / `CustomConverters` (#17050) | 4 | 4 | **0** | **0** |
+| `ProxyGraphUpdates` (#2166, #3924) | 13 | 13 | **0** | — |
+
+Measured one at a time, because a combined move cannot tell which base moved the number.
+
+- [ ] **J1. `KeysWithConverters` to Tier B.**
+- [ ] **J2. `BuiltInDataTypes` to Tier B.**
+- [ ] **J3. `ProxyGraphUpdates` to Tier B.**
+
+### J4 — the test project organised by backend store
+
+v1's layout (`InMemory/`, `SqlServer/`, `TestUtilities/`, root for store-independent tests), which
+makes a store's coverage countable by looking at the tree. A **pure move**: `eng/measure.sh` must
+return the same failure count and total with empty FIXED, BROKEN and REASONS diffs.
+`test/known-failures.txt` holds fully-qualified names, so it moves in the same commit.
+
+The census that sizes it, taken by resolving each file's fixture to its backend store rather than
+by grepping names (42 `Scaffolding/Baselines/**` files are excluded from compilation and are not
+counted):
+
+| Backend | Files |
+|---|---|
+| InMemory (Tier A) | 61 |
+| SQLite (Tier B) | 24 |
+| Store-independent (`Expressions/`, `ProjectionSplit/`, compliance, infrastructure) | 26 |
+| Shared harness (`TestUtilities/`, used by both) | 4 |
+
+- [ ] **J4. Reorganise `test/InfoCarrier.Core.FunctionalTests` by backend store.**
+
+### J5–J6 — D3 answer (c), in two steps
+
+- [ ] **J5. The document seam, and the package reference leaves with it.**
+      A provider-neutral *"is this type mapped to one document?"* question, answered by the
+      relational implementation behind it. `ServerSaveChangesExecutor.IssuedAtSave` is the shape to
+      copy: it asks the backend a capability question rather than testing for a store family.
+      **A green build is not evidence here.** B12's symptom was wrong data with no exception, so
+      the pins are `JsonQuery` at 0 failures, `JsonOwnedCollectionUpdate` at 5 of 5, and
+      `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`.
+
+- [ ] **J6. A backend-supplied query-capability set, replacing the fixed boundary allowlist.**
+      `TypeAllowlist` and `ServerBoundaryAnalyzer` decide where a query is cut without ever asking
+      the backend what it can translate. ADR-010 requires the two sides to agree about the boundary,
+      and today they agree by both holding the same hard-coded list — which is agreement about the
+      list, not about the store.
+
+### Recorded, not scheduled
+
+- **D4's two chained-InfoCarrier defects.** The probe stays out of the suite so the baseline keeps
+  meaning "inherited spec tests failing"; it lives outside the repo, and D4 records what it printed.
+- **A third store.** Cosmos is the recommended candidate — first-party EF Core 10 provider
+  (`src/EFCore.Cosmos` is in the EF tree), an emulator in one container, and 155 test files in
+  `EFCore.Cosmos.FunctionalTests` to check our overrides against, which is the method CLAUDE.md
+  depends on and which no other candidate offers. MongoDB is cheaper to run and has no EF suite at
+  all. Adopting one is its own milestone, and J5/J6 are what make it cheap.

@@ -292,14 +292,104 @@ package is referenced by a component that is, by construction, not relational. T
   backend would need its own clause — Cosmos recognises an ordinal key by the property's shape, not
   by this name."* So the current clause is not provider-neutral, only relational-shaped.
 
-**Candidate answers, none chosen:**
+**Candidate answers:**
 
 | # | Answer | Cost |
 |---|---|---|
 | a | Keep it | Zero work; the smell and the WASM bytes stay. |
 | b | Read the annotation by its **string** name and drop the package | Small; loses the compile-time constant, and an EF rename becomes a silent behaviour change rather than a build error. |
-| c | Define a provider-neutral seam — *"is this type mapped to a document?"* — that a backend answers | The principled answer, and the one that also serves Cosmos. Largest. |
+| **c** | **Define a provider-neutral seam — *"is this type mapped to a document?"* — that a backend answers** | The principled answer, and the one that also serves Cosmos. Largest. |
 | d | Move the JSON clause into an optional `InfoCarrier.Core.Relational` package | Keeps the core clean; splits a convention across two packages, which is its own trap. |
+
+**DECIDED 2026-08-16: (c), in two steps, and the package is the second step rather than the
+first.** The audit that settled it is below, and its finding is that the reference is the least of
+what is store-flavoured here.
+
+**(b) was rejected explicitly.** It removes the package and keeps every relational assumption
+intact, so it buys the WebAssembly bytes and nothing else — while making an EF rename a silent
+behaviour change instead of a build error. The reference is worth removing as a *consequence* of
+answering the question properly, not as the goal.
+
+**The audit, 2026-08-16.** The four call sites are as recorded above; nothing has moved. What is
+new is the sweep of everything else, because "which parts only work if the store is relational?"
+is the question the package reference stands in for:
+
+| Component | Verdict |
+|---|---|
+| `InfoCarrierTypeMappingSource` | Neutral — CLR types only. |
+| `InfoCarrierValueGeneratorSelector` | Neutral — numeric temporary keys, gated on `ValueGenerated`. |
+| `ServerSaveChangesExecutor.IssuedAtSave` | Neutral **on purpose**: it asks the backend's own `IValueGeneratorSelector` whether the store issues at save, rather than testing for SQL. This is the shape the seam should copy. |
+| `InProcessInfoCarrierServer` transactions | Neutral — it relays what the store says, refusals included. |
+| `InfoCarrierDatabaseCreator` | Neutral (all no-ops). |
+| `InfoCarrierKeyDiscoveryConvention` | **Relational-shaped** — the JSON ordinal key. Already known; CLAUDE.md records that Cosmos needs its own clause. |
+| `InfoCarrierDatabase.Expand` | **Relational-shaped** — the JSON document owner scan. |
+| `TypeAllowlist` + `ServerBoundaryAnalyzer` | **Store-blind, and this was not recorded anywhere.** |
+
+**The third row is the finding.** The boundary between what the server runs and what the client
+runs is decided from a **fixed list**, and the backend is never asked what it can translate. It is
+invisible against SQLite because SQLite translates a great deal, so the fixed list is a decent
+approximation of the truth. It stops being one against any store that translates less: the client
+would ship a query the server cannot execute, and the failure would arrive from the store rather
+than from the boundary that should have refused it. **Removing the package reference does nothing
+about this**, which is why (c) is two steps and why the package is the second.
+
+### D4 — chained InfoCarrier: a server whose own `DbContext` is an InfoCarrier client
+
+**Raised and measured 2026-08-16, during the D3 audit. Two defects recorded, neither scheduled.**
+
+Chaining is the sharpest available test of provider-neutrality, because the "store" behind the
+server is then this provider itself — an implementation that translates nothing, has no columns and
+no connection. It was **executed rather than reasoned about**: three levels (outer client →
+middle → middle → SQLite), the same assertions at depths 1, 2 and 3, 27 tests.
+
+**23 of 27 pass.** Queries over entities, `Include`, scalar projections, the projection split
+itself, transactions with savepoints and rollback, and `SaveChanges` insert and delete all survive
+two chained hops unchanged. That is the headline: chaining nearly works, and nothing in the design
+prevents it.
+
+| Shape | 1 hop | 2 hops | 3 hops |
+|---|---|---|---|
+| Entities, `Include`, scalar projection, client-side projection | pass | pass | pass |
+| Transaction + savepoint + rollback | pass | pass | pass |
+| `SaveChanges` insert, `SaveChanges` delete | pass | pass | pass |
+| **Anonymous projection** | pass | **fail** | **fail** |
+| **`SaveChanges` update** | pass | pass | **fail** |
+
+**Defect 1 — an anonymous projection fails at the first chained hop.** The middle node returns a
+queryable of `TupleCarrier` tuples and the outer client refuses it:
+
+```
+Type 'System.Linq.EnumerableQuery`1[System.ValueTuple`2[System.String,System.Int32]]'
+is not on the deserialization allowlist (ADR-008 constraint 2).
+```
+
+**Defect 2 — an update is silently lost at the second chained hop, and this is the serious one.**
+The client reported `0` changes, no exception was raised, and the row in the store was unchanged —
+the wrong-data-without-an-exception shape that A49, B4 and B12 each cost a session to.
+
+**It was named by the payload, not by reading code.** A recording decorator on `IInfoCarrierClient`
+at every hop printed each query result, and one field differs:
+
+```
+PROBE-Q hop0->store  … "isTracked":true   bytes=461
+PROBE-Q hop1->hop0   … "isTracked":true   bytes=461
+PROBE-Q hop2->hop1   … "isTracked":false  bytes=817
+```
+
+**A middle node reports its rows as untracked.** `ServerQueryExecutor`'s `IsTracked` answers from
+its own state manager, and `ClientResultMaterializer` declines to track a row that arrives saying
+`false` — so the outer client holds a `Detached` entity, `SaveChanges` finds nothing to send, and
+the user's edit disappears. The payload grows at the same hop for the same reason: an untracked
+entity serializes its navigations as a plain object graph.
+
+**Why depth 3 and not depth 2.** One middle node replays and saves; that path is exercised by the
+whole suite. It takes a *second* middle for a result that has already been materialized by a client
+to be re-served as a server's answer, and that is the step that loses the flag.
+
+**Not scheduled, and the probe is deliberately not in the suite** — it would add tests and failures
+to a baseline whose number must keep meaning "inherited spec tests failing". Should chaining ever
+become a supported topology, the probe is the specification for it, and the recording decorator is
+the instrument that found this in one filtered run.
 
 **Related to D2**, and worth taking together: both are the same question at different levels —
 *which part of a model is the store's business, and which is shared?* D2 asks it about the

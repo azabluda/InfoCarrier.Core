@@ -378,6 +378,51 @@ Three separable pieces, and only the first can be done outside the library:
 - AOT/trimming verification (requirements §4.5).
 - Sample apps, NuGet packaging, `release.yml`.
 
+### M9 — Provider neutrality and store coverage
+
+**Opened 2026-08-16.** M8's remaining exit criteria stay open; this milestone runs beside it,
+because its subject is orthogonal — M8 is about shipping the provider, M9 is about what the
+provider assumes of the store behind it.
+
+**The premise.** This is a non-relational provider whose client is, by construction, never a
+relational context (ADR-013). It nevertheless references `Microsoft.EntityFrameworkCore.Relational`
+and its whole test suite runs on two stores, one of which is a real relational database. Nothing
+here is broken; the question is what would break under a store that is neither InMemory nor SQLite.
+
+**What the opening audit established** (evidence in [`architecture.md`](architecture.md) §6a D3):
+
+- The package reference is used for **exactly one question** at four call sites, and is a symptom
+  rather than the disease. `InfoCarrierTypeMappingSource`, `InfoCarrierValueGeneratorSelector`,
+  `ServerSaveChangesExecutor.IssuedAtSave` and the transaction path are all store-neutral, and
+  `IssuedAtSave` is neutral on purpose — it asks the backend's own `IValueGeneratorSelector`
+  instead of testing for SQL.
+- **Two components genuinely assume a relational store**: `InfoCarrierKeyDiscoveryConvention`'s
+  JSON ordinal key and `InfoCarrierDatabase.Expand`'s JSON document scan.
+- **A third assumes something stronger and is not recorded anywhere**: `TypeAllowlist` and
+  `ServerBoundaryAnalyzer` decide the query boundary from a **fixed list**, never asking the
+  backend what it can translate. That is safe against SQLite because SQLite translates a great
+  deal. Against a store that translates less, the client ships queries the server cannot run.
+- **Chained InfoCarrier — a server whose own `DbContext` is an InfoCarrier client — very nearly
+  works**, and was measured rather than reasoned about. See D4 below.
+
+**Exit criteria**
+- A provider-neutral *"is this type mapped to one document?"* seam, with the relational
+  implementation behind it, so `InfoCarrier.Core` no longer references
+  `Microsoft.EntityFrameworkCore.Relational` (D3 answer **(c)**, chosen 2026-08-16).
+- A backend-supplied query-capability set replacing the fixed boundary allowlist, so the split
+  point is a property of the store rather than of this provider.
+- The test project organised **by backend store**, as v1's was, so a store's coverage is
+  countable by looking at it.
+- Every base that runs on Tier A only because it was adopted there first is moved to the tier that
+  translates (CLAUDE.md's A79/A80 rule). The audit found three, worth 24 mirrored skips.
+
+**Deliberately *not* exit criteria**
+- Adding a third store. Cosmos is the recommended candidate and the only one with both a
+  first-party EF Core 10 provider and a reference suite to check overrides against, but adopting
+  it is its own milestone. The seam above is what makes it cheap; doing it first would be building
+  the seam blind.
+- Fixing the chained-InfoCarrier defects. They are recorded, not scheduled.
+
 ---
 
 ## CI strategy
