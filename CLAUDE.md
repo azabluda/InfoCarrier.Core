@@ -77,19 +77,32 @@ here, and both are cheap to avoid:
   hides `1 Error(s)`, which is how it survived three attempts. It produced two confident false
   clearances before the real cause — an upstream bug in EF's own test type — was found. This is the
   standing "establish that the code *ran*" rule, in the one form it had not yet been broken in.
-- **Before moving a base to Tier B, grep it for `ExecuteWithStrategyInTransactionAsync`.** That
-  helper opens **one** transaction and then requires **every other context** to enlist in it via
-  `UseTransaction`, and the only way a relational suite does that is
-  `transaction.GetDbTransaction()` — the call ADR-013 puts permanently out of this client's reach.
-  On Tier A the transaction is ignored and nothing shows; on Tier B it is real, the inner contexts
-  stay outside it, and the outer one holds the store's write lock. J3 moved `ProxyGraphUpdates` on
-  the strength of 13 mirrored skips and measured **733 failures, 717 of them that class, 471 of
-  them `SQLite Error 5: 'database is locked'`** — each waiting out a 30-second lock timeout, which
-  is why the run took hours rather than minutes. **The tell is not in the skips and not in the
-  fixture: it is the base's own transaction strategy.** A base that uses it cannot move until the
-  client can join an open server transaction by its wire token — a product feature that does not
-  exist. `GraphUpdates` and `ProxyGraphUpdates` are both on Tier A for this reason, not by
-  accident.
+- **Before moving a base to Tier B, grep it for `ExecuteWithStrategyInTransactionAsync` — and if it
+  uses one, write the `UseTransaction` override in the same commit as the store switch.** That
+  helper opens **one** transaction and then requires **every other context** to enlist in it. On
+  Tier A the transaction is ignored and nothing shows; on Tier B it is real, and without the
+  override the inner contexts stay outside it while the outer one holds the store's write lock. J3
+  moved `ProxyGraphUpdates` on the strength of 13 mirrored skips and measured **733 failures, 717 of
+  them that class, 471 of them `SQLite Error 5: 'database is locked'`** — each waiting out a
+  30-second lock timeout, which is why the run took hours rather than minutes. **The tell is not in
+  the skips and not in the fixture: it is the base's own transaction strategy.**
+  **CORRECTED 2026-08-17 (M9), and the correction is the operative half.** This entry used to end
+  *"a base that uses it cannot move until the client can join an open server transaction by its wire
+  token — a product feature that does not exist"*, and named `GraphUpdates` and `ProxyGraphUpdates`
+  as permanently Tier A. **Nothing was missing.**
+  `InfoCarrierDatabaseFacadeExtensions.UseInfoCarrierTransaction` and
+  `InfoCarrierTransactionManager.UseTransaction(token)` have shipped since M4, with the non-owning
+  semantics the question worried about. What was missing was the **test class's own
+  `UseTransaction` override**, which `ConferencePlannerInfoCarrierTest` and
+  `OptimisticConcurrencyInfoCarrierTest` already carried — one grep away the whole time. Both bases
+  are now on **Tier B and green**: `ProxyGraphUpdates` in J11 (167 fixed, 0 broken) and
+  `GraphUpdates` in J12a, with **zero** "database is locked" because the override landed with the
+  store switch. Full reading in `architecture.md` §6a **D6**, closed. **The general lesson is the
+  one this file states elsewhere and this entry broke: before pricing a gap, check whether a sibling
+  of it already works.**
+  A relational suite normally enlists with `transaction.GetDbTransaction()`, which ADR-013 does put
+  permanently out of this client's reach — that part was always true, and it is why the override is
+  needed rather than why the move is impossible.
 - **A newly-red SQLite test is not automatically a regression.** Grep
   `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
   with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
@@ -167,7 +180,7 @@ found. **The standing price for all of it — "626 + 322 lines of relational mir
 abstract seeds" — was a price for a route nobody was going to take.**
 
 Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22453, Passed: 22219, Failed: 13, Skipped: 221`** (2026-08-11) across the
+**`Total tests: 22656, Passed: 22466, Failed: 13, Skipped: 177`** (2026-08-17, `j15`) across the
 Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
 `LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
 `CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
@@ -184,11 +197,17 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `ComplexTypeQuery`, `Spatial` and both `ManyToMany*Load` bases are clear.
 **Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
-Tier B adoptions added, and Phase C's C1–C96 for the rest — **C96 re-derives the whole tail**** — read out of `artifacts/measure/`,
-currently `c96`. C55–C96 took 132 to 13, and none of the 13 is C86's own new tests — those are 5 of 5; `Query.Associations` is 336 of 336, and
+Tier B adoptions added, and Phase C's C1–C96 for the rest — **C96 re-derives the whole tail**, and
+**Phase J's "The residual 13, examined properly" re-derives it again against M9's run** — read out of `artifacts/measure/`,
+currently `j15`. C55–C96 took 132 to 13, and none of the 13 is C86's own new tests — those are 5 of 5; `Query.Associations` is 336 of 336, and
 `MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
-**There is no largest block any more: the 13 are six pairs and one singleton, in seven different
-classes.** `JsonQuery` fell from 40 to 4 when C80 took B12 and to **0** when C96 took the
+**There is no largest block any more: the 13 sit in eight different classes — five hold two each,
+three hold one each** (grouped from `artifacts/measure/j15.txt`; the earlier "six pairs and one
+singleton, in seven classes" was C96's composition and M9's tier moves changed it). **After J15 not
+one of them is of unknown standing**, which had not been true before: J15 seeded the `Dashboard`
+set EF leaves empty and showed that `Composition_over_collection_of_complex_mapped_as_scalar`
+returns the **right answer**, so it is A28 proper rather than A28 by assertion.
+`JsonQuery` fell from 40 to 4 when C80 took B12 and to **0** when C96 took the
 eighteenth of EF's own APPLY overrides, `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22,
 `Scaffolding.CompiledModel` from 4 to **0** across C90–C93, and `BulkUpdates` from 6 to 2 when C94
 took EF's own #28886 skip. **All 13 are re-derived one at a time in C96** — grouped by class *and*
