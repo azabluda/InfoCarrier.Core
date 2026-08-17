@@ -613,3 +613,69 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
 
 ---
 
+## Phase K — packaging and release (M8 exit criteria)
+
+- [x] **M8-19. The two products pack, and only the two products.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`j23` against `j21`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      Both gates run because `Directory.Build.props` reaches `src/`, and both are neutral — which
+      is what packaging metadata should be, and is worth having measured rather than assumed.
+
+      **Version: `10.0.0-preview.1`, decided 2026-08-17.** `10.0.0` matches EF Core's major, which
+      is the convention every EF provider follows and the fastest way for a reader to know which EF
+      this targets. **`-preview.1` should stay until M8's exit criteria are met**: nine limitations
+      are known, there is no gRPC binding, and results do not stream — and the last two may touch
+      `IInfoCarrierTransport`. A stable `10.0.0` is a promise not to break that surface.
+
+      **`IsPackable` is `false` in `Directory.Build.props` and `true` in the two `src/` projects.**
+      The default is `true`, so `dotnet pack` on the solution would otherwise have produced a
+      package for every sample and every test project. Verified by counting the output: **four
+      files**, the two products and their symbol packages.
+
+      **The nuspec was read rather than trusted**, and it is right: MIT as a licence *expression*,
+      the README embedded, `<repository>` carrying branch and commit (so SourceLink works), the XML
+      documentation shipped, and `InfoCarrier.Core` depending on `InfoCarrier.Core.Abstractions` at
+      the same version — which is why the push order matters and why M8-20 says so.
+
+      **Two findings, both recorded where the next reader will meet them:**
+
+      - **The package declares a dependency nobody wrote.**
+        `Microsoft.Extensions.DependencyInjection >= 10.0.9` is in the nuspec although no `.csproj`
+        references it: `CentralPackageTransitivePinningEnabled` promotes a *pin* into the package.
+        `Directory.Packages.props` claimed "raising it changes no declared dependency of
+        InfoCarrier.Core" — true of the projects, false of the package, and now corrected there.
+        Left as it is: the floor is real, and removing transitive pinning for the packable projects
+        reintroduces the NU1109 the pin exists to prevent.
+      - **The package README is `docs/nuget-readme.md`, not the repository README.** nuget.org
+        renders a README but resolves images only against **absolute** URLs, so the banner would
+        show as a broken image, and a dozen relative documentation links would be dead inside a
+        package. A short package-focused readme avoids both. It is the one file that can drift from
+        the repository README, so it is deliberately short and mostly pointers.
+
+- [x] **M8-20. `release.yml` — pack on a tag, gate it, attach it; publish by hand.** `<this commit>`
+      **Chosen 2026-08-17 over pushing automatically, and the reason is irreversibility.** A pushed
+      NuGet version is immutable: it can be deprecated or unlisted, never truly withdrawn. So the
+      irreversible step stays with a human holding the packages, and **no `NUGET_API_KEY` lives in
+      this repository's secrets** — which also means an accidental tag cannot publish anything.
+
+      The workflow runs **the same two gates `build.yml` runs**, because a release must clear at
+      least what a push clears; packs with `ContinuousIntegrationBuild=true` (deterministic, and it
+      normalises the paths SourceLink embeds); and attaches the four files to a GitHub Release,
+      marked pre-release when the tag contains a hyphen.
+
+      **It verifies the tag against the packaged version.** A `v10.0.0-preview.2` tag against a
+      props file still saying `preview.1` would otherwise publish the wrong version under the right
+      name, and nothing downstream would notice. The step fails loudly instead.
+
+      `fetch-depth: 0`, because SourceLink stamps the commit and a shallow clone gives it nothing
+      to stamp. The release body carries the two push commands **with exact filenames rather than
+      globs** — `InfoCarrier.Core.*.nupkg` also matches the Abstractions package — and in the order
+      nuget.org requires.
+
+      **Not verified by execution.** This workflow has never run; it cannot be, without a tag. The
+      YAML structure matches `build.yml`'s, the shell steps are straightforward, and a BOM was
+      stripped so the file starts as `build.yml` does — but **the first tag is the test**, and that
+      is worth knowing before relying on it.
+
+---
+

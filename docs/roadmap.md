@@ -376,7 +376,15 @@ Three separable pieces, and only the first can be done outside the library:
   server currently buffers into an `ArrayList`.
 - Compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5).
 - AOT/trimming verification (requirements §4.5).
-- Sample apps, NuGet packaging, `release.yml`.
+- ~~Sample apps~~ **DONE** (Phases H/I) — a Blazor WebAssembly client and a console client, both
+  against a SQLite-backed ASP.NET Core server.
+- ~~NuGet packaging, `release.yml`~~ **DONE (M8-19, M8-20)** — `InfoCarrier.Core` and
+  `InfoCarrier.Core.Abstractions` at **`10.0.0-preview.1`**, with MIT metadata, SourceLink, symbol
+  packages and a package README. `release.yml` packs on a `v*` tag, runs both gates, checks the tag
+  against the packaged version, and attaches the files to a GitHub Release. **Publishing to
+  nuget.org is deliberately manual** — a pushed version is immutable, so no API key lives in this
+  repository. **Nothing has been published yet, and `-preview.1` should stay until the criteria
+  below are met.**
 
 ### M9 — Provider neutrality and store coverage — **CLOSED 2026-08-17**
 

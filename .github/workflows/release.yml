@@ -1,0 +1,137 @@
+# Release: pack on a tag, gate it, attach the packages to a GitHub Release.
+#
+# THIS WORKFLOW DOES NOT PUBLISH TO NUGET.ORG, and that is a decision rather than an omission
+# (M8-20). A pushed NuGet version is immutable: it can be deprecated or unlisted, never truly
+# withdrawn. So the irreversible step is left to a human with the packages in hand, and no
+# NUGET_API_KEY lives in this repository's secrets. The push is one command, printed in the
+# release body:
+#
+#     dotnet nuget push InfoCarrier.Core.Abstractions.<version>.nupkg --source nuget.org --api-key ...
+#     dotnet nuget push InfoCarrier.Core.<version>.nupkg             --source nuget.org --api-key ...
+#
+# ORDER MATTERS: Abstractions first. InfoCarrier.Core declares a dependency on it at the same
+# version, and nuget.org rejects a package whose dependency does not resolve.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # So a release build can be rehearsed without creating a tag. Produces the same artifacts and
+  # skips the GitHub Release step.
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  SOLUTION: InfoCarrier.Core.slnx
+  TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
+
+jobs:
+  release:
+    name: Pack and release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # required to create the Release
+
+    steps:
+      # Full history: SourceLink stamps the commit into the package, and a shallow clone gives
+      # it nothing to stamp.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION }}
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
+
+      # The same two gates build.yml runs, because a release must clear at least what a push
+      # clears. The spec suite is legitimately red (CLAUDE.md forbids skipping to force green),
+      # so the ratchet decides, not the exit code.
+      - name: Test (round-trip + smoke)
+        run: >
+          dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
+          --filter "FullyQualifiedName~ExpressionRoundTripTest|FullyQualifiedName~InMemorySmokeTest"
+
+      - name: Test (HTTP transport)
+        run: >
+          dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
+          --no-build --configuration Release
+
+      - name: Test (full suite)
+        continue-on-error: true
+        timeout-minutes: 90
+        run: >
+          dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
+          --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
+
+      - name: Spec ratchet
+        run: ./eng/ratchet.sh artifacts/test-results/results.trx test/known-failures.txt
+
+      - name: Trim ratchet (Blazor publish)
+        run: bash eng/trim-ratchet.sh
+
+      # ContinuousIntegrationBuild makes the build deterministic and normalises the source paths
+      # SourceLink embeds. Only set here, never locally, which is what the property is for.
+      - name: Pack
+        run: >
+          dotnet pack ${{ env.SOLUTION }} --no-build --configuration Release
+          -p:ContinuousIntegrationBuild=true
+          --output artifacts/pack
+
+      # The tag is the source of truth for what is being released, and it must agree with what
+      # MSBuild produced — a tag of v10.0.0-preview.2 against a props file still saying preview.1
+      # would otherwise publish the wrong version under the right name.
+      - name: Verify the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(ls artifacts/pack/InfoCarrier.Core.*.nupkg \
+                | grep -v Abstractions \
+                | sed -E 's|.*/InfoCarrier\.Core\.(.*)\.nupkg|\1|')
+          echo "tag=$tag packaged=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag '$tag' does not match the packaged version '$pkg'. Update VersionPrefix/VersionSuffix in Directory.Build.props, or retag."
+            exit 1
+          fi
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/pack/*
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/pack/*.nupkg
+            artifacts/pack/*.snupkg
+          generate_release_notes: true
+          # A pre-release tag marks the Release as a pre-release, so the repository's landing
+          # page does not advertise it as the current version.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            Packages are attached. Publishing to nuget.org is deliberately manual — a pushed
+            version is immutable, so no API key lives in this repository.
+
+            **Push Abstractions first:** `InfoCarrier.Core` declares a dependency on it at the
+            same version, and nuget.org rejects a package whose dependency does not resolve.
+
+            ```bash
+            # Exact filenames, not globs: `InfoCarrier.Core.*.nupkg` also matches the
+            # Abstractions package, which is the sort of thing that is only noticed afterwards.
+            V=${{ github.ref_name }}; V=${V#v}
+            SRC=https://api.nuget.org/v3/index.json
+
+            dotnet nuget push "InfoCarrier.Core.Abstractions.$V.nupkg" --source $SRC --api-key "$NUGET_API_KEY"
+            dotnet nuget push "InfoCarrier.Core.$V.nupkg"              --source $SRC --api-key "$NUGET_API_KEY"
+            ```
+
+            Known limitations for this release: [`docs/limitations.md`](docs/limitations.md).

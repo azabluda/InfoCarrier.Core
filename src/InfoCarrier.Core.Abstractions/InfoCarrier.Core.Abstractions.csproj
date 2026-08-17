@@ -4,7 +4,12 @@
     <Description>Public contracts for InfoCarrier.Core — client/server/transport/serializer abstractions. DI-first testability seam.</Description>
     <RootNamespace>InfoCarrier.Core</RootNamespace>
     <AssemblyName>InfoCarrier.Core.Abstractions</AssemblyName>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\docs\nuget-readme.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />

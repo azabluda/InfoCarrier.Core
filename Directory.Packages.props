@@ -20,6 +20,15 @@
       at 10.0.9. Pinned lower, the restore fails with NU1109 in the test and sample projects.
       Raising it changes no declared dependency of InfoCarrier.Core, which references only
       Microsoft.EntityFrameworkCore and Microsoft.EntityFrameworkCore.Relational.
+
+      CORRECTED 2026-08-17 (M8-19), and only the last sentence was wrong. It IS a declared
+      dependency of the *package*: transitive pinning promotes a pin into the nuspec, so
+      InfoCarrier.Core.10.0.0-preview.1 declares Microsoft.Extensions.DependencyInjection >= 10.0.9
+      even though no csproj references it. Left as it is — the floor is real (EF Core's SQLite
+      package reaches it), and consumers of an EF provider acquire that package anyway — but it is
+      recorded because a dependency nobody chose is exactly what nobody looks for. Turning
+      CentralPackageTransitivePinningEnabled off for the packable projects is the alternative, and
+      it reintroduces the NU1109 this pin exists to prevent.
     -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
