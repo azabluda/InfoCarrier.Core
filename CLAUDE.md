@@ -57,6 +57,19 @@ here, and both are cheap to avoid:
   to exactly one tier** — three Northwind bases ran on both, green on both, 906 tests of pure
   duplication (A81). When a base could go either way, the tier that *translates* is the one whose
   green means more.
+- **Before moving a base to Tier B, grep it for `ExecuteWithStrategyInTransactionAsync`.** That
+  helper opens **one** transaction and then requires **every other context** to enlist in it via
+  `UseTransaction`, and the only way a relational suite does that is
+  `transaction.GetDbTransaction()` — the call ADR-013 puts permanently out of this client's reach.
+  On Tier A the transaction is ignored and nothing shows; on Tier B it is real, the inner contexts
+  stay outside it, and the outer one holds the store's write lock. J3 moved `ProxyGraphUpdates` on
+  the strength of 13 mirrored skips and measured **733 failures, 717 of them that class, 471 of
+  them `SQLite Error 5: 'database is locked'`** — each waiting out a 30-second lock timeout, which
+  is why the run took hours rather than minutes. **The tell is not in the skips and not in the
+  fixture: it is the base's own transaction strategy.** A base that uses it cannot move until the
+  client can join an open server transaction by its wire token — a product feature that does not
+  exist. `GraphUpdates` and `ProxyGraphUpdates` are both on Tier A for this reason, not by
+  accident.
 - **A newly-red SQLite test is not automatically a regression.** Grep
   `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
   with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference

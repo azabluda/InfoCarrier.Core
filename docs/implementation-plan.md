@@ -699,7 +699,50 @@ Measured one at a time, because a combined move cannot tell which base moved the
       starting:** `BuiltInDataTypesSqliteTest` is **2201 lines**, so the adoption surface is large
       even though most of it is `AssertSql` this provider cannot use. Worth doing, worth doing on
       its own, and worth measuring in halves.
-- [ ] **J3. `ProxyGraphUpdates` to Tier B.**
+- [ ] **J3. `ProxyGraphUpdates` to Tier B — ATTEMPTED, REVERTED, BLOCKED.** `<this commit>`
+      **Not a tier move. It needs a product feature that does not exist**, and the skip census gave
+      no hint of it — which is the transferable part.
+
+      The move itself was the same three lines as J1 and J2: store factory to `Sqlite`, delete the
+      thirteen skips, keep the by-hand reseed. The run was stopped at **21,289 of 22,453** after
+      about two hours, with **733 distinct failures, 717 of them this class**. Reasons, tallied:
+
+      | Count | Reason |
+      |---|---|
+      | 471 | `InfoCarrierServerException : SQLite Error 5: 'database is locked'` |
+      | 246 | `DbUpdateException` (the same lock, one frame out) |
+
+      **The cause is one mechanism, not 717 findings.**
+      `TestHelpers.ExecuteWithStrategyInTransactionAsync` opens **one** transaction on an outer
+      context and then hands every inner context to `useTransaction(innerContext.Database,
+      transaction)`. `ProxyGraphUpdatesSqliteTestBase` satisfies that with
+      `facade.UseTransaction(transaction.GetDbTransaction())` — **ADR-013's call**, which a client
+      that is never a relational context cannot make. Our `UseTransaction` is therefore a no-op:
+      the inner contexts run *outside* the transaction while the outer one holds SQLite's write
+      lock, and each one waits out a **30-second** lock timeout before failing. That timeout is
+      why a normally six-minute suite ran for hours, and it is the same "an abandoned transaction
+      wedges writes" behaviour [`roadmap.md`](roadmap.md) §M8 records from the other direction.
+
+      **On Tier A none of this is visible**, because the transaction is ignored outright and
+      `ReseedAsync` puts the data back by hand. The InMemory skips were a true statement about the
+      InMemory store *and* an accidental screen over a second, larger dependency.
+
+      **What would unblock it: a client-side way to join an open server transaction by its wire
+      token.** `IInfoCarrierClient.BeginTransactionAsync` already returns that token and every
+      request record already carries `TransactionId`, so the missing piece is one client API —
+      plus the authorization question §M8 raises, because today any caller holding a token can join.
+      Filed as J7 below rather than folded in here: it is product work with a security question
+      attached, and it deserves its own measurement.
+
+      **The check that would have caught this in a grep**, now also in `CLAUDE.md`: before moving a
+      base to Tier B, grep it for `ExecuteWithStrategyInTransactionAsync`. `GraphUpdates` and
+      `ProxyGraphUpdates` are on Tier A because of it, not by accident.
+
+- [ ] **J7. Let a client context join an open server transaction by token.**
+      What J3 needs. One client-side API over the existing wire — no protocol change, since the
+      token is already returned and already carried. The design question is not the plumbing but
+      **who may join**: §M8 records that the envelope carries no caller identity, so a token is
+      today a bearer credential. Answer that before shipping the API, not after.
 
 ### J4 — the test project organised by backend store
 
