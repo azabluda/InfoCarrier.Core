@@ -848,11 +848,51 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 |---|---|
 | `CustomConverters.Value_conversion_is_appropriately_used_for_join_condition` | The test joins on **anonymous types**. The tree that reaches SQLite has, for *both* key selectors, `(object)new ValueTuple<int?, bool, int>(…)` — a **boxed** tuple, which relational translation refuses. So the anonymous key was correctly re-carried as a `ValueTuple` and then boxed. **The boxing is evidently not ours**: neither `TransparentIdentifierRewriter` nor `ProjectionRewriter` contains a single `Expression.Convert`, and `TupleCarrier` contains no `typeof(object)`. Where it comes from is unresolved. **The probe is the standing one** — print the boundary verdict and the shipped tree in `QuerySplitter.Split` and compare it with the raw captured tree, which answers "ours or already in the input" in one filtered run. |
 
-- [ ] **J8. Close `GroupBy_converted_enum`** — decide whether a non-composed grouping is carried
-      (a shape on the wire) or refused at the boundary with a sentence that says why.
-- [ ] **J9. Decide whether a query constant travels as its provider value.** Closes both
-      `KeysWithConverters` failures. Weigh against ADR-012: the seam stays the answer for a type the
-      model says nothing about; this is about types the model *has* mapped.
+- [ ] **J8. Close `GroupBy_converted_enum`.** Designed 2026-08-17, not implemented.
+      The server returns `GroupBySingleQueryingEnumerable+InternalGrouping<,>` and the allowlist
+      refuses it — correctly, since it is an EF internal type. **Three answers, and the third is
+      the one to try first:**
+
+      | # | Answer | Note |
+      |---|---|---|
+      | a | Carry `IGrouping<K,V>` as a wire shape | The most work, and it puts an EF-shaped concept in the protocol. |
+      | b | Refuse at the boundary with a sentence naming the reason | Honest, cheap, and leaves the test red — a worse answer than (c) if (c) works. |
+      | c | **Cut below the `GroupBy` and let the client group** | The rows are shippable; only the *grouping* is not. The client already applies a residual, and grouping in memory over shipped rows is exactly what a residual is for. |
+
+      **The trap in (c), and why it needs care rather than a one-liner:** the refusal must apply
+      only when the **final result element** is a grouping. Marking `IGrouping<,>` non-shippable
+      per *node* would cut every aggregate `GroupBy` too — the ones that must stay on the server —
+      and those are a large, currently-green family. The check belongs on the query root, not in
+      `ServerBoundaryAnalyzer`'s per-node verdict. Measure before believing either way.
+
+- [ ] **J9. Should a query constant travel as its provider value?** Designed 2026-08-17, **blocked
+      on a LOCKED ADR** and deliberately not implemented.
+      Closes both `KeysWithConverters` failures, which are one defect with two faces (above).
+
+      **The natural mechanism already exists and the contract forbids using it.** ADR-012's
+      `IInfoCarrierValueMapper` maps "a CLR type the wire cannot walk" to a primitive and back,
+      in both directions, on both halves — precisely what these two constants need. But ADR-012 is
+      **LOCKED**, and states the contract *"in terms of the CLR type alone: neither side may
+      consult a type mapping to decide"*. Deriving mappers from the model's value converters
+      consults exactly that.
+
+      **The distinction that might justify an amendment, and it is the same one B12/C80 and J5
+      already rest on.** ADR-012's clause was written against B23, where sending a scalar through
+      EF's core `ValueConverterSelector` inside `PrimitiveCoercion.Coerce` cost **381** — a
+      *store* type mapping, which the two providers genuinely compute differently. A converter
+      configured in `OnModelCreating` is not that: it is **shared model configuration**, identical
+      on both sides by construction, and J5's seam exists because *"where a key shape is decided by
+      the caller's own model configuration rather than by the store, the client has to reach the
+      same answer as the server"*. If that reading holds, the amendment is narrow: *a converter the
+      model declares is not a type mapping.*
+
+      **Do not proceed without deciding that explicitly.** CLAUDE.md: reversing or amending a
+      LOCKED ADR requires a dated supersession edit in `decisions.md`, never a code change that
+      quietly contradicts it. Options, if it is taken: (i) derive mappers from the model's
+      converters and register them automatically on both halves; (ii) leave ADR-012 alone and give
+      the *constant* path its own model lookup, which duplicates the idea in a second place;
+      (iii) do nothing and classify both tests as permanent. **(i) is the recommendation** — it
+      reuses the seam, needs no wire change, and keeps one mechanism rather than two.
 - [x] **J10. The join key was never boxed, and the fix is one line.** `<this commit>`
       `Total tests: 22456, Passed: 22229, Failed: 17, Skipped: 210` (`j10`): **1 fixed, 0 broken**.
 

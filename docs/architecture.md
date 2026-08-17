@@ -401,6 +401,29 @@ saying out loud before anyone prices (b) as small.
 **Not blocking anything today.** It becomes load-bearing the moment a third store is adopted, which
 is why M9 lists Cosmos as explicitly out of scope until this exists.
 
+**RECOMMENDATION, added 2026-08-17: (c), and start by writing down what is already known rather
+than by building a mechanism.** Two of M9's own findings are evidence about the shape of the
+answer, and both point away from (b):
+
+- **J10.** EF's SQLite translates an anonymous join key and a `Tuple` one, and refuses a
+  `ValueTuple` — with `NewExpression.Members` supplied either way. No capability *manifest* would
+  ever have expressed that: it is not an operator or a type, it is a shape. A handshake asking
+  "what can you translate?" would have answered "joins", and been wrong.
+- **J8.** A non-composed `GroupBy` is refused by EF's InMemory provider and accepted by SQLite.
+  That one *is* operator-shaped, and is the kind of thing (b) could express.
+
+So the axis has at least two kinds of fact in it — coarse ones a backend could declare, and fine
+ones that are properties of a *tree shape* and are only ever discovered by running the query.
+**(b) cannot cover the second kind, and pricing it as if it could is the mistake to avoid.**
+(c) — one shared declaration, derived twice, exactly as D2 proposes for the model — covers the
+coarse facts honestly and leaves the fine ones where they already are: findings, written down,
+fixed one at a time. It also needs no wire operation and no cache.
+
+**What "start by writing it down" means concretely:** the fine-grained facts this milestone found
+are already recorded next to the code that depends on them (J10's comment in
+`TransparentIdentifierRewriter`). That is the useful artefact. A mechanism should follow a second
+backend, not precede it.
+
 ### D6 — a second client context cannot join an open server transaction
 
 **Raised 2026-08-17 by plan J3, which was reverted on it. No decision, and the security question
