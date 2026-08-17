@@ -357,6 +357,86 @@ would ship a query the server cannot execute, and the failure would arrive from 
 than from the boundary that should have refused it. **Removing the package reference does nothing
 about this**, which is why (c) is two steps and why the package is the second.
 
+### D5 — the query boundary does not ask the backend what it can translate
+
+**Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6). No decision.**
+
+**First, a correction to how D3 and the M9 roadmap entry first stated this.** They said the remedy
+was *"a backend-supplied query-capability set replacing the fixed boundary allowlist"*. **Replacing
+is wrong and would be a security regression.** `TypeAllowlist` is not a capability list: it is
+ADR-008 constraint 2, and its own summary says why — without it `TypeNodeResolver` resolved any
+name a payload supplied by scanning every loaded assembly, *"a remote-code-execution vector the
+moment a network transport exists"*. `security-review.md` §2 adds that its safety is a
+**conjunction** across several clauses, so widening it is exactly how the conjunction collapses.
+A backend must never be able to widen it by answering a question.
+
+**What is actually missing is a second, independent axis.** Today `ServerBoundaryAnalyzer` cuts a
+query where the wire cannot express it or a type is not permitted — *"can this be sent safely?"* It
+never asks *"can the thing at the other end evaluate it?"* The two are unrelated: `Regex.IsMatch`
+is refused by the allowlist (A46) while `string.StartsWith` is permitted and translated by SQLite
+but not by every store. So a capability axis **narrows** what is shipped; the allowlist decides
+what may be shipped at all, and neither substitutes for the other.
+
+**Why it is invisible today.** Tier B is SQLite, which translates a great deal, so the allowlist is
+a decent approximation of the truth. Against a store that translates less it stops being one, and
+the failure arrives from the store rather than from the boundary that should have refused it.
+`GroupBy_converted_enum` (plan J1/J2 residual) is a small preview: the first non-composed `GroupBy`
+this provider ever shipped, previously screened by InMemory refusing the operator outright.
+
+**Four candidate answers, none chosen:**
+
+| # | Answer | Cost |
+|---|---|---|
+| a | Leave it. Document that the client assumes a capable backend. | Zero work. Honest only while every supported backend is relational. |
+| b | A capability handshake: the client asks the server once and caches the answer | Automatic and always correct. Adds a wire operation, a cache, and a versioning question — and the answer has to be expressible, which is the hard part: EF providers do not enumerate what they translate. |
+| c | The application declares the capability set on both sides, from one shared source | No wire change, and it is **D2's shape** — the same "one configuration, derived twice" this repo already needs for the model. Manual, and wrong if it drifts. |
+| d | Ship optimistically, catch the translation failure, re-run client-side | What EF itself removed on purpose. Silent performance cliffs, and unsound the moment a query has side effects. |
+
+**The honest difficulty, and it is (b)'s:** *"what can you translate?"* has no EF-shaped answer. A
+provider exposes no capability manifest, and the real answer is a predicate over expression trees.
+Anything cheap here will be a coarse approximation — operator families rather than a decision
+procedure — which may be enough to move the failure to the right side of the wire, and is worth
+saying out loud before anyone prices (b) as small.
+
+**Not blocking anything today.** It becomes load-bearing the moment a third store is adopted, which
+is why M9 lists Cosmos as explicitly out of scope until this exists.
+
+### D6 — a second client context cannot join an open server transaction
+
+**Raised 2026-08-17 by plan J3, which was reverted on it. No decision, and the security question
+turns out to be already answered.**
+
+`TestHelpers.ExecuteWithStrategyInTransactionAsync` opens one transaction and makes every other
+context enlist through `UseTransaction`. Relational suites do that with
+`transaction.GetDbTransaction()`; ADR-013 puts that permanently out of reach here. So
+`ProxyGraphUpdates` cannot move to Tier B — 653 failures, 471 of them
+`SQLite Error 5: 'database is locked'`, each waiting out a 30-second lock timeout.
+
+**What is missing is one client-side API** — something like
+`Database.UseInfoCarrierTransaction(token)`. **No protocol change is needed**:
+`IInfoCarrierClient.BeginTransactionAsync` already returns the token, and every request record
+already carries `TransactionId`.
+
+**The security objection does not survive checking, and that is the finding.** M8's roadmap note
+records that the envelope carries no caller identity, so *"any caller who knows a token can join
+the transaction"*. That is true — and it is true **today, without this API**.
+`InProcessInfoCarrierServer.Acquire` runs *any* request that names a token on that transaction's
+context, and every request type carries the field. So the exposure is a property of the existing
+wire protocol, not of the proposed API: **shipping `UseInfoCarrierTransaction` widens nothing.**
+Binding a token to its creator remains worth doing, and it is M8's item, independent of this one.
+
+**The real design questions are the two this does not answer:**
+
+- **What does a joining context do on dispose?** EF's semantics for an enlisted context are "the
+  transaction is not mine" — the joiner must not commit or roll back. The token makes ownership
+  expressible, so this is decidable rather than deep.
+- **Is a client transaction object shared or duplicated?** Two contexts holding two
+  `InfoCarrierTransaction` instances over one server token would each answer `SupportsSavepoints`
+  and each try to end it. The cheap answer is that a joined transaction is explicitly non-owning.
+
+**Estimated small, and deliberately not started**, because J3 is the only thing waiting on it and
+J3 is not on M9's exit criteria.
+
 ### D4 — chained InfoCarrier: a server whose own `DbContext` is an InfoCarrier client
 
 **Raised and measured 2026-08-16, during the D3 audit. Two defects recorded, neither scheduled.**

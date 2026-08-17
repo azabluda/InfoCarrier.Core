@@ -740,9 +740,16 @@ Measured one at a time, because a combined move cannot tell which base moved the
 
 - [ ] **J7. Let a client context join an open server transaction by token.**
       What J3 needs. One client-side API over the existing wire — no protocol change, since the
-      token is already returned and already carried. The design question is not the plumbing but
-      **who may join**: §M8 records that the envelope carries no caller identity, so a token is
-      today a bearer credential. Answer that before shipping the API, not after.
+      token is already returned and already carried.
+      **The blocking objection recorded here on 2026-08-16 does not survive checking, and the
+      correction is the useful part.** It said a token is a bearer credential and that "who may
+      join" had to be answered before shipping. The first half is true; the second does not follow.
+      `InProcessInfoCarrierServer.Acquire` already runs **any** request naming a token on that
+      transaction's context, and every request record already carries `TransactionId` — so the
+      exposure is a property of the wire protocol as it stands, and **this API widens nothing**.
+      Binding a token to its creator stays worth doing and stays M8's item.
+      What does need deciding is ownership: a joined transaction must not commit or roll back on
+      dispose. [`architecture.md`](architecture.md) §6a **D6**.
 
 ### J4 — the test project organised by backend store
 
@@ -800,6 +807,55 @@ counted):
          the grep is only for planning. Every other cross-tier "reference" the script did find —
          eight of them — turned out to be prose in `<c>` tags.
 
+### J1/J2 residual — all five classified
+
+The two tier moves raised `failed` 13 → 18. Diffing the current run against the M9 baseline gives
+**exactly five new, none gone**, and every one is this provider's rather than the backing store's.
+Classified here so the count keeps meaning something.
+
+**One is not a gap at all.**
+
+| Test | Verdict |
+|---|---|
+| `CustomConverters.Collection_enum_as_string_Contains` | **A28 family. Red forever, correctly.** The base's whole body is `Assert.Throws<InvalidOperationException>` around the query; this provider answers it. **Probed rather than assumed**, because "no exception" and "wrong answer" look identical from the count: with one seeded row, `Seller` returns `server=1, client=1` and `Customer` returns `server=0, client=0`. A filter that matched everything would have shown `Customer: server=1`. The answer is right. |
+
+**Two are one defect with two faces — a captured constant whose CLR type the wire cannot
+round-trip.** Both are *query constants*, not stored values, and both are a **key behind a value
+converter** that travels by reflective object shape instead of as its provider value:
+
+| Test | Which face |
+|---|---|
+| `KeysWithConverters.Can_insert_and_read_back_with_enumerable_class_key_and_optional_dependents` | **Outbound.** `EnumerableClassKey` implements `IEnumerable`, so `DynamicValueMapper.MapToNode` takes its **collection** branch and calls `GetEnumerator()`, which EF's test type does not implement. Reached from `ExpressionToNodeTranslator.VisitConstant`. |
+| `KeysWithConverters.Can_query_and_update_owned_entity_with_value_converter` | **Inbound.** `protected class Key(string id) { public string Value { get; } }` — no parameterless constructor, one get-only member — so the **server** cannot rebuild it: `MissingMethodException: Cannot dynamically create an instance … No parameterless constructor defined`, surfaced through `RoundTripAsync`. |
+
+**ADR-012's seam is the shipped answer and it does not fit here**, which is the finding. Its two
+standard mappers are *BCL* types whose members throw for ordinary instances (`IPAddress.ScopeId`,
+`Uri.AbsolutePath`) — an application storing one "has opted into nothing". These two are the
+**application's own** types, and the model already says exactly how they become primitives: a value
+converter. **The open question is whether a constant whose CLR type matches a mapped property type
+should travel as its provider value**, the way `ChangeEntryMapper` already sends property values
+(A19). That is a design question, not a bug fix, and it is filed as J9 below.
+
+**One is a code path that had never run before.**
+
+| Test | Verdict |
+|---|---|
+| `CustomConverters.GroupBy_converted_enum` | **The first non-composed `GroupBy` this provider has ever been asked to carry.** `context.Set<Entity>().GroupBy(e => e.SomeEnum).ToList()` returns EF's `GroupBySingleQueryingEnumerable+InternalGrouping<,>`, which the deserialization allowlist refuses. It could not have surfaced before: `NorthwindGroupByQuery` is **Tier A**, and InMemory refuses a non-composed `GroupBy` outright — which is precisely the override J2 deleted. Not a regression; a gap that Tier A was standing in front of. |
+
+**One needs one more probe, and the theorising stops here.**
+
+| Test | What is known |
+|---|---|
+| `CustomConverters.Value_conversion_is_appropriately_used_for_join_condition` | The test joins on **anonymous types**. The tree that reaches SQLite has, for *both* key selectors, `(object)new ValueTuple<int?, bool, int>(…)` — a **boxed** tuple, which relational translation refuses. So the anonymous key was correctly re-carried as a `ValueTuple` and then boxed. **The boxing is evidently not ours**: neither `TransparentIdentifierRewriter` nor `ProjectionRewriter` contains a single `Expression.Convert`, and `TupleCarrier` contains no `typeof(object)`. Where it comes from is unresolved. **The probe is the standing one** — print the boundary verdict and the shipped tree in `QuerySplitter.Split` and compare it with the raw captured tree, which answers "ours or already in the input" in one filtered run. |
+
+- [ ] **J8. Close `GroupBy_converted_enum`** — decide whether a non-composed grouping is carried
+      (a shape on the wire) or refused at the boundary with a sentence that says why.
+- [ ] **J9. Decide whether a query constant travels as its provider value.** Closes both
+      `KeysWithConverters` failures. Weigh against ADR-012: the seam stays the answer for a type the
+      model says nothing about; this is about types the model *has* mapped.
+- [ ] **J10. Probe the boxed join key** in `Value_conversion_is_appropriately_used_for_join_condition`
+      before pricing anything.
+
 ### J5–J6 — D3 answer (c), in two steps
 
 - [x] **J5. The document seam, and the package reference leaves with it.** `<this commit>`
@@ -853,11 +909,15 @@ counted):
       the pins are `JsonQuery` at 0 failures, `JsonOwnedCollectionUpdate` at 5 of 5, and
       `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`.
 
-- [ ] **J6. A backend-supplied query-capability set, replacing the fixed boundary allowlist.**
-      `TypeAllowlist` and `ServerBoundaryAnalyzer` decide where a query is cut without ever asking
-      the backend what it can translate. ADR-010 requires the two sides to agree about the boundary,
-      and today they agree by both holding the same hard-coded list — which is agreement about the
-      list, not about the store.
+- [ ] **J6. Ask the backend what it can evaluate — a second axis, beside the allowlist.**
+      **Rescoped 2026-08-17; the earlier wording here said "replacing the fixed boundary allowlist"
+      and that would have been a security regression.** `TypeAllowlist` is ADR-008 constraint 2 —
+      an RCE control whose own summary describes the alternative as *"a remote-code-execution vector
+      the moment a network transport exists"*, and whose safety `security-review.md` §2 calls a
+      conjunction. A backend must never widen it. The missing axis is separate and only ever
+      **narrows** what is shipped: *can the thing at the other end evaluate this?*
+      Four candidate answers, the difficulty of the automatic one, and why nothing is blocked on it
+      today are in [`architecture.md`](architecture.md) §6a **D5**. **Design first, as D3 was.**
 
 ### Recorded, not scheduled
 
