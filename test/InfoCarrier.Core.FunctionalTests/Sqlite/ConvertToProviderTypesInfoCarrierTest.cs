@@ -4,11 +4,11 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory;
+namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 
 /// <summary>
-///     <c>ConvertToProviderTypesTestBase</c> on Tier A — the same corpus with every property
+///     <c>ConvertToProviderTypesTestBase</c> on ADR-009 Tier B — the same corpus with every property
 ///     converted to a provider type on the way out.
 /// </summary>
 /// <remarks>
@@ -20,10 +20,6 @@ public class ConvertToProviderTypesInfoCarrierTest(
     : ConvertToProviderTypesTestBase<
         ConvertToProviderTypesInfoCarrierTest.ConvertToProviderTypesInfoCarrierFixture>(fixture)
 {
-    /// <inheritdoc />
-    public override Task Optional_datetime_reading_null_from_database()
-        => Task.CompletedTask;
-
     public class ConvertToProviderTypesInfoCarrierFixture : ConvertToProviderTypesFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
@@ -33,12 +29,12 @@ public class ConvertToProviderTypesInfoCarrierTest(
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
 
-        public override bool StrictEquality => true;
+        public override bool StrictEquality => false;
 
         public override bool SupportsAnsi => false;
 
@@ -46,12 +42,12 @@ public class ConvertToProviderTypesInfoCarrierTest(
 
         public override bool SupportsLargeStringComparisons => true;
 
-        public override bool SupportsBinaryKeys => false;
+        public override bool SupportsBinaryKeys => true;
 
-        public override bool SupportsDecimalComparisons => true;
+        public override bool SupportsDecimalComparisons => false;
 
         public override DateTime DefaultDateTime => new();
 
-        public override bool PreservesDateTimeKind => true;
+        public override bool PreservesDateTimeKind => false;
     }
 }

@@ -773,7 +773,26 @@ Measured one at a time, because a combined move cannot tell which base moved the
       and the `ExecuteWithStrategyInTransactionAsync` override should be **deleted** — that is the
       ConferencePlanner precedent J3 followed, and it held there.
 
-- [ ] **J2b. `BuiltInDataTypes` and `ConvertToProviderTypes` to Tier B.**
+- [x] **J2b. `BuiltInDataTypes` and `ConvertToProviderTypes` to Tier B — measured in halves, both at ZERO cost.** `<this commit>`
+      `26 / 22654` unchanged across both, **0 fixed and 0 broken each time**. The file was split so
+      each half could be measured alone, which is what makes "zero cost" a fact rather than a hope.
+
+      Both fixtures now carry `BuiltInDataTypesSqliteFixture`'s eight capability flags. **Four change
+      value and none is cosmetic** — `StrictEquality`, `SupportsDecimalComparisons` and
+      `PreservesDateTimeKind` become `false`, `SupportsBinaryKeys` becomes `true` — and each turns
+      assertions on or off inside the base. That they change and nothing breaks is the result.
+
+      **What the move was for**: each class had a silent
+      `Optional_datetime_reading_null_from_database() => Task.CompletedTask`, because the InMemory
+      store has no null to read. SQLite has one, so both now run, and both pass. Same accounting as
+      J12b — an empty override already counted as a passing test, so `total` does not move; the
+      difference is that the tick now means something.
+
+      **The earlier price of "2201 lines of EF SQLite surface" was for the wrong thing.** That file is
+      overwhelmingly `AssertSql`, which this provider cannot use and does not need. What was actually
+      required was eight flag values and two deletions.
+
+- [x] ~~**J2b (original entry).**~~ Superseded above.
       No skips to retire, so this is not J2's argument. What it *would* retire is the silent
       `Optional_datetime_reading_null_from_database() => Task.CompletedTask` in each — a test that
       does nothing at all, because the InMemory store has no null to read. **Priced before
