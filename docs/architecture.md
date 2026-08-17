@@ -359,7 +359,9 @@ about this**, which is why (c) is two steps and why the package is the second.
 
 ### D5 — the query boundary does not ask the backend what it can translate
 
-**Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6). No decision.**
+**Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).
+DECIDED 2026-08-17: answer (c), and the deliverable is the written record rather than a
+mechanism. See "THE DECISION" at the end of this entry.**
 
 **First, a correction to how D3 and the M9 roadmap entry first stated this.** They said the remedy
 was *"a backend-supplied query-capability set replacing the fixed boundary allowlist"*. **Replacing
@@ -423,6 +425,52 @@ fixed one at a time. It also needs no wire operation and no cache.
 are already recorded next to the code that depends on them (J10's comment in
 `TransparentIdentifierRewriter`). That is the useful artefact. A mechanism should follow a second
 backend, not precede it.
+
+## THE DECISION — (c), taken 2026-08-17
+
+**Answer (c) is adopted: the application declares the capability set on both sides from one shared
+source. No mechanism is built in M9, and that is part of the decision rather than a deferral of
+it.**
+
+**Why not (b), which is the one that sounds right.** A handshake is automatic and always current,
+and it cannot express half the facts. J10 is the counter-example and it is decisive: EF's SQLite
+translates an anonymous-type join key and a `Tuple` one and **refuses a `ValueTuple`**, with
+`NewExpression.Members` supplied either way. That is not an operator and not a type — it is a
+**tree shape**, and no manifest a provider could publish would carry it. A handshake asking "what
+can you translate?" would answer "joins", and be wrong. Pricing (b) as if it covered everything is
+the specific mistake this entry exists to prevent.
+
+**Why not (a) or (d).** (a) is honest only while every supported backend is relational, which is
+true today and is exactly the assumption M9 exists to stop making silently. (d) is what EF itself
+removed on purpose: silent performance cliffs, and unsound the moment a query has side effects.
+
+**Why (c) is the same shape as something this repo already needs.** D2 records that the model must
+be one configuration derived twice, because the client's model and the server's are built by
+different providers. A capability set has the identical shape and the identical failure mode — it
+is wrong if it drifts — so it should be declared once and read by both halves, not negotiated.
+
+**The known facts, which are the deliverable.** The axis holds two kinds, and separating them is
+the useful part:
+
+| Kind | Example | Can a declaration carry it? |
+|---|---|---|
+| **Coarse** — an operator a backend does not translate | A non-composed `GroupBy`: EF's InMemory refuses it, SQLite accepts it (J8) | **Yes.** This is what (c) declares. |
+| **Coarse** — a BCL call a backend cannot map | `Regex.IsMatch`: SQLite emits `REGEXP` (J20); a store without regex cannot | **Yes.** |
+| **Fine** — a property of the expression's *shape* | A `ValueTuple` join key refused where an anonymous type and a `Tuple` are accepted (J10) | **No.** Only found by running the query. |
+
+**So the deliverable of J6 is this table plus the comments already sitting next to the code that
+depends on each fact**, and the mechanism follows the second backend. Cosmos is the candidate and
+is explicitly out of M9's scope.
+
+**Consequence for M9's exit criterion, stated so the closure is not a fudge.** The criterion was
+written as *"a query boundary that also asks what the backend can evaluate"*. Taken literally it
+cannot be met inside M9: there is no second backend to ask, and adding one is the thing M9 puts out
+of scope. It is restated in [`roadmap.md`](roadmap.md) as *"the axis is identified, decided and
+recorded"*, which is what was actually achievable and what has been done.
+
+**What would reopen this:** adopting a second store. At that point (c) needs a concrete shape — one
+declaration, read by both halves — and the fine-grained facts stay where they are, as findings
+beside the code.
 
 ### D6 — a second client context cannot join an open server transaction
 

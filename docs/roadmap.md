@@ -409,12 +409,20 @@ here is broken; the question is what would break under a store that is neither I
 - A provider-neutral *"is this type mapped to one document?"* seam, with the relational
   implementation behind it, so `InfoCarrier.Core` no longer references
   `Microsoft.EntityFrameworkCore.Relational` (D3 answer **(c)**, chosen 2026-08-16).
-- A query boundary that also asks **what the backend can evaluate**, not only what the wire can
-  carry safely. **Corrected 2026-08-17 (see [`architecture.md`](architecture.md) §6a D5): this is a
-  second, independent axis, and it must not touch `TypeAllowlist`.** That allowlist is ADR-008
-  constraint 2 — a remote-code-execution control whose safety `security-review.md` §2 calls a
-  conjunction — so a backend must never be able to widen it by answering a question. The capability
-  axis only ever *narrows* what is shipped.
+- ~~A query boundary that also asks **what the backend can evaluate**~~ — **RESTATED 2026-08-17:
+  the capability axis is *identified, decided and recorded*.** It is a second, independent axis and
+  it must not touch `TypeAllowlist` — that allowlist is ADR-008 constraint 2, a remote-code-execution
+  control whose safety `security-review.md` §2 calls a conjunction, so a backend must never be able
+  to widen it by answering a question. The capability axis only ever *narrows* what is shipped.
+  **Decided: answer (c)** — one declaration, read by both halves, D2's shape — with **no mechanism
+  built in M9**, because (b) cannot express a fact like J10's `ValueTuple` join key and because a
+  mechanism should follow a second backend rather than precede it. The full decision, and the table
+  of coarse-versus-fine facts that is its deliverable, is [`architecture.md`](architecture.md)
+  §6a **D5**.
+  **Why restated rather than met as written:** the original wording cannot be satisfied inside M9 —
+  there is no second backend to ask, and adding one is explicitly out of this milestone's scope. A
+  criterion that requires the thing the milestone excludes is a criterion that can only be met by
+  changing the milestone. Recorded here rather than quietly dropped.
 - The test project organised **by backend store**, as v1's was, so a store's coverage is
   countable by looking at it.
 - Every base that runs on Tier A only because it was adopted there first is moved to the tier that

@@ -1480,7 +1480,15 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       the pins are `JsonQuery` at 0 failures, `JsonOwnedCollectionUpdate` at 5 of 5, and
       `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`.
 
-- [ ] **J6. Ask the backend what it can evaluate — a second axis, beside the allowlist.**
+- [x] **J6. Ask the backend what it can evaluate — a second axis, beside the allowlist.**
+      **DECIDED 2026-08-17: answer (c), no mechanism in M9.** The decision, its argument, and the
+      table of coarse-versus-fine facts that is its actual deliverable are in
+      [`architecture.md`](architecture.md) §6a **D5**; the exit criterion is restated in
+      [`roadmap.md`](roadmap.md). Two things are worth repeating here because they are what decided
+      it: **(b) cannot express J10** — a `ValueTuple` join key refused where an anonymous type and a
+      `Tuple` are accepted is a property of the *tree shape*, and no provider manifest carries that
+      — and **the criterion as originally written required a second backend**, which M9 puts out of
+      scope, so it could only ever be met by changing the milestone. Restated rather than dropped.
       **Rescoped 2026-08-17; the earlier wording here said "replacing the fixed boundary allowlist"
       and that would have been a security regression.** `TypeAllowlist` is ADR-008 constraint 2 —
       an RCE control whose own summary describes the alternative as *"a remote-code-execution vector
