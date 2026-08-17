@@ -945,3 +945,58 @@ button, and every claim below is about what happens when you press one.
       still resolves `order.Customer` in one extra round trip, 14 round trips total and unchanged;
       the Transfer page read `ALFKI`/34 → committed `BERGS`/33 → forced a failure and stayed
       `BERGS`/33.
+
+## Phase M — taking control of compiler warnings
+
+**Why this is worth a phase.** There were **18 distinct warning texts** in
+`dotnet build InfoCarrier.Core.slnx`, and **three of them nobody had ever read** were high-severity
+security advisories. That is the whole argument: `EF1001` is expected and allowed, and 244 of it
+buried the two that were not.
+
+Occurrence counts at the start (each warning is printed twice, once at compile and once in the
+summary, so these are double the distinct sites):
+
+| Code | Count | What |
+|---|---|---|
+| `EF1001` | 244 | EF internals — **expected and allowed**, `CLAUDE.md` |
+| `NU1903` | 44 | **known vulnerabilities** |
+| `CS8618` | 24 | non-nullable field uninitialised |
+| `CS1573`/`CS1591`/`CS1574`/`CS1570` | 46 | XML doc |
+| `CS8604`/`CS8602`/`CS8765`/`CS8625`/`CS8619` | 22 | nullability |
+
+**44 distinct CS sites, every one in a file this repository owns** — 22 in `src/InfoCarrier.Core`,
+1 in `src/InfoCarrier.Core.AspNetCore`, 21 in `test/`. **None is in an EF spec base class**, which
+is what makes a repo-wide `TreatWarningsAsErrors` reachable rather than aspirational.
+
+**Neither ratchet is affected.** `eng/ratchet.sh` gates the spec-test failure count and
+`eng/trim-ratchet.sh` gates ILLink `IL2xxx`, which the C# compiler never emits. There was no
+warning ratchet to replace.
+
+- [x] **M8-27. The two advisories are closed by a version floor, not by a suppression.**
+      `<this commit>`
+      `eng/measure.sh m8-27 j25`: `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` —
+      **0 fixed, 0 broken, `REASONS: unchanged`**. `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `InfoCarrier.Core.TransportTests`: **17 of 17** (run because the SQLite native package moved).
+      `NU1903` occurrences **44 → 0**.
+
+      **The brief said three advisories; the build emits nine**, all high — one SQLite and **eight**
+      against `System.Security.Cryptography.Xml`.
+
+      **Neither reaches a shipped product, and that was measured rather than assumed.**
+      `dotnet list package --vulnerable --include-transitive` reports `InfoCarrier.Core` and
+      `InfoCarrier.Core.AspNetCore` **clean**. `SQLitePCLRaw.lib.e_sqlite3` reaches
+      `Northwind.Server` and both test projects through `Microsoft.Data.Sqlite.Core`;
+      `System.Security.Cryptography.Xml` reaches **only** `InfoCarrier.Core.FunctionalTests`,
+      through `EFCore.SqlServer` → `Microsoft.Data.SqlClient`. That lowers the severity for a
+      consumer; it does not make the finding go away, and a fixed version exists for both.
+
+      Both are transitive-only, and `CentralPackageTransitivePinningEnabled` is already on, so a
+      `PackageVersion` floor is the whole fix. **The four `SQLitePCLRaw` packages are pinned as a
+      family** — `core`, `bundle_e_sqlite3`, `lib.e_sqlite3`, `provider.e_sqlite3` ship in lockstep,
+      and pinning the one the advisory names would leave the other three a version behind it.
+
+      **A double hyphen inside an XML comment cost one restore.** Writing *"a version floor rather
+      than a suppression -- nothing here is being accepted as a risk"* is invalid XML; it did not
+      report a malformed comment but `NU1010` against **every** `PackageReference` in the
+      repository, because the whole `Directory.Packages.props` stopped parsing. An error naming
+      thirty packages meant one punctuation mark.
