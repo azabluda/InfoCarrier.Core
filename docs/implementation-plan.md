@@ -1047,7 +1047,24 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
 
 ---
 
-## Phase L — what half (A) left behind
+## Phase L — PARKED
+
+> **Parked 2026-08-17. It is correct; its value is unquantified. Those are two statements and the
+> second is the one that parked it.**
+>
+> **Not in `v10-claude`** — it lives on `streaming/d7-half-a-parked` and nothing depends on it.
+>
+> What was measured: the suite is unmoved at every step (0 fixed / 0 broken against `j25`), trim
+> `OURS: 88 <= 88`, transport tests 18 of 18, and the wire genuinely streams. **What was never
+> measured: peak memory, payload size, time-to-first-byte, throughput.** Every benefit claim in the
+> step entries below is reasoning about the code, not a number — read them that way.
+> `roadmap.md`'s exit criterion (A) carries the full reckoning, the three measurements that would
+> settle it, and the permanent API cost.
+>
+> **Picking it up again costs a rebase, not a rewrite**: each commit is green against the same `j25`
+> baseline this milestone still uses. What follows is what half (A) left open, and it is accurate.
+
+## What half (A) left behind
 
 **D7 half (B) is unchanged in scope but better specified**, and the addition is not the hook
 lifetime it was already about. A streamed failure travels as a **trailing item**, and that is safe

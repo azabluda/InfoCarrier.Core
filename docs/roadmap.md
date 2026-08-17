@@ -379,14 +379,69 @@ Three separable pieces, and only the first can be done outside the library:
   longer gates a release.
 - Streaming results (requirements §4.4, wire-protocol W4). **Split in two by
   [`architecture.md`](architecture.md) §6a D7, and only the first half is in M8:**
-  - ~~**(A) Streaming the wire**~~ — **DONE (M8-23…M8-26, 2026-08-17).** The caller's API did not
-    change, as predicted. Two of D7's estimates did not survive contact and the corrections are in
-    that entry: **point 1 is `NoTracking`-only**, because the `ArrayList` was holding the query open
-    until the server's change tracker was complete and dropping it measured 20 broken; and **the
-    obstacle at point 2 was the two base64 layers rather than the `byte[]`**, so a query response
-    stopped being an envelope payload and `IInfoCarrierTransport` grew a second method. Proved by
-    `StreamingOverHttpTest`, which was itself falsified against a deliberately re-buffered wire
-    before being believed.
+  - **(A) Streaming the wire** — **BUILT AND PARKED 2026-08-17. Not in `v10-claude`; it lives on
+    the branch `streaming/d7-half-a-parked` and nothing downstream depends on it.**
+
+    **It is correct, and its value is unquantified. Those are two different statements and the
+    second is the one that parked it.**
+
+    **Proven, by measurement:** the suite is unmoved — `22658 / 22472 / 9 / 177`, 0 fixed and 0
+    broken against `j25` at each of five steps; trim `OURS: 88 <= 88`; transport tests 18 of 18; the
+    wire genuinely streams (`StreamingOverHttpTest`, falsified in both directions); the browser
+    hands back a live stream (headless Edge, three-arm probe); the base64 nesting is gone (the
+    payload assertion can now find a projected value in the raw body).
+
+    **NOT measured — asserted from reading the code, and recorded here so nobody inherits it as
+    fact:**
+
+    - **peak memory.** No before/after number exists at either end. D7's *"560 MB, held three times
+      over"* was C37 measuring a **result size**; it was never a measurement of this change.
+    - **payload size.** "~1.78×" is arithmetic — base64's 4/3 applied twice — and it ignores the
+      ~10 bytes per row the tagged array adds back. The two were never netted against a real body.
+    - **time-to-first-byte.** The mechanism is proven; the magnitude is unknown.
+    - **throughput or latency.** No benchmark was written.
+
+    So the cost is known (~**1,600 net lines** across `src`/`test`/`samples`, 983 in `src`, plus 425
+    of docs, and the permanent API surface below) and the benefit is not. **That asymmetry is the
+    reason to park, and it would equally be the reason not to un-park on enthusiasm.** Three
+    numbers would settle it: response bytes, peak working set at both ends, and time to first row,
+    each on the clean tip and on this branch, for one ordinary result and one deliberately large
+    one.
+
+    **One thing worth keeping straight if it is picked up:** *"it only helps `AsNoTracking`"* is not
+    what the gate does. Three of the four changes apply to every query — the node list, the base64
+    layers, incremental client decoding — and only *"do not drain EF first"* is `NoTracking`-gated.
+    That one costs **time-to-first-byte**, not whatever the memory win turns out to be, because the
+    `ArrayList` held references and a tracking query's entities are pinned by the change tracker
+    anyway.
+
+    **What it costs permanently, if it ever lands:** `IInfoCarrierTransport` gains a **required**
+    second method and `IInfoCarrierSerializer` a `Limits` member, so every transport implementer
+    must change; `QueryDataResult.Rows` becomes a **live sequence holding a server `DbContext`**,
+    which is a new hazard class (an abandoned enumeration pins a context, and inside a transaction a
+    connection); a failure after partial success becomes expressible on the wire; and the
+    `NoTracking` asymmetry is a subtle invariant that regressed once already.
+
+    **What is still ahead, beyond half (B):** the server still pulls rows out of EF with a
+    synchronous `foreach` over `IQueryable`, so a slow store blocks a thread per row. That is
+    independent of (B), cheaper than it, and unpriced.
+
+    **Three findings from it are worth more than the code and are why the branch is kept.**
+
+    1. **That `ArrayList` was load-bearing for something that read around it.** It held the query
+       open until the server's change tracker was complete; `ServerQueryExecutor`'s probes all read
+       the `IStateManager`, and under any identity-resolving behaviour that is only complete at the
+       end of the enumeration. Removing it measured **20 broken**, all `ManyToMany*`.
+    2. **The obstacle at point 2 was the nesting, not the `byte[]`** — rows were base64 inside
+       base64 inside JSON, and nothing streams through a layer that must be complete before the one
+       outside it.
+    3. **An instrument that cannot fail proves nothing**, three times in one sitting: the streaming
+       test passed against a deliberately re-buffered wire, the first browser discriminator
+       reported "NOT STREAMING" while measuring nothing, and the WebAssembly option key was nearly
+       confirmed from the wrong string heap. **And the browser premise in D7 is wrong on .NET 10** —
+       `HttpCompletionOption.ResponseHeadersRead` is what enables streaming there, not
+       `SetBrowserResponseStreamingEnabled`. That correction is true whether or not (A) is ever
+       taken.
   - **(B) `IAsyncEnumerable<T>` to the caller** — **deferred.** `ClientResultMaterializer` buffers
     *deliberately*: its `EntityMaterializer` hook is DI-scoped and saved/restored around the decode,
     so lazy yielding would let a nested lazy load clobber it. It also only ever applies to a
