@@ -887,3 +887,30 @@ button, and every claim below is about what happens when you press one.
       The sort is composed on `IQueryable<Order>` before `Skip`/`Take` for the reason M8-23 gives
       in full: `request.ApplySorting` would sort the client-only `OrderRow` and leave the `OrderBy`
       on the client side of the projection split.
+
+- [x] **M8-25. Transfer: a customer, not a primary key.** `<this commit>`
+      `eng/trim-ratchet.sh`: **`OURS: 88 <= 88`**, total 853. No spec-suite run: no `src/` or
+      `test/` code changed.
+
+      The dropdown offered `ALFKI`. It now offers *Alfreds Futterkiste*, with `OptionValue` keeping
+      the id as the bound value because that is what the foreign key needs. It also offers **all
+      65** ordered by company name, rather than the first twelve **by key** — two string columns
+      for 65 rows is nothing on the wire, and a list silently holding twelve of sixty-five was its
+      own small dishonesty about what the store contains.
+
+      **Driven in a real browser, both paths:**
+
+      | | Observed |
+      |---|---|
+      | Dropdown | 65 options, `Alfreds Futterkiste [ALFKI]` … `Wolski Zajazd`, ordered by name |
+      | Commit | picked *Berglunds snabbköp* **by name** → order 1 belongs to `BERGS`, stock 38 → 37 |
+      | Forced failure | store **unchanged** (`BERGS`, 37) — the rollback held |
+      | Wire shape | `🔓 BeginTransaction` → `Query` → `Query` → `💾 SaveChanges` → `💾 SaveChanges ⚠️ fault` → `↩️ RollbackTransaction` |
+      | W5 | the bar carries the server's chain, ending `FOREIGN KEY constraint failed` |
+
+      **A probe of mine was wrong before the page was**, which is the M8-23 lesson repeating:
+      `document.querySelector('fluent-message-bar')` returned `null` and briefly looked like a
+      page that had stopped reporting failures. `FluentMessageBar` renders as
+      **`div.fluent-messagebar`**, not as a custom element. The page was correct throughout; the
+      instrument was not. *Read what the instrument prints — and check the instrument before the
+      subject.*

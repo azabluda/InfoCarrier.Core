@@ -40,6 +40,13 @@ demonstrated — several quantity edits accumulate in one change tracker and lea
 `SaveChanges`. The master list is a projection over a join, so it shows *Alfreds Futterkiste* rather
 than `ALFKI` and the server does the joining.
 
+**Transfer** moves order 1 to another customer and takes a unit off a product's stock, both inside
+one transaction, and offers a tickbox that makes the second save fail on the *server's* database.
+You pick the new owner by company name; the id stays the bound value, because that is what the
+foreign key needs. Either way the panel shows the whole shape — `BeginTransaction`, the saves, then
+`Commit` or `Rollback` — and both figures are read back afterwards through a fresh context, so they
+are the server's answer rather than the local change tracker agreeing with itself.
+
 The store is seeded with **65 customers, 240 orders, 476 order lines, 30 products and 8
 categories** — enough that the grid pages properly and each page change is visibly its own query.
 The data is generated from row indices rather than from `Random`, so it is byte-identical on every

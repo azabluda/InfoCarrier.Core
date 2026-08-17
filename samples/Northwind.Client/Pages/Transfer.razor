@@ -17,7 +17,14 @@
 
 <div class="toolbar">
     <div class="field">
-        <FluentSelect TOption="string" Items="@_customerIds" @bind-Value="_target" Label="Move order 1 to" />
+        @*
+            A customer, not a primary key. The list offered `ALFKI`; nobody chooses a company that
+            way. OptionValue keeps the id as the bound value -- it is what the foreign key needs --
+            while OptionText is what a reader recognises.
+        *@
+        <FluentSelect TOption="CustomerOption" Items="@_customers"
+                      OptionValue="@(c => c.Id)" OptionText="@(c => c.Company)"
+                      @bind-Value="_target" Label="Move order 1 to" Style="min-width: 16rem;" />
     </div>
     <div class="field field-inline">
         <FluentCheckbox @bind-Value="_forceFailure" Label="Force a failure part-way" />
@@ -69,8 +76,12 @@ else if (_ok is { } ok)
     private const int OrderId = 1;
     private const int ProductId = 1;
 
+    // Client-only, and split like every other row type on these pages: the server is asked for two
+    // columns and the record is built here (ADR-010).
+    private sealed record CustomerOption(string Id, string Company);
+
     // Read from the store rather than hard-coded, so the list cannot drift from the seed.
-    private string[] _customerIds = [];
+    private List<CustomerOption> _customers = [];
 
     private string _target = "ANATR";
     private bool _forceFailure;
@@ -85,7 +96,13 @@ else if (_ok is { } ok)
         try
         {
             await using NorthwindContext context = await Contexts.CreateDbContextAsync();
-            _customerIds = await context.Customers.OrderBy(c => c.Id).Take(12).Select(c => c.Id).ToArrayAsync();
+            // All 65, ordered by the name they are shown under rather than by key. Two string
+            // columns for 65 rows is nothing on the wire, and a dropdown that silently held the
+            // first twelve keys was its own small dishonesty about what the store contains.
+            _customers = await context.Customers
+                .OrderBy(c => c.CompanyName)
+                .Select(c => new CustomerOption(c.Id, c.CompanyName))
+                .ToListAsync();
         }
         catch (Exception exception)
         {
