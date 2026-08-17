@@ -764,6 +764,30 @@ Measured one at a time, because a combined move cannot tell which base moved the
       (`ServerSaveChangesExecutor`, the `Deleted` pass), but EF sorts modification commands
       topologically itself, so tracking order is not what reaches the store.
 
+      **AND THE `PrincipalKey` HYPOTHESIS ABOVE WAS CHECKED AND DOES NOT HOLD. Read this before
+      re-deriving it.** Every reference-resolution path in `ServerSaveChangesExecutor` already
+      resolves through `foreignKey.PrincipalKey`, not through the primary key:
+
+      | Path | What it does |
+      |---|---|
+      | `PrincipalPropertyOf` | matches by **position** into `foreignKey.PrincipalKey.Properties` |
+      | the reference redirect | keys `qualifiedPlaceholders` on `(foreignKey.PrincipalKey.Properties[index], clientValue)` |
+      | the generated-key read-back | asks `PrincipalPropertyOf(fk, property)` for `ValueGenerated` |
+
+      The only `FindPrimaryKey()` in the file is inside an identity-conflict **diagnostic**, which
+      cannot cause a store error. So C76's fix is not incomplete here, and the defect is somewhere
+      else.
+
+      **Where to look next, and why.** The failing families are all `..._orphaned...`, and an
+      orphan is produced by **nulling** the dependent's foreign key — so `FOREIGN KEY constraint
+      failed` means the null did not reach the store and the row still points at a deleted
+      principal. The next probe is therefore about *values*, not about key identity: record the
+      `ChangeEntry` for the orphaned dependent and check whether the nulled FK travels as a null,
+      or is dropped as "unset" by the sentinel/`HasExplicitValue` logic in `ChangeEntryMapper` and
+      then never written. **A null that is indistinguishable from unset is a shape this file has
+      met before** — it is exactly what `SentinelProperties` exists for.
+      One filtered run with a recording decorator answers it.
+
       **The 5 that are not alternate-key are separate and small**:
       `Avoid_nulling_shared_FK_property_when_deleting` (×3) and
       `Save_two_entity_cycle_with_lazy_loading` (×2). Do not fold them in.
