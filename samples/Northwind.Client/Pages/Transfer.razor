@@ -177,8 +177,10 @@ else if (_ok is { } ok)
         {
             await using NorthwindContext context = await Contexts.CreateDbContextAsync();
 
-            _actualCustomer = (await context.Orders.SingleAsync(o => o.Id == OrderId)).CustomerId;
-            _actualStock = (await context.Products.SingleAsync(p => p.Id == ProductId)).UnitsInStock;
+            // AsNoTracking: this card claims to show the server's figures rather than the local
+            // change tracker agreeing with itself, and a no-tracking read makes that structural.
+            _actualCustomer = (await context.Orders.AsNoTracking().SingleAsync(o => o.Id == OrderId)).CustomerId;
+            _actualStock = (await context.Products.AsNoTracking().SingleAsync(p => p.Id == ProductId)).UnitsInStock;
         }
         catch (Exception exception)
         {

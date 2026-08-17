@@ -53,7 +53,10 @@ async Task RunAsync()
         {
             using var context = new NorthwindContext(options);
 
+            // AsNoTracking: these are printed and dropped. The behaviour travels in
+            // QueryDataRequest.TrackingBehavior, so the server marks the rows untracked too.
             List<Customer> customers = await context.Customers
+                .AsNoTracking()
                 .Where(c => c.Country == "Germany")
                 .OrderBy(c => c.Id)
                 .ToListAsync();
@@ -100,6 +103,8 @@ async Task RunAsync()
         {
             using var context = new NorthwindContext(options);
 
+            // Tracked: a lazy load needs the entity to carry a loader, and AsNoTracking here would
+            // not fail -- it would silently leave order.Customer null.
             Order order = await context.Orders.SingleAsync(o => o.Id == 1);
             Console.WriteLine($"      order {order.Id} loaded          (round trips so far: {counter.Requests})");
 

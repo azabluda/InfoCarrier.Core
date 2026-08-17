@@ -254,7 +254,8 @@
 
         await Guard(async () =>
         {
-            // No Include, and that is the whole point: what comes back is one order.
+            // No Include, and that is the whole point: what comes back is one order. Tracked,
+            // because the quantities are edited through this context and LoadAsync needs an entry.
             _order = await _context.Orders.SingleOrDefaultAsync(o => o.Id == orderId);
 
             if (_order is null)

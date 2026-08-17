@@ -914,3 +914,34 @@ button, and every claim below is about what happens when you press one.
       **`div.fluent-messagebar`**, not as a custom element. The page was correct throughout; the
       instrument was not. *Read what the instrument prints — and check the instrument before the
       subject.*
+
+- [x] **M8-26. `AsNoTracking` where it belongs, and only there.** `<this commit>`
+      `eng/trim-ratchet.sh`: **`OURS: 88 <= 88`**, total 853. No spec-suite run: samples only.
+
+      Every query in all four sample projects was classified. **Two qualified**; the rest either
+      cannot take it or would gain nothing.
+
+      | Site | Verdict |
+      |---|---|
+      | `Northwind.Demo` — German customers | **`AsNoTracking`** — entities printed and dropped |
+      | `Transfer.ReadBackAsync` — order + product | **`AsNoTracking`** — read-only, and it is part of the card's claim |
+      | `Northwind.Demo` — lazy-loading step | tracked; a loader only rides on a tracked entity |
+      | `Northwind.Demo` — unit-of-work lines | tracked; edited and saved |
+      | `OrderPage` detail | tracked; edited, saved, and `Entry(…).LoadAsync()` needs an entry |
+      | `Transfer.TransferAsync` — order + product | tracked; modified inside the transaction |
+      | `Customers`/`OrderPage` grids, `Transfer` dropdown | projections to client-only records — **no entity is tracked in the first place**, so it would be noise |
+      | `CountAsync` calls | scalar |
+
+      **It is not a client-side nicety in this provider.** `QueryExecutor.TrackingBehaviorFinder`
+      lifts the marker out of the tree and it travels in `QueryDataRequest.TrackingBehavior`, so
+      the *server* marks the rows untracked too and `ClientResultMaterializer` skips identity
+      resolution. `QuerySplitter` already carries `AsNoTracking` in its `QueryMarkers` set.
+
+      **The dangerous one is the lazy-loading step, and it is dangerous because it does not
+      throw.** `AsNoTracking` there would leave `order.Customer` `null` and print an empty name —
+      a silent wrong answer, which is the shape this repository keeps paying for.
+
+      Verified by running both clients: the console demo prints the same 8 German customers and
+      still resolves `order.Customer` in one extra round trip, 14 round trips total and unchanged;
+      the Transfer page read `ALFKI`/34 → committed `BERGS`/33 → forced a failure and stayed
+      `BERGS`/33.
