@@ -155,9 +155,19 @@ mode.
 drifted out of sync with git once already (F1–F7 were committed while still shown unchecked).
 One substep per commit, message prefixed `Step <id>:`.
 
-**EF1001 warnings are expected and allowed.** This provider legitimately depends on EF Core
-internals (`IStateManager`, `EntityQueryable<>`, `InternalEntityEntry`). Do not suppress them
-repo-wide and do not refactor to avoid them — but do prefer public API where one exists.
+**EF1001 usage is expected and allowed; the warning is suppressed per file, EF's own way.** This
+provider legitimately depends on EF Core internals (`IStateManager`, `EntityQueryable<>`,
+`InternalEntityEntry`). Do not refactor to avoid them — but do prefer public API where one exists.
+
+The 19 files that use internals carry a **file-scoped** `#pragma warning disable EF1001` under a
+two-line comment naming the reason. That is what EF Core's own providers do and it was checked
+before it was copied: `subrepos/efcore` has **51 files** with `#pragma warning disable EF1001`
+across eight projects (21 in `EFCore.Relational` alone), some file-scoped and some in narrow
+pairs, and **no `NoWarn` for EF1001 anywhere in the repository**.
+
+**Do not add `NoWarn=EF1001`** to a project or to `Directory.Build.props`. The pragma is per file
+on purpose: a *new* file that reaches for an internal API still warns, which is the tripwire that
+keeps "prefer public API where one exists" enforceable. A `NoWarn` would remove it silently.
 
 **Do not add a NuGet dependency on Remote.Linq or Aqua** (ADR-001). They are specification
 material only.

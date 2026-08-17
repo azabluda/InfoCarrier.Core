@@ -1035,3 +1035,31 @@ warning ratchet to replace.
       **The product fix is the one worth keeping.** Two warnings that looked like two sites were one
       missing annotation on a contract, and the `!` operators around them were hiding it rather than
       documenting it. `= null!` was not used anywhere.
+
+- [x] **M8-30. `EF1001`: EF's own answer, checked before it was copied. The build is CLEAN.**
+      `<this commit>`
+      `eng/measure.sh m8-30 m8-29`: `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` —
+      **0 fixed, 0 broken, `REASONS: unchanged`**. `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      **`dotnet build InfoCarrier.Core.slnx` now reports `0 Warning(s), 0 Error(s)`.**
+
+      **What other providers do, read out of `subrepos/efcore` rather than recalled.** EF Core's own
+      providers use **`#pragma warning disable EF1001`** at the point of use, under the comment
+      *"Internal EF Core API usage."*: **51 files across eight projects** — `EFCore.Relational` 21,
+      `EFCore.SqlServer` 10, `EFCore.Cosmos` 7, `EFCore.Sqlite.Core` 6, `EFCore.InMemory` 3,
+      `EFCore` 2, plus `Sqlite.NTS` and `Proxies`. Both granularities appear: a single file-scoped
+      `disable` where a file's whole job is internal work, narrow `disable`/`restore` pairs for
+      isolated sites. **There is no `NoWarn` for `EF1001` anywhere in EF Core's repository.**
+
+      This repository had **122 sites in 19 files**, and the dense ones are dense —
+      `ClientResultMaterializer` 29, `ServerQueryExecutor` 16, `InfoCarrierDatabase` 8 — so the
+      file-scoped form is the one that matches. Each of the 19 gets one pragma under a two-line
+      comment naming the reason.
+
+      **Per file rather than `NoWarn`, and the difference is the whole point.** A `NoWarn` in
+      `Directory.Build.props` would be one line and would also silence the *next* file that reaches
+      for an internal API. The pragma leaves that tripwire armed, which is what keeps `CLAUDE.md`'s
+      "prefer public API where one exists" enforceable rather than aspirational.
+
+      **`CLAUDE.md`'s guardrail is rewritten in this commit**, because the old wording —
+      *"Do not suppress them repo-wide"* — read against a build that now shows none of them would
+      have looked like a rule that had been quietly broken.

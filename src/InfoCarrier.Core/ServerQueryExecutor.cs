@@ -12,6 +12,10 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Update;
 
+// Internal EF Core API usage. This provider is built on EF Core internals by design
+// (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
+#pragma warning disable EF1001
+
 namespace InfoCarrier.Core;
 
 /// <summary>
