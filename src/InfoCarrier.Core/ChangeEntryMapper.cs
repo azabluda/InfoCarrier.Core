@@ -111,7 +111,27 @@ public static class ChangeEntryMapper
                     Expressions.PrimitiveCoercion.WireType(property)),
             });
 
-            if (carriesOriginals && property.IsConcurrencyToken)
+            // A foreign key's original as well as a concurrency token's, and for a different
+            // consumer: **EF's command ordering**, not the concurrency check (J11).
+            //
+            // `CommandBatchPreparer` builds its dependency graph from *original* foreign-key
+            // values, because that is what says a dependent is **releasing** a principal. The
+            // server rebuilds an entity from current values, attaches it and sets `Modified`,
+            // which snapshots originals from the entity — so without this every original equals
+            // its current value, an orphaned dependent looks like one that never had a parent,
+            // nothing orders its `UPDATE` before the principal's `DELETE`, and the store refuses
+            // the delete. Measured as **165 `FOREIGN KEY constraint failed`** the moment
+            // `ProxyGraphUpdates` reached a store that enforces them (J3); Tier A cannot show it,
+            // and a single-context EF never loses the originals in the first place.
+            //
+            // `Modified` only, and foreign keys only. C42 measured the symmetric temptation —
+            // sending every propagated foreign key *back* — at **1 fixed, 2 broken**, and the rule
+            // it established holds in this direction too: send what the other side cannot derive,
+            // and nothing else. A `Deleted` entry needs no ordering hint, because the row it
+            // releases is the one being deleted.
+            if (carriesOriginals
+                && (property.IsConcurrencyToken
+                    || (entry.EntityState == EntityState.Modified && property.IsForeignKey())))
             {
                 // The value the check is made against. Only the token's original matters: the
                 // server rebuilds the entity from the *current* values, attaches it and sets

@@ -867,7 +867,25 @@ Measured one at a time, because a combined move cannot tell which base moved the
         at 1 fixed / 2 broken; the symmetric temptation here is to send every original. Send
         exactly the foreign-key properties, and only for `Modified` entries.
 
-      **The one thing still unexplained, and it is the check on any fix**: why the *primary-key*
+      ## DONE `<this commit>` — 167 fixed, 0 broken, `182 -> 15`
+
+      `Total tests: 22672, Passed: 22486, Failed: 15, Skipped: 171` (`j11`). **`ProxyGraphUpdates`
+      is GREEN**, and J3's deliberate rise of 165 is repaid with two to spare. One line in
+      `ChangeEntryMapper`: a `Modified` entry now carries the originals of its **foreign-key**
+      properties as well as its concurrency tokens.
+
+      **The alternate-key correlation was a red herring, and the measurement says so.** All five
+      non-alternate-key failures — `Avoid_nulling_shared_FK_property_when_deleting` ×3 and
+      `Save_two_entity_cycle_with_lazy_loading` ×2 — closed too. So it was **one cause with 167
+      faces**, not 162 plus 5, and the name-grouping that narrowed the search also over-narrowed the
+      conclusion. Grouping by name is how to find a defect; only the fix says how far it reached.
+
+      **The residual question below is now answered as far as it needs to be.** Why the
+      primary-key variants passed *before* is still not fully explained — but `BROKEN: 0` across
+      22,672 tests establishes the fix is general and costs nothing, which is what the question was
+      guarding against.
+
+      **      **The one thing still unexplained, and it is the check on any fix**: why the *primary-key*
       variants of these same tests pass. The mechanism above is not specific to alternate keys, so
       either those pass for an unrelated reason — a plausible candidate is that EF declares
       `ON DELETE SET NULL` for the simple optional FK and SQLite then repairs it whatever the order

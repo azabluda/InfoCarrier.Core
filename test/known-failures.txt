@@ -189,5 +189,14 @@
 # requires. Filed as J11. GraphUpdatesInfoCarrierTest (1787 tests) is still Tier A, so this family
 # has never run against a store that enforces foreign keys at all. Reverting is three edits if the
 # rise is judged too large to hold. 22672 / 22319 / 182 / 171 (`j3b`).
-failed=182
+# 2026-08-17 (J11) - 182 -> 15, and J3's rise of 165 is repaid with 2 to spare. ProxyGraphUpdates
+# is GREEN. 167 fixed, 0 broken, one cause: original foreign-key values never reached the server.
+# ChangeEntryMapper sent originals for concurrency tokens only -- correct for the concurrency check
+# and wrong for EF's command ordering, which builds its dependency graph from ORIGINAL foreign-key
+# values because that is what says a dependent is releasing a principal. The server attaches an
+# entity from current values and sets Modified, which snapshots originals from the entity, so an
+# orphaned dependent looked like one that never had a parent, nothing ordered its UPDATE before the
+# principal's DELETE, and the store refused the delete. Only two contexts against a store that
+# enforces constraints can lose this. 22672 / 22486 / 15 / 171 (`j11`).
+failed=15
 total=22672
