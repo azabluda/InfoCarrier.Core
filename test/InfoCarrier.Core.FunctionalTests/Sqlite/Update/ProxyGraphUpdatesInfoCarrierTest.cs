@@ -2,21 +2,16 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
-// A skipped override of an inherited `[ConditionalTheory]` supplies no data of its own, and the
-// analyzer cannot see that the base still does. EF's own ProxyGraphUpdatesInMemoryTest carries the
-// same overrides and suppresses this in its project file.
-#pragma warning disable xUnit1003
-
-namespace InfoCarrier.Core.FunctionalTests.InMemory.Update;
+namespace InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 
 /// <summary>
-///     <c>ProxyGraphUpdatesTestBase</c> on ADR-009 Tier A, in all three proxy flavours.
+///     <c>ProxyGraphUpdatesTestBase</c> on ADR-009 Tier B, in all three proxy flavours.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -29,9 +24,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Update;
 ///         the saving half; this is the only place they meet.
 ///     </para>
 ///     <para>
-///         Structure and skips are EF's own <c>ProxyGraphUpdatesInMemoryTest</c>, one for one:
-///         the FK-constraint and cascade-delete skips are InMemory's limits (issues #2166 and
-///         #3924), and the backing store is InMemory.
+///         <b>Tier B, and it was Tier A until J3.</b> Tier A brought <b>thirteen</b> skips with it,
+///         structured after EF's <c>ProxyGraphUpdatesInMemoryTest</c>, and every one is a statement
+///         about the InMemory store rather than about proxies: foreign-key constraint checking
+///         (issue #2166) and cascade delete (issue #3924). <c>ProxyGraphUpdatesSqliteTest</c> skips
+///         <b>none</b> of them. Since the corpus is *reparenting, severing and cascading a graph*,
+///         cascade delete is not incidental to it — it is most of the subject, and it was untested
+///         here.
 ///     </para>
 /// </remarks>
 public class ProxyGraphUpdatesInfoCarrierTest
@@ -40,98 +39,28 @@ public class ProxyGraphUpdatesInfoCarrierTest
         : ProxyGraphUpdatesTestBase<TFixture>(fixture)
         where TFixture : ProxyGraphUpdatesInfoCarrierTestBase<TFixture>.ProxyGraphUpdatesInfoCarrierFixtureBase, new()
     {
-        [ConditionalFact(Skip = "FK constraint checking. Issue #2166")]
-        public override Task Optional_one_to_one_relationships_are_one_to_one()
-            => base.Optional_one_to_one_relationships_are_one_to_one();
-
-        [ConditionalFact(Skip = "FK constraint checking. Issue #2166")]
-        public override Task Optional_one_to_one_with_AK_relationships_are_one_to_one()
-            => base.Optional_one_to_one_with_AK_relationships_are_one_to_one();
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Optional_many_to_one_dependents_with_alternate_key_are_orphaned_in_store(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Optional_many_to_one_dependents_with_alternate_key_are_orphaned_in_store(
-                cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Optional_many_to_one_dependents_are_orphaned_in_store(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Optional_many_to_one_dependents_are_orphaned_in_store(cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_one_to_one_are_cascade_detached_when_Added(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_one_to_one_are_cascade_detached_when_Added(cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalFact(Skip = "FK constraint checking. Issue #2166")]
-        public override Task Required_one_to_one_relationships_are_one_to_one()
-            => base.Required_one_to_one_relationships_are_one_to_one();
-
-        [ConditionalFact(Skip = "FK constraint checking. Issue #2166")]
-        public override Task Required_one_to_one_with_AK_relationships_are_one_to_one()
-            => base.Required_one_to_one_with_AK_relationships_are_one_to_one();
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_one_to_one_with_alternate_key_are_cascade_detached_when_Added(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_one_to_one_with_alternate_key_are_cascade_detached_when_Added(
-                cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_one_to_one_with_alternate_key_are_cascade_deleted_in_store(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_one_to_one_with_alternate_key_are_cascade_deleted_in_store(
-                cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_many_to_one_dependents_are_cascade_deleted_in_store(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_many_to_one_dependents_are_cascade_deleted_in_store(
-                cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_many_to_one_dependents_with_alternate_key_are_cascade_deleted_in_store(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_many_to_one_dependents_with_alternate_key_are_cascade_deleted_in_store(
-                cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_non_PK_one_to_one_are_cascade_detached_when_Added(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_non_PK_one_to_one_are_cascade_detached_when_Added(cascadeDeleteTiming, deleteOrphansTiming);
-
-        [ConditionalTheory(Skip = "Cascade delete. Issue #3924")]
-        public override Task Required_non_PK_one_to_one_with_alternate_key_are_cascade_detached_when_Added(
-            CascadeTiming cascadeDeleteTiming,
-            CascadeTiming deleteOrphansTiming)
-            => base.Required_non_PK_one_to_one_with_alternate_key_are_cascade_detached_when_Added(
-                cascadeDeleteTiming, deleteOrphansTiming);
-
         /// <inheritdoc />
         /// <remarks>
-        ///     The InMemory store has no transaction to roll back, so the data goes back by hand —
-        ///     EF's own InMemory base does the same, and so does `GraphUpdatesInfoCarrierTest`.
+        ///     <para>
+        ///         The base opens a transaction on one context and hands every <em>other</em>
+        ///         context to this hook to enlist in it. Relational suites do that with
+        ///         <c>transaction.GetDbTransaction()</c>, which ADR-013 puts out of reach; the
+        ///         InfoCarrier equivalent shares the server's W3 token instead, and the result is
+        ///         explicitly not owned — ending it detaches this context and leaves the
+        ///         transaction to whoever began it.
+        ///     </para>
+        ///     <para>
+        ///         <b>Without this the whole class deadlocks itself.</b> J3's first attempt moved
+        ///         the store and not this hook: the inner contexts ran outside the transaction, the
+        ///         outer one held SQLite's write lock, and 471 of 653 failures were
+        ///         <c>SQLite Error 5: 'database is locked'</c>, each after a 30-second timeout.
+        ///         <c>ConferencePlannerInfoCarrierTest</c> and
+        ///         <c>OptimisticConcurrencyInfoCarrierTest</c> already carried this hook for the
+        ///         same reason, and its comment there names the same symptom.
+        ///     </para>
         /// </remarks>
-        protected override async Task ExecuteWithStrategyInTransactionAsync(
-            Func<DbContext, Task> testOperation,
-            Func<DbContext, Task>? nestedTestOperation1 = null,
-            Func<DbContext, Task>? nestedTestOperation2 = null,
-            Func<DbContext, Task>? nestedTestOperation3 = null)
-        {
-            await base.ExecuteWithStrategyInTransactionAsync(
-                testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
-
-            await Fixture.ReseedAsync();
-        }
+        protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+            => facade.UseInfoCarrierTransaction(transaction);
 
         public abstract class ProxyGraphUpdatesInfoCarrierFixtureBase : ProxyGraphUpdatesFixtureBase
         {
@@ -153,7 +82,7 @@ public class ProxyGraphUpdatesInfoCarrierTest
 
             protected override ITestStoreFactory TestStoreFactory
                 => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                    InfoCarrierTestStoreFactory.InMemory,
+                    InfoCarrierTestStoreFactory.Sqlite,
                     ContextType,
                     (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                     onAddOptions: AddProxyOptions,

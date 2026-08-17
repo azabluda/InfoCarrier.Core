@@ -435,30 +435,39 @@ context enlist through `UseTransaction`. Relational suites do that with
 `ProxyGraphUpdates` cannot move to Tier B — 653 failures, 471 of them
 `SQLite Error 5: 'database is locked'`, each waiting out a 30-second lock timeout.
 
-**What is missing is one client-side API** — something like
-`Database.UseInfoCarrierTransaction(token)`. **No protocol change is needed**:
-`IInfoCarrierClient.BeginTransactionAsync` already returns the token, and every request record
-already carries `TransactionId`.
+**CORRECTED 2026-08-17, and the correction is the whole entry.** This said *"what is missing is one
+client-side API"*. **Nothing was missing.** `InfoCarrierDatabaseFacadeExtensions.UseInfoCarrierTransaction`
+and `InfoCarrierTransactionManager.UseTransaction(token)` have both shipped since M4, complete with
+the non-owning semantics this question worried about — `InfoCarrierTransaction` takes
+`owned: false`, and its `CommitAsync`/`RollbackAsync` check that flag before touching the server, so
+a joining context detaches instead of ending someone else's transaction.
 
-**The security objection does not survive checking, and that is the finding.** M8's roadmap note
-records that the envelope carries no caller identity, so *"any caller who knows a token can join
-the transaction"*. That is true — and it is true **today, without this API**.
+**What was actually missing was the test class's `UseTransaction` override**, which
+`ConferencePlannerInfoCarrierTest` and `OptimisticConcurrencyInfoCarrierTest` have both carried for
+some time — and the comment on the first of them names the exact symptom J3 produced: *"Without
+enlisting, the second runs on its own SQLite connection and gets 'database is locked'."* The
+evidence was in the repository the whole time, one grep away.
+
+**The lesson is the one this repo keeps relearning, in a new place.** J3 read 653 failures of one
+mechanism and concluded a product feature was absent, without checking whether the feature existed.
+That is the same shape as C58 ("a remedy priced as expensive when the price was for the route") and
+as B3d/C10's *"626 + 322 lines"* — **before pricing a gap, check whether a sibling of it already
+works.** Two classes in the same suite already did this.
+
+**The security objection does not survive checking either.** M8's roadmap note records that the
+envelope carries no caller identity, so *"any caller who knows a token can join the transaction"*.
+That is true — and it is true **today, and was true before this API existed**.
 `InProcessInfoCarrierServer.Acquire` runs *any* request that names a token on that transaction's
-context, and every request type carries the field. So the exposure is a property of the existing
-wire protocol, not of the proposed API: **shipping `UseInfoCarrierTransaction` widens nothing.**
-Binding a token to its creator remains worth doing, and it is M8's item, independent of this one.
+context, and every request type carries the field. So the exposure is a property of the wire
+protocol, not of `UseInfoCarrierTransaction`. Binding a token to its creator remains worth doing,
+and it is M8's item, independent of this one.
 
-**The real design questions are the two this does not answer:**
+**Both design questions this entry raised were already answered in the shipped code**, which is
+consistent with the correction above: a joined transaction is non-owning, so it neither commits nor
+rolls back on dispose, and two contexts hold two `InfoCarrierTransaction` objects over one token
+with only the owner able to end it.
 
-- **What does a joining context do on dispose?** EF's semantics for an enlisted context are "the
-  transaction is not mine" — the joiner must not commit or roll back. The token makes ownership
-  expressible, so this is decidable rather than deep.
-- **Is a client transaction object shared or duplicated?** Two contexts holding two
-  `InfoCarrierTransaction` instances over one server token would each answer `SupportsSavepoints`
-  and each try to end it. The cheap answer is that a joined transaction is explicitly non-owning.
-
-**Estimated small, and deliberately not started**, because J3 is the only thing waiting on it and
-J3 is not on M9's exit criteria.
+**Closed by plan J3 (2026-08-17).** Nothing was built for it.
 
 ### D4 — chained InfoCarrier: a server whose own `DbContext` is an InfoCarrier client
 

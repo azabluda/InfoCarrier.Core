@@ -699,9 +699,45 @@ Measured one at a time, because a combined move cannot tell which base moved the
       starting:** `BuiltInDataTypesSqliteTest` is **2201 lines**, so the adoption surface is large
       even though most of it is `AssertSql` this provider cannot use. Worth doing, worth doing on
       its own, and worth measuring in halves.
-- [ ] **J3. `ProxyGraphUpdates` to Tier B — ATTEMPTED, REVERTED, BLOCKED.** `<this commit>`
-      **Not a tier move. It needs a product feature that does not exist**, and the skip census gave
-      no hint of it — which is the transferable part.
+- [x] **J3. `ProxyGraphUpdates` to Tier B — DONE on the second attempt.** `<this commit>`
+      `Total tests: 22672, Passed: 22319, Failed: 182, Skipped: 171` (`j3b`) against
+      `22456 / 22229 / 17 / 210` (`j10`). **A deliberate rise of 165, and the largest this file has
+      recorded since L1** — which is the right comparison, because it is the same kind: skipped
+      tests becoming real ones.
+
+      **The first attempt's diagnosis was wrong, and finding out cost nothing but a grep.** It
+      concluded a product feature was missing. **Nothing was missing.**
+      `UseInfoCarrierTransaction` and the non-owning `UseTransaction(token)` have shipped since M4.
+      What was missing was this class's **`UseTransaction` override** — which
+      `ConferencePlannerInfoCarrierTest` and `OptimisticConcurrencyInfoCarrierTest` already carry,
+      and whose comment on the first names the exact symptom: *"Without enlisting, the second runs
+      on its own SQLite connection and gets 'database is locked'."* **Before pricing a gap, check
+      whether a sibling of it already works** — two classes in this same suite did.
+
+      With the hook in place the deadlock is gone completely: **0 `database is locked`**, and the
+      run takes **5.6 minutes** instead of the two hours the first attempt was still short of.
+
+      **What the move bought and what it cost.** `skipped` 210 → 171 (the 13 skips × 3 flavours),
+      `total` 22456 → 22672 (those 39 becoming 216 real parameterizations), `passed` +90.
+      **165 fail, and they are one defect with 165 faces**: every single one is
+      `SQLite Error 19: 'FOREIGN KEY constraint failed'`, spread 56 / 56 / 55 across the three
+      proxy flavours. That is precisely what the deleted skips were about — EF's #2166 (FK
+      constraint checking) and #3924 (cascade delete) are InMemory *not enforcing* either. On a
+      store that enforces both, this provider's `SaveChanges` replay does not order or propagate
+      deletes the way a relational store requires.
+
+      **This is a large, previously invisible area, not a regression.** `GraphUpdatesInfoCarrierTest`
+      — the non-proxy corpus, 1787 tests — is still Tier A, so the whole `GraphUpdates` family has
+      never once run against a store that enforces foreign keys. Filed as J11.
+
+      **If this rise is judged too large to hold, reverting is three edits** (store factory, the
+      thirteen skips, the `UseTransaction` override) and the base returns to Tier A with EF's own
+      mirrored skips — which is an adoption choice, not the test-suppression CLAUDE.md forbids.
+
+- [ ] **J11. Cascade delete and foreign-key ordering in the SaveChanges replay.**
+      The 165. One message, one cause. Start by asking whether the server replays deletes in
+      dependency order at all, and whether a cascade the *client* decided is re-derived on the
+      server or expected to travel.
 
       The move itself was the same three lines as J1 and J2: store factory to `Sqlite`, delete the
       thirteen skips, keep the by-hand reseed. The run was stopped at **21,289 of 22,453** after

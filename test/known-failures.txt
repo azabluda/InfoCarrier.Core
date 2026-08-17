@@ -180,5 +180,14 @@
 # supplied. The "(object)new ValueTuple<...>" in EF's message is EF's own rendering of a key it
 # could not decompose -- nobody boxed anything, and all four wire stages print a clean tree.
 # 22456 / 22229 / 17 / 210 (`j10`).
-failed=17
-total=22456
+# 2026-08-17 (J3) - 17 -> 182 and `total` 22456 -> 22672. A DELIBERATE RISE, the largest since L1
+# and the same kind: 39 skipped tests become 216 real ones. ProxyGraphUpdates moved to Tier B. Its
+# 13 skips were EF InMemory NOT ENFORCING foreign keys (#2166) or cascade delete (#3924);
+# ProxyGraphUpdatesSqliteTest skips none of them. All 165 new failures are one message and one
+# cause -- SQLite Error 19: FOREIGN KEY constraint failed -- spread 56/56/55 across the three proxy
+# flavours, so the SaveChanges replay does not order or propagate deletes as a relational store
+# requires. Filed as J11. GraphUpdatesInfoCarrierTest (1787 tests) is still Tier A, so this family
+# has never run against a store that enforces foreign keys at all. Reverting is three edits if the
+# rise is judged too large to hold. 22672 / 22319 / 182 / 171 (`j3b`).
+failed=182
+total=22672
