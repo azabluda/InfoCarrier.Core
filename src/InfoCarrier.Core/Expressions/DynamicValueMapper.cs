@@ -405,8 +405,23 @@ public class DynamicValueMapper(
             };
         }
 
-        // Collection / array.
-        if (value is IEnumerable enumerable && value is not string)
+        // A grouping is a key *and* a sequence, so the collection branch below would carry the
+        // sequence and silently lose the key. Projected into this provider's own
+        // `WireGrouping<,>` and then walked as an ordinary object shape — which keeps EF's
+        // internal `InternalGrouping` off `TypeAllowlist`, where an EF internal type has no
+        // business being (M9 J8). `IGrouping<,>` itself was always admitted; the concrete type
+        // was the refusal.
+        if (WireGrouping.TryWrap(value, out object? asGrouping, out Type? groupingType))
+        {
+            value = asGrouping!;
+            type = groupingType!;
+            typeNode = _typeMapper.ToTypeNode(type);
+        }
+
+        // Collection / array. `WireGrouping<,>` is excluded because it *is* enumerable and would
+        // otherwise be claimed here, losing the key it exists to carry — the same hazard that made
+        // `EnumerableClassKey` walk as a collection and throw (J9), met deliberately this time.
+        if (value is IEnumerable enumerable && value is not string && !WireGrouping.Is(type))
         {
             var items = new List<DynamicValueNode>();
             Type elementType = GetElementType(type);

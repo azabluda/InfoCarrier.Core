@@ -71,6 +71,13 @@ public sealed class TypeAllowlist
         typeof(HashSet<>), typeof(ISet<>), typeof(IReadOnlySet<>), typeof(SortedSet<>),
         typeof(Dictionary<,>), typeof(IDictionary<,>), typeof(IReadOnlyDictionary<,>),
         typeof(KeyValuePair<,>), typeof(IGrouping<,>), typeof(ILookup<,>),
+
+        // This provider's own grouping (M9 J8). Admitting it is what keeps EF's internal
+        // `GroupBySingleQueryingEnumerable+InternalGrouping` OUT of this list: the server projects
+        // into `WireGrouping<,>` and only that name ever crosses. An EF internal type in an
+        // ADR-008 constraint 2 allowlist would widen the conjunction `security-review.md` §2
+        // describes; a public type of ours does not.
+        typeof(WireGrouping<,>),
         typeof(ReadOnlyCollection<>), typeof(Collection<>),
         typeof(ImmutableArray<>), typeof(ImmutableList<>), typeof(ImmutableHashSet<>),
         typeof(ImmutableSortedSet<>), typeof(IImmutableSet<>), typeof(IImmutableList<>),
