@@ -256,6 +256,38 @@ code {
 }
 
 /*
+ * Master-detail. A grid rather than two flex children, for the same reason the shell is one: the
+ * list must hold its width while the detail takes what is left, and a flex row lets a long company
+ * name push the list wider. It collapses to one column when the content area is narrow.
+ */
+.master-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 1500px) {
+    .master-detail {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.master-detail > .grid-wrap {
+    margin-top: 1rem;
+}
+
+.md-detail > .card:first-child {
+    margin-top: 1rem;
+}
+
+/* The selected row. Fluent's own hover styling stays; this only marks the current one. */
+.master-detail .row-selected {
+    background: var(--neutral-fill-secondary-rest, rgba(128, 128, 128, 0.1));
+    box-shadow: inset 3px 0 0 0 var(--accent-fill-rest);
+}
+
+/*
  * One chip per active column filter, in the grid's footer. ColumnBase.Filtered renders nothing in
  * Fluent UI 4.14.4 -- measured, not assumed -- so this is the only thing telling a reader that the
  * 65 rows have become 8 on purpose. Clicking a chip clears that filter.

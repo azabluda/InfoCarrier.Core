@@ -32,6 +32,14 @@ Each active filter shows as a chip in the grid footer that clears it. That is th
 control rather than the grid's: `ColumnBase.Filtered` renders nothing in Fluent UI 4.14.4, so
 without it an active filter is invisible and the item count is the only clue.
 
+**Order** is a master-detail screen: a paged, sortable grid of orders on the left, the selected
+order's detail on the right. It runs **two** `DbContext`s on purpose. The grid takes a fresh one per
+page, because a grid provider may ask again before the last answer lands and a `DbContext` is not
+thread-safe; the detail keeps one per selected order, because the unit of work is the thing being
+demonstrated — several quantity edits accumulate in one change tracker and leave as **one**
+`SaveChanges`. The master list is a projection over a join, so it shows *Alfreds Futterkiste* rather
+than `ALFKI` and the server does the joining.
+
 The store is seeded with **65 customers, 240 orders, 476 order lines, 30 products and 8
 categories** — enough that the grid pages properly and each page change is visibly its own query.
 The data is generated from row indices rather than from `Random`, so it is byte-identical on every

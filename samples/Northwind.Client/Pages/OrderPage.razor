@@ -10,137 +10,234 @@
 <h1>🧾 One order, one unit of work</h1>
 
 <p class="page-lede">
-    The query asks for an order and nothing else. Its <code>Customer</code> and its lines are
-    <em>not</em> loaded until you ask for them, which costs a round trip each. Then edit as many
-    quantities as you like and save: <strong>one</strong> <code>SaveChanges</code> carries all of
-    them, because one context has been tracking them the whole time.
+    Pick an order on the left. The query asks for that order and nothing else &mdash; its
+    <code>Customer</code> and its lines are <em>not</em> loaded until you ask for them, which costs
+    a round trip each. Then edit as many quantities as you like and save: <strong>one</strong>
+    <code>SaveChanges</code> carries all of them, because one context has been tracking them the
+    whole time.
 </p>
-
-<p class="page-note">
-    The loads here are <code>LoadAsync</code> rather than a bare <code>order.Customer</code>, and in
-    a browser that is forced: a navigation getter is synchronous, so automatic lazy loading would
-    have to block on the round trip, and a single-threaded WebAssembly runtime cannot block. This
-    client therefore does not enable lazy-loading proxies at all, so an unloaded navigation is
-    simply <code>null</code>. The server does enable them; it is not a browser.
-</p>
-
-<div class="toolbar">
-    <div class="field">
-        <FluentNumberField @bind-Value="_orderId" Label="Order id" Min="1" Max="@NorthwindSeed.OrderCount.ToString()" Style="width: 7rem;" />
-    </div>
-    <FluentButton Appearance="Appearance.Accent" OnClick="LoadAsync">Load order</FluentButton>
-    <span class="toolbar-spacer"></span>
-    <span class="toolbar-note">@Log.Sequence round trips so far</span>
-</div>
 
 @if (_error is { } error)
 {
     <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
 }
 
-@if (_order is { } order)
-{
-    <div class="card-row">
-        <div class="card">
-            <p class="card-title">📋 Order @order.Id</p>
+<div class="master-detail">
+    @*
+        The master. Its own server-side paging, exactly like the Customers grid: 240 orders do not
+        arrive so that the browser can show twelve of them.
+    *@
+    <div class="grid-wrap">
+        <FluentDataGrid ItemsProvider="@LoadPageAsync" TGridItem="OrderRow" Pagination="@_pagination"
+                        GridTemplateColumns="0.7fr 1.8fr 1fr" ShowHover="true"
+                        OnRowClick="@OnRowClickAsync"
+                        RowClass="@(row => row.Id == _selectedId ? "row-selected" : null)">
+            <PropertyColumn Property="@(r => r.Id)" Title="Order" Sortable="true" IsDefaultSortColumn="true" />
+            <PropertyColumn Property="@(r => r.Company)" Title="Customer" Sortable="true" />
+            <PropertyColumn Property="@(r => r.Placed)" Title="Placed" Format="yyyy-MM-dd" Sortable="true" />
+        </FluentDataGrid>
 
-            <div class="kv">
-                <span class="kv-key">Placed</span>
-                <span class="kv-value">@order.OrderDate.ToString("yyyy-MM-dd")</span>
-            </div>
-            <div class="kv">
-                <span class="kv-key">Customer id</span>
-                <span class="kv-value">@order.CustomerId</span>
-            </div>
-            <div class="kv">
-                <span class="kv-key">Customer</span>
-                @if (_customerText is { } customerText)
-                {
-                    <span class="kv-value">@customerText</span>
-                }
-                else
-                {
-                    <FluentButton OnClick="TouchCustomer">not loaded &mdash; load it</FluentButton>
-                }
-            </div>
-            <div class="kv">
-                <span class="kv-key">Lines</span>
-                @if (_lines is { } loaded)
-                {
-                    <span class="kv-value">@loaded.Count loaded</span>
-                }
-                else
-                {
-                    <FluentButton OnClick="TouchLines">not loaded &mdash; load them</FluentButton>
-                }
-            </div>
+        <div class="grid-foot">
+            <FluentPaginator State="@_pagination" />
+            <span class="toolbar-spacer"></span>
+            <span class="toolbar-note">@Log.Sequence round trips so far</span>
         </div>
-
-        @if (_lines is { } lines)
-        {
-            <div class="card">
-                <p class="card-title">✏️ Lines &mdash; edit any quantity</p>
-
-                @foreach (OrderDetail line in lines)
-                {
-                    <div class="kv">
-                        <span class="kv-key">product @line.ProductId &nbsp;&middot;&nbsp; @line.UnitPrice.ToString("0.00")</span>
-                        <FluentNumberField Value="@line.Quantity" Min="0" Style="width: 6.5rem;"
-                                           ValueChanged="@(value => SetQuantity(line, value))"
-                                           TValue="int" Immediate="true" />
-                    </div>
-                }
-
-                <div class="actions">
-                    <FluentButton Appearance="Appearance.Accent" Disabled="@(_pending == 0)" OnClick="SaveAsync">
-                        Save @_pending change@(_pending == 1 ? "" : "s")
-                    </FluentButton>
-                    <span class="toolbar-note">
-                        @if (_saved is { } saved)
-                        {
-                            @($"Last save: {saved} entries, in 1 SaveChanges envelope.")
-                        }
-                        else
-                        {
-                            @("The button counts what the change tracker is holding.")
-                        }
-                    </span>
-                </div>
-            </div>
-        }
     </div>
 
-    <p class="page-note">
-        Loading the order was one round trip. Loading the customer was one more, the lines one more
-        &mdash; and saving is one, however many quantities changed.
-    </p>
-}
+    <div class="md-detail">
+        @if (_order is { } order)
+        {
+            <div class="card">
+                <p class="card-title">📋 Order @order.Id</p>
+
+                <div class="kv">
+                    <span class="kv-key">Placed</span>
+                    <span class="kv-value">@order.OrderDate.ToString("yyyy-MM-dd")</span>
+                </div>
+                <div class="kv">
+                    <span class="kv-key">Customer id</span>
+                    <span class="kv-value">@order.CustomerId</span>
+                </div>
+                <div class="kv">
+                    <span class="kv-key">Customer</span>
+                    @if (_customerText is { } customerText)
+                    {
+                        <span class="kv-value">@customerText</span>
+                    }
+                    else
+                    {
+                        <FluentButton OnClick="TouchCustomer">not loaded &mdash; load it</FluentButton>
+                    }
+                </div>
+                <div class="kv">
+                    <span class="kv-key">Lines</span>
+                    @if (_lines is { } loaded)
+                    {
+                        <span class="kv-value">@loaded.Count loaded</span>
+                    }
+                    else
+                    {
+                        <FluentButton OnClick="TouchLines">not loaded &mdash; load them</FluentButton>
+                    }
+                </div>
+            </div>
+
+            @if (_lines is { } lines)
+            {
+                <div class="card">
+                    <p class="card-title">✏️ Lines &mdash; edit any quantity</p>
+
+                    @foreach (OrderDetail line in lines)
+                    {
+                        <div class="kv">
+                            <span class="kv-key">product @line.ProductId &nbsp;&middot;&nbsp; @line.UnitPrice.ToString("0.00")</span>
+                            <FluentNumberField Value="@line.Quantity" Min="0" Style="width: 6.5rem;"
+                                               ValueChanged="@(value => SetQuantity(line, value))"
+                                               TValue="int" Immediate="true" />
+                        </div>
+                    }
+
+                    <div class="actions">
+                        <FluentButton Appearance="Appearance.Accent" Disabled="@(_pending == 0)" OnClick="SaveAsync">
+                            Save @_pending change@(_pending == 1 ? "" : "s")
+                        </FluentButton>
+                        <span class="toolbar-note">
+                            @if (_saved is { } saved)
+                            {
+                                @($"Last save: {saved} entries, in 1 SaveChanges envelope.")
+                            }
+                            else
+                            {
+                                @("The button counts what the change tracker is holding.")
+                            }
+                        </span>
+                    </div>
+                </div>
+            }
+
+            <p class="page-note">
+                Selecting the order was one round trip. Loading the customer was one more, the lines
+                one more &mdash; and saving is one, however many quantities changed.
+            </p>
+        }
+        else
+        {
+            <div class="card">
+                <p class="card-title">📋 No order selected</p>
+                <p class="page-note" style="margin-top: 0;">Choose a row on the left.</p>
+            </div>
+        }
+
+        <p class="page-note">
+            The loads here are <code>LoadAsync</code> rather than a bare <code>order.Customer</code>,
+            and in a browser that is forced: a navigation getter is synchronous, so automatic lazy
+            loading would have to block on the round trip, and a single-threaded WebAssembly runtime
+            cannot block. This client therefore does not enable lazy-loading proxies at all, so an
+            unloaded navigation is simply <code>null</code>. The server does enable them; it is not
+            a browser.
+        </p>
+    </div>
+</div>
 
 @code {
+    // Client-only, like the Customers page's row type, and split the same way: the server is asked
+    // for three columns and this record is built in the browser (ADR-010). Company comes from
+    // o.Customer.CompanyName, so the server answers with a join rather than the client fetching
+    // 240 orders and then 65 customers to label them.
+    private sealed record OrderRow(int Id, string Company, DateTime Placed);
+
+    private readonly PaginationState _pagination = new() { ItemsPerPage = 12 };
+
     private NorthwindContext? _context;
     private Order? _order;
     private List<OrderDetail>? _lines;
     private string? _customerText;
-    private int _orderId = 1;
+    private int? _selectedId;
     private int _pending;
     private int? _saved;
     private string? _error;
 
-    // **One context for this page, unlike Customers, and here it is the point rather than a
-    // habit.** The unit of work IS the demonstration: several edits accumulate in one change
-    // tracker and leave as one SaveChanges. Safe to hold because every operation below is started
-    // by a button — there is no provider polling it, which is exactly what made a page-scoped
-    // context wrong on Customers.
+    // Selects the first order so the page shows its detail immediately. A page that shows nothing
+    // until something is clicked hides the very thing it is here to show, and the lazy-loading
+    // point is unaffected: the navigations are still untouched afterwards.
     protected override async Task OnInitializedAsync()
-        // Loads order 1 straight away. A page that shows nothing until a button is pressed hides
-        // the very thing it is here to show, and the lazy-loading point is unaffected: the
-        // navigations are still untouched afterwards.
-        => await LoadAsync();
+        => await SelectAsync(1);
 
-    private async Task LoadAsync()
+    // -------------------------------------------------------------------- the master half
+
+    // **A context per provider call, and NOT the page's own.** A grid provider is free to ask
+    // again before the previous answer lands, and a DbContext is not thread-safe -- that overlap
+    // is what produced EF's "A second operation was started on this context instance" on the
+    // Customers page. The detail half below keeps a page-scoped context because it genuinely
+    // needs one; this half has no unit of work to preserve. Two contexts on one page, for two
+    // different reasons.
+    private async ValueTask<GridItemsProviderResult<OrderRow>> LoadPageAsync(
+        GridItemsProviderRequest<OrderRow> request)
     {
-        // A fresh context per load, so a second "Load order" does not inherit the last one's
-        // tracked edits — that would make the pending count a lie.
+        try
+        {
+            await using NorthwindContext context = await Contexts.CreateDbContextAsync();
+
+            int total = await context.Orders.CountAsync(request.CancellationToken);
+
+            List<OrderRow> rows = await Sorted(context.Orders, request)
+                .Skip(request.StartIndex)
+                .Take(request.Count ?? _pagination.ItemsPerPage)
+                .Select(o => new OrderRow(o.Id, o.Customer!.CompanyName, o.OrderDate))
+                .ToListAsync(request.CancellationToken);
+
+            return GridItemsProviderResult.From(rows, total);
+        }
+        catch (Exception exception)
+        {
+            _error = Describe(exception);
+            return GridItemsProviderResult.From<OrderRow>([], 0);
+        }
+    }
+
+    // Composed on IQueryable<Order>, before Skip/Take -- never through request.ApplySorting, which
+    // sorts the client-only OrderRow and would leave the OrderBy on the client side of the
+    // projection split. Same reasoning as the Customers page, in full there.
+    private static IQueryable<Order> Sorted(
+        IQueryable<Order> query, GridItemsProviderRequest<OrderRow> request)
+    {
+        bool ascending = request.SortByAscending;
+
+        return request.SortByColumn?.Title switch
+        {
+            "Customer" => Then(By(query, o => o.Customer!.CompanyName, ascending)),
+            "Placed" => Then(By(query, o => o.OrderDate, ascending)),
+            _ => By(query, o => o.Id, ascending),
+        };
+
+        static IOrderedQueryable<Order> By<TKey>(
+            IQueryable<Order> source, System.Linq.Expressions.Expression<Func<Order, TKey>> key, bool ascending)
+            => ascending ? source.OrderBy(key) : source.OrderByDescending(key);
+
+        // Id as a tie-break: many orders share a customer and a date, and an unstable order makes
+        // a page boundary show the same row twice.
+        static IQueryable<Order> Then(IOrderedQueryable<Order> source)
+            => source.ThenBy(o => o.Id);
+    }
+
+    private async Task OnRowClickAsync(FluentDataGridRow<OrderRow> row)
+    {
+        if (row.Item is { } item)
+        {
+            await SelectAsync(item.Id);
+        }
+    }
+
+    // -------------------------------------------------------------------- the detail half
+
+    // **One context per selected order, and here it is the point rather than a habit.** The unit
+    // of work IS the demonstration: several edits accumulate in one change tracker and leave as
+    // one SaveChanges. Safe to hold because every operation below is started by a click.
+    //
+    // A fresh one per selection, so picking a second order does not inherit the first one's
+    // tracked edits -- that would make the pending count a lie.
+    private async Task SelectAsync(int orderId)
+    {
         if (_context is not null)
         {
             await _context.DisposeAsync();
@@ -148,6 +245,7 @@
 
         _context = await Contexts.CreateDbContextAsync();
 
+        _selectedId = orderId;
         _order = null;
         _lines = null;
         _customerText = null;
@@ -157,11 +255,11 @@
         await Guard(async () =>
         {
             // No Include, and that is the whole point: what comes back is one order.
-            _order = await _context.Orders.SingleOrDefaultAsync(o => o.Id == _orderId);
+            _order = await _context.Orders.SingleOrDefaultAsync(o => o.Id == orderId);
 
             if (_order is null)
             {
-                _error = $"No order with id {_orderId}.";
+                _error = $"No order with id {orderId}.";
             }
         });
     }
@@ -226,9 +324,12 @@
         catch (Exception exception)
         {
             // Visible, never swallowed (spec §6). The panel on the right carries the detail.
-            _error = $"{exception.GetType().Name}: {exception.Message}";
+            _error = Describe(exception);
         }
     }
+
+    private static string Describe(Exception exception)
+        => $"{exception.GetType().Name}: {exception.Message}";
 
     public async ValueTask DisposeAsync()
     {

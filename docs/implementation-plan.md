@@ -852,3 +852,38 @@ button, and every claim below is about what happens when you press one.
       `samples/Northwind.Server`**, which builds the client as a project reference and keeps the two
       manifests in step. Three boot failures were diagnosed by streaming `Runtime.exceptionThrown`
       and `Log.entryAdded` over CDP; none of them was visible in the page's own error UI.
+
+- [x] **M8-24. Order: master-detail, and the id field is gone.** `<this commit>`
+      `eng/trim-ratchet.sh`: **`OURS: 88 <= 88`**, total 853. No spec-suite run: no `src/` or
+      `test/` code changed.
+
+      An order was chosen by typing its primary key into a `FluentNumberField` bounded
+      `Min="1" Max="NorthwindSeed.OrderCount"`. Nobody picks a record that way. It is now a paged,
+      sortable grid of orders on the left and the detail on the right, driven by selection.
+
+      **Two `DbContext`s on one page, for two different reasons, and the page says so.** The grid
+      takes a fresh one per provider call, because a grid provider may ask again before the last
+      answer lands and a `DbContext` is not thread-safe — the fault that produced EF's *"A second
+      operation was started on this context instance"* on Customers. The detail keeps a page-scoped
+      one per selected order, because **the unit of work is the demonstration**: several edits
+      accumulate in one change tracker and leave as one `SaveChanges`.
+
+      **The master list is a projection over a join**, `o.Customer!.CompanyName`, so the grid shows
+      *Alfreds Futterkiste* rather than `ALFKI` and the server does the joining — 240 orders do not
+      arrive so that the browser can label twelve of them.
+
+      **Driven in a real browser, and every claim below is a reading rather than an expectation:**
+
+      | Action | Observed |
+      |---|---|
+      | Page load | `240 items · Page 1 of 20`, order 1 auto-selected and row-highlighted |
+      | Click row 3 | selection moves, detail shows Order 3 / `ANATR`, 1 round trip |
+      | *load it* (customer) | `Ana Trujillo Emparedados — México D.F.`, 1 round trip |
+      | *load them* (lines) | 2 lines for order 1, edit fields appear |
+      | Sort by **Customer** | tree `OrderBy`+`ThenBy`; SQLite got `ORDER BY "c"."CompanyName", "o"."Id"` |
+      | Two quantity edits | button reads **Save 2 changes**, off the change tracker |
+      | Save | **one** wire entry, `💾 SaveChanges`, *"Last save: 2 entries, in 1 SaveChanges envelope"*, two `UPDATE "OrderDetails"` at the store |
+
+      The sort is composed on `IQueryable<Order>` before `Skip`/`Take` for the reason M8-23 gives
+      in full: `request.ApplySorting` would sort the client-only `OrderRow` and leave the `OrderBy`
+      on the client side of the projection split.
