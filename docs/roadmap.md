@@ -379,10 +379,14 @@ Three separable pieces, and only the first can be done outside the library:
   longer gates a release.
 - Streaming results (requirements §4.4, wire-protocol W4). **Split in two by
   [`architecture.md`](architecture.md) §6a D7, and only the first half is in M8:**
-  - **(A) Streaming the wire** — the server stops buffering every row into an `ArrayList`, the
-    response goes out chunked, and the client deserializes incrementally. Peak memory falls at both
-    ends (this suite's largest single result is **560 MB**, currently held three times over) and the
-    caller's API does not change.
+  - ~~**(A) Streaming the wire**~~ — **DONE (M8-23…M8-26, 2026-08-17).** The caller's API did not
+    change, as predicted. Two of D7's estimates did not survive contact and the corrections are in
+    that entry: **point 1 is `NoTracking`-only**, because the `ArrayList` was holding the query open
+    until the server's change tracker was complete and dropping it measured 20 broken; and **the
+    obstacle at point 2 was the two base64 layers rather than the `byte[]`**, so a query response
+    stopped being an envelope payload and `IInfoCarrierTransport` grew a second method. Proved by
+    `StreamingOverHttpTest`, which was itself falsified against a deliberately re-buffered wire
+    before being believed.
   - **(B) `IAsyncEnumerable<T>` to the caller** — **deferred.** `ClientResultMaterializer` buffers
     *deliberately*: its `EntityMaterializer` hook is DI-scoped and saved/restored around the decode,
     so lazy yielding would let a nested lazy load clobber it. It also only ever applies to a

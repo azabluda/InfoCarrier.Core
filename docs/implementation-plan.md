@@ -1026,3 +1026,50 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
       WASM boot in headless Edge takes longer than a 120-second wait allows.
 
 ---
+
+- [x] **M8-27. The version rationale and the roadmap, brought back to what is true.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`m8-27` against `j25`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      Both gates run because `Directory.Build.props` reaches `src/` (M8-19's own note).
+
+      **`-preview.1` keeps its suffix and loses one of its three reasons.** The note said the
+      version should stay pre-release because nine limitations are known, there is no gRPC binding,
+      and *"results do not stream yet — and the last two may touch `IInfoCarrierTransport`"*.
+      Streaming landed and **it did touch that seam**: `SendQueryAsync`, `IInfoCarrierSerializer.Limits`,
+      and `QueryDataResult` leaving the envelope. **That is the suffix being made good rather than
+      an argument for dropping it** — the surface moved exactly as the note predicted, which is why
+      nothing had promised not to move it. gRPC may move it again; half (B) will move
+      `ClientResultMaterializer`.
+
+      **`roadmap.md`'s exit criterion (A) is struck, with the two estimates that did not survive
+      named there rather than only here**, because the roadmap is what a reader consults for scope
+      and D7's original pricing is what they would otherwise carry away.
+
+---
+
+## Phase L — what half (A) left behind
+
+**D7 half (B) is unchanged in scope but better specified**, and the addition is not the hook
+lifetime it was already about. A streamed failure travels as a **trailing item**, and that is safe
+today *only because* `ClientResultMaterializer` decodes to completion — the fault is always reached
+before any row reaches the caller. **Yielding rows lazily removes that guarantee**, so (B) has to
+answer fault delivery as well as the DI-scoped materializer hook. It is recorded on
+`QueryStreamItem` itself so the next reader meets it where the decision lives.
+
+**The server still pulls rows out of EF synchronously** — a `foreach` over `IQueryable` inside
+`SerializeRows`. Making that `IAsyncEnumerable` end to end is independent of (B), cheaper than it,
+and is the last buffered hop nobody has priced.
+
+**The falsification of `StreamingOverHttpTest` is not in CI.** That the test *can* fail was
+established by hand, by putting `ResponseContentRead` back, and the evidence lives in a commit
+message and in D7. A second test asserting the buffered path deadlocks is writable but costs its
+10-second deadline on every run. A judgement call, recorded rather than left implicit.
+
+**Two ways to pin a server context now exist and they are adjacent.**
+`InProcessInfoCarrierServer._transactions` is still unbounded (M8's own note), and an **abandoned
+enumeration** holds a `DbContext` — and, inside a transaction, a store connection — until its
+enumerator is disposed. Nothing in this provider abandons one, because the materializer drains; a
+caller using `IInfoCarrierClient` directly can. Both are the library's to answer and they want
+answering together.
+
+---

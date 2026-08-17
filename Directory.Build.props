@@ -26,9 +26,17 @@
       follows and the fastest way for a reader to know which EF this targets.
 
       `-preview.1` is deliberate and should stay until M8's exit criteria are met. Nine
-      limitations are known and written up in docs/limitations.md, there is no gRPC binding, and
-      results do not stream yet — and the last two may touch IInfoCarrierTransport. A stable
-      10.0.0 is a promise not to break that surface, and this is not the moment to make it.
+      limitations are known and written up in docs/limitations.md, and there is no gRPC binding.
+
+      This used to list "results do not stream yet" as a third reason, and add that the last two
+      "may touch IInfoCarrierTransport". Streaming landed in M8-23…M8-26 (architecture.md §6a D7,
+      half A) and it did touch that seam: IInfoCarrierTransport gained SendQueryAsync,
+      IInfoCarrierSerializer gained Limits, and QueryDataResult stopped being an envelope payload.
+      **That is the argument for the suffix being made good rather than an argument for dropping
+      it** — the surface moved exactly as predicted, which is why nothing had promised not to move
+      it. gRPC is future scope and may move it again; half (B) of D7 will move
+      ClientResultMaterializer. A stable 10.0.0 is a promise not to break that surface, and this is
+      still not the moment to make it.
     -->
     <VersionPrefix>10.0.0</VersionPrefix>
     <VersionSuffix>preview.1</VersionSuffix>
