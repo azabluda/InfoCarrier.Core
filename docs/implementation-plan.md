@@ -762,7 +762,43 @@ counted):
 | Store-independent (`Expressions/`, `ProjectionSplit/`, compliance, infrastructure) | 26 |
 | Shared harness (`TestUtilities/`, used by both) | 4 |
 
-- [ ] **J4. Reorganise `test/InfoCarrier.Core.FunctionalTests` by backend store.**
+- [x] **J4. Reorganise `test/InfoCarrier.Core.FunctionalTests` by backend store.** `<this commit>`
+      `Total tests: 22453, Passed: 22225, Failed: 18, Skipped: 210` (`j4`) — **all four figures
+      identical to `j2b`**, and `REASONS: unchanged`.
+
+      **The neutrality proof needed one extra step, because the failing test *names* necessarily
+      move.** `measure.sh` snapshots fully-qualified names, so a namespace change makes FIXED and
+      BROKEN both non-empty by construction — 18 names leave, 18 arrive. Stripping the inserted
+      store segment and diffing the two snapshots gives **no differences at all**: the same 18
+      tests, failing for the same reasons, before and after.
+
+      The layout, after v1's (`InMemory/`, `SqlServer/`, `TestUtilities/`, root):
+
+      | Location | Files | What |
+      |---|---|---|
+      | `InMemory/` | 57 | Tier A test classes, sub-structure kept (`Query/`, `Update/`, `Scaffolding/`) |
+      | `InMemory/Scaffolding/Baselines/` | 42 | not compiled; travels with its test — see below |
+      | `Sqlite/` | 25 | Tier B test classes (`Query/`, `Query/Associations/`, `Update/`, `Types/`, `BulkUpdates/`) |
+      | `TestUtilities/` | 16 | the harness, **kept whole** — it defines both store factories, so it is shared by construction |
+      | root, `Expressions/`, `ProjectionSplit/`, `ModelBuilding/` | 18 | store-independent: wire format, boundary analysis, compliance, infrastructure |
+
+      **Four things this turned up that a rename alone would not have:**
+
+      1. **`test/known-failures.txt` needed no change.** It holds `failed=`, `total=` and prose —
+         **no test names at all** — so namespaces cannot move it. The expectation that it would was
+         wrong, and checking took one grep.
+      2. **`Scaffolding/Baselines/` has to travel with its test.** `CompiledModelTestBase`
+         locates it from `[CallerFilePath]` on `AddReferences`, which our
+         `CompiledModelInfoCarrierTest` overrides — so the baselines follow that *file*, not the
+         project. The two `csproj` lines moved with it, and getting that wrong reproduced CLAUDE.md's
+         documented **125 duplicate-definition errors** immediately, which is a good tripwire.
+      3. **One file was split.** `BuiltInDataTypesInfoCarrierTest.cs` held three classes across two
+         tiers after J2. `CustomConverters` is now `Sqlite/CustomConvertersInfoCarrierTest.cs`.
+      4. **A shared helper crossed a tier and my grep missed it.** `AssociationsWarnings` is
+         `internal static class`, which the cross-reference script's pattern did not match, and it
+         is used by two Tier B classes. **The compiler is the reliable cross-reference checker**;
+         the grep is only for planning. Every other cross-tier "reference" the script did find —
+         eight of them — turned out to be prose in `<c>` tags.
 
 ### J5–J6 — D3 answer (c), in two steps
 

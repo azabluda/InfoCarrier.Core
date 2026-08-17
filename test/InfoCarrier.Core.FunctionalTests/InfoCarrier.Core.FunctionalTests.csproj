@@ -23,8 +23,8 @@
       duplicate-definition errors. EF's own InMemory and Sqlite test projects carry these two
       lines verbatim.
     -->
-    <Compile Remove="Scaffolding\Baselines\**\*" />
-    <None Include="Scaffolding\Baselines\**\*" />
+    <Compile Remove="InMemory\Scaffolding\Baselines\**\*" />
+    <None Include="InMemory\Scaffolding\Baselines\**\*" />
   </ItemGroup>
 
   <ItemGroup>
