@@ -133,6 +133,8 @@ on first reading, so it is written down.
 | 4 | Every enum is admitted | An enum constructs nothing. It can complete a *signature*, which is how it appears in the pivot above — and that is blocked elsewhere. |
 | 5 | The server executes the tree against its own `DbContext` | The point of the product. Authorization of *what data* a client may query is the application's, and this library does not attempt it. **Stated so nobody assumes otherwise.** |
 | 6 | `Regex` is admitted, so a payload may name `Regex.IsMatch` with a catastrophic-backtracking pattern | **DoS, not code execution — see §4a.** The overloads EF's own tests use take no timeout, so a match runs unbounded. Mitigated by the deployer, not by this library. |
+| 7 | `MaxResponseBytes` defaults to `null`, and **streaming removes the natural ceiling** | Recorded ahead of the change (`architecture.md` §6a **D7**). While the server buffers, a ruinous result is ruinous *locally* and visible; once it streams, an unbounded response becomes the ordinary path. A deployment that exposes this to untrusted callers should set a bound. |
+| 8 | **An abandoned enumeration pins server resources** | Also D7, and it is §8a's abandoned-transaction shape reached by ordinary code: a caller that `break`s out of a `foreach` leaves a query, a `DbContext` and a store connection open. Unlike §8a's case, no crash is needed — correct-looking client code does it. |
 
 ## 4a. Amendment — `Regex` admitted (M9 J20), and why the conjunction survives
 

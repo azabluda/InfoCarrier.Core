@@ -371,9 +371,23 @@ Three separable pieces, and only the first can be done outside the library:
 | Surviving more than one server instance | **library / deployment** | The registry is process-local, so a token only resolves on the instance that created it — horizontal scaling needs affinity or a shared registry. The sample is single-instance and does not hit this. |
 
 **Exit criteria**
-- HTTP and gRPC transport bindings (only in-process exists today).
-- Streaming results as `IAsyncEnumerable<T>` (requirements §4.4, wire-protocol W4) — the
-  server currently buffers into an `ArrayList`.
+- ~~HTTP and gRPC transport bindings~~ — **HTTP is DONE** (Phase H, and shipped as a package in
+  M8-22). **gRPC moved to FUTURE SCOPE 2026-08-17**, because D7 established it is not a
+  prerequisite for anything: ASP.NET Core streams a JSON array chunked and
+  `JsonSerializer.DeserializeAsyncEnumerable` consumes one, so gRPC buys no capability the HTTP
+  binding lacks. It stays a welcome extra binding — `IInfoCarrierTransport` is one method — and no
+  longer gates a release.
+- Streaming results (requirements §4.4, wire-protocol W4). **Split in two by
+  [`architecture.md`](architecture.md) §6a D7, and only the first half is in M8:**
+  - **(A) Streaming the wire** — the server stops buffering every row into an `ArrayList`, the
+    response goes out chunked, and the client deserializes incrementally. Peak memory falls at both
+    ends (this suite's largest single result is **560 MB**, currently held three times over) and the
+    caller's API does not change.
+  - **(B) `IAsyncEnumerable<T>` to the caller** — **deferred.** `ClientResultMaterializer` buffers
+    *deliberately*: its `EntityMaterializer` hook is DI-scoped and saved/restored around the decode,
+    so lazy yielding would let a nested lazy load clobber it. It also only ever applies to a
+    pass-through, single-server-query, non-single-result query. A second project, not a stretch of
+    the first.
 - Compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5).
 - AOT/trimming verification (requirements §4.5).
 - ~~Sample apps~~ **DONE** (Phases H/I) — a Blazor WebAssembly client and a console client, both

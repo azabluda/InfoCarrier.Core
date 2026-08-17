@@ -586,6 +586,70 @@ application's configuration; this asks it about the provider's own.
 `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`. B12's own symptom was
 **wrong data with no exception**, so a green build is not evidence here — the measurement is.
 
+### D7 — streaming results: two features, and only one of them is cheap
+
+**Raised and scoped 2026-08-17 (M8). gRPC moved to future scope in the same decision, because it
+turned out not to be a prerequisite for any of this.**
+
+**The question that started it:** does streaming need gRPC? **No.** ASP.NET Core writes a JSON
+array incrementally and sends it chunked; `JsonSerializer.DeserializeAsyncEnumerable<T>` consumes
+one on the client. gRPC offers server streaming as a first-class concept and buys nothing here that
+HTTP cannot do. So the binding was never the obstacle — **four buffering points are**, and reading
+them apart is what this entry is for.
+
+| # | Where | What it holds | Cost to change |
+|---|---|---|---|
+| 1 | `ServerQueryExecutor`: `var results = new ArrayList()` | every row, before anything is sent | **low**, internal |
+| 2 | `QueryDataResult.SerializedResults` is `byte[]` | the whole result set as one blob | **medium** — a wire contract |
+| 3 | `HttpInfoCarrierTransport.ReadAsByteArrayAsync`, and the endpoint's single `WriteAsync` | the whole payload, both directions | **low**, internal to the bindings |
+| 4 | `ClientResultMaterializer.Materialize` | every materialized row | **high — and it is deliberate** |
+
+**Point 4 is the one that decides the shape of the feature, and the code already explains itself:**
+
+> *"Decoded to completion before anything is handed out … yielding lazily lets the caller start a
+> nested exchange part-way through this one, and this method's own hook would then already have
+> been replaced."*
+
+`mapper.EntityMaterializer` is a **DI-scoped hook, saved and restored around the decode**. A lazy
+load issued from inside a `foreach` over the results is a whole nested exchange, and lazy yielding
+would leave the inner materializer's hook in place for the rest of the outer decode. That is a bug
+someone has already paid for. `AttachJoinRows(rows)` then needs the complete set, and so does the
+residual whenever `SplitQuery.IsPassThrough` is false — `OrderBy`, `Count` and `GroupBy` over a
+client-side projection cannot be answered a row at a time.
+
+**So the feature splits, and the halves are worth very different amounts:**
+
+**(A) Streaming the wire — points 1, 2, 3. Take this.** The server stops materialising every row
+before it answers, the response goes out chunked, and the client deserializes incrementally into
+the row list it already builds. **Peak memory falls at both ends** — C37 measured this suite's
+largest single result at **560,839,164 bytes**, and today that exists as a `byte[]` on the server,
+again on the wire, and again on the client before a single row is materialized. Time-to-first-byte
+improves. **The caller's API does not change**, so nothing about EF's contract moves.
+
+**(B) `IAsyncEnumerable` to the caller — point 4. Do not take this yet.** It requires reworking the
+materializer's hook mechanism so a nested exchange cannot clobber it, and it only ever applies to a
+**pass-through, single-server-query, non-single-result** query — because anything else has a
+residual that consumes the whole sequence. That is a real subset of real queries, but it is a
+second project and it should not be smuggled into the first.
+
+**Two consequences that are true the moment (A) lands, recorded here and in
+[`security-review.md`](security-review.md):**
+
+- **`InfoCarrierPayloadLimits.MaxResponseBytes` defaults to `null` — unbounded.** Today the server
+  buffers, so a ruinous result is at least ruinous *locally* and visible. Streaming removes that
+  natural ceiling and makes an unbounded response the ordinary path.
+- **An abandoned enumeration pins server resources.** A caller that `break`s out of a `foreach`
+  leaves a query, a `DbContext` and a store connection open — the same shape as
+  `security-review.md` §8a's abandoned transaction, but reachable by ordinary correct-looking code
+  rather than by a crash.
+
+**And one that is the browser's, not this provider's.** Blazor WebAssembly **buffers the whole
+response by default**; streaming needs `SetBrowserResponseStreamingEnabled(true)` per request
+(verified present in the .NET 10 WASM package). Without it the sample would show no benefit and
+would look as though the feature does not work. **This repo has been caught by a WebAssembly
+default twice already** (blocking lazy loads, the compiled model's thread), so the browser proof
+must be deliberate rather than assumed.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
