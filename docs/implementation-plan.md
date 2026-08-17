@@ -1515,8 +1515,8 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 
 | Test | × | First message | Standing |
 |---|---|---|---|
-| `Can_track_entity_with_complex_property_bag_collections` | 2 | `ArgumentException … get_Item(System.String)` | **Known and documented.** A property-bag complex *collection* on an `Added` entity, failing inside EF's own `StructuralTypeMaterializerSource`. CLAUDE.md already carries it. |
-| `Correlated_collection_with_distinct_3_levels` | 2 | `Assert.Equal() Values differ` | **Known.** C64/C96: no correct answer satisfies the assertion, and EF's InMemory suite refuses the query outright. |
+| `Can_track_entity_with_complex_property_bag_collections` | 2 | `ArgumentException … get_Item(System.String)` | **UPSTREAM, on a path only this provider takes (J22).** EF's own `StructuralTypeMaterializerSource` builds `Expression.Property(instance, Item[string])` with no index argument. Route priced and not taken — see J22. |
+| `Correlated_collection_with_distinct_3_levels` | 2 | `Assert.Equal() Values differ` | **A28 family, and the old wording overstated it (J22).** **Every** EF provider refuses this query, so the base's expected result was never validated against any answer. |
 | ~~`Regex_IsMatch`, `Regex_IsMatch_constant_input`~~ | ~~2~~ | LINQ not translated | ~~A46's deliberate allowlist refusal~~ — **reversed and fixed by J20.** `Regex` is admitted; `security-review.md` §4a carries the decision. |
 | ~~`Can_insert_and_read_back_with_enumerable_class_key…`~~ | ~~1~~ | `InvalidCastException` | ~~**Upstream**, and the only one~~ — **the bug is still upstream, and J21 removed our path into it.** EF's `EnumerableClassKey.Equals` still casts to `IntClassKey`; the server's query cache no longer meets it. |
 | ~~`Parameter_collection_null_Contains`~~ | ~~1~~ | LINQ not translated | ~~SQLite-tier~~ — **the label was wrong and J19 fixed it.** No reference provider refuses this; it was ours, and one clause. |
@@ -1814,6 +1814,107 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 
       **0 broken across 22,658 is the claim that mattered**, because this reverses a
       research-findings rule for a whole class of values.
+
+- [x] **J22. The last three of the residual, re-derived — one attacked and reverted, two settled by
+      grep.** `<this commit>` Docs only; no gate. **No code shipped, deliberately.**
+
+      ### 1. The property-bag pair — upstream, on a path only this provider takes. ATTACKED AND REVERTED.
+
+      **The standing note was wrong twice over, and my own first correction of it was wrong too.**
+      It read *"fails inside EF's own `StructuralTypeMaterializerSource` … red forever"*. I then
+      said the opposite — *"EF's `ComplexTypesTrackingInMemoryTest` overrides nothing, so EF expects
+      it to pass on InMemory, so it is ours"*. **Both are half right, and the probe settled it.**
+
+      The server's own stack, printed from `InfoCarrierFaultMapper.Rehydrate`:
+
+      ```
+      at System.Linq.Expressions.Expression.Property(Expression, PropertyInfo)
+      at …StructuralTypeMaterializerSource.CreateMemberAssignment(…)
+      at …StructuralTypeMaterializerSource.CreateMaterializeExpression(…)   <- complex type
+      at …StructuralTypeMaterializerSource.AddInitializeExpression(…)
+      at …StructuralTypeMaterializerSource.CreateMaterializeExpression(…)   <- entity
+      at …RuntimeEntityType.GetOrCreateMaterializer(…)
+      at InfoCarrier.Core.ServerSaveChangesExecutor.Materialize(…)
+      ```
+
+      **EF's defect, named exactly:** `CreateMemberAssignment` calls
+      `Expression.Property(instance, member)` where `member` is the `Item[string]` **indexer** of a
+      property-bag complex type, supplying no index argument. .NET refuses it. `ServerSaveChangesExecutor.SetOnEntity`
+      already guards the identical hazard one level down — *"EF reports its properties as the
+      `Item[string]` indexer; handing that to `SetValue` without an index is a parameter-count
+      mismatch"* — so this repo had already met the shape and EF had not.
+
+      **Why EF's own InMemory suite passes it, and it is not because the materializer works.**
+      Nothing on EF's side materializes this entity **from a value buffer**: the test constructs the
+      object and EF tracks it. This provider must materialize, because the entity reached the server
+      as values. So EF never executes the broken path. EF's **SQL Server** suite does disable the
+      test outright (`=> Task.CompletedTask`, *"Issue #36175: Complex types with notification change
+      tracking are not supported"*), which is the corroboration. **J9/J21's shape a third time: an
+      upstream bug reached only by a path this provider takes.**
+
+      **The attack, and why it was reverted.** Two edits were made and measured on the target
+      class — a `Materialize` branch and a complex-value indexer branch — both gated on
+      `entityType.IsPropertyBag`. **The probe showed neither fired**, and the reason is the model:
+
+      ```csharp
+      public List<Dictionary<string, object>> Teams { get; set; } = [];      // complex COLLECTION of bags
+      b.ComplexProperty(e => e.FeaturedTeam, "FeaturedTeamPropertyBag", …)   // a bag
+      ```
+
+      **The property bag is the *complex type*, not the entity.** `PubWithPropertyBagCollections`
+      is an ordinary class, so `IsPropertyBag` is `false` on it and both branches were inert.
+      Reverted rather than kept: J9 already paid for leaving inert code with an unverified
+      explanation, and this session's own J21 nearly repeated it.
+
+      **The route that would work, priced honestly.** Avoid `GetOrCreateMaterializer` whenever the
+      entity type contains a property-bag complex type, and construct the entity ourselves. That is
+      not a clause — the materializer is used *precisely because* it performs constructor binding
+      (the docstring cites a positional record and *"No parameterless constructor defined"*), so the
+      carve-out has to reproduce binding via `IRuntimeEntityType.ConstructorBinding`. **Real work,
+      EF1001 internals, for 2 tests, against an upstream defect EF has an issue number for.** Not
+      taken. Recorded so it is priced once rather than re-priced.
+
+      ### 2. `Correlated_collection_with_distinct_3_levels` — A28 family, and the old wording overstated it
+
+      The note said *"no correct answer satisfies the assertion"*. What is actually true, and it is
+      both weaker and more useful:
+
+      | Suite | Behaviour |
+      |---|---|
+      | `GearsOfWarQueryInMemoryTest` | refuses — `InMemoryStrings.DistinctOnSubqueryNotSupported` (#24325) |
+      | `GearsOfWarQueryRelationalTestBase` | refuses — `RelationalStrings.DistinctOnCollectionNotSupported` |
+      | SQLite, SQL Server, Temporal SQL Server | call `base`, i.e. the relational refusal |
+
+      **Every EF provider refuses this query**, so the `AssertQuery` expectation in the base has
+      never been checked against any provider's answer. This provider executes it — the split leaves
+      part of it client-side, where InMemory's Distinct-on-subquery limit never applies — and gets a
+      different result. So it is **A28 family**: a spec test asserting a limitation this provider
+      does not have.
+
+      **It is not the *verified* A28 that J15 and J2 produced**, and the difference matters: those
+      two showed the answer is *right*. Here all that is shown is that the expected value is
+      unvalidated. Verifying it would need an independent oracle for a three-level correlated
+      collection under `Distinct`, which is J15-sized work for 2 tests. Stated as what it is.
+
+      ### 3. The type-argument sweep — J18's guard is COMPLETE, not a special case
+
+      J18 refused `Cast<T>`/`OfType<T>` **by name**, which left open whether other operators hide a
+      type argument the boundary never examines. They do not, and the check is exact. A type
+      argument can only name a type the arguments do not determine when the *source* is non-generic,
+      and there are exactly two such methods on each declaring type:
+
+      ```
+      M:System.Linq.Queryable.Cast``1(System.Linq.IQueryable)
+      M:System.Linq.Queryable.OfType``1(System.Linq.IQueryable)
+      M:System.Linq.Enumerable.Cast``1(System.Collections.IEnumerable)
+      M:System.Linq.Enumerable.OfType``1(System.Collections.IEnumerable)
+      ```
+
+      Every other `Queryable`/`Enumerable` method takes `IQueryable<TSource>`/`IEnumerable<TSource>`,
+      so its type arguments are fixed by the source and its lambdas — both of which
+      `ClientEvaluationFinder` already walks. **`RejectUnshippableTypeArgument` covers the whole
+      surface**, and J18's "fixed by name, completeness unknown" is now closed. Read off the .NET 10
+      reference documentation rather than reasoned about.
 
 **`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
 and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same

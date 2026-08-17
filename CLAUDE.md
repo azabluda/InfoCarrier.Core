@@ -328,11 +328,21 @@ Not yet implemented, in rough priority order:
     trim warnings by declaring member, never by file path: this repository's own path contains the
     string "InfoCarrier", so a naive grep attributes all 1129 to this product.**
 - **Complex types work** (A32) — `ComplexTypesTrackingTestBase` is **249 of 251**, and the two
-  left are one shape of one feature: a property-bag complex *collection* on an `Added` entity,
-  which fails inside EF's own `StructuralTypeMaterializerSource`. A complex value cannot ride in
-  the value dictionary an entity is built from — `CreateEntry` and `ShadowValuesFactory` are
-  name-keyed and complex leaves collide (`Culture.Species` and `Milk.Species` are both
-  `"Species"`) — so both sides set it through its CLR member instead. The
+  left are one shape of one feature: a property-bag complex *collection* on an `Added` entity.
+  A complex value cannot ride in the value dictionary an entity is built from — `CreateEntry` and
+  `ShadowValuesFactory` are name-keyed and complex leaves collide (`Culture.Species` and
+  `Milk.Species` are both `"Species"`) — so both sides set it through its CLR member instead.
+  **J22 traced the residual two to an UPSTREAM defect on a path only this provider takes, and
+  corrected two wrong readings on the way.** EF's `StructuralTypeMaterializerSource.CreateMemberAssignment`
+  calls `Expression.Property(instance, member)` where `member` is the `Item[string]` **indexer** of
+  a property-bag complex type, with no index argument — the same hazard
+  `ServerSaveChangesExecutor.SetOnEntity` already guards one level down. **The property bag is the
+  complex type, not the entity** (`List<Dictionary<string, object>> Teams`), so a fix gated on
+  `IEntityType.IsPropertyBag` is inert — measured, and reverted. EF's own InMemory suite passes the
+  test **because EF never materializes the entity from a value buffer**; EF's SQL Server suite
+  disables it outright (issue #36175). The route — construct the entity without
+  `GetOrCreateMaterializer` — has to reproduce constructor binding, so it is priced in J22 and not
+  taken. The
   `Query.Associations.ComplexProperties` family is **not** adoptable on Tier A (A77): EF's InMemory
   provider does not translate a complex property access at all, which is why EF ships no InMemory
   complex-type query test. Complex-type *queries* need Tier B.
