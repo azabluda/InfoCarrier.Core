@@ -35,10 +35,31 @@ public class DynamicValueMapper(
     private readonly IModel? _model = model;
     private readonly TypeNodeMapper _typeMapper = typeMapper;
     private readonly TypeNodeResolver _typeResolver = typeResolver;
+    // The application's mappers first, then the model's own opinion (M9 J9). Built here rather
+    // than registered, because that is what makes it symmetric: each half derives it from the
+    // model it was given, and the two models agree about converters by construction (A49), so
+    // unlike a registered mapper it cannot end up present on one side only. Last in the chain, so
+    // an application that registers a mapper for a type is never overridden by the model.
     private readonly IReadOnlyList<ValueMapping.IInfoCarrierValueMapper> _valueMappers
-        = valueMappers as IReadOnlyList<ValueMapping.IInfoCarrierValueMapper>
-            ?? valueMappers?.ToList()
-            ?? [];
+        = Chain(valueMappers, model);
+
+    private static IReadOnlyList<ValueMapping.IInfoCarrierValueMapper> Chain(
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers,
+        IModel? model)
+    {
+        List<ValueMapping.IInfoCarrierValueMapper> chain = [.. valueMappers ?? []];
+
+        if (model is not null)
+        {
+            var fromModel = new ValueMapping.ModelConverterValueMapper(model);
+            if (!fromModel.IsEmpty)
+            {
+                chain.Add(fromModel);
+            }
+        }
+
+        return chain;
+    }
 
     // Per-message reference maps (aqua ToContext/FromContext), ReferenceEqualityComparer-keyed.
     // The forward map holds wire ids, not nodes: identity has to survive serialization.

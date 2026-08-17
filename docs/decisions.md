@@ -390,6 +390,35 @@ also the general answer to "a CLR type the wire cannot walk", which is the shape
 
 ---
 
+**AMENDMENT, 2026-08-17 (M9, plan J9). A value converter declared in the model is not a type
+mapping.**
+
+ADR-012's "CLR type alone" clause bars consulting a **store type mapping**, which the two providers
+compute independently. B23 measured the cost of ignoring that at **381**: it sent scalars through
+EF's core `ValueConverterSelector` inside `PrimitiveCoercion.Coerce`, which is on every scalar path.
+
+A **value converter declared in the model** is not one. It is shared configuration, identical on
+both sides by construction, and it is the same fact B12/C80 and J5 already require both halves to
+agree about — J5's document seam exists precisely because *"where a key shape is decided by the
+caller's own model configuration rather than by the store, the client has to reach the same answer
+as the server"*.
+
+A mapper may therefore be derived from a model-declared converter, **provided it is registered on
+both halves and applies only where the reflective walk would otherwise fail.**
+
+`ValueMapping.ModelConverterValueMapper` is that mapper. Two things keep it inside the amendment
+rather than beyond it:
+
+- **Symmetry is structural, not a registration rule.** It is built inside `DynamicValueMapper` from
+  whichever model that mapper was given, so each half derives it from its own. Unlike an
+  application-registered mapper it *cannot* be present on one side only.
+- **It is last in the chain**, so an application that registers its own mapper for a type keeps
+  first refusal, and the narrowing clause — model type not a wire primitive, provider type is one —
+  keeps it off every path `PrimitiveCoercion` already short-circuits, which is where B23's breadth
+  came from.
+
+Measured on adoption: **15 → 14, 0 broken** across 22,672 tests.
+
 ## ADR-013 — The test project may reference `EFCore.Relational.Specification.Tests` — LOCKED (2026-08-11)
 
 **Context.** ADR-004 adopts `EFCore.Specification.Tests`, the *core* spec suite, and the test

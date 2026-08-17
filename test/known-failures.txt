@@ -198,5 +198,12 @@
 # orphaned dependent looked like one that never had a parent, nothing ordered its UPDATE before the
 # principal's DELETE, and the store refused the delete. Only two contexts against a store that
 # enforces constraints can lose this. 22672 / 22486 / 15 / 171 (`j11`).
-failed=15
+# 2026-08-17 (J9) - 15 -> 14. ADR-012 amended (dated): a value converter declared in the model is
+# not a store type mapping, so a value mapper may be derived from one. ModelConverterValueMapper is
+# built inside DynamicValueMapper from the model it was given, so each half derives it from its own
+# and it cannot be present on one side only. Closes the inbound face -- a key class with no
+# parameterless constructor now travels as the string the model always said it was. The outbound
+# face is still open and now fails DIFFERENTLY (InvalidCastException, wrong converter selected for a
+# related key type), which is progress and is written up in J9. 22672 / 22487 / 14 / 171 (`j9`).
+failed=14
 total=22672

@@ -1084,8 +1084,38 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       and those are a large, currently-green family. The check belongs on the query root, not in
       `ServerBoundaryAnalyzer`'s per-node verdict. Measure before believing either way.
 
-- [ ] **J9. Should a query constant travel as its provider value?** Designed 2026-08-17, **blocked
-      on a LOCKED ADR** and deliberately not implemented.
+- [~] **J9. A query constant now travels as its provider value — 1 of 2 closed.** `<this commit>`
+      `Total tests: 22672, Passed: 22487, Failed: 14, Skipped: 171` (`j9`): **1 fixed, 0 broken**.
+      ADR-012 carries the dated amendment the user approved, and
+      `ValueMapping.ModelConverterValueMapper` is the mapper it permits — built inside
+      `DynamicValueMapper` from the model it was given, so **symmetry is structural**: each half
+      derives it from its own model and it cannot be present on one side only.
+
+      **Closed:** `Can_query_and_update_owned_entity_with_value_converter`. The inbound face —
+      `class Key(string id)`, no parameterless constructor — now arrives as the string the model
+      always said it was.
+
+      **Still open, and it is a NEW failure rather than the old one:**
+      `Can_insert_and_read_back_with_enumerable_class_key_and_optional_dependents` no longer throws
+      `NotImplementedException` from `GetEnumerator()`. It now throws
+
+      ```
+      InvalidCastException : Unable to cast object of type
+        'EnumerableClassKey[…InfoCarrierFixture]' to type 'IntClassKey[…InfoCarrierFixture]'
+      ```
+
+      **The mapper is selecting the wrong converter.** `_byClrType` is keyed by
+      `converter.ModelClrType`, and something makes an `EnumerableClassKey` match `IntClassKey`'s
+      entry. The likely cause — **unverified, do not act on it without checking** — is that these EF
+      test key types share a base and a converter's `ModelClrType` is the base rather than the leaf,
+      so one dictionary entry answers for several types. C53 is the precedent to read first: it is
+      the same shape one level up (*"a member declared on a base class the model never names"*), and
+      its rule was **base classes only, never a category**.
+
+      **Next probe:** print every `(ModelClrType → ProviderClrType)` pair the constructor records for
+      this fixture's model, and the `declaredType` each lookup is made with. One filtered run.
+      If it is the base-type collision, the fix is to key on the **exact** type and require
+      `converter.ModelClrType == declaredType` rather than an assignability match.
       Closes both `KeysWithConverters` failures, which are one defect with two faces (above).
 
       **The natural mechanism already exists and the contract forbids using it.** ADR-012's
