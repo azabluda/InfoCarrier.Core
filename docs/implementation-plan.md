@@ -779,3 +779,57 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
 
 ---
 
+
+## Phase L — streaming the wire (architecture.md §6a D7, half A)
+
+- [x] **M8-23. The server stops holding the result set, and the change tracker is why it can only
+      half stop.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`m8-23b` against `j25`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+
+      D7's buffering point 1 — `var results = new ArrayList()` in `ServerQueryExecutor` — is
+      priced there as **low, internal**. Half of it is. The other half is a wire-visible behaviour
+      change, and **the suite named it in one run: 0 fixed, 20 broken (`m8-23`), every one a skip
+      navigation or an `IsLoaded` assertion in `ManyToMany*`.**
+
+      **The obstacle is the change tracker, not the query.** `SerializeRows`' probes — `IsLoaded`,
+      `IsTracked`, `ReadShadowValue`, `ReadJoinEntities`, `FindEntityType` — all interrogate the
+      server's `IStateManager`, and under any behaviour that resolves identity the state manager is
+      only complete once the query has been enumerated to the end: a later row can add to an
+      earlier row's collection, and a join row's far side can have its inverse navigation marked
+      loaded after the near side has already been written. Serializing row N before row N+1 has
+      been materialized asks the tracker a question it cannot yet answer — and it **answers
+      wrongly rather than refusing**, which is the B12/B4 shape. The tell was
+      `Load_collection_using_Query_with_Include_for_same_collection` reporting `IsLoaded: false`
+      for a navigation the server was holding.
+
+      So the point splits, and only one half is unconditional:
+
+      | Change | Applies | What it removes |
+      |---|---|---|
+      | Map and write each row straight into a `Utf8JsonWriter` instead of building a `List<DynamicValueNode>` first | **always** | the node graph — the largest of the three copies |
+      | Pull rows from EF instead of draining them into an `ArrayList` | **`NoTracking` only** | the row buffer as well |
+
+      **`NoTracking` is sound for a reason that is checkable rather than hopeful.** It creates no
+      state entries at all, so every probe above already falls through to reading the navigation
+      value on the instance, and EF returns a fresh instance per row with its includes
+      materialized. Nothing a later row does can change an earlier one.
+      `NoTrackingWithIdentityResolution` is **not** in scope, for the same reason `TrackAll` is
+      not: it resolves identity, which is exactly the property that makes an earlier row's graph
+      still mutable.
+
+      **This is the behaviour a large read-only result set uses**, which is the case D7 wanted:
+      C37's 560 MB and 111 MB Northwind results are no-tracking projections.
+
+      **A leading run of null rows is counted rather than written.** The element type is the first
+      non-null row's, and it is what a null row's node is typed by, so a null seen before any real
+      row cannot be typed yet. Deferring one renumbers nothing — `DynamicValueMapper.MapValue`
+      allocates a wire reference id only for a non-null, non-primitive value — and if every row is
+      null the type stays unresolved, which is the answer the buffered version reached too.
+
+      **The general lesson, and it is one this repo keeps relearning:** a buffer whose contents
+      look inert can be load-bearing for something that reads *around* it. That `ArrayList` was not
+      holding rows for its own sake — it was holding the query open until the tracker was complete,
+      and nothing in the code said so.
+
+---

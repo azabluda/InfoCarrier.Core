@@ -161,13 +161,40 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
             return QueryProvider.Execute(query);
         }
 
-        var results = new ArrayList();
-        foreach (object? item in BuildQueryable(query))
+        IQueryable queryable = BuildQueryable(query);
+
+        // **The result is drained first unless it is untracked, and the reason is the change
+        // tracker rather than the query** (D7 buffering point 1, corrected by measurement).
+        //
+        // `SerializeRows`' probes — `IsLoaded`, `IsTracked`, `ReadShadowValue`, `ReadJoinEntities`,
+        // `FindEntityType` — all interrogate the server's `IStateManager`, and under any behaviour
+        // that resolves identity the state manager is only complete once the query has been
+        // enumerated to the end: a later row can add to an earlier row's collection, and a join
+        // row's far side can have its inverse navigation marked loaded after the near side has
+        // already been written. Pulling rows straight from EF measured **29 broken**, every one of
+        // them a skip navigation or an `IsLoaded` assertion in `ManyToMany*`.
+        //
+        // Under `NoTracking` there is no identity map and no entry to be incomplete: EF returns a
+        // fresh instance per row with its includes already materialized, every probe falls through
+        // to reading the navigation value, and nothing a later row does can change an earlier one.
+        // So that behaviour — which is what a large read-only result set uses, and what the
+        // 560 MB results in this suite are — streams, and the rest is drained exactly as before.
+        //
+        // The larger buffer goes either way: `SerializeRows` writes each row into the response as
+        // it maps it rather than building a `List<DynamicValueNode>` first, so the node graph — the
+        // biggest of the three copies — is never held at all.
+        if (_context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.NoTracking)
         {
-            results.Add(item);
+            return queryable;
         }
 
-        return results;
+        var drained = new ArrayList();
+        foreach (object? item in queryable)
+        {
+            drained.Add(item);
+        }
+
+        return drained;
     }
 
     private IQueryable BuildQueryable(Expression query)
@@ -215,16 +242,17 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
 
     private QueryDataResult MapResults(object? result, bool singleResult, ProjectionShape? shape)
     {
-        List<object?> rows = ToRows(result, singleResult);
+        // The element type is read off the first non-null row, so it is known only once the rows
+        // have been walked — which is why serialization reports it back rather than being handed
+        // it. Entity-typed results → identity-keyed rows; projections → columnar data (E2 refines).
+        (byte[] payload, Type? elementType) = SerializeRows(ToRows(result, singleResult), shape);
 
-        // Entity-typed results → identity-keyed rows; projections → columnar data (E2 refines).
-        Type? elementType = rows.FirstOrDefault(r => r is not null)?.GetType();
         bool isEntityResult = elementType is not null
             && _context.Model.FindEntityType(elementType) is not null;
 
         return new QueryDataResult
         {
-            SerializedResults = SerializeResult(rows, elementType, shape),
+            SerializedResults = payload,
             IsEntityResult = isEntityResult,
             ElementTypeName = elementType?.FullName,
         };
@@ -239,22 +267,30 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
     ///     list, not as N integer rows. Enumerating unconditionally flattened exactly that away,
     ///     and the client then failed casting an <c>Int32</c> to <c>IEnumerable&lt;int&gt;</c>.
     /// </remarks>
-    private static List<object?> ToRows(object? result, bool singleResult)
+    private static IEnumerable<object?> ToRows(object? result, bool singleResult)
         => singleResult || result is not IEnumerable enumerable || result is string
             ? [result]
-            : enumerable.Cast<object?>().ToList();
+            : enumerable.Cast<object?>();
 
     /// <summary>
     ///     Serializes result rows as a <see cref="DynamicValueNode" /> graph
-    ///     (<c>docs/result-wire-format.md</c>).
+    ///     (<c>docs/result-wire-format.md</c>), pulling them one at a time.
     /// </summary>
     /// <remarks>
-    ///     Never reflection-serialize the live entity graph: <c>Customer → Orders → Customer</c>
-    ///     throws "a possible object cycle was detected", shadow properties are invisible to a
-    ///     public-property walk, and lazy-loading proxies get walked as data
-    ///     (ADR-008 constraints 1 and 5).
+    ///     <para>
+    ///         Never reflection-serialize the live entity graph: <c>Customer → Orders → Customer</c>
+    ///         throws "a possible object cycle was detected", shadow properties are invisible to a
+    ///         public-property walk, and lazy-loading proxies get walked as data
+    ///         (ADR-008 constraints 1 and 5).
+    ///     </para>
+    ///     <para>
+    ///         <paramref name="rows" /> is enumerated lazily and each row is written as it arrives,
+    ///         so the result set is never held as objects <em>and</em> as a
+    ///         <c>List&lt;DynamicValueNode&gt;</c> at once (D7 buffering point 1). It returns the
+    ///         element type it found, because that is not knowable until a row has been seen.
+    ///     </para>
     /// </remarks>
-    private byte[] SerializeResult(List<object?> rows, Type? elementType, ProjectionShape? shape)
+    private (byte[] Payload, Type? ElementType) SerializeRows(IEnumerable<object?> rows, ProjectionShape? shape)
     {
         var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
@@ -421,17 +457,64 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.IsShadowProperty() || p.GetGetter().GetClrValue(entity) is not null);
 
-        var nodes = new List<DynamicValueNode>();
+        using var buffer = new MemoryStream();
+        using var writer = new System.Text.Json.Utf8JsonWriter(buffer);
+
+        void Write(DynamicValueNode node)
+            => System.Text.Json.JsonSerializer.Serialize(
+                writer, node, ExpressionJsonContext.Default.DynamicValueNode);
+
+        void WriteNullRow(Type type) => Write(mapper.ToDynamicValue(null, type));
+
+        // The element type is the first non-null row's, and it is what a *null* row's node is
+        // typed by — so a leading run of nulls is counted rather than written, and flushed once a
+        // real row names the type. Deferring one cannot renumber anything: `MapValue` allocates a
+        // wire reference id only for a non-null, non-primitive value, so a null row consumes none.
+        Type? elementType = null;
+        int pendingNulls = 0;
+
+        writer.WriteStartArray();
+
         foreach (object? item in rows)
         {
-            nodes.Add(item is null
-                ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
-                : mapper.ToRowValue(
-                    item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape));
+            if (item is null)
+            {
+                if (elementType is null)
+                {
+                    pendingNulls++;
+                }
+                else
+                {
+                    WriteNullRow(elementType);
+                }
+
+                continue;
+            }
+
+            if (elementType is null)
+            {
+                elementType = item.GetType();
+                for (; pendingNulls > 0; pendingNulls--)
+                {
+                    WriteNullRow(elementType);
+                }
+            }
+
+            Write(mapper.ToRowValue(
+                item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape));
         }
 
-        return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-            nodes, ExpressionJsonContext.Default.ListDynamicValueNode);
+        // Every row was null, so nothing ever named the type — which is the answer the buffered
+        // version reached too.
+        for (; pendingNulls > 0; pendingNulls--)
+        {
+            WriteNullRow(typeof(object));
+        }
+
+        writer.WriteEndArray();
+        writer.Flush();
+
+        return (buffer.ToArray(), elementType);
     }
 
     /// <summary>
