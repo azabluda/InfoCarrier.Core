@@ -1,12 +1,14 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -663,33 +665,91 @@ internal sealed class QueryExecutor<TElement>
         /// </remarks>
         private Expression Substitute(object? value, Type parameterType)
         {
-            if (_insideEFCall
+            if (_insideEFCall)
+            {
+                return Expression.Constant(value, parameterType);
+            }
 
-                // `value is null` rides with the collections, and that is the J19 fix. Every other
-                // clause in this guard already decides from `parameterType`; this one alone read
-                // the runtime value, and a null is not an `IEnumerable`. So a null collection
-                // parameter fell through to `Expression.Constant(null, …)` and reached the server
-                // as the literal `null.Contains(p.Int)`, which nothing can translate — while EF's
-                // own funcletizer lifts it into a parameter and every reference provider then
-                // answers `WHERE 0`. CLAUDE.md's standing rule, in a new place: derive it from the
-                // CLR type alone, because a value cannot say what declares it.
-                || (value is not System.Collections.IEnumerable && value is not null)
-                || value is string
-                || SequenceElementType(parameterType) is not { } elementType
+            // `value is null` rides with the collections, and that is the J19 fix. Every other
+            // clause here decides from `parameterType`; this one alone read the runtime value, and
+            // a null is not an `IEnumerable`. So a null collection parameter fell through to
+            // `Expression.Constant(null, …)` and reached the server as the literal
+            // `null.Contains(p.Int)`, which nothing can translate — while EF's own funcletizer
+            // lifts it into a parameter and every reference provider then answers `WHERE 0`.
+            bool collectionShaped = (value is System.Collections.IEnumerable || value is null)
+                && value is not string
+                && SequenceElementType(parameterType) is { } elementType
 
                 // Box only where the wire can give the box's property back what it declares. A
                 // collection is materialized on the far side as a `List<T>`, so a parameter typed
                 // `IOrderedEnumerable<T>` cannot be handed one — the server rebuilt the value and
                 // then failed to assign it, eight `Contains_with_local_ordered_enumerable_*` deep.
-                // The same shape of guard the spelled-out array needed, for the same reason.
-                || !(parameterType.IsArray
-                    || parameterType.IsAssignableFrom(typeof(List<>).MakeGenericType(elementType))))
+                && (parameterType.IsArray
+                    || parameterType.IsAssignableFrom(typeof(List<>).MakeGenericType(elementType)));
+
+            if (collectionShaped)
             {
-                return Expression.Constant(value, parameterType);
+                return Boxed(value, parameterType);
             }
 
-            return Boxed(value, parameterType);
+            // J21: a **scalar** the wire does not carry as a primitive is boxed for the same reason
+            // a collection is — so the server's funcletizer lifts it back into a parameter.
+            //
+            // This is the third face of one divergence. The client captures at ADR-006's point,
+            // *downstream* of EF's own parameter extraction, so every captured variable is already
+            // a `__p_0` here and this method decides what it becomes again. research-findings §6
+            // said "a scalar becomes a plain constant", and for a wire primitive that is right and
+            // is unchanged. For anything else it puts a value in the tree that EF's providers
+            // never see one of — and EF *reads* the constants in a tree:
+            // `ExpressionEqualityComparer.CompareConstant` calls `Equals` on them to build the
+            // compiled-query cache key. A key class with a user-written `Equals` is therefore
+            // invoked by the server's query cache, which is a place the caller never intended it
+            // to run.
+            //
+            // **The test is "the model maps a property of this CLR type", and it is not the
+            // obvious "is it a scalar".** The first attempt guarded on
+            // `value is not IEnumerable`, and a probe showed it declining the very value it was
+            // written for, seven times: EF's `EnumerableClassKey` **implements
+            // `IEnumerable<byte>`** — that is what it is named for. So "not a collection" is not a
+            // property of the value at all here.
+            //
+            // Dropping that guard instead would box `IOrderedEnumerable<T>`, which the collection
+            // branch above excludes on purpose, and would re-break the eight
+            // `Contains_with_local_ordered_enumerable_*` tests its comment names. Asking the model
+            // separates them cleanly and for the right reason: a mapped property's CLR type is a
+            // *value* the caller stores, and EF's own providers carry it as a parameter with the
+            // property's converter applied. `IOrderedEnumerable<T>` is never a property type, and
+            // neither is an anonymous type.
+            if (!PrimitiveCoercion.IsWirePrimitive(parameterType)
+                && parameterType != typeof(object)
+                && _queryContext.Context.Model.FindRuntimeEntityType(parameterType) is null
+                && IsMappedPropertyType(_queryContext.Context.Model, parameterType))
+            {
+                return Boxed(value, parameterType);
+            }
+
+            return Expression.Constant(value, parameterType);
         }
+
+        /// <summary>
+        ///     Whether the model maps any property whose CLR type is <paramref name="type" /> —
+        ///     that is, whether this is a <em>value the caller stores</em> rather than an
+        ///     incidental CLR type the query happens to mention.
+        /// </summary>
+        /// <remarks>
+        ///     Cached per model in a <see cref="ConditionalWeakTable{TKey,TValue}" />: the answer
+        ///     depends only on the model, this is asked once per query parameter across the whole
+        ///     suite, and a weak table lets a model be collected rather than pinning every model a
+        ///     process ever built.
+        /// </remarks>
+        private static bool IsMappedPropertyType(IModel model, Type type)
+            => MappedPropertyTypes
+                .GetValue(model, static m => [.. m.GetEntityTypes()
+                    .SelectMany(e => e.GetProperties())
+                    .Select(p => p.ClrType)])
+                .Contains(type);
+
+        private static readonly ConditionalWeakTable<IModel, HashSet<Type>> MappedPropertyTypes = new();
 
         /// <summary>
         ///     A collection parameter in the shape EF's own funcletizer lifts back into a

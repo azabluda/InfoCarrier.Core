@@ -1510,7 +1510,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 | `Can_track_entity_with_complex_property_bag_collections` | 2 | `ArgumentException … get_Item(System.String)` | **Known and documented.** A property-bag complex *collection* on an `Added` entity, failing inside EF's own `StructuralTypeMaterializerSource`. CLAUDE.md already carries it. |
 | `Correlated_collection_with_distinct_3_levels` | 2 | `Assert.Equal() Values differ` | **Known.** C64/C96: no correct answer satisfies the assertion, and EF's InMemory suite refuses the query outright. |
 | ~~`Regex_IsMatch`, `Regex_IsMatch_constant_input`~~ | ~~2~~ | LINQ not translated | ~~A46's deliberate allowlist refusal~~ — **reversed and fixed by J20.** `Regex` is admitted; `security-review.md` §4a carries the decision. |
-| `Can_insert_and_read_back_with_enumerable_class_key…` | 1 | `InvalidCastException` | **Upstream**, and the only one: EF's own `EnumerableClassKey.Equals` casts to `IntClassKey` (J9). |
+| ~~`Can_insert_and_read_back_with_enumerable_class_key…`~~ | ~~1~~ | `InvalidCastException` | ~~**Upstream**, and the only one~~ — **the bug is still upstream, and J21 removed our path into it.** EF's `EnumerableClassKey.Equals` still casts to `IntClassKey`; the server's query cache no longer meets it. |
 | ~~`Parameter_collection_null_Contains`~~ | ~~1~~ | LINQ not translated | ~~SQLite-tier~~ — **the label was wrong and J19 fixed it.** No reference provider refuses this; it was ours, and one clause. |
 | `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Settled by J16, no code.** Right type, right verdict, EF's wording of a different true fact. Three siblings green. |
 | `Casts_are_removed_from_expression_tree_when_redundant` | 1 | ~~`Assert.Throws: Exception type was not an exact match`~~ → `Assert.Equal: Strings differ` (J18) | **Re-diagnosed by J17; the entry below it used to carry was wrong.** Not cast elision — a type-argument boundary, guarded in J18. What is left is EF's *printed* message, which ADR-006 cannot reproduce. |
@@ -1743,6 +1743,69 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       **`PlatformNotSupportedException` was deliberately not used as the argument.**
       `CompileToAssembly` does throw it on modern .NET. That is a property of the runtime and could
       change; the signature argument is a property of this allowlist.
+
+- [x] **J21. A mapped value type travels as a parameter, not as a constant — and the upstream bug
+      is still upstream.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`j21` against `j20`):
+      **1 fixed, 0 broken. 10 → 9.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      **`KeysWithConvertersInfoCarrierTest` is 47 of 47.**
+
+      **Nothing here fixes EF's defect, and the entry above is unchanged about that.**
+      `KeysWithConvertersTestBase.EnumerableClassKey.Equals(object)` still casts its argument to
+      `IntClassKey`. What J21 removes is **our path into it** — and J9's trace had already named
+      that path exactly:
+
+      ```
+      at KeysWithConvertersTestBase`1.EnumerableClassKey.Equals(Object obj)
+      at Query.ExpressionEqualityComparer.ExpressionComparer.CompareConstant(…)
+      ```
+
+      **EF reads the constants in a tree.** `CompareConstant` calls `Equals` on them to build the
+      compiled-query cache key. EF's own providers never have an `EnumerableClassKey` constant
+      there, because the caller's captured variable is a *parameter*. This client had one, because
+      it captures at ADR-006's point — **downstream of EF's parameter extraction** — so every
+      captured variable is already a `__p_0` by the time `Substitute` decides what it becomes
+      again, and research-findings §6 said "a scalar becomes a plain constant".
+
+      **§6 is right for a wire primitive and wrong for everything else**, which is now the rule:
+      a value the model maps is boxed, so the server's own funcletizer lifts it back into a
+      parameter. This is the **third face of one divergence** — B22/C88 for collections, J19 for a
+      null collection, J21 for a mapped scalar.
+
+      ## The probe is the part to keep, and the first version was wrong in a way reading could not catch
+
+      Version one guarded on `value is not System.Collections.IEnumerable`. The target test did not
+      move. **That is the exact situation CLAUDE.md says not to read** — a matcher that never fired
+      and a fix that did not help are identical from outside — so it was probed rather than
+      re-reasoned. The probe printed:
+
+      ```
+      7  CONSTANT EnumerableClassKey wirePrimitive=False
+      ```
+
+      **The branch declined the very value it was written for, seven times.** EF's
+      `EnumerableClassKey` *implements `IEnumerable<byte>`* — that is what the type is named for.
+      Without the probe the conclusion would have been "boxing does not help", and the change would
+      have been reverted for the opposite of the true reason.
+
+      **And the guard could not simply be dropped.** `IOrderedEnumerable<T>` would then be boxed,
+      which the collection branch excludes on purpose, and the eight
+      `Contains_with_local_ordered_enumerable_*` tests its comment names would go red. Checked
+      before the full run, and green: 8 of 8.
+
+      **So the discriminator is the model, and that is the principled one anyway.**
+      `IsMappedPropertyType` asks whether any entity type declares a property of that CLR type —
+      i.e. whether this is a **value the caller stores** rather than an incidental CLR type the
+      query mentions. `IOrderedEnumerable<T>` is never a property type; neither is an anonymous
+      type. Cached per model in a `ConditionalWeakTable`, since the answer depends only on the
+      model and a weak table does not pin every model a process builds.
+
+      **Two conservative exclusions, stated as conservative rather than derived**: `object`, because
+      a parameter declared that way says nothing about what it holds; and an entity type, which
+      travels by its own rules and which this class already resolves through the model elsewhere.
+
+      **0 broken across 22,658 is the claim that mattered**, because this reverses a
+      research-findings rule for a whole class of values.
 
 **`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
 and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same

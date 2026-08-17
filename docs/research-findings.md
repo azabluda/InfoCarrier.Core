@@ -130,6 +130,35 @@ never produces): Block/Loop/Try/Goto/Switch/Label/DebugInfo/Throw/Dynamic. EF ex
 > `Contains_with_local_ordered_enumerable_*` tests, server-side, on *"Object of type
 > 'List<String>' cannot be converted to type 'IOrderedEnumerable<String>'"*.
 
+> ⚠️ **Superseded again for a NULL collection, 2026-08-17 (plan J19).** The guard above read the
+> runtime *value* — `value is not IEnumerable` — and a null is not one, so a null collection
+> parameter was never boxed and reached the server as the literal `null.Contains(p.Int)`. Every
+> other clause already decided from the declared type. **1 fixed, 0 broken** (`j19`). Note what the
+> classification cost: this had stood for two milestones as "SQLite-tier", a store limitation, and
+> EF's SQLite, SQL Server and Cosmos suites all pass the base test.
+
+> ⚠️ **Superseded for MAPPED SCALARS, 2026-08-17 (plan J21), which is the first real narrowing of
+> "scalars are unchanged".** That guard is right for a **wire primitive** and it stays. It is wrong
+> for a value the model *maps* — a key or property CLR type behind a value converter. **EF reads
+> the constants in a tree**: `ExpressionEqualityComparer.CompareConstant` calls `Equals` on them to
+> build the compiled-query cache key. EF's own providers never have such a constant there, because
+> the caller's captured variable is a parameter; this client does, because it captures at ADR-006's
+> point, downstream of EF's parameter extraction. So a caller's `Equals` was invoked by the
+> **server's query cache**, which is not a place any caller intends it to run.
+>
+> The test is `IsMappedPropertyType` — does any entity type declare a property of this CLR type —
+> and **not** "is it a scalar". The obvious version of that guard, `value is not IEnumerable`, was
+> written, measured as no change, and **probed**: it had declined its own target seven times,
+> because EF's `EnumerableClassKey` implements `IEnumerable<byte>`. Dropping the guard instead
+> would have boxed `IOrderedEnumerable<T>` and re-broken the eight tests named above. A mapped
+> property's CLR type separates them for the right reason: it is a value the caller *stores*.
+> **1 fixed, 0 broken across 22,658** (`j21`).
+>
+> **Three supersessions of one rule now** — collections (C88), a null collection (J19), a mapped
+> scalar (J21). The rule underneath them is not "wrap or do not wrap": it is that the client
+> substitutes EF's extracted parameters back in as constants, and **a constant is a different thing
+> to EF than a parameter is**. Only a wire primitive is safe to inline.
+
 v1's bug: wrapping parameter values in a custom generic struct `ValueWrapper<T>` as a tree
 constant broke translation. **Rule:** substitute compiled-query parameters as **plain
 `ConstantExpression` of the runtime value** (typed to the parameter's type), resolved from

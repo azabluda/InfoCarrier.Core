@@ -309,7 +309,15 @@ internal static class PrimitiveCoercion
                 : listOfElement;
     }
 
-    private static bool IsWirePrimitive(Type type)
+    /// <summary>
+    ///     Whether the wire carries a value of this type as a primitive, with no mapping consulted.
+    /// </summary>
+    /// <remarks>
+    ///     <c>internal</c> rather than private since M9 J21, which needs the same question one
+    ///     layer up: <c>QueryExecutor.Substitute</c> decides whether a parameter value may be
+    ///     inlined as a constant, and "is it a wire primitive" is exactly the line.
+    /// </remarks>
+    internal static bool IsWirePrimitive(Type type)
     {
         Type underlying = Nullable.GetUnderlyingType(type) ?? type;
 
