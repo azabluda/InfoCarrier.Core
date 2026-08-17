@@ -892,8 +892,8 @@ public class ClientResultMaterializer(
     /// <remarks>
     ///     Building a <c>List&lt;T&gt;</c> and assigning it works only where the navigation is
     ///     willing to take one, and `FieldMappingTestBase` is a catalogue of the ones that are
-    ///     not: `BlogReadOnly._posts` is an `ObservableCollection<T>` and
-    ///     `BlogReadOnlyExplicit._myposts` a `Collection<T>` — neither of which a list can be
+    ///     not: `BlogReadOnly._posts` is an <c>ObservableCollection&lt;T&gt;</c> and
+    ///     `BlogReadOnlyExplicit._myposts` a <c>Collection&lt;T&gt;</c> — neither of which a list can be
     ///     assigned to — while `BlogFull.Posts` has a setter that throws outright unless the model
     ///     is seeding. The accessor answers all three, because it is what EF's own materializer
     ///     uses: it knows the concrete type to instantiate, the member to reach it through, and

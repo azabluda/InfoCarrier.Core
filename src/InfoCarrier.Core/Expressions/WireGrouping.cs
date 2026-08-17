@@ -117,7 +117,7 @@ internal static class WireGrouping
     /// </remarks>
     /// <remarks>
     ///     <para>
-    ///         <b>The <see cref="DynamicDependencyAttribute" /> is a correctness fix, not warning
+    ///         <b>The <see cref="System.Diagnostics.CodeAnalysis.DynamicDependencyAttribute" /> is a correctness fix, not warning
     ///         cosmetics.</b> <see cref="Activator.CreateInstance(Type)" /> is the only caller of
     ///         <see cref="WireGrouping{TKey, TElement}" />'s constructor, and a trimmer cannot see a
     ///         constructor reached that way — so without this it is free to remove it and the

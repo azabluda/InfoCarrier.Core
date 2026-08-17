@@ -1000,3 +1000,21 @@ warning ratchet to replace.
       report a malformed comment but `NU1010` against **every** `PackageReference` in the
       repository, because the whole `Directory.Packages.props` stopped parsing. An error naming
       thirty packages meant one punctuation mark.
+
+- [x] **M8-28. The XML-doc warnings, fixed rather than silenced.** `<this commit>`
+      `eng/measure.sh m8-28 m8-27`: `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` —
+      **0 fixed, 0 broken, `REASONS: unchanged`**. `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `CS1570`/`CS1573`/`CS1574`/`CS1591` **46 → 0**.
+
+      All 22 sites are in `src/`, and each was a real defect in a repository whose comments carry
+      this much of its reasoning:
+
+      | Code | What was actually wrong |
+      |---|---|
+      | `CS1570` ×2 | `ObservableCollection<T>` and `Collection<T>` written raw inside backticks in a `<remarks>` — **the `<T>` opened an XML tag**, so the whole remark was malformed and the doc file dropped it |
+      | `CS1574` ×4 | crefs that cannot resolve: `IModel` and `DynamicDependencyAttribute` had no `using`, `OpenFragments` is a member of `BoundaryAnalysis`, and **`RelationalTypeBaseExtensions` is not referenceable at all** — M9 removed the product's `EFCore.Relational` reference and the comment outlived it |
+      | `CS1573` ×11 | missing `<param>` on primary constructors and one positional record; `Replay` documented two of its seven parameters |
+      | `CS1591` ×5 | **undocumented public members of a shipping package** — `MapInfoCarrier`, `HttpInfoCarrierTransport.SendAsync`, both `InfoCarrierTransportException` constructors, `DynamicValueMapper.FromDynamicValue` |
+
+      The `CS1574` on `RelationalTypeBaseExtensions` is the one worth keeping: a stale cref is how
+      a comment tells you it is describing a dependency that no longer exists.

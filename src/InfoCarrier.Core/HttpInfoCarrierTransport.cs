@@ -29,6 +29,16 @@ public sealed class HttpInfoCarrierTransport(
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly string _requestUri = requestUri;
 
+    /// <summary>
+    ///     Posts one envelope and returns the one that comes back.
+    /// </summary>
+    /// <param name="request">The envelope to send.</param>
+    /// <param name="cancellationToken">Cancels the round trip.</param>
+    /// <returns>The server's envelope, including a fault it chose to report as data (W5).</returns>
+    /// <exception cref="InfoCarrierTransportException">
+    ///     The request never reached a server, or what came back was not an envelope. A failure
+    ///     the server reported is not this: it arrives inside the envelope.
+    /// </exception>
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default)

@@ -664,6 +664,17 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
     /// <param name="References">
     ///     Temporary foreign keys — placeholders belonging to some other entry.
     /// </param>
+    /// <param name="Change">The wire entry this replay was unpacked from.</param>
+    /// <param name="Entity">The reconstituted instance, before it is tracked.</param>
+    /// <param name="EntityType">The server model's type for <paramref name="Entity" />.</param>
+    /// <param name="Shadow">
+    ///     Values with no CLR member to hold them, which have to be written onto the entry after
+    ///     it is tracked rather than onto the object.
+    /// </param>
+    /// <param name="IsAdded">
+    ///     Whether this entry is an insert. Added entries are the only ones whose keys may be
+    ///     placeholders, which is what makes them worth distinguishing here.
+    /// </param>
     private sealed record Replay(
         ChangeEntry Change,
         object Entity,

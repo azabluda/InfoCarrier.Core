@@ -51,7 +51,8 @@ public class ExpressionSerializer(
     /// <summary>
     ///     Builds a model-aware serializer pipeline for the given EF model. Used by the server,
     ///     which constructs the pipeline from the resolved <see cref="Microsoft.EntityFrameworkCore.DbContext.Model" />
-    ///     rather than resolving <see cref="IModel" /> from DI (which is scoped to the context).
+    ///     rather than resolving <see cref="Microsoft.EntityFrameworkCore.Metadata.IModel" /> from
+    ///     DI (which is scoped to the context).
     /// </summary>
     /// <param name="model">The server's EF model.</param>
     /// <param name="valueMappers">

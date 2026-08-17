@@ -21,7 +21,7 @@ namespace InfoCarrier.Core.Query;
 ///         Server-ok alone does not make a subtree shippable. It must also contain a query root
 ///         (otherwise there is nothing to execute) and be <em>closed</em> — referencing no
 ///         parameter bound outside it. An open subtree is a correlated subquery sitting under a
-///         client-side projection; see <see cref="OpenFragments" />.
+///         client-side projection; see <see cref="BoundaryAnalysis.OpenFragments" />.
 ///     </para>
 /// </remarks>
 /// <remarks>

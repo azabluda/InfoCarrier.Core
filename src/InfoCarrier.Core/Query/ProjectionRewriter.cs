@@ -89,6 +89,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     client-side operators a split is allowed to produce; see
     ///     <see cref="QuerySplitter" />'s client-evaluation guard.
     /// </param>
+    /// <param name="alreadyReassembled">
+    ///     A reassembly an earlier pass produced, which this one must preserve rather than treat
+    ///     as client code to rewrite again.
+    /// </param>
     public static Expression Rewrite(
         Expression query,
         ServerBoundaryAnalyzer analyzer,

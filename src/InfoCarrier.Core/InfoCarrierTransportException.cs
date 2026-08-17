@@ -14,11 +14,23 @@ namespace InfoCarrier.Core;
 /// </remarks>
 public sealed class InfoCarrierTransportException : Exception
 {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="InfoCarrierTransportException" /> class.
+    /// </summary>
+    /// <param name="message">What went wrong on the way to the server, or on the way back.</param>
     public InfoCarrierTransportException(string message)
         : base(message)
     {
     }
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="InfoCarrierTransportException" /> class.
+    /// </summary>
+    /// <param name="message">What went wrong on the way to the server, or on the way back.</param>
+    /// <param name="innerException">
+    ///     The transport's own failure — an <see cref="HttpRequestException" />, a serialization
+    ///     error. It is kept because it names the layer that actually failed.
+    /// </param>
     public InfoCarrierTransportException(string message, Exception innerException)
         : base(message, innerException)
     {

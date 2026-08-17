@@ -34,7 +34,7 @@ namespace InfoCarrier.Core;
 ///         <b>What makes this safe to state on a non-relational provider.</b> The trigger is the
 ///         caller's own <c>ToJson()</c>, which is an annotation and is therefore already on the
 ///         client's model — both sides run the same <c>OnModelCreating</c>. Nothing relational is
-///         resolved from the service provider; only <see cref="RelationalTypeBaseExtensions" />'s
+///         resolved from the service provider; only <c>RelationalTypeBaseExtensions</c>'s
 ///         <c>GetContainerColumnName()</c> is read, and it walks the ownership chain so a nested
 ///         owned type inherits its container from the type that declared it. Where no
 ///         <c>ToJson()</c> was called the convention is inert and the core behaviour is unchanged.

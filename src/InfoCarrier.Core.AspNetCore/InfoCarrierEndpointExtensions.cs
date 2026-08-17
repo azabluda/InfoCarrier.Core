@@ -49,6 +49,15 @@ namespace InfoCarrier.Core.AspNetCore;
 /// </remarks>
 public static class InfoCarrierEndpointExtensions
 {
+    /// <summary>
+    ///     Maps the endpoint a client's transport posts its envelopes to.
+    /// </summary>
+    /// <param name="endpoints">The route builder to map onto.</param>
+    /// <param name="pattern">
+    ///     The route pattern. Must agree with the client's request URI, which defaults to the
+    ///     same value.
+    /// </param>
+    /// <returns>The mapped endpoint, so the caller can add its own conventions.</returns>
     public static IEndpointConventionBuilder MapInfoCarrier(
         this IEndpointRouteBuilder endpoints,
         string pattern = "infocarrier")

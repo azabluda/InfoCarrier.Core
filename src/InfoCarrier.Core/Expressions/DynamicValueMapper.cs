@@ -134,6 +134,10 @@ public class DynamicValueMapper(
     ///     field could be found ... and the property does not have a getter") rather than
     ///     returning anything to skip.
     /// </param>
+    /// <param name="readJoinEntities">
+    ///     Reads the join entities behind a skip navigation. A many-to-many payload lives on the
+    ///     join row rather than on either end, so it cannot be recovered from the two entities.
+    /// </param>
     /// <param name="findEntityType">
     ///     Names the entity type of an instance the CLR type cannot identify. A shared-type
     ///     entity is exactly that case: every many-to-many join entity is a
@@ -700,6 +704,11 @@ public class DynamicValueMapper(
             : PrimitiveCoercion.Coerce(property.PrimitiveValue, declaredType);
     }
 
+    /// <summary>
+    ///     Rebuilds the value a <see cref="DynamicValueNode" /> describes.
+    /// </summary>
+    /// <param name="node">The node to rebuild from.</param>
+    /// <returns>The reconstructed value, or <see langword="null" /> where the node carried none.</returns>
     public virtual object? FromDynamicValue(DynamicValueNode node)
     {
         // Back-reference: the target must already be registered. It is, because the forward

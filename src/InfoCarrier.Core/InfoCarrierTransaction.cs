@@ -27,6 +27,11 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="InfoCarrierTransaction" /> class.
 /// </remarks>
+/// <param name="client">The client this transaction's commit and rollback travel through.</param>
+/// <param name="serverTransactionId">
+///     The server's token for this transaction. Every request made while it is current names it,
+///     which is what makes those requests one unit on the far side.
+/// </param>
 /// <param name="onFinished">
 ///     Told when this transaction ends, however it ends. A caller may commit through the
 ///     transaction object rather than through the manager —

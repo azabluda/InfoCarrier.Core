@@ -1246,6 +1246,8 @@ public sealed class QuerySplitter
     {
         private ClientCodeReason? _found;
 
+        /// <param name="expression">The subtree to search.</param>
+        /// <param name="allowlist">The types the server will accept; the same list it enforces.</param>
         /// <param name="methodsOnly">
         ///     Restricts the search to a method the server cannot run, skipping the client-only
         ///     <em>type</em> clauses below. C68 needs that distinction: constructing a client type
