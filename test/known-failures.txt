@@ -213,5 +213,14 @@
 # mirrored and xUnit counts a skipped theory as one test, the same accounting as C94. The two new
 # failures are one message, NOT NULL constraint failed: OwnedOptional1.Id, filed as J13.
 # 22654 / 22461 / 16 / 177 (`j12a`).
-failed=16
+# 2026-08-17 (J12b) - 16 -> 26, A DELIBERATE RISE, and `total` unchanged at 22654. Deleted
+# GraphUpdates' 28 silent `=> Task.CompletedTask` overrides (140 lines). Of the 28, 18 now pass and
+# 10 fail. The total does NOT move, and that is the point: these were never skips -- an empty
+# override counts as a PASSING test, so 28 green ticks in every previous run were an empty method
+# body. Worse than a skip, which at least announces itself in the Skipped column. The 10 are five
+# tests times async in three groups, all classified in J12b and filed as J14: four are "the entity
+# type 'Cruiser' was not found" (a model fault, which cannot be a store limitation), two are an
+# unknown foreign-key value at save, and five are DbUpdateException.
+# 22654 / 22451 / 26 / 177 (`j12b`).
+failed=26
 total=22654

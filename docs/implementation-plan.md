@@ -715,9 +715,33 @@ Measured one at a time, because a combined move cannot tell which base moved the
       are precisely what a real store tests, and they are J12b. Splitting them off keeps this
       measurement interpretable.
 
-- [ ] **J12b. Delete `GraphUpdates`'  28 silent no-op overrides.** Each is an InMemory statement:
-      FK uniqueness, or a cascade the store is supposed to perform. On Tier B they become real
-      tests. Expect a rise and classify it before committing.
+- [x] **J12b. Deleted `GraphUpdates`' 28 silent no-op overrides.** `<this commit>`
+      `Total tests: 22654, Passed: 22451, Failed: 26, Skipped: 177` (`j12b`). **A deliberate rise of
+      10, and the honest trade is 18 for 10**: of 28 tests that did nothing at all, 18 now pass and
+      10 fail. 140 lines deleted.
+
+      **`total` is unchanged, and that is the finding.** These were never skips — a
+      `=> Task.CompletedTask` override *counts as a passing test*. So **28 green ticks in every
+      previous run were an empty method body**. That is worse than a skip, which at least announces
+      itself in the `Skipped` column, and it is why deleting them is progress even at +10.
+
+      **The 10 are five tests × async, in three groups, classified rather than counted:**
+
+      | Group | Count | Message |
+      |---|---|---|
+      | `Cruiser` / `CruiserWithSentinel` not in the model | 4 | *"The entity type 'Cruiser' was not found. Ensure that the entity type has been added…"* — a **model** fault, which cannot be a store limitation |
+      | Unknown foreign-key value at save | 2 | *"The value of 'SomethingOfCategoryB.CategoryId' is unknown when attempting to save…"* |
+      | `DbUpdateException` | 5 | a store constraint; overlaps J13's shape |
+
+      Every one of the five test names is `Can_insert_when_…_has_default_value` or
+      `…_has_sentinel_value`, so **this is the sentinel/default-value family** — and
+      `ChangeEntryMapper`'s `SentinelProperties` comment is where to start, because it already
+      describes a value the wire cannot distinguish from unset. Filed as J14.
+
+- [ ] **J14. The sentinel/default-value family on a real store** — 10 failures, 5 tests × async.
+      Three groups, classified in J12b. **Start with the four `Cruiser`-not-in-model ones**: an
+      entity type missing from the model is a fixture or convention fault, cannot be a store
+      limitation, is the cheapest of the three to settle, and may explain the others.
 
 - [ ] **J13. `NOT NULL constraint failed: OwnedOptional1.Id`** — an owned dependent's key arrives
       null. Two tests, one message.
