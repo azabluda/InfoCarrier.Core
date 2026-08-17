@@ -78,7 +78,11 @@ namespace InfoCarrier.Core;
 [JsonSerializable(typeof(InfoCarrierFault))]
 [JsonSerializable(typeof(InfoCarrierOperation))]
 [JsonSerializable(typeof(QueryDataRequest))]
-[JsonSerializable(typeof(QueryDataResult))]
+
+// QueryDataResult is deliberately absent, and its absence is the wire change D7 half (A) made.
+// It is no longer an envelope payload: a query response is a QueryStreamItem array written as the
+// rows are produced, and it is `ExpressionJsonContext` that covers it -- see the note there for
+// why it has to be that context and not this one.
 [JsonSerializable(typeof(SaveChangesRequest))]
 [JsonSerializable(typeof(SaveChangesResult))]
 [JsonSerializable(typeof(ChangeEntry))]

@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.Json.Serialization;
+using InfoCarrier.Core.Common;
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -72,6 +73,17 @@ namespace InfoCarrier.Core.Expressions;
 [JsonSerializable(typeof(TypeNode))]
 [JsonSerializable(typeof(DynamicValueNode))]
 [JsonSerializable(typeof(List<DynamicValueNode>))]
+
+// The streamed query response (D7). It belongs to *this* context rather than to
+// InfoCarrierJsonContext, and that is forced rather than tidy: a QueryStreamItem carries a
+// DynamicValueNode, and a node is only correct under the options above -- MaxDepth 256, the named
+// floating-point literals, WhenWritingNull. A context carries its own options, so serializing a
+// node through the transport serializer's context would quietly write a different wire.
+// InfoCarrierFault rides along because a stream carries its own failures, having no envelope to
+// put them in.
+[JsonSerializable(typeof(QueryStreamItem))]
+[JsonSerializable(typeof(QueryResultHeader))]
+[JsonSerializable(typeof(InfoCarrierFault))]
 [JsonSerializable(typeof(DynamicPropertyValue))]
 [JsonSerializable(typeof(EntityKeyNode))]
 [JsonSerializable(typeof(NodeKind))]

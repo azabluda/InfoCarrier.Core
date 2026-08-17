@@ -71,9 +71,19 @@ public class ClientResultMaterializer(
     }
 
     /// <summary>
-    ///     Materializes the wire result into a sequence of <typeparamref name="TElement" />.
+    ///     Materializes the wire result into a list of <typeparamref name="TElement" />.
     /// </summary>
-    public virtual IEnumerable<TElement> Materialize<TElement>(QueryDataResult result)
+    /// <remarks>
+    ///     <b>It returns a list, and D7 buffering point 4 says why that is deliberate</b> — see the
+    ///     comment on the decode loop below. The rows now <em>arrive</em> incrementally, which is
+    ///     the whole of half (A); handing them out incrementally is half (B) and is a different
+    ///     project. Returning <c>List&lt;TElement&gt;</c> rather than
+    ///     <c>IEnumerable&lt;TElement&gt;</c> states that rather than leaving it to a reader to
+    ///     discover, and saves the caller a <c>ToList()</c> it was doing anyway.
+    /// </remarks>
+    public virtual async Task<List<TElement>> MaterializeAsync<TElement>(
+        QueryDataResult result,
+        CancellationToken cancellationToken = default)
     {
         var mapper = (DynamicValueMapper)_serializer.ValueMapper;
 
@@ -91,13 +101,20 @@ public class ClientResultMaterializer(
 
         // Decoded to completion before anything is handed out, for the same reason: yielding
         // lazily lets the caller start a nested exchange part-way through this one, and this
-        // method's own hook would then already have been replaced. The payload is deserialized
-        // into a list of nodes up front regardless, so nothing extra is held.
+        // method's own hook would then already have been replaced.
+        //
+        // What changed with D7 half (A) is where the rows come from, not this. They used to be
+        // deserialized into a `List<DynamicValueNode>` up front — so the whole result existed
+        // twice, as nodes and as materialized rows — and they now arrive one at a time off the
+        // wire. The list below is the one remaining copy, and it is the deliberate one:
+        // `AttachJoinRows` needs the complete set, and so does the residual whenever
+        // `SplitQuery.IsPassThrough` is false.
         var rows = new List<TElement>();
 
         try
         {
-            foreach (DynamicValueNode row in DeserializeRows(result))
+            await foreach (DynamicValueNode row in
+                result.Rows.WithCancellation(cancellationToken).ConfigureAwait(false))
             {
                 // A null row is data, not an absent row. `Select(c => c.Orders.FirstOrDefault())`
                 // over a customer with no orders produces one, and skipping it silently returned
@@ -188,10 +205,6 @@ public class ClientResultMaterializer(
             }
         }
     }
-
-    private static List<DynamicValueNode> DeserializeRows(QueryDataResult result)
-        => System.Text.Json.JsonSerializer.Deserialize(
-            result.SerializedResults, ExpressionJsonContext.Default.ListDynamicValueNode) ?? [];
 
     /// <summary>
     ///     Materializes one entity row: identity resolution first, then scalars, then

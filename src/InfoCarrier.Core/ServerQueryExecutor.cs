@@ -55,7 +55,7 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
             object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
 
             // Map results to the wire format (entity rows vs columnar projections).
-            return MapResults(result, request.ReturnsSingleResult, shape);
+            return MapResults(result, query, request.ReturnsSingleResult, shape);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
@@ -197,6 +197,23 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
         return drained;
     }
 
+    /// <summary>
+    ///     The element type a query's rows have: its own result type when it returns a single
+    ///     result, and its sequence's element type otherwise.
+    /// </summary>
+    /// <remarks>
+    ///     <b>A method rather than the two-line conditional it replaces, and the reason is the trim
+    ///     gate.</b> ILLink reports an unannotated <c>Type</c> flowing into
+    ///     <c>IModel.FindEntityType</c> once <em>per origin</em>, so writing the conditional at the
+    ///     call site produced two warnings for one call — one naming
+    ///     <see cref="GetElementType" />'s return and one naming <c>Expression.Type</c>'s getter —
+    ///     and took `eng/trim-baseline.txt` from 88 to 89. Behind one return there is one origin
+    ///     and one warning. The warning itself is not removable: which type a caller's query names
+    ///     is the premise of this provider, which is what that baseline exists to say.
+    /// </remarks>
+    private static Type ElementTypeOf(Expression query, bool singleResult)
+        => singleResult ? query.Type : GetElementType(query.Type);
+
     private IQueryable BuildQueryable(Expression query)
     {
         // Route the rebound tree through the server context's own query provider so EF
@@ -240,21 +257,33 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
         return queryable?.GetGenericArguments()[0] ?? queryType;
     }
 
-    private QueryDataResult MapResults(object? result, bool singleResult, ProjectionShape? shape)
+    /// <summary>
+    ///     Describes the result and hands back its rows, without reading one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The element type is the one the <em>query</em> declares. It used to be the first
+    ///         non-null row's runtime type, which a streamed response cannot use: the header goes
+    ///         out before a row has been seen. The two differ only where a row is a proxy or a
+    ///         derived type, and the declared type is the better answer — a lazy-loading proxy's
+    ///         CLR type is not in the model, so the old rule reported
+    ///         <c>IsEntityResult: false</c> for a result that was entirely entities. Nothing in
+    ///         this provider routes on either member; both are diagnostics.
+    ///     </para>
+    ///     <para>
+    ///         Entity-typed results → identity-keyed rows; projections → columnar data
+    ///         (E2 refines).
+    ///     </para>
+    /// </remarks>
+    private QueryDataResult MapResults(object? result, Expression query, bool singleResult, ProjectionShape? shape)
     {
-        // The element type is read off the first non-null row, so it is known only once the rows
-        // have been walked — which is why serialization reports it back rather than being handed
-        // it. Entity-typed results → identity-keyed rows; projections → columnar data (E2 refines).
-        (byte[] payload, Type? elementType) = SerializeRows(ToRows(result, singleResult), shape);
-
-        bool isEntityResult = elementType is not null
-            && _context.Model.FindEntityType(elementType) is not null;
+        Type elementType = ElementTypeOf(query, singleResult);
 
         return new QueryDataResult
         {
-            SerializedResults = payload,
-            IsEntityResult = isEntityResult,
-            ElementTypeName = elementType?.FullName,
+            Rows = SerializeRows(ToRows(result, singleResult), elementType, shape),
+            IsEntityResult = _context.Model.FindEntityType(elementType) is not null,
+            ElementTypeName = elementType.FullName,
         };
     }
 
@@ -284,13 +313,23 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
     ///         (ADR-008 constraints 1 and 5).
     ///     </para>
     ///     <para>
-    ///         <paramref name="rows" /> is enumerated lazily and each row is written as it arrives,
-    ///         so the result set is never held as objects <em>and</em> as a
-    ///         <c>List&lt;DynamicValueNode&gt;</c> at once (D7 buffering point 1). It returns the
-    ///         element type it found, because that is not knowable until a row has been seen.
+    ///         <paramref name="rows" /> is enumerated lazily and each row is mapped as it is asked
+    ///         for, so the result set is never held as objects <em>and</em> as a
+    ///         <c>List&lt;DynamicValueNode&gt;</c> at once (D7 buffering points 1 and 2). Whoever
+    ///         enumerates this owns the <c>DbContext</c> it reads through — see
+    ///         <see cref="QueryDataResult" />.
+    ///     </para>
+    ///     <para>
+    ///         The mapping itself is synchronous, and so is the <c>foreach</c> over EF's own
+    ///         results. This is an <c>IAsyncEnumerable</c> because that is what the wire needs, not
+    ///         because the work is asynchronous; pulling rows out of EF through
+    ///         <c>IAsyncEnumerable</c> as well is a further step and is not this one.
     ///     </para>
     /// </remarks>
-    private (byte[] Payload, Type? ElementType) SerializeRows(IEnumerable<object?> rows, ProjectionShape? shape)
+    private async IAsyncEnumerable<DynamicValueNode> SerializeRows(
+        IEnumerable<object?> rows,
+        Type elementType,
+        ProjectionShape? shape)
     {
         var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
@@ -457,64 +496,16 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.IsShadowProperty() || p.GetGetter().GetClrValue(entity) is not null);
 
-        using var buffer = new MemoryStream();
-        using var writer = new System.Text.Json.Utf8JsonWriter(buffer);
-
-        void Write(DynamicValueNode node)
-            => System.Text.Json.JsonSerializer.Serialize(
-                writer, node, ExpressionJsonContext.Default.DynamicValueNode);
-
-        void WriteNullRow(Type type) => Write(mapper.ToDynamicValue(null, type));
-
-        // The element type is the first non-null row's, and it is what a *null* row's node is
-        // typed by — so a leading run of nulls is counted rather than written, and flushed once a
-        // real row names the type. Deferring one cannot renumber anything: `MapValue` allocates a
-        // wire reference id only for a non-null, non-primitive value, so a null row consumes none.
-        Type? elementType = null;
-        int pendingNulls = 0;
-
-        writer.WriteStartArray();
-
+        // A null row is data, not an absent row, and it still needs a type: the declared element
+        // type answers that without a row having to be seen, which is what the buffered format
+        // needed the whole result set for.
         foreach (object? item in rows)
         {
-            if (item is null)
-            {
-                if (elementType is null)
-                {
-                    pendingNulls++;
-                }
-                else
-                {
-                    WriteNullRow(elementType);
-                }
-
-                continue;
-            }
-
-            if (elementType is null)
-            {
-                elementType = item.GetType();
-                for (; pendingNulls > 0; pendingNulls--)
-                {
-                    WriteNullRow(elementType);
-                }
-            }
-
-            Write(mapper.ToRowValue(
-                item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape));
+            yield return item is null
+                ? mapper.ToDynamicValue(null, elementType)
+                : mapper.ToRowValue(
+                    item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape);
         }
-
-        // Every row was null, so nothing ever named the type — which is the answer the buffered
-        // version reached too.
-        for (; pendingNulls > 0; pendingNulls--)
-        {
-            WriteNullRow(typeof(object));
-        }
-
-        writer.WriteEndArray();
-        writer.Flush();
-
-        return (buffer.ToArray(), elementType);
     }
 
     /// <summary>

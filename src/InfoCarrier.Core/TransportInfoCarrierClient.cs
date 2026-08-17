@@ -18,12 +18,28 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     private readonly IInfoCarrierSerializer _serializer = serializer;
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The one operation that does not round-trip an envelope. Its answer is a sequence, and
+    ///     D7's whole point is that the sequence reaches the client as it is produced — so it goes
+    ///     out as an envelope and comes back as a stream. The fault check that
+    ///     <see cref="RoundTripAsync{TRequest,TResponse}" /> performs happens inside
+    ///     <see cref="QueryStreamReader" /> instead, against the same
+    ///     <see cref="InfoCarrierFaultMapper" />.
+    /// </remarks>
     public async Task<QueryDataResult> QueryDataAsync(
         QueryDataRequest request,
         Microsoft.EntityFrameworkCore.DbContext clientContext,
         CancellationToken cancellationToken = default)
-        => await RoundTripAsync<QueryDataRequest, QueryDataResult>(
-            InfoCarrierOperation.Query, request, cancellationToken).ConfigureAwait(false);
+    {
+        var envelope = new InfoCarrierEnvelope
+        {
+            ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
+            Operation = InfoCarrierOperation.Query,
+            Payload = await _serializer.SerializeAsync(request, cancellationToken).ConfigureAwait(false),
+        };
+
+        return await _transport.SendQueryAsync(envelope, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public async Task<SaveChangesResult> SaveChangesAsync(

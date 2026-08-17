@@ -56,6 +56,18 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
                 + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
         }
 
+        // Outside the try, with the version check and for the same reason: a query answers with a
+        // stream, so asking for one here is a mistake in the *caller's* wiring rather than a
+        // failure of the operation. Left inside, it would come back as a perfectly well-formed
+        // fault envelope — an error report about the server, describing a defect in the transport
+        // — and a transport still wired the old way would look like a server that cannot query.
+        if (request.Operation == InfoCarrierOperation.Query)
+        {
+            throw new NotSupportedException(
+                "An InfoCarrier query response is streamed and does not fit in an envelope payload. "
+                + $"Call {nameof(DispatchQueryAsync)} for {nameof(InfoCarrierOperation.Query)}.");
+        }
+
         try
         {
             return await ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -83,17 +95,128 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         }
     }
 
+    /// <summary>
+    ///     Handles one <see cref="InfoCarrierOperation.Query" /> envelope and produces the response
+    ///     as a stream of items (<c>docs/architecture.md</c> §6a <b>D7</b>).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Why a query does not go through <see cref="DispatchAsync" />.</b> Every other
+    ///         operation answers with one value that fits in an envelope payload. A query answers
+    ///         with a sequence, and the whole point of D7 is that the sequence must reach the wire
+    ///         as it is produced rather than after it is complete — which an
+    ///         <c>InfoCarrierEnvelope</c>, whose <c>Payload</c> is a <c>byte[]</c>, cannot express.
+    ///     </para>
+    ///     <para>
+    ///         <b>The version check still comes first and still throws</b>, exactly as it does in
+    ///         <see cref="DispatchAsync" /> and for the same reason: the two ends disagree about
+    ///         what an envelope is, so answering with a stream of items would be optimistic. It is
+    ///         raised on the first <c>MoveNext</c>, which is before a byte of the response has been
+    ///         written, so a binding can still turn it into a plain HTTP 400.
+    ///     </para>
+    ///     <para>
+    ///         <b>A failure is a result, and here it is a trailing one</b> (wire-protocol W5). A
+    ///         failure before the query runs is the only item in the response; a failure part-way
+    ///         through the rows arrives after the rows already sent, because the status line and
+    ///         those rows are long gone by then. <see cref="OperationCanceledException" /> is
+    ///         excluded from both, unchanged: cancellation is the caller's own token, not a
+    ///         server-side failure to report.
+    ///     </para>
+    /// </remarks>
+    public async IAsyncEnumerable<QueryStreamItem> DispatchQueryAsync(
+        InfoCarrierEnvelope request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+        {
+            throw new NotSupportedException(
+                $"InfoCarrier protocol version {request.ProtocolVersion} is not supported by this "
+                + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
+        }
+
+        QueryDataResult? result = null;
+        InfoCarrierFault? fault = null;
+
+        try
+        {
+            result = await _server
+                .QueryDataAsync(Payload<QueryDataRequest>(request), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            fault = InfoCarrierFaultMapper.Capture(exception);
+        }
+
+        if (fault is not null || result is null)
+        {
+            yield return new QueryStreamItem { Fault = fault };
+            yield break;
+        }
+
+        yield return new QueryStreamItem
+        {
+            Header = new QueryResultHeader
+            {
+                ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
+                IsEntityResult = result.IsEntityResult,
+                ElementTypeName = result.ElementTypeName,
+            },
+        };
+
+        // The manual enumerator, because a `yield return` cannot live inside a `catch` and a row
+        // that throws has to become an item rather than escape.
+        IAsyncEnumerator<Expressions.DynamicValueNode> rows =
+            result.Rows.GetAsyncEnumerator(cancellationToken);
+
+        try
+        {
+            while (true)
+            {
+                Expressions.DynamicValueNode? row = null;
+                InfoCarrierFault? rowFault = null;
+
+                try
+                {
+                    if (await rows.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        row = rows.Current;
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    rowFault = InfoCarrierFaultMapper.Capture(exception);
+                }
+
+                if (rowFault is not null)
+                {
+                    yield return new QueryStreamItem { Fault = rowFault };
+                    yield break;
+                }
+
+                if (row is null)
+                {
+                    yield break;
+                }
+
+                yield return new QueryStreamItem { Row = row };
+            }
+        }
+        finally
+        {
+            await rows.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
     private async Task<InfoCarrierEnvelope> ExecuteAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken)
         => request.Operation switch
         {
-            InfoCarrierOperation.Query
-                => await RespondAsync(
-                    request,
-                    _server.QueryDataAsync(Payload<QueryDataRequest>(request), cancellationToken))
-                    .ConfigureAwait(false),
-
+            // `Query` never reaches here: `DispatchAsync` refuses it up front, beside the version
+            // check, because it is answered by `DispatchQueryAsync` as a stream.
             InfoCarrierOperation.SaveChanges
                 => await RespondAsync(
                     request,

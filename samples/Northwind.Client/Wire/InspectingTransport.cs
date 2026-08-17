@@ -68,4 +68,41 @@ public sealed class InspectingTransport(
 
         return response;
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         <b>What the panel can honestly report about a streamed response is different, and
+    ///         pretending otherwise would be the wrong demonstration.</b> There is no response
+    ///         envelope to show and no total byte count to print at the moment the call returns —
+    ///         the rows have not arrived yet. What <em>is</em> known then is the one number
+    ///         streaming exists to improve: how long until the server said something.
+    ///     </para>
+    ///     <para>
+    ///         The elapsed time recorded here is therefore <b>time to first byte</b>, not time to
+    ///         the last row, and the log says so. Buffering the rows in order to report a size
+    ///         would undo the feature in the act of displaying it.
+    ///     </para>
+    /// </remarks>
+    public async Task<QueryDataResult> SendQueryAsync(
+        InfoCarrierEnvelope request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        int requestBytes = _serializer.Serialize(request).Length;
+        long started = Stopwatch.GetTimestamp();
+
+        try
+        {
+            QueryDataResult result = await _inner.SendQueryAsync(request, cancellationToken).ConfigureAwait(false);
+            _log.RecordStreamStart(request, requestBytes, Stopwatch.GetElapsedTime(started));
+            return result;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _log.RecordFailure(request, requestBytes, Stopwatch.GetElapsedTime(started), exception);
+            throw;
+        }
+    }
 }

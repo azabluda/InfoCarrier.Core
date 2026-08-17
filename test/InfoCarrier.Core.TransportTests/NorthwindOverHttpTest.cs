@@ -53,23 +53,26 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         // rode along. System.Text.Json's default DateTime converter always emits the date part in
         // "yyyy-MM-dd" form. The five anchor orders are enough to detect it: if OrderDate rode
         // along at all it rode along for every row, so catching any one of them is catching all.
-        // The recorded response body is not that JSON directly, though, and is
-        // base64 two layers deep. The recorded bytes are the *outer* InfoCarrierEnvelope; its
-        // Payload is itself a byte[], which System.Text.Json (with no converter registered for it
-        // here) renders as base64. Decoding that yields the JSON for a QueryDataResult, whose
-        // SerializedResults is *again* a byte[] -- the row data actually lives one base64 layer
-        // further in than the envelope. The base64 alphabet contains no '-', so a hyphenated date
-        // can never appear at either outer layer regardless of what the rows carry; both layers
-        // must be decoded before the search means anything.
+        //
+        // **The search is against the response body itself now, and that is D7 half (A) showing
+        // through.** It used to have to decode two base64 layers first: the recorded bytes were an
+        // InfoCarrierEnvelope whose Payload was a byte[] holding a QueryDataResult, whose
+        // SerializedResults was *again* a byte[] holding the rows. The base64 alphabet contains no
+        // '-', so a hyphenated date could not appear at either outer layer no matter what the rows
+        // carried, and an assertion against the raw body could not fail -- which Phase 1 learned
+        // the expensive way. A streamed query response has no nesting left: the rows are JSON
+        // objects in a top-level JSON array, so their values are in the body as text.
         string[] seededOrderDates = ["2026-01-05", "2026-02-11", "2026-02-18", "2026-03-02", "2026-03-20"];
-        var serializer = new SystemTextJsonInfoCarrierSerializer();
         string allRowData = string.Concat(
-            recorder.ResponseBodies
-                .Select(bytes => serializer.Deserialize<InfoCarrierEnvelope>(bytes))
-                .Where(envelope => envelope is not null)
-                .Select(envelope => serializer.Deserialize<QueryDataResult>(envelope!.Payload))
-                .Where(result => result is not null)
-                .Select(result => System.Text.Encoding.UTF8.GetString(result!.SerializedResults)));
+            recorder.ResponseBodies.Select(System.Text.Encoding.UTF8.GetString));
+
+        // The premise the search rests on, asserted rather than assumed: the dates are absent
+        // because the projection excluded them, not because the body is opaque to this search. A
+        // value the projection *did* ask for has to be findable by the very same means, or the
+        // assertions below prove nothing -- which is exactly the trap the old two-layer form fell
+        // into.
+        Assert.Contains("ALFKI", allRowData);
+
         foreach (string orderDate in seededOrderDates)
         {
             Assert.DoesNotContain(orderDate, allRowData);

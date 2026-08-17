@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -114,7 +115,9 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         _client = new TransportInfoCarrierClient(
             new EnvelopeTransport(
                 (envelope, cancellationToken) => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
-                    .DispatchAsync(envelope, cancellationToken)),
+                    .DispatchAsync(envelope, cancellationToken),
+                (envelope, cancellationToken) => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
+                    .DispatchQueryAsync(envelope, cancellationToken)),
             _serializer);
     }
 
@@ -162,11 +165,56 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     </para>
     /// </remarks>
     private sealed class EnvelopeTransport(
-        Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler) : IInfoCarrierTransport
+        Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler,
+        Func<InfoCarrierEnvelope, CancellationToken, IAsyncEnumerable<QueryStreamItem>> queryHandler)
+        : IInfoCarrierTransport
     {
         public Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
             => handler(request, cancellationToken);
+
+        /// <summary>
+        ///     Carries a streamed query response, serializing every item on the way past.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The serialization is the point, and it is newly this class's job.</b> This
+        ///         transport hands the envelope straight to the server because
+        ///         <see cref="InfoCarrierEnvelopeServer" /> used to serialize the payload itself —
+        ///         so every result row in the whole suite crossed real JSON without this class
+        ///         doing anything. D7 half (A) moved the query response out of the envelope, and
+        ///         with it that free coverage: without the round trip below, 22 656 tests would run
+        ///         against live <c>DynamicValueNode</c> objects and stop proving the result wire
+        ///         format entirely.
+        ///     </para>
+        ///     <para>
+        ///         Per item, not per response — a simulation that buffered the items in order to
+        ///         serialize them together would be testing the opposite of what streaming is.
+        ///     </para>
+        /// </remarks>
+        public Task<QueryDataResult> SendQueryAsync(
+            InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
+            => QueryStreamReader.ReadAsync(
+                Simulate(queryHandler(request, cancellationToken), cancellationToken),
+                "the in-process backend test store",
+                owner: null,
+                cancellationToken);
+
+        private static async IAsyncEnumerable<QueryStreamItem> Simulate(
+            IAsyncEnumerable<QueryStreamItem> items,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (QueryStreamItem item in
+                items.WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                // Through `ExpressionJsonContext`, which is the context the real bindings use for a
+                // query response: a `DynamicValueNode` is only correct under its options.
+                yield return System.Text.Json.JsonSerializer.Deserialize(
+                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                        item, ExpressionJsonContext.Default.QueryStreamItem),
+                    ExpressionJsonContext.Default.QueryStreamItem)!;
+            }
+        }
     }
 
     /// <summary>

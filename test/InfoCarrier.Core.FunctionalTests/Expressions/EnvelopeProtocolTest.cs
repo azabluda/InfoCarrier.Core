@@ -245,20 +245,32 @@ public class EnvelopeProtocolTest
     ///     the test the smoke test's old inline dispatcher could not be: it handled
     ///     <c>Query</c> and threw for the other eight.
     /// </summary>
+    /// <remarks>
+    ///     <b><c>Query</c> goes through its own entry point since D7 half (A)</b>, because its
+    ///     answer is a stream rather than an envelope — so it is dispatched here through
+    ///     <see cref="InfoCarrierEnvelopeServer.DispatchQueryAsync" />, and the count assertion at
+    ///     the end still holds every operation to having been exercised. Draining the sequence is
+    ///     what makes the call happen at all: an async iterator's body does not run until it is
+    ///     enumerated, so asserting on <c>Calls</c> without the <c>await foreach</c> would pass
+    ///     against a server that was never asked anything.
+    /// </remarks>
     [Fact]
     public async Task Every_declared_operation_dispatches_to_its_own_server_method()
     {
         var server = new RecordingServer();
         InfoCarrierEnvelopeServer envelopeServer = Server(server);
 
-        await envelopeServer.DispatchAsync(Envelope(
+        await foreach (QueryStreamItem _ in envelopeServer.DispatchQueryAsync(Envelope(
             InfoCarrierOperation.Query, new QueryDataRequest
             {
                 SerializedQuery = Serializer.Serialize(1),
                 TrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.TrackAll,
                 IsAsync = false,
                 ReturnsSingleResult = false,
-            }));
+            })))
+        {
+            // Drained for its effect; the items themselves are `DispatchQueryAsync`'s own tests.
+        }
         await envelopeServer.DispatchAsync(Envelope(
             InfoCarrierOperation.SaveChanges, new SaveChangesRequest { Entries = [] }));
         await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction));
@@ -327,7 +339,7 @@ public class EnvelopeProtocolTest
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
         {
             Calls.Add("Query");
-            return Task.FromResult(new QueryDataResult { SerializedResults = [], IsEntityResult = false });
+            return Task.FromResult(new QueryDataResult { Rows = System.Linq.AsyncEnumerable.Empty<InfoCarrier.Core.Expressions.DynamicValueNode>(), IsEntityResult = false });
         }
 
         public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)

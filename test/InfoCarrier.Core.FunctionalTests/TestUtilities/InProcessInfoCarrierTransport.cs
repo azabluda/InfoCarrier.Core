@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -28,12 +29,22 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </remarks>
 /// <param name="handler">The in-process handler standing in for the network server.</param>
 /// <param name="serializer">The serializer used to simulate the wire.</param>
+/// <param name="queryHandler">
+///     The in-process handler for a streamed query response, normally
+///     <see cref="InfoCarrierEnvelopeServer.DispatchQueryAsync" />. Null for a transport that is
+///     only ever asked to carry the other eight operations, which is what the token test needs.
+/// </param>
 public sealed class InProcessInfoCarrierTransport(
     Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler,
-    IInfoCarrierSerializer serializer) : IInfoCarrierTransport
+    IInfoCarrierSerializer serializer,
+    Func<InfoCarrierEnvelope, CancellationToken, IAsyncEnumerable<QueryStreamItem>>? queryHandler = null)
+    : IInfoCarrierTransport
 {
     private readonly Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> _handler = handler;
     private readonly IInfoCarrierSerializer _serializer = serializer;
+
+    private readonly Func<InfoCarrierEnvelope, CancellationToken, IAsyncEnumerable<QueryStreamItem>>? _queryHandler
+        = queryHandler;
 
     /// <inheritdoc />
     public async Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
@@ -45,6 +56,59 @@ public sealed class InProcessInfoCarrierTransport(
         // Round-trip the response before handing it back.
         return await SimulateAsync(response, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The same simulation as <see cref="SendAsync" />, one item at a time: the request
+    ///     envelope is round-tripped whole, and every <see cref="QueryStreamItem" /> the server
+    ///     produces is serialized and deserialized before the client sees it. <b>Per item rather
+    ///     than per response, because that is what the wire now does</b> — and because a simulation
+    ///     that buffered the items in order to round-trip them together would be testing the
+    ///     opposite of the thing under test.
+    /// </remarks>
+    public Task<QueryDataResult> SendQueryAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
+    {
+        Func<InfoCarrierEnvelope, CancellationToken, IAsyncEnumerable<QueryStreamItem>> queries =
+            _queryHandler
+            ?? throw new InvalidOperationException(
+                $"This {nameof(InProcessInfoCarrierTransport)} was built without a query handler, "
+                + "so it cannot carry a Query operation.");
+
+        return QueryStreamReader.ReadAsync(
+            SimulateQueryAsync(request, queries, cancellationToken),
+            "the in-process transport",
+            owner: null,
+            cancellationToken);
+    }
+
+    private async IAsyncEnumerable<QueryStreamItem> SimulateQueryAsync(
+        InfoCarrierEnvelope request,
+        Func<InfoCarrierEnvelope, CancellationToken, IAsyncEnumerable<QueryStreamItem>> queries,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        InfoCarrierEnvelope simulatedRequest = await SimulateAsync(request, cancellationToken).ConfigureAwait(false);
+
+        await foreach (QueryStreamItem item in
+            queries(simulatedRequest, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            yield return RoundTrip(item);
+        }
+    }
+
+    /// <summary>
+    ///     One response item through real serialization.
+    /// </summary>
+    /// <remarks>
+    ///     Through <see cref="ExpressionJsonContext" /> rather than through the injected
+    ///     <see cref="IInfoCarrierSerializer" />, because that is the context the real bindings use
+    ///     for a query response — a <see cref="Expressions.DynamicValueNode" /> is only correct
+    ///     under its options. Simulating the wire with a different one would prove the wrong thing.
+    /// </remarks>
+    private static QueryStreamItem RoundTrip(QueryStreamItem item)
+        => System.Text.Json.JsonSerializer.Deserialize(
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                item, ExpressionJsonContext.Default.QueryStreamItem),
+            ExpressionJsonContext.Default.QueryStreamItem)!;
 
     private async Task<InfoCarrierEnvelope> SimulateAsync(InfoCarrierEnvelope value, CancellationToken cancellationToken)
     {

@@ -55,9 +55,7 @@ public sealed class SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits
     {
     }
 
-    /// <summary>
-    ///     The payload limits this serializer applies.
-    /// </summary>
+    /// <inheritdoc />
     public InfoCarrierPayloadLimits Limits => _limits;
 
     /// <inheritdoc />

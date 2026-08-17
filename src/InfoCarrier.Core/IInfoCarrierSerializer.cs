@@ -11,6 +11,20 @@ namespace InfoCarrier.Core;
 public interface IInfoCarrierSerializer
 {
     /// <summary>
+    ///     The size bounds this serializer applies (milestone M5).
+    /// </summary>
+    /// <remarks>
+    ///     On the interface rather than on the implementation because a <em>streamed</em> response
+    ///     is bounded by whoever reads the stream, not by whoever deserializes a payload —
+    ///     <see cref="HttpInfoCarrierTransport" /> has to see
+    ///     <see cref="InfoCarrierPayloadLimits.MaxResponseBytes" /> in order to count against it,
+    ///     and before this it could only have got there by testing for a concrete serializer type.
+    ///     An implementation that bounds nothing returns
+    ///     <c>new InfoCarrierPayloadLimits(null, null)</c>.
+    /// </remarks>
+    InfoCarrierPayloadLimits Limits { get; }
+
+    /// <summary>
     ///     Serializes a value to a byte payload.
     /// </summary>
     /// <typeparam name="T">The type to serialize.</typeparam>

@@ -23,10 +23,7 @@ namespace InfoCarrier.Core;
 internal sealed class QueryExecutor<TElement>
 {
     private static readonly System.Reflection.MethodInfo MaterializeMethod
-        = typeof(ClientResultMaterializer).GetMethod(nameof(ClientResultMaterializer.Materialize))!;
-
-    private static readonly System.Reflection.MethodInfo ToListMethod
-        = typeof(Enumerable).GetMethod(nameof(Enumerable.ToList))!;
+        = typeof(ClientResultMaterializer).GetMethod(nameof(ClientResultMaterializer.MaterializeAsync))!;
 
     private static readonly System.Reflection.MethodInfo AsQueryableMethod
         = typeof(Queryable).GetMethods()
@@ -105,7 +102,9 @@ internal sealed class QueryExecutor<TElement>
                 .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.Context, _queryContext.CancellationToken)
                 .GetAwaiter()
                 .GetResult();
-            results.Add(Materialize(serverQuery, result));
+            results.Add(MaterializeAsync(serverQuery, result, _queryContext.CancellationToken)
+                .GetAwaiter()
+                .GetResult());
         }
 
         IEnumerable<TElement> mapped = Guarded(ApplyResidual(results, singleResult));
@@ -196,7 +195,7 @@ internal sealed class QueryExecutor<TElement>
                 throw;
             }
 
-            results.Add(Materialize(serverQuery, result));
+            results.Add(await MaterializeAsync(serverQuery, result, cancellationToken).ConfigureAwait(false));
         }
 
         foreach (TElement element in Guarded(ApplyResidual(results, singleResult)))
@@ -227,17 +226,32 @@ internal sealed class QueryExecutor<TElement>
     ///     Turns one server result into what the residual expects for that slot.
     /// </summary>
     /// <remarks>
-    ///     The boundary element type is not <typeparamref name="TElement" /> whenever a residual
-    ///     exists, so materialization goes through the runtime type. Rows are drained eagerly:
-    ///     the wire reference scope belongs to one round trip, and a lazily materialized sequence
-    ///     would decode against whichever scope the *next* request had reset.
+    ///     <para>
+    ///         The boundary element type is not <typeparamref name="TElement" /> whenever a residual
+    ///         exists, so materialization goes through the runtime type. Rows are drained eagerly:
+    ///         the wire reference scope belongs to one round trip, and a lazily materialized sequence
+    ///         would decode against whichever scope the *next* request had reset.
+    ///     </para>
+    ///     <para>
+    ///         The awaited result is read off the <see cref="Task{TResult}" /> reflectively, because
+    ///         the element type is only known at run time and so the task's own type is too.
+    ///         Awaiting it as a bare <see cref="Task" /> first is what makes the exception the
+    ///         caller sees the one the materializer threw rather than a
+    ///         <see cref="System.Reflection.TargetInvocationException" /> — an <c>async</c> method
+    ///         puts its failure on the task, not on the <c>Invoke</c>.
+    ///     </para>
     /// </remarks>
-    private object? Materialize(ServerQuery serverQuery, QueryDataResult result)
+    private async Task<object?> MaterializeAsync(
+        ServerQuery serverQuery, QueryDataResult result, CancellationToken cancellationToken)
     {
-        ClientResultMaterializer materializer = _materializer;
+        object task = Invoke(
+            MaterializeMethod.MakeGenericMethod(serverQuery.ElementType),
+            _materializer,
+            [result, cancellationToken])!;
 
-        object rows = Invoke(MaterializeMethod.MakeGenericMethod(serverQuery.ElementType), materializer, [result])!;
-        object list = Invoke(ToListMethod.MakeGenericMethod(serverQuery.ElementType), null, [rows])!;
+        await ((Task)task).ConfigureAwait(false);
+
+        object list = task.GetType().GetProperty(nameof(Task<object>.Result))!.GetValue(task)!;
 
         if (serverQuery.ReturnsSingleResult)
         {

@@ -45,16 +45,58 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         => _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>();
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         <b>The lease outlives this method, and that is the price of streaming.</b>
+    ///         <see cref="QueryDataResult.Rows" /> is read lazily and every row is mapped through
+    ///         the server's own <c>IStateManager</c>, so the context — and, inside a transaction,
+    ///         the store connection — has to stay open until the sequence is exhausted or its
+    ///         enumerator is disposed. The <c>finally</c> that used to release it here would have
+    ///         disposed the context before the first row was asked for.
+    ///     </para>
+    ///     <para>
+    ///         A caller that stops enumerating early releases it, because <c>await foreach</c>
+    ///         disposes the enumerator; a caller that takes the result and never enumerates it at
+    ///         all does not. That is D7's abandoned-enumeration note, and it is why nothing in this
+    ///         provider hands a <see cref="QueryDataResult" /> anywhere without draining it.
+    ///     </para>
+    /// </remarks>
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         Lease lease = Acquire(request.TransactionId);
+
+        QueryDataResult result;
         try
         {
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers);
             var executor = new ServerQueryExecutor(lease.Context, serializer);
-            return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+            result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Nothing was handed out, so nothing else can release it.
+            await lease.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+
+        return result with { Rows = Holding(result.Rows, lease) };
+    }
+
+    /// <summary>
+    ///     Keeps <paramref name="lease" /> alive for exactly as long as the rows are being read.
+    /// </summary>
+    private static async IAsyncEnumerable<Expressions.DynamicValueNode> Holding(
+        IAsyncEnumerable<Expressions.DynamicValueNode> rows,
+        Lease lease)
+    {
+        try
+        {
+            await foreach (Expressions.DynamicValueNode row in rows.ConfigureAwait(false))
+            {
+                yield return row;
+            }
         }
         finally
         {

@@ -55,6 +55,40 @@ public sealed class WireLog
         });
 
     /// <summary>
+    ///     Records a streamed query response at the moment its header arrived — which is the only
+    ///     moment there is anything to record.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A streamed response has no envelope and no size at this point: the rows have not
+    ///         arrived, which is the entire feature. <see cref="WireEntry.Duration" /> is therefore
+    ///         <b>time to first byte</b> here and time to the last byte everywhere else, and
+    ///         <see cref="WireEntry.ResponseBytes" /> is <c>-1</c> to mean "not a number that
+    ///         exists yet" rather than <c>0</c>, which would read as an empty response.
+    ///     </para>
+    ///     <para>
+    ///         The panel could report a total by draining the rows, and must not: the display would
+    ///         then be the reason the feature stopped working, which is the shape of bug
+    ///         <see cref="WireDecoder" />'s own remarks record.
+    ///     </para>
+    /// </remarks>
+    public void RecordStreamStart(InfoCarrierEnvelope request, int requestBytes, TimeSpan timeToFirstByte)
+        => Add(new WireEntry
+        {
+            Sequence = ++_sequence,
+            Operation = request.Operation,
+            RequestBytes = requestBytes,
+            ResponseBytes = -1,
+            Duration = timeToFirstByte,
+            RequestPayload = WireDecoder.Describe(request.Payload),
+            ResponsePayload =
+                "(streamed) The rows of a query response arrive as the server produces them, so "
+                + "there is no response body to show here and no total size to report. The time "
+                + "above is time to the first byte.",
+            Fault = null,
+        });
+
+    /// <summary>
     ///     Records a round trip the transport could not complete — no response envelope exists.
     /// </summary>
     public void RecordFailure(InfoCarrierEnvelope request, int requestBytes, TimeSpan duration, Exception exception)

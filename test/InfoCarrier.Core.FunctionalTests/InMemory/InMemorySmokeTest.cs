@@ -53,7 +53,8 @@ public class InMemorySmokeTest
         var envelopeServer = new InfoCarrierEnvelopeServer(server, new SystemTextJsonInfoCarrierSerializer());
         var transport = new InProcessInfoCarrierTransport(
             envelopeServer.DispatchAsync,
-            new SystemTextJsonInfoCarrierSerializer());
+            new SystemTextJsonInfoCarrierSerializer(),
+            envelopeServer.DispatchQueryAsync);
         var client = new TransportInfoCarrierClient(transport, new SystemTextJsonInfoCarrierSerializer());
 
         // Let EF build its own internal service provider via the InfoCarrier options

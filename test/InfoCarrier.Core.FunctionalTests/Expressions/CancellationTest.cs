@@ -60,7 +60,10 @@ public class CancellationTest
         var server = new InfoCarrierEnvelopeServer(recorder, Serializer);
         using var cts = new CancellationTokenSource();
 
-        await server.DispatchAsync(
+        // Through its own entry point since D7 half (A) — a query answers with a stream — and
+        // drained, because an async iterator's body does not run until it is enumerated: asserting
+        // on the recorded tokens without this would pass against a server never asked anything.
+        await foreach (QueryStreamItem _ in server.DispatchQueryAsync(
             Envelope(
                 InfoCarrierOperation.Query,
                 new QueryDataRequest
@@ -70,7 +73,9 @@ public class CancellationTest
                     IsAsync = true,
                     ReturnsSingleResult = false,
                 }),
-            cts.Token);
+            cts.Token))
+        {
+        }
         await server.DispatchAsync(
             Envelope(InfoCarrierOperation.SaveChanges, new SaveChangesRequest { Entries = [] }), cts.Token);
         await server.DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction), cts.Token);
@@ -214,7 +219,9 @@ public class CancellationTest
         var envelopeServer = new InfoCarrierEnvelopeServer(
             new InProcessInfoCarrierServer(serverProvider), Serializer);
         var client = new TransportInfoCarrierClient(
-            new InProcessInfoCarrierTransport(envelopeServer.DispatchAsync, Serializer), Serializer);
+            new InProcessInfoCarrierTransport(
+                envelopeServer.DispatchAsync, Serializer, envelopeServer.DispatchQueryAsync),
+            Serializer);
 
         return new SmokeContext(new DbContextOptionsBuilder<SmokeContext>().UseInfoCarrier(client).Options);
     }
@@ -247,7 +254,7 @@ public class CancellationTest
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
         {
             Tokens.Add(cancellationToken);
-            return Task.FromResult(new QueryDataResult { SerializedResults = [], IsEntityResult = false });
+            return Task.FromResult(new QueryDataResult { Rows = System.Linq.AsyncEnumerable.Empty<InfoCarrier.Core.Expressions.DynamicValueNode>(), IsEntityResult = false });
         }
 
         public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)

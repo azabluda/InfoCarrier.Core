@@ -833,3 +833,90 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
       and nothing in the code said so.
 
 ---
+
+- [x] **M8-24. The query response leaves the envelope, and the rows become a stream.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`m8-24b` against `j25`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `InfoCarrier.Core.TransportTests`: **17 of 17**.
+
+      D7's buffering points 2 and 3, in one commit because they cannot disagree: the wire contract
+      and both bindings.
+
+      **What was in the way was not the `byte[]` but the nesting.** A query response was
+      `SerializedResults` (a `byte[]`) inside `QueryDataResult` inside `InfoCarrierEnvelope.Payload`
+      (another `byte[]`) — **two base64 layers**, each of which has to be complete before the one
+      outside it can be written, and which between them inflate the payload by about 1.78×. No
+      arrangement of flushes streams through that. So the query response stopped being an envelope
+      payload at all.
+
+      | | Before | After |
+      |---|---|---|
+      | Query response body | `InfoCarrierEnvelope` JSON, rows base64 two layers in | a top-level JSON array of `QueryStreamItem` |
+      | `QueryDataResult.SerializedResults` | `byte[]`, the whole result set | `Rows`, an `IAsyncEnumerable<DynamicValueNode>` |
+      | Transport seam | `SendAsync` only | plus `SendQueryAsync` |
+      | Server seam | `DispatchAsync` for all nine | plus `DispatchQueryAsync`, and `Query` refused by the other |
+
+      **The item is tagged rather than the array being an object with a `rows` member, and that is
+      forced by the reader.** `JsonSerializer.DeserializeAsyncEnumerable` reads a *top-level* array
+      incrementally and nothing else; a nested array would need a hand-written `Utf8JsonReader` loop
+      over a buffered stream on the client. The tag costs about ten bytes a row and buys a
+      source-generated reader and a source-generated writer.
+
+      **A fault is now a trailing item, because a streamed failure has nowhere else to go.** The
+      status line and the first rows are long gone by the time an EF translation failure or a store
+      error arrives, so it cannot become an HTTP 500 or an envelope `Fault`. It is safe today
+      *because* point 4 is deliberate: `ClientResultMaterializer` decodes to completion, so the
+      trailing fault is always reached before any row reaches the caller. **Half (B) has to answer
+      this again**, and that is now recorded on the type itself.
+
+      **Three things measured or found rather than reasoned:**
+
+      - **`JsonSerializer.Serialize(Utf8JsonWriter, …)` flushes the writer synchronously**, and a
+        synchronous write to an ASP.NET Core response body throws *"Synchronous operations are
+        disallowed"*. The endpoint was written the obvious way first — one `Utf8JsonWriter` over
+        `Response.Body`, `WriteStartArray`, one `Serialize` per item — and **8 of the 17 transport
+        tests said so in one run**. There is no `SerializeAsync` overload taking a writer, so the
+        three punctuation bytes are written by hand and each item goes to the stream through
+        `SerializeAsync`.
+      - **The 22 656-test suite was getting its result-wire-format coverage for free, from a line
+        that no longer exists.** `EnvelopeTransport` hands the envelope straight to the server and
+        never serialized anything itself — `InfoCarrierEnvelopeServer` serialized the payload, and
+        every result row in the suite crossed real JSON as a side effect of that. Moving the query
+        response out of the envelope would have silently ended it, leaving 22 656 tests running
+        against live `DynamicValueNode` objects. Both in-process test transports now round-trip
+        every `QueryStreamItem` through `ExpressionJsonContext` explicitly, **per item, because a
+        simulation that buffered them to serialize them together would be testing the opposite of
+        the thing under test**.
+      - **`DispatchAsync` refuses `Query` outside its own try/catch**, beside the version check.
+        Inside, the refusal came back as a well-formed fault envelope — an error report about the
+        server describing a defect in the caller's wiring — and a transport still wired the old way
+        would have looked like a server that cannot answer queries.
+      - **The trim gate went to 89, and the cause was a conditional rather than a new capability.**
+        ILLink reports an unannotated `Type` flowing into `IModel.FindEntityType` once **per
+        origin**, so `singleResult ? query.Type : GetElementType(query.Type)` written at the call
+        site produced *two* warnings for *one* call. Behind a named method there is one origin and
+        one warning, and the baseline stays at 88. Worth recording because the count moved for a
+        reason that has nothing to do with how much reflection the code does — which is exactly the
+        reading `eng/trim-ratchet.sh`'s own header warns against.
+
+      **`MaxResponseBytes` now means something.** It could not be applied to a stream by the
+      existing `Guard(payload.Length, …)`, which needs the bytes already in hand, so the HTTP client
+      counts them as they are read and refuses at the point they pass. The default stays `null`;
+      what changed is that setting it works on the path that made it matter. `IInfoCarrierSerializer`
+      gained a `Limits` member for this, because the transport could otherwise only have reached it
+      by testing for a concrete serializer type.
+
+      **The element type in the header is the query's declared one, not the first row's runtime
+      type** — a streamed header goes out before a row exists. It is also the better of the two: a
+      lazy-loading proxy's CLR type is not in the model, so the old rule reported
+      `IsEntityResult: false` for a result that was entirely entities. Nothing routes on either
+      member; both are diagnostics.
+
+      **The in-process server's lease now outlives its method.** Rows are mapped through the
+      server's own `IStateManager`, so the `DbContext` has to stay open until the sequence is
+      exhausted — the `finally` that used to release it would have disposed the context before the
+      first row was asked for. An abandoned enumeration therefore pins a context, which is D7's own
+      note; `await foreach` releases it, and nothing in this provider takes a `QueryDataResult`
+      without draining it.
+
+---
