@@ -79,9 +79,14 @@ providers reject.
 > Every limitation, with a worked example, written for someone who does not care about the
 > internals. It takes a few minutes to tell whether any of them touches your application.
 
-**Not yet done:** NuGet packaging, a shipped gRPC binding, and streaming results as
-`IAsyncEnumerable`. The HTTP binding lives in the samples and is production-shaped, not
-production-blessed — see below.
+**Packaged, not published.** `dotnet pack` produces `InfoCarrier.Core` and
+`InfoCarrier.Core.AspNetCore` at `10.0.0-preview.1`, and pushing a `v*` tag attaches both — plus
+their symbol packages — to a GitHub Release. **Neither is on nuget.org.** A pushed NuGet version
+can be unlisted but never withdrawn, so that one irreversible step is left to a human with the
+packages in hand; no publishing key lives in this repository.
+
+**Not yet done:** a shipped gRPC binding, and streaming results as `IAsyncEnumerable`. Both may
+change `IInfoCarrierTransport`, which is why the version still says `preview`.
 
 ## How it fits together
 
@@ -144,6 +149,13 @@ database, running against a SQLite-backed server, plus a **wire inspector** down
 every round trip — the operation, the bytes each way, the time, and the decoded payload, including
 the expression tree unpacked out of the base64 it travels in.
 
+Three pages, deliberately ordinary. **Customers** is a grid that sorts and filters in its own
+column headers, so the `OrderBy`, the `Where` and the `Skip`/`Take` in the panel are the ones the
+grid itself composed. **Order** is master-detail: pick an order on the left, edit line quantities
+on the right, and several edits leave as one `SaveChanges`. **Transfer** moves an order to another
+customer and adjusts stock inside one transaction, with a tickbox that makes the second save fail
+on the server so you can watch the rollback.
+
 There is a console client too, which is the same client without a browser:
 
 ```bash
@@ -192,6 +204,7 @@ a caller may see.
 | [`docs/expression-serialization.md`](docs/expression-serialization.md) | How a LINQ tree becomes bytes |
 | [`docs/projection-split.md`](docs/projection-split.md) | What runs on the server, what runs on the client |
 | [`docs/roadmap.md`](docs/roadmap.md) | Milestones and CI strategy |
+| [`docs/build-warnings.md`](docs/build-warnings.md) | Which warnings are fatal, which are suppressed, where, and why |
 
 ## Build and test
 
@@ -204,6 +217,17 @@ dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests
 
 The first is the inherited EF specification suite; the second drives a real HTTP hop against an
 ASP.NET Core server.
+
+The build is clean — `0 Warning(s)` — and stays that way because **warnings are errors in CI, and
+only in CI**. Locally a warning is a warning, so half-finished work still builds. To see what the
+server will see:
+
+```bash
+CI=true dotnet build InfoCarrier.Core.slnx
+```
+
+[`docs/build-warnings.md`](docs/build-warnings.md) records what is suppressed, where, and why —
+read it before adding a `NoWarn`.
 
 ## Credits
 

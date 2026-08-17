@@ -1150,3 +1150,65 @@ warning ratchet to replace.
 texts. Nine security advisories closed by a version floor, 22 XML-doc defects fixed, 23 nullability
 sites answered, 36 unused usings removed, `EF1001` handled the way EF Core's own providers handle
 it, and a new warning now fails CI.
+
+## Phase N — the documentation a consumer reads
+
+Two audiences, and the whole phase exists because they had been served by one set of files. The
+three READMEs are the *repository's* front doors; the site under [`../website/`](../website/) is
+for a C# developer who has never seen this repository and does not want to. **Nothing internal
+goes on the site** — no ADR numbers, no phase labels, no test tiers, no wire internals beyond what
+a consumer must set.
+
+**Gates.** Everything in this phase is text plus a workflow. `eng/measure.sh` and
+`eng/trim-ratchet.sh` say nothing about a Markdown file, and CLAUDE.md's table is explicit that
+`docs/`/`eng/` text changes need neither. Each step below states what it ran and what it did not,
+rather than staying silent about it.
+
+- [x] **N1. The repository README, checked claim by claim rather than edited in place.**
+      `<this commit>`
+
+      Four claims were checked against the repository and three of them had moved.
+
+      **"Not yet done: NuGet packaging"** was the largest. Phase K did it: `Directory.Build.props`
+      carries the package identity, `IsPackable` opts the two `src/` projects in individually, and
+      `release.yml` packs on a `v*` tag and attaches the `.nupkg` and `.snupkg` to a GitHub
+      Release. What is *not* done is publishing — deliberately, and `release.yml`'s own header says
+      why. The README now separates the two, because "no packaging" and "packaged but not pushed"
+      send a reader to different places.
+
+      **"The HTTP binding lives in the samples"** was M8-22's before-picture. It is in
+      `InfoCarrier.Core`, which the table three paragraphs below already said — the two halves of
+      the same section disagreed.
+
+      **The three sample pages** were redesigned in M8-23…M8-26 and the README still described
+      them as an undifferentiated "three pages". Named now, one sentence each, because what each
+      page demonstrates is the reason to run it.
+
+      **`docs/build-warnings.md` was linked from nowhere.** It is in the documentation table, and
+      `CI=true dotnet build` is in *Build and test* — a contributor who does not know that warnings
+      are fatal on the server finds out from a red run otherwise.
+
+      Verified unchanged: the suite figures (`22658 / 22472 / 9 / 177`) against
+      `artifacts/measure/m8-32`, the badge's `22,472`, both package descriptions, and every
+      relative link in the documentation table resolving to a file that exists.
+
+      **Gates: none, and that is the rule rather than an omission.** One Markdown file changed; no
+      `src/`, no `test/`. CLAUDE.md's table says `docs/` text needs neither `eng/measure.sh` nor
+      `eng/trim-ratchet.sh`.
+
+- [ ] **N2. `samples/README.md`: three stale numbers and one section that contradicted itself.**
+      `<this commit>`
+
+- [ ] **N3. `docs/nuget-readme.md`: honest about where the packages actually are.** `<this commit>`
+
+- [ ] **N4. The site: Material for MkDocs, in `website/`, with `docs/` left alone.** `<this commit>`
+
+- [ ] **N5. Getting started — install, first client, first server, samples.** `<this commit>`
+
+- [ ] **N6. Using it — querying, saving, transactions, loading, errors.** `<this commit>`
+
+- [ ] **N7. Configuration — client, server, value mappers, custom transports.** `<this commit>`
+
+- [ ] **N8. Platform notes, security, limitations, the public surface at a glance.** `<this commit>`
+
+- [ ] **N9. `docs.yml` — build on every push, deploy to Pages, disturb nothing.** `<this commit>`
