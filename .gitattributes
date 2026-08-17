@@ -1,0 +1,52 @@
+# Line endings — decided 2026-08-17, after a session of "LF will be replaced by CRLF" warnings.
+#
+# WHAT WAS ACTUALLY WRONG, because it was not what the warnings suggested. `git ls-files --eol`
+# reported `i/lf` for EVERY tracked text file: the repository content was already uniformly LF and
+# had been all along, because Git for Windows sets `core.autocrlf=true` system-wide and normalises
+# on commit. The mess was entirely in the WORKING TREE — 207 files LF, 126 CRLF and 11 mixed —
+# because `autocrlf` converts to CRLF on checkout while the tools used to edit here write LF. So
+# nothing needed repairing in history; what was missing was a statement of intent that both ends
+# agree on.
+#
+# THE DECISION IS LF EVERYWHERE, in the repository and in the working tree, on every platform.
+# `eol=lf` overrides `core.autocrlf`, so this file settles it for every contributor without anyone
+# having to configure anything, which is the point of putting it in the repository rather than in a
+# machine's git config.
+#
+# Why LF rather than CRLF:
+#   - CI runs on ubuntu-latest, and `eng/*.sh` are executed by bash there. A CRLF shell script
+#     fails with the notoriously unhelpful `$'\r': command not found`.
+#   - Every tool in this repo's loop — dotnet, the shell scripts, the editors — reads LF happily on
+#     Windows. Visual Studio and VS Code both save LF without complaint when told to.
+#   - It makes the working tree byte-identical to what is committed, so `git diff` never shows a
+#     whole file as changed because someone's editor rewrote the endings.
+* text=auto eol=lf
+
+# Shell scripts: stated explicitly rather than left to `text=auto`, because this is the one case
+# where getting it wrong breaks CI rather than merely producing noise.
+*.sh text eol=lf
+
+# Windows batch files genuinely want CRLF — cmd.exe can mis-parse an LF-only `.bat` in some
+# constructs. There are none in the repository today; this is here so that adding one later does
+# not require rediscovering why it misbehaves.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary — never touch the bytes, never try to diff them as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.nupkg binary
+*.snupkg binary
+*.db binary
+*.dll binary
+*.exe binary
+
+# Better hunk headers in diffs. Cosmetic, and cheap.
+*.cs   diff=csharp
+*.md   diff=markdown
+*.json diff=json
