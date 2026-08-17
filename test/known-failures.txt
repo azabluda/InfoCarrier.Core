@@ -143,5 +143,15 @@
 # with Assert.Equal(SqliteStrings.ApplyNotSupported, ...) -- the class comment here had said for
 # four steps that it does not, and C77 carried that note forward as a classification instead of
 # grepping. A classification is not evidence. JsonQuery is now 0.
-failed=13
+# 2026-08-16 (J1) - 13 -> 15, A DELIBERATE RISE, and `skipped` 221 -> 214. KeysWithConverters moved
+# from ADR-009 Tier A to Tier B. Its seven skips were EF's own KeysWithConvertersInMemoryTest
+# refusing issue #26238; KeysWithConvertersSqliteTest skips NONE of them and ignores nothing, so
+# seven of the shapes that base exists to cover were being asserted about the backing store rather
+# than about this provider -- CLAUDE.md's A79/A80 rule. Five now pass. The two that fail are new
+# information and both are the wire's, not the store's: DynamicValueMapper.MapToNode takes its
+# collection branch on a key type that merely implements IEnumerable, and RehydrateObject cannot
+# construct a nested generic test type with no parameterless constructor. Both classified in J1 of
+# docs/implementation-plan.md. Figures read off the run's own summary block, never by arithmetic:
+# 22453 / 22224 / 15 / 214 (`j1b`).
+failed=15
 total=22453

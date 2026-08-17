@@ -631,7 +631,34 @@ SQLite suite skips **zero** of them, which is the whole argument:
 
 Measured one at a time, because a combined move cannot tell which base moved the number.
 
-- [ ] **J1. `KeysWithConverters` to Tier B.**
+- [x] **J1. `KeysWithConverters` to Tier B.** `<this commit>`
+      `Total tests: 22453, Passed: 22224, Failed: 15, Skipped: 214` (`j1b`), against
+      `22453 / 22219 / 13 / 221` (`m8-17`). **All four figures are read out of the run's own summary
+      block; none is arithmetic.** Seven skips gone, five of them now passing, and
+      **`failed` rises 13 → 15 deliberately** — the two that fail describe *this provider* where
+      before they described EF's InMemory store, which is the whole point of the move.
+
+      **The move needed one thing EF's SQLite fixture gets for free, and finding it cost a run.**
+      Deleting the seven skips and the three `Ignore<EnumerableClassKey*>()` calls put the class at
+      **47 failures**, every one `CollectionWithoutComparer`: `EnumerableClassKey.Id` is an
+      `IEnumerable` behind a value converter with no value comparer, and model validation warns.
+      `KeysWithConvertersSqliteFixture` does not hit it because its `AddOptions` is
+      `builder.UseSqlite(…)` and **never chains to base**, so `FixtureBase`'s
+      `ConfigureWarnings(Default(Throw))` never runs. This client cannot take that route —
+      `UseSqlite` is precisely what it does not do — so it ignores the one event id instead, on
+      **both** halves, because the model is validated twice (A49).
+
+      **The two residual failures are both new information, and both are the wire's rather than the
+      store's.** Neither existed as a failure before; both were hidden inside a skip that was about
+      InMemory.
+
+      | Test | What it says |
+      |---|---|
+      | `Can_insert_and_read_back_with_enumerable_class_key_and_optional_dependents` | `NotImplementedException` from `EnumerableClassKey.GetEnumerator()`, reached from `DynamicValueMapper.MapToNode`. The mapper sees `IEnumerable` and takes the **collection** branch on a value that is a *key*, not a collection. **ADR-012's family exactly** — a CLR type whose member throws for an ordinary instance, like `IPAddress.ScopeId` (C23) and `Uri.AbsolutePath` (C34) — except the value arrives as a `ConstantExpression` in a query, where there is no property to read a converter from. |
+      | `Can_query_and_update_owned_entity_with_value_converter` | `MissingMethodException: Cannot dynamically create an instance of type '…+Key[…]'. Reason: No parameterless constructor defined.` Raised deserializing the round trip, so it is `RehydrateObject` on a nested generic type with no parameterless constructor. |
+
+      Left red and classified, as CLAUDE.md requires. Neither is a reason to go back to Tier A:
+      on Tier A they were unreported.
 - [ ] **J2. `BuiltInDataTypes` to Tier B.**
 - [ ] **J3. `ProxyGraphUpdates` to Tier B.**
 
