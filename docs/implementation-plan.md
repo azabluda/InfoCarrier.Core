@@ -1511,7 +1511,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 | `Correlated_collection_with_distinct_3_levels` | 2 | `Assert.Equal() Values differ` | **Known.** C64/C96: no correct answer satisfies the assertion, and EF's InMemory suite refuses the query outright. |
 | `Regex_IsMatch`, `Regex_IsMatch_constant_input` | 2 | LINQ not translated | **Ours, by design** — A46's deliberate allowlist refusal. **Not upstream**, which the earlier summary got wrong. |
 | `Can_insert_and_read_back_with_enumerable_class_key…` | 1 | `InvalidCastException` | **Upstream**, and the only one: EF's own `EnumerableClassKey.Equals` casts to `IntClassKey` (J9). |
-| `Parameter_collection_null_Contains` | 1 | LINQ not translated | SQLite-tier; the 1 that survived `PrimitiveCollectionsQuery` going 4 → 1 in C88. |
+| ~~`Parameter_collection_null_Contains`~~ | ~~1~~ | LINQ not translated | ~~SQLite-tier~~ — **the label was wrong and J19 fixed it.** No reference provider refuses this; it was ours, and one clause. |
 | `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Settled by J16, no code.** Right type, right verdict, EF's wording of a different true fact. Three siblings green. |
 | `Casts_are_removed_from_expression_tree_when_redundant` | 1 | ~~`Assert.Throws: Exception type was not an exact match`~~ → `Assert.Equal: Strings differ` (J18) | **Re-diagnosed by J17; the entry below it used to carry was wrong.** Not cast elision — a type-argument boundary, guarded in J18. What is left is EF's *printed* message, which ADR-006 cannot reproduce. |
 | `Collection_enum_as_string_Contains` | 1 | `Assert.Throws: No exception was thrown` | **A28, verified** by probe in J2's triage: `Seller` → 1/1, `Customer` → 0/0, so the server really filters. |
@@ -1671,6 +1671,46 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       2 and `Cast<object>` returns 2, so a guard that refused *every* `Cast`/`OfType` would fail it.
       Without those two lines the test would pass for the wrong reason, which is the one way this
       particular fix could rot.
+
+- [x] **J19. A null collection parameter is boxed like any other — and the classification that hid
+      it was wrong.** `<this commit>`
+      `Total tests: 22657, Passed: 22468, Failed: 12, Skipped: 177` (`j19` against `j18`):
+      **1 fixed, 0 broken. 13 → 12.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+
+      **The label was the defect.** `Parameter_collection_null_Contains` had stood as *"SQLite-tier;
+      the 1 that survived `PrimitiveCollectionsQuery` going 4 → 1 in C88"* — a store limitation, red
+      by right. **CLAUDE.md's own rule says to grep EF's suites for the name, and nobody had.**
+      EF's SQLite, SQL Server and Cosmos tests all override it *only to pin SQL* and all call
+      `base`; SQLite emits `WHERE 0`. **No reference provider refuses this query.** So it was ours.
+
+      **What the message said, once read as a trace rather than as a category:**
+
+      ```
+      .Where(p => null.Contains(p.Int))
+      ```
+
+      The null array reached the server as an **inline literal**, and nothing can translate
+      `null.Contains(…)`. EF's own funcletizer lifts the captured variable into a parameter, and
+      then the provider answers `WHERE 0`.
+
+      **One clause, and the shape of it is the reusable part.** `QueryExecutor.Substitute` decides
+      whether to box a collection parameter (B22/C88, so the server's funcletizer lifts it back).
+      Its guard is five clauses; **four already decide from `parameterType`, and the fifth read the
+      runtime value** — `value is not System.Collections.IEnumerable`, which a null fails. So a null
+      collection was never boxed. `value is null` now rides with the collections and every other
+      clause is unchanged.
+
+      **This is the third failure of one divergence, which is why it is worth naming.** The client
+      substitutes EF's extracted parameters back in as constants (research-findings §6), where EF's
+      own providers keep parameters. B22/C88 was that divergence for collections, this is it for a
+      *null* collection, and J21 is it for a scalar behind a value converter. **CLAUDE.md states the
+      rule already — derive it from the CLR type alone, because a value cannot say what declares
+      it** — and this is C34's *"a key resolved by value rather than by what declares it"* in a
+      fourth place.
+
+      **Method note, since three sessions have now been cost by the same thing:** this was found by
+      grepping EF's own suites for a test name that had carried a classification for two milestones.
+      *A classification is not evidence* (C96), and **age is not evidence** either.
 
 **`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
 and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same

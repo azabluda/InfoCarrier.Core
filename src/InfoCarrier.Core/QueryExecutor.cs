@@ -664,7 +664,16 @@ internal sealed class QueryExecutor<TElement>
         private Expression Substitute(object? value, Type parameterType)
         {
             if (_insideEFCall
-                || value is not System.Collections.IEnumerable
+
+                // `value is null` rides with the collections, and that is the J19 fix. Every other
+                // clause in this guard already decides from `parameterType`; this one alone read
+                // the runtime value, and a null is not an `IEnumerable`. So a null collection
+                // parameter fell through to `Expression.Constant(null, …)` and reached the server
+                // as the literal `null.Contains(p.Int)`, which nothing can translate — while EF's
+                // own funcletizer lifts it into a parameter and every reference provider then
+                // answers `WHERE 0`. CLAUDE.md's standing rule, in a new place: derive it from the
+                // CLR type alone, because a value cannot say what declares it.
+                || (value is not System.Collections.IEnumerable && value is not null)
                 || value is string
                 || SequenceElementType(parameterType) is not { } elementType
 

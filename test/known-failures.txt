@@ -261,5 +261,15 @@
 # interface a mapped type implements, so only a type no entity implements reaches here, and
 # LINQ-to-objects answers empty for that too. J17 had filed it as the stronger thing.
 # Figures read off the run's own summary block: 22657 / 22467 / 13 / 177 (`j18`).
-failed=13
+# 2026-08-17 (J19) - 13 -> 12, `total` unchanged at 22657. A NULL collection parameter is now boxed
+# like any other, so the server's funcletizer lifts it back into a parameter instead of receiving the
+# literal `null.Contains(p.Int)`. QueryExecutor.Substitute's guard has five clauses; four decide from
+# parameterType and the fifth read the runtime value (`value is not IEnumerable`), which a null
+# fails. THE CLASSIFICATION IS THE PART WORTH READING: this had stood as "SQLite-tier", a store
+# limitation, for two milestones -- and EF's SQLite, SQL Server and Cosmos suites all override it
+# only to pin SQL and all call base, SQLite emitting WHERE 0. No reference provider refuses it. It
+# was ours. CLAUDE.md already says to grep EF's suites for the name before calling a failure the
+# store's; nobody had. 1 fixed, 0 broken; trim ratchet unchanged at 88.
+# Figures read off the run's own summary block: 22657 / 22468 / 12 / 177 (`j19`).
+failed=12
 total=22657
