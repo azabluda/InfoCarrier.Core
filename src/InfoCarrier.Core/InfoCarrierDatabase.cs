@@ -26,7 +26,8 @@ public class InfoCarrierDatabase(
     IExpressionSerializer expressionSerializer,
     ICurrentDbContext currentContext,
     IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger,
-    IDiagnosticsLogger<DbLoggerCategory.Query> queryLogger) : IDatabase
+    IDiagnosticsLogger<DbLoggerCategory.Query> queryLogger,
+    Metadata.IInfoCarrierDocumentMapping documentMapping) : IDatabase
 {
     private static readonly System.Reflection.MethodInfo ExecuteQueryMethod
         = typeof(InfoCarrierDatabase).GetMethod(nameof(ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
@@ -35,6 +36,7 @@ public class InfoCarrierDatabase(
             .OfType<InfoCarrierOptionsExtension>()
             .First()
             .InfoCarrierClient!;
+    private readonly Metadata.IInfoCarrierDocumentMapping _documentMapping = documentMapping;
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly ICurrentDbContext _currentContext = currentContext;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger = updateLogger;
@@ -254,7 +256,7 @@ public class InfoCarrierDatabase(
     ///         that way already), and its own state manager re-pairs them on the key.
     ///     </para>
     /// </remarks>
-    private static IEnumerable<IUpdateEntry> Expand(IList<IUpdateEntry> entries)
+    private IEnumerable<IUpdateEntry> Expand(IList<IUpdateEntry> entries)
     {
         var seen = new HashSet<IUpdateEntry>();
         var sent = new HashSet<IUpdateEntry>(entries);
@@ -334,7 +336,7 @@ public class InfoCarrierDatabase(
     ///     is the whole of the remove case. An element the client never materialized is not here
     ///     and cannot be: the client can only send what it knows.
     /// </remarks>
-    private static IEnumerable<IUpdateEntry> JsonDocumentMembers(IUpdateEntry owner)
+    private IEnumerable<IUpdateEntry> JsonDocumentMembers(IUpdateEntry owner)
     {
         if (owner is not InternalEntityEntry ownerEntry)
         {
@@ -344,7 +346,7 @@ public class InfoCarrierDatabase(
         foreach (InternalEntityEntry candidate in ownerEntry.StateManager.Entries)
         {
             if (!ReferenceEquals(candidate, ownerEntry)
-                && candidate.EntityType.GetContainerColumnName() is not null
+                && _documentMapping.FindContainerName(candidate.EntityType) is not null
                 && JsonColumnOwners(candidate).Any(o => ReferenceEquals(o, ownerEntry)))
             {
                 yield return candidate;
@@ -363,9 +365,9 @@ public class InfoCarrierDatabase(
     ///     it. Reading it costs nothing on a model with no <c>ToJson()</c>: it is null and this
     ///     yields immediately.
     /// </remarks>
-    private static IEnumerable<IUpdateEntry> JsonColumnOwners(IUpdateEntry entry)
+    private IEnumerable<IUpdateEntry> JsonColumnOwners(IUpdateEntry entry)
     {
-        if (entry.EntityType.GetContainerColumnName() is null)
+        if (_documentMapping.FindContainerName(entry.EntityType) is null)
         {
             yield break;
         }

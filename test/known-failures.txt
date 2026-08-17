@@ -163,5 +163,16 @@
 # untranslated Join over converted columns, and one A28-family test whose base asserts a limitation
 # this provider does not have. Classified in J2 of docs/implementation-plan.md.
 # Figures read off the run's own summary block: 22453 / 22225 / 18 / 210 (`j2b`).
+# 2026-08-16 (J4) - unchanged at 18/22453. The functional tests are organised by backend store now
+# (InMemory/ 57, Sqlite/ 25, TestUtilities/ 16, 18 store-independent). This file needed NO edit for
+# it: it holds failed=, total= and prose, and no test names, so a namespace change cannot move it.
+# 2026-08-16 (J5) - failed unchanged at 18; `total` 22453 -> 22456, A DELIBERATE RISE and the second
+# this file records. The three are DocumentMappingPinTest, all passing. InfoCarrier.Core no longer
+# references Microsoft.EntityFrameworkCore.Relational: the four call sites now ask
+# Metadata.IInfoCarrierDocumentMapping, whose default reads the container annotation by its string
+# name, and those three tests pin the strings and the ownership-chain walk against EF's own
+# constants and extension method. The D3 regression pins were checked positively rather than
+# inferred: JsonQuerySqlite 393/0, JsonOwnedCollectionUpdate 5/0, ComplexCollectionJsonUpdate 18/0.
+# Figures read off the run's own summary block: 22456 / 22228 / 18 / 210 (`j5c`).
 failed=18
-total=22453
+total=22456

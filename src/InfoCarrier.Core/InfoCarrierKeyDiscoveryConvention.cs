@@ -54,15 +54,17 @@ namespace InfoCarrier.Core;
 ///         relational provider registers.
 ///     </para>
 /// </remarks>
-public class InfoCarrierKeyDiscoveryConvention(ProviderConventionSetBuilderDependencies dependencies)
+public class InfoCarrierKeyDiscoveryConvention(
+    ProviderConventionSetBuilderDependencies dependencies,
+    Metadata.IInfoCarrierDocumentMapping documentMapping)
     : KeyDiscoveryConvention(dependencies), IEntityTypeAnnotationChangedConvention
 {
     /// <summary>
     ///     EF's own name for the synthesized ordinal, taken from EF rather than repeated, so the
     ///     two models cannot drift apart on it.
     /// </summary>
-    public const string SynthesizedOrdinalPropertyName =
-        RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName;
+    public virtual string SynthesizedOrdinalPropertyName =>
+        documentMapping.SynthesizedOrdinalPropertyName;
 
     /// <inheritdoc />
     /// <remarks>
@@ -79,7 +81,7 @@ public class InfoCarrierKeyDiscoveryConvention(ProviderConventionSetBuilderDepen
         }
 
         if (ownership?.IsUnique == false
-            && entityType.GetContainerColumnName() is not null)
+            && documentMapping.FindContainerName(entityType) is not null)
         {
             return [];
         }
@@ -92,7 +94,7 @@ public class InfoCarrierKeyDiscoveryConvention(ProviderConventionSetBuilderDepen
         IList<IConventionProperty> keyProperties,
         IConventionEntityType entityType)
     {
-        bool isMappedToJson = entityType.GetContainerColumnName() is not null;
+        bool isMappedToJson = documentMapping.FindContainerName(entityType) is not null;
         IConventionProperty? synthesizedProperty =
             keyProperties.FirstOrDefault(p => p.Name == SynthesizedOrdinalPropertyName);
         IConventionForeignKey? ownershipForeignKey = entityType.FindOwnership();
@@ -170,7 +172,7 @@ public class InfoCarrierKeyDiscoveryConvention(ProviderConventionSetBuilderDepen
         IConventionAnnotation? oldAnnotation,
         IConventionContext<IConventionAnnotation> context)
     {
-        if (name == RelationalAnnotationNames.ContainerColumnName)
+        if (documentMapping.ContainerAnnotationNames.Contains(name, StringComparer.Ordinal))
         {
             Reconfigure(this, entityTypeBuilder);
         }

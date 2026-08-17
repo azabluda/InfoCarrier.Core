@@ -305,6 +305,30 @@ package is referenced by a component that is, by construction, not relational. T
 first.** The audit that settled it is below, and its finding is that the reference is the least of
 what is store-flavoured here.
 
+**DONE 2026-08-16 (M9, plan J5). `InfoCarrier.Core` no longer references
+`Microsoft.EntityFrameworkCore.Relational`.** `Metadata.IInfoCarrierDocumentMapping` asks the one
+question, and `AnnotationDocumentMapping` answers it by reading the container annotation by its
+**string** name — so (c) supplies the architecture and (b) supplies the default, which is the
+combination neither row describes on its own. **Measured neutral**: `18 / 22456` against
+`18 / 22453`, empty FIXED and BROKEN, REASONS unchanged, the three extra tests being the pin
+itself. The D3 pins were verified *positively* rather than inferred from a stable count —
+`JsonQuerySqlite` 393/0, `JsonOwnedCollectionUpdate` 5/0, `ComplexCollectionJsonUpdate` 18/0.
+
+Three facts the write-up above did not anticipate, all of them found by running it:
+
+- **`GetContainerColumnName()` is a walk, not an annotation read** — it falls back through the
+  ownership chain, so reading the annotation on the type alone answers `null` for every nested
+  type. That is B12 one level down, and it is what the pin test's third assertion exists for.
+- **`SynthesizedOrdinalPropertyName` had to move onto the seam as well.** It is a `const`, so it is
+  inlined at runtime, but naming its declaring type still needs the assembly at compile time. It
+  belongs there anyway: Cosmos recognises the ordinal by the property's *shape*, not by this name.
+- **EF will not let a provider register its own service through `EntityFrameworkServicesBuilder`.**
+  Its `TryAdd` validates against EF's service contracts; routing this one through it put *"The
+  database provider attempted to register an implementation of the 'IInfoCarrierDocumentMapping'
+  service"* on 21,991 tests. It registers on the plain collection, as ADR-012's value mappers do.
+
+**Step two — the boundary allowlist — is not done**, and it remains the larger half.
+
 **(b) was rejected explicitly.** It removes the package and keeps every relational assumption
 intact, so it buys the WebAssembly bytes and nothing else — while making an EF rename a silent
 behaviour change instead of a build error. The reference is worth removing as a *consequence* of

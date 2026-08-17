@@ -802,7 +802,50 @@ counted):
 
 ### J5–J6 — D3 answer (c), in two steps
 
-- [ ] **J5. The document seam, and the package reference leaves with it.**
+- [x] **J5. The document seam, and the package reference leaves with it.** `<this commit>`
+      `Total tests: 22456, Passed: 22228, Failed: 18, Skipped: 210` (`j5c`) against
+      `22453 / 22225 / 18 / 210` (`j4`): **FIXED and BROKEN both empty, REASONS unchanged**, and
+      `total` rises by exactly the three new pin tests, all passing.
+      **`InfoCarrier.Core.csproj` no longer references `Microsoft.EntityFrameworkCore.Relational`.**
+
+      `Metadata.IInfoCarrierDocumentMapping` asks the one question — *is this type stored inside
+      one document belonging to something else?* — plus the two things that vary with the answer:
+      which annotations can change it, and what the store calls the synthesized ordinal. The
+      default, `AnnotationDocumentMapping`, reads the relational annotation **by string name**
+      (D3 answer (c), string-default variant, chosen 2026-08-16).
+
+      **The three D3 pins were checked positively, not inferred from a stable count**, because
+      B12's symptom was wrong data with no exception: `JsonQuerySqlite` **393 passed / 0 failed**,
+      `JsonOwnedCollectionUpdate` **5 / 0**, `ComplexCollectionJsonUpdate` **18 / 0**, and
+      `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection` passed.
+
+      **Four things this cost, and three of them were only findable by running it:**
+
+      1. **`GetContainerColumnName()` is not an annotation read — it is a *walk*.** It falls back
+         through the ownership chain for an entity type and through the declaring type for a
+         complex type, so a nested owned type inherits its container. Reading the annotation on
+         the type alone answers `null` for every nested type, which is B12 one level down.
+      2. **`RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName` had to go too.** It is
+         a `const`, so it is inlined at runtime — but naming the type still needs the assembly at
+         compile time. It is now on the seam, which is where it belongs: CLAUDE.md already records
+         that Cosmos recognises the ordinal by the property's *shape* rather than by this name.
+      3. **EF refuses a provider's own service through `EntityFrameworkServicesBuilder`.** Its
+         `TryAdd` validates against EF's list of service contracts, and routing this one there put
+         *"The database provider attempted to register an implementation of the
+         'IInfoCarrierDocumentMapping' service"* on **21,991** tests in a single run. It registers
+         on the plain collection instead, exactly as ADR-012's value mappers do.
+      4. **A `const` became a property, and `ApiConsistencyTest` caught it.**
+         `InfoCarrierKeyDiscoveryConvention.SynthesizedOrdinalPropertyName` is now `virtual`;
+         without that, `Public_inheritable_apis_should_be_virtual` failed and was the entire
+         difference between 19 and 18.
+
+      **`DocumentMappingPinTest` is the price of naming the string, and it was watched failing.**
+      Two assertions compare the strings to EF's constants; the third walks a real `ToJson()` model
+      and compares `FindContainerName` with `GetContainerColumnName()` for **every** entity and
+      complex type. Deliberately removing the ownership-chain fallback made it fail with
+      `Expected: "Items", Actual: null` — D1's rule, that the assertion you never watched fail is
+      the one to distrust. The test asserts non-vacuity directly too: one type outside a container,
+      two inside, and the nested one reachable only through the walk.
       A provider-neutral *"is this type mapped to one document?"* question, answered by the
       relational implementation behind it. `ServerSaveChangesExecutor.IssuedAtSave` is the shape to
       copy: it asks the backend a capability question rather than testing for a store family.

@@ -15,7 +15,9 @@ namespace InfoCarrier.Core;
 ///     store's provider, so where a key shape is decided by the caller's own model configuration
 ///     rather than by the store, the client has to reach the same answer (B12, C80).
 /// </remarks>
-public class InfoCarrierConventionSetBuilder(ProviderConventionSetBuilderDependencies dependencies)
+public class InfoCarrierConventionSetBuilder(
+    ProviderConventionSetBuilderDependencies dependencies,
+    Metadata.IInfoCarrierDocumentMapping documentMapping)
     : ProviderConventionSetBuilder(dependencies)
 {
     /// <inheritdoc />
@@ -23,7 +25,8 @@ public class InfoCarrierConventionSetBuilder(ProviderConventionSetBuilderDepende
     {
         ConventionSet conventionSet = base.CreateConventionSet();
 
-        conventionSet.Replace<KeyDiscoveryConvention>(new InfoCarrierKeyDiscoveryConvention(Dependencies));
+        conventionSet.Replace<KeyDiscoveryConvention>(
+            new InfoCarrierKeyDiscoveryConvention(Dependencies, documentMapping));
 
         return conventionSet;
     }

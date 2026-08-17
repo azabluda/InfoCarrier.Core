@@ -69,6 +69,19 @@ public static class InfoCarrierServiceCollectionExtensions
         // value-mapper chain of ADR-012 is consumed.
         services.AddInfoCarrierStandardValueMappers();
 
+        // The one question this provider asks about how the backing store lays out a nested
+        // structure (M9 J5, `docs/architecture.md` §6a D3). `InfoCarrierConventionSetBuilder` and
+        // `InfoCarrierDatabase` both take it, and EF resolves both from this same collection once
+        // it is built, so a plain registration here reaches them.
+        //
+        // **Not through `EntityFrameworkServicesBuilder`**, which validates every `TryAdd` against
+        // its own list of EF service contracts and refuses anything else: routing it there put
+        // *"The database provider attempted to register an implementation of the
+        // 'IInfoCarrierDocumentMapping' service"* on **21,991** tests in one run. The value mappers
+        // above are registered here for the same reason — a provider's own service is the
+        // application's collection's business, not EF's.
+        services.TryAddSingleton<Metadata.IInfoCarrierDocumentMapping, Metadata.AnnotationDocumentMapping>();
+
         services.TryAddScoped<TypeNodeMapper>();
         services.TryAddScoped<TypeNodeResolver>();
         services.TryAddScoped<IDynamicValueMapper, DynamicValueMapper>();
