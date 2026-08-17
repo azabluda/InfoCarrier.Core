@@ -161,7 +161,7 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
         => AssertQuery(
             async,
             ss => ss.Set<CogTag>().Select(x => new { x.Id, SquadIdString = x.Gear.SquadId.ToString() }),
-            ss => ss.Set<CogTag>().Select(x => new { x.Id, SquadIdString = x.Gear == null ? null : x.Gear.SquadId.ToString() }),
+            ss => ss.Set<CogTag>().Select(x => new { x.Id, SquadIdString = x.Gear == null ? null! : x.Gear.SquadId.ToString() }),
             elementSorter: e => e.Id,
             elementAsserter: (e, a) =>
             {

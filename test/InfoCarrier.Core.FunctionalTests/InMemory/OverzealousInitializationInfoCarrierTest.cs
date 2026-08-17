@@ -19,7 +19,7 @@ public class OverzealousInitializationInfoCarrierTest(OverzealousInitializationI
 {
     public class InfoCarrierFixture : OverzealousInitializationFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "OverzealousInitializationInfoCarrierTest";

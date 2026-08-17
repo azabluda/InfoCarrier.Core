@@ -21,7 +21,7 @@ public class NotificationEntitiesInfoCarrierTest(NotificationEntitiesInfoCarrier
 {
     public class InfoCarrierFixture : NotificationEntitiesFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "NotificationEntitiesInfoCarrierTest";

@@ -32,7 +32,7 @@ public class FieldMappingInfoCarrierTest(FieldMappingInfoCarrierTest.InfoCarrier
 
     public class InfoCarrierFixture : FieldMappingFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "FieldMappingInfoCarrierTest";

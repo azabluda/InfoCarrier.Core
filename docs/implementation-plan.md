@@ -1018,3 +1018,20 @@ warning ratchet to replace.
 
       The `CS1574` on `RelationalTypeBaseExtensions` is the one worth keeping: a stale cref is how
       a comment tells you it is describing a dependency that no longer exists.
+
+- [x] **M8-29. The nullability warnings, answered per site.** `<this commit>`
+      `eng/measure.sh m8-29 m8-28`: `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` —
+      **0 fixed, 0 broken, `REASONS: unchanged`**. `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      **`EF1001` is now the only warning the build emits.**
+
+      | Sites | Answer |
+      |---|---|
+      | 12 × `CS8618` `_testStoreFactory` | declared `ITestStoreFactory?` — the field is lazily built with `??=`, so nullable is the **true** annotation. Most of the suite's other 50-odd copies were already `?`; these twelve had drifted. |
+      | 2 × `CS8602` in `ProjectionRewriter` (**product**) | **one fix, not two**: `IsResultSelectorOperator`'s `out` parameter is non-null whenever it returns `true`, and that contract was never expressed. `[NotNullWhen(true)]` states it, closes both warnings, and let **three** `!` suppressions be deleted. |
+      | 2 × `CS8604` in `InfoCarrierBackendTestStore` | `ServiceProvider` is EF's own nullable `TestStore` member, assigned in this store's constructor |
+      | 2 × `CS8602`/`CS8604` in `QuerySplitterTest` | expression trees the splitter *reads* — `FirstOrDefault()!.Title` is a node, never a dereference |
+      | 1 × `CS8619` in `GearsOfWarQuery` | the expected-results lambda made the anonymous member `string?` while the actual made it `string` |
+
+      **The product fix is the one worth keeping.** Two warnings that looked like two sites were one
+      missing annotation on a contract, and the `!` operators around them were hiding it rather than
+      documenting it. `= null!` was not used anywhere.

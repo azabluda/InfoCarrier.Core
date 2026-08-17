@@ -18,7 +18,7 @@ public class ManyToManyLoadInfoCarrierTest(ManyToManyLoadInfoCarrierTest.InfoCar
 {
     public class InfoCarrierFixture : ManyToManyLoadFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "ManyToManyLoadInfoCarrierTest";

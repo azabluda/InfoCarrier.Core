@@ -60,7 +60,7 @@ public class StoreGeneratedFixupInfoCarrierTest(StoreGeneratedFixupInfoCarrierTe
 
     public class InfoCarrierFixture : StoreGeneratedFixupFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "StoreGeneratedFixupInfoCarrierTest";

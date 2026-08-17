@@ -382,7 +382,7 @@ public class QuerySplitterTest : IDisposable
         SplitQuery split = Split(
             _context.Authors
                 .Select(a => new { a, books = a.Books.Where(b => b.Id < 5) })
-                .Select(x => new { x.a.Name, Title = x.books.FirstOrDefault().Title }));
+                .Select(x => new { x.a.Name, Title = x.books.FirstOrDefault()!.Title }));
 
         Assert.Equal(typeof(ValueTuple<string, string>), Assert.Single(split.ServerQueries).ElementType);
     }
@@ -436,7 +436,7 @@ public class QuerySplitterTest : IDisposable
         var query = _context.Authors.Join(
             _context.Books,
             a => new ClientRow(a.Name, a),
-            b => new ClientRow(b.Title, b.Author),
+            b => new ClientRow(b.Title, b.Author!),
             (a, b) => a.Name);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => Split(query));

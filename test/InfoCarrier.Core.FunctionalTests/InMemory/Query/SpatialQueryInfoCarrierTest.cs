@@ -52,7 +52,7 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
 
     public class InfoCarrierFixture : SpatialQueryFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "SpatialQueryInfoCarrierTest";

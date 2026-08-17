@@ -23,8 +23,8 @@ public class ComplexTypesTrackingInfoCarrierTest(ComplexTypesTrackingInfoCarrier
     /// <inheritdoc />
     protected override async Task ExecuteWithStrategyInTransactionAsync(
         Func<DbContext, Task> testOperation,
-        Func<DbContext, Task> nestedTestOperation1 = null,
-        Func<DbContext, Task> nestedTestOperation2 = null)
+        Func<DbContext, Task>? nestedTestOperation1 = null,
+        Func<DbContext, Task>? nestedTestOperation2 = null)
     {
         try
         {
@@ -38,7 +38,7 @@ public class ComplexTypesTrackingInfoCarrierTest(ComplexTypesTrackingInfoCarrier
 
     public class InfoCarrierFixture : FixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "ComplexTypesTrackingInfoCarrierTest";

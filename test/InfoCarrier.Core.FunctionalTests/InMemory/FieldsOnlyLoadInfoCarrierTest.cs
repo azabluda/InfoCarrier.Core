@@ -19,7 +19,7 @@ public class FieldsOnlyLoadInfoCarrierTest(FieldsOnlyLoadInfoCarrierTest.InfoCar
 {
     public class InfoCarrierFixture : FieldsOnlyLoadFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "FieldsOnlyLoadInfoCarrierTest";

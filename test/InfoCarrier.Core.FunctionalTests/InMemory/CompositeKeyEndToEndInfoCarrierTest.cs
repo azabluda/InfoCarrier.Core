@@ -21,7 +21,7 @@ public class CompositeKeyEndToEndInfoCarrierTest(CompositeKeyEndToEndInfoCarrier
 {
     public class InfoCarrierFixture : CompositeKeyEndToEndFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "CompositeKeyEndToEndInfoCarrierTest";

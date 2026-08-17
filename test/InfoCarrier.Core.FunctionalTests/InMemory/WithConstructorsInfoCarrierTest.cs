@@ -57,7 +57,7 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
 
     public class InfoCarrierFixture : WithConstructorsFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "WithConstructorsInfoCarrierTest";

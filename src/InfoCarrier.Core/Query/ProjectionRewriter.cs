@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -147,7 +148,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             }
         }
 
-        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(selector!);
+        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(selector);
         if (bodyAnalysis.FactsFor(selector.Body).ServerOk)
         {
             // The projection is server-executable as written.
@@ -156,7 +157,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         List<Expression> fragments = [];
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
-        CollectFragments(selector!.Body, bodyAnalysis, selector.Parameters, fragments, guards);
+        CollectFragments(selector.Body, bodyAnalysis, selector.Parameters, fragments, guards);
         if (fragments.Count == 0)
         {
             // A body that reads nothing from the row — leave it to the plain cut.
@@ -233,7 +234,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         silently replace the elements with their sort keys.
     ///     </para>
     /// </remarks>
-    internal static bool IsResultSelectorOperator(MethodCallExpression call, out LambdaExpression? selector)
+    internal static bool IsResultSelectorOperator(
+        MethodCallExpression call, [NotNullWhen(true)] out LambdaExpression? selector)
     {
         selector = null;
 
@@ -311,7 +313,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             }
         }
 
-        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(innerSelector!);
+        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(innerSelector);
         if (bodyAnalysis.FactsFor(innerSelector.Body).ServerOk)
         {
             // Nothing client-typed here; the ordinary path ships it whole.

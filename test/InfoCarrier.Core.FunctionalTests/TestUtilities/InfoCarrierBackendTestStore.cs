@@ -178,7 +178,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.
     /// </summary>
     public virtual DbContext CreateDbContext()
-        => (DbContext)ServiceProvider.GetRequiredService(ServerContextType);
+        => (DbContext)ServiceProvider!.GetRequiredService(ServerContextType);
 
     /// <summary>
     ///     The context type the server runs, which may add store-specific model configuration
@@ -290,5 +290,5 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         => _client.SupportsSavepointsAsync(transactionId, cancellationToken);
 
     private IInfoCarrierServer CreateServer()
-        => ServiceProvider.GetRequiredService<IInfoCarrierServer>();
+        => ServiceProvider!.GetRequiredService<IInfoCarrierServer>();
 }

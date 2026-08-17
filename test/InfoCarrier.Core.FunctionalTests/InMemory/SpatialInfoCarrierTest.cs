@@ -36,7 +36,7 @@ public class SpatialInfoCarrierTest(SpatialInfoCarrierTest.InfoCarrierFixture fi
 
     public class InfoCarrierFixture : SpatialFixtureBase
     {
-        private ITestStoreFactory _testStoreFactory;
+        private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "SpatialInfoCarrierTest";
