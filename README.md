@@ -7,7 +7,7 @@
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0-512BD4)](https://github.com/dotnet/efcore)
 [![Spec suite](https://img.shields.io/badge/EF%20spec%20suite-22%2C472%20passing-brightgreen)](docs/limitations.md)
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](license.txt)
 
 </div>
 
@@ -212,4 +212,4 @@ ASP.NET Core server.
 
 ## License
 
-MIT — every source file carries the header. A `LICENSE` file is not yet in the repository root.
+MIT — Copyright (c) Alexander Zabluda. See [license.txt](license.txt).
