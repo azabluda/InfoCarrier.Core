@@ -45,11 +45,25 @@ public sealed class HttpInfoCarrierTransport(
     ///     <para>
     ///         <b>Set through the option key rather than through
     ///         <c>SetBrowserResponseStreamingEnabled</c>, and that is forced.</b> That extension
-    ///         method exists only on the <c>browser</c> target framework, and this assembly targets
-    ///         <c>net10.0</c> so that one package serves WPF, MAUI, console and WebAssembly
-    ///         clients alike. The extension method sets exactly this option; setting it directly is
-    ///         the same instruction, and every non-browser handler ignores an option it does not
-    ///         know.
+    ///         method ships in <c>Microsoft.AspNetCore.Components.WebAssembly</c>, and this assembly
+    ///         targets <c>net10.0</c> with no Blazor dependency so that one package serves WPF,
+    ///         MAUI, console and WebAssembly clients alike.
+    ///     </para>
+    ///     <para>
+    ///         <b>The literal is verified against both ends rather than remembered</b>, because a
+    ///         wrong option key is silent — <c>HttpRequestOptions</c> accepts any key, so a typo
+    ///         would leave the browser buffering with nothing to show for it.
+    ///         <c>WebAssemblyEnableStreamingResponse</c> is present in the user-string heap of
+    ///         <b>both</b> <c>Microsoft.AspNetCore.Components.WebAssembly.dll</c> (which writes it,
+    ///         from <c>SetBrowserResponseStreamingEnabled</c>) and the browser build of
+    ///         <c>System.Net.Http.dll</c> (whose <c>BrowserHttpHandler</c> reads it), at 10.0.11.
+    ///         Do not confuse it with <c>System.Net.Http.WasmEnableStreamingResponse</c>, which is
+    ///         in the same assembly and is the <em>global</em> AppContext switch behind
+    ///         <c>DOTNET_WASM_ENABLE_STREAMING_RESPONSE</c>, not the per-request option.
+    ///     </para>
+    ///     <para>
+    ///         Every non-browser handler ignores an option it does not know, so this costs a
+    ///         desktop or server client nothing.
     ///     </para>
     /// </remarks>
     private static readonly HttpRequestOptionsKey<bool> BrowserResponseStreaming
@@ -105,6 +119,9 @@ public sealed class HttpInfoCarrierTransport(
         // ResponseHeadersRead, which is the whole of the client half of D7: the default,
         // ResponseContentRead, completes the task only once the last byte of the body has arrived,
         // so every row would still be in memory before the first one was decoded.
+        //
+        // `StreamingOverHttpTest` is the pin on this one word, and it was verified by putting
+        // `ResponseContentRead` back: the test fails on its deadline.
         HttpResponseMessage response = await PostAsync(
             request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 

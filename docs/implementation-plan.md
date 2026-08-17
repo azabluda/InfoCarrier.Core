@@ -920,3 +920,61 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
       without draining it.
 
 ---
+
+- [x] **M8-25. The proof that it streams, and the first version of it was worthless.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`m8-25b` against `j25`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `InfoCarrier.Core.TransportTests`: **18 of 18**.
+
+      D7 says a green suite cannot tell streaming from buffering, and that is exactly what happened
+      to the test written to tell them apart.
+
+      **`StreamingOverHttpTest` asserts the one state buffering cannot reach**: the client holds the
+      response header while the server has produced **zero** rows. A gated `IInfoCarrierServer`
+      decorator holds the rows; the assertion is a count with no other explanation, not a duration.
+
+      **The first version passed against a deliberately re-buffered wire.** It timed a
+      `DelegatingHandler`, and `HttpCompletionOption` is applied by `HttpClient` *after* the handler
+      pipeline returns — so a handler sees the response headers at the same moment whichever option
+      is in force. The instrument was watching a boundary at which the two are identical. It now
+      watches `IInfoCarrierTransport.SendQueryAsync` returning, which is where they differ.
+
+      **Both directions were executed:** with `ResponseHeadersRead` the test passes; with
+      `ResponseContentRead` put back it **fails on its deadline**. That is the whole value of the
+      test, and it is the standing "establish that the code *ran*" rule in its other form — *a probe
+      that passes is evidence only once it is known to be able to fail*. A streaming test that
+      passes against a buffering implementation is worse than no test, because it also certifies the
+      regression it exists to catch.
+
+      **The instrument had to avoid the repo's own instrument.** `RecordingHandler` calls
+      `ReadAsByteArrayAsync` on every response, so every transport test that uses it reads a fully
+      buffered body no matter what the wire did. Those tests prove correctness and can say nothing
+      about streaming.
+
+      **`WebAssemblyEnableStreamingResponse` is now verified rather than remembered**, and the
+      near-miss is worth recording because a wrong key would be **silent** — `HttpRequestOptions` is
+      a dictionary and accepts anything. The literal is present in the **user-string heap** of both
+      `Microsoft.AspNetCore.Components.WebAssembly.dll` (which writes it, from
+      `SetBrowserResponseStreamingEnabled`) and the browser build of `System.Net.Http.dll` (whose
+      `BrowserHttpHandler` reads it), at 10.0.11. **Reading the wrong heap gave the wrong answer
+      first**: `strings` shows UTF-8 *metadata names*, and .NET string *literals* are UTF-16, so the
+      first pass found only `System.Net.Http.WasmEnableStreamingResponse` — which is real, is in the
+      same assembly, and is the **global** AppContext switch behind
+      `DOTNET_WASM_ENABLE_STREAMING_RESPONSE` rather than the per-request option.
+
+      **Docs updated in this commit, and one of them corrected an overclaim of its own.**
+      `architecture.md` **D7** now records what was built; the §6a wire-layering entry records that
+      the two base64 layers are gone for queries and still present for the other eight operations;
+      `security-review.md` weakness 7 is narrowed. The correction: `MaxResponseBytes` was **already
+      enforced**, by `Guard<QueryDataResult>(payload.Length, …)` on the buffered payload. That shape
+      cannot work on a stream, so the honest statement is that the bound was **carried across rather
+      than lost** — nothing new was added, but had nothing replaced it streaming would have
+      *removed* an existing control. The quantity counted did change: the raw body rather than the
+      base64-inflated payload, so an unchanged setting admits roughly **1.78×** as much row data.
+
+      **`docs/limitations.md` is deliberately unchanged.** It claims to be a complete list of
+      scenarios in EF's suite that behave unlike a normal provider, and streaming produces no such
+      scenario — same API, same results, exception type and message preserved, which the unchanged
+      run is the evidence for.
+
+---

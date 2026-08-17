@@ -192,6 +192,16 @@ nesting depth, and getting it wrong is silent. That argues for (b) or (d) more s
 size overhead did. It also means the phase-2 wire inspector must decode two layers to show anything
 useful, not one.
 
+**RESOLVED for the query direction 2026-08-17 by [D7](#d7--streaming-results-what-was-built), and
+not because of this.** Streaming needed the nesting gone for its own reasons — nothing streams
+through a layer that must be complete before the layer outside it can be written — so a query
+response is now a top-level JSON array of `QueryStreamItem` with no base64 in it at all. The
+assertion above is now a plain search of the response body, and it carries an
+`Assert.Contains("ALFKI", …)` alongside so that "the body is searchable" is asserted rather than
+assumed. **The other eight operations still nest one layer** (`Payload` is still a `byte[]`), so
+the lesson stands wherever a `SaveChanges` payload is asserted on — and the wire inspector still
+decodes structurally rather than by member name, which is why it needed no change.
+
 **The transferable lesson, which is about method rather than about this field:** of the several
 mechanism assertions strengthened in this phase, exactly one was never deliberately broken to
 confirm it could fail — and that was the vacuous one. **The assertion you did not watch fail is the
@@ -586,10 +596,13 @@ application's configuration; this asks it about the provider's own.
 `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`. B12's own symptom was
 **wrong data with no exception**, so a green build is not evidence here — the measurement is.
 
-### D7 — streaming results: two features, and only one of them is cheap
+### D7 — streaming results: what was built
 
 **Raised and scoped 2026-08-17 (M8). gRPC moved to future scope in the same decision, because it
-turned out not to be a prerequisite for any of this.**
+turned out not to be a prerequisite for any of this. Half (A) BUILT 2026-08-17 in M8-23/M8-24/M8-25;
+half (B) remains deferred.** The scoping below is kept as written, because two of its four
+estimates were wrong and the corrections are the useful part. **What shipped is recorded at the end
+of this entry.**
 
 **The question that started it:** does streaming need gRPC? **No.** ASP.NET Core writes a JSON
 array incrementally and sends it chunked; `JsonSerializer.DeserializeAsyncEnumerable<T>` consumes
@@ -649,6 +662,95 @@ response by default**; streaming needs `SetBrowserResponseStreamingEnabled(true)
 would look as though the feature does not work. **This repo has been caught by a WebAssembly
 default twice already** (blocking lazy loads, the compiled model's thread), so the browser proof
 must be deliberate rather than assumed.
+
+---
+
+#### What was built (half A), and what the estimates got wrong
+
+**Point 1 was priced "low, internal" and is only half takeable.** The `ArrayList` was not holding
+rows for its own sake — it was holding the query open **until the server's change tracker was
+complete**, and nothing said so. `ServerQueryExecutor`'s probes (`IsLoaded`, `IsTracked`,
+`ReadShadowValue`, `ReadJoinEntities`, `FindEntityType`) all read the `IStateManager`, and under any
+behaviour that resolves identity that is only complete at the end of the enumeration: a later row
+can add to an earlier row's collection, and a join row's far side can be marked loaded after the
+near side has been written. Pulling rows straight from EF measured **20 broken**, every one a skip
+navigation or an `IsLoaded` assertion in `ManyToMany*`. So:
+
+- **always** — each row is mapped and written as it is produced, never collected into a
+  `List<DynamicValueNode>` first. That is the largest of the three copies and it is gone
+  unconditionally.
+- **`NoTracking` only** — the query itself is not drained either. That behaviour creates no state
+  entries, so every probe already falls through to reading the navigation value on the instance and
+  nothing a later row does can change an earlier one. It is also the behaviour a large read-only
+  result uses: C37's 560 MB and 111 MB results are no-tracking projections.
+
+**Point 2's cost was the nesting, not the `byte[]`.** `SerializedResults` sat inside
+`QueryDataResult` inside `InfoCarrierEnvelope.Payload` — two base64 layers, each of which must be
+complete before the one outside it can be written, and together about 1.78× inflation. No
+arrangement of flushes streams through that, so the query response stopped being an envelope payload:
+
+| | Before | After |
+|---|---|---|
+| Query response body | `InfoCarrierEnvelope` JSON, rows base64 two layers in | a top-level JSON array of `QueryStreamItem` |
+| `QueryDataResult` | `byte[] SerializedResults` | `IAsyncEnumerable<DynamicValueNode> Rows` |
+| Transport seam | `SendAsync` | plus `SendQueryAsync` |
+| Server seam | `DispatchAsync` for all nine | plus `DispatchQueryAsync`; `DispatchAsync` refuses `Query` |
+
+**The item is tagged (`{"header":…}`, `{"row":…}`, `{"fault":…}`) rather than the body being an
+object with a `rows` member, and the reader forces it**: `JsonSerializer.DeserializeAsyncEnumerable`
+reads a *top-level* array incrementally and nothing else. A nested array would need a hand-written
+`Utf8JsonReader` loop over a buffered stream on the client. The tag costs about ten bytes a row.
+
+**A failure is now a trailing item, and half (B) has to answer that again.** The status line and the
+first rows are gone by the time an EF translation failure or a store error arrives, so it cannot
+become an HTTP 500 or an envelope `Fault`. It is safe *because* point 4 is deliberate: the
+materializer decodes to completion, so a trailing fault is always reached before any row reaches the
+caller. **Yielding rows lazily removes that guarantee.**
+
+**Three things the build found that this entry did not predict:**
+
+1. **`JsonSerializer.Serialize(Utf8JsonWriter, …)` flushes the writer synchronously**, and ASP.NET
+   Core refuses a synchronous write to the response body. The endpoint was written the obvious way
+   first and **8 of the 17 transport tests said so in one run**. There is no `SerializeAsync`
+   overload taking a writer, so the array punctuation is written by hand.
+2. **The spec suite's result-wire-format coverage was a side effect of a line that no longer
+   exists.** `EnvelopeTransport` hands the envelope straight to the server; it was
+   `InfoCarrierEnvelopeServer` serializing the *payload* that made every result row in 22,656 tests
+   cross real JSON. Moving the query response out of the envelope would have ended that silently.
+   Both in-process test transports now round-trip each `QueryStreamItem` explicitly — **per item**,
+   because a simulation that buffered them to serialize them together would test the opposite of
+   streaming.
+3. **The trim count moved for a reason unrelated to reflection.** ILLink reports an unannotated
+   `Type` flowing into `IModel.FindEntityType` once *per data-flow origin*, so a ternary at the call
+   site produced two warnings for one call (88 → 89). Behind a named method there is one origin.
+
+**How it is proved, and the proof needed falsifying before it was worth anything.**
+`StreamingOverHttpTest` gates the server inside its row enumeration and asserts the client holds the
+response header while **zero** rows have been produced — a state a buffered wire cannot reach. **The
+first version of that test passed against a deliberately re-buffered wire**, because it timed a
+`DelegatingHandler` and `HttpCompletionOption` is applied by `HttpClient` *after* the handler
+pipeline returns. The instrument now watches `SendQueryAsync` returning, which is where the two
+differ, and **it has been shown to fail when `ResponseHeadersRead` is put back to
+`ResponseContentRead`**. A streaming test that passes against a buffering implementation is worth
+less than no test, because it also certifies the regression it exists to catch.
+
+**Two live consequences, both now real rather than anticipated:**
+
+- **`MaxResponseBytes` is carried across rather than lost, and that is the accurate framing.** It
+  was already enforced, by `Guard<QueryDataResult>(payload.Length, …)` on the buffered payload —
+  a shape that cannot work on a stream, so had nothing replaced it streaming would have *removed*
+  an existing control rather than merely failing to add one. The bytes are now counted as they are
+  read. **The quantity did change**: the raw body rather than the base64-inflated payload, so an
+  unchanged setting admits roughly 1.78× as much row data. The default stays `null`, for the reason
+  `InfoCarrierPayloadLimits` gives. `IInfoCarrierSerializer` gained `Limits` so the transport can
+  see it at all.
+- **An abandoned enumeration pins a server `DbContext`.** The in-process server's lease now outlives
+  its own method, because rows are mapped through that context's state manager. `await foreach`
+  releases it; taking a `QueryDataResult` and never enumerating it does not.
+
+**Still buffered, deliberately:** point 4, and the server's own pull from EF, which is a synchronous
+`foreach` over `IQueryable`. Making that `IAsyncEnumerable` end to end is a further step this entry
+does not cover and half (A) did not take.
 
 ## 7. Out of scope (initial release) — requirements §6
 
