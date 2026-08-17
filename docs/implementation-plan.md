@@ -1553,3 +1553,39 @@ which is a deliberate piece of work rather than a classification.
 control. `Collection_enum_as_string_Contains` had one seeded row and the probe was strengthened
 until a non-matching value proved the filter ran; this one has none, and no amount of reading the
 failure would have revealed that.
+
+### J8's trim cost — caught by CI, reduced from 5 to 2 (2026-08-17)
+
+**`eng/trim-ratchet.sh` failed in CI at 91 against a baseline of 86, and it was right to.** I did
+not run it before committing J8; the gate is what noticed. `eng/measure.sh` and the transport tests
+say nothing about trimming, and `WireGrouping.TryWrap` is the most reflective thing this milestone
+added.
+
+**Three of the five were avoidable, and avoiding them is the reusable part.** The first version
+built the closed `WireGrouping<,>` and then *filled* it with `GetProperty` and `GetMethod`, which
+cost `IL2062`, `IL2065` and `IL2075` on the fill path alone. Filling it instead through a
+non-generic `IWireGroupingSink` that the closed type implements costs **nothing**: the closed type
+can cast to its own `IGrouping<TKey, TElement>`, and the caller never has to.
+
+```
+91  -> GetProperty / GetMethod fill
+88  -> IWireGroupingSink.Fill(object)
+```
+
+**A `dynamic` shortcut was tried and rejected on sight** — `((dynamic)value).Key` would have pulled
+the whole C# binder into a WebAssembly download to save one cast.
+
+**The remaining two are the premise, and `eng/trim-baseline.txt` already says so**:
+`GetInterfaces()` on a runtime type, and `MakeGenericType` from arguments the caller's model
+supplies. Baseline raised 86 → 88 with that reason, which is what the file's own header prescribes.
+
+**One genuine correctness fix came out of it.** `Activator.CreateInstance(wrappedType)` is the only
+caller of `WireGrouping<,>`'s constructor, and a trimmer cannot see a constructor reached that way —
+so it was free to remove it, and a published client would have failed at run time on the first
+non-composed `GroupBy`. A `[DynamicDependency]` on `TryWrap` keeps it. **That changes no warning
+count**, which is exactly why it would never have been found by chasing the number.
+
+**Also recorded so nobody misreads it:** `total` fell 1129 → 853, and none of that is ours — EF
+Core's own count dropped 864 → 585 with package movement since M8-17.
+
+Suite re-measured after the refactor: `13 / 22655`, empty FIXED and BROKEN, `REASONS: unchanged`.

@@ -25,5 +25,27 @@
 # singletons. By cause: 45 are DynamicallyAccessedMembers mismatches (mostly `Type.GetInterfaces()`
 # on a type the model named), 15 are MakeGenericMethod/MakeGenericType, 17 are IL2026 calls into
 # APIs already marked RequiresUnreferencedCode.
-ours=86
-total=1129
+# 2026-08-17 (M9, J8) — 86 -> 88, A DELIBERATE RISE OF 2, and the first change to this file since it
+# was written. `WireGrouping.TryWrap` projects EF's internal grouping into this provider's own
+# `WireGrouping<,>`, so that an EF internal type never has to be admitted to `TypeAllowlist`. It
+# needs exactly the two things this file already names as the premise: `GetInterfaces()` on a runtime
+# type (IL2075), and `MakeGenericType` from arguments the caller's model supplies (IL2062, through
+# `Activator.CreateInstance`).
+#
+# IT WAS 5 AND IS 2, WHICH IS THE PART WORTH KEEPING. The first version filled the closed generic
+# with `GetProperty`/`GetMethod` and cost three further warnings on the fill path alone. Filling it
+# through a non-generic `IWireGroupingSink` that the closed type implements costs nothing: the closed
+# type can cast to its own `IGrouping<TKey,TElement>`, and the caller never has to. So of the five,
+# three were avoidable and were avoided; two are the premise and stay.
+#
+# A `[DynamicDependency]` on `TryWrap` keeps `WireGrouping<,>`'s parameterless constructor, which is
+# reached only through `Activator.CreateInstance` and which a trimmer would otherwise be free to
+# remove. That is a RUN-TIME correctness fix, not a warning fix, and it changes no count — without it
+# a published client would fail on the first non-composed `GroupBy`, which is the class of break
+# these warnings are about.
+#
+# `total` also falls, 1129 -> 853, and that is NOT this change: EF Core's own count dropped from 864
+# to 585 with the package/SDK movement since M8-17. Recorded so the next reader does not read a
+# 276-warning improvement as ours.
+ours=88
+total=853

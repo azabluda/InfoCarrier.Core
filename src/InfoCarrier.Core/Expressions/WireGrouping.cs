@@ -5,6 +5,27 @@ using System.Collections;
 namespace InfoCarrier.Core.Expressions;
 
 /// <summary>
+///     Lets <see cref="WireGrouping" /> fill a closed <see cref="WireGrouping{TKey, TElement}" />
+///     without reflecting on it.
+/// </summary>
+/// <remarks>
+///     <b>This interface exists for the trimmer.</b> Building the closed generic needs
+///     <c>MakeGenericType</c> and there is no way round that — the type arguments come from the
+///     caller's model. But *filling* it did not need reflection at all, and doing it with
+///     <c>GetProperty</c>/<c>GetMethod</c> cost three IL warnings (`IL2062`, `IL2065`, `IL2075`) on
+///     top of the one that is unavoidable. Casting to a non-generic interface costs none.
+/// </remarks>
+internal interface IWireGroupingSink
+{
+    /// <summary>
+    ///     Copies <paramref name="grouping" /> in, casting it to the closed type's own
+    ///     <see cref="IGrouping{TKey, TElement}" /> — which the closed type can do and the caller
+    ///     cannot.
+    /// </summary>
+    void Fill(object grouping);
+}
+
+/// <summary>
 ///     The wire's own <see cref="IGrouping{TKey, TElement}" />: a key and a sequence, and nothing
 ///     else (M9 J8).
 /// </summary>
@@ -42,8 +63,16 @@ namespace InfoCarrier.Core.Expressions;
 /// </remarks>
 /// <typeparam name="TKey">The grouping key's type.</typeparam>
 /// <typeparam name="TElement">The grouped element's type.</typeparam>
-public sealed class WireGrouping<TKey, TElement> : IGrouping<TKey, TElement>
+public sealed class WireGrouping<TKey, TElement> : IGrouping<TKey, TElement>, IWireGroupingSink
 {
+    /// <inheritdoc />
+    void IWireGroupingSink.Fill(object grouping)
+    {
+        var typed = (IGrouping<TKey, TElement>)grouping;
+        Key = typed.Key;
+        Items = [.. typed];
+    }
+
     /// <summary>
     ///     The key this group was formed on.
     /// </summary>
@@ -86,6 +115,24 @@ internal static class WireGrouping
     ///     Declines anything that is not a grouping, and anything that already is a
     ///     <see cref="WireGrouping{TKey, TElement}" /> — so it is idempotent and cannot wrap twice.
     /// </remarks>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The <see cref="DynamicDependencyAttribute" /> is a correctness fix, not warning
+    ///         cosmetics.</b> <see cref="Activator.CreateInstance(Type)" /> is the only caller of
+    ///         <see cref="WireGrouping{TKey, TElement}" />'s constructor, and a trimmer cannot see a
+    ///         constructor reached that way — so without this it is free to remove it and the
+    ///         published app would fail at run time on the first non-composed <c>GroupBy</c>, which
+    ///         is precisely the class of break `eng/trim-baseline.txt` warns the warnings are about.
+    ///     </para>
+    ///     <para>
+    ///         Two IL warnings remain here and both are the premise this whole assembly is built on:
+    ///         <c>GetInterfaces()</c> on a runtime type, and <c>MakeGenericType</c> from arguments
+    ///         the caller's model supplies. No annotation can say *"whatever type the caller named"*.
+    ///     </para>
+    /// </remarks>
+    [System.Diagnostics.CodeAnalysis.DynamicDependency(
+        System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicParameterlessConstructor,
+        typeof(WireGrouping<,>))]
     public static bool TryWrap(object value, out object? wrapped, out Type? wrappedType)
     {
         wrapped = null;
@@ -106,21 +153,18 @@ internal static class WireGrouping
             return false;
         }
 
-        Type[] arguments = grouping.GetGenericArguments();
-        wrappedType = typeof(WireGrouping<,>).MakeGenericType(arguments);
+        // `MakeGenericType` is the one reflective step that cannot be removed: the key and element
+        // types come from the caller's model, so no annotation can name them ahead of time. That is
+        // the same premise `eng/trim-baseline.txt` records for the rest of this assembly.
+        wrappedType = typeof(WireGrouping<,>).MakeGenericType(grouping.GetGenericArguments());
         wrapped = Activator.CreateInstance(wrappedType)!;
 
-        wrappedType.GetProperty(nameof(WireGrouping<object, object>.Key))!
-            .SetValue(wrapped, grouping.GetProperty("Key")!.GetValue(value));
+        // Everything after it is ordinary typed code, through `IWireGroupingSink`. Reading `Key`
+        // and appending items with `GetProperty`/`GetMethod` worked and cost three further IL
+        // warnings; the interface costs none, and the casts inside it are checked by the runtime
+        // exactly as the reflection was.
+        ((IWireGroupingSink)wrapped).Fill(value);
 
-        object list = Activator.CreateInstance(typeof(List<>).MakeGenericType(arguments[1]))!;
-        System.Reflection.MethodInfo add = list.GetType().GetMethod("Add")!;
-        foreach (object? item in (IEnumerable)value)
-        {
-            add.Invoke(list, [item]);
-        }
-
-        wrappedType.GetProperty(nameof(WireGrouping<object, object>.Items))!.SetValue(wrapped, list);
         return true;
     }
 }
