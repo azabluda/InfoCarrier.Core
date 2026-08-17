@@ -1297,10 +1297,39 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       What the run *does* establish is that the failure is a **server fault on the query path**
       (`QueryDataAsync` → `RoundTripAsync` rethrow), and that it survives J13 and J14 unchanged.
 
-      **Next probe:** print every `(ModelClrType → ProviderClrType)` pair the constructor records for
-      this fixture's model, and the `declaredType` each lookup is made with. One filtered run.
-      If it is the base-type collision, the fix is to key on the **exact** type and require
-      `converter.ModelClrType == declaredType` rather than an assignability match.
+      ## TRACED 2026-08-17 — two suspects cleared, and the previous "inert" reading was the lesson
+
+      Re-run **with a trace instead of a tally**, which is what the correction above asked for.
+
+      **1. `ModelConverterValueMapper` is not at fault, and this is now traced rather than argued.**
+      Every one of its **7** calls in this test is:
+
+      ```
+      TOWIRE declared=EnumerableClassKey value=EnumerableClassKey
+             converterModel=EnumerableClassKey accepts=True
+      ```
+
+      Never a mismatch, so the guard that was reverted had genuinely nothing to decline — the
+      "inert" verdict was right by luck and for the wrong reason. **The tally could not tell those
+      apart; the trace can.**
+
+      **2. It is not a rehydrated server fault either.** A probe inside
+      `InfoCarrierFaultMapper.Rehydrate` logged **nothing at all** across the run, so no
+      `InfoCarrierFault` was ever built — despite the client stack naming
+      `TransportInfoCarrierClient.cs:103`, which *is* the `throw Rehydrate(fault)` line. **A stack
+      line inside an `async` method is attributed to the state machine and is not reliable**; the
+      probe outranks it.
+
+      **What is left, and it is now a small space.** The `InvalidCastException` is raised somewhere
+      that applies **one entity type's converter to another's value** —
+      `EnumerableClassKey` handed to `IntClassKey`'s converter — and it is neither the value-mapper
+      chain nor the fault path. `PrimitiveCoercion.ToWireValue(property, value)` with a `property`
+      from the wrong entity type is the remaining shape, which would make it a
+      **result-serialization** defect rather than a constant-mapping one.
+
+      **Next probe:** log `(entityType, property, value.GetType())` at every
+      `PrimitiveCoercion.ToWireValue` call on the server's result path, and find the pair that
+      disagrees. One filtered run.
       Closes both `KeysWithConverters` failures, which are one defect with two faces (above).
 
       **The natural mechanism already exists and the contract forbids using it.** ADR-012's
