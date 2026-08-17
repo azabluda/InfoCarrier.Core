@@ -1112,6 +1112,19 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       the same shape one level up (*"a member declared on a base class the model never names"*), and
       its rule was **base classes only, never a category**.
 
+      **A guard was tried and measured INERT, which is itself the finding.** Declining when
+      `!converter.ModelClrType.IsInstanceOfType(value)` measured **0 fixed, 0 broken, REASONS
+      unchanged** — so `IsInstanceOfType` *passes*: the value genuinely is an instance of the
+      converter's model type, and the `InvalidCastException` is raised **inside**
+      `ConvertToProvider` by the converter's own body. The guard was reverted rather than kept:
+      inert code carrying an unverified explanation is worse than no code.
+
+      **So the base-type suspicion is half right and the conclusion drawn from it was wrong.** The
+      declared type and the converter agree; what disagrees is the converter's *internal* cast. That
+      points at a converter declared for one key type whose body targets another — read EF's
+      `KeysWithConvertersFixtureBase` configuration for these two types before touching the mapper
+      again.
+
       **Next probe:** print every `(ModelClrType → ProviderClrType)` pair the constructor records for
       this fixture's model, and the `declaredType` each lookup is made with. One filtered run.
       If it is the base-type collision, the fix is to key on the **exact** type and require
