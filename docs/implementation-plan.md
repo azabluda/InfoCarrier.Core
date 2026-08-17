@@ -1499,3 +1499,57 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
   `EFCore.Cosmos.FunctionalTests` to check our overrides against, which is the method CLAUDE.md
   depends on and which no other candidate offers. MongoDB is cheaper to run and has no EF suite at
   all. Adopting one is its own milestone, and J5/J6 are what make it cheap.
+
+### The residual 13, examined properly (2026-08-17)
+
+**A first pass at summarising these was wrong in three ways and is corrected here.** It claimed
+"3 upstream", "2 A28 family" and "4 singletons". Read off the run instead:
+
+| Test | × | First message | Standing |
+|---|---|---|---|
+| `Can_track_entity_with_complex_property_bag_collections` | 2 | `ArgumentException … get_Item(System.String)` | **Known and documented.** A property-bag complex *collection* on an `Added` entity, failing inside EF's own `StructuralTypeMaterializerSource`. CLAUDE.md already carries it. |
+| `Correlated_collection_with_distinct_3_levels` | 2 | `Assert.Equal() Values differ` | **Known.** C64/C96: no correct answer satisfies the assertion, and EF's InMemory suite refuses the query outright. |
+| `Regex_IsMatch`, `Regex_IsMatch_constant_input` | 2 | LINQ not translated | **Ours, by design** — A46's deliberate allowlist refusal. **Not upstream**, which the earlier summary got wrong. |
+| `Can_insert_and_read_back_with_enumerable_class_key…` | 1 | `InvalidCastException` | **Upstream**, and the only one: EF's own `EnumerableClassKey.Equals` casts to `IntClassKey` (J9). |
+| `Parameter_collection_null_Contains` | 1 | LINQ not translated | SQLite-tier; the 1 that survived `PrimitiveCollectionsQuery` going 4 → 1 in C88. |
+| `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Newly understood — see below.** |
+| `Casts_are_removed_from_expression_tree_when_redundant` | 1 | `Assert.Throws: Exception type was not an exact match` | **Newly understood — see below.** |
+| `Collection_enum_as_string_Contains` | 1 | `Assert.Throws: No exception was thrown` | **A28, verified** by probe in J2's triage: `Seller` → 1/1, `Customer` → 0/0, so the server really filters. |
+| `Composition_over_collection_of_complex_mapped_as_scalar` | 1 | `Assert.Throws: No exception was thrown` | **NOT verifiable here — see below.** |
+
+**`Casts_are_removed_from_expression_tree_when_redundant` is a mechanism, not a singleton.**
+
+```
+Expected: InvalidOperationException     Actual: InvalidCastException
+---- Unable to cast object of type 'MockEntity' to type 'IDummyEntity'
+```
+
+EF **removes a redundant cast** during translation; ADR-006 captures the tree *before* that, so the
+cast survives, reaches the client residual, and executes. The test asks for EF's translation
+refusal and gets a real cast failure instead. This is the same shape as C56 one level down — a
+diagnostic EF raises downstream of the capture point — except here what is missing is not a
+*refusal* but a *simplification*.
+
+**`Update_with_invalid_lambda_in_set_property_throws` fails at our own boundary.** The stack is
+`QuerySplitter.RejectClientEvaluation`, so the exception type is right and the *message* is ours
+rather than EF's. C56's family precisely: the split refuses first, and EF never gets to produce
+the specific diagnostic the base asserts.
+
+**`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
+and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same
+projection applied client-side:
+
+```
+rows=0 expectedRows=0    REMOTED = (empty)    EXPECTED = (empty)
+```
+
+**The `Dashboard` set is never seeded** — the base only ever asserted a throw, so EF never needed
+data. So "no exception was thrown" is being observed over an empty table and says nothing about
+whether the projection would be correct. **A28 requires evidence that the answer is right**, and
+here there is no answer to check. Verifying it means seeding `Dashboard` in a test of our own,
+which is a deliberate piece of work rather than a classification.
+
+**The transferable point:** an `Assert.Throws` test that never needed data makes a *vacuous*
+control. `Collection_enum_as_string_Contains` had one seeded row and the probe was strengthened
+until a non-matching value proved the filter ran; this one has none, and no amount of reading the
+failure would have revealed that.
