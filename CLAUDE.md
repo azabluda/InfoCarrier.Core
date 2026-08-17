@@ -57,6 +57,18 @@ here, and both are cheap to avoid:
   to exactly one tier** — three Northwind bases ran on both, green on both, 906 tests of pure
   duplication (A81). When a base could go either way, the tier that *translates* is the one whose
   green means more.
+- **Which gate to run before which commit.** `eng/measure.sh` says nothing about trimming, and the
+  trim gate says nothing about behaviour — they are separate axes and M9's J8 was committed green on
+  one while failing the other in CI.
+  | Change touches | Run |
+  |---|---|
+  | `src/` | **both** `eng/measure.sh` and `eng/trim-ratchet.sh` |
+  | `test/` only | `eng/measure.sh` |
+  | `docs/`, `eng/` text only | neither |
+
+  The trim ratchet is a clean publish: ~41 s in CI, about a minute locally. That is cheap enough
+  that "product code changed" is the whole trigger — do not try to judge whether a change *looks*
+  reflective, because `WireGrouping` did not look like five warnings.
 - **A probe that prints nothing is evidence only once the build is known green — check the error
   count, never the elapsed time.** M9's J9 read three successive "nothing logged" results as
   clearances. All three were a **stale binary**: the probe named a property that does not exist
