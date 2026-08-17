@@ -1,103 +1,215 @@
-# InfoCarrier.Core
+<div align="center">
 
-A next-generation **Entity Framework Core database provider** that remotes LINQ queries and
-change-tracking over a wire protocol — enabling true multi-tier applications with EF Core.
+![InfoCarrier.Core — EF Core in your client, real database on the server](docs/assets/infocarrier-core-banner.png)
 
-## Core Idea
+**Use the full power of Entity Framework Core in a client application that has no database.**
 
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+[![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0-512BD4)](https://github.com/dotnet/efcore)
+[![Spec suite](https://img.shields.io/badge/EF%20spec%20suite-22%2C472%20passing-brightgreen)](docs/limitations.md)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
+</div>
+
+---
+
+## What it is
+
+InfoCarrier.Core is a **non-relational provider for Entity Framework Core** that you deploy on the
+*client* side of a multi-tier application. Your client gets a real `DbContext` — LINQ, change
+tracking, the identity map, navigation fix-up, lazy loading, transactions — but no connection
+string and no database driver. Queries and units of work are translated into serializable requests
+and executed by your application server against the real database.
+
+The `DbContext` and the entity classes are **shared source between client and server**. You write
+the model once.
+
+```csharp
+// In a WPF, Blazor WebAssembly, MAUI or console app — no database here.
+var options = new DbContextOptionsBuilder<NorthwindContext>()
+    .UseInfoCarrier(client)
+    .Options;
+
+await using var context = new NorthwindContext(options);
+
+var recent = await context.Orders
+    .Include(o => o.Customer)
+    .Where(o => o.Customer!.Country == "Germany" && o.Freight > 50m)
+    .OrderByDescending(o => o.OrderDate)
+    .Take(20)
+    .ToListAsync();
+
+recent[0].Freight = 0m;
+await context.SaveChangesAsync();   // a unit of work, executed on the server
 ```
-┌──────────────────────┐         ┌──────────────────────┐
-│   Client (Blazor,     │         │   Server (ASP.NET)   │
-│   MAUI, Console...)  │ ◄─────► │                      │
-│                       │  Wire   │   Real EF Core       │
-│   DbContext with      │  Proto  │   DbContext against  │
-│   InfoCarrier provider│         │   SQL Server,        │
-│   (no real DB)        │         │   PostgreSQL, etc.   │
-└──────────────────────┘         └──────────────────────┘
-```
 
-1. **Client** writes LINQ queries against a normal `DbContext` — but the provider serializes
-   the expression tree instead of executing SQL.
-2. **Wire protocol** transports serialized expressions + entity change-tracking state.
-3. **Server** deserializes, executes against a real EF Core context, and returns results.
-4. **Entity identity, fixup, and change-tracking** operate normally on the client —
-   but the data source is remote.
+That LINQ query is not evaluated in the client. It crosses the wire as an expression tree, and the
+server runs it against SQL Server, SQLite, PostgreSQL — whatever your server-side provider is.
 
-## Why a Rewrite?
+## Why you might want this
 
-The [original InfoCarrier.Core v1](https://github.com/azabluda/InfoCarrier.Core) (EF Core 5,
-Remote.Linq v6.2.3, Aqua v4.5.3) proved the concept works. But the serialization pipeline
-(Remote.Linq + Aqua DynamicObject) caused deep issues:
-
-- Castle.Core proxy serialization failures
-- Expression tree PartialEval type mismatches
-- DynamicObject mapping for owned/shared entity types
-- GeoJSON Z/M coordinate loss
-- Many-to-many SaveChanges fixup through the wire
-
-InfoCarrier.Core is **a greenfield rewrite** targeting EF Core 10, with a fresh look at the
-expression serialization strategy and lessons learned from v1.
+- **Your rich client needs more than a REST façade.** Hand-rolling an endpoint per screen, and a
+  DTO per endpoint, is the cost this removes. The client composes the query it actually needs.
+- **You already know the API.** It is EF Core. There is nothing new to learn on the client.
+- **One model, not two.** No DTO layer to keep in sync with the entities.
+- **The transport is yours.** This library turns commands into serializable objects and results
+  back into tracked entities. How they travel — HTTP, gRPC, WCF, a message bus, in-process — is
+  your decision.
 
 ## Status
 
-Queries, the client/server projection split, `SaveChanges` (including many-to-many), lazy
-loading and transactions all work end-to-end, over an in-process transport or a real HTTP hop.
-A Blazor WebAssembly client whose `DbContext` has no database runs against a SQLite-backed
-server.
+Working today, and exercised end-to-end by the test suite: **queries**, the **client/server
+projection split**, **`SaveChanges`** including many-to-many graphs, **lazy loading**,
+**transactions with savepoints**, **complex types**, **JSON-mapped owned collections**, **spatial
+types**, and **compiled models**.
 
-The functional suite inherits Microsoft's `EFCore.Specification.Tests` (ADR-004) — the same
-suite EF Core's own SQL Server, SQLite and InMemory providers run:
+This provider inherits Microsoft's `EFCore.Specification.Tests` — the same suite EF Core's own SQL
+Server, SQLite and InMemory providers run:
 
-**`Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`** (2026-08-17)
+```
+Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
+```
 
-**The nine failures are known, classified, and gated in CI so the number cannot grow
-unnoticed.** They amount to *one* unsupported scenario, one query to use with caution, and a
-few differences that are not defects — two of them are queries this provider answers that other
-EF providers reject. Read [`docs/limitations.md`](docs/limitations.md) before adopting: it lists
-every one with a worked example, so you can tell in a few minutes whether any of them touches
-your application.
+**The nine failures are known, classified and gated in CI so the number cannot grow unnoticed.**
+They come to *one* unsupported scenario, one query to treat with caution, and a few differences
+that are not defects — two of them are queries this provider **answers** that other EF Core
+providers reject.
 
-### Documentation
+> **Evaluating this library? Read [`docs/limitations.md`](docs/limitations.md) first.**
+> Every limitation, with a worked example, written for someone who does not care about the
+> internals. It takes a few minutes to tell whether any of them touches your application.
+
+**Not yet done:** NuGet packaging, a shipped gRPC binding, and streaming results as
+`IAsyncEnumerable`. The HTTP binding lives in the samples and is production-shaped, not
+production-blessed — see below.
+
+## How it fits together
+
+Three pieces, and only the middle one is yours to choose.
+
+| Piece | Who provides it |
+|---|---|
+| `IInfoCarrierClient` — turns EF operations into requests | **This library** |
+| `IInfoCarrierTransport` — carries an envelope to the server and back | **You** (an HTTP binding is in [`samples/`](samples)) |
+| `IInfoCarrierServer` — replays a request against a real `DbContext` | **This library** |
+
+### Client
+
+```csharp
+var serializer = new SystemTextJsonInfoCarrierSerializer();
+using var httpClient = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
+
+IInfoCarrierClient client = new TransportInfoCarrierClient(
+    new HttpInfoCarrierTransport(httpClient, serializer),   // your transport
+    serializer);
+
+var options = new DbContextOptionsBuilder<NorthwindContext>()
+    .UseInfoCarrier(client)
+    .Options;
+```
+
+### Server
+
+```csharp
+builder.Services.AddDbContext<NorthwindContext>(o => o.UseSqlite(connectionString));
+builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<NorthwindContext>());
+
+builder.Services
+    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
+    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+    .AddInfoCarrierStandardValueMappers();
+
+// Then expose one endpoint that hands the payload to `InfoCarrierEnvelopeServer`.
+// `MapInfoCarrier` is ~50 lines and lives in the sample, not in the package — the transport
+// is deliberately yours. Copy it, or write the equivalent for gRPC or WCF.
+app.MapInfoCarrier();
+```
+
+The server executes the client's tree against its own model, with its own query filters and its
+own interceptors. A client cannot reach past what the server's model exposes.
+
+## Try it
+
+```bash
+dotnet run --project samples/Northwind.Server
+```
+
+Open <http://localhost:5199>. You get a **Blazor WebAssembly** client whose `DbContext` has no
+database, running against a SQLite-backed server, plus a **wire inspector** down the side showing
+every round trip — the operation, the bytes each way, the time, and the decoded payload, including
+the expression tree unpacked out of the base64 it travels in.
+
+There is a console client too, which is the same client without a browser:
+
+```bash
+dotnet run --project samples/Northwind.Demo
+```
+
+See [`samples/README.md`](samples/README.md), which also records the two things WebAssembly will
+not do — and why neither is this provider's constraint.
+
+## How it differs from v1
+
+This is a **ground-up rewrite** of [InfoCarrier.Core v1](https://github.com/azabluda/InfoCarrier.Core)
+for EF Core 10, not a port.
+
+- **No Remote.Linq or Aqua dependency.** The expression serializer is in-tree and purpose-built,
+  which is what makes the wire format, its type allowlist and its AOT story ours to reason about.
+- **A security boundary that is stated and tested.** Deserialization is default-deny across node
+  kinds, types and methods, and the review behind it is
+  [`docs/security-review.md`](docs/security-review.md) — including what is *accepted* and why.
+- **The EF specification suite is the acceptance criterion.** v1's stated failure mode was
+  suppressing tests; here a red test is information, skipping one to go green is forbidden, and
+  the failure count is ratcheted in CI.
+- **Trimming and AOT are measured, not assumed.** The Blazor client publishes trimmed and runs.
+
+## Security
+
+The server executes an expression tree that arrived over the network. That is the product, and it
+is bounded deliberately: a default-deny allowlist over node kinds, types and methods; no assembly
+is loaded to satisfy a payload; and reflection entry points that would turn a resolved `Type` into
+a call are blocked. The reasoning, the adversarial tests, and the weaknesses that are **accepted
+rather than solved**, are in [`docs/security-review.md`](docs/security-review.md).
+
+**Authentication and authorization are out of scope and are yours.** No identity travels in the
+envelope. Authenticate the transport, and use query filters on the *server's* model to decide what
+a caller may see.
+
+## Documentation
 
 | Doc | Contents |
 |---|---|
-| [`docs/limitations.md`](docs/limitations.md) | **Start here if you are evaluating this provider** — every known limitation, with a worked example each |
-| [`docs/decisions.md`](docs/decisions.md) | ADR log — LOCKED vs PROVISIONAL design decisions |
-| [`docs/roadmap.md`](docs/roadmap.md) | Milestone plan M1–M8 + CI strategy |
-| [`docs/implementation-plan.md`](docs/implementation-plan.md) | Current-milestone task detail |
-| [`docs/architecture.md`](docs/architecture.md) | System architecture + test strategy + open questions |
-| [`docs/expression-serialization.md`](docs/expression-serialization.md) | Serializer research & design direction + open questions |
-| [`docs/wire-protocol.md`](docs/wire-protocol.md) | Client↔server contract + open questions |
-| [`docs/research-infrastructure.md`](docs/research-infrastructure.md) | Subrepos + CodeGraph MCP setup |
-| [`docs/infocarrier-core-requirements.md`](docs/infocarrier-core-requirements.md) | Authoritative requirements spec |
-| [`docs/ci-cd.md`](docs/ci-cd.md) | CI/CD strategy |
+| [`docs/limitations.md`](docs/limitations.md) | **Start here if you are evaluating** — every known limitation, with an example |
+| [`docs/security-review.md`](docs/security-review.md) | The deserialization path, its bound, and what is accepted |
+| [`docs/architecture.md`](docs/architecture.md) | Components, test strategy, open questions |
+| [`docs/decisions.md`](docs/decisions.md) | ADR log — the decisions and why |
+| [`docs/wire-protocol.md`](docs/wire-protocol.md) | Client ↔ server contract |
+| [`docs/expression-serialization.md`](docs/expression-serialization.md) | How a LINQ tree becomes bytes |
+| [`docs/projection-split.md`](docs/projection-split.md) | What runs on the server, what runs on the client |
+| [`docs/roadmap.md`](docs/roadmap.md) | Milestones and CI strategy |
 
-## Repository Structure
+## Build and test
 
-```
-InfoCarrier.Core/
-├── README.md                 ← this file
-├── .github/workflows/        ← CI/CD (placeholder)
-├── docs/                     ← architecture decision records, design docs
-├── subrepos/                 ← 3rd-party source for reference (not submodules, all git-ignored)
-│   ├── efcore/               ← EF Core source (for test compliance)
-│   ├── rlinq/                ← Remote.Linq source (if adopted)
-│   ├── aqua/                 ← Aqua source (if adopted)
-│   └── infocarrier-v1/       ← original InfoCarrier.Core v1 (non-authoritative, for inspiration)
-└── samples/                  ← sample apps (design docs only for now)
+```bash
+dotnet build InfoCarrier.Core.slnx
+
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
+dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
 ```
 
-## Key Dependencies
+The first is the inherited EF specification suite; the second drives a real HTTP hop against an
+ASP.NET Core server.
 
-| Dependency | Version | Purpose |
-|------------|---------|---------|
-| .NET SDK | 10.0.x | Runtime |
-| EF Core | 10.0.x | Database provider framework |
-| Expression Serializer | in-tree | Greenfield — no Remote.Linq/Aqua dependency (ADR-001) |
-| System.Text.Json | 10.0.x | Default wire serializer (source-generated, AOT-friendly) |
-| xUnit.net | 2.9.x | Functional test suite |
-| ASP.NET Core | 10.0.x | Server hosting (planned) |
+## Credits
+
+- [Entity Framework Core](https://github.com/dotnet/efcore) by Microsoft — this provider is built
+  on it and judged by its test suite.
+- [InfoCarrier.Core v1](https://github.com/azabluda/InfoCarrier.Core), by
+  [on/off it-solutions gmbh](http://www.onoff-it-solutions.info), which proved the idea.
+- [Remote.Linq](https://github.com/6bee/Remote.Linq) and
+  [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn — v1's foundation, and
+  specification material for this rewrite.
 
 ## License
 
-MIT — see [original license](../license.txt).
+MIT — every source file carries the header. A `LICENSE` file is not yet in the repository root.
