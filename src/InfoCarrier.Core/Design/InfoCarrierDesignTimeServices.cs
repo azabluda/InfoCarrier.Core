@@ -1,6 +1,5 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using InfoCarrier.Core.Design;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.DependencyInjection;
 

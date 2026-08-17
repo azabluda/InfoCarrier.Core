@@ -2,7 +2,6 @@
 
 using System.Reflection;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.InMemory.Internal;
 using Microsoft.EntityFrameworkCore.Query;

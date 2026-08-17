@@ -1,0 +1,29 @@
+# EditorConfig — https://editorconfig.org
+root = true
+
+[*.cs]
+
+# ---------------------------------------------------------------------------------------------
+# IDE0005: unnecessary using directive.
+#
+# A `using` that nothing needs is a claim about a dependency that is not true, and in this
+# repository that claim matters -- what the product references is a recurring subject (ADR-001
+# forbids Remote.Linq/Aqua; M9 removed the EFCore.Relational reference, and a stale `using` was
+# how one comment outlived it).
+#
+# Two things it needs, both of which cost a run to discover:
+#
+#   * `EnforceCodeStyleInBuild` in Directory.Build.props, or the IDE#### analyzers run only in an
+#     editor and CI never sees this.
+#   * `GenerateDocumentationFile`. With documentation generation off the compiler does not record
+#     which usings a file's XML comments reach through, and IDE0005 does not run at all -- it says
+#     so, as a warning naming the property. Six projects had it off, so this rule was silently
+#     inert in all of them while appearing to be repository-wide.
+#
+# NOTE there is deliberately no `dotnet_analyzer_diagnostic.category-Style.severity = none` here.
+# An earlier version had one, on the assumption that `EnforceCodeStyleInBuild` would flood the
+# build with formatting diagnostics. Measured: it does not. Almost every IDE#### rule defaults to
+# *suggestion*, which is not a build warning, so the build is clean with the category left alone.
+# Disabling it would only have pre-empted every style rule anyone later wanted to adopt, silently.
+# ---------------------------------------------------------------------------------------------
+dotnet_diagnostic.IDE0005.severity = warning

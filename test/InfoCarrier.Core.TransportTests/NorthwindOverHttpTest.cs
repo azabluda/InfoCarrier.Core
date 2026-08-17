@@ -1,6 +1,5 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using InfoCarrier.Core;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Northwind.Shared;

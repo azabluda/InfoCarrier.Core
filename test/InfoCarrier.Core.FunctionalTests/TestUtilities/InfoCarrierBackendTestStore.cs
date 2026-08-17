@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 

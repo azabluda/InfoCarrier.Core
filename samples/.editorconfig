@@ -1,0 +1,23 @@
+# Folder-scoped. Inherits the repository root .editorconfig (no `root = true` here) and adds
+# only what is specific to samples/.
+
+[*.cs]
+
+# ---------------------------------------------------------------------------------------------
+# The XML-doc warnings are switched off for everything under samples/, and only here.
+#
+# These projects generate a documentation file -- IDE0005 does not run without one -- but nothing
+# under samples/ is a public API surface that anyone reads, so "missing XML comment for publicly
+# visible member" is noise on every test class and every sample page. In src/ the same four rules
+# stay ON and are answered properly: M8-28 fixed 22 real sites there, including malformed XML that
+# silently dropped a whole <remarks>, and four crefs that no longer resolved.
+#
+# Folder-scoped rather than `<NoWarn>` in each csproj, which is what this replaced. NoWarn is
+# invisible from the file that trips it, has to be repeated per project, and is easy to widen by
+# accident; a scoped .editorconfig states the boundary once, in the directory the boundary is
+# about, and a new project under samples/ inherits it with no build-file edit at all.
+# ---------------------------------------------------------------------------------------------
+dotnet_diagnostic.CS1591.severity = none
+dotnet_diagnostic.CS1573.severity = none
+dotnet_diagnostic.CS1574.severity = none
+dotnet_diagnostic.CS1570.severity = none

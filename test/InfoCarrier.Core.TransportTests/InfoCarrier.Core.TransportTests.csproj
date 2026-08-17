@@ -5,7 +5,12 @@
     <RootNamespace>InfoCarrier.Core.TransportTests</RootNamespace>
     <AssemblyName>InfoCarrier.Core.TransportTests</AssemblyName>
     <IsPackable>false</IsPackable>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Not a documented API, but the doc file is generated anyway: IDE0005 (unnecessary using) does
+      not run without one. The doc-comment warnings that come with it (1254 in this repository) are
+      switched off by the folder-scoped .editorconfig, not here.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

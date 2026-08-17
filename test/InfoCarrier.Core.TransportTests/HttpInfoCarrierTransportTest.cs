@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Net;
-using InfoCarrier.Core;
 using InfoCarrier.Core.Common;
 using Xunit;
 

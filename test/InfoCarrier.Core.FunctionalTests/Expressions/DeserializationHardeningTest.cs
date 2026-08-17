@@ -1,6 +1,5 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using System.Linq.Expressions;
 using System.Reflection;
 using InfoCarrier.Core.Expressions;
 using Xunit;

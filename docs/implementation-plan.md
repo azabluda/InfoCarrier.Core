@@ -1063,3 +1063,37 @@ warning ratchet to replace.
       **`CLAUDE.md`'s guardrail is rewritten in this commit**, because the old wording —
       *"Do not suppress them repo-wide"* — read against a build that now shows none of them would
       have looked like a rule that had been quietly broken.
+
+- [x] **M8-31. Unused usings become a warning, and two blunt instruments were replaced by scoped
+      ones.** `<this commit>`
+      `eng/measure.sh m8-31 m8-30`: `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` —
+      **0 fixed, 0 broken, `REASONS: unchanged`**. `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `InfoCarrier.Core.TransportTests`: **17 of 17**. The Blazor sample boots (driven).
+      **36 unused `using` directives removed; the build stays `0 Warning(s), 0 Error(s)`.**
+
+      `IDE0005` is on at `warning` in a root `.editorconfig`, with `EnforceCodeStyleInBuild` in
+      `Directory.Build.props` so it runs in the build rather than only in an editor.
+
+      **It was silently inert in six of eight projects, and the build said so.** `IDE0005` needs
+      `GenerateDocumentationFile`, and the samples and both test projects set it **false** — so
+      the rule covered `src/` only while looking repository-wide. The tell was a warning nobody
+      reads, `EnableGenerateDocumentationFile`, naming the property. It was found by counting
+      warnings after the fix rather than by trusting that the fix applied. Removing 15 usings in
+      `src/` and stopping there would have been a confident false clearance.
+
+      **Removing a using exposes another**, so this had to iterate: 15 in `src/` over three passes,
+      then 21 more once the other six projects were covered, converging in three rounds.
+
+      **Two things this repository asked for, and both replaced something blunt with something
+      scoped:**
+
+      | Was | Now | Why |
+      |---|---|---|
+      | `dotnet_analyzer_diagnostic.category-Style.severity = none` at root | **deleted** | It was guarding a problem that does not exist. Almost every `IDE####` rule defaults to *suggestion*, which is not a build warning — **measured: the build is `0 Warning(s)` without it**. All it would ever have done is silently pre-empt every style rule anyone later wanted to adopt. |
+      | `<NoWarn>CS1591;CS1573;CS1574;CS1570</NoWarn>` in six `.csproj` | **`test/.editorconfig` and `samples/.editorconfig`** | A `NoWarn` is invisible from the file that trips it, is repeated per project, and widens by accident. A folder-scoped `.editorconfig` states the boundary once, in the directory the boundary is about, and a new project under `test/` inherits it with no build-file edit. |
+
+      **The scoped files are load-bearing, and that was probed rather than assumed**: with
+      `test/.editorconfig` removed, `InfoCarrier.Core.FunctionalTests` alone emits **1238 `CS1591`,
+      12 `CS1574` and 4 `CS1570`** — 1254 warnings, which is exactly why those projects had
+      documentation generation switched off in the first place. In `src/` the same four rules stay
+      **on**, and M8-28 answered all 22 sites there.
