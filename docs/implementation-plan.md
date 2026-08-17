@@ -853,8 +853,33 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 - [ ] **J9. Decide whether a query constant travels as its provider value.** Closes both
       `KeysWithConverters` failures. Weigh against ADR-012: the seam stays the answer for a type the
       model says nothing about; this is about types the model *has* mapped.
-- [ ] **J10. Probe the boxed join key** in `Value_conversion_is_appropriately_used_for_join_condition`
-      before pricing anything.
+- [x] **J10. The join key was never boxed, and the fix is one line.** `<this commit>`
+      `Total tests: 22456, Passed: 22229, Failed: 17, Skipped: 210` (`j10`): **1 fixed, 0 broken**.
+
+      **Every theory in the entry this replaces was wrong, and the probe said so in four lines.**
+      The tree is clean at *all four* stages — captured at `Split`, after `ReCarryInternalTypes`,
+      after `ProjectionRewriter`, and rebound on the server — each printing
+      `new ValueTuple\`3(Item1 = …, Item2 = …, Item3 = …)` with no `Convert` anywhere. **The
+      `(object)` in EF's message is EF's own rendering of a key it could not decompose**, not
+      something anyone boxed. Reading it as boxing cost this entry two rounds of confident
+      reasoning about where the cast came from.
+
+      **The real cause, proved with no InfoCarrier in the probe at all.** A plain SQLite context,
+      the same join written three ways:
+
+      | Join key shape | EF's own SQLite provider |
+      |---|---|
+      | anonymous type | **TRANSLATED** |
+      | `ValueTuple<int?, bool, int>` (with `NewExpression.Members` supplied) | **refused** — *"could not be translated"* |
+      | `Tuple<int?, bool, int>` | **TRANSLATED** |
+
+      So the limitation is EF's, and ours was only in picking the shape that trips it: the re-carry
+      that keeps a join *on* the server was simultaneously making it untranslatable. Supplying
+      `Members` — the fix that was worth 214 tests elsewhere — is **not** enough for a join key.
+
+      The change adds the join key's type to `_referenceTyped`, the mechanism that already exists
+      for a carrier that must stay a reference type. Deliberately **not** applied to a `GroupBy`
+      key: nothing has been measured there.
 
 ### J5–J6 — D3 answer (c), in two steps
 

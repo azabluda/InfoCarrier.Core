@@ -470,8 +470,8 @@ internal static class TransparentIdentifierRewriter
                 && node.Method.Name is nameof(Queryable.Join) or nameof(Queryable.GroupJoin)
                 && node.Arguments.Count >= 4)
             {
-                RegisterKeySelector(node.Arguments[2]);
-                RegisterKeySelector(node.Arguments[3]);
+                RegisterKeySelector(node.Arguments[2], asJoinKey: true);
+                RegisterKeySelector(node.Arguments[3], asJoinKey: true);
             }
 
             // And so is a `GroupBy` key or element selector, for the same reason.
@@ -493,7 +493,40 @@ internal static class TransparentIdentifierRewriter
             return base.VisitMethodCall(node);
         }
 
-        private void RegisterKeySelector(Expression argument)
+        /// <summary>
+        ///     Registers a key selector's body as a carrier.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b><paramref name="asJoinKey" /> forces the reference-typed tuple, and it is a
+        ///         measured requirement rather than a preference (J10).</b> EF's relational
+        ///         translation accepts an <em>anonymous type</em> as a join key and refuses a
+        ///         <see cref="ValueTuple" /> — even one built with
+        ///         <see cref="NewExpression.Members" /> supplied, which is the thing that makes a
+        ///         carrier transparent everywhere else. So the re-carry that lets a join stay on
+        ///         the server was simultaneously making the join untranslatable.
+        ///     </para>
+        ///     <para>
+        ///         <b>Proved outside this provider entirely.</b> A plain SQLite context, the same
+        ///         join written three ways: anonymous key <c>TRANSLATED</c>, `ValueTuple` key
+        ///         <c>InvalidOperationException … could not be translated</c>, <c>Tuple</c> key
+        ///         <c>TRANSLATED</c>. Nothing of ours was in the probe, so the limitation is EF's
+        ///         and the defect was ours only in choosing the shape that trips it.
+        ///     </para>
+        ///     <para>
+        ///         <b>The failure was hidden behind a misleading message.</b> EF renders the key it
+        ///         cannot decompose as <c>(object)new ValueTuple&lt;…&gt;(…)</c>, which reads as
+        ///         "somebody boxed this". Nobody did: the tree this provider ships and the tree the
+        ///         server rebinds are both clean, verified by probing all four stages. The
+        ///         <c>(object)</c> is EF's own rendering of its refusal.
+        ///     </para>
+        ///     <para>
+        ///         Deliberately <em>not</em> applied to a <c>GroupBy</c> key: nothing has been
+        ///         measured about those, and the reference tuple is a different type with different
+        ///         null behaviour. One evidenced change at a time.
+        ///     </para>
+        /// </remarks>
+        private void RegisterKeySelector(Expression argument, bool asJoinKey = false)
         {
             while (argument is UnaryExpression { NodeType: ExpressionType.Quote } quote)
             {
@@ -503,6 +536,11 @@ internal static class TransparentIdentifierRewriter
             if (argument is LambdaExpression key)
             {
                 Register(key.Body, parent: null);
+
+                if (asJoinKey)
+                {
+                    _referenceTyped.Add(key.Body.Type);
+                }
             }
         }
 

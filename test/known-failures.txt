@@ -174,5 +174,11 @@
 # constants and extension method. The D3 regression pins were checked positively rather than
 # inferred: JsonQuerySqlite 393/0, JsonOwnedCollectionUpdate 5/0, ComplexCollectionJsonUpdate 18/0.
 # Figures read off the run's own summary block: 22456 / 22228 / 18 / 210 (`j5c`).
-failed=18
+# 2026-08-17 (J10) - 18 -> 17. A join key re-carried as a ValueTuple is not translatable; as a
+# Tuple it is. Proved with no InfoCarrier in the probe: a plain SQLite context translates an
+# anonymous join key and a Tuple one, and refuses a ValueTuple even with NewExpression.Members
+# supplied. The "(object)new ValueTuple<...>" in EF's message is EF's own rendering of a key it
+# could not decompose -- nobody boxed anything, and all four wire stages print a clean tree.
+# 22456 / 22229 / 17 / 210 (`j10`).
+failed=17
 total=22456
