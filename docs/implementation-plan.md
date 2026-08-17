@@ -1287,6 +1287,16 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       mapper is wrong" to "one more defect exists behind it", and it is a **single test** — much
       lower value than J12's 1787.
 
+      **CORRECTION, 2026-08-17: "the guard measured inert" was over-read, and the method matters.**
+      That conclusion came from `FIXED: 0, BROKEN: 0, REASONS: unchanged`. Those three cannot
+      distinguish *"the guard never fired"* from *"the guard fired, declined correctly, and something
+      further along threw an `InvalidCastException` too"* — because the test fails either way and the
+      reasons tally is grouped by **first message line**. **A tally is not a trace.** The guard may
+      have been right; that run does not say.
+
+      What the run *does* establish is that the failure is a **server fault on the query path**
+      (`QueryDataAsync` → `RoundTripAsync` rethrow), and that it survives J13 and J14 unchanged.
+
       **Next probe:** print every `(ModelClrType → ProviderClrType)` pair the constructor records for
       this fixture's model, and the `declaredType` each lookup is made with. One filtered run.
       If it is the base-type collision, the fix is to key on the **exact** type and require
