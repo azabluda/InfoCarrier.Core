@@ -734,10 +734,39 @@ Measured one at a time, because a combined move cannot tell which base moved the
       thirteen skips, the `UseTransaction` override) and the base returns to Tier A with EF's own
       mirrored skips — which is an adoption choice, not the test-suppression CLAUDE.md forbids.
 
-- [ ] **J11. Cascade delete and foreign-key ordering in the SaveChanges replay.**
-      The 165. One message, one cause. Start by asking whether the server replays deletes in
-      dependency order at all, and whether a cascade the *client* decided is re-derived on the
-      server or expected to travel.
+- [ ] **J11. A foreign key that references an ALTERNATE key does not survive the replay.**
+      **Narrowed 2026-08-17, before any code, and the narrowing is the point.** J3 filed the 165 as
+      "cascade delete and foreign-key ordering", which was a guess from one error message. Grouping
+      the failing *names* instead says something much sharper:
+
+      | | count |
+      |---|---|
+      | `ProxyGraphUpdates` failures | 167 |
+      | …whose name contains `alternate_key` / `_AK_` | **162** |
+      | …that do not | **5** |
+
+      Every large family is `Optional_one_to_one_with_alternate_key_*` or
+      `Optional_many_to_one_dependents_with_alternate_key_*`, each at 9 parameterizations (the
+      three cascade timings squared). So this is **not** a statement about cascade delete or about
+      ordering — both of which apply equally to the primary-key variants, and those **pass**.
+      It is: *a foreign key that points at an alternate key rather than at the primary key is not
+      resolved correctly on the server.*
+
+      **That is an existing family, not a new one.** C34 and C76 are both "a key resolved by value
+      rather than by what declares it", and C76's fix keyed the placeholder map by
+      `(key property, value)` and resolved through `foreignKey.PrincipalKey`. An alternate key is
+      exactly where `PrincipalKey` stops being the primary key — so the first thing to read is
+      whether every path that resolves a reference uses `foreignKey.PrincipalKey`, or whether some
+      still assume the primary key.
+
+      **A hypothesis that ordering explains it is already weak** and should not be spent time on
+      first: deletes are tracked before everything else and *not* in dependency order
+      (`ServerSaveChangesExecutor`, the `Deleted` pass), but EF sorts modification commands
+      topologically itself, so tracking order is not what reaches the store.
+
+      **The 5 that are not alternate-key are separate and small**:
+      `Avoid_nulling_shared_FK_property_when_deleting` (×3) and
+      `Save_two_entity_cycle_with_lazy_loading` (×2). Do not fold them in.
 
       The move itself was the same three lines as J1 and J2: store factory to `Sqlite`, delete the
       thirteen skips, keep the by-hand reseed. The run was stopped at **21,289 of 22,453** after
