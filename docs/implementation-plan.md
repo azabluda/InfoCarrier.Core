@@ -743,8 +743,48 @@ Measured one at a time, because a combined move cannot tell which base moved the
       entity type missing from the model is a fixture or convention fault, cannot be a store
       limitation, is the cheapest of the three to settle, and may explain the others.
 
-- [ ] **J13. `NOT NULL constraint failed: OwnedOptional1.Id`** — an owned dependent's key arrives
-      null. Two tests, one message.
+- [ ] **J13. One owned-collection test, and it is C76's value-only fallback biting.**
+      **Half closed by J14 and the other half re-diagnosed.** `Save_changed_owned_one_to_one` is
+      **fixed** — the `OwnerRoot` owned-collection keys J14 adopted were what it needed.
+      `Save_changed_owned_one_to_many` remains, and it is no longer `NOT NULL`: it is now an
+      identity conflict, with C11's replay diagnostic firing, which is what that instrument was
+      built for.
+
+      ```
+      The instance of entity type 'OwnedOptional1' cannot be tracked because another instance
+      with the key value '{Id: -2147482647}' is already being tracked.
+        placeholders resolved so far: -2147482647->-2147482647(tmp=True)
+        placeholder values expected in this request: -2147482647, -2147482646
+      ```
+
+      **The client is correct, and that was probed rather than assumed.** A temporary instrument in
+      `ChangeEntryMapper` printed every key and foreign-key property leaving the client:
+
+      ```
+      corr=0 OwnerRoot        Id=-2147482647 shadow=False temp=True
+      corr=1 OwnedOptional1   Id=-2147482647 shadow=True  temp=True | OwnerRootId=-2147482647
+      corr=2 OwnedOptional1   Id=-2147482646 shadow=True  temp=True | OwnerRootId=-2147482647
+      corr=3 OwnedOptional2   Id=-2147482647 shadow=True  temp=True | OwnedOptional1Id=-2147482646
+      ```
+
+      corr=1 and corr=2 carry **distinct** placeholders. The client did its job.
+
+      **Two facts point at one line.** First, the same value `-2147482647` is used by `OwnerRoot.Id`,
+      `OwnedOptional1.Id` *and* `OwnedOptional2.Id` — EF's temporary generator counts down **per key
+      property**, which is C76's premise. Second, `OwnedOptional1.Id` is **both a key and a foreign
+      key**, so the server resolves it as a *reference* through the placeholder map.
+
+      C76 keyed that map on `(key property, value)` and left **value-only as a fallback**, with the
+      note *"a reference whose principal key property cannot be named keeps exactly the behaviour it
+      had"*. **This looks like the case where that fallback resolves to another entity type's
+      registration** — corr=2's `-2147482646` finding `OwnedOptional2.Id`'s entry rather than its
+      own. That would explain the conflict exactly, and it is a **hypothesis with a named suspect**,
+      not a conclusion.
+
+      **Next probe:** print each `(property, value) → resolved` decision in the reference loop, and
+      whether it came from the qualified map or the fallback. One filtered run. If it is the
+      fallback, the question C76 deferred is now due: whether the value-only path should exist at
+      all for a property that *is* a key.
 
 - [x] ~~**J12. `GraphUpdates` to Tier B — assessed 2026-08-17.**~~ Split into J12a/J12b above.
       **Original assessment:**
