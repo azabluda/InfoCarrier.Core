@@ -778,15 +778,41 @@ Measured one at a time, because a combined move cannot tell which base moved the
       cannot cause a store error. So C76's fix is not incomplete here, and the defect is somewhere
       else.
 
-      **Where to look next, and why.** The failing families are all `..._orphaned...`, and an
-      orphan is produced by **nulling** the dependent's foreign key — so `FOREIGN KEY constraint
-      failed` means the null did not reach the store and the row still points at a deleted
-      principal. The next probe is therefore about *values*, not about key identity: record the
-      `ChangeEntry` for the orphaned dependent and check whether the nulled FK travels as a null,
-      or is dropped as "unset" by the sentinel/`HasExplicitValue` logic in `ChangeEntryMapper` and
-      then never written. **A null that is indistinguishable from unset is a shape this file has
-      met before** — it is exactly what `SentinelProperties` exists for.
-      One filtered run with a recording decorator answers it.
+      **PROBED 2026-08-17. The sentinel theory is refuted, and the real shape is now visible.**
+      A temporary instrument in `ChangeEntryMapper.ToChangeEntry` printed every key and foreign-key
+      property of every entry leaving the client, for
+      `Optional_many_to_one_dependents_with_alternate_key_are_orphaned` (27 of 27 failing):
+
+      ```
+      CLIENT OptionalAk1        state=Deleted   Id=1  AlternateId=3e3db6de…  ParentId=a2276653…
+      CLIENT OptionalAk2        state=Modified  Id=1  ParentId=<null> modified=True explicit=False
+      CLIENT OptionalComposite2 state=Modified  Id=1  ParentId=<null>          modified=True
+                                                      ParentAlternateId=3e3db6de… modified=True explicit=True
+      ```
+
+      **Two things this settles outright.**
+
+      1. **A nulled foreign key travels correctly.** `OptionalAk2.ParentId` leaves as `<null>` and
+         is flagged `modified=True`. It is *not* dropped as "unset", so
+         `SentinelProperties`/`HasExplicitValue` is **not** the mechanism. Do not re-derive this.
+      2. **The row the store rejects is identified.** `OptionalAk1` — the principal — is `Deleted`,
+         and its alternate key is `3e3db6de…`. `OptionalComposite2.ParentAlternateId` **still holds
+         `3e3db6de…`** while its sibling `ParentId` on the same entry has been nulled. A foreign key
+         still pointing at a row being deleted is exactly what SQLite refuses, and it explains the
+         `alternate_key` correlation precisely: the primary-key FK is nulled, the alternate-key FK
+         is not.
+
+      **What is NOT yet established, and must be before any fix.** Whether the client is wrong to
+      leave `ParentAlternateId` set, or the server is wrong in what it does with it. `explicit=True`
+      and `modified=True` on a *non-null* value means the client's change tracker deliberately wrote
+      it — so this may be correct client behaviour that the server then applies in the wrong order
+      or against the wrong row. The server-side half of the probe was not run.
+
+      **The next probe, precisely.** Instrument `ServerSaveChangesExecutor` to print, per replayed
+      entry, the state it tracks and the value it sets for `ParentAlternateId`, then read the row
+      the store actually holds — C42's order, which is the order that has resolved every wrong-value
+      defect in this file. Compare against EF's own `ProxyGraphUpdatesSqliteTest`, which passes the
+      same test on one context; the difference between one tracker and two is where the answer is.
 
       **The 5 that are not alternate-key are separate and small**:
       `Avoid_nulling_shared_FK_property_when_deleting` (×3) and
