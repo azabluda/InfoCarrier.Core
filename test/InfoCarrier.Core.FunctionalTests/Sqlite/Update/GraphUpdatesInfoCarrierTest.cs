@@ -126,6 +126,87 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
                 .ConfigureWarnings(w => w.Log(InfoCarrierEventId.TransactionIgnoredWarning));
 
         /// <summary>
+        ///     <c>GraphUpdatesSqliteTestBase</c>'s model additions, adopted whole (J14).
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>These entity types exist only in the relational fixture.</b> `Cruiser`,
+        ///         `AccessState`, `SomethingOfCategoryA/B` and `CompositeKeyWith&lt;&gt;` are added
+        ///         by <c>GraphUpdatesSqliteTestBase.OnModelCreating</c> and nowhere else, because
+        ///         they are configured with <c>HasDefaultValue</c> — a relational model-building
+        ///         API. On Tier A they were simply absent, which is why the tests that use them were
+        ///         silent no-ops; J12b deleted those overrides and the tests then failed with
+        ///         <i>"The entity type 'Cruiser' was not found"</i>. **A missing entity type is a
+        ///         model fault, never a store limitation**, which is why this group was the one to
+        ///         settle first.
+        ///     </para>
+        ///     <para>
+        ///         <b>It belongs on both halves, and that is the point rather than an inconvenience.</b>
+        ///         `ChangeEntryMapper` records the hazard exactly: <i>"the sentinel is computed
+        ///         twice … `HasDefaultValue(true)` makes a `bool`'s sentinel `true` on the server and
+        ///         leaves it `false` here"</i>. Configuring it once, in the shared
+        ///         `OnModelCreating` both sides derive from, is what makes the two agree (A49) —
+        ///         which is D2's whole argument.
+        ///     </para>
+        ///     <para>
+        ///         The `OwnerRoot` owned-collection keys come with it. EF *also* skips the six tests
+        ///         that exercise them, and those skips are mirrored above; the configuration is kept
+        ///         anyway so the model matches EF's rather than diverging in a second way.
+        ///     </para>
+        /// </remarks>
+        protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
+        {
+            base.OnModelCreating(modelBuilder, context);
+
+            modelBuilder.Entity<OwnerRoot>(b =>
+            {
+                b.OwnsMany(
+                    e => e.OptionalChildren, b =>
+                    {
+                        b.HasKey("Id");
+                        b.OwnsMany(e => e.Children, b => b.HasKey("Id"));
+                    });
+                b.OwnsMany(
+                    e => e.RequiredChildren, b =>
+                    {
+                        b.HasKey("Id");
+                        b.OwnsMany(e => e.Children, b => b.HasKey("Id"));
+                    });
+            });
+
+            modelBuilder.Entity<AccessState>(b =>
+            {
+                b.Property(e => e.AccessStateId).ValueGeneratedNever();
+                b.HasData(new AccessState { AccessStateId = 1 });
+            });
+
+            modelBuilder.Entity<Cruiser>(b =>
+            {
+                b.Property(e => e.IdUserState).HasDefaultValue(1);
+                b.HasOne(e => e.UserState).WithMany(e => e.Users).HasForeignKey(e => e.IdUserState);
+            });
+
+            modelBuilder.Entity<AccessStateWithSentinel>(b =>
+            {
+                b.Property(e => e.AccessStateWithSentinelId).ValueGeneratedNever();
+                b.HasData(new AccessStateWithSentinel { AccessStateWithSentinelId = 1 });
+            });
+
+            modelBuilder.Entity<CruiserWithSentinel>(b =>
+            {
+                b.Property(e => e.IdUserState).HasDefaultValue(1).HasSentinel(667);
+                b.HasOne(e => e.UserState).WithMany(e => e.Users).HasForeignKey(e => e.IdUserState);
+            });
+
+            modelBuilder.Entity<SomethingOfCategoryA>().Property<int>("CategoryId").HasDefaultValue(1);
+            modelBuilder.Entity<SomethingOfCategoryB>().Property(e => e.CategoryId).HasDefaultValue(2);
+
+            modelBuilder.Entity<CompositeKeyWith<int>>(b => b.Property(e => e.PrimaryGroup).HasDefaultValue(1).HasSentinel(1));
+            modelBuilder.Entity<CompositeKeyWith<bool>>(b => b.Property(e => e.PrimaryGroup).HasDefaultValue(true));
+            modelBuilder.Entity<CompositeKeyWith<bool?>>(b => b.Property(e => e.PrimaryGroup).HasDefaultValue(true));
+        }
+
+        /// <summary>
         ///     Reseeds through the <em>backend</em> context rather than the client one.
         /// </summary>
         /// <remarks>

@@ -230,5 +230,15 @@
 # arranged deliberately is that the collection branch does not claim it and lose the key, which is
 # J9's EnumerableClassKey hazard met on purpose. 1 fixed, 0 broken -- the aggregate GroupBy family,
 # which must stay server-side, is untouched. 22654 / 22452 / 25 / 177 (`j8`).
-failed=25
+# 2026-08-17 (J14) - 25 -> 16. 9 fixed, 0 broken, and NOT a provider fix: GraphUpdatesSqliteTestBase
+# adds Cruiser, AccessState, SomethingOfCategoryA/B and CompositeKeyWith<> to the model itself, via
+# HasDefaultValue -- a relational model-building API. On Tier A those entity types simply did not
+# exist, which is why the tests using them were silent no-ops. J12b deleted the no-ops and they failed
+# with "the entity type Cruiser was not found"; a missing entity type is a model fault and never a
+# store limitation, which is why this group was settled first. The configuration is adopted whole and
+# lands on BOTH halves, which is the point rather than an inconvenience -- ChangeEntryMapper already
+# records that HasDefaultValue(true) makes a bool sentinel true on the server and false on the client
+# unless it is configured once in the shared OnModelCreating (A49, D2). 22654 / 22461 / 16 / 177
+# (`j14`).
+failed=16
 total=22654
