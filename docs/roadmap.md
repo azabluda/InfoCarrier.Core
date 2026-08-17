@@ -378,11 +378,38 @@ Three separable pieces, and only the first can be done outside the library:
 - AOT/trimming verification (requirements §4.5).
 - Sample apps, NuGet packaging, `release.yml`.
 
-### M9 — Provider neutrality and store coverage
+### M9 — Provider neutrality and store coverage — **CLOSED 2026-08-17**
 
-**Opened 2026-08-16.** M8's remaining exit criteria stay open; this milestone runs beside it,
-because its subject is orthogonal — M8 is about shipping the provider, M9 is about what the
-provider assumes of the store behind it.
+**Opened 2026-08-16, closed 2026-08-17.** M8's remaining exit criteria stay open; this milestone
+ran beside it, because its subject is orthogonal — M8 is about shipping the provider, M9 is about
+what the provider assumes of the store behind it.
+
+**All four exit criteria are met, one of them by restatement** (the capability axis; the reason is
+recorded with the criterion below and in [`architecture.md`](architecture.md) §6a D5). Task detail
+is archived at
+[`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md).
+
+**Closing state:** `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` — from
+`145 / 22312` when the ratchet was last refreshed, and `13 / 22655` at the start of the closing
+session. **Every one of the nine is classified**, and stated for consumers in
+[`limitations.md`](limitations.md) — the first time this project has had a limitations statement
+aimed at someone outside it.
+
+**What it delivered beyond the criteria**, because the tier moves exposed real defects rather than
+just relocating tests:
+
+| | |
+|---|---|
+| `ProxyGraphUpdates` | 165 failures → **green** (J11): original foreign-key values never reached the server, so EF's command ordering could not see a dependent releasing a principal |
+| `GraphUpdates` | moved to a store that enforces foreign keys, at a cost of 2 |
+| 28 silent no-op overrides | **deleted** (J12b) — an empty override counts as a *passing* test, which is worse than a skip |
+| Wire boundary | a non-composed `GroupBy` crosses (J8); `Cast`/`OfType` type arguments are checked (J18); `Regex` is admitted with the security argument written down (J20) |
+| Parameter substitution | three supersessions of one rule — a null collection (J19) and a mapped scalar (J21) join C88's collections |
+
+**The methodological result is worth more than the count.** Six standing classifications were
+found to be wrong when checked against EF's own suites — including one that had read
+"SQLite-tier, a store limitation" for two milestones and was ours, one line. *A classification is
+not evidence, and age is not evidence.*
 
 **The premise.** This is a non-relational provider whose client is, by construction, never a
 relational context (ADR-013). It nevertheless references `Microsoft.EntityFrameworkCore.Relational`
@@ -405,12 +432,15 @@ here is broken; the question is what would break under a store that is neither I
 - **Chained InfoCarrier — a server whose own `DbContext` is an InfoCarrier client — very nearly
   works**, and was measured rather than reasoned about. See D4 below.
 
-**Exit criteria**
-- A provider-neutral *"is this type mapped to one document?"* seam, with the relational
+**Exit criteria — all met**
+- **MET (J5).** A provider-neutral *"is this type mapped to one document?"* seam, with the relational
   implementation behind it, so `InfoCarrier.Core` no longer references
   `Microsoft.EntityFrameworkCore.Relational` (D3 answer **(c)**, chosen 2026-08-16).
-- ~~A query boundary that also asks **what the backend can evaluate**~~ — **RESTATED 2026-08-17:
-  the capability axis is *identified, decided and recorded*.** It is a second, independent axis and
+  `IInfoCarrierDocumentMapping` reads the container annotation by its string name; three
+  `DocumentMappingPinTest` assertions pin the strings and the ownership-chain walk against EF's own
+  constants.
+- **MET by restatement (J6).** ~~A query boundary that also asks **what the backend can evaluate**~~
+  — **RESTATED 2026-08-17: the capability axis is *identified, decided and recorded*.** It is a second, independent axis and
   it must not touch `TypeAllowlist` — that allowlist is ADR-008 constraint 2, a remote-code-execution
   control whose safety `security-review.md` §2 calls a conjunction, so a backend must never be able
   to widen it by answering a question. The capability axis only ever *narrows* what is shipped.
@@ -423,10 +453,18 @@ here is broken; the question is what would break under a store that is neither I
   there is no second backend to ask, and adding one is explicitly out of this milestone's scope. A
   criterion that requires the thing the milestone excludes is a criterion that can only be met by
   changing the milestone. Recorded here rather than quietly dropped.
-- The test project organised **by backend store**, as v1's was, so a store's coverage is
-  countable by looking at it.
-- Every base that runs on Tier A only because it was adopted there first is moved to the tier that
-  translates (CLAUDE.md's A79/A80 rule). The audit found three, worth 24 mirrored skips.
+- **MET (J4).** The test project organised **by backend store**, as v1's was, so a store's coverage
+  is countable by looking at it: `InMemory/` 57, `Sqlite/` 25, `TestUtilities/` 16, and 18
+  store-independent.
+- **MET (J1, J2, J3+J11, J12a).** Every base that runs on Tier A only because it was adopted there
+  first is moved to the tier that translates (CLAUDE.md's A79/A80 rule). The audit found three,
+  worth 24 mirrored skips; a fourth (`GraphUpdates`) moved once J11 made it possible.
+  **The moves were not bookkeeping** — `ProxyGraphUpdates` arrived on a store that enforces foreign
+  keys with 165 failures, and closing them found a real defect in what `ChangeEntryMapper` sends.
+  **And CLAUDE.md's own rule about this was wrong and is corrected**: it said a base using
+  `ExecuteWithStrategyInTransactionAsync` could not move until a product feature existed. The
+  feature had shipped in M4; what was missing was the test class's `UseTransaction` override, which
+  two other classes already carried.
 
 **Deliberately *not* exit criteria**
 - Adding a third store. Cosmos is the recommended candidate and the only one with both a

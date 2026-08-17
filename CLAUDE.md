@@ -172,6 +172,21 @@ from the **CLR type alone**, through a service no provider replaces.
 
 ## Current state
 
+**M9 is CLOSED (2026-08-17), M8 is NOT.** M9's four exit criteria are met — the document-mapping
+seam (so `InfoCarrier.Core` no longer references `EFCore.Relational`), the test project organised
+by backend store, four bases moved to the tier that translates, and the capability axis
+*identified, decided and recorded* rather than built (`architecture.md` §6a **D5**, answer (c);
+the original wording required a second backend, which M9 excluded). Task detail is archived at
+`docs/archive/implementation-plan-m9-phase-j.md` and is never edited again;
+`docs/implementation-plan.md` holds M8's Phases H and I only.
+**The nine remaining failures now have a consumer-facing statement — `docs/limitations.md`** — and
+that is the document to keep true, because it is the only one written for someone outside this
+repository. It says one unsupported scenario, one query to treat with caution, two message-text
+differences, and two queries this provider *answers* that other EF providers reject.
+**Six standing classifications were found wrong when checked against EF's own suites in the closing
+session alone**, one of which had read "SQLite-tier, a store limitation" for two milestones and was
+ours, one line (J19). *A classification is not evidence, and age is not evidence.*
+
 **M6 is CLOSED (2026-08-11).** Every spec base EF ships that this provider can host is adopted —
 `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is green, `AdHocJsonQuery` last and
 61 of 61. It closed in four steps once B12 was decided: C80 took B12 (36 fixed), C81 added ADR-013
