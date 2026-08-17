@@ -692,7 +692,38 @@ Measured one at a time, because a combined move cannot tell which base moved the
       | `Value_conversion_is_appropriately_used_for_join_condition` | The `Join` over two converted columns is not translated. |
       | `Collection_enum_as_string_Contains` | `Assert.Throws() Failure: No exception was thrown` — and the base's body is `Assert.Throws<InvalidOperationException>(…)` around the query. **A28 family**: the spec test asserts a limitation this provider does not have, and it returns the right answer. |
 
-- [ ] **J12. `GraphUpdates` to Tier B — assessed 2026-08-17, now the obvious next adoption.**
+- [x] **J12a. `GraphUpdates` to Tier B — the store switch and the enlisting hook.** `<this commit>`
+      `Total tests: 22654, Passed: 22461, Failed: 16, Skipped: 177` (`j12a`) against
+      `22672 / 22487 / 14 / 171` (`j9`). **127 tests moved to a store that enforces constraints and
+      it cost 2 failures.** J11 did the heavy lifting; this is what was left.
+
+      **Zero `database is locked`.** The `UseTransaction` override landed in the *same* change as
+      the store switch, which is the whole lesson of J3's first attempt — omitting it there cost two
+      hours of 30-second timeouts. Applied first time here.
+
+      `total` falls 18 and `skipped` rises 6: EF's six `GraphUpdatesSqliteTestBase` skips, mirrored
+      one for one, and xUnit reports a skipped theory as one test rather than as its
+      parameterizations — the same accounting `known-failures.txt` records for C94.
+
+      **The two new failures are one message:** `SQLite Error 19: 'NOT NULL constraint failed:
+      OwnedOptional1.Id'`, on `Save_changed_owned_one_to_one` and `Save_changed_owned_one_to_many`.
+      An owned dependent's key arrives null where the store requires it. Filed as J13.
+
+      **Still to do, and deliberately a separate step:** the class carries **28** silent
+      `Task.CompletedTask` overrides — 28 tests that do nothing at all, most of them commented
+      *"FK uniqueness not enforced in in-memory database"* or about cascade delete *in store*. Those
+      are precisely what a real store tests, and they are J12b. Splitting them off keeps this
+      measurement interpretable.
+
+- [ ] **J12b. Delete `GraphUpdates`'  28 silent no-op overrides.** Each is an InMemory statement:
+      FK uniqueness, or a cascade the store is supposed to perform. On Tier B they become real
+      tests. Expect a rise and classify it before committing.
+
+- [ ] **J13. `NOT NULL constraint failed: OwnedOptional1.Id`** — an owned dependent's key arrives
+      null. Two tests, one message.
+
+- [x] ~~**J12. `GraphUpdates` to Tier B — assessed 2026-08-17.**~~ Split into J12a/J12b above.
+      **Original assessment:**
       1787 tests, and **the reason not to move it has just gone**. The assessment, not a guess:
 
       | Fact | Value |

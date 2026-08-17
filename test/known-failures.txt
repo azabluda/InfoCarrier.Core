@@ -205,5 +205,13 @@
 # parameterless constructor now travels as the string the model always said it was. The outbound
 # face is still open and now fails DIFFERENTLY (InvalidCastException, wrong converter selected for a
 # related key type), which is progress and is written up in J9. 22672 / 22487 / 14 / 171 (`j9`).
-failed=14
-total=22672
+# 2026-08-17 (J12a) - 14 -> 16, `total` 22672 -> 22654, `skipped` 171 -> 177. GraphUpdates moved to
+# Tier B: 127 tests now run against a store that enforces foreign keys, at a cost of 2 failures,
+# because J11 had already fixed the mechanism that made J3 explode. ZERO "database is locked" -- the
+# UseTransaction override landed in the same change as the store switch, which is J3's lesson. The
+# total FALLS by 18 and skipped rises by 6 because EF's six GraphUpdatesSqliteTestBase skips are
+# mirrored and xUnit counts a skipped theory as one test, the same accounting as C94. The two new
+# failures are one message, NOT NULL constraint failed: OwnedOptional1.Id, filed as J13.
+# 22654 / 22461 / 16 / 177 (`j12a`).
+failed=16
+total=22654

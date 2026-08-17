@@ -3,11 +3,19 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
+
+// A skipped override of an inherited `[ConditionalTheory]` supplies no data of its own, and the
+// analyzer cannot see that the base still does. EF's own GraphUpdatesSqliteTestBase carries the same
+// six overrides and suppresses this in its project file.
+#pragma warning disable xUnit1003
 
 #nullable disable
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory.Update;
+namespace InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 
 /// <summary>
 ///     <c>GraphUpdatesTestBase</c> on ADR-009 Tier A — the InMemory backend. 127 tests covering
@@ -182,24 +190,62 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
         // FK uniqueness not enforced in in-memory database
         => Task.CompletedTask;
 
-    protected override async Task ExecuteWithStrategyInTransactionAsync(
-        Func<DbContext, Task> testOperation,
-        Func<DbContext, Task> nestedTestOperation1 = null,
-        Func<DbContext, Task> nestedTestOperation2 = null,
-        Func<DbContext, Task> nestedTestOperation3 = null)
-    {
-        // `finally`, because a failing test dirties the store exactly as a passing one does, and
-        // reseeding only on success reports the previous test's leftovers against the next one.
-        try
-        {
-            await base.ExecuteWithStrategyInTransactionAsync(
-                testOperation, nestedTestOperation1, nestedTestOperation2, nestedTestOperation3);
-        }
-        finally
-        {
-            await Fixture.ReseedAsync();
-        }
-    }
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         The base opens a transaction on one context and hands every <em>other</em> context
+    ///         here to enlist in it. Relational suites do that with
+    ///         <c>transaction.GetDbTransaction()</c>, which ADR-013 puts out of reach; the
+    ///         InfoCarrier equivalent shares the server's W3 token, and the result is non-owning.
+    ///     </para>
+    ///     <para>
+    ///         <b>Omitting this is what made J3's first attempt take two hours of 30-second lock
+    ///         timeouts instead of failing fast</b>, so it lands in the same change as the store
+    ///         switch rather than after it.
+    ///     </para>
+    ///     <para>
+    ///         It replaces a by-hand reseed after every test, which existed only because Tier A had
+    ///         no transaction to roll back — the same workaround `ConferencePlanner` deleted when it
+    ///         gained a real one.
+    ///     </para>
+    /// </remarks>
+    protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        => facade.UseInfoCarrierTransaction(transaction);
+
+    // EF's own `GraphUpdatesSqliteTestBase` skips, one for one: SQLite cannot express the default
+    // owned-collection pattern because of its composite key. Mirrored, not invented.
+    private const string OwnedCollectionSkip =
+        "Default owned collection pattern does not work with SQLite due to composite key.";
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    public override Task Delete_principal_with_CLR_key_owned_collection(bool async)
+        => base.Delete_principal_with_CLR_key_owned_collection(async);
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    public override Task Delete_principal_with_shadow_key_owned_collection_throws(bool async)
+        => base.Delete_principal_with_shadow_key_owned_collection_throws(async);
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    public override Task Update_principal_with_CLR_key_owned_collection(bool async)
+        => base.Update_principal_with_CLR_key_owned_collection(async);
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    public override Task Update_principal_with_shadow_key_owned_collection_throws(bool async)
+        => base.Update_principal_with_shadow_key_owned_collection_throws(async);
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    public override Task Clearing_CLR_key_owned_collection(bool async, bool useUpdate, bool addNew)
+        => base.Clearing_CLR_key_owned_collection(async, useUpdate, addNew);
+
+    /// <inheritdoc />
+    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    public override Task Clearing_shadow_key_owned_collection_throws(bool async, bool useUpdate, bool addNew)
+        => base.Clearing_shadow_key_owned_collection_throws(async, useUpdate, addNew);
 
     public class InfoCarrierFixture : GraphUpdatesFixtureBase
     {
@@ -210,7 +256,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
