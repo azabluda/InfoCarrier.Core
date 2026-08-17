@@ -60,6 +60,27 @@ public sealed class TypeAllowlist
         typeof(EntityFrameworkQueryableExtensions), typeof(Math), typeof(MathF),
         typeof(Convert), typeof(StringComparer), typeof(Expression),
         typeof(DbFunctionsExtensions),
+
+        // `Regex`, admitted 2026-08-17 (M9 J20), reversing A46. EF's own SQLite provider
+        // translates `Regex.IsMatch` to `REGEXP` and its InMemory provider evaluates it, so the
+        // refusal was this provider disagreeing with every reference implementation.
+        //
+        // WHY THIS DOES NOT BREAK `security-review.md` §2's CONJUNCTION. That bound is over the
+        // *reflection invocation surface* — `Binder`, `MethodBase`, `MethodInfo`,
+        // `ConstructorInfo`, `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. `Regex` is on
+        // none of it and constructs nothing that is. The one member that touches it,
+        // `Regex.CompileToAssembly`, is unreachable **by §2's own mechanism rather than by luck**:
+        // `ResolveMethod` resolves every parameter type through this same allowlist, and its
+        // parameters are `RegexCompilationInfo[]`, `System.Reflection.AssemblyName` and
+        // `System.Reflection.Emit.CustomAttributeBuilder[]` — none admitted — so the signature
+        // lookup fails before the method is found. Exactly how `Binder` blocks
+        // `Type.InvokeMember`. `DeserializationHardeningTest` pins it rather than arguing it.
+        //
+        // WHAT IS ACCEPTED, and it is real: a hostile payload may name `Regex.IsMatch` with a
+        // catastrophic-backtracking pattern on an overload that takes no timeout. That is denial
+        // of service, not code execution, and `security-review.md` §4 records it with the
+        // deployer's mitigation. `RegexOptions` needs no entry — every enum is already admitted.
+        typeof(System.Text.RegularExpressions.Regex),
     ];
 
     private static readonly HashSet<Type> BuiltInGenericDefinitions =

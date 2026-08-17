@@ -1509,7 +1509,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 |---|---|---|---|
 | `Can_track_entity_with_complex_property_bag_collections` | 2 | `ArgumentException … get_Item(System.String)` | **Known and documented.** A property-bag complex *collection* on an `Added` entity, failing inside EF's own `StructuralTypeMaterializerSource`. CLAUDE.md already carries it. |
 | `Correlated_collection_with_distinct_3_levels` | 2 | `Assert.Equal() Values differ` | **Known.** C64/C96: no correct answer satisfies the assertion, and EF's InMemory suite refuses the query outright. |
-| `Regex_IsMatch`, `Regex_IsMatch_constant_input` | 2 | LINQ not translated | **Ours, by design** — A46's deliberate allowlist refusal. **Not upstream**, which the earlier summary got wrong. |
+| ~~`Regex_IsMatch`, `Regex_IsMatch_constant_input`~~ | ~~2~~ | LINQ not translated | ~~A46's deliberate allowlist refusal~~ — **reversed and fixed by J20.** `Regex` is admitted; `security-review.md` §4a carries the decision. |
 | `Can_insert_and_read_back_with_enumerable_class_key…` | 1 | `InvalidCastException` | **Upstream**, and the only one: EF's own `EnumerableClassKey.Equals` casts to `IntClassKey` (J9). |
 | ~~`Parameter_collection_null_Contains`~~ | ~~1~~ | LINQ not translated | ~~SQLite-tier~~ — **the label was wrong and J19 fixed it.** No reference provider refuses this; it was ours, and one clause. |
 | `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Settled by J16, no code.** Right type, right verdict, EF's wording of a different true fact. Three siblings green. |
@@ -1711,6 +1711,38 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       **Method note, since three sessions have now been cost by the same thing:** this was found by
       grepping EF's own suites for a test name that had carried a classification for two milestones.
       *A classification is not evidence* (C96), and **age is not evidence** either.
+
+- [x] **J20. `Regex` is admitted to `TypeAllowlist`, reversing A46.** `<this commit>`
+      `Total tests: 22658, Passed: 22471, Failed: 10, Skipped: 177` (`j20` against `j19`):
+      **2 fixed, 0 broken. 12 → 10.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      **The decision and its argument live in [`security-review.md`](security-review.md) §4a**, which
+      is where a change to an ADR-008 control belongs; this entry records only what was measured.
+
+      **A46 was a decision, not a finding, and it was never argued on the merits.** It recorded that
+      `Regex` is off the allowlist and that the allowlist is ADR-008 — *"a roadmap decision, not a
+      fix"*. What it did not do is ask whether `Regex` is dangerous. EF's own SQLite provider
+      translates `Regex.IsMatch` to `REGEXP` and its InMemory provider evaluates it, so these two
+      tests were **this provider disagreeing with every reference implementation** about an ordinary
+      BCL type.
+
+      **The security argument, in one line each** (full version in §4a):
+
+      | Question | Answer |
+      |---|---|
+      | Does it widen §2's conjunction? | **No.** That bound is over the reflection *invocation* surface — `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. `Regex` is on none of it and constructs none of it. |
+      | What about `Regex.CompileToAssembly`? | Unreachable, **by §2's own mechanism**: `ResolveMethod` resolves every parameter type through this allowlist, and `RegexCompilationInfo[]`, `AssemblyName` and `CustomAttributeBuilder[]` are all unadmitted. The signature lookup fails before the method is found — how `Binder` blocks `Type.InvokeMember`. |
+      | `RegexOptions`? | No entry needed; §2 already records that every enum is admitted. |
+      | So it is free? | **No.** ReDoS is real and is now accepted weakness **6** in §4, with the deployer's `REGEX_DEFAULT_MATCH_TIMEOUT` mitigation named. The library cannot inject a timeout into a static overload the caller wrote. |
+
+      **Pinned, not asserted in prose.** `DeserializationHardeningTest.Regex_is_admitted_but_CompileToAssembly_cannot_be_named`
+      checks the premise (`Regex` resolves; `Regex.IsMatch(string, string)` translates), **each of
+      the three parameter types individually**, and the whole call. §2's own standard is that a
+      review living only in prose goes stale the first time someone adds a convenience type — and
+      this commit is exactly that event, so the standard applies to itself.
+
+      **`PlatformNotSupportedException` was deliberately not used as the argument.**
+      `CompileToAssembly` does throw it on modern .NET. That is a property of the runtime and could
+      change; the signature argument is a property of this allowlist.
 
 **`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
 and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same

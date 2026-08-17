@@ -178,6 +178,91 @@ public class DeserializationHardeningTest
     }
 
     /// <summary>
+    ///     <c>Regex</c> is admitted (M9 J20, reversing A46), and the member that would matter —
+    ///     <c>Regex.CompileToAssembly</c>, which writes an assembly — cannot be named.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Why this test exists rather than a paragraph.</b> §2's bound is a conjunction
+    ///         over the reflection invocation surface, and admitting a type is precisely how a
+    ///         conjunction breaks. `Regex` is on none of that surface — but it still carries one
+    ///         member that reaches it, so the claim "admitting `Regex` is safe" needs the same
+    ///         treatment `Binder` gets: an executable assertion.
+    ///     </para>
+    ///     <para>
+    ///         <b>And it is blocked by §2's own mechanism, not by a special case.</b>
+    ///         <c>ResolveMethod</c> resolves every parameter type through the same allowlist, and
+    ///         <c>CompileToAssembly</c> takes <c>RegexCompilationInfo[]</c>,
+    ///         <c>System.Reflection.AssemblyName</c> and
+    ///         <c>System.Reflection.Emit.CustomAttributeBuilder[]</c>. None is admitted, so the
+    ///         signature lookup fails before the method is found — exactly how <c>Binder</c>
+    ///         blocks <c>Type.InvokeMember</c> above.
+    ///     </para>
+    ///     <para>
+    ///         Deliberately <em>not</em> resting on the fact that the method throws
+    ///         <c>PlatformNotSupportedException</c> on modern .NET. That is true and it is the
+    ///         weaker argument: it would stop being a reason if the runtime ever changed, whereas
+    ///         the signature argument is a property of this allowlist.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void Regex_is_admitted_but_CompileToAssembly_cannot_be_named()
+    {
+        var resolver = new TypeNodeResolver();
+
+        // The premise: `Regex` itself resolves, and so does the call the query actually needs.
+        Assert.NotNull(resolver.Resolve(Type(typeof(System.Text.RegularExpressions.Regex))));
+
+        var isMatch = new MethodCallNode
+        {
+            Method = new MethodNode
+            {
+                DeclaringType = Type(typeof(System.Text.RegularExpressions.Regex)),
+                Name = nameof(System.Text.RegularExpressions.Regex.IsMatch),
+                ParameterTypes = [Type(typeof(string)), Type(typeof(string))],
+                ReturnType = Type(typeof(bool)),
+                GenericArguments = [],
+            },
+            Arguments = [Constant("Seattle"), Constant("^S")],
+            Type = Type(typeof(bool)),
+        };
+
+        Assert.NotNull(Translator().Translate(isMatch));
+
+        // Each of the three parameter types on its own.
+        foreach (string blocked in new[]
+                 {
+                     "System.Reflection.AssemblyName",
+                     "System.Reflection.Emit.CustomAttributeBuilder",
+                     "System.Text.RegularExpressions.RegexCompilationInfo",
+                 })
+        {
+            Assert.ThrowsAny<Exception>(() => resolver.Resolve(new TypeNode { Name = blocked }));
+        }
+
+        // And the whole call, which is what a payload would actually send.
+        var compileToAssembly = new MethodCallNode
+        {
+            Method = new MethodNode
+            {
+                DeclaringType = Type(typeof(System.Text.RegularExpressions.Regex)),
+                Name = "CompileToAssembly",
+                ParameterTypes =
+                [
+                    new TypeNode { Name = "System.Text.RegularExpressions.RegexCompilationInfo[]" },
+                    new TypeNode { Name = "System.Reflection.AssemblyName" },
+                ],
+                ReturnType = Type(typeof(void)),
+                GenericArguments = [],
+            },
+            Arguments = [Constant<object?>(null), Constant<object?>(null)],
+            Type = Type(typeof(void)),
+        };
+
+        Assert.ThrowsAny<Exception>(() => Translator().Translate(compileToAssembly));
+    }
+
+    /// <summary>
     ///     A non-public method on an allowed type is refused by name (C30), so the marker
     ///     exception list cannot be widened by accident.
     /// </summary>

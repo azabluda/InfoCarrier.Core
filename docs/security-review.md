@@ -132,6 +132,61 @@ on first reading, so it is written down.
 | 3 | `DynamicValueMapper.RehydrateObject` invokes constructors and sets properties | Type comes from `TypeNodeResolver`, so the allowlist governs. This is the widest construction primitive on the path and is worth re-reading whenever the allowlist grows. |
 | 4 | Every enum is admitted | An enum constructs nothing. It can complete a *signature*, which is how it appears in the pivot above — and that is blocked elsewhere. |
 | 5 | The server executes the tree against its own `DbContext` | The point of the product. Authorization of *what data* a client may query is the application's, and this library does not attempt it. **Stated so nobody assumes otherwise.** |
+| 6 | `Regex` is admitted, so a payload may name `Regex.IsMatch` with a catastrophic-backtracking pattern | **DoS, not code execution — see §4a.** The overloads EF's own tests use take no timeout, so a match runs unbounded. Mitigated by the deployer, not by this library. |
+
+## 4a. Amendment — `Regex` admitted (M9 J20), and why the conjunction survives
+
+Reviewed **2026-08-17**, because §2's whole point is that adding a type is how the conjunction
+breaks, and this adds one. A46 had refused `Regex` since M6; the refusal is now reversed.
+
+**Why it was reversed.** EF's own SQLite provider translates `Regex.IsMatch` to `REGEXP`, and its
+InMemory provider evaluates it. So `Query.Translations.StringTranslations.Regex_IsMatch` and
+`…_constant_input` were this provider disagreeing with **every reference implementation**, on a
+type that is ordinary application code. A46 recorded the refusal as deliberate but never argued
+that `Regex` was dangerous — it argued that the allowlist is ADR-008 and that widening it is a
+decision. This is that decision, taken with the argument written down.
+
+**The RCE surface is untouched, and the reasoning is §2's own.** §2's bound is a conjunction over
+the *reflection invocation surface*: `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+`PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. `Regex` is on none of it, derives from none
+of it, and constructs none of it. `RegexOptions` needs no entry either — §2 already records that
+every enum is admitted.
+
+**The one member that reaches that surface is `Regex.CompileToAssembly`**, which is still in the
+.NET 10 API surface and which writes an assembly. It cannot be named, **by §2's mechanism rather
+than by a special case**: `ResolveMethod` resolves every parameter type through this same
+allowlist, and the overloads take `RegexCompilationInfo[]`, `System.Reflection.AssemblyName` and
+`System.Reflection.Emit.CustomAttributeBuilder[]`. None is admitted, so the signature lookup fails
+before the method is found — precisely how `Binder` blocks `Type.InvokeMember` in §2.
+
+**Deliberately not resting on `PlatformNotSupportedException`.** `CompileToAssembly` throws it on
+modern .NET, which is true and is the *weaker* argument: it is a property of the runtime and could
+change. The signature argument is a property of this allowlist, which is what this document is
+about.
+
+**Asserted, not written down.** `DeserializationHardeningTest.Regex_is_admitted_but_CompileToAssembly_cannot_be_named`
+pins the premise (`Regex` resolves, and `Regex.IsMatch(string, string)` translates), each of the
+three parameter types individually, and the whole call. §2's own standard: *a review whose
+conclusions live only in prose goes stale the first time someone adds a convenience type to a
+list.*
+
+**What is genuinely accepted is denial of service.** A hostile payload may send
+`Regex.IsMatch(input, pattern)` with a pattern whose backtracking is exponential, on an overload
+that takes no `matchTimeout`. §5 already excludes "denial of service beyond payload size" on the
+ground that an expensive query is not distinguishable from a legitimate one — **that ground is
+weaker here**, because ReDoS costs the attacker far fewer bytes than an expensive join and is not
+bounded by the size of the data. So it is recorded here rather than left to §5.
+
+**The mitigation is the deployer's and should be named in deployment guidance:** set the
+process-wide default with
+
+```
+AppContext.SetSwitch / AppDomain.CurrentDomain.SetData("REGEX_DEFAULT_MATCH_TIMEOUT", TimeSpan.FromSeconds(1))
+```
+
+The library cannot do it: the timeout belongs to the call the *caller* wrote, and rewriting a
+static overload the caller named into a different one server-side would be this provider silently
+changing the semantics of a query — the class of thing ADR-006 exists to prevent.
 
 ## 5. Not in scope, and stated so
 
