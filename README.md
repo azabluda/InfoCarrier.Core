@@ -40,23 +40,28 @@ expression serialization strategy and lessons learned from v1.
 
 ## Status
 
-**Implementation — query pipeline.** The vertical slice is green end-to-end: client capture →
-serialize → transport → server rebind → EF execute → client materialization with identity
-resolution. Phases A–E complete; spec-test fixture F1–F7 online.
+Queries, the client/server projection split, `SaveChanges` (including many-to-many), lazy
+loading and transactions all work end-to-end, over an in-process transport or a real HTTP hop.
+A Blazor WebAssembly client whose `DbContext` has no database runs against a SQLite-backed
+server.
 
-The functional suite inherits Microsoft's `EFCore.Specification.Tests` (ADR-004) —
-**413 inherited tests discovered, 141 passing** as of 2026-08-01. See
-[`docs/implementation-plan.md`](docs/implementation-plan.md) for the live task list and
-failure triage.
+The functional suite inherits Microsoft's `EFCore.Specification.Tests` (ADR-004) — the same
+suite EF Core's own SQL Server, SQLite and InMemory providers run:
 
-Not yet implemented: the client/server projection split (requirements §3), `SaveChanges`
-(incl. many-to-many), and transactions. Build order:
-[`docs/decisions.md`](docs/decisions.md) ADR-003.
+**`Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`** (2026-08-17)
+
+**The nine failures are known, classified, and gated in CI so the number cannot grow
+unnoticed.** They amount to *one* unsupported scenario, one query to use with caution, and a
+few differences that are not defects — two of them are queries this provider answers that other
+EF providers reject. Read [`docs/limitations.md`](docs/limitations.md) before adopting: it lists
+every one with a worked example, so you can tell in a few minutes whether any of them touches
+your application.
 
 ### Documentation
 
 | Doc | Contents |
 |---|---|
+| [`docs/limitations.md`](docs/limitations.md) | **Start here if you are evaluating this provider** — every known limitation, with a worked example each |
 | [`docs/decisions.md`](docs/decisions.md) | ADR log — LOCKED vs PROVISIONAL design decisions |
 | [`docs/roadmap.md`](docs/roadmap.md) | Milestone plan M1–M8 + CI strategy |
 | [`docs/implementation-plan.md`](docs/implementation-plan.md) | Current-milestone task detail |
