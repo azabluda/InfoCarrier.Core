@@ -663,6 +663,24 @@ would look as though the feature does not work. **This repo has been caught by a
 default twice already** (blocking lazy loads, the compiled model's thread), so the browser proof
 must be deliberate rather than assumed.
 
+> **CORRECTED 2026-08-17 by measurement (M8-26), and the correction is the useful half.** The
+> paragraph above is wrong about *what decides it* on .NET 10. Driving the sample in a real headless
+> browser and unwrapping the response stream gives a live `BrowserHttpReadStream` for
+> `HttpCompletionOption.ResponseHeadersRead` **with or without** the option, and a buffered
+> `MemoryStream` for `ResponseContentRead`. **The completion option is the belt; the request option
+> is the braces.** The option is kept — it is the documented switch, it costs nothing, and a wrong
+> key would be silent — but it is not what turns streaming on here.
+>
+> **The instruction that survives intact is the one about method**: the browser proof had to be
+> deliberate, and it took *three* discriminators to get one that could see anything. The outer
+> stream type is `StreamContent+ReadOnlyStream` either way, and that wrapper reports the same
+> `CanSeek` either way, so the two obvious checks returned identical answers for both requests and
+> read as *"the option made no difference"* when they showed **nothing at all**. What made the
+> third one trustworthy was a third request — `ResponseContentRead`, which must buffer — so that the
+> probe has to demonstrate it can produce a different answer before any agreement between the other
+> two means anything. Same rule as `StreamingOverHttpTest`: *a probe that passes is evidence only
+> once it is known to be able to fail.*
+
 ---
 
 #### What was built (half A), and what the estimates got wrong

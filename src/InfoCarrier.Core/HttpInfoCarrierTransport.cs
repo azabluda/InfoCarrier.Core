@@ -34,13 +34,24 @@ public sealed class HttpInfoCarrierTransport(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>The browser buffers by default, and without this the streaming leg streams
-    ///         nothing.</b> The rows would arrive exactly as fast as the last of them, which is the
-    ///         buffered behaviour D7 exists to remove — and it would look as though the feature
-    ///         does not work rather than as though it is switched off. This repository has been
-    ///         caught by a WebAssembly default twice already (blocking lazy loads, the compiled
-    ///         model's 10 MB-stack thread), which is why the browser proof is executed rather than
-    ///         assumed.
+    ///         <b>Belt and braces, and MEASURED to be the braces rather than the belt.</b> D7 was
+    ///         written expecting this to be load-bearing — "Blazor WebAssembly buffers the whole
+    ///         response by default; streaming needs <c>SetBrowserResponseStreamingEnabled(true)</c>
+    ///         per request". <b>On .NET 10 that is not what decides it.</b> Driving the sample in a
+    ///         real headless browser and unwrapping the response stream gives
+    ///         <c>BrowserHttpReadStream</c> — a live stream — for
+    ///         <see cref="HttpCompletionOption.ResponseHeadersRead" /> <em>with or without</em> this
+    ///         option, and a buffered <c>MemoryStream</c> for
+    ///         <see cref="HttpCompletionOption.ResponseContentRead" />. The completion option above
+    ///         is the belt; this is kept because it states the intent explicitly, costs nothing, and
+    ///         is the documented switch should a future runtime start buffering again.
+    ///     </para>
+    ///     <para>
+    ///         Kept rather than deleted for one more reason: **a wrong or absent key here would be
+    ///         silent**, and this repository has been caught by a WebAssembly default twice already
+    ///         (blocking lazy loads, the compiled model's 10 MB-stack thread). The sample carries
+    ///         <c>BrowserStreamingProbe</c>, which re-answers the question in whatever browser and
+    ///         runtime it is actually run on rather than trusting this comment.
     ///     </para>
     ///     <para>
     ///         <b>Set through the option key rather than through

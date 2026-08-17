@@ -2,6 +2,7 @@
 @namespace Northwind.Client.Wire
 @implements IDisposable
 @inject WireLog Log
+@inject BrowserStreamingProbe StreamingProbe
 
 @*
     Native <details> rather than FluentAccordion: an accordion animates height, and twenty of them
@@ -16,11 +17,25 @@
         <FluentButton Appearance="Appearance.Stealth" OnClick="@(() => Log.Clear())" Title="Clear the panel">
             Clear
         </FluentButton>
+        @*
+            The browser half of D7, checked in the browser. A wrong option key would be silent --
+            HttpRequestOptions accepts anything -- so "the app still works" is not evidence that
+            responses are being streamed rather than buffered. See BrowserStreamingProbe.
+        *@
+        <FluentButton Appearance="Appearance.Stealth" OnClick="@CheckStreamingAsync"
+                      Title="Ask the browser whether it hands back a streaming response"
+                      id="check-streaming">
+            Check streaming
+        </FluentButton>
     </div>
     <div class="wire-hint">
         Every entry left this browser as an expression tree and came back as rows. Nested payloads
         are decoded, so the query itself is readable.
     </div>
+    @if (this.streamingVerdict is { } verdict)
+    {
+        <pre class="wire-json" id="streaming-verdict">@verdict</pre>
+    }
 </div>
 
 <div class="wire-list">
@@ -67,6 +82,13 @@
 </div>
 
 @code {
+    // The browser's own answer to "is this response streamed?", rendered verbatim rather than
+    // reduced to a yes/no, so that a reader can see which stream types produced the verdict.
+    private string? streamingVerdict;
+
+    private async Task CheckStreamingAsync()
+        => this.streamingVerdict = await StreamingProbe.DescribeAsync();
+
     protected override void OnInitialized()
         => Log.Changed += OnChanged;
 

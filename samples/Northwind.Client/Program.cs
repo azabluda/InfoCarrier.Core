@@ -30,6 +30,10 @@ builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(builde
 
 builder.Services.AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>();
 
+// The browser half of D7's streaming, checkable from inside the browser. It shares the page's
+// HttpClient because the question is about this app's own HTTP stack.
+builder.Services.AddSingleton<Northwind.Client.Wire.BrowserStreamingProbe>();
+
 builder.Services.AddSingleton<IInfoCarrierClient>(services =>
 {
     var serializer = services.GetRequiredService<IInfoCarrierSerializer>();

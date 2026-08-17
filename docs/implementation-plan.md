@@ -978,3 +978,51 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
       run is the evidence for.
 
 ---
+
+- [x] **M8-26. The browser proof, which corrected D7 rather than confirming it.** `<this commit>`
+      `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`m8-26` against `j25`):
+      **0 fixed, 0 broken, `REASONS: unchanged`.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
+      `InfoCarrier.Core.TransportTests`: **18 of 18**.
+
+      D7 expected the per-request option to be load-bearing: *"Blazor WebAssembly buffers the whole
+      response by default; streaming needs `SetBrowserResponseStreamingEnabled(true)` per request."*
+      **Measured in a real headless browser, that is not what decides it on .NET 10.**
+
+      | Request | Response stream, unwrapped |
+      |---|---|
+      | `ResponseHeadersRead` **+ option** | `BrowserHttpReadStream` — live |
+      | `ResponseHeadersRead`, **no option** | `BrowserHttpReadStream` — live |
+      | `ResponseContentRead`, no option | `MemoryStream` — buffered |
+
+      **`HttpCompletionOption.ResponseHeadersRead` is the belt; the option key is the braces.** The
+      option stays — it is the documented switch, it costs nothing, and a wrong key would be silent
+      — but the comment on it now says which of the two does the work.
+
+      **It took three discriminators, and the first two failed the way the streaming test did.**
+
+      1. **Outer stream type.** `StreamContent+ReadOnlyStream` either way. Reported *"NOT STREAMING
+         — the option made no difference"*: a confident wrong answer, when it had shown nothing.
+      2. **`CanSeek`.** The wrapper delegates it, so it is identical either way. Reported
+         *"INCONCLUSIVE"* — at least honest.
+      3. **Unwrap to the inner stream, plus a third request that must buffer.** The third arm is
+         what makes the other two mean anything: the probe has to demonstrate it can produce a
+         different answer before agreement between the first two is evidence at all.
+
+      **The static half was checked too, and the wrong heap gave the wrong answer first** (M8-25):
+      `WebAssemblyEnableStreamingResponse` is in the **user-string** heap of both the Blazor
+      assembly that writes it and the browser `System.Net.Http` that reads it. `strings` shows UTF-8
+      *metadata names*, so a first pass found only `System.Net.Http.WasmEnableStreamingResponse` —
+      real, adjacent, and the **global** AppContext switch rather than the per-request option.
+
+      **The sample carries `BrowserStreamingProbe`** so the question is re-answered in whatever
+      browser and runtime the sample is actually run on, rather than trusting a comment. **The
+      sample's own trim count rose 8 → 9** — the probe reflects over a private BCL field, which is
+      genuinely unprovable to the trimmer. That is the sample's number and is reported but not
+      gated; `OURS` is unchanged at 88.
+
+      **Driven over the DevTools protocol**, as M8-17 established: `--dump-dom` renders a page but
+      cannot press a button, and the verdict is behind one. Two things cost a run each and are worth
+      recording: Edge refuses a CDP WebSocket without `--remote-allow-origins`, and a cold Blazor
+      WASM boot in headless Edge takes longer than a 120-second wait allows.
+
+---
