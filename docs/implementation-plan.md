@@ -1125,6 +1125,17 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       `KeysWithConvertersFixtureBase` configuration for these two types before touching the mapper
       again.
 
+      **CORRECTED again after reading EF's configuration.** `EnumerableClassKey.Converter` is
+      `ValueConverter<EnumerableClassKey, int>` and `IntClassKey` has its own — the two are distinct
+      dictionary keys, and `EnumerableClassKey` does not derive from `IntClassKey`. So the mapper is
+      **not** selecting the wrong converter, which is why the guard was inert.
+
+      **The likely reading now: the mapper worked, and the test simply got further.** Its body is
+      `RunQueries`, which runs many queries; the original `NotImplementedException` came from the
+      first. With that closed, a later one fails for an unrelated reason. That reframes this from "my
+      mapper is wrong" to "one more defect exists behind it", and it is a **single test** — much
+      lower value than J12's 1787.
+
       **Next probe:** print every `(ModelClrType → ProviderClrType)` pair the constructor records for
       this fixture's model, and the `declaredType` each lookup is made with. One filtered run.
       If it is the base-type collision, the fix is to key on the **exact** type and require
