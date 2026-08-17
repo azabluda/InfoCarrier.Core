@@ -11,6 +11,14 @@ html,
 body {
     height: 100%;
     margin: 0;
+
+    /*
+     * Scrollbars, and every other piece of browser-painted chrome, follow the OS theme. The page
+     * already does, through Fluent's DesignThemeModes.System, but a scrollbar is drawn by the
+     * browser rather than by CSS -- so without this one declaration a dark page keeps light
+     * scrollbars. Declaring both keywords keeps the light theme exactly as it was.
+     */
+    color-scheme: light dark;
     font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     background: var(--neutral-layer-2);
     color: var(--neutral-foreground-rest);
@@ -245,6 +253,42 @@ code {
     align-items: center;
     gap: 1rem;
     padding: 0.4rem 0.5rem 0.2rem;
+}
+
+/*
+ * One chip per active column filter, in the grid's footer. ColumnBase.Filtered renders nothing in
+ * Fluent UI 4.14.4 -- measured, not assumed -- so this is the only thing telling a reader that the
+ * 65 rows have become 8 on purpose. Clicking a chip clears that filter.
+ */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+    color: inherit;
+    background: var(--neutral-layer-3);
+    border: 1px solid var(--neutral-stroke-divider-rest);
+}
+
+.filter-chip:hover {
+    background: var(--neutral-fill-secondary-hover, rgba(128, 128, 128, 0.12));
+}
+
+.filter-chip-x {
+    opacity: 0.55;
+    font-size: 0.9em;
+}
+
+/* Shown by the grid's own EmptyContent, so a filter that matches nothing reads as an answer
+ * rather than as a page that failed to load. */
+.grid-empty {
+    padding: 1.5rem 0.75rem;
+    font-size: 0.85rem;
+    opacity: 0.6;
 }
 
 /* ------------------------------------------------------- key/value rows */

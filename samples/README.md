@@ -20,6 +20,18 @@ Three pages, and a **wire inspector** down the right-hand side showing every rou
 operation, the size each way, how long it took, and the **decoded** payload — including the
 expression tree, which the panel expands out of the base64 it travels in.
 
+**Customers** is an ordinary grid, and that is the point of it. Click a header to sort, open a
+column's filter to narrow it, page through the rest — there is no *Run* button, because there is
+nothing to run: sorting and filtering are already part of the expression tree the page sends.
+Sorting is composed on the `IQueryable<Customer>` **before** `Skip`/`Take`, never through the
+grid's own `ApplySorting`, which would sort the client-side projection record and quietly leave you
+with server-side paging over client-side sorting. Filtering `Country` for *Germany* takes 65 rows to
+8 and the panel shows the `Where` crossing the wire.
+
+Each active filter shows as a chip in the grid footer that clears it. That is this sample's own
+control rather than the grid's: `ColumnBase.Filtered` renders nothing in Fluent UI 4.14.4, so
+without it an active filter is invisible and the item count is the only clue.
+
 The store is seeded with **65 customers, 240 orders, 476 order lines, 30 products and 8
 categories** — enough that the grid pages properly and each page change is visibly its own query.
 The data is generated from row indices rather than from `Random`, so it is byte-identical on every

@@ -779,3 +779,76 @@ spec suite can see (M8-11 and M8-16); the rest are `samples/` and cannot move it
 
 ---
 
+
+## Phase L — the sample reads like an ordinary data app
+
+The Blazor sample looked good and behaved like nothing a reviewer has used: sorting and filtering
+sat in a toolbar beside a **Run** button, an entity was chosen by typing its primary key, and a
+dropdown offered raw customer ids. The demo exists to make this provider look like ordinary EF
+Core, so a strange UI makes the *provider* look strange.
+
+**Which gate.** `samples/` is neither `src/` nor `test/`, so `eng/measure.sh` says nothing about it
+and is not run. `eng/trim-ratchet.sh` **publishes `samples/Northwind.Client`**, so every step here
+runs it and `OURS` must not rise above 88.
+
+**How these steps are verified.** By driving a real browser over the DevTools protocol —
+`--headless=new --remote-debugging-port` plus `Runtime.evaluate`, and `--remote-allow-origins=*`,
+without which Edge refuses the CDP WebSocket. `--dump-dom` renders a page but cannot press a
+button, and every claim below is about what happens when you press one.
+
+- [x] **M8-23. Customers: the controls move into the grid, and one Fluent parameter turned out to
+      render nothing.** `<this commit>`
+      `eng/trim-ratchet.sh`: **`OURS: 88 <= 88`**, total 853. No spec-suite run: no `src/` or
+      `test/` code changed.
+
+      The toolbar is gone — country field, sort dropdown and **Run** button. Every column is
+      `Sortable`, and Company and Country each carry a `ColumnOptions` popup holding a
+      `FluentSearch`. Fluent renders a `col-sort-button` on each header and a `col-options-button`
+      labelled *"Filter this column"*, which is the shape a reviewer already knows.
+
+      **The sort is composed on `IQueryable<Customer>`, before `Skip`/`Take`, and deliberately NOT
+      through `request.ApplySorting`.** That helper sorts an `IQueryable<CustomerRow>`, and
+      `CustomerRow` is a client-only record: `ProjectionRewriter` cuts the query at the `Select`
+      (ADR-010), so an `OrderBy` composed after it lands on the **client** side of the boundary.
+      The page would then sort the twelve rows it had already been given and look entirely
+      correct — server-side paging with client-side sorting, wrong on every page but the first.
+
+      **Verified in the browser, not reasoned about.** Driving the real headers produced, in the
+      decoded tree in the wire panel and in the server's own SQL:
+
+      | Action | Tree | SQL reaching SQLite |
+      |---|---|---|
+      | Company header, 1st click | `Select`,`Take`,`Skip`,`ThenBy`,`OrderBy` | `ORDER BY "c"."CompanyName", "c"."Id"` |
+      | Company header, 2nd click | …`OrderByDescending` | `ORDER BY "c"."CompanyName" DESC, "c"."Id"` |
+      | Country filter `Germany` | …`Where`,`Contains`, literal on the wire | 65 items → **8** |
+      | Next page | `Skip`/`Take`, sort preserved | Page 2 of 6 |
+
+      A filter change costs **one** refresh, not two — wire entries went `#6` → `#8`, a `Count` and
+      a rows query. Moving off page one already re-runs the provider, so calling `RefreshDataAsync`
+      as well would buy a second round trip for the same answer, which the panel would show and a
+      reader would rightly ask about.
+
+      **`ColumnBase.Filtered` renders NOTHING in Fluent UI 4.14.4, and that was measured rather
+      than assumed.** The design said the header would show the filter was on. It does not: the
+      `col-options-button` markup is **byte-identical** with a filter set and without one — same
+      class, same `aria-label`, same `svg`. So an active filter would have been invisible, and the
+      item count its only evidence, which is how a reviewer ends up believing the store is nearly
+      empty. The page now renders **a chip per active filter** in the grid footer, each clearing
+      its own filter: *Company contains "Ma" ✕* beside *5 items*, and clicking it returns 65.
+      `Filtered` is left set, because it is the correct API and costs nothing if a later version
+      honours it.
+
+      Also `color-scheme: light dark` on `html, body`, one declaration: the page already followed
+      the OS theme through `DesignThemeModes.System`, but a **scrollbar is painted by the browser**
+      rather than by CSS, so a dark page kept light scrollbars.
+
+      **Two operational facts about driving this sample, both of which cost a run.** A Blazor WASM
+      rebuild changes every fingerprinted `.wasm` name, so (1) the **server must be restarted**
+      after a client change, and (2) the browser must reload with **`Network.setCacheDisabled`** —
+      a cached boot manifest names files that no longer exist, every request answers `304`, and the
+      app hangs on *"Starting the client…"* for ever with no error. Worse, building
+      `Northwind.Client` **alone** leaves the server's static-asset manifest stale, which shows as a
+      `404` plus an SRI `integrity` failure on `Northwind.Shared.*.wasm`. **Build through
+      `samples/Northwind.Server`**, which builds the client as a project reference and keeps the two
+      manifests in step. Three boot failures were diagnosed by streaming `Runtime.exceptionThrown`
+      and `Log.entryAdded` over CDP; none of them was visible in the page's own error UI.

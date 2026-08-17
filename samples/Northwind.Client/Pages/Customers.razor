@@ -7,23 +7,12 @@
 <h1>👥 Customers</h1>
 
 <p class="page-lede">
-    Everything you change below becomes part of a LINQ query that leaves this browser as an
-    expression tree: the filter is a <code>Where</code>, the sort an <code>OrderBy</code>, the pager
-    a <code>Skip</code>/<code>Take</code>, and the grid's columns a <code>Select</code>. Watch the
-    panel on the right &mdash; the server is asked for four columns, never for a <code>Customer</code>.
+    An ordinary grid: click a header to sort, open a column's filter to narrow it, page through the
+    rest. Every one of those becomes part of a LINQ query that leaves this browser as an expression
+    tree &mdash; the filter is a <code>Where</code>, the header click an <code>OrderBy</code>, the
+    pager a <code>Skip</code>/<code>Take</code>, and the columns a <code>Select</code>. Watch the
+    panel on the right: the server is asked for four columns, never for a <code>Customer</code>.
 </p>
-
-<div class="toolbar">
-    <div class="field">
-        <FluentTextField @bind-Value="_country" @bind-Value:after="RefreshAsync" Label="Country" Placeholder="all" />
-    </div>
-    <div class="field">
-        <FluentSelect TOption="string" Items="@SortOptions" @bind-Value="_sort" @bind-Value:after="RefreshAsync" Label="Sort by" />
-    </div>
-    <FluentButton Appearance="Appearance.Accent" OnClick="RefreshAsync">Run</FluentButton>
-    <span class="toolbar-spacer"></span>
-    <span class="toolbar-note">12 per page &mdash; every page change is a new query</span>
-</div>
 
 @if (_error is { } error)
 {
@@ -31,16 +20,68 @@
 }
 
 <div class="grid-wrap">
-    <FluentDataGrid ItemsProvider="@LoadAsync" TGridItem="CustomerRow" Pagination="@_pagination"
-                    GridTemplateColumns="0.8fr 2.4fr 1.2fr 1fr">
-        <PropertyColumn Property="@(r => r.Id)" Title="Id" />
-        <PropertyColumn Property="@(r => r.Company)" Title="Company" />
-        <PropertyColumn Property="@(r => r.City)" Title="City" />
-        <PropertyColumn Property="@(r => r.Country)" Title="Country" />
+    @*
+        Sorting and filtering live in the grid, where a reviewer expects to find them. That is not
+        only a cosmetic point: a toolbar with a "Run" button hides the fact that OrderBy and Where
+        cost this provider nothing extra, because they are already part of the tree the page sends.
+    *@
+    <FluentDataGrid @ref="_grid" ItemsProvider="@LoadAsync" TGridItem="CustomerRow" Pagination="@_pagination"
+                    GridTemplateColumns="0.8fr 2.4fr 1.2fr 1fr" ShowHover="true">
+        @* Named fragments and bare children cannot be mixed: EmptyContent below forces the
+           columns into an explicit ChildContent. *@
+        <ChildContent>
+            <PropertyColumn Property="@(r => r.Id)" Title="Id" Sortable="true" IsDefaultSortColumn="true" />
+
+            <PropertyColumn Property="@(r => r.Company)" Title="Company" Sortable="true"
+                            Filtered="@(!string.IsNullOrWhiteSpace(_company))">
+                <ColumnOptions>
+                    <FluentSearch @bind-Value="_company" @bind-Value:after="FilterChangedAsync"
+                                  Label="Company contains" Placeholder="all" AutoComplete="off" Immediate="true" />
+                </ColumnOptions>
+            </PropertyColumn>
+
+            <PropertyColumn Property="@(r => r.City)" Title="City" Sortable="true" />
+
+            <PropertyColumn Property="@(r => r.Country)" Title="Country" Sortable="true"
+                            Filtered="@(!string.IsNullOrWhiteSpace(_country))">
+                <ColumnOptions>
+                    <FluentSearch @bind-Value="_country" @bind-Value:after="FilterChangedAsync"
+                                  Label="Country contains" Placeholder="all" AutoComplete="off" Immediate="true" />
+                </ColumnOptions>
+            </PropertyColumn>
+        </ChildContent>
+
+        <EmptyContent>
+            <div class="grid-empty">No customer matches this filter.</div>
+        </EmptyContent>
     </FluentDataGrid>
 
     <div class="grid-foot">
         <FluentPaginator State="@_pagination" />
+
+        @*
+            **A chip per active filter, and it is not decoration.** ColumnBase.Filtered is the
+            right API and is set above, but in Fluent UI 4.14.4 it renders NOTHING: the header's
+            options button markup is byte-identical with a filter set and without one, which was
+            measured in the browser rather than assumed. Without these chips the only evidence a
+            filter is on is the item count, and a filter you cannot see is how a reviewer ends up
+            believing the store is nearly empty. Each chip clears its own filter.
+        *@
+        @if (!string.IsNullOrWhiteSpace(_company))
+        {
+            <button type="button" class="filter-chip" @onclick="@(() => ClearAsync(() => _company = string.Empty))">
+                Company contains &ldquo;@_company&rdquo; <span class="filter-chip-x">✕</span>
+            </button>
+        }
+        @if (!string.IsNullOrWhiteSpace(_country))
+        {
+            <button type="button" class="filter-chip" @onclick="@(() => ClearAsync(() => _country = string.Empty))">
+                Country contains &ldquo;@_country&rdquo; <span class="filter-chip-x">✕</span>
+            </button>
+        }
+
+        <span class="toolbar-spacer"></span>
+        <span class="toolbar-note">12 per page &mdash; every sort, filter and page change is a new query</span>
     </div>
 </div>
 
@@ -52,12 +93,11 @@
     // offer.
     private sealed record CustomerRow(string Id, string Company, string? City, string? Country);
 
-    private static readonly string[] SortOptions = ["Id", "Company", "City", "Country"];
-
     private readonly PaginationState _pagination = new() { ItemsPerPage = 12 };
 
+    private FluentDataGrid<CustomerRow>? _grid;
+    private string _company = string.Empty;
     private string _country = string.Empty;
-    private string _sort = "Id";
     private string? _error;
 
     // **A context per load, not one for the page**, and that is a correction rather than a
@@ -67,8 +107,8 @@
     // grid's provider is free to ask again before the previous answer lands. A DbContext is not
     // thread-safe. This page is read-only, so it has no unit of work to preserve and nothing to
     // gain from holding one -- which is exactly what IDbContextFactory is for. The Order page
-    // keeps a page-scoped context because it genuinely needs one, and every operation there is
-    // started by a button.
+    // keeps a page-scoped context for the DETAIL half because it genuinely needs one, and its own
+    // grid uses the factory for exactly the reason described here.
     private async ValueTask<GridItemsProviderResult<CustomerRow>> LoadAsync(
         GridItemsProviderRequest<CustomerRow> request)
     {
@@ -76,20 +116,13 @@
         {
             await using NorthwindContext context = await Contexts.CreateDbContextAsync();
 
-            IQueryable<Customer> query = context.Customers;
-
-            if (!string.IsNullOrWhiteSpace(_country))
-            {
-                // Composed onto the IQueryable, so it crosses as part of the expression tree
-                // rather than filtering a list that already arrived.
-                query = query.Where(c => c.Country == _country);
-            }
+            IQueryable<Customer> query = Filtered(context.Customers);
 
             // Its own round trip, and deliberately so: the pager needs a total the page has not
             // fetched. The inspector shows the server answering with a number rather than rows.
             int total = await query.CountAsync(request.CancellationToken);
 
-            List<CustomerRow> rows = await Sorted(query)
+            List<CustomerRow> rows = await Sorted(query, request)
                 .Skip(request.StartIndex)
                 .Take(request.Count ?? _pagination.ItemsPerPage)
                 .Select(c => new CustomerRow(c.Id, c.CompanyName, c.City, c.Country))
@@ -107,21 +140,82 @@
         }
     }
 
-    private IQueryable<Customer> Sorted(IQueryable<Customer> query)
-        => _sort switch
+    // Composed onto the IQueryable, so each filter crosses as part of the expression tree rather
+    // than trimming a list that already arrived.
+    private IQueryable<Customer> Filtered(IQueryable<Customer> query)
+    {
+        if (!string.IsNullOrWhiteSpace(_company))
         {
-            "Company" => query.OrderBy(c => c.CompanyName),
-            "City" => query.OrderBy(c => c.City),
-            "Country" => query.OrderBy(c => c.Country).ThenBy(c => c.Id),
-            _ => query.OrderBy(c => c.Id),
+            string company = _company;
+            query = query.Where(c => c.CompanyName.Contains(company));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_country))
+        {
+            string country = _country;
+            query = query.Where(c => c.Country.Contains(country));
+        }
+
+        return query;
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // **The sort is applied to IQueryable<Customer>, before Skip/Take, and NOT through
+    // request.ApplySorting.** That helper sorts an IQueryable<CustomerRow>, and CustomerRow is a
+    // client-only record: ProjectionRewriter cuts the query at the Select, so an OrderBy composed
+    // after it lands on the CLIENT side of the boundary. The page would then sort the twelve rows
+    // it had already been given and look entirely correct -- server-side paging with client-side
+    // sorting, which is the wrong answer whenever the result has more than one page.
+    //
+    // Keyed on the column's Title, which this page sets itself, so an unmapped column is a
+    // programming error here rather than silently unsorted data. Verified in the browser rather
+    // than reasoned about: the decoded tree in the wire panel carries the OrderBy.
+    // ---------------------------------------------------------------------------------------
+    private static IQueryable<Customer> Sorted(
+        IQueryable<Customer> query, GridItemsProviderRequest<CustomerRow> request)
+    {
+        bool ascending = request.SortByAscending;
+
+        return request.SortByColumn?.Title switch
+        {
+            // Id last as a tie-break, so a page boundary cannot show the same row twice: the seed
+            // has repeated cities and countries, and an unstable order makes paging look broken.
+            "Company" => Then(By(query, c => c.CompanyName, ascending)),
+            "City" => Then(By(query, c => c.City, ascending)),
+            "Country" => Then(By(query, c => c.Country, ascending)),
+            _ => By(query, c => c.Id, ascending),
         };
 
-    private async Task RefreshAsync()
+        static IOrderedQueryable<Customer> By<TKey>(
+            IQueryable<Customer> source, System.Linq.Expressions.Expression<Func<Customer, TKey>> key, bool ascending)
+            => ascending ? source.OrderBy(key) : source.OrderByDescending(key);
+
+        static IQueryable<Customer> Then(IOrderedQueryable<Customer> source)
+            => source.ThenBy(c => c.Id);
+    }
+
+    private async Task FilterChangedAsync()
     {
-        // Back to page one: a narrower filter can leave the current page past the end of the
-        // result, which shows an empty grid over data that is there.
-        await _pagination.SetCurrentPageIndexAsync(0);
-        StateHasChanged();
+        // One refresh, not two. Moving off page one already re-runs the provider, so calling
+        // RefreshDataAsync as well would cost a second round trip for the same answer -- which
+        // the panel on the right would show, and a reader would rightly ask about.
+        //
+        // Back to page one because a narrower filter can leave the current page past the end of
+        // the result, which shows an empty grid over data that is there.
+        if (_pagination.CurrentPageIndex != 0)
+        {
+            await _pagination.SetCurrentPageIndexAsync(0);
+        }
+        else if (_grid is { } grid)
+        {
+            await grid.RefreshDataAsync();
+        }
+    }
+
+    private async Task ClearAsync(Action clear)
+    {
+        clear();
+        await FilterChangedAsync();
     }
 
     private static string Describe(Exception exception)
