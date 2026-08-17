@@ -1513,7 +1513,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 | `Can_insert_and_read_back_with_enumerable_class_key…` | 1 | `InvalidCastException` | **Upstream**, and the only one: EF's own `EnumerableClassKey.Equals` casts to `IntClassKey` (J9). |
 | `Parameter_collection_null_Contains` | 1 | LINQ not translated | SQLite-tier; the 1 that survived `PrimitiveCollectionsQuery` going 4 → 1 in C88. |
 | `Update_with_invalid_lambda_in_set_property_throws` | 2 | LINQ not translated | **Settled by J16, no code.** Right type, right verdict, EF's wording of a different true fact. Three siblings green. |
-| `Casts_are_removed_from_expression_tree_when_redundant` | 1 | `Assert.Throws: Exception type was not an exact match` | **Re-diagnosed by J17; the entry below it used to carry was wrong.** Not cast elision — a type-argument boundary. |
+| `Casts_are_removed_from_expression_tree_when_redundant` | 1 | ~~`Assert.Throws: Exception type was not an exact match`~~ → `Assert.Equal: Strings differ` (J18) | **Re-diagnosed by J17; the entry below it used to carry was wrong.** Not cast elision — a type-argument boundary, guarded in J18. What is left is EF's *printed* message, which ADR-006 cannot reproduce. |
 | `Collection_enum_as_string_Contains` | 1 | `Assert.Throws: No exception was thrown` | **A28, verified** by probe in J2's triage: `Seller` → 1/1, `Customer` → 0/0, so the server really filters. |
 | `Composition_over_collection_of_complex_mapped_as_scalar` | 1 | `Assert.Throws: No exception was thrown` | ~~**NOT verifiable here**~~ — **A28, verified by J15.** |
 
@@ -1612,6 +1612,65 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       thing missing downstream is EF's *printing and normalization* of the query, not its cast
       elision. Getting that one word wrong pointed the remedy at code that would have measured
       neutral.
+
+- [x] **J18. The type-argument boundary: `Cast<T>`/`OfType<T>` is refused rather than answered by
+      `Enumerable`.** `<this commit>`
+      `Total tests: 22657, Passed: 22467, Failed: 13, Skipped: 177` (`j18` against `j15`):
+      **0 fixed, 0 broken**, `total` +1 for the new pin. `eng/trim-ratchet.sh`: **`OURS: 88 <= 88`**,
+      unchanged — the guard reflects over nothing.
+
+      **The count did not move and was never going to. The reasons diff is the result:**
+
+      ```
+      -  1 Assert.Throws() Failure: Exception type was not an exact match
+      +  1 Assert.Equal() Failure: Strings differ
+      ```
+
+      `Casts_are_removed_from_expression_tree_when_redundant` now gets EF's exception **type** and
+      EF's message **form**, and differs only in EF's rendering of the tree — which is J17's real
+      residual and is ADR-006's by construction. C90–C93's situation, and the reason this file keeps
+      saying to read the reasons rather than the count.
+
+      **What J18's probe actually printed**, against a seeded two-blog store:
+
+      ```
+      OfType  => 0 row(s)
+      Cast    => InvalidCastException: Unable to cast object of type 'Blog' to 'IUnmappedMarker'
+      control => 2 row(s)      (OfType<Blog>, the non-vacuity control)
+      ```
+
+      **The severity was overstated before the probe, and the correction is the part to keep.** J17
+      filed the `OfType` case as a **silent wrong answer** — the worst class this repo recognises.
+      It is not one. `TypeAllowlist.AddSupertypes` runs for **every** entity type, so any interface
+      or base class a mapped type implements is admitted and an `OfType` over a real hierarchy
+      ships. The only type that can reach the residual is one **no entity implements**, and for that
+      type LINQ-to-objects answers empty too. **No data differs; what is missing is EF's
+      diagnostic.** The evidence was exactly what J17 predicted and the mechanism was one step
+      stronger than the evidence supported — C38's lesson, in a new place: *read what the instrument
+      prints, not what it was expected to print.*
+
+      **The guard, and why each exemption is load-bearing.** `RejectUnshippableTypeArgument` fires
+      only on a client-side `Queryable`/`Enumerable` `Cast`/`OfType`, and stands down when:
+
+      | Exemption | Why |
+      |---|---|
+      | `target.IsAssignableFrom(source)` | Exactly what EF's `ProcessCastOfType` **elides**. A no-op cast is not a translation failure anywhere, and `Cast<object>` falls here too. |
+      | `allowlist.IsAllowed(target)` | It could have shipped, so the boundary fell for some other reason and that reason is not this one's to report. |
+      | `target.IsGenericParameter` | Not a type yet. |
+
+      `node.Arguments[0].Type` carries the **argument's** type rather than the declared `IQueryable`,
+      so `SequenceElementType` yields the real element type and the first exemption means what EF
+      means by it. That is why `Cast<IDomainEntity>()` over `MockEntity` — block 1 of the same spec
+      test — stays legal and still passes.
+
+      **0 broken across 22,657 is the claim that mattered**: no carrier type the rewriters
+      introduce, and no projection type, trips the guard.
+
+      **The pin is `An_unshippable_type_argument_is_refused_rather_than_answered_by_Enumerable`**, in
+      `InMemorySmokeTest`, and it carries its own control. `OfType<Blog>` over the same seed returns
+      2 and `Cast<object>` returns 2, so a guard that refused *every* `Cast`/`OfType` would fail it.
+      Without those two lines the test would pass for the wrong reason, which is the one way this
+      particular fix could rot.
 
 **`Composition_over_collection_of_complex_mapped_as_scalar` cannot be classified from this fixture,
 and calling it A28 was unfounded.** A probe ran the base's query and compared it against the same

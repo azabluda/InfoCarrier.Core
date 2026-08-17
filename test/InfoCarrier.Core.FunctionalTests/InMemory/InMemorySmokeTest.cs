@@ -152,4 +152,79 @@ public class InMemorySmokeTest
         Assert.Equal(["to-alpha"], blogs.Single(x => x.Title == "alpha").Posts.Select(p => p.Heading));
         Assert.Equal(["to-beta"], blogs.Single(x => x.Title == "beta").Posts.Select(p => p.Heading));
     }
+
+    /// <summary>
+    ///     An interface <b>no entity type implements</b>, which is the whole point of it:
+    ///     <see cref="TypeAllowlist" /> admits every interface a mapped type implements, so this
+    ///     is the one shape a <c>Cast</c>/<c>OfType</c> type argument can take and still be
+    ///     unshippable.
+    /// </summary>
+    public interface IUnmappedMarker
+    {
+        int Id { get; set; }
+    }
+
+    /// <summary>
+    ///     J18: a <c>Cast&lt;T&gt;</c> or <c>OfType&lt;T&gt;</c> the wire cannot carry is refused
+    ///     the way EF refuses it, rather than answered by <c>Enumerable</c>.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>What this looked like before the guard</b>, printed by the probe that found it
+    ///         against this very seed:
+    ///     </para>
+    ///     <code>
+    ///     OfType  => 0 row(s)
+    ///     Cast    => InvalidCastException: Unable to cast object of type 'Blog' to 'IUnmappedMarker'
+    ///     control => 2 row(s)
+    ///     </code>
+    ///     <para>
+    ///         The <c>OfType</c> line is the one worth a test. Zero rows and no error is what
+    ///         <c>Enumerable.OfType</c> does, and it is not what EF does — EF refuses the query.
+    ///         <b>It is a missing diagnostic and not a wrong answer</b>: the only type that can
+    ///         reach here is one no entity implements, for which LINQ-to-objects also answers
+    ///         empty. That distinction is recorded because J18 first assumed the stronger one.
+    ///     </para>
+    ///     <para>
+    ///         <b>The control is what makes the test non-vacuous</b>, and it is not decoration:
+    ///         <c>OfType&lt;Blog&gt;</c> over the same seed returns 2. So the store has data, the
+    ///         query path works, and the type argument is the only thing that differs between the
+    ///         refusal and the answer. Without it, a guard that refused <em>every</em>
+    ///         <c>OfType</c> would pass this test.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_unshippable_type_argument_is_refused_rather_than_answered_by_Enumerable()
+    {
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(new Blog { Title = "alpha" }, new Blog { Title = "beta" });
+                await context.SaveChangesAsync();
+            });
+
+        await using SmokeContext client = CreateClient(store);
+
+        // Was: 0 rows, no error.
+        Assert.Contains(
+            "could not be translated",
+            Assert.Throws<InvalidOperationException>(
+                () => client.Blogs.OfType<IUnmappedMarker>().ToList()).Message);
+
+        // Was: InvalidCastException out of Enumerable.Cast.
+        Assert.Contains(
+            "could not be translated",
+            Assert.Throws<InvalidOperationException>(
+                () => client.Blogs.Cast<IUnmappedMarker>().ToList()).Message);
+
+        // The non-vacuity control: a type argument the model does name still answers.
+        Assert.Equal(2, client.Blogs.OfType<Blog>().ToList().Count);
+
+        // And so does the redundant cast EF elides -- `object` is assignable from everything, so
+        // the guard must not touch it.
+        Assert.Equal(2, client.Blogs.Cast<object>().ToList().Count);
+    }
 }

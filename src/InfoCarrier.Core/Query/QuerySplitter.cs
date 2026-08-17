@@ -996,6 +996,11 @@ public sealed class QuerySplitter
                         break;
                     }
                 }
+
+                if (_found is null)
+                {
+                    RejectUnshippableTypeArgument(node);
+                }
             }
 
             if (_found is null && _clientProjectedSources.Count > 0)
@@ -1004,6 +1009,83 @@ public sealed class QuerySplitter
             }
 
             return _found is null ? base.VisitMethodCall(node) : node;
+        }
+
+        /// <summary>
+        ///     Refuses a client-side <c>Cast&lt;T&gt;</c> or <c>OfType&lt;T&gt;</c> whose
+        ///     <em>type argument</em> is one the wire cannot carry.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The gap this closes is that the walk above reads an operator's value
+        ///         arguments and never its type arguments</b> (J17/J18). <c>Cast</c> and
+        ///         <c>OfType</c> carry no lambda and no client code, so
+        ///         <see cref="ClientCodeFinder" /> finds nothing to refuse in them and they simply
+        ///         run in the residual. What they do there is not what EF does:
+        ///     </para>
+        ///     <list type="bullet">
+        ///         <item>
+        ///             <c>Cast&lt;T&gt;</c> throws a raw <see cref="InvalidCastException" /> from
+        ///             <c>Enumerable.Cast</c> — the right refusal spelled as the wrong exception.
+        ///         </item>
+        ///         <item>
+        ///             <c>OfType&lt;T&gt;</c> returns <b>zero rows and no error</b>. Measured, not
+        ///             assumed: J18's probe printed <c>OfType =&gt; 0 row(s)</c> against a seeded
+        ///             store whose control <c>OfType&lt;Blog&gt;</c> returned 2.
+        ///         </item>
+        ///     </list>
+        ///     <para>
+        ///         <b>The empty result is a missing diagnostic rather than a wrong answer, and
+        ///         saying so is the honest reading.</b> <c>TypeAllowlist.AddSupertypes</c> runs for
+        ///         <em>every</em> entity type, so any interface or base class a mapped type
+        ///         implements is admitted and an <c>OfType</c> over a real hierarchy ships. What is
+        ///         left is a type no entity implements — where LINQ-to-objects also answers empty.
+        ///         So no data differs; EF refuses the query and this provider silently agreed with
+        ///         `Enumerable`. J18 first priced this as a silent *wrong answer*, which the probe
+        ///         did not support.
+        ///     </para>
+        ///     <para>
+        ///         <b>Three exemptions, and each one keeps this from refusing something that
+        ///         works.</b> A cast the target type already satisfies is what EF's
+        ///         <c>ProcessCastOfType</c> <em>elides</em> (<c>castType.IsAssignableFrom(source)
+        ///         || castType == typeof(object)</c>), so it must stay legal — a no-op cast is not
+        ///         a translation failure anywhere. A type the allowlist permits could have shipped,
+        ///         so if it is here the boundary fell for some other reason and that reason is not
+        ///         this one's to report. And a generic parameter is not a type yet.
+        ///     </para>
+        ///     <para>
+        ///         The refusal carries no details clause, so the caller gets
+        ///         <c>CoreStrings.TranslationFailed</c> — the same form EF raises for the same
+        ///         query, which is the whole point of refusing rather than answering.
+        ///     </para>
+        /// </remarks>
+        private void RejectUnshippableTypeArgument(MethodCallExpression node)
+        {
+            if (node.Method.Name is not (nameof(Queryable.Cast) or nameof(Queryable.OfType))
+                || node.Method.DeclaringType is not { } declaring
+                || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
+                || !node.Method.IsGenericMethod)
+            {
+                return;
+            }
+
+            Type[] typeArguments = node.Method.GetGenericArguments();
+            if (typeArguments.Length != 1)
+            {
+                return;
+            }
+
+            Type target = typeArguments[0];
+            Type source = ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type);
+
+            if (target.IsGenericParameter
+                || target.IsAssignableFrom(source)
+                || allowlist.IsAllowed(target))
+            {
+                return;
+            }
+
+            _found = (node, null);
         }
 
         /// <summary>

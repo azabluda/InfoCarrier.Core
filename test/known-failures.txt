@@ -248,5 +248,18 @@
 # "no exception was thrown" everyone read was observed over an EMPTY TABLE. An Assert.Throws test
 # that never needed data is a vacuous control. FIXED and BROKEN both empty, REASONS unchanged.
 # Figures read off the run's own summary block: 22656 / 22466 / 13 / 177 (`j15`).
+# 2026-08-17 (J18) - failed unchanged at 13; `total` 22656 -> 22657 for one new pin. A client-side
+# Cast<T>/OfType<T> whose TYPE ARGUMENT the wire cannot carry is now refused with EF's own
+# TranslationFailed, instead of being answered by Enumerable. RejectClientEvaluation had only ever
+# read an operator's VALUE arguments, and Cast/OfType carry no lambda and no client code, so nothing
+# looked at T at all: Cast threw a raw InvalidCastException and OfType returned ZERO ROWS WITH NO
+# ERROR. The count cannot move here and the reasons diff is the whole result --
+# Casts_are_removed_from_expression_tree_when_redundant went from "Exception type was not an exact
+# match" to "Strings differ", so only EF's rendering of the tree is left, which ADR-006 cannot
+# reproduce. 0 fixed, 0 broken; trim ratchet unchanged at 88 (the guard reflects over nothing).
+# NOTE the empty OfType is a MISSING DIAGNOSTIC, not a wrong answer: AddSupertypes admits every
+# interface a mapped type implements, so only a type no entity implements reaches here, and
+# LINQ-to-objects answers empty for that too. J17 had filed it as the stronger thing.
+# Figures read off the run's own summary block: 22657 / 22467 / 13 / 177 (`j18`).
 failed=13
-total=22656
+total=22657
