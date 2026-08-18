@@ -1527,3 +1527,28 @@ rather than staying silent about it.
       changes for that — the workflow was already correct and waiting on the switch.
 
       **Gates: none of the repository's.** One workflow file and three Markdown files.
+
+- [x] **N10. A version claim in N8's own new document was wrong, and packing twice found it.**
+      `<this commit>`
+
+      `versioning.md` said an untagged build is *"the next patch plus its height — `10.0.1-alpha.0.7`"*.
+      That is what MinVer does after a **stable** tag. After a **prerelease** tag it appends the
+      height to the prerelease identifiers instead, and the patch does not move. Measured on this
+      repository with the tag two commits back:
+
+      | Last tag | Produced |
+      |---|---|
+      | `v10.0.0-preview.1` | `10.0.0-preview.1.2` |
+      | none | `10.0.0-alpha.0.512` |
+
+      Both were read off a real `dotnet pack`, the second by deleting the tag, packing, and putting
+      it back. The section is now a table of all three cases with the sort order spelled out, since
+      ordering is the only property the feed actually depends on.
+
+      **The same two packs exposed something larger: a tag that is not pushed makes CI disagree with
+      the developer's machine.** `v10.0.0-preview.1` exists locally and not on the remote, so this
+      machine builds `10.0.0-preview.1.2` and a runner builds `10.0.0-alpha.0.512` **from the same
+      commit**. Neither fails and nothing warns. It is now a `danger` admonition in `versioning.md`,
+      because it is the one way "the tag is the version" can bite.
+
+      **Gates: none.** Markdown only.

@@ -69,15 +69,31 @@ Verified on the built assembly rather than assumed.
 
 ## Untagged builds
 
-A commit with no tag on it builds as the next patch plus its height:
+A commit with no tag on it gets a height, and **what the height is added to depends on the last
+tag**. This is the part most likely to surprise, so it is measured rather than described:
+
+| Last tag | Two commits later | Why |
+|---|---|---|
+| `v10.0.0-preview.1` (a prerelease) | `10.0.0-preview.1.2` | The height is appended to the existing prerelease identifiers. The patch does **not** move. |
+| `v10.0.0` (stable) | `10.0.1-alpha.0.2` | Nothing can be appended to a stable version without making it look released, so the patch is bumped and a default prerelease is used. |
+| none at all | `10.0.0-alpha.0.512` | The 10.0 line is held by `MinVerMinimumMajorMinor`; the height counts from the root commit. |
+
+All three sort correctly, which is the property that matters for a feed:
 
 ```
-10.0.1-alpha.0.7
+10.0.0-alpha.0.512  <  10.0.0-preview.1  <  10.0.0-preview.1.2  <  10.0.0-preview.2  <  10.0.0
 ```
 
-Unique, ordered, and installable — which is exactly what the internal feed wants. The first build
-of a repository with no release tag at all lands at `10.0.0-alpha.0.N`, in the 10.0 line rather
-than at 0.0, because of `MinVerMinimumMajorMinor`.
+Unique, ordered and installable — exactly what the internal feed wants.
+
+!!! danger "A tag that is not pushed makes CI disagree with your machine"
+
+    The tag is the version, so a tag that exists only locally means local builds and CI builds are
+    **different versions of the same commit**. Measured on this repository: with
+    `v10.0.0-preview.1` local-only, `dotnet pack` here produced `10.0.0-preview.1.2` while a runner
+    — which sees no `v*` tag — produced `10.0.0-alpha.0.512`.
+
+    Neither build fails, and nothing warns. Push the tag when you create it.
 
 !!! warning "MinVer needs the tags"
 
