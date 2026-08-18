@@ -254,11 +254,14 @@ jobs:
           --source https://api.nuget.org/v3/index.json
           --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
 
-      # Symbols are a separate push and a non-fatal one: a failed symbol upload must not leave a
-      # release half-published, and the packages themselves are already on the feed by here.
-      - name: Push symbols
-        continue-on-error: true
-        run: |
-          for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
-            dotnet nuget push "artifacts/pack/$id.${GITHUB_REF_NAME#v}.snupkg"               --source https://api.nuget.org/v3/index.json               --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
-          done
+      # THERE IS NO SEPARATE SYMBOLS STEP, and there used to be. `dotnet nuget push` uploads the
+      # matching `.snupkg` by itself when it sits beside the `.nupkg`, which both pushes above do
+      # -- the run log shows four uploads from two commands:
+      #
+      #     Pushing InfoCarrier.Core.10.0.0-preview.1.nupkg  ... Your package was pushed.
+      #     Pushing InfoCarrier.Core.10.0.0-preview.1.snupkg ... Your package was pushed.
+      #
+      # A third step pushing the .snupkg files again earned a 409 from nuget.org ("another copy of
+      # this symbols package pending validation") on the very first real release. It was
+      # `continue-on-error`, so nothing broke -- it just printed a red annotation on an otherwise
+      # clean release, which is the kind of noise that teaches people to ignore annotations.
