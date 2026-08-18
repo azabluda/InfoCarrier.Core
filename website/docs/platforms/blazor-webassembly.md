@@ -4,7 +4,7 @@ A browser client works, and it is the case this provider is most obviously *for*
 the browser, composing real LINQ, with the database behind your server. The sample's three pages
 run in WebAssembly, published trimmed.
 
-Two constraints apply, and **neither is this provider's** — they are the browser's. A console or
+Two constraints apply, and neither is this provider's. They are the browser's. A console or
 desktop client has neither.
 
 ## Automatic lazy loading is impossible
@@ -33,7 +33,7 @@ costs exactly one round trip.
 
 !!! note "The asymmetry with the server is safe"
 
-    Your **server** may still call `UseLazyLoadingProxies()` — it is not a browser. Proxies change
+    Your **server** may still call `UseLazyLoadingProxies()`, because it is not a browser. Proxies change
     how an entity is constructed on the side that enables them, and the wire carries entity type
     *names*. The sample is wired exactly this way: proxies on the server, none in the browser.
 
@@ -44,7 +44,7 @@ costs exactly one round trip.
 `dotnet ef dbcontext optimize` output cannot be loaded in WebAssembly as generated. EF initializes
 the model on a `new Thread(…, 10 MB)` to avoid stack overflow on large models
 ([dotnet/efcore#31751](https://github.com/dotnet/efcore/issues/31751)), and WebAssembly has no
-threads — reading `Instance` throws `TypeInitializationException` wrapping
+threads, so reading `Instance` throws `TypeInitializationException` wrapping
 `PlatformNotSupportedException`, and the app never renders.
 
 EF's own escape hatch makes it initialize inline, and it works:
@@ -54,7 +54,7 @@ AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true);
 ```
 
 There is a second, better reason to skip it. `dotnet ef dbcontext optimize` needs a startup project
-it can load, and a Blazor WebAssembly project emits no `deps.json` — so your **server** ends up being
+it can load, and a Blazor WebAssembly project emits no `deps.json`, so your **server** ends up being
 the startup project, and EF's tooling then takes its configuration from the *server's* service
 provider, silently ignoring an `IDesignTimeDbContextFactory` in the client project.
 
@@ -64,7 +64,7 @@ dangerous shape: a model divergence between the two halves produces wrong answer
 errors.
 
 **Build the model at start-up instead**, as the sample does. If you do use a compiled model, verify
-which context it was generated from before trusting it — a one-line annotation like
+which context it was generated from before trusting it. A one-line annotation like
 `Relational:TableName` on a client model is the tell.
 
 ## Trimming
@@ -77,7 +77,7 @@ It reports IL trim warnings attributable to `InfoCarrier.Core`, and that is expe
 clean bill of health. The wire carries a type's **name** and the far end resolves it, so
 `Assembly.GetType(string)` and `MakeGenericMethod` are what this provider is made of, and
 `[DynamicallyAccessedMembers]` cannot describe "whatever type the caller's model names". The
-warnings mean the trimmer cannot *prove* the reflection safe for an arbitrary model — not that it
+warnings mean the trimmer cannot *prove* the reflection safe for an arbitrary model, and not that it
 broke yours.
 
 If you publish trimmed, test the paths your model actually uses. The repository gates the direction
@@ -132,4 +132,4 @@ private async ValueTask<GridItemsProviderResult<CustomerRow>> LoadAsync(
 ```
 
 And **order on the `IQueryable` before `Skip`/`Take`**, not through the grid's own sorting of the
-projected row — otherwise the server pages an unordered set and the client sorts the page.
+projected row. Otherwise the server pages an unordered set and the client sorts the page.

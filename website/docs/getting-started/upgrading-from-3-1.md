@@ -5,7 +5,7 @@ the `1.0`–`3.1` line and almost nothing else: the expression serializer, the w
 client/server split and the security model are all new code.
 
 **Your `DbContext` and your entity classes are unchanged.** Everything around them moves, and it
-will not compile until you have moved it. That is deliberate — the three public interfaces kept
+will not compile until you have moved it. That is deliberate: the three public interfaces kept
 their names and changed their shapes, so an old implementation fails to build rather than building
 and misbehaving.
 
@@ -16,7 +16,7 @@ and misbehaving.
     application, this upgrade is a port of the client first.
 
     **Name the version when you install.** `3.1.1` is still the newest *stable* release on
-    nuget.org, so an unversioned `dotnet add package` keeps giving you the old line — see
+    nuget.org, so an unversioned `dotnet add package` keeps giving you the old line. See
     [Installation](installation.md#installing).
 
 ## What did not change
@@ -42,8 +42,8 @@ and misbehaving.
 ```
 
 `Remote.Linq` and `Aqua` are gone; the only remaining dependency is
-`Microsoft.EntityFrameworkCore`. If you referenced either package *directly* — for example to
-configure a serializer — remove it. See [Installation](installation.md) for why the split is
+`Microsoft.EntityFrameworkCore`. If you referenced either package *directly*, for example to
+configure a serializer, remove it. See [Installation](installation.md) for why the split is
 where it is.
 
 ### 2. `UseInfoCarrierClient` became `UseInfoCarrier`
@@ -66,7 +66,7 @@ optionsBuilder.UseInfoCarrier(client);
 
 This is the largest saving, and the largest diff. `3.1` shipped **no** transport: every
 application implemented `IInfoCarrierClient` itself, and the samples that came with it ran to
-about a hundred lines each — an `HttpClient`, hand-configured Newtonsoft settings, one route per
+about a hundred lines each: an `HttpClient`, hand-configured Newtonsoft settings, one route per
 operation, and a cache keyed on a transaction-id header to carry transactions between calls.
 
 All of that is now three objects:
@@ -82,8 +82,9 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
     serializer);
 ```
 
-Delete your old client implementation. If you are not on HTTP — WCF, ServiceStack, a message bus,
-a direct in-process call — you now implement `IInfoCarrierTransport`, which is **one method** that
+Delete your old client implementation. If you are not on HTTP, whether that is WCF, ServiceStack, a
+message bus or a direct in-process call, you now implement `IInfoCarrierTransport`, which is one
+method that
 moves an envelope and interprets nothing, rather than the whole client interface. See
 [Custom transports](../configuration/transports.md).
 
@@ -118,7 +119,7 @@ builder.Services
 app.MapInfoCarrier();
 ```
 
-`AddInfoCarrierServer()` is gone — register `InProcessInfoCarrierServer` yourself, as above.
+`AddInfoCarrierServer()` is gone. Register `InProcessInfoCarrierServer` yourself, as above.
 `AddScoped<DbContext>` is the line people miss: the server resolves your context by its base type.
 Full detail in [Configuring the server](../configuration/server.md).
 
@@ -135,12 +136,12 @@ implementations and touch none of them.
 
 Two consequences worth calling out:
 
-- **The client contract is async-only.** `3.1`'s sync members existed to satisfy EF Core's
-  synchronous API and were routinely implemented with `.Result` or `.Wait()` — the samples carried
+- The client contract is async-only. `3.1`'s sync members existed to satisfy EF Core's synchronous
+  API and were routinely implemented with `.Result` or `.Wait()`; the samples carried
   a comment linking to the deadlock that causes. Synchronous `DbContext` calls still work; they no
   longer oblige you to write a blocking transport.
-- **Value mappers moved namespace**, to `InfoCarrier.Core.ValueMapping`, and no longer name a
-  serializer type in their signature. Two are now built in — `IPAddress` and `Uri` — so a mapper
+- Value mappers moved to the `InfoCarrier.Core.ValueMapping` namespace, and no longer name a
+  serializer type in their signature. Two are now built in, `IPAddress` and `Uri`, so a mapper
   you wrote for either can simply be deleted. See
   [Value mappers](../configuration/value-mappers.md).
 
@@ -150,21 +151,21 @@ Two consequences worth calling out:
 |---|---|
 | `InfoCarrier.Core.Client` | `InfoCarrier.Core` |
 | `InfoCarrier.Core.Server` | `InfoCarrier.Core` |
-| `InfoCarrier.Core.Common` | `InfoCarrier.Core.Common` — the wire contracts, unchanged in role |
+| `InfoCarrier.Core.Common` | `InfoCarrier.Core.Common`, the wire contracts, unchanged in role |
 | `InfoCarrier.Core.Common.ValueMapping` | `InfoCarrier.Core.ValueMapping` |
-| — | `InfoCarrier.Core.AspNetCore` |
+| none | `InfoCarrier.Core.AspNetCore` |
 
 ## What you get that 3.1 could not do
 
-Most of this is EF Core 10 rather than InfoCarrier, which is rather the point — the provider
+Most of this is EF Core 10 rather than InfoCarrier, which is the point: the provider
 inherits what the version underneath it can express.
 
 - Complex types, and JSON-mapped owned collections
 - `ExecuteUpdate` and `ExecuteDelete`
 - Many-to-many without an explicit join entity
-- Savepoints — `3.1` had begin, commit and rollback only
+- Savepoints. `3.1` had begin, commit and rollback only
 - Spatial types without data loss: Z and M ordinates survive the round trip
-- Blazor WebAssembly, published trimmed — with
+- Blazor WebAssembly, published trimmed, with
   [one constraint worth reading first](../platforms/blazor-webassembly.md)
 - A stated, tested [security boundary](../security.md) on the server, which `3.1` did not have
 
@@ -180,5 +181,5 @@ inherits what the version underneath it can express.
 8. Read [Limitations](../limitations.md) before you ship.
 
 If something in your application has no route across, please
-[open an issue](https://github.com/azabluda/InfoCarrier.Core/issues) — while this is a preview,
+[open an issue](https://github.com/azabluda/InfoCarrier.Core/issues). While this is a preview,
 that feedback still changes the shape of the API.

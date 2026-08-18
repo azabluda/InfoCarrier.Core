@@ -25,7 +25,7 @@ catch (DbUpdateException ex)
 ```
 
 Deeper in the chain, where the original exception is a type your client has no reason to reference
-— a `SqliteException`, a `SqlException`, a driver's own type — it arrives as
+such as a `SqliteException`, a `SqlException` or a driver's own type, it arrives as
 `InfoCarrierServerException`, which still names what the server actually threw:
 
 ```csharp
@@ -39,7 +39,7 @@ catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerExcepti
 ```
 
 Making every client reference every database driver, just so a `catch` clause could name the type,
-would be a worse trade than losing the name from the clause — so the name lives in a property
+would be a worse trade than losing the name from the clause, so the name lives in a property
 instead.
 
 A real chain from a foreign-key violation looks like this:
@@ -52,7 +52,7 @@ DbUpdateException                     the client's own, from EF
 
 ### The server's stack trace
 
-It is preserved, and deliberately not spliced into the client-side exception's own stack — that
+It is preserved, and deliberately not spliced into the client-side exception's own stack, because that
 would be lying about where your client is. It travels in `Exception.Data`:
 
 ```csharp
@@ -80,7 +80,7 @@ catch (InfoCarrierTransportException ex)
 }
 ```
 
-The underlying failure — an `HttpRequestException`, a serialization error — is kept as
+The underlying failure, such as an `HttpRequestException` or a serialization error, is kept as
 `InnerException`, because it names the layer that actually failed. When the server answers with a
 non-success status, the message carries the status code **and the response body**: a bare status
 code is indistinguishable from a dozen unrelated causes to whoever has to diagnose it.
@@ -105,14 +105,14 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 ## Do not match on message text
 
 Where a query cannot be translated, this provider throws `InvalidOperationException`, exactly as EF
-Core does — but the wording differs from other providers' in a couple of cases. Message text is not
+Core does, but the wording differs from other providers' in a couple of cases. Message text is not
 a supported contract on **any** EF Core provider; catch the type. See
 [Limitations](../limitations.md).
 
 ## Cancellation
 
 Every async method takes a `CancellationToken` and passes it through to the transport. A cancelled
-request raises `OperationCanceledException` and is never reported as a transport failure — it is
+request raises `OperationCanceledException` and is never reported as a transport failure. It is
 your own signal, not something that went wrong.
 
 ```csharp
@@ -124,7 +124,7 @@ List<Customer> customers = await context.Customers.ToListAsync(cts.Token);
 ## What the server does not tell you
 
 Where the server maps a failure into a fault, it sends the type name, the message, the inner chain
-and the stack trace. It does not send anything else about itself — no server paths beyond what a
+and the stack trace. It does not send anything else about itself, and no server paths beyond what a
 stack trace contains, no connection strings, no configuration. If your exception messages carry
 information a client should not see, that is worth reviewing on the server: see
 [Security](../security.md).

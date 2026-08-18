@@ -1,6 +1,6 @@
 # Limitations
 
-InfoCarrier.Core runs Microsoft's own Entity Framework Core specification suite — the same suite EF
+InfoCarrier.Core runs Microsoft's own Entity Framework Core specification suite, the same suite EF
 Core's SQL Server, SQLite and InMemory providers run. This page lists **every scenario in that suite
 that does not behave the way a normal EF Core provider behaves**, so you can judge whether any of
 them affects your application.
@@ -18,7 +18,7 @@ Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
 
 ### Inserting an entity whose complex property is a property bag
 
-**Affects you if** you map a complex property — or a complex collection — whose CLR type is
+**Affects you if** you map a complex property, or a complex collection, whose CLR type is
 `Dictionary<string, object>`. EF Core calls this a *property bag*: the shape is declared in the
 model rather than in the CLR type.
 
@@ -40,7 +40,7 @@ modelBuilder.Entity<Product>()
     });
 ```
 
-**What happens** — the insert throws:
+**What happens.** The insert throws:
 
 ```csharp
 context.Products.Add(new Product
@@ -59,7 +59,7 @@ The same applies to the collection form, `List<Dictionary<string, object>>` mapp
 by EF's suite for this shape, so treat the whole write path as unsupported rather than assuming
 update works.
 
-**Workaround** — declare the complex type as an ordinary class:
+**Workaround.** Declare the complex type as an ordinary class:
 
 ```csharp
 public class ProductSpec
@@ -81,7 +81,7 @@ modelBuilder.Entity<Product>().ComplexProperty(e => e.Spec);
 Every other complex-type shape is supported, including nested complex types and complex collections,
 as long as the type is a class rather than a dictionary.
 
-**Cause** — a defect in EF Core's own materializer, reached because this provider rebuilds entities
+**Cause.** A defect in EF Core's own materializer, reached because this provider rebuilds entities
 on the server from the values sent over the wire. Tracked upstream as
 [dotnet/efcore#36175](https://github.com/dotnet/efcore/issues/36175).
 
@@ -108,11 +108,11 @@ var report = context.Customers
     .ToList();
 ```
 
-**What happens** — the query runs and returns a result. **No EF Core provider supports this query**:
+**What happens.** The query runs and returns a result. No EF Core provider supports this query:
 SQL Server, SQLite and InMemory all reject it. Because no provider executes it, there is no reference
 answer to check this one against, so the result returned here is unverified.
 
-**Workaround** — apply `Distinct` after materialising:
+**Workaround.** Apply `Distinct` after materialising:
 
 ```csharp
 Products = o.Lines.Select(l => l.ProductName).ToList(),   // then .Distinct() in memory
@@ -128,7 +128,7 @@ and you may notice when porting code or tests.
 ### Exception message text for an untranslatable query
 
 When a query cannot be translated, this provider throws `InvalidOperationException`, exactly as EF
-Core does. **The message text may differ** in two cases — a method call inside an `ExecuteUpdate`
+Core does. **The message text may differ** in two cases: a method call inside an `ExecuteUpdate`
 property selector, and a cast to a type nothing in your model implements:
 
 ```csharp
@@ -142,7 +142,7 @@ IQueryable orders = context.Orders;
 orders.Cast<IArchivable>().FirstOrDefault();
 ```
 
-Both throw. **Catch the exception type; do not match on message text** — that is unsupported on any
+Both throw. **Catch the exception type; do not match on message text.** That is unsupported on any
 EF Core provider.
 
 ### Queries this provider answers that other providers reject
@@ -191,16 +191,16 @@ elsewhere on this site:
 
 | | |
 |---|---|
-| Relational-only APIs — `FromSql`, `ExecuteSqlRaw`, `GetDbTransaction`, migrations — are not part of this provider's surface | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
+| Relational-only APIs (`FromSql`, `ExecuteSqlRaw`, `GetDbTransaction`, migrations) are not part of this provider's surface | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
 | Results do not stream; a query materializes into a single answer | below |
 | Authentication and authorization are yours | [Security](security.md) |
 
 ## Still to come
 
-- **A gRPC binding.** HTTP ships; gRPC is a small class you can write today against
+- A gRPC binding. HTTP ships; gRPC is a small class you can write today against
   [`IInfoCarrierTransport`](configuration/transports.md), but nothing is in the box.
-- **Streaming results as `IAsyncEnumerable`.** A query result is materialized in one response
+- Streaming results as `IAsyncEnumerable`. A query result is materialized in one response
   today, so a very large result set is a very large response. Page it.
 
 Both may change the transport interface, which is why the version still says `preview`.

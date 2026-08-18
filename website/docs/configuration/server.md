@@ -22,20 +22,20 @@ app.MapInfoCarrier();
 
 ## The registrations, one at a time
 
-**`AddDbContext<ShopContext>`** — your context on your real provider. InfoCarrier never sees the
-connection string.
+`AddDbContext<ShopContext>` registers your context on your real provider. InfoCarrier never sees
+the connection string.
 
-**`AddScoped<DbContext>`** — the server resolves the context per request as the base type
+`AddScoped<DbContext>` matters because the server resolves the context per request as the base type
 `DbContext`, so the base type has to resolve. Without this line, every request fails with a
 service-resolution error.
 
-**`IInfoCarrierSerializer`** — the same format the client uses. Both ends must agree.
+`IInfoCarrierSerializer` is the same format the client uses. Both ends must agree.
 
-**`IInfoCarrierServer`** — `InProcessInfoCarrierServer` executes a request against a `DbContext`
+`IInfoCarrierServer` is where `InProcessInfoCarrierServer` executes a request against a `DbContext`
 resolved from this service provider. *In-process* means it runs in the same process as the database
-connection; it is the normal implementation, not a test double.
+connection. It is the normal implementation, and not a test double.
 
-**`AddInfoCarrierStandardValueMappers()`** — the mappers for BCL types the wire cannot walk
+`AddInfoCarrierStandardValueMappers()` adds the mappers for BCL types the wire cannot walk
 (`IPAddress` and `Uri`). The client gets these automatically; a server builds its own service
 collection, so it has to ask. A type mapped on one side only is worse than one mapped on neither.
 See [Value mappers](value-mappers.md).
@@ -56,7 +56,7 @@ app.MapInfoCarrier()
    .WithName("InfoCarrier");
 ```
 
-Whatever route you choose, the client's transport must name the same one — see
+Whatever route you choose, the client's transport must name the same one. See
 [Configuring the client](client.md#the-http-transport).
 
 ## Payload limits
@@ -71,18 +71,18 @@ builder.Services.AddSingleton<IInfoCarrierSerializer>(
 ```
 
 A query tree is kilobytes, and a `SaveChanges` request is bounded by the graph the client tracked,
-so a low ceiling is usually safe. Cap the request bytes at your gateway too — this bound is the
-last line, not the first.
+so a low ceiling is usually safe. Cap the request bytes at your gateway too. This bound is the last
+line of defence rather than the first.
 
 ## Context lifetime
 
-`InProcessInfoCarrierServer` takes a **fresh scope per request**, so every request gets a clean
+`InProcessInfoCarrierServer` takes a fresh scope per request, so every request gets a clean
 change tracker. That is deliberate: a client request is self-contained, carrying the state the
 server needs to act on it, and leftover tracked entities from a previous request would collide with
 the next one.
 
 The exception is a transaction. `BeginTransaction` pins one context, and its connection, until the
-commit or rollback — which is why transactions should be short. See
+commit or rollback, which is why transactions should be short. See
 [Transactions](../guide/transactions.md).
 
 ## Query filters are your authorization boundary
@@ -108,23 +108,23 @@ just work arriving at your context.
 
 Nothing an application registers on the *client* is forwarded to the server, and nothing the server
 registers reaches the client. The two are separate EF Core instances and either may have hooks of
-its own — which is exactly what you want when the server is the side that must not be bypassed.
+its own, which is what you want when the server is the side that must not be bypassed.
 
 ## Model parity
 
 Both halves build a model from the same `DbContext` source, and the wire names entity types and
 properties. Two rules follow:
 
-- **Deploy both halves together** when the model changes. A property the client names and the
-  server does not know is a failed request.
-- **If a model-shaping option is enabled on one side, enable it on the other.**
-  `UseLazyLoadingProxies()` is the common example — it adds a convention, so it belongs on both, or
-  neither. (A browser client is the deliberate exception; see
-  [Blazor WebAssembly](../platforms/blazor-webassembly.md).)
+Deploy both halves together when the model changes. A property the client names and the server does
+not know is a failed request.
+
+If a model-shaping option is enabled on one side, enable it on the other. `UseLazyLoadingProxies()`
+is the common example: it adds a convention, so it belongs on both or neither. A browser client is
+the deliberate exception; see [Blazor WebAssembly](../platforms/blazor-webassembly.md).
 
 ## Health of the endpoint
 
 `MapInfoCarrier` answers a malformed body, or a client speaking a different protocol version, with
-`400` and a plain-text message naming the problem — no stack trace and no server paths. Anything
+`400` and a plain-text message naming the problem, with no stack trace and no server paths. Anything
 the server *ran* and that failed comes back inside a normal response as a fault, so your client sees
 an exception rather than an HTTP error; see [Handling errors](../guide/errors.md).

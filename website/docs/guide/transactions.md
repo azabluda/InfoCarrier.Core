@@ -55,14 +55,14 @@ await transaction.CommitAsync();
 `RollbackToSavepointAsync` undoes the work after the savepoint and leaves the transaction open.
 `ReleaseSavepointAsync` discards the savepoint and keeps the work.
 
-A store that has no savepoints — EF Core's InMemory provider, for instance — reports that rather
+A store that has no savepoints, such as EF Core's InMemory provider, reports that rather
 than failing halfway. `transaction.SupportsSavepoints` answers before you try, and the answer comes
 from the server's store rather than from a guess on the client.
 
 ## Two contexts, one transaction
 
-Sometimes one screen needs several `DbContext` instances — a grid that refreshes on its own, a
-detail pane holding a unit of work — and the writes have to land together. A second context joins
+Sometimes one screen needs several `DbContext` instances, such as a grid that refreshes on its own
+and a detail pane holding a unit of work, and the writes have to land together. A second context joins
 the first one's transaction:
 
 ```csharp
@@ -83,7 +83,7 @@ await transaction.CommitAsync();                          // (2)
    There the shared thing is a `DbTransaction` on a connection; here it is the server's token,
    which is what makes sharing possible across a transport that may be stateless.
 2. **The joining context does not own the transaction.** Ending it detaches `second` and leaves the
-   transaction to whoever began it. Commit through the context that began it — two contexts able to
+   transaction to whoever began it. Commit through the context that began it, because two contexts able to
    commit the same transaction would make the outcome depend on disposal order.
 
 `UseInfoCarrierTransaction` is an extension on `DatabaseFacade`, in the `InfoCarrier.Core`
@@ -108,6 +108,6 @@ await strategy.ExecuteAsync(async () =>
 ## What is not available
 
 `IDbContextTransaction.GetDbTransaction()` and anything else that hands you a `DbTransaction` are
-relational APIs, and the client is not relational — there is no local connection to hand out. Ambient
+relational APIs, and the client is not relational, so there is no local connection to hand out. Ambient
 `TransactionScope` is likewise not part of this provider's surface. The server's token is the whole
 of what can be shared, which is what `UseInfoCarrierTransaction` takes.

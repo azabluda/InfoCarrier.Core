@@ -1,7 +1,8 @@
 # Run the samples
 
 The repository carries a Northwind sample: one shared model, one SQLite-backed server, and two
-clients that are the same client twice — a browser and a console. Neither has a connection string.
+clients that are the same client twice, one a browser and one a console. Neither has a connection
+string.
 
 ```bash
 git clone https://github.com/azabluda/InfoCarrier.Core.git
@@ -18,13 +19,13 @@ dotnet run --project samples/Northwind.Server
 
 Open <http://localhost:5199>. You get a Blazor WebAssembly client whose `DbContext` has no
 database, and a **wire inspector** down the right-hand side showing every round trip: the
-operation, the size each way, how long it took, and the decoded payload — including the expression
+operation, the size each way, how long it took, and the decoded payload, including the expression
 tree, unpacked out of the base64 it travels in.
 
 Three pages, deliberately ordinary:
 
 **Customers** is a grid. Click a header to sort, open a column filter to narrow it, page through
-the rest. There is no *Run* button because there is nothing to run — the sort, the filter and the
+the rest. There is no *Run* button because there is nothing to run: the sort, the filter and the
 paging are already part of the expression tree the page sends. Filtering `Country` for *Germany*
 takes 65 rows to 8, and the panel shows the `Where` crossing the wire.
 
@@ -34,7 +35,7 @@ The master list is a projection over a join, so it shows *Alfreds Futterkiste* r
 and the server does the joining.
 
 **Transfer** moves an order to another customer and takes a unit off a product's stock, both inside
-one transaction — with a tickbox that makes the second save fail on the server's database, so you
+one transaction, with a tickbox that makes the second save fail on the server's database, so you
 can watch the rollback. Both figures are read back afterwards through a fresh context, so what you
 see is the server's answer rather than the local change tracker agreeing with itself.
 
@@ -58,7 +59,7 @@ interesting part: touching a navigation costs a request *when it is touched*, an
 !!! tip "Delete `northwind.db` first if you want the transcript's exact numbers"
 
     The browser pages write to the same store, and the Transfer page moves an order to a different
-    customer. A store that has been clicked through answers differently — which is the
+    customer. A store that has been clicked through answers differently, which is the
     demonstration working, not the numbers being wrong.
 
 The console client **lazy-loads normally**, unlike the browser one. It is not WebAssembly, so a

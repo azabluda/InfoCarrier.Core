@@ -7,7 +7,7 @@ you want to change.
 optionsBuilder.UseInfoCarrier(client);
 ```
 
-Everything else on `DbContextOptionsBuilder` is EF Core's and works as usual — logging,
+Everything else on `DbContextOptionsBuilder` is EF Core's and works as usual: logging,
 `EnableSensitiveDataLogging`, `ConfigureWarnings`, query-tracking behaviour, proxies.
 
 ## The three objects
@@ -34,7 +34,7 @@ new HttpInfoCarrierTransport(httpClient, serializer, requestUri: "infocarrier");
 ```
 
 The third argument is the route, relative to the `HttpClient`'s `BaseAddress`. It defaults to
-`"infocarrier"`, which is also what `MapInfoCarrier()` defaults to on the server — change one and
+`"infocarrier"`, which is also what `MapInfoCarrier()` defaults to on the server. Change one and
 change the other.
 
 Everything else about the HTTP call is the `HttpClient`'s: base address, timeout, headers,
@@ -73,12 +73,12 @@ var serializer = new SystemTextJsonInfoCarrierSerializer(
 | | Default | Why |
 |---|---|---|
 | `MaxRequestBytes` | 64 MiB (`InfoCarrierPayloadLimits.DefaultMaxRequestBytes`) | An unauthenticated peer making your server allocate is the threat. No legitimate query tree comes near this. |
-| `MaxResponseBytes` | `null` — no bound | You asked for the result. This library has no basis for capping how large an answer your own query may have. |
+| `MaxResponseBytes` | `null`, no bound | You asked for the result. This library has no basis for capping how large an answer your own query may have. |
 
 Pass `null` to opt out of a bound. It is spelled as an explicit `null` rather than as a very large
 number so that opting out is visible in your code.
 
-Setting `MaxResponseBytes` on the client is a paging policy, not a security control — a useful one
+Setting `MaxResponseBytes` on the client is a paging policy rather than a security control, a useful one
 if you want a runaway query to fail loudly rather than exhaust memory.
 
 **The server has its own serializer with its own limits.** Both halves deserialize, so both need
@@ -94,7 +94,7 @@ optionsBuilder
     .LogTo(Console.WriteLine, LogLevel.Information);
 ```
 
-To see the payloads themselves, decorate the transport — that is what the sample's wire inspector
+To see the payloads themselves, decorate the transport. That is what the sample's wire inspector
 is. See [Custom transports](transports.md).
 
 ## The internal service provider
@@ -115,7 +115,7 @@ DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
 ```
 
 `AddEntityFrameworkInfoCarrier()` registers everything the provider needs, including the value
-mappers that ship with it. **Build the provider once and share it** — EF caches services on it, and
+mappers that ship with it. Build the provider once and share it: EF caches services on it, and
 a new one per context is a leak. If you do not need either feature, do not do this: the default
 path builds and caches the service provider for you.
 

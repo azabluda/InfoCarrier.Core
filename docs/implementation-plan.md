@@ -2479,3 +2479,43 @@ rather than staying silent about it.
       **Gates: none.** No `src/`, no `test/`, and neither file is part of the site build. Every
       relative link in both files was resolved against the working tree, and every site URL against
       `mkdocs.yml`.
+
+- [x] **N27. The same treatment for every other user-facing document.** `<this commit>`
+
+      N26 settled the principles on the README. This applies them to the other twenty-one
+      user-facing documents: `docs/nuget-readme.md`, `samples/README.md`, `docs/limitations.md`,
+      and all seventeen pages under `website/docs/`.
+
+      **Measured before and after, outside fenced code blocks**, because a comment inside a sample
+      is the sample's text and not this repository's prose:
+
+      | | before | after |
+      |---|---|---|
+      | em dashes in prose | 190 | **0** |
+      | bold-label bullet lists | 20 | **0** |
+
+      **Four pages were rewritten rather than edited**, because their problems were structural.
+      `docs/nuget-readme.md` dropped the raw suite numbers and the emoji callout, and *Installing*
+      moved above *Two packages* so a reader meets the `3.1.1` version trap before the packaging
+      discussion. `website/docs/index.md` lost four bold-label bullets and its verbatim test-count
+      block. `website/docs/security.md` lost twelve bold spans and a four-item bold list that was
+      padding four real warnings. `website/docs/configuration/server.md` opened five consecutive
+      paragraphs with a bold API name and a dash.
+
+      **Everything else was edited line by line.** Only sentences carrying a tell were touched, so
+      the rest of each file is byte-identical and the diff is reviewable rather than a wall of
+      re-flowed text. 21 files, 273 insertions, 282 deletions.
+
+      **Two judgement calls, both from the skill's own false-positive list.** The
+      `**Affects you if**` / `**What happens**` / `**Workaround**` / `**Cause**` labels in both
+      limitations documents are field labels in a reference document, which the skill says not to
+      flag; only the dashes after them were removed. And the em dash inside sample code comments
+      stays, because the skill leaves code blocks alone.
+
+      **The mechanical route is the wrong one here, and the reason is worth keeping.** A regex over
+      `—` produces grammatical rubbish: the right replacement is a comma, a colon, a semicolon, a
+      full stop or a rewritten clause depending on what the sentence is doing, and roughly a third
+      of these needed the clause rewritten. Every replacement in this step was chosen by reading
+      the line.
+
+      **Gates: `mkdocs build --strict`, exit 0, zero warnings.** No `src/`, no `test/`.

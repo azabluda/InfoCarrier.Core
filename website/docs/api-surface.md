@@ -37,8 +37,8 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | `IInfoCarrierTransport` | `SendAsync(InfoCarrierEnvelope, CancellationToken)` | [Custom transports](configuration/transports.md) |
 | `IInfoCarrierSerializer` | `Serialize<T>`, `Deserialize<T>`, and async counterparts | [Custom transports](configuration/transports.md#a-different-serializer) |
 | `InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper` | `TryMapToWire`, `TryMapFromWire` | [Value mappers](configuration/value-mappers.md) |
-| `IInfoCarrierServer` | The nine server operations | — |
-| `IInfoCarrierClient` | The client half of the same nine | — |
+| `IInfoCarrierServer` | The nine server operations | none |
+| `IInfoCarrierClient` | The client half of the same nine | none |
 
 `IInfoCarrierServer` and `IInfoCarrierClient` exist to be substituted in unusual hosting
 arrangements. Most applications use `InProcessInfoCarrierServer` and `TransportInfoCarrierClient`
@@ -57,7 +57,7 @@ unchanged.
 | `InfoCarrierTransportException` | The request never reached a server, or what came back was not an envelope. |
 | `InfoCarrierServerException` | The server's own exception type cannot be rebuilt here. Carries `ServerExceptionTypeName`. |
 
-Anything else you catch is EF Core's own — `DbUpdateException`, `DbUpdateConcurrencyException`,
+Anything else you catch is EF Core's own: `DbUpdateException`, `DbUpdateConcurrencyException`,
 `InvalidOperationException`. See [Handling errors](guide/errors.md).
 
 ## Wire contracts

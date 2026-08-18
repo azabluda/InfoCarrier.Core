@@ -35,7 +35,7 @@ await context.SaveChangesAsync();
 Console.WriteLine(order.Id);   // the key the server's database issued
 ```
 
-The same applies to any store-generated property — computed columns, default values, concurrency
+The same applies to any store-generated property: computed columns, default values, concurrency
 tokens.
 
 !!! note "Before the save, read the key from the entry"
@@ -79,7 +79,7 @@ context.Orders.Remove(order);
 await context.SaveChangesAsync();
 ```
 
-To delete without loading the row first, use `ExecuteDeleteAsync` — see
+To delete without loading the row first, use `ExecuteDeleteAsync`. See
 [Querying](querying.md#bulk-operations).
 
 ## Concurrency
@@ -118,6 +118,6 @@ also what stops a client from writing anything the server's model does not expos
 
 ## Errors
 
-A failure on the server — a constraint violation, a trigger, a validation exception in an
-interceptor — arrives on the client as the exception EF would have thrown locally, with its message
+A failure on the server, whether a constraint violation, a trigger or a validation exception in an
+interceptor, arrives on the client as the exception EF would have thrown locally, with its message
 and inner chain preserved. See [Handling errors](errors.md).

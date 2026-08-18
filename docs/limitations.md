@@ -1,6 +1,6 @@
 # Known limitations
 
-InfoCarrier.Core runs Microsoft's own Entity Framework Core specification test suite — the same
+InfoCarrier.Core runs Microsoft's own Entity Framework Core specification test suite, the same
 suite EF Core's SQL Server, SQLite and InMemory providers run. This page lists **every scenario in
 that suite that does not behave the way a normal EF Core provider behaves**, so you can judge
 whether any of them affects your application.
@@ -14,7 +14,7 @@ suite and it passes.
 
 ### Inserting an entity whose complex property is a property bag
 
-**Affects you if** you map a complex property — or a complex collection — whose CLR type is
+**Affects you if** you map a complex property, or a complex collection, whose CLR type is
 `Dictionary<string, object>`. EF Core calls this a *property bag*: the shape is declared in the
 model rather than in the CLR type.
 
@@ -36,7 +36,7 @@ modelBuilder.Entity<Product>()
     });
 ```
 
-**What happens** — the insert throws:
+**What happens.** The insert throws:
 
 ```csharp
 context.Products.Add(new Product
@@ -55,7 +55,7 @@ The same applies to the collection form, `List<Dictionary<string, object>>` mapp
 covered by EF's suite for this shape**, so treat the whole write path as unsupported rather than
 assuming update works.
 
-**Workaround** — declare the complex type as an ordinary class:
+**Workaround.** Declare the complex type as an ordinary class:
 
 ```csharp
 public class ProductSpec
@@ -77,7 +77,7 @@ modelBuilder.Entity<Product>().ComplexProperty(e => e.Spec);
 Every other complex-type shape is supported, including nested complex types and complex
 collections, as long as the type is a class rather than a dictionary.
 
-**Cause** — a defect in EF Core's own materializer, reached because this provider rebuilds entities
+**Cause.** A defect in EF Core's own materializer, reached because this provider rebuilds entities
 on the server from the values sent over the wire. Tracked upstream as
 [dotnet/efcore#36175](https://github.com/dotnet/efcore/issues/36175).
 
@@ -104,11 +104,11 @@ var report = context.Customers
     .ToList();
 ```
 
-**What happens** — the query runs and returns a result. **No EF Core provider supports this
+**What happens.** The query runs and returns a result. No EF Core provider supports this
 query**: SQL Server, SQLite and InMemory all reject it. Because no provider executes it, there is
 no reference answer to check ours against, so the result this provider returns is unverified.
 
-**Workaround** — apply `Distinct` after materialising:
+**Workaround.** Apply `Distinct` after materialising:
 
 ```csharp
 Products = o.Lines.Select(l => l.ProductName).ToList(),   // then .Distinct() in memory
@@ -124,7 +124,7 @@ provider, and you may notice the difference when porting code or tests.
 ### Exception message text for an untranslatable query
 
 When a query cannot be translated, this provider throws `InvalidOperationException`, exactly as EF
-Core does. **The message text may differ** in two cases — a method call inside an `ExecuteUpdate`
+Core does. **The message text may differ** in two cases: a method call inside an `ExecuteUpdate`
 property selector, and a cast to a type nothing in your model implements:
 
 ```csharp
@@ -138,7 +138,7 @@ IQueryable orders = context.Orders;
 orders.Cast<IArchivable>().FirstOrDefault();
 ```
 
-Both throw. **Catch the exception type; do not match on message text** — that is unsupported on any
+Both throw. **Catch the exception type; do not match on message text.** That is unsupported on any
 EF Core provider.
 
 ### Queries this provider answers that other providers reject

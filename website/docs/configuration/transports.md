@@ -59,7 +59,7 @@ per-request telemetry.
 ## In-process
 
 For tests, or for a client and server that live in the same process, hand the envelope straight to
-the server. Serializing both ways keeps the test honest — nothing travels by reference that would
+the server. Serializing both ways keeps the test honest, because nothing travels by reference that would
 not survive HTTP:
 
 ```csharp
@@ -113,7 +113,7 @@ public sealed class MyTransport(IMyChannel channel, IInfoCarrierSerializer seria
 Three rules the HTTP transport follows and yours should:
 
 1. **Pass the cancellation token through.** A cancelled request is the caller's signal.
-2. **Throw `InfoCarrierTransportException` for a failure of the journey** — unreachable server,
+2. Throw `InfoCarrierTransportException` for a failure of the journey: unreachable server,
    malformed answer, protocol error. Do not let a raw `JsonException` or an `HttpRequestException`
    surface: that is a lie about where the fault is. A failure the *server* reported is not this; it
    arrives inside the envelope as data.
@@ -126,8 +126,8 @@ The server half is whatever hosts your protocol, ending in a call to
 
 ## A different serializer
 
-`IInfoCarrierSerializer` is four methods — `Serialize`, `Deserialize`, and their async
-counterparts — over a `byte[]`. The library never assumes JSON. Implement it for MessagePack or
+`IInfoCarrierSerializer` is four methods over a `byte[]`: `Serialize`, `Deserialize`, and their
+async counterparts. The library never assumes JSON. Implement it for MessagePack or
 protobuf if the payload size matters to you, and register the same implementation on **both**
 halves.
 

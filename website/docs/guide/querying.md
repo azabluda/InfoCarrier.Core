@@ -21,8 +21,9 @@ Three cases, and you can usually tell which one you are in by looking at the pro
 
 ### The whole query goes
 
-If everything in the query is something the server can execute — properties of mapped entities,
-operators, the LINQ methods EF translates — the entire tree is sent and the server answers with
+If everything in the query is something the server can execute, such as properties of mapped
+entities, operators and the LINQ methods EF translates, the entire tree is sent and the server
+answers with
 rows or a scalar.
 
 ```csharp
@@ -39,8 +40,8 @@ An aggregate returns a number, not the rows behind it.
 
 ### The query is split
 
-If the projection contains code the server cannot run — one of your own methods, a locally defined
-type, formatting — the query is **cut at that point**. The server runs the part that reaches the
+If the projection contains code the server cannot run, such as one of your own methods, a locally
+defined type or formatting, the query is cut at that point. The server runs the part that reaches the
 data; the client runs the projection over what comes back.
 
 ```csharp
@@ -60,7 +61,7 @@ var report = await context.Orders
 
 This is the behaviour you want: the filter is not dragged back to the client just because the
 projection cannot be translated. It also means an unfiltered query with a client-side projection
-fetches **everything** — put the `Where` in before you worry about the `Select`.
+fetches everything, so put the `Where` in before you worry about the `Select`.
 
 !!! warning "A local function cannot appear in a query"
 
@@ -75,13 +76,13 @@ fetches **everything** — put the `Where` in before you worry about the `Select
 ### The query cannot be translated
 
 Where EF Core itself would refuse a query, this provider refuses it too, with an
-`InvalidOperationException` — the same exception type EF throws. **Catch the type, never match on
+`InvalidOperationException`, the same exception type EF throws. **Catch the type, never match on
 the message**: message text is not a supported contract on any EF Core provider, and a couple of
 messages here differ from other providers' by wording. See [Limitations](../limitations.md).
 
 ## Tracking
 
-Change tracking works exactly as it does with any provider — the identity map, navigation fix-up
+Change tracking works exactly as it does with any provider: the identity map, navigation fix-up
 and all. For a read-only screen, opt out:
 
 ```csharp
@@ -117,7 +118,8 @@ int matching = await query.CountAsync();
 ```
 
 1. **Order before you page, and order on the entity.** If you sort a client-side projection
-   instead, the server pages an unordered set and the client sorts the page — one page of the wrong
+   instead, the server pages an unordered set and the client sorts the page, giving one page of the
+   wrong
    rows, in the right order. The sample's Customers grid is built this way for exactly this reason.
 
 ## Bulk operations
@@ -135,12 +137,12 @@ int deleted = await context.Orders
 ```
 
 Both return the number of rows affected. As with any EF Core provider, neither updates your local
-change tracker — the entities the client already holds keep their old values until reloaded.
+change tracker, so the entities the client already holds keep their old values until reloaded.
 
 ## What is not part of the surface
 
-The client has no database and no relational provider, so relational-only APIs — `FromSql`,
-`Database.ExecuteSqlRaw`, `GetDbTransaction`, migrations, `EnsureCreated` — are not what this
+The client has no database and no relational provider, so relational-only APIs (`FromSql`,
+`Database.ExecuteSqlRaw`, `GetDbTransaction`, migrations, `EnsureCreated`) are not what this
 provider offers. Schema management belongs on the server, where the real provider is, and so does
 any raw SQL: expose it as a server-side operation of your own rather than sending SQL from a
 client.
@@ -148,7 +150,7 @@ client.
 ## Two things to keep in mind
 
 **Every materialized query is a network round trip.** `ToListAsync`, `FirstOrDefaultAsync`,
-`CountAsync` — each is a request. A loop that queries per item is a loop that makes one request per
+`CountAsync`, and each is a request. A loop that queries per item is a loop that makes one request per
 item. Compose the query instead, or fetch what you need with `Include`.
 
 **Result size is your query's business.** There is a default size bound on requests *towards* the

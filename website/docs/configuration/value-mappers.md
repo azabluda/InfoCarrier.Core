@@ -7,7 +7,7 @@ is the seam for those.
 ## When you need one
 
 The wire's default handling of a non-primitive value is to walk its public readable members. That is
-right for an anonymous type, a record or a DTO — and wrong for a type whose members are *computed*:
+right for an anonymous type, a record or a DTO, and wrong for a type whose members are *computed*:
 
 - `NetTopologySuite.Geometries.Geometry` exposes `Boundary` and `Envelope`, both of which return
   geometries. Walking one recurses until the stack overflows.
@@ -29,7 +29,7 @@ builder.Services.AddInfoCarrierStandardValueMappers();
 ```
 
 A geometry mapper is deliberately *not* in the box: shipping one would put a NetTopologySuite
-dependency in the package for a type most callers never use. Spatial types are fully supported —
+dependency in the package for a type most callers never use. Spatial types are fully supported;
 you supply the mapper, which is about thirty lines. There is a worked one in the repository's test
 utilities.
 
@@ -85,7 +85,7 @@ public sealed class MoneyValueMapper : IInfoCarrierValueMapper
 1. Declining is how a mapper says "not mine". A mapper that returns `true` **must** produce a
    non-null wire value; claiming a value and producing nothing is an error.
 2. **After a serialization round trip a wire primitive arrives as a `JsonElement`**, not as the CLR
-   type that was written. Convert it rather than casting it — this is the mistake to expect.
+   type that was written. Convert it rather than casting it. This is the mistake to expect.
 
 The wire value must be one of the primitives the serializer knows: in practice a `string` or a
 `byte[]`.
@@ -144,5 +144,5 @@ modelBuilder.Entity<Customer>()
 ```
 
 Both halves build the model from the same source, so both derive the same conversion. Reach for a
-mapper when there is no converter — or when the CLR type is dangerous to walk regardless of how it
+mapper when there is no converter, or when the CLR type is dangerous to walk regardless of how it
 is stored.
