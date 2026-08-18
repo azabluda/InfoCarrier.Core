@@ -1,0 +1,52 @@
+/*
+ * Site-specific overrides. Material for MkDocs is themed through CSS custom properties and plain
+ * selectors -- nothing here needs a `custom_dir` or a template override, which is worth saying
+ * because the theme looks far more rigid than it is.
+ *
+ * ONE RULE FOR THIS FILE: every block names the theme rule it is fighting. A stylesheet that
+ * overrides a theme is unreadable a year later otherwise.
+ */
+
+:root {
+    /* The header mark. Material ships `height: 1.2rem`, which renders the badge as a smudge --
+       its lettering lives inside a hexagon and needs room to be legible.
+
+       IN PIXELS RATHER THAN REM, ON PURPOSE. Material's root font-size is not constant: it steps
+       up on wide viewports, and this was measured rather than assumed -- the theme's own header
+       plus tabs is 4.8rem, and rendering it comes out 96px up to 1600px of viewport and 106px
+       above that, so one rem is 20px and then 22px. A logo declared as `4.8rem` is therefore 96px
+       on a laptop and 106px on a desktop monitor. A brand mark should be one size. */
+    --ic-logo-height: 96px;
+}
+
+/* Theme rule: `.md-header__button.md-logo img { height: 1.2rem; width: auto }`.
+   `width: auto` is left alone -- the mark is square, so its height drives everything. */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    height: var(--ic-logo-height);
+}
+
+/* Theme rule: `.md-header__button.md-logo { margin: .2rem; padding: .4rem }`. That padding is what
+   sets the header's height around the mark, and .4rem on every side of a 96px image is a lot of
+   indigo. Tightened vertically; the right side is kept so the title does not crowd the mark. */
+.md-header__button.md-logo {
+    margin: 0;
+    padding: 0.3rem 0.5rem 0.3rem 0.2rem;
+}
+
+/* THE PART THAT IS NOT COSMETIC, and the reason a bigger logo is not a one-line change.
+   `--md-scroll-margin` is a HARD-CODED 6rem in the theme (3.6rem without a tabs row). It is NOT
+   computed from the header's height by any script -- the theme's own bundle confirms it, with
+   `md-scroll-margin` appearing zero times in the JavaScript. So a taller header silently scrolls
+   every `#anchor` target underneath itself, on every deep link in the site, with nothing failing.
+
+   The sticky chrome is the tabs row plus the logo button: `2.4rem + (logo + 0.6rem of padding)`,
+   which is `3rem + var(--ic-logo-height)`. That is not a guess -- the indigo band was rendered and
+   counted at three viewport widths, and the formula reproduces all three exactly:
+
+       1280px -> 156px    1600px -> 162px    1920px -> 162px
+
+   The theme leaves 1.2rem of slack over its own chrome (6rem against 4.8rem); this keeps it. */
+:root {
+    --md-scroll-margin: calc(4.2rem + var(--ic-logo-height));
+}

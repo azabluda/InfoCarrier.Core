@@ -2314,3 +2314,41 @@ rather than staying silent about it.
 
       **Gates: `CI=true dotnet build --configuration Release` — 0 errors, the same 5 known
       `IL2110`/`IL2111`. `eng/trim-ratchet.sh` — `OK (88 <= 88)`.** No `src/`, no `test/`.
+
+- [x] **N24. A 96px header mark, and the hidden cost of a taller header.** `<this commit>`
+
+      The site's logo rendered at Material's stock `1.2rem` — 24px — where the badge is the same
+      smudge N23d took out of the sample. It is now **96px**, filling the header line, with the
+      title and the tabs arranging themselves around it.
+
+      **Material is not rigid; one stylesheet is enough.** No `custom_dir`, no template override —
+      `extra_css: [stylesheets/extra.css]` and two selectors. The theme is built out of custom
+      properties and ordinary classes, which is worth recording because the opposite is the natural
+      assumption.
+
+      **The cost is not cosmetic, and nothing fails when you get it wrong.** `--md-scroll-margin`
+      is a **hard-coded `6rem`** in the theme (`3.6rem` without a tabs row) and is **not** computed
+      from the header's height by anything — `md-scroll-margin` appears **zero times** in the
+      theme's JavaScript bundle. A taller header therefore scrolls every `#anchor` target
+      underneath itself, on every deep link in the site, silently. The sticky chrome is
+      `3rem + var(--ic-logo-height)`, and that is not a guess: the indigo band was rendered and
+      counted at three viewport widths and the formula reproduces **156px / 162px / 162px**
+      exactly. The theme leaves `1.2rem` of slack over its own chrome; this keeps it.
+
+      **The mark is sized in `px`, not `rem`, and that came out of measurement too.** Material's
+      root font-size steps up on wide viewports: the stock header-plus-tabs is `4.8rem` and renders
+      **96px up to 1600px and 106px above it**, so one rem is 20px and then 22px. `4.8rem` would
+      have been two different marks on two monitors.
+
+      **Two instruments failed on the way, both silently.**
+      - **Headless Edge renders a blank page for any URL carrying a `#fragment`.** The obvious
+        anchor test — load `…/installation/#installing`, look — returns pure white; the same page
+        without the fragment renders fine. So the anchor claim rests on geometry, not on a picture.
+      - **A correct derivation looked wrong because the arithmetic under it was.** The header
+        growth was computed at 48px against a measured 60px and written off as "the header is not
+        only its logo button". It *is*: the sum was done with `1rem = 16px` when the rendered value
+        is 20px, and at 20px the derivation is exact. **The stock chrome band is the way to read
+        the root font-size, and reading it first would have saved the wrong conclusion.**
+
+      **Gates: `mkdocs build --strict` exit 0, zero warnings; chrome band and clearance measured at
+      1280, 1600 and 1920.** No `src/`, no `test/`.

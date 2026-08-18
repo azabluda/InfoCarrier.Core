@@ -107,6 +107,11 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
 
+# One stylesheet, and it carries its own reasoning. Material is themed through CSS custom
+# properties, so nothing here needs a `custom_dir` or a template override.
+extra_css:
+  - stylesheets/extra.css
+
 plugins:
   - search
 
