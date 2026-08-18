@@ -182,7 +182,7 @@ status before relying on it.
 
 ## Releasing, start to finish
 
-1. Land the work. `CI=true dotnet build` clean, both ratchets green.
+1. Land the work. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both ratchets green.
 2. Update `docs/limitations.md` if the failure set moved.
 3. Tag: `git tag -a v10.0.0-preview.2 -m "InfoCarrier.Core 10.0.0-preview.2"`.
 4. Push the tag: `git push origin v10.0.0-preview.2`.

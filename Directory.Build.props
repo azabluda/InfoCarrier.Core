@@ -23,7 +23,13 @@
 
       `CI` is set to `true` by GitHub Actions, and by Azure Pipelines, GitLab and Travis. MSBuild
       reads environment variables as properties, so nothing has to be passed on the command line.
-      To reproduce a CI failure locally:  CI=true dotnet build InfoCarrier.Core.slnx
+      To reproduce a CI failure locally:
+        CI=true dotnet build InfoCarrier.Core.slnx --configuration Release
+
+      THE CONFIGURATION IS PART OF THE COMMAND. Omitting it builds Debug, where the Blazor sample
+      does not run the trim analyzer, so the whole class of diagnostic that fails the server is
+      invisible. That omission kept the CI build red from M8-32 to N12 while a local `CI=true`
+      build reported `0 Warning(s), 0 Error(s)` every time.
 
       There is deliberately no `WarningsNotAsErrors`. EF1001 was the one code that needed an
       exemption, and since M8-30 it needs none: the 19 files that use EF Core internals carry a
