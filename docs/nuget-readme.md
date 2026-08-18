@@ -11,6 +11,12 @@ database.
 The `DbContext` and the entity classes are shared source between client and server. You write the
 model once.
 
+> ### ⚠️ Not backward compatible with `3.1.1`
+>
+> This is a ground-up rewrite, not an upgrade. Your `DbContext` and your entity classes carry
+> over unchanged; the wiring around them does not, and existing code will **not** compile.
+> That is deliberate — see [Upgrading from 3.1](#upgrading-from-31) below.
+
 ## Example
 
 ```csharp
@@ -66,6 +72,26 @@ a stable `10.x` ships. Passing `--prerelease` works too.
 to — but pin it anyway, so the two halves cannot drift apart.
 
 Both packages ship symbols and SourceLink, so you can step into the provider from a debugger.
+
+## Upgrading from 3.1
+
+**Your `DbContext` and your entity classes are unchanged.** Everything around them moves.
+
+| | `3.1.1` | `10.0.0-preview.1` |
+|---|---|---|
+| Client wiring | `UseInfoCarrierClient(client)` | `UseInfoCarrier(client)` |
+| Transport | none shipped — yours to write | `HttpInfoCarrierTransport`, or yours |
+| Server endpoint | none shipped — yours to write | `app.MapInfoCarrier()` |
+| `IInfoCarrierClient` | sync **and** async pairs | async only, different shape |
+| `IInfoCarrierServer` | `QueryData` / `SaveChanges` (+ async) | different shape |
+| `IInfoCarrierValueMapper` | `TryMapToDynamicObject` / `TryMapFromDynamicObject` | `TryMapToWire` / `TryMapFromWire` |
+| Dependencies | **Remote.Linq** and Aqua | none beyond `Microsoft.EntityFrameworkCore` |
+
+The three interfaces **kept their names and changed their shapes**, so an existing implementation
+fails to compile rather than compiling and misbehaving.
+
+Step-by-step, with before-and-after code:
+<https://azabluda.github.io/InfoCarrier.Core/getting-started/upgrading-from-3-1/>
 
 ## Status — preview
 

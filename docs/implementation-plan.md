@@ -2134,3 +2134,61 @@ rather than staying silent about it.
       is context, and mostly belongs to other people's assemblies.
 
       **Gates: none.** One Markdown file, and no script reads it.
+
+- [x] **N21. The upgrade a 3.1 user has to make, written down.** `<this commit>`
+
+      Every user-facing document said the release is not backward compatible with `3.1.1` and none
+      of them said what to *do* about it. `website/docs/getting-started/upgrading-from-3-1.md` is
+      the missing page: what carries over (the `DbContext`, the entities, the queries), the five
+      things that move, and a checklist.
+
+      **Every "before" in it was read out of `subrepos/infocarrier-v1`, not remembered.** The
+      claims that needed checking, and what the source said:
+
+      | Claim | Where it was verified |
+      |---|---|
+      | `UseInfoCarrierClient` → `UseInfoCarrier` | `Client/Extensions/InfoCarrierDbContextOptionsExtensions.cs` |
+      | Sync **and** async pairs, plus `ServerUrl` | `Client/IInfoCarrierClient.cs`, eleven members |
+      | `IInfoCarrierServer` took a `Func<DbContext>` | `Server/IInfoCarrierServer.cs`, four members |
+      | `AddInfoCarrierServer()` existed and is gone | `Server/InfoCarrierServiceCollectionExtensions.cs` |
+      | `TryMapToDynamicObject` → `TryMapToWire` | v1 `Common/ValueMapping/IInfoCarrierValueMapper.cs` against `src/InfoCarrier.Core/ValueMapping/IInfoCarrierValueMapper.cs` |
+      | v1 shipped **no** transport | `grep -rn HttpClient subrepos/infocarrier-v1/src` returns **nothing**; every sample writes its own |
+      | Nine async operations both sides | `src` `IInfoCarrierClient` / `IInfoCarrierServer`, counted |
+
+      **The fact most likely to stop an upgrade dead is the one no other document mentioned**, and
+      it came out of the `.csproj` rather than the API: `3.1.1` is `netstandard2.0`, so it ran on
+      .NET Framework. This generation is `net10.0` only. For a WPF-on-Framework client the upgrade
+      is a port of the client first, and that belongs above the API tables, not in a footnote.
+
+      The `Remote.Linq` line is likewise from the v1 `.csproj`, so "drop any direct reference"
+      names a package that really was there.
+
+      Linked from `index.md` and `installation.md` beside the version warning — the two places a
+      3.1 user actually lands.
+
+      `.gitignore` gains `.venv/`. `website/mkdocs.yml` instructs a reader to create exactly that
+      directory at the repository root and nothing was ignoring it.
+
+      **Gates: `mkdocs build --strict` green — and the gate was shown able to fail on this very
+      file first.** One link in the new page was pointed at `../limitations-typo.md`, the build
+      exited **1** naming the page and the target, and the file was restored from a copy. A strict
+      build that has only ever been seen passing is not evidence that the page's **eight** internal
+      links resolve. No `src/`, no `test/`.
+
+- [x] **N22. The NuGet readme says what "not backward compatible" costs.** `<this commit>`
+
+      `docs/nuget-readme.md` is the one document a reader meets *before* deciding to install, and
+      it discussed the `3.1.1` trap purely as a version-pinning accident — as though naming the
+      version were the whole problem. It is not: naming the version correctly is what gets you a
+      package your existing code will not compile against.
+
+      Two additions. A short callout under the opening paragraphs, because a 3.1 user has to see it
+      before the code sample rather than after. And an *Upgrading from 3.1* section after
+      *Installing*, holding a **seven-row** before/after table — wiring, transport, endpoint, the
+      three interfaces, dependencies — and ending in a link to N21's page. It is not the same
+      table: N21 spends a section on each of those rows, which is the point of having both.
+
+      nuget.org renders a restricted subset of Markdown, so this is a blockquote and a table and
+      nothing else — no admonitions, which is why the site page and this one do not share text.
+
+      **Gates: none.** One Markdown file, and no script reads it.

@@ -100,6 +100,10 @@ The nine are known, and every one of them is written up on the
     unversioned install resolves to its newest *stable* release — `3.1.1`, built for EF Core 3.1 —
     rather than to this one. See [Installation](getting-started/installation.md).
 
+    **Coming from `3.1`?** This is a rewrite and it is not backward compatible — your model
+    carries over, the wiring around it does not. See
+    [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
+
     A gRPC binding and streaming results as `IAsyncEnumerable` are still to come, and both may
     change the transport interface.
 

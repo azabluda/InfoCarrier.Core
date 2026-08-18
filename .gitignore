@@ -34,3 +34,8 @@ samples/Northwind.Client/Properties/launchSettings.json
 
 # The MkDocs output directory. Built by .github/workflows/docs.yml, never committed.
 website/site/
+
+# The virtualenv website/mkdocs.yml tells you to create at the repository root in order to run
+# `mkdocs build --strict` locally. CI installs into the runner instead, so this exists only on a
+# developer machine -- and it is ~50 MB of somebody else's code.
+.venv/
