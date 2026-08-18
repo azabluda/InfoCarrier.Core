@@ -2558,3 +2558,33 @@ rather than staying silent about it.
       zero is evidence about the metric.**
 
       **Gates: `mkdocs build --strict`, exit 0, zero warnings.** No `src/`, no `test/`.
+
+- [x] **N29. `samples/README.md`, through the skill properly.** `<this commit>`
+
+      The first document in the planned one-at-a-time pass, and the file the earlier sweep had
+      damaged least and improved least. **Length and content are kept deliberately**: this file is
+      the samples' own notes, its reader is someone working on the repository, so the fix is the
+      prose rather than the scope.
+
+      Read whole, patterns marked, then **rewritten rather than patched**. Bold spans in prose fall
+      **27 → 3**, and the three that stay are the page names *Customers*, *Order* and *Transfer*,
+      which are labels on a screen.
+
+      **Three sayings removed, each doing rhetoric where a sentence would do.** *"This is the point
+      of the sample, and it is four lines."* *"…are gone, and that is the plan working"*, which
+      announced its own significance instead of saying what happened. *"The round-trip counts are
+      the interesting part"*, which told the reader to be interested rather than what to look at.
+
+      **And the internal milestone id.** *"in M8-22 they were"* named something no reader of this
+      file can resolve, and the sentence works without it.
+
+      **What stays, on purpose:** *"the server's answer rather than the local change tracker
+      agreeing with itself"*, *"from row indices rather than from `Random`"*, *"wrong answers rather
+      than errors"*. Each contrasts two concrete outcomes, which is the information rather than the
+      pattern.
+
+      **Sixteen figures verified present after the rewrite** (the five seed counts, Fluent UI
+      4.14.4, EF issue 31751, port 5199, 17 transport tests, the five trim counts, 330 order lines,
+      14 round trips), and every code block and the console transcript are byte-identical.
+
+      **Gates: none.** Not part of the site build; no `src/`, no `test/`.
