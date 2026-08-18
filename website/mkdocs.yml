@@ -45,6 +45,10 @@ theme:
     - toc.follow
     - content.code.copy
     - content.code.annotate
+    # Without these two, `edit_uri` above is INERT — Material renders no control at all, so the
+    # setting silently does nothing however carefully it is pointed at the right branch.
+    - content.action.edit
+    - content.action.view
     - search.suggest
     - search.highlight
   palette:

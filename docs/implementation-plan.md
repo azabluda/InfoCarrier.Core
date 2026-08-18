@@ -1699,3 +1699,36 @@ rather than staying silent about it.
       `.props` and `.csproj` in the repository parsed as XML — 10 files, 0 invalid. `dotnet restore`
       clean; `CI=true dotnet build InfoCarrier.Core.slnx -c Release` → **`5 Warning(s),
       0 Error(s)`**.
+
+- [x] **N14. `edit_uri` was inert, and finding that out is also the proof two workflows work.**
+      `<this commit>`
+
+      **N11 corrected `edit_uri` from `v10-claude` to `main` and called it *"Edit this page on every
+      site page"*. There was no edit link on any page.** Material renders that control only when
+      `content.action.edit` is among the theme features, and it was not — so the setting had been
+      doing nothing since the site was created, and pointing it at a wrong branch would have cost
+      nothing either. Found by `curl`-ing the live page and grepping for any `edit` control at all:
+      empty.
+
+      `content.action.edit` and `content.action.view` are on now, and the built page carries
+      `href="https://github.com/azabluda/InfoCarrier.Core/edit/main/website/docs/limitations.md"`.
+
+      **The N11 entry is not rewritten** — it says what was believed then, and the belief was the
+      defect. This entry is the correction.
+
+      **It is also the only honest way to prove two things the merge of #6 could not.** That merge
+      touched no `website/**` file, so `docs.yml`'s path filter correctly skipped it — which left
+      *"Docs fires from a push"* and *"the site serves new content"* both unverified, and the only
+      green `Docs` run to date was one dispatched by hand. A path-filtered workflow that has only
+      ever run manually is not a working workflow. This change touches `website/mkdocs.yml`, so:
+
+      | Claim | How this proves it |
+      |---|---|
+      | `docs.yml` fires from a **push** | it must run on this merge, without a dispatch |
+      | Pages serves the **new** build | an edit control appears on the live site, and there was none before |
+
+      A verification that needed a manufactured commit would have been noise. This one was a real
+      defect that happened to be in the right file.
+
+      **Gates: `mkdocs build --strict` green.** No `src/`, no `test/`; one line of theme
+      configuration.
