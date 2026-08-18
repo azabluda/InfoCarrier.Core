@@ -2192,3 +2192,39 @@ rather than staying silent about it.
       nothing else — no admonitions, which is why the site page and this one do not share text.
 
       **Gates: none.** One Markdown file, and no script reads it.
+
+- [x] **N23. The site wore the theme's default icon while both packages wore ours.** `<this commit>`
+
+      `mkdocs.yml` set neither `theme.logo` nor `theme.favicon`, so every tab showed Material's
+      generic mark and the header showed none at all — the one place a reader arrives at *before*
+      nuget.org, identifying itself as somebody else's template.
+
+      **Generated, not copied.** MkDocs cannot read outside its `docs_dir`, so the site needs its
+      own copy of the artwork whatever happens; `eng/make-icon.py` now derives all three outputs
+      from the same `docs/assets/icon-source.png` in one run — the 128px package icon, a 192px
+      `logo.png` (the header renders it at ~24px, so that is 2x/3x headroom) and a `favicon.ico`
+      holding 16, 32 and 48. **Each favicon frame is resampled from the 1254px source
+      independently**, which is the whole reason to ship an `.ico` rather than one PNG: a 16px cut
+      from the source is visibly cleaner than the browser's own downscale of a 128px image.
+
+      **The refactor was proved inert rather than assumed inert.** Pulling the fit-and-centre logic
+      into `render(mark, canvas)` changed the margin from a constant to a ratio, and the shipped
+      package icon is a published artefact. `git hash-object docs/assets/icon.png` before and after
+      is `da714d74…` both times — byte-identical, so no `.nupkg` in flight is affected.
+
+      **Verified by rendering it, and the first verification was wrong.** Headless Edge, the built
+      site served locally, screenshots of the header in both colour schemes. The dark-mode shot and
+      the "light" shot came back **pixel-identical**, which read as "the header is indigo in both
+      schemes" — true, but not what had been measured. **Headless Chromium defaults to
+      `prefers-color-scheme: dark`**, so the first screenshot was already the slate scheme and
+      `--force-dark-mode` changed nothing; both shots were the same scheme. The light scheme needs
+      `--blink-settings=preferredColorScheme=1`, and with it the body sampled `(255,255,255)`
+      against the dark shot's `(30,33,41)`. The logo pixels are identical across the two, which is
+      now a measurement instead of a coincidence. **A check that cannot come out differently has
+      not checked anything** — the standing probe rule, in the form the browser hands you for free.
+
+      A contrast worry about a dark navy mark on an indigo header turned out to be unfounded on
+      sight: the artwork's rim highlight carries it. No palette change.
+
+      **Gates: `mkdocs build --strict` green, exit 0, zero warnings, and every `assets/` reference
+      in the built `index.html` confirmed present on disk.** No `src/`, no `test/`.
