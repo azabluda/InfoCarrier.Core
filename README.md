@@ -238,7 +238,7 @@ only in CI**. Locally a warning is a warning, so half-finished work still builds
 server will see:
 
 ```bash
-CI=true dotnet build InfoCarrier.Core.slnx
+CI=true dotnet build InfoCarrier.Core.slnx --configuration Release
 ```
 
 [`docs/build-warnings.md`](docs/build-warnings.md) records what is suppressed, where, and why —

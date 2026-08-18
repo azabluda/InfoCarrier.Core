@@ -24,19 +24,26 @@ in, and a gate that punishes experimentation is a gate people switch off.
 **To reproduce a CI failure locally:**
 
 ```bash
-CI=true dotnet build InfoCarrier.Core.slnx
+CI=true dotnet build InfoCarrier.Core.slnx --configuration Release
 ```
+
+> **`--configuration Release` is part of the command, not decoration.** Omit it and you build
+> Debug, where `samples/Northwind.Client` does not run the trim analyzer — so an entire class of
+> diagnostic that fails the server cannot appear. That omission is exactly how the CI build stayed
+> red from M8-32 to N12 while a local `CI=true` build answered `0 Warning(s), 0 Error(s)` every
+> single time.
 
 ## What is suppressed, where, and why
 
-There is **no `WarningsNotAsErrors`** and **no repo-wide `NoWarn`**. Three scoped suppressions
-exist, and each is scoped to the smallest place that makes sense.
+There is **no repo-wide `NoWarn`**, and exactly **one** `WarningsNotAsErrors`, in one project
+file. Every suppression is scoped to the smallest place that makes sense.
 
 | Code(s) | Where | Why |
 |---|---|---|
 | `EF1001` | file-scoped `#pragma warning disable EF1001` in the **19 files** that use EF Core internals | This provider is built on `IStateManager`, `EntityQueryable<>` and `InternalEntityEntry` by design. **This is what EF Core's own providers do** — `subrepos/efcore` has 51 such files across eight projects (21 in `EFCore.Relational`) and **no `NoWarn` for EF1001 anywhere**. Per file, so a **new** file reaching for an internal API still warns. |
 | `CS1591`, `CS1573`, `CS1574`, `CS1570` | `test/.editorconfig` and `samples/.editorconfig` | Nothing under `test/` or `samples/` is a public API surface anyone reads. Without this, the functional test project alone emits **1254** of them. In `src/` these stay **on**. |
 | `IL2xxx` | `-p:TreatWarningsAsErrors=false` on `eng/trim-ratchet.sh`'s own publish | The 88 trim warnings are unfixable by design and are gated by **direction**, not by zero. See below. |
+| `IL2110`, `IL2111` | `samples/Northwind.Client.csproj`, Release only | **Downgraded from error to warning, not silenced.** They come from the *framework's own* Razor output (`Router.NotFoundPage`, `LayoutView.Layout` in `App_razor.g.cs`) — not this repository's code, and not fixable here. `eng/trim-ratchet.sh` still counts them; `NoWarn` would make it count zero and pass for ever. Only these two codes: any other trim diagnostic still fails CI, which forces a look before a new one is tolerated. |
 
 ## Two traps, both of which cost a run
 

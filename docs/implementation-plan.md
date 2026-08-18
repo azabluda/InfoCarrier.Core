@@ -1601,3 +1601,101 @@ rather than staying silent about it.
       **Gates: none of the repository's** — three workflow files and six Markdown files, nothing
       under `src/` or `test/`. `mkdocs build --strict` green, and all four workflows re-parsed to
       confirm the triggers are `[main]` and nothing else.
+
+- [x] **N12. CI had been red since M8-32, and the documented way to check could not see it.**
+      `<this commit>`
+
+      **Ten commits, every one of them reporting a green gate, every one of them red on the
+      server.** `gh run list` was the first thing run after the CLI was authenticated, and the
+      pattern was immediate: `Step M8-30` succeeded in 7m49s, and from `Step M8-32` onward every
+      *Build & Test* run failed in **under a minute** — a build failure, not a test failure. M8-32
+      is the commit that turned `TreatWarningsAsErrors` on for CI. **This predates Phase N; N1–N11
+      were committed on top of it, and each of their "gates green" claims was made with a command
+      that could not fail this way.**
+
+      **The failure is five `IL2110`/`IL2111` errors in `samples/Northwind.Client`, in Razor
+      *generated* code** — `Router.NotFoundPage`, `LayoutView.Layout` in `App_razor.g.cs`. Not this
+      repository's code, and not fixable here.
+
+      **The mechanism was already written down in `Directory.Build.props`, one step short of the
+      conclusion.** That file explains that `ILLinkTreatWarningsAsErrors` covers the ILLink *task*
+      and not the trim *analyzer*, and that `eng/trim-ratchet.sh` therefore passes
+      `-p:TreatWarningsAsErrors=false` on its own publish. What nobody carried further: the
+      **ordinary build** compiles that same project, `SuppressTrimAnalysisWarnings=false` turns the
+      analyzer on for it in Release, and M8-32 then made every one of those an error.
+
+      **Why it went unseen is the part worth keeping.** CLAUDE.md's reproduction command is
+      `CI=true dotnet build InfoCarrier.Core.slnx` — **no configuration**, so it builds Debug. The
+      Blazor sample only trims in Release. Run side by side:
+
+      | Command | Result |
+      |---|---|
+      | `CI=true dotnet build InfoCarrier.Core.slnx` (documented) | `Build succeeded. 0 Warning(s), 0 Error(s)` |
+      | `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` (what CI runs) | `Build FAILED. 5 Error(s)` |
+
+      **A gate that cannot fail is not a gate**, and this one could not — the whole class of
+      diagnostic was invisible to it. The command is corrected in CLAUDE.md,
+      `Directory.Build.props`, `README.md`, `docs/build-warnings.md` and `docs/versioning.md`, each
+      saying why the configuration is part of it.
+
+      **The fix downgrades, it does not silence.** `WarningsNotAsErrors` for `IL2110;IL2111`, in the
+      sample's Release property group only. `NoWarn` would have been worse than useless:
+      `eng/trim-ratchet.sh` **counts** these, so silencing them is how a ratchet starts reporting
+      zero and passes for ever — the failure its own clean-publish rule exists to prevent. Two codes
+      rather than the family, so a *new* trim diagnostic still fails CI and forces a look. Measured
+      after: build `5 Warning(s), 0 Error(s)`; ratchet `OURS: 88`, `Northwind 8`, `OK (88 <= 88)` —
+      the counted set is untouched.
+
+      **Two more things the CLI found in the same pass, neither of them a code defect:**
+
+      - **`Docs` failed on `configure-pages`** for every run before Pages was switched on — which
+        is the fail-closed behaviour N5 designed, working. After it was switched on it failed
+        again, differently: *"Branch `main` is not allowed to deploy to github-pages due to
+        environment protection rules."* The `github-pages` environment's branch policy allowed
+        **`develop`** only — a v1 branch that cannot build this site at all. `main` added, the
+        stale `develop` policy deleted, re-dispatched: **green in 38s, and the site now answers.**
+        Confirmed by fetching `/limitations/` and reading its heading back.
+      - **`Packages` failed for the same build reason**, so nothing has reached GitHub Packages yet.
+        It will on this push.
+
+      **Gates: `CI=true dotnet build … --configuration Release` → `0 Error(s)`;
+      `eng/trim-ratchet.sh` → `OK (88 <= 88)`.** Not `eng/measure.sh`: nothing under `src/` or
+      `test/` changed, and the release pipeline runs the full suite regardless.
+
+- [x] **N13. N12 broke the build with the comment explaining N12, and did not re-run the gate.**
+      `<this commit>`
+
+      **The PR's CI failed at `Restore`, in 17 seconds**, with
+      `NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher` — an error that names
+      trimming and has nothing to do with it. `Directory.Build.props` was **unparseable**, so there
+      was no `TargetFramework` for the trimming check to be satisfied by, and that is what it says
+      when it finds none.
+
+      **A double hyphen cannot appear inside an XML comment.** N12's own comment wrote the
+      corrected gate command in full — `dotnet build InfoCarrier.Core.slnx --configuration
+      Release` — inside `<!-- -->`. The comment explaining how to keep CI green is what turned CI
+      red. It is `-c Release` now, with a note saying why the short form is required rather than
+      preferred.
+
+      **The real defect is the order of operations, and it is the one N12 had just finished
+      documenting.** The sequence was: edit the sample csproj → build Release, green → start the
+      trim ratchet → *then* edit `Directory.Build.props` → commit. **Nothing was built after the
+      last edit.** N12's own gate line was true of a tree that no longer existed by the time it was
+      written. One commit after writing *"a gate that cannot fail is not a gate"*, the failure was
+      not running the gate at all.
+
+      **`eng/measure.sh`'s rule about reading output applies to the instrument's timing too.** The
+      trim ratchet reported `OK (88 <= 88)` and was believed — but it had been launched *before*
+      the props edit, so its publish read the good file. A green result from a run that started
+      before the change is not a result about the change.
+
+      **This error had been seen before and diagnosed the other way round.** M8-32's entry records
+      *"a build failure read as XML damage was `NETSDK1124` from a stale `obj/Release` the trim
+      publish left behind"*. Same error, opposite cause, and this time it really was XML damage —
+      on a fresh CI runner with no `obj/` to be stale. **`NETSDK1124` means "no usable
+      TargetFramework"; it does not tell you why.** Parse the props files before theorising.
+
+      **Gates, run after the last edit this time**, and a check that did not exist before: every
+      `.props` and `.csproj` in the repository parsed as XML — 10 files, 0 invalid. `dotnet restore`
+      clean; `CI=true dotnet build InfoCarrier.Core.slnx -c Release` → **`5 Warning(s),
+      0 Error(s)`**.

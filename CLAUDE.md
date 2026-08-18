@@ -71,8 +71,11 @@ here, and both are cheap to avoid:
   reflective, because `WireGrouping` did not look like five warnings.
 
   **And the build itself is a gate now.** Warnings are errors when `CI=true`, so before any commit
-  that touches code: `CI=true dotnet build InfoCarrier.Core.slnx`. It is seconds, it is what the
-  server runs, and a local build will not show you the failure. `docs/build-warnings.md` says what
+  that touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
+  **`--configuration Release` is not optional and leaving it off is how CI went red for ten
+  commits without anyone noticing (N12).** The Blazor sample turns the trim analyzer on in Release
+  only, so the Debug build cannot produce the diagnostic that fails the server. It is seconds, it
+  is what the server runs, and a Debug build will not show you the failure. `docs/build-warnings.md` says what
   is suppressed and why.
 - **A probe that prints nothing is evidence only once the build is known green — check the error
   count, never the elapsed time.** M9's J9 read three successive "nothing logged" results as
@@ -131,7 +134,7 @@ here, and both are cheap to avoid:
 | `docs/research-findings.md` | EF Core 10 pipeline findings backing the ADRs |
 | `docs/decisions.md` **ADR-013** | The test project may reference `EFCore.Relational.Specification.Tests`. **Before adopting a relational spec base, check whether it assumes the *client* is relational** — a non-virtual `UseTransaction` calling `GetDbTransaction()` makes a base unreachable here, and cost 142 tests to discover. |
 | `docs/security-review.md` | **M5's review of the deserialization path** (C48). Read §2 before adding anything to `TypeAllowlist`: its safety is a conjunction across several clauses, and `Binder`/`MethodInfo`/`Activator` each break it alone. |
-| `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why.** The build is clean (`0 Warning(s)`) and warnings are errors **in CI only** — `CI=true dotnet build` reproduces it. Read before adding any `NoWarn`. |
+| `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why.** The build is clean (`0 Warning(s)`) and warnings are errors **in CI only** — `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` reproduces it — the configuration matters. Read before adding any `NoWarn`. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
 in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in

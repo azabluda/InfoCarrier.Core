@@ -25,6 +25,31 @@
     <PublishTrimmed>true</PublishTrimmed>
     <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
+
+    <!--
+      AND THIS IS WHAT MAKES THE LINE ABOVE SURVIVABLE IN CI. `SuppressTrimAnalysisWarnings=false`
+      turns the trim ROSLYN ANALYZER on for this project in Release. Since M8-32, `CI=true` also
+      sets `TreatWarningsAsErrors`. The two together turned five warnings in the **framework's own**
+      Razor output — `Router.NotFoundPage`, `LayoutView.Layout`, in `App_razor.g.cs`, none of them
+      this repository's code and none of them fixable here — into five build errors, and the CI
+      build had been red on every push since M8-32.
+
+      `ILLinkTreatWarningsAsErrors=false` in Directory.Build.props does NOT cover this. That
+      property governs the ILLink *task*, which runs at publish; these come from the *analyzer*, at
+      compile. The props file says exactly that, in a comment written after the same distinction
+      had already cost a run — the conclusion just was not carried this one step further.
+
+      NOT `NoWarn`, and not `TreatWarningsAsErrors=false`. Both would hide the diagnostics, and
+      `eng/trim-ratchet.sh` COUNTS them: silencing them is how a ratchet starts reporting zero and
+      passes for ever. These stay warnings, stay counted, and stay gated by direction against
+      eng/trim-baseline.txt.
+
+      TWO CODES, NOT THE WHOLE IL2xxx FAMILY, ON PURPOSE. A trim diagnostic this list does not name
+      still fails CI, which is the tripwire: it forces somebody to look at a new one before it is
+      tolerated. That is the same reasoning as the per-file `#pragma warning disable EF1001` rather
+      than a blanket NoWarn.
+    -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2110;IL2111</WarningsNotAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
