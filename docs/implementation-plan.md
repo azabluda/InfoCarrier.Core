@@ -1661,3 +1661,41 @@ rather than staying silent about it.
       **Gates: `CI=true dotnet build … --configuration Release` → `0 Error(s)`;
       `eng/trim-ratchet.sh` → `OK (88 <= 88)`.** Not `eng/measure.sh`: nothing under `src/` or
       `test/` changed, and the release pipeline runs the full suite regardless.
+
+- [x] **N13. N12 broke the build with the comment explaining N12, and did not re-run the gate.**
+      `<this commit>`
+
+      **The PR's CI failed at `Restore`, in 17 seconds**, with
+      `NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher` — an error that names
+      trimming and has nothing to do with it. `Directory.Build.props` was **unparseable**, so there
+      was no `TargetFramework` for the trimming check to be satisfied by, and that is what it says
+      when it finds none.
+
+      **A double hyphen cannot appear inside an XML comment.** N12's own comment wrote the
+      corrected gate command in full — `dotnet build InfoCarrier.Core.slnx --configuration
+      Release` — inside `<!-- -->`. The comment explaining how to keep CI green is what turned CI
+      red. It is `-c Release` now, with a note saying why the short form is required rather than
+      preferred.
+
+      **The real defect is the order of operations, and it is the one N12 had just finished
+      documenting.** The sequence was: edit the sample csproj → build Release, green → start the
+      trim ratchet → *then* edit `Directory.Build.props` → commit. **Nothing was built after the
+      last edit.** N12's own gate line was true of a tree that no longer existed by the time it was
+      written. One commit after writing *"a gate that cannot fail is not a gate"*, the failure was
+      not running the gate at all.
+
+      **`eng/measure.sh`'s rule about reading output applies to the instrument's timing too.** The
+      trim ratchet reported `OK (88 <= 88)` and was believed — but it had been launched *before*
+      the props edit, so its publish read the good file. A green result from a run that started
+      before the change is not a result about the change.
+
+      **This error had been seen before and diagnosed the other way round.** M8-32's entry records
+      *"a build failure read as XML damage was `NETSDK1124` from a stale `obj/Release` the trim
+      publish left behind"*. Same error, opposite cause, and this time it really was XML damage —
+      on a fresh CI runner with no `obj/` to be stale. **`NETSDK1124` means "no usable
+      TargetFramework"; it does not tell you why.** Parse the props files before theorising.
+
+      **Gates, run after the last edit this time**, and a check that did not exist before: every
+      `.props` and `.csproj` in the repository parsed as XML — 10 files, 0 invalid. `dotnet restore`
+      clean; `CI=true dotnet build InfoCarrier.Core.slnx -c Release` → **`5 Warning(s),
+      0 Error(s)`**.
