@@ -1,0 +1,43 @@
+/*
+ * Site-specific overrides. Material for MkDocs is themed through CSS custom properties and plain
+ * selectors -- nothing here needs a `custom_dir` or a template override.
+ *
+ * ONE RULE FOR THIS FILE: every block names the theme rule it is fighting. A stylesheet that
+ * overrides a theme is unreadable a year later otherwise.
+ */
+
+/*
+ * THE MARK, AT THE FOOT OF THE NAVIGATION -- NOT IN THE HEADER, AND THAT WAS SETTLED BY TRYING IT.
+ *
+ * `theme.logo` puts the mark in the header, where Material sizes it at 1.2rem (24px). At that size
+ * the badge is a smudge: its lettering lives inside a hexagon and there is no room for it. Making
+ * it 96px works, but the header is a 2.4rem row and the mark then *sets* the header's height --
+ * 156px of sticky indigo before any content, on every page. Both were rendered and measured; the
+ * second cost more than the first was worth, so `theme.logo` is gone and the header is the
+ * theme's own again.
+ *
+ * Here the mark has 96px to itself, costs no chrome at all, and sits where the sample application
+ * puts its wordmark. The sidebar is hidden below Material's 76.25em breakpoint, so this is
+ * automatically desktop-only.
+ *
+ * A pseudo-element rather than an <img>, because that needs no template override. The URL is
+ * relative to THIS FILE, hence `../assets/`.
+ */
+/* The scrollwrap is a plain block in the theme; making it a flex column is what lets the mark be
+   pushed to the bottom with `margin-top: auto` when the navigation is short, and simply follow the
+   navigation when it is long. Nothing else in it depends on block layout at this breakpoint. */
+.md-sidebar--primary .md-sidebar__scrollwrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.md-sidebar--primary .md-sidebar__scrollwrap::after {
+    content: "";
+    display: block;
+    flex: none;
+    height: 96px;
+    margin: 1.6rem 0 0.8rem 0.6rem;
+    margin-top: auto;
+    background: url("../assets/logo.png") left center / 96px 96px no-repeat;
+    opacity: 0.85;
+}

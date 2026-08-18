@@ -13,6 +13,10 @@
 # THE GATE IS `--strict`. A link to a page that does not exist, or a page missing from the nav,
 # fails the build. That is the only automated check a documentation site has, so it runs on pull
 # requests too, where nothing is deployed.
+#
+# PREVIEWING A CHANGE. Locally: `eng/docs-serve.sh`, which creates the virtual environment if it is
+# missing and serves the site with live reload. On a pull request: this workflow attaches the built
+# site as the `site-preview` artifact, downloadable from the run page.
 name: Docs
 
 on:
@@ -67,6 +71,24 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: website/site
+
+      # A SECOND COPY, FOR HUMANS, ON PULL REQUESTS ONLY. The artifact above is a tarball in the
+      # shape `deploy-pages` wants and is awkward to open by hand; this one is a plain zip of the
+      # site, downloadable from the run page. Unzip it and serve the folder -- `python -m
+      # http.server` inside it -- rather than opening index.html from the filesystem, because the
+      # search index is fetched and a `file://` page is not allowed to fetch it.
+      #
+      # NOT A HOSTED PREVIEW, deliberately. A per-PR URL would mean either moving Pages back to
+      # branch-based publishing (this repository publishes from Actions, and Pages accepts one
+      # source, not both) or adding an external host. Neither is worth it for a site that builds
+      # in twenty seconds.
+      - name: Upload browsable copy (pull requests)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview
+          path: website/site
+          retention-days: 14
 
   deploy:
     name: Deploy
