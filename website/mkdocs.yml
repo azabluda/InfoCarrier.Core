@@ -110,6 +110,7 @@ nav:
       - Installation: getting-started/installation.md
       - Your first client and server: getting-started/first-app.md
       - Run the samples: getting-started/samples.md
+      - Upgrading from 3.1: getting-started/upgrading-from-3-1.md
   - Using it:
       - Querying: guide/querying.md
       - Saving changes: guide/saving-changes.md

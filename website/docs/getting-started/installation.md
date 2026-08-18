@@ -73,6 +73,9 @@ the same code, which is what makes the wire format meaningful — see
     The same applies to Central Package Management: pin `10.0.0-preview.1` in
     `Directory.Packages.props`.
 
+    If you are moving an application off `3.1.1`, read
+    [Upgrading from 3.1](upgrading-from-3-1.md) — the model carries over, the wiring does not.
+
 Both packages ship symbol packages and SourceLink, so you can step into the provider from a
 debugger with no extra configuration.
 
