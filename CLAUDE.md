@@ -351,7 +351,7 @@ Not yet implemented, in rough priority order:
     which is the silent-divergence shape A49/B4/B12 warn about. **A one-GUID regeneration diff is
     the tell that the factory was never consulted**, and it was misread once as "proxies do not
     affect the model". The compiled model is removed; the sample builds its model at start-up.
-  - **Trimming: 86 IL warnings are ours and spec §9's "none of ours" criterion is NOT met.** They
+  - **Trimming: 88 IL warnings are ours and spec §9's "none of ours" criterion is NOT met.** They
     are the premise showing through — the wire carries a type's *name* — so
     `[DynamicallyAccessedMembers]` cannot express them. Gated by direction in `eng/trim-ratchet.sh`
     against `eng/trim-baseline.txt`, exactly as `eng/ratchet.sh` gates the spec suite. **The app
@@ -360,7 +360,12 @@ Not yet implemented, in rough priority order:
     ILLink, and the script's first version reported `OURS: 0` — a gate that would have passed
     forever. It now wipes `obj/Release` and refuses a log with no ILLink banner. **And classify
     trim warnings by declaring member, never by file path: this repository's own path contains the
-    string "InfoCarrier", so a naive grep attributes all 1129 to this product.**
+    string "InfoCarrier", so a naive grep attributes every warning in the log to this product.**
+    **No count is quoted here on purpose — read `ours` and `total` out of `eng/trim-baseline.txt`.**
+    They move independently and for unrelated reasons: `ours` went 86 → 88 for a deliberate
+    `WireGrouping` fix, while `total` fell 1129 → 853 because EF CORE's own count dropped, which is
+    not an improvement of ours and reads like one. The baseline file records every measurement and
+    why it moved; a number copied into prose only records when it was copied.
 - **Complex types work** (A32) — `ComplexTypesTrackingTestBase` is **249 of 251**, and the two
   left are one shape of one feature: a property-bag complex *collection* on an `Added` entity.
   A complex value cannot ride in the value dictionary an entity is built from — `CreateEntry` and
