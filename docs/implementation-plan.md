@@ -2111,3 +2111,26 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — five steps, in order, no
       symbols step. No `src/`, no `test/`.
+
+- [x] **N20c. One flake sighting, written down so a second one has something to be second to.**
+      `<this commit>`
+
+      A `Build & Test` run on `main` reported `Total: 11308` against a baseline of `22658`:
+      `Test host process crashed`, no exception, mid-`NorthwindJoinQuerySqlite`, after 2m21s where
+      the suite normally takes six and a half minutes.
+
+      **The ratchet caught it on the total, and that is the whole point of that guard.** Failures
+      had "fallen" 9 → 3. Read on its own that is the best result of the day, and the run would have
+      been believed. The total is what says *fewer tests ran*, not *more passed*.
+
+      **Diagnosis: the runner, not this repository.** Re-running the same job on the same commit
+      gave `22658 / 22472 / 9 / 177` in 7m6s. The commit changed only `release.yml` and Markdown —
+      nothing any test touches — and the same suite had completed twice that hour, locally and in
+      CI.
+
+      Not chased further, deliberately: one crash with a clean re-run on identical input is a
+      runner event, and CLAUDE.md's rule already says what to do if it repeats. **What was missing
+      was the record.** The rule says a second sighting is the signal to stop everything; that only
+      works if the first one was written down.
+
+      **Gates: none.** One Markdown file.

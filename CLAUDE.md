@@ -665,6 +665,15 @@ was expected to print.
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
 default assumption.
 
+**One sighting on record, 2026-08-18, and it was the runner rather than this repository.** A
+`Build & Test` run on `main` reported `Total: 11308` against a baseline of `22658` — the host
+crashed mid-`NorthwindJoinQuerySqlite` with `Test host process crashed` and no exception. **The
+ratchet caught it on the total, which is exactly what that guard is for**: failures had "fallen"
+9 → 3, and read alone that is the best result of the day. Re-running the same job on the same
+commit gave `22658 / 22472 / 9 / 177`, and that commit changed only `release.yml` and Markdown, so
+nothing test-affecting differed between the two runs. Not chased further. **If it recurs, that is
+the second sighting and the rule below applies.**
+
 **If you do notice flakiness, it becomes the top priority — before whatever you were doing.** The
 signal is a run that differs from the previous snapshot with **no code change between them**;
 that is the only thing that justifies suspecting it. Stop, find the cause, fix it, and only then
