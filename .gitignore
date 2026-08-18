@@ -31,3 +31,6 @@ MIGRATION_STATUS.md
 # from the server, which hosts these files (samples/README.md). The server's own profile IS
 # tracked, because it pins the port both halves agree on.
 samples/Northwind.Client/Properties/launchSettings.json
+
+# The MkDocs output directory. Built by .github/workflows/docs.yml, never committed.
+website/site/

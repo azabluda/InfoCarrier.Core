@@ -1,0 +1,124 @@
+# The public documentation site: https://azabluda.github.io/InfoCarrier.Core/
+#
+# WRITTEN FOR SOMEONE OUTSIDE THIS REPOSITORY. Nothing here cites an ADR, a milestone, a phase or
+# a test tier; `docs/` is where those live and it is deliberately not this site's source. Two
+# audiences, two sets of files, and mixing them is what makes internal documents read as promises.
+#
+# Build it locally the way CI does:
+#     python -m venv .venv && .venv/Scripts/pip install -r website/requirements.txt
+#     .venv/Scripts/mkdocs build --strict --config-file website/mkdocs.yml
+#
+# `--strict` is not optional: it turns a broken internal link or a page missing from the nav into
+# a failed build, which is the only automated check a documentation site can have.
+
+site_name: InfoCarrier.Core
+site_description: >-
+  Entity Framework Core in a client application that has no database. LINQ, change tracking and
+  transactions on the client; the real database stays on your server.
+site_url: https://azabluda.github.io/InfoCarrier.Core/
+site_author: Alexander Zabluda
+copyright: MIT licensed. Copyright &copy; Alexander Zabluda.
+
+repo_url: https://github.com/azabluda/InfoCarrier.Core
+repo_name: azabluda/InfoCarrier.Core
+
+# The rewrite lives on this branch; the repository's default branch is still v1. An `edit_uri`
+# naming the wrong branch produces a 404 on every page, which is worse than no edit link.
+edit_uri: edit/v10-claude/website/docs/
+
+theme:
+  name: material
+  language: en
+  # System fonts rather than the theme's default Google Fonts. The default fetches Roboto from
+  # fonts.googleapis.com on every page view, which sends every visitor's IP to a third party for
+  # a typeface. Setting this to `false` makes the built site self-contained: the only things it
+  # loads are its own bundle and, on a page with a diagram, the Mermaid that ships inside it.
+  font: false
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  palette:
+    # The default follows the reader's system setting; the toggles override it.
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Follow system theme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+  # Mermaid ships with the theme; no diagram fetches anything at page load.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Your first client and server: getting-started/first-app.md
+      - Run the samples: getting-started/samples.md
+  - Using it:
+      - Querying: guide/querying.md
+      - Saving changes: guide/saving-changes.md
+      - Transactions: guide/transactions.md
+      - Loading related data: guide/loading-related-data.md
+      - Handling errors: guide/errors.md
+  - Configuration:
+      - The client: configuration/client.md
+      - The server: configuration/server.md
+      - Value mappers: configuration/value-mappers.md
+      - Custom transports: configuration/transports.md
+  - Reference:
+      - Blazor WebAssembly: platforms/blazor-webassembly.md
+      - Security: security.md
+      - Limitations: limitations.md
+      - Public API: api-surface.md

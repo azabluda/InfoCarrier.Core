@@ -1,0 +1,6 @@
+# Pinned, because a documentation build that resolves a different theme version on a different day
+# is not reproducible and a fresh CI runner is the only place anyone would notice.
+#
+# mkdocs-material pulls mkdocs, pymdown-extensions and mkdocs-material-extensions itself; pinning
+# the theme pins the build. Verified against Python 3.11 and 3.12.
+mkdocs-material==9.7.7

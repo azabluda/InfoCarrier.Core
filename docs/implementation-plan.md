@@ -1257,14 +1257,68 @@ rather than staying silent about it.
 
       **Gates: none.** Markdown only.
 
-- [ ] **N4. The site: Material for MkDocs, in `website/`, with `docs/` left alone.** `<this commit>`
+- [x] **N4. The site: Material for MkDocs in `website/`, sixteen pages, every snippet executed.**
+      `<this commit>`
 
-- [ ] **N5. Getting started — install, first client, first server, samples.** `<this commit>`
+      **Where, and why not `docs/`.** `docs/` is this repository's internal source of truth and a
+      static-site generator pointed at it would publish the ADR log, the roadmap and the rolling
+      plan as if they were promises to a consumer. The site is `website/mkdocs.yml` plus
+      `website/docs/`, which is MkDocs' own default layout relative to its config file, so nothing
+      had to be reconfigured to keep the two apart. `website/site/` is git-ignored.
 
-- [ ] **N6. Using it — querying, saving, transactions, loading, errors.** `<this commit>`
+      **Sixteen pages**: home; getting started (installation, first client and server, samples);
+      using it (querying, saving changes, transactions, loading related data, errors);
+      configuration (client, server, value mappers, custom transports); reference (Blazor
+      WebAssembly, security, limitations, public API).
 
-- [ ] **N7. Configuration — client, server, value mappers, custom transports.** `<this commit>`
+      **Every code sample was compiled and run**, not written from memory. A console harness in the
+      scratchpad references `src/InfoCarrier.Core`, stands a SQLite-backed
+      `InProcessInfoCarrierServer` behind a serializing loopback transport, and executes the
+      snippets as assertions: query with `Include`/`Where`/`OrderBy`/`Take`, projection and
+      aggregates, `AsNoTracking`, a two-entity unit of work, a store-generated key coming back,
+      explicit reference and collection loads, savepoint plus rollback, two contexts sharing one
+      transaction through `UseInfoCarrierTransaction`, `ExecuteUpdate`/`ExecuteDelete`, a
+      server-side failure, a transport failure, payload limits, and a custom value mapper.
+      **Sixteen of sixteen pass.**
 
-- [ ] **N8. Platform notes, security, limitations, the public surface at a glance.** `<this commit>`
+      **The value-mapper snippet is the reason the harness exists rather than a review.** The first
+      version passed and proved nothing: the mapper was registered, the query ran, the assertion
+      was green — and a call counter showed `ToWire=0 FromWire=0`. `o.Freight > money.Amount` folds
+      to a decimal constant on the client, so the `Money` never reached the wire. The mapper only
+      fires for a value the wire must actually carry; with `Money` as a **mapped property** and the
+      constant compared against it, the counter reads `ToWire=1 FromWire=1`. **A probe that passes
+      is evidence only once it has been shown able to fail**, and this one failed first.
 
-- [ ] **N9. `docs.yml` — build on every push, deploy to Pages, disturb nothing.** `<this commit>`
+      **Two facts came out of the harness that no reading would have produced.** The exception
+      chain from a foreign-key violation is
+      `DbUpdateException → DbUpdateException → InfoCarrierServerException`, the last naming
+      `Microsoft.Data.Sqlite.SqliteException` in `ServerExceptionTypeName`, with the server's stack
+      trace present under `Exception.Data["InfoCarrier.ServerStackTrace"]` on the inner two and
+      absent on the outer. That is the errors page, verbatim. And **`FromSqlRaw` executed and
+      returned rows** when the client project adds a `Microsoft.EntityFrameworkCore.Relational`
+      reference — undocumented, outside the stated surface, and a package the product deliberately
+      dropped in M9, so the site does **not** advertise it; it says relational APIs are not part of
+      what this provider offers, which is true and is the sentence a consumer needs. Flagged for a
+      decision rather than silently documented.
+
+      **`--strict`, and the gate was proved able to fail.** `mkdocs build --strict` turns a broken
+      internal link or a missing nav target into a failed build. A deliberately broken link was
+      added to `index.md`, the build aborted naming it, and the link was removed —
+      `Aborted with 1 warnings in strict mode!` is the failure mode this gate is for.
+
+      **The built site fetches nothing.** `theme.font: false`, because Material's default pulls
+      Roboto from `fonts.googleapis.com` on every page view and sends every visitor's IP to a third
+      party for a typeface. Mermaid ships inside the theme bundle, so diagrams cost no request
+      either. What is left in the output is SVG namespaces, an icon-licence URL and ordinary
+      hyperlinks.
+
+      **Versions are pinned** in `website/requirements.txt` (`mkdocs-material==9.7.7`), because a
+      documentation build that resolves a different theme on a different day is not reproducible
+      and a fresh runner is the only place anyone would notice.
+
+      **Gates: `mkdocs build --strict`, green. Not `eng/measure.sh` and not
+      `eng/trim-ratchet.sh`** — no file under `src/` or `test/` changed. The verification harness is
+      in the scratchpad and is deliberately not committed: it would be a fifth project in the
+      solution, and `eng/measure.sh` parses the last `Total tests:` block.
+
+- [ ] **N5. `docs.yml` — build on every push, deploy to Pages, disturb nothing.** `<this commit>`
