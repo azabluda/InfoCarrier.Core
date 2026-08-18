@@ -2111,3 +2111,26 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — five steps, in order, no
       symbols step. No `src/`, no `test/`.
+
+- [x] **N20b. A count copied into prose drifted from the file that owns it.** `<this commit>`
+
+      `CLAUDE.md` said **86** IL trim warnings are ours. `eng/trim-baseline.txt` says **88**, and
+      has since J8 raised it deliberately for a `WireGrouping` fix that needs exactly the two
+      reflection shapes this provider is built on. Nothing is broken and nothing was mis-gated —
+      `eng/trim-ratchet.sh` reads the **baseline file**, never the prose — but a reader checking the
+      gate against the note found them disagreeing.
+
+      **The companion sentence now quotes no number at all**, which is the more useful half. It
+      cited `1129` as the total; the total is `853` today, and it fell for a reason that is **not
+      ours** — EF Core's own count dropped with a package update. A reader seeing "276 fewer
+      warnings" could reasonably conclude this repository improved something. It did not.
+
+      So the prose points at `eng/trim-baseline.txt` and names neither figure. **The baseline file
+      records every measurement and why it moved; a number copied into prose records only when it
+      was copied.**
+
+      Worth stating plainly, since the two counts confuse everyone who meets them: **`ours` is the
+      gated one** — `eng/trim-ratchet.sh` fails on `ours > baseline` and on nothing else. `total`
+      is context, and mostly belongs to other people's assemblies.
+
+      **Gates: none.** One Markdown file, and no script reads it.
