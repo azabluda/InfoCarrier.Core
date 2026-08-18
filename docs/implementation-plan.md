@@ -1824,3 +1824,45 @@ rather than staying silent about it.
       **Gates: XML parsed for all three project files; `dotnet pack` produced all four packages;
       `CI=true dotnet build -c Release` → `5 Warning(s), 0 Error(s)`.** No `test/` change, so not
       `eng/measure.sh`; no publish path change, so not the trim ratchet.
+
+- [x] **N16b. The icon is a native-resolution crop of the banner, not a rebuild.** `<this commit>`
+
+      N16's icon was rejected on sight, and correctly. It was a **1.23x upscale** of a 94x104
+      hexagon lifted from a 185x164 screenshot; no amount of care recovers detail that was never
+      captured.
+
+      **The attempted fix was worse.** Every element of the mark is a geometric primitive, so it
+      looked rebuildable: measure each component off the draft, redraw as circles, an arc and a
+      rounded stem, supersample. The measuring was sound; the drawing was not. The corner-rounding
+      trick left a spike at the hexagon apex, the arc apertures read as Pac-Man, and the lettering
+      sat wrong. Reverted rather than iterated, because the output would have been a
+      *reconstruction of intent from 94 pixels* rather than the actual design.
+
+      **The answer was already in the repository.** `docs/assets/infocarrier-core-banner.png` is
+      1774x887 and carries the mark at roughly 107x115 — a better and slightly different variant of
+      it. Cropping **128x128 around it at native resolution means no resampling at all**, which is
+      the only way to be certain the result is as sharp as the source.
+
+      **The banner variant differs from the draft, and the banner is the one to keep**: its `i` dot
+      is **white**, where the draft's is blue. Two variants existed and nobody had said which was
+      current.
+
+      **Checked at the sizes it is actually displayed**, not just at 128: rendered at 128, 64 and 32
+      on white, because nuget.org lists at about 64 and Visual Studio at 32. It reads at all three.
+
+      **The background stays dark rather than being masked to the hexagon.** Cutting a transparent
+      silhouette would clip the outer glow and edge highlight that make the plate read, and those
+      are what the design relies on.
+
+      **The honest ceiling: 128 is all this artwork supports.** The largest raster of the mark in
+      existence here is ~115px tall. No 256 or 512 variant is offered, because either would be an
+      upscale wearing a bigger filename. A crisp large icon needs the original vector.
+
+      Verified inside the package rather than on disk: `icon.png` (17,828 bytes) present and
+      `<icon>icon.png</icon>` declared.
+
+      **A useful confirmation fell out of the check.** Packing on this branch produced
+      `10.0.0-preview.1.1` — the height appended to the prerelease tag, exactly the MinVer behaviour
+      N10 corrected the documentation to describe.
+
+      **Gates: `dotnet pack` clean; icon confirmed inside the nupkg.** No `src/` code, no `test/`.
