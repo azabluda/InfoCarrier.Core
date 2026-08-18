@@ -126,6 +126,19 @@
     -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
+    <!--
+      EMBEDDED, not PackageIconUrl. The old URL form is deprecated and renders nothing on
+      nuget.org for new packages; an embedded icon travels inside the .nupkg and works offline and
+      in Visual Studio's package manager. Each packable project adds the file itself, next to the
+      README, because both are pulled in from outside the project directory.
+
+      128x128, which is what nuget.org recommends. It is displayed far smaller than that in list
+      views (32px in Visual Studio), which is why the mark is a shape and three glyphs rather
+      than a wordmark: the "InfoCarrier.Core" text in the original draft is illegible below about
+      64px and is dropped.
+    -->
+    <PackageIcon>icon.png</PackageIcon>
+
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

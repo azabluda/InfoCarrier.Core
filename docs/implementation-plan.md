@@ -1782,3 +1782,45 @@ rather than staying silent about it.
       **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — `permissions
       {contents: read, id-token: write}`, environment `nuget-org`, six steps in the intended order.
       No `src/`, no `test/`.
+
+- [x] **N16. A package icon, and the wordmark had to go rather than shrink.** `<this commit>`
+
+      `docs/assets/icon.png`, **128×128**, which is what nuget.org recommends, embedded in both
+      packages via `PackageIcon` — *not* `PackageIconUrl`, which is deprecated and renders nothing
+      for a new package.
+
+      **The draft's "InfoCarrier.Core" wordmark is dropped, and that is the design decision rather
+      than a crop.** An icon is displayed far smaller than the size it ships at: nuget.org lists at
+      about 64px and Visual Studio's package manager at 32. Rendered at 32 the wordmark is a grey
+      smear; the hexagon and `ic.c` still read. Checked by generating the 32px and 64px reductions
+      and looking at them, not by assuming.
+
+      **The white background is removed by flooding from the border, never globally.** A global
+      "white → transparent" would have eaten the white `ic.` lettering *inside* the hexagon, which
+      is the same colour. The flood only reaches pixels connected to the edge.
+
+      **The first version left a fringe.** A hard threshold cut the anti-aliased boundary where the
+      navy met white, leaving **38 pale opaque pixels touching transparency** — invisible on
+      nuget.org's white chrome, a light halo on a dark theme. Measured rather than eyeballed:
+      *pale, opaque, and adjacent to a transparent pixel* is the test, and it distinguishes a
+      fringe from the white lettering, which is pale and opaque but touches nothing transparent.
+      Re-flooded at a looser threshold with alpha feathered by how close each pixel was to white:
+      **38 → 1**.
+
+      **Source quality is the honest limit.** The draft is 185×164 and the hexagon within it only
+      94×104, so 128 is a 1.23× upscale — fine at the sizes an icon is actually shown, but this is
+      not a master. A vector redraw would be sharper if the icon is ever wanted large.
+
+      **Verified where it counts, inside the package** rather than on disk: both `.nupkg` files
+      contain `icon.png` (18,527 bytes) and both nuspecs declare `<icon>icon.png</icon>`.
+
+      **Three failed attempts to edit the `.csproj` files, one cause.** The Bash heredoc used to
+      apply the edits **eats backslashes** — `'\'` reached Python as `'\'` — so every pattern
+      naming `..\..\docs\…` silently failed to match. Fixed by using the editing tool, which has no
+      escaping layer. **And the same `--`-in-an-XML-comment mistake as N13 recurred in the new
+      `PackageIcon` comment**, three steps after it was written up; caught this time by parsing the
+      XML before building rather than by a red CI run. That check is worth making routine.
+
+      **Gates: XML parsed for all three project files; `dotnet pack` produced all four packages;
+      `CI=true dotnet build -c Release` → `5 Warning(s), 0 Error(s)`.** No `test/` change, so not
+      `eng/measure.sh`; no publish path change, so not the trim ratchet.

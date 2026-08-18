@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\..\docs\nuget-readme.md" Pack="true" PackagePath="README.md" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\docs\assets\icon.png" Pack="true" PackagePath="icon.png" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
