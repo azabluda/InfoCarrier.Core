@@ -2111,3 +2111,42 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — five steps, in order, no
       symbols step. No `src/`, no `test/`.
+
+- [x] **N20. A one-second XML check, because the same bug got through twice wearing a disguise.**
+      `<this commit>`
+
+      **Two of three CI failures in one afternoon were a malformed project file, and neither said
+      so.** The second reported:
+
+      ```
+      error NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher
+      ```
+
+      which mentions trimming **only because a missing `TargetFramework` trips that check first** —
+      `Directory.Build.props` would not parse, so there was no framework to satisfy it. The same
+      error had appeared once before from an entirely different cause (a stale `obj/Release`), so
+      its own history misleads whoever greps for it.
+
+      **Both real cases were a double hyphen inside an XML comment**, which is illegal and very easy
+      to write while documenting a command:
+
+      ```xml
+      <!-- CI=true dotnet build InfoCarrier.Core.slnx --configuration Release -->
+      ```
+
+      That is a comment explaining how to keep CI green, and it is what turned CI red. `-c Release`
+      is the fix, and the script's header says so.
+
+      **Made to fail before being trusted.** Reintroducing the exact bug produced
+      `not well-formed (invalid token): line 168, column 50` and exit 1; removing it produced
+      `OK (10 files parsed)`.
+
+      **Its first run found a bug in itself, and the lesson generalises.** It called `python3`,
+      which on Windows resolves to a Microsoft Store stub that exists on `PATH` and then refuses to
+      execute — so it declared **all ten** project files malformed. **`command -v` proves a name
+      resolves, not that it runs.** It now tries `python3`, `python`, `py` and keeps the first that
+      survives `-c "pass"`, and skips with a notice if none does. A gate that cannot be run locally
+      is the problem it was written to fix.
+
+      **Gates: `eng/check-project-xml.sh` OK (10 files); `CI=true dotnet build -c Release` →
+      `0 Error(s)`.** No `src/` code, no `test/`.
