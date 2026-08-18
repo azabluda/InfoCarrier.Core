@@ -2519,3 +2519,42 @@ rather than staying silent about it.
       the line.
 
       **Gates: `mkdocs build --strict`, exit 0, zero warnings.** No `src/`, no `test/`.
+
+- [x] **N28. N27 was cosmetic, and `docs/nuget-readme.md` was the proof.** `<this commit>`
+
+      N27 claimed to give every user-facing document *"the same treatment"* as N26. It applied
+      **two of the skill's thirty-five sections** by string substitution, and left the structural
+      principles N26 established untouched.
+
+      | N26 principle | applied in N27 |
+      |---|---|
+      | Docs link in the first ten lines | no |
+      | No test counts | two files of twenty-one |
+      | No security essay, link instead | no |
+      | One example, not four | no |
+      | Cut content rather than reword it | **no** |
+
+      **`docs/nuget-readme.md` is the clearest failure.** It kept a *Two packages* table, a *Status*
+      section, a *Security* section and a full upgrade table, every one of which the README had
+      dropped, so the two documents described the same product with opposite structures. It is now
+      the same shape: the same four sections in the same order, the same three snippets under
+      *Getting started*, **131 lines each**. The extra words are the two callouts that only matter
+      on nuget.org. Every link is absolute, because nuget.org cannot resolve a relative path.
+
+      **A phrase removed from the README for being this exact pattern survived in
+      `samples/README.md`** — *"sharing the type makes that true by construction rather than by
+      discipline"*. That is what a mechanical pass looks like from the outside: the tell is fixed
+      where you looked and untouched everywhere else.
+
+      **What stays, and why it is not the same thing.** *"in the model rather than in the CLR
+      type"*, *"refused rather than resolved"*, *"a class rather than a dictionary"*, *"wrong
+      answers rather than errors"*. A contrast between two concrete outcomes **is** the information,
+      and the skill's own false-positive list says to keep real alternatives. The pattern worth
+      removing is the rhetorical one, where the second half carries nothing.
+
+      **The lesson, and it is the one N26 already recorded in a weaker form.** Invoking the skill is
+      not applying it. §14 and §15 are countable, so they are the ones a hurried pass does; §9, §27,
+      §28 and §32 need the sentence read, so they are the ones it skips. **A metric that goes to
+      zero is evidence about the metric.**
+
+      **Gates: `mkdocs build --strict`, exit 0, zero warnings.** No `src/`, no `test/`.

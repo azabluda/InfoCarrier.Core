@@ -1,8 +1,8 @@
 # Security
 
-Your server executes an expression tree that arrived over the network. That is the product, and it
-is the thing to think about before deploying it. This page covers what the library does about it and
-what it leaves to you.
+Your server executes an expression tree that arrived over the network. That is what the library is
+for, and it is the thing to think about before deploying it. This page covers what the library
+bounds and what it leaves to you.
 
 ## What the library bounds
 
@@ -69,8 +69,8 @@ everything a client submits is replayed through it.
 
 ## Think about the shape of the exposure
 
-A client can compose any query over the entity types your shared model exposes. That is the feature.
-It also means four things.
+A client can compose any query over the entity types your shared model exposes. That is what you
+asked for, and it has four consequences.
 
 The shared model is your API surface. An entity type in the shared project is a type any client can
 query, so if some data should never leave the server, keep it out of the shared model or map it on a

@@ -24,7 +24,7 @@ Three pages, and a **wire inspector** down the right-hand side showing every rou
 operation, the size each way, how long it took, and the decoded payload, including the
 expression tree, which the panel expands out of the base64 it travels in.
 
-**Customers** is an ordinary grid, and that is the point of it. Click a header to sort, open a
+**Customers** is deliberately an ordinary grid. Click a header to sort, open a
 column's filter to narrow it, page through the rest. There is no *Run* button, because there is
 nothing to run: sorting and filtering are already part of the expression tree the page sends.
 Sorting is composed on the `IQueryable<Customer>` **before** `Skip`/`Take`, never through the
@@ -104,8 +104,8 @@ configuration from the **startup application's own service provider**, silently 
 client's `IDesignTimeDbContextFactory`. The generated model was the *server's*: annotated
 `Relational:TableName` and `Proxies:LazyLoading = true`. The browser was running on a relational,
 proxied model and appeared to work, which is the dangerous shape, because model divergence between
-the two halves produces wrong answers rather than errors. It is removed rather than made almost
-right.
+the two halves produces wrong answers rather than errors. The compiled model is removed; a nearly
+correct one would have been worse than none.
 
 ## Run it in a console
 
@@ -183,7 +183,7 @@ than the numbers being wrong.
 
 | Project | What it is |
 |---|---|
-| `Northwind.Shared` | The model and **one** `NorthwindContext`, used by both halves. The wire carries entity type *names*, so the two models must agree; sharing the type makes that true by construction rather than by discipline. |
+| `Northwind.Shared` | The model and **one** `NorthwindContext`, used by both halves. The wire carries entity type *names*, so the two models must agree, and sharing the type is what guarantees it. |
 | `Northwind.Server` | ASP.NET Core + SQLite. `app.MapInfoCarrier()` is the one route it owns; everything else is the browser client's, which this host also serves, so there is one origin and no CORS. Creates and seeds `northwind.db` at start-up. |
 | `Northwind.Client` | The Blazor WebAssembly client: three pages, the wire inspector, and no database. |
 | `Northwind.Demo` | The console client above. |

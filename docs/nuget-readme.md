@@ -2,27 +2,86 @@
 
 **Use the full power of Entity Framework Core in a client application that has no database.**
 
-InfoCarrier.Core is a non-relational EF Core provider that you deploy on the *client* side of a
-multi-tier application. Your client gets a real `DbContext` with LINQ, change tracking, the identity
-map, navigation fix-up, lazy loading and transactions, but no connection string and no database
-driver. Queries and units of work travel to your application server and run there against the real
-database.
+[Documentation](https://azabluda.github.io/InfoCarrier.Core/) &nbsp;·&nbsp;
+[Limitations](https://azabluda.github.io/InfoCarrier.Core/limitations/) &nbsp;·&nbsp;
+[Source](https://github.com/azabluda/InfoCarrier.Core)
 
-The `DbContext` and the entity classes are shared source between client and server, so you write the
-model once.
+InfoCarrier.Core is a non-relational provider for Entity Framework Core that you deploy on the
+*client* side of a multi-tier application. Your client gets a real `DbContext` with LINQ, change
+tracking, the identity map, navigation fix-up, lazy loading and transactions, but no connection
+string and no database driver. Queries and units of work travel to your application server and run
+there against the real database.
 
-> **Not backward compatible with `3.1.1`.** This is a ground-up rewrite. Your `DbContext` and your
-> entity classes carry over unchanged; the wiring around them does not, and existing code will not
-> compile. See [Upgrading from 3.1](#upgrading-from-31) below.
+> **Coming from 3.1?** This is a rewrite, not an upgrade. Your `DbContext` and your entity classes
+> carry over unchanged; the wiring around them does not, and existing code will not compile. See
+> [Upgrading from 3.1](https://azabluda.github.io/InfoCarrier.Core/getting-started/upgrading-from-3-1/).
 
-## Example
+## What works
+
+- Queries, including the client/server projection split
+- `SaveChanges`, including many-to-many graphs
+- Lazy loading, and transactions with savepoints
+- Complex types, JSON-mapped owned collections, spatial types, compiled models
+- Blazor WebAssembly, published trimmed
+- HTTP out of the box. To use gRPC, WCF or a message bus instead, you implement one small
+  interface
+
+## What does not
+
+The [limitations page](https://azabluda.github.io/InfoCarrier.Core/limitations/) lists every
+scenario that behaves differently from a normal EF Core provider, with a worked example for each.
+It is a short read, and worth doing before you adopt.
+
+## Getting started
+
+```bash
+# client and server
+dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+
+# server endpoint
+dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1
+```
+
+> **Name the version.** `InfoCarrier.Core` has been on nuget.org since 1.0, and its newest *stable*
+> release is `3.1.1`, built for EF Core 3.1. An unversioned `dotnet add package InfoCarrier.Core`
+> installs that one, and will keep doing so until a stable `10.x` ships. `--prerelease` works too.
+
+### The shared model
 
 ```csharp
-// In a WPF, Blazor WebAssembly, MAUI or console app — no database here.
+// A project referenced by both the client and the server.
+public class NorthwindContext(DbContextOptions<NorthwindContext> options) : DbContext(options)
+{
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Order> Orders => Set<Order>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+        => modelBuilder.Entity<Order>()
+            .HasOne(e => e.Customer)
+            .WithMany()
+            .HasForeignKey(e => e.CustomerId);
+}
+```
+
+The client and the server must build the same model, so the context and the entity classes live in
+a project that both of them reference.
+
+### The client
+
+```csharp
+// A WPF, Blazor WebAssembly, MAUI or console app. There is no database in this process.
+var serializer = new SystemTextJsonInfoCarrierSerializer();
+using var httpClient = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
+
+IInfoCarrierClient client = new TransportInfoCarrierClient(
+    new HttpInfoCarrierTransport(httpClient, serializer),
+    serializer);
+
 var options = new DbContextOptionsBuilder<NorthwindContext>()
     .UseInfoCarrier(client)
     .Options;
 
+// Everything below this line is ordinary EF Core.
 await using var context = new NorthwindContext(options);
 
 var recent = await context.Orders
@@ -36,91 +95,37 @@ recent[0].Freight = 0m;
 await context.SaveChangesAsync();   // a unit of work, executed on the server
 ```
 
-That query is not evaluated on the client. It crosses the wire as an expression tree, and the server
-runs it against SQL Server, SQLite, PostgreSQL, or whatever provider the server uses.
+That query is not evaluated on the client. It crosses the wire as an expression tree, and the
+server runs it against SQL Server, SQLite, PostgreSQL, or whatever provider the server uses.
 
-## Installing
+### The server
 
-```bash
-dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # the client and the server
-dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # the server endpoint
+```csharp
+builder.Services.AddDbContext<NorthwindContext>(o => o.UseSqlServer(connectionString));
+builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<NorthwindContext>());
+
+builder.Services
+    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
+    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+    .AddInfoCarrierStandardValueMappers();
+
+// One endpoint, from InfoCarrier.Core.AspNetCore.
+app.MapInfoCarrier();
 ```
 
-> **Name the version.** `InfoCarrier.Core` has been on nuget.org since 1.0, and its newest *stable*
-> release is `3.1.1`, the earlier line built for EF Core 3.1. An unversioned
-> `dotnet add package InfoCarrier.Core` installs that one, and will keep doing so until a stable
-> `10.x` ships. Passing `--prerelease` works too.
+Your server executes an expression tree that arrived over the network. Read the
+[security page](https://azabluda.github.io/InfoCarrier.Core/security/) before you expose the
+endpoint.
 
-`InfoCarrier.Core.AspNetCore` is new in this generation and has no older version to fall back to,
-but pin it anyway so the two halves cannot drift apart.
+## Credits
 
-Both packages ship symbols and SourceLink, so you can step into the provider from a debugger.
+Built on [Entity Framework Core](https://github.com/dotnet/efcore) and judged by its test suite.
 
-## Two packages
-
-| Package | What it is for | Cost |
-|---|---|---|
-| `InfoCarrier.Core` | The provider, the wire contracts, and `HttpInfoCarrierTransport` | one dependency: `Microsoft.EntityFrameworkCore` |
-| `InfoCarrier.Core.AspNetCore` | `app.MapInfoCarrier()`, the server endpoint | a framework reference to `Microsoft.AspNetCore.App` |
-
-A client references only `InfoCarrier.Core`. The HTTP transport is in it because it costs nothing:
-`System.Net.Http` is in the shared framework, so it is safe in Blazor WebAssembly. The ASP.NET Core
-endpoint is a separate package because it is not free, and a WPF, MAUI or WebAssembly client should
-not have to be an ASP.NET Core app to restore its data-access library.
-
-To use gRPC, WCF or a message bus instead of HTTP, you implement one small interface.
-
-## Upgrading from 3.1
-
-Your `DbContext` and your entity classes are unchanged. Everything around them moves.
-
-| | `3.1.1` | `10.0.0-preview.1` |
-|---|---|---|
-| Client wiring | `UseInfoCarrierClient(client)` | `UseInfoCarrier(client)` |
-| Transport | none shipped, yours to write | `HttpInfoCarrierTransport`, or yours |
-| Server endpoint | none shipped, yours to write | `app.MapInfoCarrier()` |
-| `IInfoCarrierClient` | sync and async pairs | async only, different shape |
-| `IInfoCarrierServer` | `QueryData` / `SaveChanges` (+ async) | different shape |
-| `IInfoCarrierValueMapper` | `TryMapToDynamicObject` / `TryMapFromDynamicObject` | `TryMapToWire` / `TryMapFromWire` |
-| Dependencies | Remote.Linq and Aqua | none beyond `Microsoft.EntityFrameworkCore` |
-
-The three interfaces kept their names and changed their shapes, so an existing implementation fails
-to compile instead of compiling and misbehaving.
-
-Step by step, with before-and-after code:
-<https://azabluda.github.io/InfoCarrier.Core/getting-started/upgrading-from-3-1/>
-
-## Status
-
-This package is `10.0.0-preview.1`. It is exercised by Microsoft's own
-`EFCore.Specification.Tests`, the same suite EF Core's SQL Server, SQLite and InMemory providers
-run. The failures that remain are known, classified, and gated in CI so their number cannot grow
-unnoticed.
-
-Read the limitations page before adopting:
-<https://azabluda.github.io/InfoCarrier.Core/limitations/>
-
-Still to come before a stable release: a shipped gRPC binding, and streaming results as
-`IAsyncEnumerable`.
-
-## Security
-
-Your server executes an expression tree that arrived over the network. That path is bounded by a
-default-deny allowlist over node kinds, types and methods; no assembly is loaded to satisfy a
-payload; and the reflection entry points that would turn a resolved `Type` into a call are blocked.
-The review, its adversarial tests, and the weaknesses that are accepted rather than solved, are at
-<https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md>.
-
-Authentication and authorization are out of scope and remain yours. No identity travels in the
-envelope. Authenticate the transport, and use query filters on the server's model to decide what a
-caller may see.
-
-## Documentation and samples
-
-Documentation: <https://azabluda.github.io/InfoCarrier.Core/>
-
-Source and samples: <https://github.com/azabluda/InfoCarrier.Core>
-
-## License
+[InfoCarrier.Core 1.0 to 3.1](https://github.com/azabluda/InfoCarrier.Core/tree/master), by
+[on/off it-solutions gmbh](http://www.onoff-it-solutions.info), proved the idea. It was inspired by
+[Remote.Linq](https://github.com/6bee/Remote.Linq) and
+[aqua-core](https://github.com/6bee/aqua-core) by Christof Senn, and built on them: they carried the
+expression serialization in every version up to 3.1. Version 10 has its own serializer and no longer
+depends on them.
 
 MIT, Copyright (c) Alexander Zabluda.
