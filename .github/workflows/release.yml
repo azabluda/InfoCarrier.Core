@@ -5,8 +5,14 @@
 # deprecated or unlisted, never truly withdrawn, so a person decides. That was M8-20's rule and it
 # still holds — what changed is where the person stands. They used to run `dotnet nuget push` from
 # their own machine with their own key; they now approve a protected environment, and the workflow
-# pushes. Same gate, but the key is not on a laptop, the step is repeatable, and the push is
-# recorded against the run. See the `publish-nuget` job for the one-time setup.
+# pushes. Same gate, but the step is repeatable and the push is recorded against the run.
+#
+# AND THERE IS NO PUBLISHING SECRET ANYWHERE IN THIS REPOSITORY. Publishing uses nuget.org's
+# TRUSTED PUBLISHING: the job proves its identity with a GitHub OIDC token, nuget.org validates it
+# against a policy naming this owner, this repository, this workflow file and this environment, and
+# returns an API key valid for ONE HOUR. Nothing long-lived is stored, so nothing long-lived can
+# leak. nuget.org's own guidance now calls API keys "strongly discouraged" for automation.
+# See the `publish-nuget` job for the one-time setup.
 #
 # THE VERSION IS THE TAG. MinVer derives it (Directory.Build.props), which is why this workflow no
 # longer compares the two and why `fetch-depth: 0` below is load-bearing rather than tidy.
@@ -140,24 +146,12 @@ jobs:
             reviewer**. Nothing reaches nuget.org until somebody approves it, because a pushed
             version can be unlisted but never withdrawn.
 
-            Approve it and it pushes both packages. **If the `nuget-org` environment has no
-            `NUGET_API_KEY` yet**, the job stops and says so, having pushed nothing — download the
-            packages below and run these, in this order:
+            Approve it and it pushes both packages, `InfoCarrier.Core` first — the second
+            declares a dependency on it at the same version, and nuget.org rejects a package whose
+            dependency does not resolve.
 
-            ```bash
-            # InfoCarrier.Core FIRST: InfoCarrier.Core.AspNetCore depends on it at the same
-            # version, and nuget.org rejects a package whose dependency does not resolve.
-            #
-            # Exact filenames, not globs: `InfoCarrier.Core.*.nupkg` also matches
-            # InfoCarrier.Core.AspNetCore.
-            V=${{ github.ref_name }}; V=${V#v}
-            SRC=https://api.nuget.org/v3/index.json
-
-            dotnet nuget push "InfoCarrier.Core.$V.nupkg"             --source $SRC --api-key "$KEY"
-            dotnet nuget push "InfoCarrier.Core.AspNetCore.$V.nupkg"  --source $SRC --api-key "$KEY"
-            dotnet nuget push "InfoCarrier.Core.$V.snupkg"            --source $SRC --api-key "$KEY"
-            dotnet nuget push "InfoCarrier.Core.AspNetCore.$V.snupkg" --source $SRC --api-key "$KEY"
-            ```
+            Publishing uses **Trusted Publishing**: the job exchanges a GitHub OIDC token for an
+            API key valid for one hour. No publishing secret is stored in this repository.
 
             Known limitations for this release: [`docs/limitations.md`](docs/limitations.md).
 
@@ -171,19 +165,32 @@ jobs:
   # required reviewer approves it, the key is an environment secret rather than a personal one,
   # and every push is recorded against the run that made it. Dated note in docs/roadmap.md.
   #
-  # SETUP, in two halves, and the second is optional for now.
-  #   1. Settings -> Environments -> `nuget-org`, with required reviewers.  DONE.
-  #   2. A NUGET_API_KEY secret scoped to that environment.                 NOT YET.
+  # ONE-TIME SETUP, in two halves. BOTH ARE REQUIRED and each fails closed on its own.
   #
-  # WITHOUT THE KEY THIS JOB FAILS, ON PURPOSE, and prints the two commands to run by hand. A
-  # green "Publish to nuget.org" that pushed nothing is the false clearance this repository has
-  # been bitten by before; a red job that tells you exactly what to type is not. The release
-  # itself is unaffected — `release` has already packed, gated and published the GitHub Release
-  # by the time this job is even offered for approval.
+  #   1. GitHub: Settings -> Environments -> `nuget-org` -> tick "Required reviewers", name at
+  #      least one, and SAVE. Ticking without saving leaves `protection_rules: []`, and then a
+  #      tag publishes with nobody in the loop — which is the one thing this job exists to
+  #      prevent.
   #
-  # If nuget.org Trusted Publishing is available to this account, prefer it over the key: it
-  # authenticates this workflow by OIDC and removes the long-lived secret altogether. Verify
-  # before relying on it.
+  #   2. nuget.org: your username -> Trusted Publishing -> create a policy with
+  #        Repository Owner : azabluda
+  #        Repository       : InfoCarrier.Core
+  #        Workflow File    : release.yml      (file name only, no .github/workflows/ prefix)
+  #        Environment      : nuget-org        (optional, and worth setting: it pins the policy
+  #                                             to the approval-gated job rather than to any job
+  #                                             in this workflow)
+  #      The policy applies to every package owned by that account, so neither package has to
+  #      exist on nuget.org first — which matters here, because neither does.
+  #
+  # A NEW POLICY ON A PRIVATE REPOSITORY IS "PENDING" FOR 7 DAYS and goes inactive if nothing is
+  # published in that window; the first successful publish makes it permanent. This repository is
+  # public, so it should be active immediately — but check the status in the UI if a push is
+  # refused.
+  #
+  # WHY OIDC RATHER THAN A STORED KEY. The token is minted per run, is good for one exchange, and
+  # yields an API key valid for one hour. There is no secret to rotate, to leak, or to forget on a
+  # laptop. Request it immediately before the push, as below: asking early and pushing late is the
+  # documented way to have it expire under you.
   # ------------------------------------------------------------------------------------------
   publish-nuget:
     name: Publish to nuget.org
@@ -194,6 +201,13 @@ jobs:
     environment:
       name: nuget-org
       url: https://www.nuget.org/packages/InfoCarrier.Core
+
+    # `id-token: write` is what lets this job ask GitHub for the OIDC token nuget.org validates.
+    # Without it the login step fails with a token-issuance error rather than an auth error, which
+    # is worth knowing before diagnosing the wrong end.
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Download packages
@@ -207,31 +221,19 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      # Stop here, loudly, rather than letting `dotnet nuget push` fail with a message about
-      # authentication that says nothing about what to do. The packages are on the GitHub Release
-      # either way, so the manual route below is a copy-paste.
-      - name: Require a key
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -n "$NUGET_API_KEY" ]; then
-            echo "nuget-org carries a key; publishing."
-            exit 0
-          fi
-          V="${GITHUB_REF_NAME#v}"
-          echo "::error::The nuget-org environment has no NUGET_API_KEY, so nothing was pushed. Add one (Settings -> Environments -> nuget-org -> Add secret) to publish from CI, or push by hand from the packages attached to this release -- InfoCarrier.Core FIRST, because InfoCarrier.Core.AspNetCore depends on it and nuget.org rejects a package whose dependency does not resolve."
-          {
-            echo "### Publish $V by hand"
-            echo
-            echo '```bash'
-            echo "SRC=https://api.nuget.org/v3/index.json"
-            echo "dotnet nuget push \"InfoCarrier.Core.$V.nupkg\"            --source \$SRC --api-key \"\$KEY\""
-            echo "dotnet nuget push \"InfoCarrier.Core.AspNetCore.$V.nupkg\" --source \$SRC --api-key \"\$KEY\""
-            echo "dotnet nuget push \"InfoCarrier.Core.$V.snupkg\"           --source \$SRC --api-key \"\$KEY\""
-            echo "dotnet nuget push \"InfoCarrier.Core.AspNetCore.$V.snupkg\" --source \$SRC --api-key \"\$KEY\""
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+      # THE CREDENTIAL IS MINTED HERE, ONE STEP BEFORE IT IS USED. nuget.org exchanges this
+      # job's OIDC token for an API key valid for ONE HOUR, and each token buys exactly one key.
+      # Requesting it early and pushing late is the documented way to have it expire mid-release,
+      # so this sits immediately above the pushes and nowhere else.
+      #
+      # `user` is the nuget.org PROFILE NAME, not an email address. It is not a secret — it is
+      # already visible on every package page — so it is written plainly rather than hidden in a
+      # secret that would only make the failure harder to read.
+      - name: Exchange the OIDC token for a short-lived key
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: azabluda
 
       # ORDER MATTERS, and it is why this is two steps rather than a glob over the folder.
       # InfoCarrier.Core.AspNetCore declares a dependency on InfoCarrier.Core at the same
@@ -240,32 +242,23 @@ jobs:
       # EXACT FILENAMES, not globs: `InfoCarrier.Core.*.nupkg` also matches
       # InfoCarrier.Core.AspNetCore. A stale filter of exactly that shape is what broke the old
       # version gate, so the lesson is spent here rather than learned twice.
-      #
-      # The key travels as an environment variable rather than inline, so it never appears in a
-      # command line the runner echoes.
       - name: Push InfoCarrier.Core
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: >
           dotnet nuget push "artifacts/pack/InfoCarrier.Core.${GITHUB_REF_NAME#v}.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
 
       - name: Push InfoCarrier.Core.AspNetCore
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: >
           dotnet nuget push "artifacts/pack/InfoCarrier.Core.AspNetCore.${GITHUB_REF_NAME#v}.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
 
       # Symbols are a separate push and a non-fatal one: a failed symbol upload must not leave a
       # release half-published, and the packages themselves are already on the feed by here.
       - name: Push symbols
         continue-on-error: true
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
-            dotnet nuget push "artifacts/pack/$id.${GITHUB_REF_NAME#v}.snupkg"               --source https://api.nuget.org/v3/index.json               --api-key "$NUGET_API_KEY"
+            dotnet nuget push "artifacts/pack/$id.${GITHUB_REF_NAME#v}.snupkg"               --source https://api.nuget.org/v3/index.json               --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           done
