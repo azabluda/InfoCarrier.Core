@@ -1229,7 +1229,33 @@ rather than staying silent about it.
 
       **Gates: none.** Markdown only.
 
-- [ ] **N3. `docs/nuget-readme.md`: honest about where the packages actually are.** `<this commit>`
+- [x] **N3. `docs/nuget-readme.md`: honest about where the packages actually are.** `<this commit>`
+
+      **Every absolute link in this file was broken, and the reason is worth stating once.** It
+      links absolutely on purpose — a package README is rendered outside the repository, where a
+      relative path means nothing — and all three pointed at `blob/master/…` or at the repository
+      root. **`master` is v1.** `git ls-tree -r --name-only origin/master` has no `docs/` at all:
+      it is `InfoCarrier.Core.sln`, `BuildScript/`, `sample/ServiceStackSample.Client/`. So the
+      two links a reader is *told* to follow before adopting — limitations and the security review
+      — were 404s, and the third landed on the previous product. They point at `v10-claude`, which
+      is where the files are; `git ls-tree` confirms both, on the remote rather than locally.
+
+      **The absolute-link rule was recorded and the consequence of the branch was not.** The
+      `PackageReadmeFile` comment in `Directory.Build.props` explains why this file exists at all
+      (nuget.org resolves images only against absolute URLs). Nothing said that "absolute" also
+      means "names a branch", and the default branch being the previous major made that silent.
+
+      **A *Getting the packages* section, because the honest answer is not `dotnet add package`.**
+      Nothing is on nuget.org; a package README that omits this leaves a reader to discover it from
+      a failed restore. Two routes that work today: the `.nupkg` and `.snupkg` attached to each
+      GitHub Release with a local feed, or `dotnet pack InfoCarrier.Core.slnx` from a clone —
+      **`-b v10-claude`**, for the same reason the links needed fixing.
+
+      Verified unchanged: `10.0.0-preview.1` against `Directory.Build.props`, the suite figures,
+      both package descriptions, and that `dotnet pack` on the solution yields exactly the two
+      products (`IsPackable` is false in `Directory.Build.props` and opted into per project).
+
+      **Gates: none.** Markdown only.
 
 - [ ] **N4. The site: Material for MkDocs, in `website/`, with `docs/` left alone.** `<this commit>`
 

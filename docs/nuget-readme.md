@@ -50,6 +50,32 @@ WebAssembly client must not have to be an ASP.NET Core app to restore its data-a
 `IInfoCarrierTransport` is one method, so HTTP is a default rather than a requirement. gRPC, WCF,
 a message bus or a direct in-process call are all a small class.
 
+## Getting the packages
+
+**Neither package is on nuget.org yet**, so `dotnet add package InfoCarrier.Core` will not find
+one. A pushed NuGet version can be unlisted but never withdrawn, and this is a preview; the
+irreversible step is deliberately left until the surface settles.
+
+Until then, both `.nupkg` files — with their symbol packages — are attached to each
+[GitHub Release](https://github.com/azabluda/InfoCarrier.Core/releases). Point a local feed at the
+folder you downloaded them into:
+
+```bash
+dotnet nuget add source ./packages --name infocarrier-local
+dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+```
+
+Or build them from the repository, which needs nothing but the .NET 10 SDK. **Note the branch** —
+this is a ground-up rewrite for EF Core 10, and the repository's default branch is still v1:
+
+```bash
+git clone -b v10-claude https://github.com/azabluda/InfoCarrier.Core.git
+cd InfoCarrier.Core
+dotnet pack InfoCarrier.Core.slnx -c Release -o artifacts/pack
+```
+
+Both packages land in `artifacts/pack`; every other project in the solution opts out of packing.
+
 ## Status — preview
 
 This package is `10.0.0-preview.1`. It is exercised by Microsoft's own
@@ -65,7 +91,7 @@ amount to one unsupported scenario, one query to treat with caution, and a few d
 not defects.
 
 **Read the limitations page before adopting:**
-<https://github.com/azabluda/InfoCarrier.Core/blob/master/docs/limitations.md>
+<https://github.com/azabluda/InfoCarrier.Core/blob/v10-claude/docs/limitations.md>
 
 Still to come before a stable release: a shipped gRPC binding and streaming results as
 `IAsyncEnumerable`.
@@ -76,7 +102,7 @@ The server executes an expression tree that arrived over the network. That is bo
 — a default-deny allowlist over node kinds, types and methods, no assembly loaded to satisfy a
 payload, and reflection entry points blocked. The review, its adversarial tests, and the weaknesses
 that are *accepted rather than solved*, are at
-<https://github.com/azabluda/InfoCarrier.Core/blob/master/docs/security-review.md>.
+<https://github.com/azabluda/InfoCarrier.Core/blob/v10-claude/docs/security-review.md>.
 
 **Authentication and authorization are out of scope and are yours.** No identity travels in the
 envelope. Authenticate the transport, and use query filters on the server's model to decide what a
@@ -84,7 +110,7 @@ caller may see.
 
 ## Documentation and samples
 
-<https://github.com/azabluda/InfoCarrier.Core>
+<https://github.com/azabluda/InfoCarrier.Core/tree/v10-claude>
 
 ## License
 
