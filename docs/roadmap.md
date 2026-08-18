@@ -390,6 +390,17 @@ Three separable pieces, and only the first can be done outside the library:
   criteria below are met**: the suffix is the promise not yet made about `IInfoCarrierTransport`,
   and a gRPC binding or streaming results may still change it.
 
+  **AMENDED 2026-08-18 (N8), and the amendment is about *where the human stands*, not whether
+  there is one.** The rule above is unchanged: a pushed NuGet version can be unlisted but never
+  withdrawn, so a person decides. What it used to cost was a key on somebody's laptop and a step
+  nobody could repeat. `release.yml` now carries a `publish-nuget` job in a **protected
+  environment with required reviewers** — it waits for an approval and then pushes, so the key is
+  an environment secret rather than a personal one and every push is recorded against its run.
+  Two further changes landed with it: **the version is now the git tag** (MinVer; there is no
+  version number in any file, so the tag-versus-props check `release.yml` carried is gone — it was
+  also broken, see [`versioning.md`](versioning.md)), and **every code push publishes to GitHub
+  Packages** as an internal feed. Full account in [`versioning.md`](versioning.md).
+
 ### M9 — Provider neutrality and store coverage — **CLOSED 2026-08-17**
 
 **Opened 2026-08-16, closed 2026-08-17.** M8's remaining exit criteria stay open; this milestone

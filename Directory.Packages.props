@@ -1,5 +1,11 @@
 <Project>
   <ItemGroup>
+    <!--
+      MinVer derives the version from the git tag (see Directory.Build.props). Build-time only:
+      Directory.Build.props references it with PrivateAssets="all", so it appears in no nuspec.
+    -->
+    <PackageVersion Include="MinVer" Version="7.0.0" />
+
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />

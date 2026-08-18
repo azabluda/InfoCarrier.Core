@@ -63,16 +63,41 @@
     <IsPackable>false</IsPackable>
 
     <!--
-      10.0.0 matches Entity Framework Core's major, which is the convention every EF provider
-      follows and the fastest way for a reader to know which EF this targets.
+      THE VERSION IS THE GIT TAG. There is no version number in this file, and that is the point:
+      it used to be here *and* in the tag, and `release.yml` carried a step whose only job was to
+      check that the two agreed. That step was broken — a stale `grep -v Abstractions` left over
+      from M8-22, so the glob also matched InfoCarrier.Core.AspNetCore and every tagged release
+      would have failed on it. MinVer removes the disagreement instead of policing it.
 
-      `-preview.1` is deliberate and should stay until M8's exit criteria are met. Nine
-      limitations are known and written up in docs/limitations.md, there is no gRPC binding, and
-      results do not stream yet — and the last two may touch IInfoCarrierTransport. A stable
-      10.0.0 is a promise not to break that surface, and this is not the moment to make it.
+      To release:  git tag -a v10.0.0-preview.2 -m "..."  &&  git push origin v10.0.0-preview.2
+      To see what a build will produce:  dotnet msbuild -getProperty:Version
+
+      An untagged commit builds as the next patch with a height — `10.0.1-alpha.0.7` — which is
+      unique, ordered, and exactly what an internal CI feed wants.
+
+      `MinVerMinimumMajorMinor` is 10.0 because the major.minor tracks Entity Framework Core's,
+      which is the convention every EF provider follows and the fastest way for a reader to know
+      which EF a package targets. It also keeps a repository with no release tag yet inside the
+      10.0 line rather than starting at 0.0.
+
+      `-preview` should stay until M8's exit criteria are met: there is no gRPC binding and results
+      do not stream yet, and both may touch IInfoCarrierTransport. A stable 10.0.0 is a promise not
+      to break that surface.
+
+      MinVer needs the tags, so any workflow that builds must check out with `fetch-depth: 0`.
+      A shallow clone has no tags, and the version silently becomes a default.
     -->
-    <VersionPrefix>10.0.0</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerMinimumMajorMinor>10.0</MinVerMinimumMajorMinor>
+
+    <!--
+      Pinned, and NOT derived from the package version. An AssemblyVersion that moves with every
+      patch forces every consumer to rebuild or to carry a binding redirect, for a change that is
+      by definition compatible. Major only, which is what EF Core and ASP.NET Core both do.
+      FileVersion and InformationalVersion still carry the full version, and the latter carries the
+      commit SHA — `10.0.0-preview.1+901bc81…` — so a binary is still traceable to a source line.
+    -->
+    <AssemblyVersion>10.0.0.0</AssemblyVersion>
 
     <Authors>Alexander Zabluda</Authors>
     <Copyright>Copyright (c) Alexander Zabluda</Copyright>
@@ -105,4 +130,13 @@
   <PropertyGroup Label="Signing">
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
+
+  <!--
+    Every project, not only the two packable ones, so that a test or sample assembly reports the
+    same version as the product it exercises. `PrivateAssets="all"` keeps it out of the nuspec: it
+    is a build-time task, and nothing InfoCarrier ships depends on it at run time.
+  -->
+  <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

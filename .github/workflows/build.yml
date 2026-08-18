@@ -27,7 +27,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Full history, because MinVer reads the version off the git tags and a shallow
+      # clone has none. Without this the build still succeeds and silently produces a
+      # default version, which is the failure mode worth spending one fetch to avoid.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -67,7 +72,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Full history, because MinVer reads the version off the git tags and a shallow
+      # clone has none. Without this the build still succeeds and silently produces a
+      # default version, which is the failure mode worth spending one fetch to avoid.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

@@ -54,10 +54,28 @@ Trigger: tag push (`v*`), or `workflow_dispatch` to rehearse without a tag.
 - Checks the tag against the packaged version, and fails if they disagree
 - Attaches the `.nupkg` and `.snupkg` files to a GitHub Release
 
-**It does not run `dotnet nuget push`, and no `NUGET_API_KEY` secret exists in this repository.**
-A pushed NuGet version can be unlisted but never withdrawn, so the irreversible step is left to a
-human with the packages in hand; the Release body carries the two commands and the order they must
-run in. Both packages are published at `10.0.0-preview.1`, by that route.
+Then a second job, `publish-nuget`, **waits for a human**. It runs in the `nuget-org`
+environment, which has required reviewers, so nothing reaches nuget.org until somebody approves
+it. On approval it pushes `InfoCarrier.Core`, then `InfoCarrier.Core.AspNetCore`, then the symbol
+packages — in that order, because the second declares a dependency on the first and nuget.org
+rejects a package whose dependency does not resolve.
+
+`NUGET_API_KEY` is a secret scoped to that environment, not a repository secret, so no workflow
+outside it can read the key.
+
+### `packages.yml` — the internal feed
+
+Trigger: every push to `main`/`v10-claude` that touches something other than documentation.
+
+Packs and pushes to GitHub Packages with the run's own `GITHUB_TOKEN`; there is no secret to
+configure. MinVer gives each commit a unique ordered prerelease, so a build of any branch is
+installable by name. Consuming it needs a PAT with `read:packages`, which is a GitHub limitation
+and the reason nuget.org stays the public route.
+
+### Versioning
+
+The git tag is the version — see [`versioning.md`](versioning.md). Every workflow that builds
+checks out with `fetch-depth: 0`, because MinVer reads the tags and a shallow clone has none.
 
 ### Docker SQL Server for SqlServer Tests
 

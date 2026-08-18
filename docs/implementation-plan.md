@@ -1394,3 +1394,104 @@ rather than staying silent about it.
       **Gates: none of the repository's.** Markdown only; nothing under `src/` or `test/`.
       `mkdocs build --strict` re-run and green, and the renamed heading was checked for inbound
       anchor links first — there were none.
+
+- [x] **N8. The version is the git tag, the gate that policed it was broken, and the human moves
+      rather than disappears.** `<this commit>`
+
+      **One commit, because it is one change to `release.yml`.** Splitting the version source from
+      the publishing route would have put two halves of the same file in two commits, and neither
+      half is coherent alone: the step that had to go was the version gate, and what fills its place
+      is the approval-gated push.
+
+      ### The version source
+
+      **The gate failed, and it was run rather than read.** `release.yml`'s *"Verify the tag matches
+      the package version"* step did:
+
+      ```bash
+      pkg=$(ls artifacts/pack/InfoCarrier.Core.*.nupkg | grep -v Abstractions | sed -E '…')
+      ```
+
+      Both products were packed locally and the step's own shell was run against the four real
+      files:
+
+      ```
+      tag=[10.0.0-preview.1]
+      packaged=[10.0.0-preview.1
+      AspNetCore.10.0.0-preview.1]
+      >>> GATE FAILS
+      ```
+
+      `InfoCarrier.Core.Abstractions` was merged away in **M8-22** and `InfoCarrier.Core.AspNetCore`
+      arrived in the same step. The glob matches both packages; the filter excludes one that no
+      longer exists. **Every tagged release would have stopped there** — and the same file's Release
+      body carries a comment warning about this exact glob, written while the step above it kept
+      the bug. A warning in prose is not a gate.
+
+      **MinVer, so there is nothing left to compare.** The number lived in `Directory.Build.props`
+      *and* in the tag; the step existed only because two sources can disagree. `MinVer 7.0.0`
+      derives it from the tag, `VersionPrefix`/`VersionSuffix` are gone, and the step is replaced by
+      one the old design could not make: that all four expected files exist under the exact names
+      the push step will use. That replacement was also run, and made to fail by deleting a file.
+
+      **Measured, not assumed, in this order:**
+
+      | | |
+      |---|---|
+      | untagged pack | `InfoCarrier.Core.10.0.0-alpha.0.510.nupkg` — the 10.0 line held by `MinVerMinimumMajorMinor` |
+      | `git tag -a v10.0.0-preview.1` then pack | `10.0.0-preview.1`, **byte-identical to what the hand-maintained property produced** |
+      | inter-package dependency | `<dependency id="InfoCarrier.Core" version="10.0.0-preview.1" />` — lock-step survives the change |
+      | built assembly | `AssemblyVersion 10.0.0.0`, `FileVersion 10.0.0.0`, `InformationalVersion 10.0.0-preview.1+901bc81…` |
+
+      `AssemblyVersion` is **pinned to `10.0.0.0` and deliberately not derived**. Left to follow the
+      package version it would become `10.0.1.0` on the first patch and force every consumer to
+      rebuild, for a change that is compatible by definition. EF Core and ASP.NET Core both pin it.
+
+      **`fetch-depth: 0` is now load-bearing in `build.yml`.** MinVer reads tags; a shallow clone
+      has none, and it falls back to a default **without failing** — the build succeeds and quietly
+      produces the wrong number. `release.yml` already had it, for SourceLink.
+
+      **`v10.0.0-preview.1` was created locally and NOT pushed.** It exists so a local `dotnet pack`
+      reproduces the version the documents claim is published. Pushing it fires `release.yml`.
+
+      **Gates, all three, because `Directory.Build.props` governs what `src/` compiles to:**
+      `CI=true dotnet build` → `0 Warning(s), 0 Error(s)`; `eng/trim-ratchet.sh` → `OURS: 88
+      TOTAL: 853`, `OK (88 <= 88)`; `eng/measure.sh n8-minver` →
+      **`Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`**, read out of the run's own
+      summary block, and the failing *names* diff **byte-identical** against `m8-32`. A version
+      number should change nothing about behaviour, and this is the measurement that says so rather
+      than the assumption.
+
+      ### The two feeds
+
+      **`packages.yml`** publishes to GitHub Packages on every code push to `main`/`v10-claude`.
+      Documentation-only pushes are skipped, because the assembly would be identical. It needs no
+      configured secret — the run's own `GITHUB_TOKEN` with `packages: write` is enough — and it
+      builds with `CI=true`, so an internal build still has to compile clean. **GitHub Packages
+      cannot be a public feed**: consuming a NuGet package from it needs a PAT with
+      `read:packages` even when the package is public. What it gives in exchange is deletable
+      versions, which nuget.org never allows and which is exactly what a feed of throwaway builds
+      needs.
+
+      **`release.yml` gains `publish-nuget`, in a protected environment.** M8-20's rule is intact —
+      a pushed version can be unlisted but never withdrawn, so a person decides. **What changed is
+      where the person stands.** They used to run `dotnet nuget push` from their own machine with
+      their own key; they now approve the `nuget-org` environment, and the workflow pushes. Same
+      gate, but the key is an environment secret rather than a personal one, the step is
+      repeatable, and the push is recorded against the run. Dated amendment in `roadmap.md`.
+
+      **Exact filenames in the push steps, never a glob** — `InfoCarrier.Core.*.nupkg` also matches
+      `InfoCarrier.Core.AspNetCore`, which is the shape of the bug N8 just removed. Spending the
+      lesson once is cheaper than learning it twice. Symbols are a separate, `continue-on-error`
+      push: a failed symbol upload must not leave a release half-published.
+
+      **New: `docs/versioning.md`**, which is where the whole of this now lives — what each part of
+      the version means, why the three assembly fields differ, why lock-step, and the release
+      sequence. `README.md`, `roadmap.md` and `ci-cd.md` point at it.
+
+      **Two one-time setups are the user's and cannot be done from here**: the `nuget-org`
+      environment with required reviewers and its `NUGET_API_KEY`, and (still outstanding from N5)
+      Pages. Both fail closed.
+
+      **Gates: none of the repository's** — two workflow files and four Markdown files, nothing
+      under `src/` or `test/`. All four workflows parse as YAML, checked.

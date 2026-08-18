@@ -219,6 +219,7 @@ The table below is the other audience: the documents this repository is *develop
 | [`docs/projection-split.md`](docs/projection-split.md) | What runs on the server, what runs on the client |
 | [`docs/roadmap.md`](docs/roadmap.md) | Milestones and CI strategy |
 | [`docs/build-warnings.md`](docs/build-warnings.md) | Which warnings are fatal, which are suppressed, where, and why |
+| [`docs/versioning.md`](docs/versioning.md) | How a version is decided, and how to cut a release |
 
 ## Build and test
 

@@ -1,9 +1,15 @@
-# Release: pack on a tag, gate it, attach the packages to a GitHub Release.
+# Release: pack on a tag, gate it, attach the packages to a GitHub Release, then wait for a human
+# before touching nuget.org.
 #
-# THIS WORKFLOW DOES NOT PUBLISH TO NUGET.ORG, and that is a decision rather than an omission
-# (M8-20). A pushed NuGet version is immutable: it can be deprecated or unlisted, never truly
-# withdrawn. So the irreversible step is left to a human with the packages in hand, and no
-# NUGET_API_KEY lives in this repository's secrets.
+# NOTHING REACHES NUGET.ORG WITHOUT AN APPROVAL. A pushed NuGet version is immutable: it can be
+# deprecated or unlisted, never truly withdrawn, so a person decides. That was M8-20's rule and it
+# still holds — what changed is where the person stands. They used to run `dotnet nuget push` from
+# their own machine with their own key; they now approve a protected environment, and the workflow
+# pushes. Same gate, but the key is not on a laptop, the step is repeatable, and the push is
+# recorded against the run. See the `publish-nuget` job for the one-time setup.
+#
+# THE VERSION IS THE TAG. MinVer derives it (Directory.Build.props), which is why this workflow no
+# longer compares the two and why `fetch-depth: 0` below is load-bearing rather than tidy.
 #
 # ORDER MATTERS: InfoCarrier.Core first, then InfoCarrier.Core.AspNetCore, which declares a
 # dependency on it at the same version — nuget.org rejects a package whose dependency does not
@@ -82,21 +88,35 @@ jobs:
           -p:ContinuousIntegrationBuild=true
           --output artifacts/pack
 
-      # The tag is the source of truth for what is being released, and it must agree with what
-      # MSBuild produced — a tag of v10.0.0-preview.2 against a props file still saying preview.1
-      # would otherwise publish the wrong version under the right name.
-      - name: Verify the tag matches the package version
+      # THERE IS NOTHING LEFT TO VERIFY, and that is the improvement. This step used to compare
+      # the tag against a version in Directory.Build.props, because the two were separate and
+      # could disagree. MinVer derives the version FROM the tag, so they cannot.
+      #
+      # The step is not merely redundant, it was broken: `ls InfoCarrier.Core.*.nupkg | grep -v
+      # Abstractions` was written when InfoCarrier.Core.Abstractions existed. M8-22 merged that
+      # away and added InfoCarrier.Core.AspNetCore, which the same glob matches and the grep does
+      # not exclude — so `pkg` held two lines and every tagged release would have failed here.
+      # Confirmed by packing both products and running the step's own shell against them.
+      #
+      # What replaced it is a check the old one could not make: that both expected files exist,
+      # under the exact names the push step will use.
+      - name: Verify the packages
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          pkg=$(ls artifacts/pack/InfoCarrier.Core.*.nupkg \
-                | grep -v Abstractions \
-                | sed -E 's|.*/InfoCarrier\.Core\.(.*)\.nupkg|\1|')
-          echo "tag=$tag packaged=$pkg"
-          if [ "$tag" != "$pkg" ]; then
-            echo "::error::Tag '$tag' does not match the packaged version '$pkg'. Update VersionPrefix/VersionSuffix in Directory.Build.props, or retag."
-            exit 1
-          fi
+          version="${GITHUB_REF_NAME#v}"
+          missing=0
+          for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
+            for ext in nupkg snupkg; do
+              file="artifacts/pack/$id.$version.$ext"
+              if [ -f "$file" ]; then
+                echo "ok      $file"
+              else
+                echo "::error::Expected $file, which was not produced. MinVer derives the version from the tag, so a mismatch here means the tag is not what was built — check that the workflow checked out with fetch-depth 0."
+                missing=1
+              fi
+            done
+          done
+          exit $missing
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
@@ -116,21 +136,76 @@ jobs:
           # page does not advertise it as the current version.
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            Packages are attached. Publishing to nuget.org is deliberately manual — a pushed
-            version is immutable, so no API key lives in this repository.
-
-            **Push `InfoCarrier.Core` first:** `InfoCarrier.Core.AspNetCore` declares a
-            dependency on it at the same version, and nuget.org rejects a package whose
-            dependency does not resolve.
-
-            ```bash
-            # Exact filenames, not globs: `InfoCarrier.Core.*.nupkg` also matches
-            # InfoCarrier.Core.AspNetCore, which is the sort of thing only noticed afterwards.
-            V=${{ github.ref_name }}; V=${V#v}
-            SRC=https://api.nuget.org/v3/index.json
-
-            dotnet nuget push "InfoCarrier.Core.$V.nupkg"            --source $SRC --api-key "$NUGET_API_KEY"
-            dotnet nuget push "InfoCarrier.Core.AspNetCore.$V.nupkg" --source $SRC --api-key "$NUGET_API_KEY"
-            ```
+            Packages are attached, and the `publish-nuget` job of this run is **waiting for a
+            reviewer**. Approve it in the run's *Review pending deployments* prompt and it pushes
+            both packages to nuget.org, `InfoCarrier.Core` first. Nothing reaches nuget.org until
+            somebody approves, because a pushed version can be unlisted but never withdrawn.
 
             Known limitations for this release: [`docs/limitations.md`](docs/limitations.md).
+
+  # ------------------------------------------------------------------------------------------
+  # The irreversible step, and the only one in this repository that needs a human.
+  #
+  # M8-20 kept nuget.org publishing off CI entirely, and its reasoning was right: a pushed NuGet
+  # version can be unlisted but never withdrawn, so a person must decide. What it bought that
+  # reasoning with was a key on somebody's laptop and a step nobody could repeat. A protected
+  # ENVIRONMENT keeps the decision and drops the price: the job below does not start until a
+  # required reviewer approves it, the key is an environment secret rather than a personal one,
+  # and every push is recorded against the run that made it. Dated note in docs/roadmap.md.
+  #
+  # ONE-TIME SETUP: Settings -> Environments -> New environment -> `nuget-org`; tick "Required
+  # reviewers" and name at least one; add the secret NUGET_API_KEY scoped to that environment.
+  # Until that exists the job fails closed, having pushed nothing.
+  #
+  # If nuget.org Trusted Publishing is available to this account, prefer it: it authenticates
+  # this workflow by OIDC and removes the long-lived key altogether. Verify before relying on it.
+  # ------------------------------------------------------------------------------------------
+  publish-nuget:
+    name: Publish to nuget.org
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    environment:
+      name: nuget-org
+      url: https://www.nuget.org/packages/InfoCarrier.Core
+
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts/pack
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # ORDER MATTERS, and it is why this is two steps rather than a glob over the folder.
+      # InfoCarrier.Core.AspNetCore declares a dependency on InfoCarrier.Core at the same
+      # version, and nuget.org rejects a package whose dependency does not resolve.
+      #
+      # EXACT FILENAMES, not globs: `InfoCarrier.Core.*.nupkg` also matches
+      # InfoCarrier.Core.AspNetCore. A stale filter of exactly that shape is what broke the old
+      # version gate, so the lesson is spent here rather than learned twice.
+      - name: Push InfoCarrier.Core
+        run: >
+          dotnet nuget push "artifacts/pack/InfoCarrier.Core.${GITHUB_REF_NAME#v}.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+
+      - name: Push InfoCarrier.Core.AspNetCore
+        run: >
+          dotnet nuget push "artifacts/pack/InfoCarrier.Core.AspNetCore.${GITHUB_REF_NAME#v}.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+
+      # Symbols are a separate push and a non-fatal one: a failed symbol upload must not leave a
+      # release half-published, and the packages themselves are already on the feed by here.
+      - name: Push symbols
+        continue-on-error: true
+        run: |
+          for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
+            dotnet nuget push "artifacts/pack/$id.${GITHUB_REF_NAME#v}.snupkg"               --source https://api.nuget.org/v3/index.json               --api-key "${{ secrets.NUGET_API_KEY }}"
+          done

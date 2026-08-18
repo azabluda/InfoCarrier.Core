@@ -1,0 +1,85 @@
+# Internal CI feed: pack every push and publish it to GitHub Packages.
+#
+# WHAT THIS IS FOR. A build of the current branch, installable, without waiting for a release.
+# MinVer gives each commit a unique ordered prerelease — 10.0.1-alpha.0.7 — so a consumer can
+# name the exact build they are testing against and NuGet orders them correctly.
+#
+# WHAT IT IS NOT. GitHub Packages is not a public feed: consuming a NuGet package from it needs a
+# personal access token with `read:packages`, even when the package is public. That is a GitHub
+# limitation, not a choice here, and it is why nuget.org remains the way anyone outside gets these
+# packages. The compensating advantage is that a version here can be DELETED, which nuget.org
+# never allows — exactly what an internal feed of throwaway builds needs.
+#
+# TO CONSUME IT:
+#   dotnet nuget add source https://nuget.pkg.github.com/azabluda/index.json \
+#     --name infocarrier-ci --username <you> --password <PAT with read:packages> --store-password-in-clear-text
+#   dotnet add package InfoCarrier.Core --prerelease
+#
+# NO SECRET TO CONFIGURE. GITHUB_TOKEN is issued to the run and `packages: write` is enough.
+name: Packages
+
+on:
+  push:
+    branches: [main, v10-claude]
+    paths-ignore:
+      # A documentation change produces an identical assembly, so publishing a new version for one
+      # would be noise on the feed. The site has its own workflow.
+      - 'docs/**'
+      - 'website/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Pack and publish to GitHub Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      # Full history, because MinVer reads the version off the git tags. On a shallow clone every
+      # build would publish the same default version and overwrite the last one.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore InfoCarrier.Core.slnx
+
+      # An internal build still has to compile clean: CI=true makes warnings errors, exactly as
+      # build.yml does. This feed is for builds someone might install, not for anything that
+      # compiles.
+      - name: Build
+        env:
+          CI: true
+        run: dotnet build InfoCarrier.Core.slnx --no-restore --configuration Release
+
+      - name: Pack
+        run: >
+          dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release
+          -p:ContinuousIntegrationBuild=true
+          --output artifacts/pack
+
+      - name: Show the version being published
+        run: ls -1 artifacts/pack
+
+      # A glob is safe HERE, unlike on nuget.org: GitHub Packages resolves a dependency within the
+      # same feed, so the two packages may arrive in either order. `--skip-duplicate` keeps a
+      # re-run of the same commit from failing, since its version is identical.
+      - name: Push
+        run: >
+          dotnet nuget push "artifacts/pack/*.nupkg"
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --skip-duplicate
