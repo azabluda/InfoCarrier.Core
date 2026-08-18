@@ -125,13 +125,18 @@ body {
     border-top: 1px solid var(--neutral-stroke-divider-rest);
 }
 
-.app-brand-mark {
-    /* Sized in CSS as well as in the markup so the rail does not reflow between first paint and
-       the image arriving. */
-    width: 2.5rem;
-    height: 2.5rem;
+.app-brand-text {
     display: block;
-    opacity: 0.9;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1;
+}
+
+.app-brand-accent {
+    /* The same token the active nav item and the primary button use, so the wordmark tracks
+       the theme rather than pinning a blue that only suits the dark one. */
+    color: var(--accent-fill-rest);
 }
 
 /* ----------------------------------------------------------------- main */

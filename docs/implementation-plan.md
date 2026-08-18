@@ -2283,3 +2283,34 @@ rather than staying silent about it.
       **Gates: `CI=true dotnet build --configuration Release` — 0 errors, the same 5 known
       `IL2110`/`IL2111`. `eng/trim-ratchet.sh` — `OK (88 <= 88)`. Rendered and read at 2x.** No
       `src/`, no `test/`.
+
+- [x] **N23d. The badge does not belong in a nav rail at any size — the wordmark does.** `<this commit>`
+
+      N23c moved the badge to the foot of the rail and doubled it to 40px. Still wrong, and the
+      reason is not the size: **the badge is a 128px artefact**. It is drawn to be legible on a
+      package listing, so its lettering lives *inside* a hexagon with a rim highlight and a
+      gradient. Put that in a 232px rail and the hexagon is all anyone sees.
+
+      The rail now sets **`ic.c` as text** — 1.9rem, 700 weight, the trailing `c` in
+      `var(--accent-fill-rest)`, which is the same token the active nav item and the primary button
+      use. This is what the README banner's mock UI does, and it had been showing the answer for
+      two steps: **the mock never contains the badge — it contains lettering.**
+
+      Text over an image for three reasons that are not taste: it is crisp at every size and on
+      every DPI, it cannot reflow the rail while a file loads, and it follows the theme's accent
+      instead of pinning a blue chosen for a dark background.
+
+      `samples/Northwind.Client/wwwroot/logo.png` is **deleted** and `eng/make-icon.py` no longer
+      writes one there — `FAVICON_ROOTS` for both web surfaces, `SITE_LOGO` for the site alone. A
+      favicon must be an image and 16px is what the format is, so the badge stays there and in the
+      documentation site's header, where a small mark beside the site name is the idiom. The three
+      surviving outputs hash byte-identical again.
+
+      **Verified by sampling the rendered pixels, because reading the screenshot got it wrong.**
+      The dot looked blue at 3x and it is not: columns 21-46 of the wordmark are `(255,255,255)`
+      and columns 47-59 are `(96,201,252)`, so `ic.` is foreground and only the final `c` is
+      accent, which is what the artwork does. **A magnified screenshot is an interpretation; the
+      pixel values are the measurement.**
+
+      **Gates: `CI=true dotnet build --configuration Release` — 0 errors, the same 5 known
+      `IL2110`/`IL2111`. `eng/trim-ratchet.sh` — `OK (88 <= 88)`.** No `src/`, no `test/`.

@@ -35,14 +35,14 @@
         </NavLink>
 
         @*
-            The mark sits at the foot of the rail rather than in the header. At header height
-            it renders about 20px and reads as a smudge -- the hexagon survives, the lettering
-            inside it does not. Down here it gets twice the size and the space the artwork
-            this sample is dressed from gives it. One static file, no icon package.
+            The wordmark as TEXT, not as the hexagon badge. The badge is drawn to be legible
+            at 128px on a package listing; shrunk into a nav rail it is a blue smudge at 20px
+            and merely small at 40px. The README banner's mock UI sets "ic.c" here as plain
+            lettering, and text is the one thing that stays crisp at any size the rail gives
+            it -- no image, no reflow, and it follows the theme's own accent colour.
         *@
         <div class="app-brand">
-            <img class="app-brand-mark" src="logo.png" alt="InfoCarrier.Core"
-                 width="40" height="40" />
+            <span class="app-brand-text">ic.<span class="app-brand-accent">c</span></span>
         </div>
     </nav>
 
