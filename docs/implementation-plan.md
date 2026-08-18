@@ -1866,3 +1866,45 @@ rather than staying silent about it.
       N10 corrected the documentation to describe.
 
       **Gates: `dotnet pack` clean; icon confirmed inside the nupkg.** No `src/` code, no `test/`.
+
+- [x] **N16c. Transparent background, and the edge is computed rather than drawn.** `<this commit>`
+
+      Two requirements: keep the plate's light-and-shade gradient, and make the edge neat on any
+      background. Those pull against each other — the gradient is *inside* the plate, so only the
+      silhouette may be cut, and the cut has to be exact or it fringes.
+
+      **The obvious mask technique fails, twice over.** Pillow has no rounded polygon. The usual
+      substitute — fill an inset polygon, then stroke it with a round-jointed pen — leaves a
+      **visible notch at the top apex** where the stroke closes. That is the same artefact that
+      wrecked N16's geometric rebuild, and it reappeared here in a completely different piece of
+      code before being recognised.
+
+      **An analytic signed distance field has no seam.** Six half-planes, each eroded by the corner
+      radius and the whole dilated by the same amount: the edges stay exactly where the artwork puts
+      them and only the corners round. Coverage comes out as `0.5 - distance`, which is one pixel of
+      linear ramp across the boundary — anti-aliasing without supersampling.
+
+      **The geometry is measured, not guessed.** Luminance profiles across each edge put the plate
+      at **109 x 121.5**, centred at `(634.5, 82.25)`, aspect **0.897** — wider than a regular
+      hexagon's 0.866, which the mask matches rather than idealises.
+
+      **`INSET = 2.0` is the fringe fix.** The outermost pixels of the plate are already blended
+      with the black field behind them; including them leaves a dark rim on a light background.
+
+      **Verified numerically rather than by eye**, because "looks neat" is not a check:
+
+      | | |
+      |---|---|
+      | opaque edge pixels that are near-black (background bleed) | **0** |
+      | mean edge colour | `(8, 28, 68)` — plate navy, not background |
+      | corner alpha | `0, 0, 0, 0` |
+      | partial-alpha buckets | ~30 pixels in each of six, i.e. a real ramp rather than a hard cut |
+
+      Three candidates were rendered on **both white and near-black** and compared before choosing
+      `INSET=2.0, RADIUS=16`; an icon that only works on one background is half-checked.
+
+      **`eng/make-icon.py` regenerates it**, and its output was confirmed byte-identical to the
+      chosen candidate — so the script is the artwork's source, not a description of it.
+
+      **Gates: `dotnet pack` clean; `icon.png` (20,464 bytes) confirmed inside the nupkg with
+      `<icon>icon.png</icon>`.** No `src/` code, no `test/`.
