@@ -91,7 +91,7 @@ amount to one unsupported scenario, one query to treat with caution, and a few d
 not defects.
 
 **Read the limitations page before adopting:**
-<https://github.com/azabluda/InfoCarrier.Core/blob/v10-claude/docs/limitations.md>
+<https://azabluda.github.io/InfoCarrier.Core/limitations/>
 
 Still to come before a stable release: a shipped gRPC binding and streaming results as
 `IAsyncEnumerable`.
@@ -110,7 +110,9 @@ caller may see.
 
 ## Documentation and samples
 
-<https://github.com/azabluda/InfoCarrier.Core/tree/v10-claude>
+**Documentation:** <https://azabluda.github.io/InfoCarrier.Core/>
+
+**Source and samples:** <https://github.com/azabluda/InfoCarrier.Core/tree/v10-claude>
 
 ## License
 

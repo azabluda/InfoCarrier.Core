@@ -2,6 +2,10 @@
 
 A client whose `DbContext` has **no database**, talking to a SQLite-backed server over HTTP.
 
+> Using the library rather than working on it? The documentation site is the place to start:
+> <https://azabluda.github.io/InfoCarrier.Core/>. This file is the samples' own notes — what each
+> page demonstrates, and what running them established.
+
 There are two clients, and they are the same client twice: a **browser** (Blazor WebAssembly) and
 a **console**. Both build the same `NorthwindContext` from `Northwind.Shared`, both wire it with
 `UseInfoCarrier`, and neither has a connection string.

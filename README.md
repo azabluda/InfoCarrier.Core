@@ -194,6 +194,14 @@ a caller may see.
 
 ## Documentation
 
+**If you are here to *use* this library, the documentation site is written for you:**
+<https://azabluda.github.io/InfoCarrier.Core/> — installation, a first client and server,
+querying, saving, transactions, configuration, and the limitations, with runnable code on every
+page and no internals. Its source is [`website/`](website/); `mkdocs build --strict` is the gate,
+and [`.github/workflows/docs.yml`](.github/workflows/docs.yml) publishes it.
+
+The table below is the other audience: the documents this repository is *developed* against.
+
 | Doc | Contents |
 |---|---|
 | [`docs/limitations.md`](docs/limitations.md) | **Start here if you are evaluating** — every known limitation, with an example |

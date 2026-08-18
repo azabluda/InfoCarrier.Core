@@ -1,0 +1,88 @@
+# The documentation site: build it on every push, publish it to GitHub Pages.
+#
+# SEPARATE FROM build.yml ON PURPOSE. That workflow's `CI: true` makes compiler warnings fatal and
+# its spec-ratchet job takes up to ninety minutes; neither has anything to say about Markdown, and
+# a documentation typo must not queue behind a 22,000-test suite. Nothing here touches the
+# solution, the ratchets or the baselines.
+#
+# ONE-TIME SETUP, and this workflow cannot do it for you: in the repository's
+# Settings -> Pages, set Source to "GitHub Actions". Until that is done the `deploy` job fails on
+# `configure-pages` while `build` keeps passing, which is the right way round -- the content is
+# still verified.
+#
+# THE GATE IS `--strict`. A link to a page that does not exist, or a page missing from the nav,
+# fails the build. That is the only automated check a documentation site has, so it runs on pull
+# requests too, where nothing is deployed.
+name: Docs
+
+on:
+  push:
+    branches: [main, v10-claude]
+    paths:
+      - 'website/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main, v10-claude]
+    paths:
+      - 'website/**'
+      - '.github/workflows/docs.yml'
+  # So the site can be republished without a content change -- after enabling Pages, for instance.
+  workflow_dispatch:
+
+# Read the repository; write Pages and the OIDC token deploy-pages authenticates with.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. `cancel-in-progress: false` because cancelling a half-finished
+# deployment is worse than waiting for it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: website/requirements.txt
+
+      # Pinned in the requirements file, so a fresh runner builds the same site as a local machine.
+      - name: Install MkDocs
+        run: pip install -r website/requirements.txt
+
+      - name: Build (strict)
+        run: mkdocs build --strict --config-file website/mkdocs.yml
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/site
+
+  deploy:
+    name: Deploy
+    # Never from a pull request: a fork's branch must not be able to publish to this site.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

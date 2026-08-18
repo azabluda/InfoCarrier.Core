@@ -1321,4 +1321,30 @@ rather than staying silent about it.
       in the scratchpad and is deliberately not committed: it would be a fifth project in the
       solution, and `eng/measure.sh` parses the last `Total tests:` block.
 
-- [ ] **N5. `docs.yml` — build on every push, deploy to Pages, disturb nothing.** `<this commit>`
+- [x] **N5. `docs.yml` — build on every push, deploy to Pages, disturb nothing.** `<this commit>`
+
+      **A third workflow rather than a job in `build.yml`, and the reason is what each gate is
+      for.** `build.yml` sets `CI: true`, which makes compiler warnings fatal, and its
+      *spec-ratchet* job is allowed ninety minutes; neither has anything to say about a Markdown
+      file, and a documentation typo must not queue behind a 22,000-test suite. `docs.yml` touches
+      no project, no ratchet and no baseline — `git diff` against `build.yml` and `release.yml` is
+      empty, checked rather than asserted, and all three parse as YAML.
+
+      **`--strict` runs on pull requests too, where nothing is deployed.** The deploy job is gated
+      on `github.event_name != 'pull_request'`, so a fork's branch cannot publish to this site
+      while its content is still verified. `concurrency: pages` with `cancel-in-progress: false`,
+      because cancelling a half-finished deployment is worse than waiting for one.
+
+      **One manual step remains and this workflow cannot do it**: *Settings → Pages → Source →
+      GitHub Actions*. Until then `build` passes and `deploy` fails on `configure-pages`, which is
+      the right way round — the content is still checked. The workflow's own header says so.
+
+      **The three READMEs now point at the site**, each in the register of its own audience: the
+      repository README separates "here to use it" from the internal documents it develops against,
+      `samples/README.md` opens with one line for a reader who took a wrong turn, and
+      `docs/nuget-readme.md` sends *limitations* to the site rather than to a file inside a
+      repository. **Those URLs 404 until Pages is switched on** — noted here so the next reader
+      knows it is a pending switch rather than a wrong link.
+
+      **Gates: none of the repository's.** A workflow file and three Markdown files; nothing under
+      `src/` or `test/`. `mkdocs build --strict` was re-run and is green.
