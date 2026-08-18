@@ -2051,3 +2051,32 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` green**, no inbound anchor to the renamed README heading,
       and the retargeted link verified. Markdown only.
+
+- [x] **N18. Real artwork arrives, and the script collapses to nine lines.** `<this commit>`
+
+      The source is now **1254x1254, square, RGBA with a genuine alpha channel** — corners at
+      `(0,0,0,0)`, a real anti-aliased band at the boundary, mark **1035x1184**. 128 is a **0.10x
+      downscale**.
+
+      **Everything the previous script did was compensation for not having this.** The earlier
+      sources were browser screenshots: not square, opaque, white behind the mark, with an alpha
+      channel that existed and was entirely unused. Cutting those required flooding inward from the
+      border — never keying white globally, because the lettering is white too — and feathering
+      alpha by hand against a whiteness threshold. **All of it is deleted.** What remains is crop to
+      `getbbox()`, fit inside the margin, downscale, centre.
+
+      That is the whole lesson of N16 through N16e in one diff: **the technique was never the
+      problem, the source was.** Five icons, four rejections, and the fix was a file.
+
+      Measured after: corners transparent, **80** boundary pixels, **0** pale halo. Six near-black
+      boundary pixels are the artwork's own dark outer rim, not contamination — with genuine alpha
+      there is no background left to bleed. Rendered at 128, 64 and 32 on white, near-black and a
+      nuget.org-style card.
+
+      `icon.png` (16,842 bytes) confirmed inside the nupkg with `<icon>icon.png</icon>`.
+
+      **The source is committed at 1 MB**, which is deliberate: it is the only editable form of the
+      artwork, and nuget.org's own limit is 1 MB for the *icon*, not the repository. A 128px PNG
+      alone would leave the next person exactly where this phase started.
+
+      **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
