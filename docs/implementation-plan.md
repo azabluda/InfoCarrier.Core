@@ -1908,3 +1908,40 @@ rather than staying silent about it.
 
       **Gates: `dotnet pack` clean; `icon.png` (20,464 bytes) confirmed inside the nupkg with
       `<icon>icon.png</icon>`.** No `src/` code, no `test/`.
+
+- [x] **N16d. "Light effect good?" — it was not, and only the question found it.** `<this commit>`
+
+      N16c shipped with `INSET = 2.0` and was verified as neat: **0 background bleed, clean corners,
+      a proper alpha ramp**. Every one of those numbers was true. They measured whether the edge was
+      *tidy* and said nothing about whether it was *right*.
+
+      **The plate is lit from the top left and carries a rim highlight on its upper-left edges
+      only** — about twice the plate's brightness (left edge 56, top apex 62, plate ~29) — while the
+      right and bottom edges have none. That asymmetry **is** the lighting. `INSET = 2.0` put the
+      mask boundary just inside it and cut it to nothing:
+
+      | inset | (584,51) | (581,57) | (581,69) | (581,105) |
+      |---|---|---|---|---|
+      | **1.0** | **255** | **255** | **255** | **255** |
+      | 2.0 (shipped) | 132 | **0** | **0** | **0** |
+
+      The interior gradient had survived intact throughout — top-left `L=29.6` down to bottom-right
+      `L=17.3` — which is why the loss was invisible in review. **The icon looked fine. It was just
+      missing the thing that made it look lit.**
+
+      `INSET = 1.0` restores the highlight at full opacity everywhere it exists, for **one**
+      near-black pixel on the entire boundary.
+
+      **A measuring mistake worth recording, because it nearly hid the answer.** The first
+      comparison scored each inset by *the brightest opaque pixel on the boundary*, which produced
+      nonsense — 2.0 scored higher than 1.0. The metric was picking up the **white lettering**
+      wherever the boundary passed near it. Scoring resumed against **identified rim pixels**, found
+      by profiling across each edge, and the picture was immediately unambiguous. **A metric that
+      answers is not the same as a metric that answers the question asked.**
+
+      **The general point.** N16c's checks were the ones I chose, and they were all about the cut.
+      Nobody had asked what the mask was cutting *through*. One question from outside the work —
+      *"light effect good?"* — was worth more than the whole verification suite around it.
+
+      **Gates: `dotnet pack` clean; `icon.png` (20,411 bytes) inside the nupkg; rendered at 128 and
+      32 on white and near-black.** No `src/` code, no `test/`.

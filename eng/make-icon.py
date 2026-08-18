@@ -22,6 +22,19 @@ the corner radius and dilate by the same amount, and the edges stay put while th
 The numbers below were measured off the banner from luminance profiles across each edge, not
 guessed. INSET exists because the outermost pixel of the plate is already blended with the black
 field behind it; taking it would leave a dark fringe.
+
+INSET IS 1.0 AND NOT 2.0, WHICH IS NOT A ROUNDING PREFERENCE. The plate is lit from the top left
+and carries a rim highlight on its upper-left edges only -- about twice the brightness of the plate
+(left edge 56, top apex 62, against a plate around 29), while the right and bottom edges have none.
+That rim IS the light effect. At INSET=2.0 the mask boundary falls just inside it and the highlight
+is cut to alpha 0 on every edge that has one. The result still looks tidy, which is exactly why it
+survived a review that only asked whether the edge was clean. Measured at identified rim pixels:
+
+    inset   (584,51)  (581,57)  (581,69)  (581,105)
+      1.0        255       255       255        255
+      2.0        132         0         0          0
+
+1.0 keeps the highlight and costs one near-black pixel on the entire boundary.
 """
 
 import math
@@ -35,7 +48,7 @@ OUT = os.path.join("docs", "assets", "icon.png")
 CX, CY = 634.5, 82.25      # plate centre in the banner
 W, H = 109.0, 121.5        # plate size; aspect 0.897, a little wider than a regular hexagon
 BOX = (571, 18, 699, 146)  # the 128x128 crop, chosen so the plate lands centred
-INSET = 2.0                # keep clear of the pixel already blended with the background
+INSET = 1.0                # clears the background-blended pixel, keeps the rim highlight
 RADIUS = 16.0              # corner rounding, matched to the artwork
 SIZE = 128                 # what nuget.org recommends
 
