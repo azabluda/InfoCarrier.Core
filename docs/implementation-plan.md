@@ -2174,3 +2174,21 @@ rather than staying silent about it.
       exited **1** naming the page and the target, and the file was restored from a copy. A strict
       build that has only ever been seen passing is not evidence that the page's **eight** internal
       links resolve. No `src/`, no `test/`.
+
+- [x] **N22. The NuGet readme says what "not backward compatible" costs.** `<this commit>`
+
+      `docs/nuget-readme.md` is the one document a reader meets *before* deciding to install, and
+      it discussed the `3.1.1` trap purely as a version-pinning accident — as though naming the
+      version were the whole problem. It is not: naming the version correctly is what gets you a
+      package your existing code will not compile against.
+
+      Two additions. A short callout under the opening paragraphs, because a 3.1 user has to see it
+      before the code sample rather than after. And an *Upgrading from 3.1* section after
+      *Installing*, holding a **seven-row** before/after table — wiring, transport, endpoint, the
+      three interfaces, dependencies — and ending in a link to N21's page. It is not the same
+      table: N21 spends a section on each of those rows, which is the point of having both.
+
+      nuget.org renders a restricted subset of Markdown, so this is a blockquote and a table and
+      nothing else — no admonitions, which is why the site page and this one do not share text.
+
+      **Gates: none.** One Markdown file, and no script reads it.
