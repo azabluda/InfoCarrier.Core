@@ -1257,7 +1257,7 @@ rather than staying silent about it.
 
       **Gates: none.** Markdown only.
 
-- [x] **N4. The site: Material for MkDocs in `website/`, sixteen pages, every snippet executed.**
+- [x] **N4. The site: Material for MkDocs in `website/`, seventeen pages, every snippet executed.**
       `<this commit>`
 
       **Where, and why not `docs/`.** `docs/` is this repository's internal source of truth and a
@@ -1266,7 +1266,7 @@ rather than staying silent about it.
       `website/docs/`, which is MkDocs' own default layout relative to its config file, so nothing
       had to be reconfigured to keep the two apart. `website/site/` is git-ignored.
 
-      **Sixteen pages**: home; getting started (installation, first client and server, samples);
+      **Seventeen pages**: home; getting started (installation, first client and server, samples);
       using it (querying, saving changes, transactions, loading related data, errors);
       configuration (client, server, value mappers, custom transports); reference (Blazor
       WebAssembly, security, limitations, public API).
@@ -1279,7 +1279,13 @@ rather than staying silent about it.
       explicit reference and collection loads, savepoint plus rollback, two contexts sharing one
       transaction through `UseInfoCarrierTransaction`, `ExecuteUpdate`/`ExecuteDelete`, a
       server-side failure, a transport failure, payload limits, and a custom value mapper.
-      **Sixteen of sixteen pass.**
+      **Seventeen of seventeen pass.**
+
+      **Both of those counts said "sixteen" when this entry was first written, and neither had been
+      counted.** They were estimated from the nav and from the snippet list, and `find | wc -l` and
+      `grep -c '^PASS '` disagreed with both. Corrected here, and worth recording because it is the
+      cheapest possible instance of the rule this file states everywhere else: **a number that was
+      not read is not a measurement**, however small the thing being counted.
 
       **The value-mapper snippet is the reason the harness exists rather than a review.** The first
       version passed and proved nothing: the mapper was registered, the query ran, the assertion
