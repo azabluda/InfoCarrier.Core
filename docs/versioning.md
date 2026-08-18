@@ -146,12 +146,36 @@ dotnet add package InfoCarrier.Core --prerelease
 ### nuget.org
 
 Pushing a tag runs the gates, packs, and creates the Release. The `publish-nuget` job then **stops
-and waits for a reviewer**. Approve it and it pushes `InfoCarrier.Core` first, then
-`InfoCarrier.Core.AspNetCore`, then the symbol packages.
+and waits for a reviewer**. Approve it and it pushes `InfoCarrier.Core`, then
+`InfoCarrier.Core.AspNetCore`.
 
 The order is not cosmetic: `InfoCarrier.Core.AspNetCore` declares a dependency on
 `InfoCarrier.Core` at the same version, and nuget.org rejects a package whose dependency does not
 resolve.
+
+**Symbols need no step of their own.** `dotnet nuget push` uploads the matching `.snupkg` whenever
+it sits beside the `.nupkg`, so two commands produce four uploads.
+
+### What the first release actually did
+
+`10.0.0-preview.1`, 2026-08-18, and it is recorded because a mechanism that has never run is a
+design rather than a fact:
+
+| | |
+|---|---|
+| Gates before packing | `22658` tests, `9` failing — the baseline — and `trim-ratchet: OK (88 <= 88)` |
+| Trusted Publishing | `Successfully exchanged OIDC token for NuGet API key` — worked on its first execution, no key anywhere |
+| Uploads | four, from two `dotnet nuget push` commands |
+| Result | both packages live; `InfoCarrier.Core` gained its first `10.x`, `InfoCarrier.Core.AspNetCore` its first version ever |
+
+**One thing went wrong and it was ours.** A third step pushed the `.snupkg` files a second time and
+took a `409` — *"another copy of this symbols package pending validation"*. It was
+`continue-on-error`, so the release completed, but it printed a failure annotation on a successful
+run. The step is gone.
+
+**And the thing to keep watching:** `3.1.1` is still the latest *stable*, so
+`dotnet add package InfoCarrier.Core` with no version continues to resolve to the EF Core 3.1 line.
+That stays true until a stable `10.x` ships.
 
 **M8-20's rule is intact — a person still decides, because a pushed version can be unlisted but
 never withdrawn.** What changed is where that person stands. They used to run `dotnet nuget push`

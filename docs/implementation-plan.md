@@ -2080,3 +2080,34 @@ rather than staying silent about it.
       alone would leave the next person exactly where this phase started.
 
       **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
+
+- [x] **N19. The first real release, and the one thing that went wrong was ours.** `<this commit>`
+
+      **`10.0.0-preview.1` is published.** `InfoCarrier.Core` gained its first `10.x`;
+      `InfoCarrier.Core.AspNetCore` its first version ever. Verified against nuget.org rather than
+      against the run: both package pages answer `200`, both shields badges now render
+      `v10.0.0-preview.1` — Core's rendered `3.1.1` an hour ago — and the published `.nupkg`
+      contains `icon.png` (16,842 bytes) and the corrected `README.md`.
+
+      **Trusted Publishing worked on its first execution.** `Successfully exchanged OIDC token for
+      NuGet API key`, and no publishing secret exists anywhere in this repository. N15 built it
+      untested; this is the run that made it a fact.
+
+      **The failure was a step that should never have existed.** `dotnet nuget push` uploads the
+      matching `.snupkg` whenever it sits beside the `.nupkg` — two commands, four uploads, visible
+      in the log. A third step pushing the symbol packages *again* took a `409` from nuget.org
+      (*"another copy of this symbols package pending validation"*).
+
+      **Its reasoning was sound and its premise was false.** N9 wrote it so "a failed symbol upload
+      must not leave a release half-published" — true, and there was nothing left to upload. It was
+      `continue-on-error`, so nothing broke; what it produced was a **red annotation on a wholly
+      successful release**, which is precisely the noise that trains people to stop reading
+      annotations. Removed, with the log excerpt in the workflow so nobody re-adds it.
+
+      `docs/versioning.md` gains *"What the first release actually did"* — the gate figures, the
+      OIDC line, four uploads from two commands, and the standing consequence that `3.1.1` is still
+      the latest **stable**, so an unversioned install keeps resolving to the EF Core 3.1 line until
+      a stable `10.x` ships.
+
+      **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — five steps, in order, no
+      symbols step. No `src/`, no `test/`.
