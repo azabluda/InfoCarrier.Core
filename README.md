@@ -88,8 +88,10 @@ dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # th
 dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # the server endpoint
 ```
 
-Name the version — or pass `--prerelease`. Without either, NuGet looks for a stable release and
-there is not one yet.
+> ⚠️ **Name the version.** `InfoCarrier.Core` has been on nuget.org since v1, and its newest
+> *stable* release is **`3.1.1`** — the previous generation, built for EF Core 3.1. An unversioned
+> `dotnet add package InfoCarrier.Core` installs **that**, not this one, and will keep doing so
+> until a stable `10.x` ships. Name the version, or pass `--prerelease`.
 
 **Not yet done:** a shipped gRPC binding, and streaming results as `IAsyncEnumerable`. Both may
 change `IInfoCarrierTransport`, which is why the version still says `preview`.

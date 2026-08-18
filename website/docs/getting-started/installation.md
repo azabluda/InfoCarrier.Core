@@ -53,14 +53,25 @@ the same code, which is what makes the wire format meaningful — see
     Install-Package InfoCarrier.Core.AspNetCore -Version 10.0.0-preview.1
     ```
 
-!!! tip "Name the version, or pass `--prerelease`"
+!!! danger "Always name the version — an unversioned install gets the *previous generation*"
+
+    `InfoCarrier.Core` has been on nuget.org since v1, and its newest **stable** release is
+    `3.1.1`, built for **EF Core 3.1**. NuGet prefers a stable release over a prerelease, so:
 
     ```bash
-    dotnet add package InfoCarrier.Core --prerelease
+    dotnet add package InfoCarrier.Core              # installs 3.1.1 — NOT this library
+    dotnet add package InfoCarrier.Core --version 10.0.0-preview.1   # correct
+    dotnet add package InfoCarrier.Core --prerelease                 # also correct
     ```
 
-    Without one or the other, NuGet looks for a stable release and there is not one yet. The same
-    applies to Central Package Management: pin `10.0.0-preview.1` in `Directory.Packages.props`.
+    It does not fail, and it does not warn. You get a different, incompatible library that targets
+    an EF Core seven majors old. This stays true until a stable `10.x` ships.
+
+    `InfoCarrier.Core.AspNetCore` is new in this generation and has no older version to fall back
+    to — but pin it anyway, so the two halves cannot drift apart.
+
+    The same applies to Central Package Management: pin `10.0.0-preview.1` in
+    `Directory.Packages.props`.
 
 Both packages ship symbol packages and SourceLink, so you can step into the provider from a
 debugger with no extra configuration.

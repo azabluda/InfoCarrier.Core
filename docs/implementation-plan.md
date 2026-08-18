@@ -1988,3 +1988,39 @@ rather than staying silent about it.
       For a 128px icon that no longer matters; for anything large it would.
 
       **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
+- [x] **N17. `dotnet add package InfoCarrier.Core` installs v1, and four pages said it would fail.**
+      `<this commit>`
+
+      N7 wrote every install instruction around one sentence: *"Without either, NuGet looks for a
+      stable release and there is not one yet."* **There is one.** `InfoCarrier.Core` has been on
+      nuget.org since v1 and its newest stable release is **`3.1.1`**, built for **EF Core 3.1**.
+
+      ```
+      2.1.1  2.1.4  2.2.0  2.2.1  2.2.6  2.2.7  3.1.0  3.1.1
+      ```
+
+      **The failure mode is the opposite of what was documented, and worse.** An unversioned
+      `dotnet add package InfoCarrier.Core` does not fail to find anything — it **succeeds**,
+      silently installing a library seven EF majors old. NuGet prefers a stable release over a
+      prerelease, so this stays true until a stable `10.x` ships, however many previews come first.
+      A reader following our own instructions verbatim would have hit it.
+
+      **The two packages are asymmetric**, which nothing said either: `InfoCarrier.Core.AspNetCore`
+      is new to this generation and returns 404, so for *that* one an unversioned install really
+      does find nothing. Same command, two different wrong outcomes.
+
+      Corrected on all four pages — `README.md`, `docs/nuget-readme.md`, the site's installation
+      page and its home page — and the site's version is a `danger` admonition showing the three
+      commands side by side, because "it installs the wrong thing without warning you" is not a tip.
+
+      **How it was found is the part worth keeping.** It came out of *cleanup verification* after
+      the release was rejected: a `curl` against nuget.org to confirm nothing had been published.
+      `InfoCarrier.Core` answered **HTTP 200**. The check was written to prove an absence and
+      discovered a presence — the docs bug was a free side effect of not trusting "nothing was
+      published" without asking.
+
+      **The README badge is affected too** and is left alone deliberately: `nuget/vpre` currently
+      renders `3.1.1`, v1's version. It becomes correct the moment `10.0.0-preview.1` is pushed,
+      and the docs are already written as though it has been.
+
+      **Gates: `mkdocs build --strict` green.** Markdown only; no `src/`, no `test/`.
