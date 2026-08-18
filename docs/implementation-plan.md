@@ -2024,3 +2024,30 @@ rather than staying silent about it.
       and the docs are already written as though it has been.
 
       **Gates: `mkdocs build --strict` green.** Markdown only; no `src/`, no `test/`.
+
+- [x] **N17b. "v1" is wrong, not merely vague, and it appeared in every user-facing document.**
+      `<this commit>`
+
+      The earlier InfoCarrier.Core is called **"v1"** throughout, and the published record says
+      otherwise: nuget.org carries `1.0.0-beta0002` through **`3.1.1`**, and this repository still
+      has `release/2.2`, `release/3.1` and `release/5.0` branches. Calling that "v1" understates it
+      by two majors, and it matters precisely where N17 landed: a reader told the old line is "v1"
+      has no reason to expect an unversioned install to hand them **3.1.1**.
+
+      Replaced with the span — **InfoCarrier.Core 1.0–3.1** on first mention, *"the earlier line"*
+      as shorthand — in `README.md` (five places, including the *How it differs from* heading),
+      `docs/nuget-readme.md`, and the site's installation and home pages. `grep -n '\bv1\b'` over
+      the user-facing set now returns nothing.
+
+      **The old links were pointed somewhere real while renaming them.** They said
+      `github.com/azabluda/InfoCarrier.Core` — which is *this* repository, whose default branch is
+      now `main` and therefore the **new** product, so a reader clicking "the previous version"
+      landed on the current one. They now name `/tree/master`, checked and answering 200.
+
+      **Internal documents are deliberately untouched.** `implementation-plan.md`, `roadmap.md`,
+      `decisions.md` and `architecture.md` use "v1" as a term of art hundreds of times, and their
+      audience is this repository. The instruction was about user-facing text and the split is the
+      same one Phase N is built on.
+
+      **Gates: `mkdocs build --strict` green**, no inbound anchor to the renamed README heading,
+      and the retargeted link verified. Markdown only.

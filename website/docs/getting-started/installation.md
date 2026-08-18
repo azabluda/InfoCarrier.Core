@@ -55,7 +55,7 @@ the same code, which is what makes the wire format meaningful — see
 
 !!! danger "Always name the version — an unversioned install gets the *previous generation*"
 
-    `InfoCarrier.Core` has been on nuget.org since v1, and its newest **stable** release is
+    `InfoCarrier.Core` has been on nuget.org since **1.0**, and its newest **stable** release is
     `3.1.1`, built for **EF Core 3.1**. NuGet prefers a stable release over a prerelease, so:
 
     ```bash
