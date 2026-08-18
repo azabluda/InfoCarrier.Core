@@ -2352,3 +2352,38 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` exit 0, zero warnings; chrome band and clearance measured at
       1280, 1600 and 1920.** No `src/`, no `test/`.
+
+- [x] **N25. Previewing the site before it is published — locally and on a pull request.** `<this commit>`
+
+      Nothing was wrong here; there was simply no answer to "how do I look at this before it goes
+      live", and the two commands `mkdocs.yml` carried in a comment fail on a fresh clone because
+      the virtual environment they need is git-ignored.
+
+      **`eng/docs-serve.sh`** — live reload, and `--build` for the one-shot `--strict` build CI
+      runs. It creates `.venv` from `website/requirements.txt` when it is missing and is a no-op
+      afterwards.
+
+      **It tries `python3`, `python`, `py` and keeps the first that survives running `-c "pass"`,
+      not the first that resolves.** On this repository's Windows machines `python3` is a Microsoft
+      Store shim: `command -v` finds it and then it refuses to run, which is how
+      `eng/check-project-xml.sh` once reported all ten project files malformed. Demonstrated rather
+      than assumed — the loop prints `skipped: python3`, `picked: python` here, so the `-c "pass"`
+      test is doing work.
+
+      **The script prints no URL, and that is the fix rather than an omission.** Its first version
+      announced `http://127.0.0.1:8000`; the site is served at
+      `http://127.0.0.1:8000/InfoCarrier.Core/`, because `site_url` carries that path — matching
+      where Pages puts it. The root **302**s there, so a browser is fine and a `curl` without `-L`
+      is not, which is exactly how it was found. **mkdocs announces the correct URL itself**, so
+      the line above it could only ever be redundant or wrong.
+
+      **On a pull request, `docs.yml` now attaches the built site as the `site-preview` artifact** —
+      a plain zip, next to the tarball `deploy-pages` wants, 14-day retention, pull requests only.
+      Unzip and *serve* the folder rather than opening `index.html` from disk: the search index is
+      fetched, and a `file://` page is not allowed to fetch it.
+
+      **A hosted per-PR URL was considered and refused.** It needs either moving Pages back to
+      branch-based publishing — Pages takes one source, and this repository publishes from Actions
+      — or an external host. Neither is worth it for a site that builds in twenty seconds.
+
+      **Gates: `eng/docs-serve.sh --build` green, and both modes executed.** No `src/`, no `test/`.
