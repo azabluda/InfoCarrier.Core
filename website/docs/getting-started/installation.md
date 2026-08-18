@@ -67,11 +67,10 @@ debugger with no extra configuration.
 
 ### Building from source instead
 
-Nothing beyond the .NET 10 SDK is needed. **Note the branch** — this is a ground-up rewrite for EF
-Core 10, and the repository's default branch is still the previous major version:
+Nothing beyond the .NET 10 SDK is needed:
 
 ```bash
-git clone -b v10-claude https://github.com/azabluda/InfoCarrier.Core.git
+git clone https://github.com/azabluda/InfoCarrier.Core.git
 cd InfoCarrier.Core
 dotnet pack InfoCarrier.Core.slnx -c Release -o artifacts/pack
 ```

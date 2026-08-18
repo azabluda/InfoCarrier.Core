@@ -1552,3 +1552,52 @@ rather than staying silent about it.
       because it is the one way "the tag is the version" can bite.
 
       **Gates: none.** Markdown only.
+
+- [x] **N11. `main` becomes the only trunk, and 14 references had to move first.** `<this commit>`
+
+      **The branch layout is v1's and v2 does not need it.** `master` and `develop` are the *same
+      commit* (`9e7831a`) with `release/2.2`, `release/3.1` and `release/5.0` beside them — a
+      GitFlow layout where `develop` integrates and a release branch stabilises. Since N8 the
+      **tag** is the release: MinVer derives the version from it and `release.yml` fires on it, so a
+      release branch holds nothing and a `develop`/`master` split decides nothing. One trunk plus
+      tags.
+
+      **`main`, not `develop`.** The name `develop` conventionally means *"not the released
+      branch"*, which is the opposite of what a sole trunk is. `main` was also already named in all
+      three workflow triggers and in `build.yml`'s `pull_request` filter, so those needed no change
+      beyond dropping the branches that are leaving.
+
+      **v1 is untouched, by decision.** `master`, `develop`, the three `release/*` branches and the
+      thirty-odd tags from `1.0.0` to `3.1.1` all stay exactly as they are. Nothing is renamed and
+      nothing is deleted, so every existing link to v1 keeps resolving. That also means v1's history
+      was never at risk from this: it is held by tags and release branches regardless of what any
+      branch ref does.
+
+      **Fourteen references named the working branch, and each would have 404'd the moment it went
+      away.** Found by grep before anything moved, not after:
+
+      | | |
+      |---|---|
+      | `website/mkdocs.yml` `edit_uri` | *Edit this page* on **every** site page |
+      | `installation.md`, `samples.md` | `git clone -b v10-claude` |
+      | `docs/nuget-readme.md` | `blob/v10-claude/…security-review.md` and `tree/v10-claude`, **inside the published package** |
+      | `build.yml`, `docs.yml`, `packages.yml` | trigger lists |
+      | `ci-cd.md`, `versioning.md` | prose |
+
+      The two `git clone` instructions lose their `-b` and their *"note the branch"* note, and
+      `nuget-readme.md`'s source link becomes the bare repository URL — **both of which are only
+      true once `main` is the default branch**, which is a repository setting and not something a
+      commit can do.
+
+      **The timing was the lucky part rather than the clever part.** Nothing is on nuget.org yet, so
+      the package README carrying `blob/v10-claude/…` has not shipped — and a package README is
+      immutable per version, so a link fixed after publishing stays broken for that version for
+      ever.
+
+      **Not rewritten: the historical entries above.** N3 and N8 still say `v10-claude`, because
+      that is what was true when each landed. This entry supersedes N8's *"every code push to
+      `main`/`v10-claude`"*.
+
+      **Gates: none of the repository's** — three workflow files and six Markdown files, nothing
+      under `src/` or `test/`. `mkdocs build --strict` green, and all four workflows re-parsed to
+      confirm the triggers are `[main]` and nothing else.

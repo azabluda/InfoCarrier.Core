@@ -88,7 +88,7 @@ The server executes an expression tree that arrived over the network. That is bo
 — a default-deny allowlist over node kinds, types and methods, no assembly loaded to satisfy a
 payload, and reflection entry points blocked. The review, its adversarial tests, and the weaknesses
 that are *accepted rather than solved*, are at
-<https://github.com/azabluda/InfoCarrier.Core/blob/v10-claude/docs/security-review.md>.
+<https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md>.
 
 **Authentication and authorization are out of scope and are yours.** No identity travels in the
 envelope. Authenticate the transport, and use query filters on the server's model to decide what a
@@ -98,7 +98,7 @@ caller may see.
 
 **Documentation:** <https://azabluda.github.io/InfoCarrier.Core/>
 
-**Source and samples:** <https://github.com/azabluda/InfoCarrier.Core/tree/v10-claude>
+**Source and samples:** <https://github.com/azabluda/InfoCarrier.Core>
 
 ## License
 

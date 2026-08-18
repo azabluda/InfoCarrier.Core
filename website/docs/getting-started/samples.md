@@ -4,7 +4,7 @@ The repository carries a Northwind sample: one shared model, one SQLite-backed s
 clients that are the same client twice — a browser and a console. Neither has a connection string.
 
 ```bash
-git clone -b v10-claude https://github.com/azabluda/InfoCarrier.Core.git
+git clone https://github.com/azabluda/InfoCarrier.Core.git
 cd InfoCarrier.Core
 ```
 

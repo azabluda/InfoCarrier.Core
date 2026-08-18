@@ -2,9 +2,10 @@ name: Build & Test
 
 on:
   push:
-    # `v10-claude` is where the work actually happens; a gate that never runs on the branch it
-    # is gating is not a gate. `main`/`develop` stay for when that changes.
-    branches: [main, develop, v10-claude]
+    # `main` is the only trunk. `master` and `develop` are v1 and carry their own (AppVeyor)
+    # build; a workflow that lives only on this branch cannot run on theirs anyway, so naming
+    # them here would be dead configuration.
+    branches: [main]
   pull_request:
     branches: [main]
 

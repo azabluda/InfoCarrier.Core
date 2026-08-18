@@ -66,7 +66,7 @@ step with the manual push commands in the run summary, having pushed nothing.
 
 ### `packages.yml` — the internal feed
 
-Trigger: every push to `main`/`v10-claude` that touches something other than documentation.
+Trigger: every push to `main` that touches something other than documentation.
 
 Packs and pushes to GitHub Packages with the run's own `GITHUB_TOKEN`; there is no secret to
 configure. MinVer gives each commit a unique ordered prerelease, so a build of any branch is

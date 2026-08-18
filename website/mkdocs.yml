@@ -22,9 +22,9 @@ copyright: MIT licensed. Copyright &copy; Alexander Zabluda.
 repo_url: https://github.com/azabluda/InfoCarrier.Core
 repo_name: azabluda/InfoCarrier.Core
 
-# The rewrite lives on this branch; the repository's default branch is still v1. An `edit_uri`
-# naming the wrong branch produces a 404 on every page, which is worse than no edit link.
-edit_uri: edit/v10-claude/website/docs/
+# `main` is the trunk. An `edit_uri` naming the wrong branch produces a 404 on every page, which
+# is worse than no edit link — so it is worth re-checking whenever the branch layout moves.
+edit_uri: edit/main/website/docs/
 
 theme:
   name: material

@@ -20,7 +20,7 @@ name: Packages
 
 on:
   push:
-    branches: [main, v10-claude]
+    branches: [main]
     paths-ignore:
       # A documentation change produces an identical assembly, so publishing a new version for one
       # would be noise on the feed. The site has its own workflow.

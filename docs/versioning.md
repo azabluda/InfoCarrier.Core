@@ -123,7 +123,7 @@ deliberate: releasing both together means the newest of each always agree.)
 
 | Feed | Trigger | Gate |
 |---|---|---|
-| **GitHub Packages** | every push to `main`/`v10-claude` that touches code | automatic, `packages.yml` |
+| **GitHub Packages** | every push to `main` that touches code | automatic, `packages.yml` |
 | **GitHub Release** | a `v*` tag | automatic, `release.yml` |
 | **nuget.org** | a `v*` tag | **a human approves the `nuget-org` environment** |
 
