@@ -1495,3 +1495,35 @@ rather than staying silent about it.
 
       **Gates: none of the repository's** — two workflow files and four Markdown files, nothing
       under `src/` or `test/`. All four workflows parse as YAML, checked.
+
+- [x] **N9. The publish job fails usefully while there is no key.** `<this commit>`
+
+      The `nuget-org` environment and its required reviewers now exist; **`NUGET_API_KEY` does not
+      yet**, because the first upload is being done by hand. That is a supported state and the
+      workflow now says so rather than discovering it at `dotnet nuget push`.
+
+      **A `Require a key` step, and it fails rather than skips.** A green *Publish to nuget.org*
+      that pushed nothing is the false-clearance shape this repository has paid for before — a gate
+      that passes for ever because it silently does nothing. `eng/trim-ratchet.sh`'s first version
+      was exactly that. So the missing key is an **error**, with the four `dotnet nuget push`
+      commands written into `$GITHUB_STEP_SUMMARY` filled in with the version being released, and
+      the same list restored to the Release body. Nothing about the release is lost: `release` has
+      packed, gated and published the GitHub Release before this job is even offered for approval.
+
+      **The guard was run both ways**, its `run:` block extracted from the parsed YAML so what was
+      tested is what the workflow will execute:
+
+      | | |
+      |---|---|
+      | `NUGET_API_KEY=abc123` | `nuget-org carries a key; publishing.` → exit **0** |
+      | `NUGET_API_KEY=""` | `::error::…` plus the filled-in commands in the summary → exit **1** |
+
+      A guard that cannot fail is not a guard, and this one was made to do both.
+
+      **The key now travels as an environment variable** on each push step rather than interpolated
+      into the command line, so it cannot appear in an echoed command.
+
+      **Pages is enabled**, so `docs.yml` will deploy on the first push. Nothing in the repository
+      changes for that — the workflow was already correct and waiting on the switch.
+
+      **Gates: none of the repository's.** One workflow file and three Markdown files.

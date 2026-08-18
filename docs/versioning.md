@@ -143,13 +143,26 @@ from their own machine with their own key. They now approve a protected environm
 the key is not on a laptop, the step is repeatable, and the push is recorded against the run that
 made it.
 
-**One-time setup:** *Settings → Environments → New environment → `nuget-org`*, tick **Required
-reviewers** and name at least one, then add `NUGET_API_KEY` as a secret scoped to that environment.
-Until that exists the job fails closed, having pushed nothing.
+**Setup, in two halves:**
 
-If nuget.org **Trusted Publishing** is available to this account, prefer it — it authenticates the
-workflow by OIDC and removes the long-lived key entirely. Check its current status before relying
-on it.
+| | Status |
+|---|---|
+| *Settings → Environments → `nuget-org`*, with **Required reviewers** | done |
+| `NUGET_API_KEY`, scoped to that environment | not yet — first upload is by hand |
+
+**Without the key the job fails on purpose**, at its first step, having pushed nothing. It prints
+the four `dotnet nuget push` commands into the run summary, filled in with the version being
+released, and the Release body carries the same list. The release itself is unaffected: `release`
+has already packed, gated and published the GitHub Release before `publish-nuget` is even offered
+for approval.
+
+**A green "Publish to nuget.org" that pushed nothing would be worse than a red one.** That is the
+false-clearance shape this repository has been bitten by before — a gate that passes for ever
+because it silently does nothing. A red job that tells you exactly what to type is not that.
+
+If nuget.org **Trusted Publishing** is available to this account, prefer it over adding the key —
+it authenticates the workflow by OIDC and removes the long-lived secret entirely. Check its current
+status before relying on it.
 
 ## Releasing, start to finish
 

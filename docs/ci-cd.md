@@ -61,7 +61,8 @@ packages — in that order, because the second declares a dependency on the firs
 rejects a package whose dependency does not resolve.
 
 `NUGET_API_KEY` is a secret scoped to that environment, not a repository secret, so no workflow
-outside it can read the key.
+outside it can read the key. **It is not configured yet** — until it is, the job stops at its first
+step with the manual push commands in the run summary, having pushed nothing.
 
 ### `packages.yml` — the internal feed
 
