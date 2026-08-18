@@ -47,8 +47,12 @@ body {
 }
 
 .app-logo {
-    font-size: 1.05rem;
-    line-height: 1;
+    /* An <img> since the emoji became the real mark. Sized here as well as in the markup so
+       the header does not reflow between first paint and the image arriving. */
+    width: 1.25rem;
+    height: 1.25rem;
+    display: block;
+    flex: none;
 }
 
 .app-mark {

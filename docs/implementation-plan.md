@@ -2228,3 +2228,33 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` green, exit 0, zero warnings, and every `assets/` reference
       in the built `index.html` confirmed present on disk.** No `src/`, no `test/`.
+
+- [x] **N23b. The sample had no favicon at all, and its header wore a satellite dish.** `<this commit>`
+
+      Two more surfaces, found by looking rather than by guessing. `samples/Northwind.Client/
+      wwwroot/index.html` contained **no `<link rel="icon">` of any kind**, so every browser tab
+      showing the sample took a **404 on `/favicon.ico`** and fell back to the generic page icon.
+      And `MainLayout.razor`'s brand slot was the emoji `📡`.
+
+      `eng/make-icon.py` now writes `logo.png` and `favicon.ico` into a *list* of web roots — the
+      site's `assets/` and the sample's `wwwroot/` — because neither MkDocs nor a Blazor `wwwroot`
+      can read outside its own root, so each surface needs its own copy whatever happens. **All
+      three pre-existing outputs hash byte-identical after the change** (`da714d74…`, `b723dcf2…`,
+      `79e16886…`), which is the same inertness check N23 used and the reason a second refactor of
+      a published artefact is safe to make.
+
+      The nav icons stay emoji, and the file says why: Fluent UI ships its icon set as a separate,
+      large package, and a sample about the wire should not pull one in to decorate a menu. **That
+      argument is about a package, not about images** — a single static PNG in the brand slot costs
+      no dependency, so it does not contradict the note it sits next to.
+
+      **Verified by running it**, not by reading the diff. `dotnet run --project
+      samples/Northwind.Server`, then headless Edge with a virtual-time budget so WebAssembly
+      actually boots: `/favicon.ico` and `/logo.png` both **200**, a nonexistent `.ico` still
+      **404** so the 200s mean something, the mark renders top-left in the header, and the page
+      behind it is the working app — 65 customers, two round trips in the wire panel.
+
+      **Gates: `CI=true dotnet build --configuration Release` — 0 errors, and the 5 `IL2110`/
+      `IL2111` warnings are the known non-fatal set from `App_razor.g.cs`, a file this change does
+      not touch. `eng/trim-ratchet.sh` — `OURS: 88`, `OK (88 <= 88)`.** Sample code changed, so
+      both were run; no `src/`, no `test/`.
