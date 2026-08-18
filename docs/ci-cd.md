@@ -60,9 +60,10 @@ it. On approval it pushes `InfoCarrier.Core`, then `InfoCarrier.Core.AspNetCore`
 packages — in that order, because the second declares a dependency on the first and nuget.org
 rejects a package whose dependency does not resolve.
 
-`NUGET_API_KEY` is a secret scoped to that environment, not a repository secret, so no workflow
-outside it can read the key. **It is not configured yet** — until it is, the job stops at its first
-step with the manual push commands in the run summary, having pushed nothing.
+**There is no publishing secret in this repository.** The job exchanges a GitHub OIDC token for a
+nuget.org API key valid for one hour (Trusted Publishing), so nothing long-lived is stored. It
+needs `id-token: write`, and a policy on nuget.org naming this owner, repository, workflow file and
+environment. See [`versioning.md`](versioning.md).
 
 ### `packages.yml` — the internal feed
 

@@ -1732,3 +1732,53 @@ rather than staying silent about it.
 
       **Gates: `mkdocs build --strict` green.** No `src/`, no `test/`; one line of theme
       configuration.
+
+- [x] **N15. Trusted Publishing: no publishing secret exists at all.** `<this commit>`
+
+      nuget.org's own account page now says it plainly: *"API keys are strongly discouraged for
+      automated publishing and should be replaced with Trusted Publishing."* N9 had priced that as
+      *"prefer it if available, verify before relying on it"* — it is available, so it is taken, and
+      the API-key route is gone rather than kept as a fallback. One path is easier to keep true
+      than two.
+
+      **What replaces the secret.** The job asks GitHub for an OIDC token; nuget.org validates it
+      against a policy naming owner, repository, workflow file and environment, and returns an API
+      key valid for **one hour**. Nothing long-lived is stored, so nothing long-lived can leak, be
+      rotated late, or sit forgotten on a laptop. `grep 'secrets.'` over `release.yml` now returns
+      **nothing**.
+
+      **Read from the vendor rather than remembered**, because the mechanism is newer than any
+      recollection worth trusting: `NuGet/login@v1` takes `user` (the nuget.org *profile name*, not
+      an email) and emits `NUGET_API_KEY` as a step output; the job needs `id-token: write`. Both
+      confirmed against the action's own repository and Microsoft's documentation before the
+      workflow was written.
+
+      **The exchange sits one step above the pushes, and that placement is load-bearing.** Each
+      token buys exactly one key, the key lives an hour, and asking early then pushing late is the
+      documented way to have it expire mid-release — with the first package published and the
+      second not.
+
+      **THE APPROVAL GATE DID NOT EXIST, and this is the finding of the step.** The `nuget-org`
+      environment was created, but the API says:
+
+      ```
+      protection_rules  : []
+      branch policy     : null
+      secrets           : 0
+      ```
+
+      **Required reviewers had been ticked but never saved.** With no key that was harmless — the
+      job stopped at its own guard. The moment a credential existed, a tag would have published to
+      nuget.org **unattended**, which is the single thing M8-20's rule exists to prevent. Found by
+      reading the environment over the API instead of trusting the UI, and the same lesson as
+      everything else today: *the setting you believe you made is not evidence.*
+
+      **Setup is now two halves that each fail closed**, written up in `versioning.md` with the
+      four policy fields and the exact `gh api` call that proves the reviewer stuck. Also recorded:
+      the policy covers **every package owned by the account**, so neither package has to exist on
+      nuget.org first — which is the question that would otherwise have been asked at the worst
+      moment, since neither does.
+
+      **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — `permissions
+      {contents: read, id-token: write}`, environment `nuget-org`, six steps in the intended order.
+      No `src/`, no `test/`.

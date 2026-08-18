@@ -159,26 +159,47 @@ from their own machine with their own key. They now approve a protected environm
 the key is not on a laptop, the step is repeatable, and the push is recorded against the run that
 made it.
 
-**Setup, in two halves:**
+### There is no publishing secret
 
-| | Status |
+Publishing uses nuget.org's **Trusted Publishing**. The job asks GitHub for an OIDC token,
+nuget.org validates it against a policy naming this owner, repository, workflow file and
+environment, and returns an API key valid for **one hour**. Nothing long-lived is stored, so
+nothing long-lived can leak — and nuget.org's own guidance now calls API keys *"strongly
+discouraged"* for automated publishing.
+
+The exchange happens in the step immediately above the pushes, deliberately: each token buys
+exactly one key, and requesting it early then pushing late is the documented way to have it expire
+mid-release.
+
+**Setup, in two halves. Both are required, and each fails closed on its own.**
+
+| Where | What |
 |---|---|
-| *Settings → Environments → `nuget-org`*, with **Required reviewers** | done |
-| `NUGET_API_KEY`, scoped to that environment | not yet — first upload is by hand |
+| GitHub | *Settings → Environments → `nuget-org`* → tick **Required reviewers**, name at least one, and **Save**. |
+| nuget.org | *Your username → Trusted Publishing → Create*, with the four fields below. |
 
-**Without the key the job fails on purpose**, at its first step, having pushed nothing. It prints
-the four `dotnet nuget push` commands into the run summary, filled in with the version being
-released, and the Release body carries the same list. The release itself is unaffected: `release`
-has already packed, gated and published the GitHub Release before `publish-nuget` is even offered
-for approval.
+| Policy field | Value |
+|---|---|
+| Repository Owner | `azabluda` |
+| Repository | `InfoCarrier.Core` |
+| Workflow File | `release.yml` — **file name only**, no `.github/workflows/` prefix |
+| Environment | `nuget-org` — optional, and worth setting: it pins the policy to the approval-gated job rather than to any job in this workflow |
 
-**A green "Publish to nuget.org" that pushed nothing would be worse than a red one.** That is the
-false-clearance shape this repository has been bitten by before — a gate that passes for ever
-because it silently does nothing. A red job that tells you exactly what to type is not that.
+The policy covers **every package owned by that account**, so neither package has to exist on
+nuget.org first — which matters here, because neither does.
 
-If nuget.org **Trusted Publishing** is available to this account, prefer it over adding the key —
-it authenticates the workflow by OIDC and removes the long-lived secret entirely. Check its current
-status before relying on it.
+!!! warning "Tick *and* save the reviewer"
+
+    Ticking **Required reviewers** without saving leaves the environment with
+    `protection_rules: []`, and then a tag publishes with nobody in the loop. Checked over the API
+    rather than in the UI: `gh api repos/azabluda/InfoCarrier.Core/environments/nuget-org` must
+    show a non-empty `protection_rules`.
+
+!!! note "A new policy on a private repository is *pending* for 7 days"
+
+    It goes inactive if nothing is published in that window; the first successful publish makes it
+    permanent. This repository is public, so the policy should be active immediately — but check
+    the status in the nuget.org UI if a push is refused.
 
 ## Releasing, start to finish
 
