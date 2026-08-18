@@ -4,6 +4,8 @@
 
 **Use the full power of Entity Framework Core in a client application that has no database.**
 
+[![NuGet](https://img.shields.io/nuget/vpre/InfoCarrier.Core?label=InfoCarrier.Core&color=004880)](https://www.nuget.org/packages/InfoCarrier.Core)
+[![NuGet](https://img.shields.io/nuget/vpre/InfoCarrier.Core.AspNetCore?label=InfoCarrier.Core.AspNetCore&color=004880)](https://www.nuget.org/packages/InfoCarrier.Core.AspNetCore)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0-512BD4)](https://github.com/dotnet/efcore)
 [![Spec suite](https://img.shields.io/badge/EF%20spec%20suite-22%2C472%20passing-brightgreen)](docs/limitations.md)
@@ -79,11 +81,15 @@ providers reject.
 > Every limitation, with a worked example, written for someone who does not care about the
 > internals. It takes a few minutes to tell whether any of them touches your application.
 
-**Packaged, not published.** `dotnet pack` produces `InfoCarrier.Core` and
-`InfoCarrier.Core.AspNetCore` at `10.0.0-preview.1`, and pushing a `v*` tag attaches both — plus
-their symbol packages — to a GitHub Release. **Neither is on nuget.org.** A pushed NuGet version
-can be unlisted but never withdrawn, so that one irreversible step is left to a human with the
-packages in hand; no publishing key lives in this repository.
+**Both packages are on nuget.org**, at `10.0.0-preview.1`, with symbol packages and SourceLink:
+
+```bash
+dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # the client and the server
+dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # the server endpoint
+```
+
+Name the version — or pass `--prerelease`. Without either, NuGet looks for a stable release and
+there is not one yet.
 
 **Not yet done:** a shipped gRPC binding, and streaming results as `IAsyncEnumerable`. Both may
 change `IInfoCarrierTransport`, which is why the version still says `preview`.

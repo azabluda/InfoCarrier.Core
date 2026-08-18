@@ -30,7 +30,7 @@ server runs it against SQL Server, PostgreSQL, SQLite — whatever provider the 
 
 -   :material-rocket-launch: **[Install it](getting-started/installation.md)**
 
-    Two packages, and an honest answer about where to get them.
+    Two packages on nuget.org, split on the only line that costs anything.
 
 -   :material-code-braces: **[Build a client and a server](getting-started/first-app.md)**
 
@@ -92,11 +92,13 @@ The nine are known, and every one of them is written up on the
 
 !!! warning "This is a preview"
 
-    The current version is `10.0.0-preview.1`, and neither package is on nuget.org yet. See
-    [Installation](getting-started/installation.md) for the two ways to get it that work today.
+    ```bash
+    dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+    ```
 
-    A gRPC binding and streaming results as `IAsyncEnumerable` are still to come, and both may
-    change the transport interface.
+    `10.0.0-preview.1` is the current version, so name it or pass `--prerelease` — there is no
+    stable release yet. A gRPC binding and streaming results as `IAsyncEnumerable` are still to
+    come, and both may change the transport interface.
 
 ## Security in one paragraph
 

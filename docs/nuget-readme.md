@@ -50,31 +50,17 @@ WebAssembly client must not have to be an ASP.NET Core app to restore its data-a
 `IInfoCarrierTransport` is one method, so HTTP is a default rather than a requirement. gRPC, WCF,
 a message bus or a direct in-process call are all a small class.
 
-## Getting the packages
-
-**Neither package is on nuget.org yet**, so `dotnet add package InfoCarrier.Core` will not find
-one. A pushed NuGet version can be unlisted but never withdrawn, and this is a preview; the
-irreversible step is deliberately left until the surface settles.
-
-Until then, both `.nupkg` files — with their symbol packages — are attached to each
-[GitHub Release](https://github.com/azabluda/InfoCarrier.Core/releases). Point a local feed at the
-folder you downloaded them into:
+## Installing
 
 ```bash
-dotnet nuget add source ./packages --name infocarrier-local
-dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # the client and the server
+dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # the server endpoint
 ```
 
-Or build them from the repository, which needs nothing but the .NET 10 SDK. **Note the branch** —
-this is a ground-up rewrite for EF Core 10, and the repository's default branch is still v1:
+**Name the version, or pass `--prerelease`.** Without either, NuGet looks for a stable release and
+there is not one yet.
 
-```bash
-git clone -b v10-claude https://github.com/azabluda/InfoCarrier.Core.git
-cd InfoCarrier.Core
-dotnet pack InfoCarrier.Core.slnx -c Release -o artifacts/pack
-```
-
-Both packages land in `artifacts/pack`; every other project in the solution opts out of packing.
+Both packages ship symbols and SourceLink, so you can step into the provider from a debugger.
 
 ## Status — preview
 

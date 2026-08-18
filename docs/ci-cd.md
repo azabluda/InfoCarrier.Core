@@ -45,12 +45,19 @@ jobs:
           INFOCARRIER_SQL_CONNECTION: Server=localhost,1433;Database=InfoCarrierTest;User=sa;Password=InfoCarrier1!;TrustServerCertificate=true
 ```
 
-### `release.yml` — NuGet Pack & Publish
+### `release.yml` — pack, gate, attach
 
-Trigger: tag push (`v*`).
+Trigger: tag push (`v*`), or `workflow_dispatch` to rehearse without a tag.
 
-- `dotnet pack src/InfoCarrier.Core/InfoCarrier.Core.csproj -c Release`
-- `dotnet nuget push` to NuGet.org (needs `NUGET_API_KEY` secret)
+- Runs the same gates `build.yml` does, then `dotnet pack InfoCarrier.Core.slnx -c Release`
+  with `ContinuousIntegrationBuild=true`
+- Checks the tag against the packaged version, and fails if they disagree
+- Attaches the `.nupkg` and `.snupkg` files to a GitHub Release
+
+**It does not run `dotnet nuget push`, and no `NUGET_API_KEY` secret exists in this repository.**
+A pushed NuGet version can be unlisted but never withdrawn, so the irreversible step is left to a
+human with the packages in hand; the Release body carries the two commands and the order they must
+run in. Both packages are published at `10.0.0-preview.1`, by that route.
 
 ### Docker SQL Server for SqlServer Tests
 

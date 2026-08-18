@@ -386,8 +386,9 @@ Three separable pieces, and only the first can be done outside the library:
   the ASP.NET Core endpoint carries a framework reference a client must not. `release.yml` packs on a `v*` tag, runs both gates, checks the tag
   against the packaged version, and attaches the files to a GitHub Release. **Publishing to
   nuget.org is deliberately manual** — a pushed version is immutable, so no API key lives in this
-  repository. **Nothing has been published yet, and `-preview.1` should stay until the criteria
-  below are met.**
+  repository. **Both packages are published at `-preview.1`, and `-preview` should stay until the
+  criteria below are met**: the suffix is the promise not yet made about `IInfoCarrierTransport`,
+  and a gRPC binding or streaming results may still change it.
 
 ### M9 — Provider neutrality and store coverage — **CLOSED 2026-08-17**
 

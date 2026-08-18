@@ -1354,3 +1354,43 @@ rather than staying silent about it.
 
       **Gates: none of the repository's.** A workflow file and three Markdown files; nothing under
       `src/` or `test/`. `mkdocs build --strict` was re-run and is green.
+
+- [x] **N7. The documents describe a published package.** `<this commit>`
+
+      Requested directly: write every document as though both packages are on nuget.org. Six files
+      carried the old claim, and they are not six copies of one sentence — each states it in the
+      register of its own audience, so each needed its own answer.
+
+      | File | Was | Is |
+      |---|---|---|
+      | `README.md` | *"Packaged, not published … neither is on nuget.org"* | two version badges and the two `dotnet add package` lines |
+      | `docs/nuget-readme.md` | *Getting the packages* — a local feed over a downloaded `.nupkg` | *Installing* — the ordinary two lines |
+      | `website/docs/getting-started/installation.md` | a **warning** admonition, then two workarounds | CLI / `PackageReference` / Package Manager tabs, with *from source* kept as an alternative |
+      | `website/docs/index.md` | *"neither package is on nuget.org yet"* | the install line, preview caveat kept |
+      | `docs/roadmap.md` | *"Nothing has been published yet"* | published at `-preview.1`, and **why the suffix still stays** |
+      | `docs/ci-cd.md` | *"`dotnet nuget push` to NuGet.org (needs `NUGET_API_KEY` secret)"* | what `release.yml` actually does |
+
+      **`docs/ci-cd.md` was already wrong before this change, and only reading it to edit it found
+      that.** It described `release.yml` as pushing to nuget.org with a `NUGET_API_KEY` secret.
+      `release.yml` does no such thing and says so in its own header — the push is manual and no
+      such secret exists. The line predates M8-20 and had survived every edit since, because
+      nothing that grepped for publication status ever *read* the file it hit. It now records pack,
+      the tag/version check and the Release attachment, and says the push is a human's.
+
+      **The one substantive addition is `--prerelease`, and it is the claim most likely to be
+      tested first.** `dotnet add package InfoCarrier.Core` with no version does **not** resolve
+      `10.0.0-preview.1`: NuGet looks for a stable release, and there is not one. Every install
+      instruction therefore names the version, and each page also gives the `--prerelease`
+      alternative. An install line that fails on a reader's first attempt is worse than no install
+      line.
+
+      **What was deliberately left alone.** `release.yml` is unchanged and still correct — it packs
+      and attaches, a human pushes, no API key lives here — so nothing about having published makes
+      it stale. `Directory.Build.props`'s note that `-preview.1` should stay is likewise still true;
+      a published preview is still a preview. And N1–N6 above are **not** rewritten: they are the
+      record of what was true when each landed, and back-dating them would make this file a
+      description of the present rather than a log.
+
+      **Gates: none of the repository's.** Markdown only; nothing under `src/` or `test/`.
+      `mkdocs build --strict` re-run and green, and the renamed heading was checked for inbound
+      anchor links first — there were none.
