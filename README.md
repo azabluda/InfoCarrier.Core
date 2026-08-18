@@ -88,8 +88,10 @@ dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # th
 dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # the server endpoint
 ```
 
-Name the version — or pass `--prerelease`. Without either, NuGet looks for a stable release and
-there is not one yet.
+> ⚠️ **Name the version.** `InfoCarrier.Core` has been on nuget.org since **1.0**, and its newest
+> *stable* release is **`3.1.1`** — the earlier line, built for EF Core 3.1. An unversioned
+> `dotnet add package InfoCarrier.Core` installs **that**, not this one, and will keep doing so
+> until a stable `10.x` ships. Name the version, or pass `--prerelease`.
 
 **Not yet done:** a shipped gRPC binding, and streaming results as `IAsyncEnumerable`. Both may
 change `IInfoCarrierTransport`, which is why the version still says `preview`.
@@ -171,17 +173,18 @@ dotnet run --project samples/Northwind.Demo
 See [`samples/README.md`](samples/README.md), which also records the two things WebAssembly will
 not do — and why neither is this provider's constraint.
 
-## How it differs from v1
+## How it differs from InfoCarrier.Core 1.0–3.1
 
-This is a **ground-up rewrite** of [InfoCarrier.Core v1](https://github.com/azabluda/InfoCarrier.Core)
-for EF Core 10, not a port.
+This is a **ground-up rewrite** of
+[InfoCarrier.Core 1.0–3.1](https://github.com/azabluda/InfoCarrier.Core/tree/master) for EF Core
+10, not a port. That line ran from `1.0` to `3.1.1` and targeted EF Core 1.x through 3.1.
 
 - **No Remote.Linq or Aqua dependency.** The expression serializer is in-tree and purpose-built,
   which is what makes the wire format, its type allowlist and its AOT story ours to reason about.
 - **A security boundary that is stated and tested.** Deserialization is default-deny across node
   kinds, types and methods, and the review behind it is
   [`docs/security-review.md`](docs/security-review.md) — including what is *accepted* and why.
-- **The EF specification suite is the acceptance criterion.** v1's stated failure mode was
+- **The EF specification suite is the acceptance criterion.** The earlier line's stated failure mode was
   suppressing tests; here a red test is information, skipping one to go green is forbidden, and
   the failure count is ratcheted in CI.
 - **Trimming and AOT are measured, not assumed.** The Blazor client publishes trimmed and runs.
@@ -248,10 +251,10 @@ read it before adding a `NoWarn`.
 
 - [Entity Framework Core](https://github.com/dotnet/efcore) by Microsoft — this provider is built
   on it and judged by its test suite.
-- [InfoCarrier.Core v1](https://github.com/azabluda/InfoCarrier.Core), by
+- [InfoCarrier.Core 1.0–3.1](https://github.com/azabluda/InfoCarrier.Core/tree/master), by
   [on/off it-solutions gmbh](http://www.onoff-it-solutions.info), which proved the idea.
 - [Remote.Linq](https://github.com/6bee/Remote.Linq) and
-  [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn — v1's foundation, and
+  [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn — that line's foundation, and
   specification material for this rewrite.
 
 ## License

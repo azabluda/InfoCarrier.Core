@@ -57,8 +57,13 @@ dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # th
 dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # the server endpoint
 ```
 
-**Name the version, or pass `--prerelease`.** Without either, NuGet looks for a stable release and
-there is not one yet.
+**Name the version.** `InfoCarrier.Core` has been on nuget.org since **1.0**, and its newest
+*stable* release is **`3.1.1`** — the earlier line, built for EF Core 3.1. An unversioned
+`dotnet add package InfoCarrier.Core` installs that one, not this one, and will keep doing so until
+a stable `10.x` ships. Passing `--prerelease` works too.
+
+`InfoCarrier.Core.AspNetCore` is new in this generation, so it has no older version to fall back
+to — but pin it anyway, so the two halves cannot drift apart.
 
 Both packages ship symbols and SourceLink, so you can step into the provider from a debugger.
 

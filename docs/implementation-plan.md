@@ -1988,3 +1988,66 @@ rather than staying silent about it.
       For a 128px icon that no longer matters; for anything large it would.
 
       **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
+- [x] **N17. `dotnet add package InfoCarrier.Core` installs v1, and four pages said it would fail.**
+      `<this commit>`
+
+      N7 wrote every install instruction around one sentence: *"Without either, NuGet looks for a
+      stable release and there is not one yet."* **There is one.** `InfoCarrier.Core` has been on
+      nuget.org since v1 and its newest stable release is **`3.1.1`**, built for **EF Core 3.1**.
+
+      ```
+      2.1.1  2.1.4  2.2.0  2.2.1  2.2.6  2.2.7  3.1.0  3.1.1
+      ```
+
+      **The failure mode is the opposite of what was documented, and worse.** An unversioned
+      `dotnet add package InfoCarrier.Core` does not fail to find anything — it **succeeds**,
+      silently installing a library seven EF majors old. NuGet prefers a stable release over a
+      prerelease, so this stays true until a stable `10.x` ships, however many previews come first.
+      A reader following our own instructions verbatim would have hit it.
+
+      **The two packages are asymmetric**, which nothing said either: `InfoCarrier.Core.AspNetCore`
+      is new to this generation and returns 404, so for *that* one an unversioned install really
+      does find nothing. Same command, two different wrong outcomes.
+
+      Corrected on all four pages — `README.md`, `docs/nuget-readme.md`, the site's installation
+      page and its home page — and the site's version is a `danger` admonition showing the three
+      commands side by side, because "it installs the wrong thing without warning you" is not a tip.
+
+      **How it was found is the part worth keeping.** It came out of *cleanup verification* after
+      the release was rejected: a `curl` against nuget.org to confirm nothing had been published.
+      `InfoCarrier.Core` answered **HTTP 200**. The check was written to prove an absence and
+      discovered a presence — the docs bug was a free side effect of not trusting "nothing was
+      published" without asking.
+
+      **The README badge is affected too** and is left alone deliberately: `nuget/vpre` currently
+      renders `3.1.1`, v1's version. It becomes correct the moment `10.0.0-preview.1` is pushed,
+      and the docs are already written as though it has been.
+
+      **Gates: `mkdocs build --strict` green.** Markdown only; no `src/`, no `test/`.
+
+- [x] **N17b. "v1" is wrong, not merely vague, and it appeared in every user-facing document.**
+      `<this commit>`
+
+      The earlier InfoCarrier.Core is called **"v1"** throughout, and the published record says
+      otherwise: nuget.org carries `1.0.0-beta0002` through **`3.1.1`**, and this repository still
+      has `release/2.2`, `release/3.1` and `release/5.0` branches. Calling that "v1" understates it
+      by two majors, and it matters precisely where N17 landed: a reader told the old line is "v1"
+      has no reason to expect an unversioned install to hand them **3.1.1**.
+
+      Replaced with the span — **InfoCarrier.Core 1.0–3.1** on first mention, *"the earlier line"*
+      as shorthand — in `README.md` (five places, including the *How it differs from* heading),
+      `docs/nuget-readme.md`, and the site's installation and home pages. `grep -n '\bv1\b'` over
+      the user-facing set now returns nothing.
+
+      **The old links were pointed somewhere real while renaming them.** They said
+      `github.com/azabluda/InfoCarrier.Core` — which is *this* repository, whose default branch is
+      now `main` and therefore the **new** product, so a reader clicking "the previous version"
+      landed on the current one. They now name `/tree/master`, checked and answering 200.
+
+      **Internal documents are deliberately untouched.** `implementation-plan.md`, `roadmap.md`,
+      `decisions.md` and `architecture.md` use "v1" as a term of art hundreds of times, and their
+      audience is this repository. The instruction was about user-facing text and the split is the
+      same one Phase N is built on.
+
+      **Gates: `mkdocs build --strict` green**, no inbound anchor to the renamed README heading,
+      and the retargeted link verified. Markdown only.

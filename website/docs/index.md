@@ -96,9 +96,12 @@ The nine are known, and every one of them is written up on the
     dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
     ```
 
-    `10.0.0-preview.1` is the current version, so name it or pass `--prerelease` — there is no
-    stable release yet. A gRPC binding and streaming results as `IAsyncEnumerable` are still to
-    come, and both may change the transport interface.
+    **Name the version.** `InfoCarrier.Core` has been on nuget.org since **1.0**, and an
+    unversioned install resolves to its newest *stable* release — `3.1.1`, built for EF Core 3.1 —
+    rather than to this one. See [Installation](getting-started/installation.md).
+
+    A gRPC binding and streaming results as `IAsyncEnumerable` are still to come, and both may
+    change the transport interface.
 
 ## Security in one paragraph
 
