@@ -40,11 +40,14 @@ theme:
   # a typeface. Setting this to `false` makes the built site self-contained: the only things it
   # loads are its own bundle and, on a page with a diagram, the Mermaid that ships inside it.
   font: false
-  # The mark shipped on both NuGet packages, so the tab, the header and the package listing are
-  # one identity. Both files are generated from `docs/assets/icon-source.png` by `eng/make-icon.py`
-  # -- MkDocs cannot reach outside `docs_dir`, so the site needs its own copy either way, and
-  # generating it beats copying a 128px PNG that then drifts.
-  logo: assets/logo.png
+  # NO `logo:` ON PURPOSE -- it was tried and removed. Material sizes a header logo at 1.2rem,
+  # where this badge is an illegible smudge, and sizing it up makes the mark set the header's
+  # height: 156px of sticky indigo on every page, measured. The mark is at the foot of the
+  # navigation instead, in `stylesheets/extra.css`, where it has 96px and costs no chrome.
+  #
+  # `assets/logo.png` and `assets/favicon.ico` are generated from `docs/assets/icon-source.png` by
+  # `eng/make-icon.py` -- MkDocs cannot reach outside `docs_dir`, so the site needs its own copy
+  # either way, and generating it beats copying a file that then drifts.
   favicon: assets/favicon.ico
   icon:
     repo: fontawesome/brands/github

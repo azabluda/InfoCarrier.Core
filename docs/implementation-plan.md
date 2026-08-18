@@ -2387,3 +2387,39 @@ rather than staying silent about it.
       — or an external host. Neither is worth it for a site that builds in twenty seconds.
 
       **Gates: `eng/docs-serve.sh --build` green, and both modes executed.** No `src/`, no `test/`.
+
+- [x] **N24b. N24 is reverted: the header is the theme's again, and the mark moved to the foot of the nav.** `<this commit>`
+
+      **N24 worked and was still the wrong trade.** A 96px mark in a 2.4rem header row does not sit
+      *in* the header — it **becomes** the header, and the sticky chrome went from **96px to
+      156px** on every page before a word of content. That was measured in N24 and recorded as a
+      success; seeing it is what settled it. `theme.logo` is gone, `--md-scroll-margin` is the
+      theme's own `6rem` again because the chrome is stock again (**re-measured: 96px**), and
+      Material's default header logo is back.
+
+      **Three layouts were considered for keeping it big, and the theme's own DOM refused two.**
+      - *Spanning the header and the tabs row* (96px of chrome, exactly what the mark needs):
+        **`.md-tabs` is outside `</header>`**, inside `.md-container`. It is not sticky and scrolls
+        away, so the mark would have been left hanging over the page content.
+      - *Absolutely positioned into the left gutter*: the gutter is `.md-grid`'s centring, which is
+        zero just above the breakpoint where the logo appears at all — Material shows both the logo
+        and the tabs only above **76.25em** — so there is a band of widths where it would land on
+        the title.
+      - *Full-bleed header inner*: works, but moves the search box and the repository block to the
+        far right and pulls the header out of alignment with everything below it.
+
+      **So the mark went where it costs nothing: the foot of the primary sidebar, at 96px.** A
+      `::after` on `.md-sidebar__scrollwrap`, so no template override and no `custom_dir`; the
+      scrollwrap becomes a flex column so `margin-top: auto` pins the mark to the bottom when the
+      navigation is short and simply follows it when it is long. **Both cases rendered** — the home
+      page, whose nav is one item, and `guide/querying/`, whose nav is five — and the navigation is
+      unaffected in both. The sidebar is hidden below the same 76.25em breakpoint, so this is
+      desktop-only for free.
+
+      **What N24 leaves behind is worth keeping even though its change is gone.** The finding that
+      `--md-scroll-margin` is hard-coded and unlinked to the header's height is a real trap for the
+      next person who tries this, and the note in `extra.css` now records why the header route was
+      abandoned rather than leaving it to be rediscovered.
+
+      **Gates: `mkdocs build --strict` green; chrome band re-measured at 96px, matching stock.** No
+      `src/`, no `test/`.
