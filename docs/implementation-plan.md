@@ -1782,3 +1782,209 @@ rather than staying silent about it.
       **Gates: `mkdocs build --strict` green; `release.yml` re-parsed** — `permissions
       {contents: read, id-token: write}`, environment `nuget-org`, six steps in the intended order.
       No `src/`, no `test/`.
+
+- [x] **N16. A package icon, and the wordmark had to go rather than shrink.** `<this commit>`
+
+      `docs/assets/icon.png`, **128×128**, which is what nuget.org recommends, embedded in both
+      packages via `PackageIcon` — *not* `PackageIconUrl`, which is deprecated and renders nothing
+      for a new package.
+
+      **The draft's "InfoCarrier.Core" wordmark is dropped, and that is the design decision rather
+      than a crop.** An icon is displayed far smaller than the size it ships at: nuget.org lists at
+      about 64px and Visual Studio's package manager at 32. Rendered at 32 the wordmark is a grey
+      smear; the hexagon and `ic.c` still read. Checked by generating the 32px and 64px reductions
+      and looking at them, not by assuming.
+
+      **The white background is removed by flooding from the border, never globally.** A global
+      "white → transparent" would have eaten the white `ic.` lettering *inside* the hexagon, which
+      is the same colour. The flood only reaches pixels connected to the edge.
+
+      **The first version left a fringe.** A hard threshold cut the anti-aliased boundary where the
+      navy met white, leaving **38 pale opaque pixels touching transparency** — invisible on
+      nuget.org's white chrome, a light halo on a dark theme. Measured rather than eyeballed:
+      *pale, opaque, and adjacent to a transparent pixel* is the test, and it distinguishes a
+      fringe from the white lettering, which is pale and opaque but touches nothing transparent.
+      Re-flooded at a looser threshold with alpha feathered by how close each pixel was to white:
+      **38 → 1**.
+
+      **Source quality is the honest limit.** The draft is 185×164 and the hexagon within it only
+      94×104, so 128 is a 1.23× upscale — fine at the sizes an icon is actually shown, but this is
+      not a master. A vector redraw would be sharper if the icon is ever wanted large.
+
+      **Verified where it counts, inside the package** rather than on disk: both `.nupkg` files
+      contain `icon.png` (18,527 bytes) and both nuspecs declare `<icon>icon.png</icon>`.
+
+      **Three failed attempts to edit the `.csproj` files, one cause.** The Bash heredoc used to
+      apply the edits **eats backslashes** — `'\'` reached Python as `'\'` — so every pattern
+      naming `..\..\docs\…` silently failed to match. Fixed by using the editing tool, which has no
+      escaping layer. **And the same `--`-in-an-XML-comment mistake as N13 recurred in the new
+      `PackageIcon` comment**, three steps after it was written up; caught this time by parsing the
+      XML before building rather than by a red CI run. That check is worth making routine.
+
+      **Gates: XML parsed for all three project files; `dotnet pack` produced all four packages;
+      `CI=true dotnet build -c Release` → `5 Warning(s), 0 Error(s)`.** No `test/` change, so not
+      `eng/measure.sh`; no publish path change, so not the trim ratchet.
+
+- [x] **N16b. The icon is a native-resolution crop of the banner, not a rebuild.** `<this commit>`
+
+      N16's icon was rejected on sight, and correctly. It was a **1.23x upscale** of a 94x104
+      hexagon lifted from a 185x164 screenshot; no amount of care recovers detail that was never
+      captured.
+
+      **The attempted fix was worse.** Every element of the mark is a geometric primitive, so it
+      looked rebuildable: measure each component off the draft, redraw as circles, an arc and a
+      rounded stem, supersample. The measuring was sound; the drawing was not. The corner-rounding
+      trick left a spike at the hexagon apex, the arc apertures read as Pac-Man, and the lettering
+      sat wrong. Reverted rather than iterated, because the output would have been a
+      *reconstruction of intent from 94 pixels* rather than the actual design.
+
+      **The answer was already in the repository.** `docs/assets/infocarrier-core-banner.png` is
+      1774x887 and carries the mark at roughly 107x115 — a better and slightly different variant of
+      it. Cropping **128x128 around it at native resolution means no resampling at all**, which is
+      the only way to be certain the result is as sharp as the source.
+
+      **The banner variant differs from the draft, and the banner is the one to keep**: its `i` dot
+      is **white**, where the draft's is blue. Two variants existed and nobody had said which was
+      current.
+
+      **Checked at the sizes it is actually displayed**, not just at 128: rendered at 128, 64 and 32
+      on white, because nuget.org lists at about 64 and Visual Studio at 32. It reads at all three.
+
+      **The background stays dark rather than being masked to the hexagon.** Cutting a transparent
+      silhouette would clip the outer glow and edge highlight that make the plate read, and those
+      are what the design relies on.
+
+      **The honest ceiling: 128 is all this artwork supports.** The largest raster of the mark in
+      existence here is ~115px tall. No 256 or 512 variant is offered, because either would be an
+      upscale wearing a bigger filename. A crisp large icon needs the original vector.
+
+      Verified inside the package rather than on disk: `icon.png` (17,828 bytes) present and
+      `<icon>icon.png</icon>` declared.
+
+      **A useful confirmation fell out of the check.** Packing on this branch produced
+      `10.0.0-preview.1.1` — the height appended to the prerelease tag, exactly the MinVer behaviour
+      N10 corrected the documentation to describe.
+
+      **Gates: `dotnet pack` clean; icon confirmed inside the nupkg.** No `src/` code, no `test/`.
+
+- [x] **N16c. Transparent background, and the edge is computed rather than drawn.** `<this commit>`
+
+      Two requirements: keep the plate's light-and-shade gradient, and make the edge neat on any
+      background. Those pull against each other — the gradient is *inside* the plate, so only the
+      silhouette may be cut, and the cut has to be exact or it fringes.
+
+      **The obvious mask technique fails, twice over.** Pillow has no rounded polygon. The usual
+      substitute — fill an inset polygon, then stroke it with a round-jointed pen — leaves a
+      **visible notch at the top apex** where the stroke closes. That is the same artefact that
+      wrecked N16's geometric rebuild, and it reappeared here in a completely different piece of
+      code before being recognised.
+
+      **An analytic signed distance field has no seam.** Six half-planes, each eroded by the corner
+      radius and the whole dilated by the same amount: the edges stay exactly where the artwork puts
+      them and only the corners round. Coverage comes out as `0.5 - distance`, which is one pixel of
+      linear ramp across the boundary — anti-aliasing without supersampling.
+
+      **The geometry is measured, not guessed.** Luminance profiles across each edge put the plate
+      at **109 x 121.5**, centred at `(634.5, 82.25)`, aspect **0.897** — wider than a regular
+      hexagon's 0.866, which the mask matches rather than idealises.
+
+      **`INSET = 2.0` is the fringe fix.** The outermost pixels of the plate are already blended
+      with the black field behind them; including them leaves a dark rim on a light background.
+
+      **Verified numerically rather than by eye**, because "looks neat" is not a check:
+
+      | | |
+      |---|---|
+      | opaque edge pixels that are near-black (background bleed) | **0** |
+      | mean edge colour | `(8, 28, 68)` — plate navy, not background |
+      | corner alpha | `0, 0, 0, 0` |
+      | partial-alpha buckets | ~30 pixels in each of six, i.e. a real ramp rather than a hard cut |
+
+      Three candidates were rendered on **both white and near-black** and compared before choosing
+      `INSET=2.0, RADIUS=16`; an icon that only works on one background is half-checked.
+
+      **`eng/make-icon.py` regenerates it**, and its output was confirmed byte-identical to the
+      chosen candidate — so the script is the artwork's source, not a description of it.
+
+      **Gates: `dotnet pack` clean; `icon.png` (20,464 bytes) confirmed inside the nupkg with
+      `<icon>icon.png</icon>`.** No `src/` code, no `test/`.
+
+- [x] **N16d. "Light effect good?" — it was not, and only the question found it.** `<this commit>`
+
+      N16c shipped with `INSET = 2.0` and was verified as neat: **0 background bleed, clean corners,
+      a proper alpha ramp**. Every one of those numbers was true. They measured whether the edge was
+      *tidy* and said nothing about whether it was *right*.
+
+      **The plate is lit from the top left and carries a rim highlight on its upper-left edges
+      only** — about twice the plate's brightness (left edge 56, top apex 62, plate ~29) — while the
+      right and bottom edges have none. That asymmetry **is** the lighting. `INSET = 2.0` put the
+      mask boundary just inside it and cut it to nothing:
+
+      | inset | (584,51) | (581,57) | (581,69) | (581,105) |
+      |---|---|---|---|---|
+      | **1.0** | **255** | **255** | **255** | **255** |
+      | 2.0 (shipped) | 132 | **0** | **0** | **0** |
+
+      The interior gradient had survived intact throughout — top-left `L=29.6` down to bottom-right
+      `L=17.3` — which is why the loss was invisible in review. **The icon looked fine. It was just
+      missing the thing that made it look lit.**
+
+      `INSET = 1.0` restores the highlight at full opacity everywhere it exists, for **one**
+      near-black pixel on the entire boundary.
+
+      **A measuring mistake worth recording, because it nearly hid the answer.** The first
+      comparison scored each inset by *the brightest opaque pixel on the boundary*, which produced
+      nonsense — 2.0 scored higher than 1.0. The metric was picking up the **white lettering**
+      wherever the boundary passed near it. Scoring resumed against **identified rim pixels**, found
+      by profiling across each edge, and the picture was immediately unambiguous. **A metric that
+      answers is not the same as a metric that answers the question asked.**
+
+      **The general point.** N16c's checks were the ones I chose, and they were all about the cut.
+      Nobody had asked what the mask was cutting *through*. One question from outside the work —
+      *"light effect good?"* — was worth more than the whole verification suite around it.
+
+      **Gates: `dotnet pack` clean; `icon.png` (20,411 bytes) inside the nupkg; rendered at 128 and
+      32 on white and near-black.** No `src/` code, no `test/`.
+
+- [x] **N16e. New source artwork, six times the target size, and the whole problem dissolves.**
+      `<this commit>`
+
+      Four icons were rejected before this one and **every failure was the same failure**: the
+      source was about the size of the output, so there was no headroom and something had to be
+      invented. Draft hexagon 94x104 → 128 was a 1.23x upscale. The geometric rebuild invented the
+      shapes. The banner crop was native but only 109x121, and masking it tightly enough to look
+      neat cut the rim highlight the artwork is lit by.
+
+      The new artwork carries the mark at **654x763**. 128 is a **0.16x downscale**, so the
+      resampling *is* the anti-aliasing and nothing is reconstructed. That single fact is what fixed
+      it — not technique.
+
+      **What was asked for and what arrived, because the gap matters.** The request was SVG, else
+      2048, else 1024 square with a real alpha channel. What came back was a **browser screenshot**:
+      779x838, not square, `mode=RGBA` but **every pixel alpha 255** and the corners opaque white.
+      An alpha channel that exists and is unused is the shape of "transparent" that a screenshot
+      always produces. It was usable anyway only because the mark within it is large and the
+      surround is *uniformly* `#FFFFFF` — 16,800 of 16,800 sampled pixels — which makes the cut
+      unambiguous.
+
+      **The background is flooded from the border, never keyed globally.** The lettering is white
+      too; a global white→transparent eats it. Alpha is feathered by whiteness at **full**
+      resolution, and the 6x downscale afterwards resolves the edge — which is why there is no
+      supersampling in the script.
+
+      **`docs/assets/icon-source.png` is committed beside the icon.** A 128px PNG cannot be edited
+      or re-derived by anyone; the source and `eng/make-icon.py` make the shipped file reproducible.
+
+      **The script does NOT reproduce the reviewed candidate byte-for-byte**, and that is stated
+      rather than glossed: the candidate used a hand-measured crop box, the script uses
+      `getbbox()` over the alpha. Same mark size (103x120), a slightly different boundary, 129 edge
+      pixels against 181. The script's output is what ships and is what was checked.
+
+      Verified: **0** white-halo pixels on the boundary, corners fully transparent, rendered at 128,
+      64 and 32 on white, near-black and nuget.org's grey card. `icon.png` (13,901 bytes) confirmed
+      inside the nupkg with `<icon>icon.png</icon>`.
+
+      **Still worth getting: the real vector.** Everything here is derived from a screenshot of it.
+      For a 128px icon that no longer matters; for anything large it would.
+
+      **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
