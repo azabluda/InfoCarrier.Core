@@ -14,9 +14,6 @@
 
 <div class="app-shell">
     <header class="app-header">
-        @* The product mark, not a FluentIcon -- one static file, no icon package. `alt` is
-           empty on purpose: the name follows it in text, so this is decoration. *@
-        <img class="app-logo" src="logo.png" alt="" width="20" height="20" />
         <span class="app-mark">InfoCarrier<span class="app-mark-dim">.Core</span></span>
         <span class="app-sep">/</span>
         <span class="app-title">Northwind</span>
@@ -36,6 +33,17 @@
             <span class="nav-label">🔄 Transfer</span>
             <span class="nav-hint">transactions &amp; errors</span>
         </NavLink>
+
+        @*
+            The mark sits at the foot of the rail rather than in the header. At header height
+            it renders about 20px and reads as a smudge -- the hexagon survives, the lettering
+            inside it does not. Down here it gets twice the size and the space the artwork
+            this sample is dressed from gives it. One static file, no icon package.
+        *@
+        <div class="app-brand">
+            <img class="app-brand-mark" src="logo.png" alt="InfoCarrier.Core"
+                 width="40" height="40" />
+        </div>
     </nav>
 
     <main class="app-main">

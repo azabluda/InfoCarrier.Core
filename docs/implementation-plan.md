@@ -2258,3 +2258,28 @@ rather than staying silent about it.
       `IL2111` warnings are the known non-fatal set from `App_razor.g.cs`, a file this change does
       not touch. `eng/trim-ratchet.sh` — `OURS: 88`, `OK (88 <= 88)`.** Sample code changed, so
       both were run; no `src/`, no `test/`.
+
+- [x] **N23c. Twenty pixels is not a size the mark works at.** `<this commit>`
+
+      N23b put the mark in the sample's header brand slot, where it renders at **~20px**. At that
+      size the hexagon survives and the lettering inside it does not — it reads as a blue smudge,
+      which is worse than the emoji it replaced, because an emoji at 20px is *supposed* to look
+      like that.
+
+      Moved to the **foot of the nav rail at 40px**, above a divider, which is where the README
+      banner's mock UI puts it — the artwork this sample is dressed from had already answered the
+      question. The header goes back to text alone rather than carrying a second, smaller copy.
+      `.app-nav` becomes a flex column and the block is pinned with `margin-top: auto`, so a rail
+      that ever grows past the viewport pushes the mark down instead of painting over the last nav
+      item.
+
+      **The general point, and it is the one N23 made about screenshots in a different form.** The
+      favicon was checked at 16, 32 and 48 by rendering each frame and looking at it. The header
+      logo was checked by confirming it *loaded* — a 200, a pixel sample, a mark visible in a
+      1400px-wide screenshot. Both are true statements about a thing that looked bad. **"It is
+      there" and "it is legible" are different measurements, and only the second one was ever the
+      requirement.**
+
+      **Gates: `CI=true dotnet build --configuration Release` — 0 errors, the same 5 known
+      `IL2110`/`IL2111`. `eng/trim-ratchet.sh` — `OK (88 <= 88)`. Rendered and read at 2x.** No
+      `src/`, no `test/`.

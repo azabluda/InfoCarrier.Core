@@ -46,15 +46,6 @@ body {
     border-bottom: 1px solid var(--neutral-stroke-divider-rest);
 }
 
-.app-logo {
-    /* An <img> since the emoji became the real mark. Sized here as well as in the markup so
-       the header does not reflow between first paint and the image arriving. */
-    width: 1.25rem;
-    height: 1.25rem;
-    display: block;
-    flex: none;
-}
-
 .app-mark {
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -87,6 +78,8 @@ body {
 
 .app-nav {
     grid-area: nav;
+    display: flex;
+    flex-direction: column;
     padding: 0.75rem 0.5rem;
     background: var(--neutral-layer-1);
     border-right: 1px solid var(--neutral-stroke-divider-rest);
@@ -122,6 +115,23 @@ body {
     display: block;
     font-size: 0.72rem;
     opacity: 0.6;
+}
+
+.app-brand {
+    /* Pinned to the foot of the rail with `auto` rather than a fixed offset, so a rail that grows
+       past the viewport pushes the mark down instead of painting it over the last nav item. */
+    margin-top: auto;
+    padding: 0.9rem 0.7rem 0.3rem;
+    border-top: 1px solid var(--neutral-stroke-divider-rest);
+}
+
+.app-brand-mark {
+    /* Sized in CSS as well as in the markup so the rail does not reflow between first paint and
+       the image arriving. */
+    width: 2.5rem;
+    height: 2.5rem;
+    display: block;
+    opacity: 0.9;
 }
 
 /* ----------------------------------------------------------------- main */
