@@ -28,6 +28,7 @@ not explain:
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
 | `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count. It guards the **total** as well: a crashed host reports fewer failures because fewer tests ran, which once came within one measurement of looking like an improvement. **The baseline is read out of the TRX, never out of the console block and never by arithmetic** — the TRX is what this script parses, and its `total` counts the skips its `passed` and `failed` do not. |
+| `eng/check-project-xml.sh` | Parses every `.csproj`/`.props`/`.targets` as XML, in about a second. **Wired into both `build.yml` jobs, before restore.** A malformed project file does not announce itself: it once surfaced as `NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher`, which names trimming and actually means "no usable TargetFramework" — and the same error had appeared before from a stale `obj/Release`, so its own history misleads. Both real cases were a **double hyphen inside an XML comment**, which is illegal and very easy to write while documenting a command: `<!-- dotnet build --configuration Release -->`. Use `-c Release`. |
 | `eng/gate.sh` | A detached delay used to schedule an unattended session. Sleeps 7200s, then writes `artifacts/gate-open.txt`. Not part of the build; delete it if it stops being useful. |
 
 **Measuring a change: `eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which
@@ -351,7 +352,7 @@ Not yet implemented, in rough priority order:
     which is the silent-divergence shape A49/B4/B12 warn about. **A one-GUID regeneration diff is
     the tell that the factory was never consulted**, and it was misread once as "proxies do not
     affect the model". The compiled model is removed; the sample builds its model at start-up.
-  - **Trimming: 86 IL warnings are ours and spec §9's "none of ours" criterion is NOT met.** They
+  - **Trimming: 88 IL warnings are ours and spec §9's "none of ours" criterion is NOT met.** They
     are the premise showing through — the wire carries a type's *name* — so
     `[DynamicallyAccessedMembers]` cannot express them. Gated by direction in `eng/trim-ratchet.sh`
     against `eng/trim-baseline.txt`, exactly as `eng/ratchet.sh` gates the spec suite. **The app
@@ -360,7 +361,11 @@ Not yet implemented, in rough priority order:
     ILLink, and the script's first version reported `OURS: 0` — a gate that would have passed
     forever. It now wipes `obj/Release` and refuses a log with no ILLink banner. **And classify
     trim warnings by declaring member, never by file path: this repository's own path contains the
-    string "InfoCarrier", so a naive grep attributes all 1129 to this product.**
+    string "InfoCarrier", so a naive grep attributes every warning in the log to this product.**
+    (The totals move for reasons that are not ours: `ours` went 86 → 88 for a deliberate
+    `WireGrouping` fix, and `total` fell 1129 → 853 when EF Core's own count dropped. Read the
+    current pair out of `eng/trim-baseline.txt`; it records every measurement and why each moved,
+    which is why no number is quoted here.)
 - **Complex types work** (A32) — `ComplexTypesTrackingTestBase` is **249 of 251**, and the two
   left are one shape of one feature: a property-bag complex *collection* on an `Added` entity.
   A complex value cannot ride in the value dictionary an entity is built from — `CreateEntry` and
@@ -664,6 +669,15 @@ was expected to print.
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
 default assumption.
+
+**One sighting on record, 2026-08-18, and it was the runner rather than this repository.** A
+`Build & Test` run on `main` reported `Total: 11308` against a baseline of `22658` — the host
+crashed mid-`NorthwindJoinQuerySqlite` with `Test host process crashed` and no exception. **The
+ratchet caught it on the total, which is what that guard is for**: failures had "fallen" 9 → 3, and
+without the total check it would have read as the best result of the day. Re-running the same job
+on the same commit gave `22658 / 22472 / 9 / 177`. The commit changed only `release.yml` and
+Markdown, so nothing test-affecting differed between the two runs. Not chased further; if it
+recurs, it is the top priority and the rule below applies.
 
 **If you do notice flakiness, it becomes the top priority — before whatever you were doing.** The
 signal is a run that differs from the previous snapshot with **no code change between them**;

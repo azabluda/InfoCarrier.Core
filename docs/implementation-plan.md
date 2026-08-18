@@ -2080,3 +2080,39 @@ rather than staying silent about it.
       alone would leave the next person exactly where this phase started.
 
       **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
+
+- [x] **N20. Three leftovers: a stale number, an unrecorded flake, and a gate for the bug that got
+      through twice.** `<this commit>`
+
+      **`CLAUDE.md` said 86 IL warnings; `eng/trim-baseline.txt` says 88**, and has since J8's
+      deliberate `WireGrouping` rise. Corrected — and the companion sentence that quoted `1129` now
+      quotes nothing at all, because `total` has since fallen to 853 for reasons that are **not
+      ours** (EF Core's own count dropped). A number copied into prose goes stale silently; the
+      baseline file records every measurement *and why it moved*, so the prose points there.
+
+      **The flake is on record.** A `Build & Test` run on `main` reported `Total: 11308` against a
+      baseline of `22658` — `Test host process crashed`, no exception, mid-`NorthwindJoinQuerySqlite`.
+      **The ratchet caught it on the total**, which is exactly what that guard exists for: failures
+      had "fallen" 9 → 3 and would otherwise have read as the best result of the day. Re-running the
+      same job on the same commit gave `22658 / 22472 / 9 / 177`, and the commit changed only
+      `release.yml` and Markdown — nothing test-affecting differed between them. Written up beside
+      the flakiness rule so a second sighting has something to be a second sighting *of*.
+
+      **`eng/check-project-xml.sh`, wired into both `build.yml` jobs before restore.** Two of three
+      CI failures in one afternoon were a malformed project file, and neither said so — one arrived
+      as `NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher`, which names trimming
+      and means *"no usable TargetFramework"*. Both were a **double hyphen inside an XML comment**,
+      illegal and very easy to write while documenting a command.
+
+      **The check was made to fail before it was trusted.** Reintroducing the exact N13 bug produced
+      `not well-formed (invalid token): line 168, column 50` and exit 1; removing it produced
+      `OK (10 files parsed)`.
+
+      **And its first run found a bug in itself.** It called `python3`, which on Windows resolves to
+      a Microsoft Store stub that exists on `PATH` and then refuses to run — so it reported **all
+      ten** project files malformed. `command -v` proves a name resolves, not that it executes; the
+      script now tries `python3`, `python`, `py` and keeps the first that survives `-c "pass"`.
+      **A gate that cannot be run locally is the problem it was written to fix.**
+
+      **Gates: `eng/check-project-xml.sh` OK; `CI=true dotnet build -c Release` → `0 Error(s)`.**
+      No `src/` code, no `test/`.

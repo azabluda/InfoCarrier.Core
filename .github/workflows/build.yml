@@ -40,6 +40,13 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      # Before restore, because a malformed project file does not announce itself as one: it
+      # surfaced once as `NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher`, which
+      # names trimming and means "no usable TargetFramework". One second, and the failure names the
+      # file and the line.
+      - name: Check project XML
+        run: bash eng/check-project-xml.sh
+
       - name: Restore
         run: dotnet restore ${{ env.SOLUTION }}
 
@@ -84,6 +91,13 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Before restore, because a malformed project file does not announce itself as one: it
+      # surfaced once as `NETSDK1124: Trimming assemblies requires .NET Core 3.0 or higher`, which
+      # names trimming and means "no usable TargetFramework". One second, and the failure names the
+      # file and the line.
+      - name: Check project XML
+        run: bash eng/check-project-xml.sh
 
       - name: Restore
         run: dotnet restore ${{ env.SOLUTION }}
