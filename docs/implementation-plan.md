@@ -2192,3 +2192,125 @@ rather than staying silent about it.
       nothing else — no admonitions, which is why the site page and this one do not share text.
 
       **Gates: none.** One Markdown file, and no script reads it.
+
+- [x] **N23. The site wore the theme's default icon while both packages wore ours.** `<this commit>`
+
+      `mkdocs.yml` set neither `theme.logo` nor `theme.favicon`, so every tab showed Material's
+      generic mark and the header showed none at all — the one place a reader arrives at *before*
+      nuget.org, identifying itself as somebody else's template.
+
+      **Generated, not copied.** MkDocs cannot read outside its `docs_dir`, so the site needs its
+      own copy of the artwork whatever happens; `eng/make-icon.py` now derives all three outputs
+      from the same `docs/assets/icon-source.png` in one run — the 128px package icon, a 192px
+      `logo.png` (the header renders it at ~24px, so that is 2x/3x headroom) and a `favicon.ico`
+      holding 16, 32 and 48. **Each favicon frame is resampled from the 1254px source
+      independently**, which is the whole reason to ship an `.ico` rather than one PNG: a 16px cut
+      from the source is visibly cleaner than the browser's own downscale of a 128px image.
+
+      **The refactor was proved inert rather than assumed inert.** Pulling the fit-and-centre logic
+      into `render(mark, canvas)` changed the margin from a constant to a ratio, and the shipped
+      package icon is a published artefact. `git hash-object docs/assets/icon.png` before and after
+      is `da714d74…` both times — byte-identical, so no `.nupkg` in flight is affected.
+
+      **Verified by rendering it, and the first verification was wrong.** Headless Edge, the built
+      site served locally, screenshots of the header in both colour schemes. The dark-mode shot and
+      the "light" shot came back **pixel-identical**, which read as "the header is indigo in both
+      schemes" — true, but not what had been measured. **Headless Chromium defaults to
+      `prefers-color-scheme: dark`**, so the first screenshot was already the slate scheme and
+      `--force-dark-mode` changed nothing; both shots were the same scheme. The light scheme needs
+      `--blink-settings=preferredColorScheme=1`, and with it the body sampled `(255,255,255)`
+      against the dark shot's `(30,33,41)`. The logo pixels are identical across the two, which is
+      now a measurement instead of a coincidence. **A check that cannot come out differently has
+      not checked anything** — the standing probe rule, in the form the browser hands you for free.
+
+      A contrast worry about a dark navy mark on an indigo header turned out to be unfounded on
+      sight: the artwork's rim highlight carries it. No palette change.
+
+      **Gates: `mkdocs build --strict` green, exit 0, zero warnings, and every `assets/` reference
+      in the built `index.html` confirmed present on disk.** No `src/`, no `test/`.
+
+- [x] **N23b. The sample had no favicon at all, and its header wore a satellite dish.** `<this commit>`
+
+      Two more surfaces, found by looking rather than by guessing. `samples/Northwind.Client/
+      wwwroot/index.html` contained **no `<link rel="icon">` of any kind**, so every browser tab
+      showing the sample took a **404 on `/favicon.ico`** and fell back to the generic page icon.
+      And `MainLayout.razor`'s brand slot was the emoji `📡`.
+
+      `eng/make-icon.py` now writes `logo.png` and `favicon.ico` into a *list* of web roots — the
+      site's `assets/` and the sample's `wwwroot/` — because neither MkDocs nor a Blazor `wwwroot`
+      can read outside its own root, so each surface needs its own copy whatever happens. **All
+      three pre-existing outputs hash byte-identical after the change** (`da714d74…`, `b723dcf2…`,
+      `79e16886…`), which is the same inertness check N23 used and the reason a second refactor of
+      a published artefact is safe to make.
+
+      The nav icons stay emoji, and the file says why: Fluent UI ships its icon set as a separate,
+      large package, and a sample about the wire should not pull one in to decorate a menu. **That
+      argument is about a package, not about images** — a single static PNG in the brand slot costs
+      no dependency, so it does not contradict the note it sits next to.
+
+      **Verified by running it**, not by reading the diff. `dotnet run --project
+      samples/Northwind.Server`, then headless Edge with a virtual-time budget so WebAssembly
+      actually boots: `/favicon.ico` and `/logo.png` both **200**, a nonexistent `.ico` still
+      **404** so the 200s mean something, the mark renders top-left in the header, and the page
+      behind it is the working app — 65 customers, two round trips in the wire panel.
+
+      **Gates: `CI=true dotnet build --configuration Release` — 0 errors, and the 5 `IL2110`/
+      `IL2111` warnings are the known non-fatal set from `App_razor.g.cs`, a file this change does
+      not touch. `eng/trim-ratchet.sh` — `OURS: 88`, `OK (88 <= 88)`.** Sample code changed, so
+      both were run; no `src/`, no `test/`.
+
+- [x] **N23c. Twenty pixels is not a size the mark works at.** `<this commit>`
+
+      N23b put the mark in the sample's header brand slot, where it renders at **~20px**. At that
+      size the hexagon survives and the lettering inside it does not — it reads as a blue smudge,
+      which is worse than the emoji it replaced, because an emoji at 20px is *supposed* to look
+      like that.
+
+      Moved to the **foot of the nav rail at 40px**, above a divider, which is where the README
+      banner's mock UI puts it — the artwork this sample is dressed from had already answered the
+      question. The header goes back to text alone rather than carrying a second, smaller copy.
+      `.app-nav` becomes a flex column and the block is pinned with `margin-top: auto`, so a rail
+      that ever grows past the viewport pushes the mark down instead of painting over the last nav
+      item.
+
+      **The general point, and it is the one N23 made about screenshots in a different form.** The
+      favicon was checked at 16, 32 and 48 by rendering each frame and looking at it. The header
+      logo was checked by confirming it *loaded* — a 200, a pixel sample, a mark visible in a
+      1400px-wide screenshot. Both are true statements about a thing that looked bad. **"It is
+      there" and "it is legible" are different measurements, and only the second one was ever the
+      requirement.**
+
+      **Gates: `CI=true dotnet build --configuration Release` — 0 errors, the same 5 known
+      `IL2110`/`IL2111`. `eng/trim-ratchet.sh` — `OK (88 <= 88)`. Rendered and read at 2x.** No
+      `src/`, no `test/`.
+
+- [x] **N23d. The badge does not belong in a nav rail at any size — the wordmark does.** `<this commit>`
+
+      N23c moved the badge to the foot of the rail and doubled it to 40px. Still wrong, and the
+      reason is not the size: **the badge is a 128px artefact**. It is drawn to be legible on a
+      package listing, so its lettering lives *inside* a hexagon with a rim highlight and a
+      gradient. Put that in a 232px rail and the hexagon is all anyone sees.
+
+      The rail now sets **`ic.c` as text** — 1.9rem, 700 weight, the trailing `c` in
+      `var(--accent-fill-rest)`, which is the same token the active nav item and the primary button
+      use. This is what the README banner's mock UI does, and it had been showing the answer for
+      two steps: **the mock never contains the badge — it contains lettering.**
+
+      Text over an image for three reasons that are not taste: it is crisp at every size and on
+      every DPI, it cannot reflow the rail while a file loads, and it follows the theme's accent
+      instead of pinning a blue chosen for a dark background.
+
+      `samples/Northwind.Client/wwwroot/logo.png` is **deleted** and `eng/make-icon.py` no longer
+      writes one there — `FAVICON_ROOTS` for both web surfaces, `SITE_LOGO` for the site alone. A
+      favicon must be an image and 16px is what the format is, so the badge stays there and in the
+      documentation site's header, where a small mark beside the site name is the idiom. The three
+      surviving outputs hash byte-identical again.
+
+      **Verified by sampling the rendered pixels, because reading the screenshot got it wrong.**
+      The dot looked blue at 3x and it is not: columns 21-46 of the wordmark are `(255,255,255)`
+      and columns 47-59 are `(96,201,252)`, so `ic.` is foreground and only the final `c` is
+      accent, which is what the artwork does. **A magnified screenshot is an interpretation; the
+      pixel values are the measurement.**
+
+      **Gates: `CI=true dotnet build --configuration Release` — 0 errors, the same 5 known
+      `IL2110`/`IL2111`. `eng/trim-ratchet.sh` — `OK (88 <= 88)`.** No `src/`, no `test/`.

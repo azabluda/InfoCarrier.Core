@@ -46,11 +46,6 @@ body {
     border-bottom: 1px solid var(--neutral-stroke-divider-rest);
 }
 
-.app-logo {
-    font-size: 1.05rem;
-    line-height: 1;
-}
-
 .app-mark {
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -83,6 +78,8 @@ body {
 
 .app-nav {
     grid-area: nav;
+    display: flex;
+    flex-direction: column;
     padding: 0.75rem 0.5rem;
     background: var(--neutral-layer-1);
     border-right: 1px solid var(--neutral-stroke-divider-rest);
@@ -118,6 +115,28 @@ body {
     display: block;
     font-size: 0.72rem;
     opacity: 0.6;
+}
+
+.app-brand {
+    /* Pinned to the foot of the rail with `auto` rather than a fixed offset, so a rail that grows
+       past the viewport pushes the mark down instead of painting it over the last nav item. */
+    margin-top: auto;
+    padding: 0.9rem 0.7rem 0.3rem;
+    border-top: 1px solid var(--neutral-stroke-divider-rest);
+}
+
+.app-brand-text {
+    display: block;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1;
+}
+
+.app-brand-accent {
+    /* The same token the active nav item and the primary button use, so the wordmark tracks
+       the theme rather than pinning a blue that only suits the dark one. */
+    color: var(--accent-fill-rest);
 }
 
 /* ----------------------------------------------------------------- main */
