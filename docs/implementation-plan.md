@@ -1945,3 +1945,46 @@ rather than staying silent about it.
 
       **Gates: `dotnet pack` clean; `icon.png` (20,411 bytes) inside the nupkg; rendered at 128 and
       32 on white and near-black.** No `src/` code, no `test/`.
+
+- [x] **N16e. New source artwork, six times the target size, and the whole problem dissolves.**
+      `<this commit>`
+
+      Four icons were rejected before this one and **every failure was the same failure**: the
+      source was about the size of the output, so there was no headroom and something had to be
+      invented. Draft hexagon 94x104 → 128 was a 1.23x upscale. The geometric rebuild invented the
+      shapes. The banner crop was native but only 109x121, and masking it tightly enough to look
+      neat cut the rim highlight the artwork is lit by.
+
+      The new artwork carries the mark at **654x763**. 128 is a **0.16x downscale**, so the
+      resampling *is* the anti-aliasing and nothing is reconstructed. That single fact is what fixed
+      it — not technique.
+
+      **What was asked for and what arrived, because the gap matters.** The request was SVG, else
+      2048, else 1024 square with a real alpha channel. What came back was a **browser screenshot**:
+      779x838, not square, `mode=RGBA` but **every pixel alpha 255** and the corners opaque white.
+      An alpha channel that exists and is unused is the shape of "transparent" that a screenshot
+      always produces. It was usable anyway only because the mark within it is large and the
+      surround is *uniformly* `#FFFFFF` — 16,800 of 16,800 sampled pixels — which makes the cut
+      unambiguous.
+
+      **The background is flooded from the border, never keyed globally.** The lettering is white
+      too; a global white→transparent eats it. Alpha is feathered by whiteness at **full**
+      resolution, and the 6x downscale afterwards resolves the edge — which is why there is no
+      supersampling in the script.
+
+      **`docs/assets/icon-source.png` is committed beside the icon.** A 128px PNG cannot be edited
+      or re-derived by anyone; the source and `eng/make-icon.py` make the shipped file reproducible.
+
+      **The script does NOT reproduce the reviewed candidate byte-for-byte**, and that is stated
+      rather than glossed: the candidate used a hand-measured crop box, the script uses
+      `getbbox()` over the alpha. Same mark size (103x120), a slightly different boundary, 129 edge
+      pixels against 181. The script's output is what ships and is what was checked.
+
+      Verified: **0** white-halo pixels on the boundary, corners fully transparent, rendered at 128,
+      64 and 32 on white, near-black and nuget.org's grey card. `icon.png` (13,901 bytes) confirmed
+      inside the nupkg with `<icon>icon.png</icon>`.
+
+      **Still worth getting: the real vector.** Everything here is derived from a screenshot of it.
+      For a 128px icon that no longer matters; for anything large it would.
+
+      **Gates: `dotnet pack` clean.** No `src/` code, no `test/`.
