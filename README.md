@@ -36,9 +36,9 @@ there against the real database.
 
 ## What does not
 
-[`docs/limitations.md`](docs/limitations.md) lists every scenario that behaves differently from a
-normal EF Core provider, with a worked example for each. It is a short read, and worth doing before
-you adopt.
+The [limitations page](https://azabluda.github.io/InfoCarrier.Core/limitations/) lists every
+scenario that behaves differently from a normal EF Core provider, with a worked example for each.
+It is a short read, and worth doing before you adopt.
 
 ## Getting started
 
