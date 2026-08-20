@@ -7,118 +7,101 @@ protocol. Client `DbContext` has no database; the server executes against a real
 
 ```powershell
 dotnet build InfoCarrier.Core.slnx                       # note: .slnx, not .sln
-dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # full suite
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the suite
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 17 tests, separate project
 ```
 
-Point test runs at the `.csproj`, not the `.slnx` — the solution also contains
-`test/InfoCarrier.Core.TransportTests` (17 tests), and running both together inflates `Total`
-past what `test/known-failures.txt` was written against. `eng/measure.sh` was scoped to the
-`.csproj` for the same reason; a hand run must be scoped the same way or its count is not
-comparable. The transport tests are a separate project, run separately:
-`dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj`.
+**Point test runs at the `.csproj`, never at the `.slnx`.** The solution holds both test projects,
+and running them together inflates `Total` past what `test/known-failures.txt` was written against.
+`eng/measure.sh` is scoped to the `.csproj` for the same reason, so a hand run scoped any other way
+is not comparable to it.
 
-Report test results as `Passed: N, Failed: M, Total: T` from actual output — never estimate
-or infer a count.
+**Report test results as `Passed: N, Failed: M, Total: T`, read out of the run's own output.** Never
+estimate a count, and never derive one figure from the others.
 
-Everything in `eng/` — there is nothing else, and no script does anything a comment in it does
-not explain:
+`eng/` holds these and nothing else. No script does anything a comment inside it does not explain.
 
 | Script | What it is for |
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
-| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count. It guards the **total** as well: a crashed host reports fewer failures because fewer tests ran, which once came within one measurement of looking like an improvement. **The baseline is read out of the TRX, never out of the console block and never by arithmetic** — the TRX is what this script parses, and its `total` counts the skips its `passed` and `failed` do not. |
-| `eng/gate.sh` | A detached delay used to schedule an unattended session. Sleeps 7200s, then writes `artifacts/gate-open.txt`. Not part of the build; delete it if it stops being useful. |
+| `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
+| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. |
+| `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
+| `eng/make-icon.py` | Regenerates `docs/assets/icon.png` from the source artwork. Run it when the artwork changes. |
 
-**Measuring a change: `eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which
-wraps the whole loop). It prints the count, the exact list of tests fixed and broken, *and* a
-diff of the failure **reasons** — three levels, because each one hides a mistake the level below
-it catches:
+## Measuring and gating
+
+**`eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which wraps the whole loop)
+prints the count, the exact list of tests fixed and broken, *and* a diff of the failure **reasons**.
+Three levels, because each one hides a mistake the level below it catches:
 
 - the count alone cannot tell "fixed 4, broke 4" from "changed nothing";
 - the fixed/broken lists alone cannot tell "changed nothing" from "fixed what it aimed at and
-  uncovered the next problem in the same tests" — both leave the name list byte-identical. That
-  one produced a wrong revert (plan L8) after two runs were read as neutral.
+  uncovered the next problem in the same tests" — both leave the name list byte-identical. That one
+  produced a wrong revert (plan L8) after two runs were read as neutral.
 
-Never state a verdict from partial output. Two specific errors have each cost a wrong revert
-here, and both are cheap to avoid:
+**Never state a verdict from partial output.**
 
-- **A count that did not move does not mean the target does not exist.** A matcher that never
-  fired and a rewrite that did not help look identical from outside. Establish that the code
-  *ran* — a probe writing to a file, since xUnit swallows stdout — before concluding anything
-  about the problem.
+**Which gate to run before which commit.** `eng/measure.sh` says nothing about trimming and the trim
+gate says nothing about behaviour. They are separate axes, and M9's J8 was committed green on one
+while failing the other in CI.
+
+| Change touches | Run |
+|---|---|
+| `src/` | **both** `eng/measure.sh` and `eng/trim-ratchet.sh` |
+| `test/` only | `eng/measure.sh` |
+| `docs/`, `eng/` text only | neither |
+
+The trim ratchet is a clean publish: ~41 s in CI, about a minute locally. That is cheap enough that
+"product code changed" is the whole trigger — do not try to judge whether a change *looks*
+reflective, because `WireGrouping` did not look like five warnings.
+
+**And the build itself is a gate.** Warnings are errors when `CI=true`, so before any commit that
+touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
+**`--configuration Release` is not optional, and leaving it off is how CI went red for ten commits
+without anyone noticing (N12).** The Blazor sample turns the trim analyzer on in Release only, so a
+Debug build cannot produce the diagnostic that fails the server. It takes seconds and it is what the
+server runs. `docs/build-warnings.md` says what is suppressed and why.
+
+Each of the following has already cost a wrong conclusion here, and each is cheap to avoid.
+
+- **A count that did not move does not mean the target does not exist.** A matcher that never fired
+  and a rewrite that did not help look identical from outside. Establish that the code *ran* first —
+  with a probe that writes to a file, because xUnit swallows stdout.
+- **A probe that prints nothing is evidence only once the build is known green. Check the error
+  count, never the elapsed time.** `dotnet build … | Select-Object -Last 2` shows `Time Elapsed` and
+  hides `1 Error(s)`, which is how three successive "nothing logged" results were each read as a
+  clearance while every run used a stale binary.
 - **"EF ships no InMemory test for this base" means move it to Tier B, not drop it.** ADR-009 has
   two tiers precisely because InMemory cannot host everything, and a base adopted on the wrong one
-  produces failures that describe the *backing store* rather than this provider. Two bases were
-  reverted on that mistake and both pass on Tier B, first run, no overrides (A79). Only "EF ships no
+  produces failures that describe the *backing store* rather than this provider. Only "EF ships no
   test for it on any store we have" justifies leaving a base unadopted. The tell: **if adopting a
   base means writing a workaround for a store capability the base assumes, check the tier before
-  writing the workaround** (A80 deleted one such workaround by moving a class). And **a base belongs
-  to exactly one tier** — three Northwind bases ran on both, green on both, 906 tests of pure
-  duplication (A81). When a base could go either way, the tier that *translates* is the one whose
-  green means more.
-- **Which gate to run before which commit.** `eng/measure.sh` says nothing about trimming, and the
-  trim gate says nothing about behaviour — they are separate axes and M9's J8 was committed green on
-  one while failing the other in CI.
-  | Change touches | Run |
-  |---|---|
-  | `src/` | **both** `eng/measure.sh` and `eng/trim-ratchet.sh` |
-  | `test/` only | `eng/measure.sh` |
-  | `docs/`, `eng/` text only | neither |
-
-  The trim ratchet is a clean publish: ~41 s in CI, about a minute locally. That is cheap enough
-  that "product code changed" is the whole trigger — do not try to judge whether a change *looks*
-  reflective, because `WireGrouping` did not look like five warnings.
-
-  **And the build itself is a gate now.** Warnings are errors when `CI=true`, so before any commit
-  that touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
-  **`--configuration Release` is not optional and leaving it off is how CI went red for ten
-  commits without anyone noticing (N12).** The Blazor sample turns the trim analyzer on in Release
-  only, so the Debug build cannot produce the diagnostic that fails the server. It is seconds, it
-  is what the server runs, and a Debug build will not show you the failure. `docs/build-warnings.md` says what
-  is suppressed and why.
-- **A probe that prints nothing is evidence only once the build is known green — check the error
-  count, never the elapsed time.** M9's J9 read three successive "nothing logged" results as
-  clearances. All three were a **stale binary**: the probe named a property that does not exist
-  (`InfoCarrierFault.ExceptionType`; it is `TypeName`), so every build after it failed and every run
-  used the previous assembly. `dotnet build ... | Select-Object -Last 2` shows `Time Elapsed` and
-  hides `1 Error(s)`, which is how it survived three attempts. It produced two confident false
-  clearances before the real cause — an upstream bug in EF's own test type — was found. This is the
-  standing "establish that the code *ran*" rule, in the one form it had not yet been broken in.
+  writing the workaround.** And **a base belongs to exactly one tier** — running one on both is
+  duplication, not coverage. When a base could go either way, the tier that *translates* is the one
+  whose green means more.
 - **Before moving a base to Tier B, grep it for `ExecuteWithStrategyInTransactionAsync` — and if it
   uses one, write the `UseTransaction` override in the same commit as the store switch.** That
   helper opens **one** transaction and then requires **every other context** to enlist in it. On
   Tier A the transaction is ignored and nothing shows; on Tier B it is real, and without the
-  override the inner contexts stay outside it while the outer one holds the store's write lock. J3
-  moved `ProxyGraphUpdates` on the strength of 13 mirrored skips and measured **733 failures, 717 of
-  them that class, 471 of them `SQLite Error 5: 'database is locked'`** — each waiting out a
-  30-second lock timeout, which is why the run took hours rather than minutes. **The tell is not in
-  the skips and not in the fixture: it is the base's own transaction strategy.**
-  **CORRECTED 2026-08-17 (M9), and the correction is the operative half.** This entry used to end
-  *"a base that uses it cannot move until the client can join an open server transaction by its wire
-  token — a product feature that does not exist"*, and named `GraphUpdates` and `ProxyGraphUpdates`
-  as permanently Tier A. **Nothing was missing.**
-  `InfoCarrierDatabaseFacadeExtensions.UseInfoCarrierTransaction` and
-  `InfoCarrierTransactionManager.UseTransaction(token)` have shipped since M4, with the non-owning
-  semantics the question worried about. What was missing was the **test class's own
-  `UseTransaction` override**, which `ConferencePlannerInfoCarrierTest` and
-  `OptimisticConcurrencyInfoCarrierTest` already carried — one grep away the whole time. Both bases
-  are now on **Tier B and green**: `ProxyGraphUpdates` in J11 (167 fixed, 0 broken) and
-  `GraphUpdates` in J12a, with **zero** "database is locked" because the override landed with the
-  store switch. Full reading in `architecture.md` §6a **D6**, closed. **The general lesson is the
-  one this file states elsewhere and this entry broke: before pricing a gap, check whether a sibling
-  of it already works.**
-  A relational suite normally enlists with `transaction.GetDbTransaction()`, which ADR-013 does put
-  permanently out of this client's reach — that part was always true, and it is why the override is
-  needed rather than why the move is impossible.
+  override the inner contexts stay outside it while the outer one holds the store's write lock —
+  471 `SQLite Error 5: 'database is locked'` in a single run, each waiting out a 30-second timeout.
+  **The tell is not in the skips and not in the fixture: it is the base's own transaction strategy.**
+  The override calls `InfoCarrierDatabaseFacadeExtensions.UseInfoCarrierTransaction` and
+  `InfoCarrierTransactionManager.UseTransaction(token)`, both shipped since M4. `architecture.md`
+  §6a **D6** is the full reading, closed.
 - **A newly-red SQLite test is not automatically a regression.** Grep
-  `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it
-  with `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
+  `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it with
+  `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
   provider. Adopt EF's override. **Grep `EFCore.Relational.Specification.Tests` too** — a limit
-  every relational provider has is overridden on the relational *base*, not in SQLite's own
-  suite, and reading only the latter had `Reverse_without_explicit_ordering` classified as a real
-  failure for two sessions. The reverse also happens — an override of ours that EF does *not*
-  have is a workaround to delete once the limitation goes.
+  every relational provider has is overridden on the relational *base*, not in SQLite's own suite,
+  and reading only the latter had `Reverse_without_explicit_ordering` classified as ours for two
+  sessions. The reverse also happens: an override of ours that EF does *not* have is a workaround to
+  delete once the limitation goes.
+
+**What each of these cost, and how it was found, is in
+[`docs/plans/v10/findings.md`](docs/plans/v10/findings.md).**
 
 ## Where authority lives
 

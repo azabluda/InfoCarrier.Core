@@ -432,3 +432,50 @@ loaded (B10), and whether a no-tracking row carries complex values at all (B11).
 *assertion*, not the count — `AssertOwnedBranch` dereferencing a null and `AssertAddress`
 comparing `expected is null` to `actual is null` each named their defect outright.
 
+### Establish that the code ran — the stale-binary form
+
+**A probe that prints nothing is evidence only once the build is known green — check the error
+count, never the elapsed time.** M9's J9 read three successive "nothing logged" results as
+clearances. All three were a **stale binary**: the probe named a property that does not exist
+(`InfoCarrierFault.ExceptionType`; it is `TypeName`), so every build after it failed and every run
+used the previous assembly. `dotnet build ... | Select-Object -Last 2` shows `Time Elapsed` and
+hides `1 Error(s)`, which is how it survived three attempts. It produced two confident false
+clearances before the real cause — an upstream bug in EF's own test type — was found. This is the
+standing "establish that the code *ran*" rule, in the one form it had not yet been broken in.
+
+### Before pricing a gap, check whether a sibling of it already works
+
+The rule in `CLAUDE.md` about `ExecuteWithStrategyInTransactionAsync` used to end by declaring two
+bases permanently unreachable. It was wrong, and this is the correction it carried for two
+milestones.
+
+J3 moved `ProxyGraphUpdates` on the strength of 13 mirrored skips and measured **733 failures, 717
+of them that class, 471 of them `SQLite Error 5: 'database is locked'`** — each waiting out a
+30-second lock timeout, which is why that run took hours rather than minutes.
+
+**CORRECTED 2026-08-17 (M9), and the correction is the operative half.** This entry used to end
+*"a base that uses it cannot move until the client can join an open server transaction by its wire
+token — a product feature that does not exist"*, and named `GraphUpdates` and `ProxyGraphUpdates`
+as permanently Tier A. **Nothing was missing.**
+`InfoCarrierDatabaseFacadeExtensions.UseInfoCarrierTransaction` and
+`InfoCarrierTransactionManager.UseTransaction(token)` have shipped since M4, with the non-owning
+semantics the question worried about. What was missing was the **test class's own
+`UseTransaction` override**, which `ConferencePlannerInfoCarrierTest` and
+`OptimisticConcurrencyInfoCarrierTest` already carried — one grep away the whole time. Both bases
+are now on **Tier B and green**: `ProxyGraphUpdates` in J11 (167 fixed, 0 broken) and
+`GraphUpdates` in J12a, with **zero** "database is locked" because the override landed with the
+store switch. Full reading in `architecture.md` §6a **D6**, closed. **The general lesson is the one
+`CLAUDE.md` states elsewhere and this entry broke: before pricing a gap, check whether a sibling of
+it already works.**
+A relational suite normally enlists with `transaction.GetDbTransaction()`, which ADR-013 does put
+permanently out of this client's reach — that part was always true, and it is why the override is
+needed rather than why the move is impossible.
+
+### A base belongs to exactly one tier
+
+The evidence behind the tier rule, which `CLAUDE.md` now states without it. Two bases were reverted
+on the "EF ships no InMemory test, therefore out of scope" mistake, and both pass on Tier B, first
+run, no overrides (A79). A80 deleted a workaround for a store capability by moving the class that
+needed it rather than by writing around it, which is where the "check the tier before writing the
+workaround" tell comes from. And three Northwind bases ran on both tiers, green on both — 906 tests
+of pure duplication (A81), which is what "exactly one tier" is protecting against.
