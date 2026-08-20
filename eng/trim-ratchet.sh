@@ -34,24 +34,19 @@ log="$out/publish.log"
 # pass forever while regressions sailed through. The count must come from a trimmer that RAN.
 rm -rf "$root/samples/Northwind.Client/obj/Release" "$root/samples/Northwind.Client/bin/Release"
 
-# TreatWarningsAsErrors is FORCED OFF for this publish, and it is not a loophole.
+# -p:TrimReport=true IS THE WHOLE SWITCH, and this is the only place in the repository that sets it.
 #
-# Directory.Build.props turns warnings into errors when CI=true. The trim analyzer emits its
-# IL2xxx findings as ordinary compiler warnings — they carry a source line, unlike the ILLink
-# step's own output — so under CI they became errors and the publish failed. The gate that
-# exists to MEASURE these warnings was the one thing that could not tolerate them.
+# It turns on SuppressTrimAnalysisWarnings=false, TrimmerSingleWarn=false and
+# TreatWarningsAsErrors=false together, all three declared in one PropertyGroup in
+# Northwind.Client.csproj. Everywhere else the trim diagnostics stay off, so no other build needs an
+# exemption to survive them and the repository carries no WarningsNotAsErrors at all.
 #
-# ILLinkTreatWarningsAsErrors does not help: it feeds the ILLink task, not the Roslyn analyzer.
-# NoWarn would be worse than useless — this script COUNTS these warnings, so silencing them
-# reports OURS: 0 and passes for ever, which is exactly the failure the clean-publish rule below
-# exists to prevent.
-#
-# So the two axes stay separate: warnings-as-errors gates the ordinary build, and the DIRECTION
-# of the trim count gates this one.
+# NoWarn would be worse than useless: this script COUNTS these warnings, so silencing them reports
+# OURS: 0 and passes for ever -- exactly the failure the clean-publish rule above exists to prevent.
 
 echo "trim-ratchet: publishing samples/Northwind.Client (Release, trimmed, clean)…"
 dotnet publish "$root/samples/Northwind.Client/Northwind.Client.csproj" \
-    -c Release --nologo -p:TreatWarningsAsErrors=false > "$log" 2>&1
+    -c Release --nologo -p:TrimReport=true > "$log" 2>&1
 status=$?
 
 if [ $status -ne 0 ]; then
@@ -118,6 +113,7 @@ def owner(diagnostic):
 tally = collections.Counter(owner(d) for _, d in unique)
 print(tally['InfoCarrier.Core'])
 print(len(unique))
+print(tally['Northwind'])
 for name, n in tally.most_common():
     print(f"{n}\t{name}")
 PY
@@ -125,6 +121,7 @@ PY
 
 ours=$(echo "$counts" | sed -n 1p)
 total=$(echo "$counts" | sed -n 2p)
+sample=$(echo "$counts" | sed -n 3p)
 
 if [ -z "$ours" ]; then
     echo "trim-ratchet: could not parse the publish log — see $log" >&2
@@ -132,25 +129,57 @@ if [ -z "$ours" ]; then
 fi
 
 echo
-echo "OURS: $ours   TOTAL (all assemblies): $total"
+echo "OURS: $ours   SAMPLE: $sample   TOTAL (all assemblies): $total"
 echo
-echo "$counts" | tail -n +3 | sed 's/^/    /'
+echo "$counts" | tail -n +4 | sed 's/^/    /'
 echo
 
-baseline=$(grep -E '^ours=' "$baseline_file" | cut -d= -f2)
-if [ -z "$baseline" ]; then
-    echo "trim-ratchet: no 'ours=' line in $baseline_file" >&2
-    exit 1
-fi
+# Two gated owners, and the second one is not padding.
+#
+# `ours` is the product and always was. `northwind` is the SAMPLE's own code, gated since N30 to
+# replace a tripwire that N30 removed: the trim analyzer used to run on every Release compile, so a
+# new trim diagnostic in the sample failed CI. That analyzer was measured to contribute 6 of this
+# publish's 1119 IL warning lines and none of InfoCarrier.Core's, so it went -- and the signal it
+# did carry moves here, onto the instrument that measures the whole publish rather than one compile.
+#
+# Everyone else is reported and not gated. EF Core alone contributes 585 and this repo does not get
+# to fix those.
+fail=0
+for owner in ours northwind; do
+    case "$owner" in
+        ours)     actual=$ours   ;;
+        northwind) actual=$sample ;;
+    esac
 
-if [ "$ours" -gt "$baseline" ]; then
-    echo "trim-ratchet: FAIL — InfoCarrier.Core trim warnings rose from $baseline to $ours." >&2
-    echo "Lower the baseline in the same commit as a fix; raise it only with a reason." >&2
-    exit 1
-fi
+    baseline=$(grep -E "^$owner=" "$baseline_file" | cut -d= -f2)
+    if [ -z "$baseline" ]; then
+        echo "trim-ratchet: no '$owner=' line in $baseline_file" >&2
+        exit 1
+    fi
 
-if [ "$ours" -lt "$baseline" ]; then
-    echo "trim-ratchet: improved ($baseline -> $ours). Lower 'ours=' in $baseline_file."
-fi
+    # BOTH SIDES MUST BE INTEGERS BEFORE THEY ARE COMPARED, and this is not defensive padding.
+    # `[ "$a" -gt "$b" ]` on a non-integer prints "integer expression expected" to STDERR and then
+    # takes the FALSE branch, so a mis-parsed count sails through as "OK" and the script exits 0.
+    # That happened while N30 was being written -- an off-by-one in which line of the counter's
+    # output was read fed a tab-joined "585 EFCore" into the comparison and the gate passed anyway.
+    for n in "$actual" "$baseline"; do
+        case "$n" in
+            ''|*[!0-9]*)
+                echo "trim-ratchet: $owner count is not a number: '$n'. See $log" >&2
+                exit 1
+                ;;
+        esac
+    done
 
-echo "trim-ratchet: OK ($ours <= $baseline)."
+    if [ "$actual" -gt "$baseline" ]; then
+        echo "trim-ratchet: FAIL — $owner trim warnings rose from $baseline to $actual." >&2
+        echo "Lower the baseline in the same commit as a fix; raise it only with a reason." >&2
+        fail=1
+    elif [ "$actual" -lt "$baseline" ]; then
+        echo "trim-ratchet: $owner improved ($baseline -> $actual). Lower '$owner=' in $baseline_file."
+    else
+        echo "trim-ratchet: $owner OK ($actual <= $baseline)."
+    fi
+done
+
+exit $fail

@@ -26,10 +26,11 @@
       To reproduce a CI failure locally:
         CI=true dotnet build InfoCarrier.Core.slnx -c Release
 
-      THE CONFIGURATION IS PART OF THE COMMAND. Omitting it builds Debug, where the Blazor sample
-      does not run the trim analyzer, so the whole class of diagnostic that fails the server is
-      invisible. That omission kept the CI build red from M8-32 to N12 while a local `CI=true`
-      build reported `0 Warning(s), 0 Error(s)` every time.
+      THE CONFIGURATION IS PART OF THE COMMAND, because Release is what the server builds. Omitting
+      it once kept the CI build red from M8-32 to N12 while a local `CI=true` build reported
+      `0 Warning(s), 0 Error(s)` every time: the Blazor sample ran the trim analyzer in Release only,
+      so Debug could not produce the diagnostic that was failing. N30 removed that analyzer from the
+      ordinary build, so the specific trap is gone and the habit stays.
 
       `-c Release` rather than the long spelling, and that is not a style choice: a double hyphen
       cannot appear inside an XML comment. Writing the long form here made this file unparseable,
@@ -45,20 +46,6 @@
     -->
     <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
 
-    <!--
-      ILLink's own warnings are never errors. The trimmed Blazor publish reports 88 IL2xxx
-      warnings owned by InfoCarrier.Core, unfixable by design: the wire carries a type's NAME, so
-      Assembly.GetType(string) and MakeGenericMethod are what this provider is made of, and
-      [DynamicallyAccessedMembers] cannot describe them. eng/trim-ratchet.sh gates their
-      DIRECTION against eng/trim-baseline.txt.
-
-      This property covers the ILLink TASK only. It is NOT what keeps the trim ratchet green, and
-      believing it was cost a run: most IL2xxx findings come from the trim ROSLYN ANALYZER during
-      compilation (they carry a source line), so plain TreatWarningsAsErrors turns those into
-      errors and this property never sees them. eng/trim-ratchet.sh therefore passes
-      -p:TreatWarningsAsErrors=false on its own publish, and says why.
-    -->
-    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <Company>InfoCarrier.Core</Company>
     <Product>InfoCarrier.Core</Product>
     <Description>Entity Framework Core database provider that remotes LINQ queries and change-tracking over a wire protocol.</Description>

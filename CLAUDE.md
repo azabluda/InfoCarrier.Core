@@ -72,11 +72,12 @@ here, and both are cheap to avoid:
 
   **And the build itself is a gate now.** Warnings are errors when `CI=true`, so before any commit
   that touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
-  **`--configuration Release` is not optional and leaving it off is how CI went red for ten
-  commits without anyone noticing (N12).** The Blazor sample turns the trim analyzer on in Release
-  only, so the Debug build cannot produce the diagnostic that fails the server. It is seconds, it
-  is what the server runs, and a Debug build will not show you the failure. `docs/build-warnings.md` says what
-  is suppressed and why.
+  **`--configuration Release` is not optional**, because it is what the server builds, and a Debug
+  build has never been evidence about a Release one. Leaving it off is how CI went red for ten
+  commits without anyone noticing (N12): the Blazor sample ran the trim analyzer in Release only, so
+  Debug could not produce the diagnostic that was failing the server. **That particular trap is
+  closed** — N30 took the analyzer out of the ordinary build entirely — but the rule outlived its
+  reason and stands. `docs/build-warnings.md` says what is suppressed and why.
 - **A probe that prints nothing is evidence only once the build is known green — check the error
   count, never the elapsed time.** M9's J9 read three successive "nothing logged" results as
   clearances. All three were a **stale binary**: the probe named a property that does not exist

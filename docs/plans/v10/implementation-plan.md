@@ -2248,3 +2248,44 @@ rather than staying silent about it.
       **Gates: none.** No `src/`, no `test/`, and neither file is part of the site build. Every
       relative link in both files was resolved against the working tree, and every site URL against
       `mkdocs.yml`.
+
+- [x] **N30. One switch for the trim report, and the analyzer that was paying for nothing.** `<this commit>`
+
+      The trim gate had four moving parts: `SuppressTrimAnalysisWarnings=false` on every Release
+      build of the Blazor sample, a `WarningsNotAsErrors=IL2110;IL2111` to survive `CI=true`, a
+      `-p:TreatWarningsAsErrors=false` on the ratchet's own command line, and
+      `ILLinkTreatWarningsAsErrors=false` in the root props. Three of the four existed only to undo
+      the first.
+
+      **Measured before touching anything.** Splitting `artifacts/trim/publish.log` by emitter shape
+      gives **1113** lines from the ILLink task and **6** from the trim Roslyn analyzer. Five of the
+      six are the framework's own Razor output and one is EF's `ExecuteUpdateAsync`; **none of
+      InfoCarrier.Core's 88 came from the analyzer**. A `CI=true dotnet build -c Release` of the
+      sample reported exactly those five and nothing else. So the analyzer that cost three
+      suppressions was reporting nothing about this product.
+
+      It now turns on with **`-p:TrimReport=true`**, which `eng/trim-ratchet.sh` passes and nothing
+      else in the repository sets. One `PropertyGroup` in `Northwind.Client.csproj` holds all three
+      properties the report needs. The other two suppressions are deleted and the repository now
+      carries **no `WarningsNotAsErrors` at all** — a claim `Directory.Build.props` had been making
+      in prose while the sample contradicted it.
+
+      A side effect worth naming: the old `-p:TreatWarningsAsErrors=false` applied to every project
+      in the publish graph, so `InfoCarrier.Core` was built without the CI gate whenever the ratchet
+      ran. The switch is scoped to one project file, so it is not.
+
+      **The lost tripwire is replaced rather than mourned.** With the analyzer gone, a new trim
+      diagnostic in the sample's own code no longer fails CI, so `northwind=8` joins `ours=88` in
+      `eng/trim-baseline.txt` and the script gates both by direction. That measures the whole
+      publish instead of one compile, which is strictly more.
+
+      **A standing claim was wrong and is corrected in three files.** `docs/build-warnings.md` said
+      "most `IL2xxx` findings come from the trim Roslyn analyzer during compilation". It is 6 of
+      1119. The distinction it drew was real — the analyzer is why warnings-as-errors bit — but the
+      word "most" is what made the analyzer look load-bearing for two milestones. The same edit
+      closes the now-stale reason for `--configuration Release` in `CLAUDE.md`,
+      `Directory.Build.props` and `docs/build-warnings.md`: the rule stands, its original reason
+      does not.
+
+      **Gates: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` and
+      `eng/trim-ratchet.sh`.** No `src/`, no `test/`, so no `eng/measure.sh`.

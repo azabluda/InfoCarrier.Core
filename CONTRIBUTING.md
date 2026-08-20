@@ -45,9 +45,9 @@ Read [`docs/build-warnings.md`](docs/build-warnings.md) before adding a `NoWarn`
 broken by name, and a diff of the failure *reasons*. Read the reasons. A count that did not move
 cannot tell "fixed four, broke four" apart from "changed nothing".
 
-`eng/trim-ratchet.sh` publishes the Blazor sample trimmed and compares its IL warnings against
-[`eng/trim-baseline.txt`](eng/trim-baseline.txt). It fails when the count goes up. The count does
-not have to be zero.
+`eng/trim-ratchet.sh` publishes the Blazor sample trimmed and compares two IL warning counts, the
+provider's and the sample's own, against [`eng/trim-baseline.txt`](eng/trim-baseline.txt). It fails
+when either goes up. Neither has to be zero.
 
 `eng/ratchet.sh` is the CI half of the same idea. The workflow invokes it, so you never have to.
 

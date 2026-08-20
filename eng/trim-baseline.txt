@@ -47,5 +47,15 @@
 # `total` also falls, 1129 -> 853, and that is NOT this change: EF Core's own count dropped from 864
 # to 585 with the package/SDK movement since M8-17. Recorded so the next reader does not read a
 # 276-warning improvement as ours.
+# 2026-08-21 (N30) — `northwind` is gated from now on, and `ours` is unchanged at 88.
+#
+# The sample's own 8 warnings were reported and ungated until now. They are gated because N30 took
+# the trim ROSLYN ANALYZER out of the ordinary Release build, and that analyzer was the thing that
+# made a new trim diagnostic in the sample fail CI. It was measured first: of the publish's 1119 IL
+# warning lines, 1113 come from the ILLink task and 6 from the analyzer — five of those six are the
+# framework's own Razor output and one is EF's `ExecuteUpdateAsync`, and NONE of InfoCarrier.Core's
+# 88 came from it. So the analyzer carried no signal about this product and cost two suppressions to
+# keep, and the one signal it did carry — the sample's own code — is gated here instead.
 ours=88
+northwind=8
 total=853

@@ -58,10 +58,12 @@ jobs:
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
           --no-build --configuration Release
 
-      # Phase 2 of M8. Publishes the Blazor client trimmed and gates on the DIRECTION of this
-      # product's IL2xxx count, not on zero — spec §9's "no warning attributable to
-      # InfoCarrier.Core" is not met and eng/trim-baseline.txt records why. The script publishes
-      # clean on purpose: an incremental publish does not re-run ILLink and would report zero.
+      # Phase 2 of M8. Publishes the Blazor client trimmed and gates on the DIRECTION of two
+      # IL2xxx counts, this product's and the sample's own, not on zero — spec §9's "no warning
+      # attributable to InfoCarrier.Core" is not met and eng/trim-baseline.txt records why. The
+      # script publishes clean on purpose: an incremental publish does not re-run ILLink and would
+      # report zero. It also turns the diagnostics on, with -p:TrimReport=true; no other build in
+      # this repository emits an IL2xxx at all.
       - name: Trim ratchet (Blazor publish)
         run: bash eng/trim-ratchet.sh
 

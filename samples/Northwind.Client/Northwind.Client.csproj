@@ -13,43 +13,34 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!--
-    The trimming gate (spec §7). A Blazor release publish trims anyway; what these add is
-    VISIBILITY. The Blazor SDK sets SuppressTrimAnalysisWarnings=true by default, so a plain
-    publish reports nothing at all and a trim hole in this provider would ship unnoticed.
-
-    TrimmerSingleWarn=false expands the per-assembly summary into individual IL2xxx warnings, which
-    is the difference between "InfoCarrier.Core has trim warnings" and knowing which call site.
-  -->
+  <!-- THE APP RUNS TRIMMED, ALWAYS. That is a product claim, so it is unconditional. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <PublishTrimmed>true</PublishTrimmed>
+  </PropertyGroup>
+
+  <!--
+    TRIM DIAGNOSTICS ARE OFF UNLESS THE RATCHET ASKS FOR THEM. `eng/trim-ratchet.sh` publishes with
+    -p:TrimReport=true, and nothing else in the repository sets it, so this one switch is the whole
+    mechanism.
+
+    A switch is needed at all because the Blazor SDK suppresses trim warnings by default: a plain
+    publish reports nothing, and a trim hole in this provider would ship unnoticed.
+    TrimmerSingleWarn=false expands the per-assembly summary into individual IL2xxx warnings, which
+    is the difference between "InfoCarrier.Core has trim warnings" and knowing which call site.
+    TreatWarningsAsErrors goes off HERE rather than on the ratchet's command line so that the switch
+    stays one property in one place.
+
+    This used to be on for every Release build, which cost two suppressions to survive `CI=true`: a
+    WarningsNotAsErrors exemption here and a -p:TreatWarningsAsErrors=false there. Neither was
+    buying anything. docs/build-warnings.md carries the measurement.
+
+    NOT NoWarn, and never NoWarn. eng/trim-ratchet.sh COUNTS these warnings, and silencing them is
+    how a ratchet starts reporting zero and passes for ever.
+  -->
+  <PropertyGroup Condition="'$(TrimReport)' == 'true'">
     <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
-
-    <!--
-      AND THIS IS WHAT MAKES THE LINE ABOVE SURVIVABLE IN CI. `SuppressTrimAnalysisWarnings=false`
-      turns the trim ROSLYN ANALYZER on for this project in Release. Since M8-32, `CI=true` also
-      sets `TreatWarningsAsErrors`. The two together turned five warnings in the **framework's own**
-      Razor output — `Router.NotFoundPage`, `LayoutView.Layout`, in `App_razor.g.cs`, none of them
-      this repository's code and none of them fixable here — into five build errors, and the CI
-      build had been red on every push since M8-32.
-
-      `ILLinkTreatWarningsAsErrors=false` in Directory.Build.props does NOT cover this. That
-      property governs the ILLink *task*, which runs at publish; these come from the *analyzer*, at
-      compile. The props file says exactly that, in a comment written after the same distinction
-      had already cost a run — the conclusion just was not carried this one step further.
-
-      NOT `NoWarn`, and not `TreatWarningsAsErrors=false`. Both would hide the diagnostics, and
-      `eng/trim-ratchet.sh` COUNTS them: silencing them is how a ratchet starts reporting zero and
-      passes for ever. These stay warnings, stay counted, and stay gated by direction against
-      eng/trim-baseline.txt.
-
-      TWO CODES, NOT THE WHOLE IL2xxx FAMILY, ON PURPOSE. A trim diagnostic this list does not name
-      still fails CI, which is the tripwire: it forces somebody to look at a new one before it is
-      tolerated. That is the same reasoning as the per-file `#pragma warning disable EF1001` rather
-      than a blanket NoWarn.
-    -->
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2110;IL2111</WarningsNotAsErrors>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
