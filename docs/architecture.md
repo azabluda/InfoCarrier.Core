@@ -467,7 +467,7 @@ is explicitly out of M9's scope.
 **Consequence for M9's exit criterion, stated so the closure is not a fudge.** The criterion was
 written as *"a query boundary that also asks what the backend can evaluate"*. Taken literally it
 cannot be met inside M9: there is no second backend to ask, and adding one is the thing M9 puts out
-of scope. It is restated in [`roadmap.md`](roadmap.md) as *"the axis is identified, decided and
+of scope. It is restated in [`roadmap.md`](plans/v10/roadmap.md) as *"the axis is identified, decided and
 recorded"*, which is what was actually achievable and what has been done.
 
 **What would reopen this:** adopting a second store. At that point (c) needs a concrete shape — one

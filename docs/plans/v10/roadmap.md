@@ -9,8 +9,8 @@ The fine-grained checkbox plan for the *current* milestone lives in
 [`implementation-plan.md`](implementation-plan.md), which is **rewritten each milestone**.
 Do not put per-milestone task detail here; do not put roadmap-level scope there.
 
-Authority: [`infocarrier-core-requirements.md`](infocarrier-core-requirements.md) ·
-[`decisions.md`](decisions.md) · [`research-findings.md`](research-findings.md)
+Authority: [`infocarrier-core-requirements.md`](../../infocarrier-core-requirements.md) ·
+[`decisions.md`](../../decisions.md) · [`research-findings.md`](../../research-findings.md)
 
 ---
 
@@ -55,7 +55,7 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
 ### M2 — Projection split (requirements §3) ✅ **complete**
 
 The one genuinely unsolved design problem. **Spec written 2026-08-01:**
-[`projection-split.md`](projection-split.md), recorded as [ADR-010](decisions.md#adr-010).
+[`projection-split.md`](../../projection-split.md), recorded as [ADR-010](../../decisions.md#adr-010).
 
 Two things changed from the research-findings §8 sketch. The boundary is computed **on the
 client**, not the server — the allowlist rejects during deserialization, so the server never gets
@@ -104,18 +104,18 @@ minimal-column payload (W1).
 >   line in the right place took three attempts, costing 235 and then 69 tests respectively when
 >   drawn too widely.
 > - **Transparent identifiers are the remaining ceiling** — now specified in
->   [`transparent-identifiers.md`](transparent-identifiers.md) / [ADR-011](decisions.md#adr-011). `from … join … select new { a, b }`
+>   [`transparent-identifiers.md`](../../transparent-identifiers.md) / [ADR-011](../../decisions.md#adr-011). `from … join … select new { a, b }`
 >   makes an anonymous type EF handles internally and we must treat as a boundary, so everything
 >   downstream lands on the client. Deferring the reassembly and threading tuple slots through
 >   downstream operators is the next real gain, and is the "operator pushdown" the spec deferred.
 
 **Exit criteria**
-- **Result wire format** — spec written: [`result-wire-format.md`](result-wire-format.md).
+- **Result wire format** — spec written: [`result-wire-format.md`](../../result-wire-format.md).
   1,047 of 1,440 failures (73%). Do this first: it is independent of the type-boundary work,
   it unblocks SaveChanges, and until it lands most other failures are masked behind it.
 - ✅ Server-side type allowlist enforced, so client-only types cannot be materialized
   server-side even in-process. Projection tests fail again before they are fixed.
-- ✅ Design spec + ADR — [`projection-split.md`](projection-split.md), [ADR-010](decisions.md#adr-010).
+- ✅ Design spec + ADR — [`projection-split.md`](../../projection-split.md), [ADR-010](../../decisions.md#adr-010).
 - ✅ Boundary detection **in the client**; client applies the residual projection.
   `ServerQueryExecutor` unchanged, as the design's own test required.
 - ✅ Minimal-column payload (wire-protocol W1) — the same mechanism as the boundary rewrite, not
@@ -240,7 +240,7 @@ constraints it must meet when it lands.
   entries, so the client is given its own. Both were previously hidden by client and server
   sharing a process.
 - Security review of the deserialization path. ✅ (C48, 2026-08-10 —
-  [`security-review.md`](security-review.md).)
+  [`security-review.md`](../../security-review.md).)
 
   The material finding is that the type allowlist's safety is a **conjunction, not a single
   check**. `System.Type` is admitted and every enum is admitted, so a payload can legitimately
@@ -308,7 +308,7 @@ aborted the test host:
 | Piece | Plan | What it is |
 |---|---|---|
 | Type mapping | C15 | The NetTopologySuite branch every provider carries, in `InfoCarrierTypeMappingSource`. Worth 19 tests by itself: the client — not SpatiaLite — was what could not map a `Point`. |
-| Value-mapper seam | C17, [ADR-012](decisions.md#adr-012) | Product API. A geometry travels as one wire primitive instead of being walked reflectively, which is what overflowed the stack in C9. |
+| Value-mapper seam | C17, [ADR-012](../../decisions.md#adr-012) | Product API. A geometry travels as one wire primitive instead of being walked reflectively, which is what overflowed the stack in C9. |
 | WKT mapper | C18 | **Test-side**, so `InfoCarrier.Core` still does not reference NetTopologySuite — v1's arrangement, kept. |
 
 **Z and M survive because the format is WKT, not v1's GeoJSON**, which carries neither. That is
@@ -333,7 +333,7 @@ exceptions; it cannot cover a client that never runs again.
 still *read* correctly (isolation holds — it saw the pre-write value), but its **write blocked
 until the test's own timeout**. Once such a transaction has written, it holds SQLite's write lock,
 so one abandoned browser tab wedges writes for the whole server. Full detail in
-[`security-review.md`](security-review.md) §8.
+[`security-review.md`](../../security-review.md) §8.
 
 **DEPRIORITIZED 2026-08-16, and the reason is that the pattern it protects is not the recommended
 one.** Holding a store transaction open across client round trips is pessimistic locking over a
@@ -398,8 +398,8 @@ Three separable pieces, and only the first can be done outside the library:
   an environment secret rather than a personal one and every push is recorded against its run.
   Two further changes landed with it: **the version is now the git tag** (MinVer; there is no
   version number in any file, so the tag-versus-props check `release.yml` carried is gone — it was
-  also broken, see [`versioning.md`](versioning.md)), and **every code push publishes to GitHub
-  Packages** as an internal feed. Full account in [`versioning.md`](versioning.md).
+  also broken, see [`versioning.md`](../../versioning.md)), and **every code push publishes to GitHub
+  Packages** as an internal feed. Full account in [`versioning.md`](../../versioning.md).
 
 ### M9 — Provider neutrality and store coverage — **CLOSED 2026-08-17**
 
@@ -408,14 +408,14 @@ ran beside it, because its subject is orthogonal — M8 is about shipping the pr
 what the provider assumes of the store behind it.
 
 **All four exit criteria are met, one of them by restatement** (the capability axis; the reason is
-recorded with the criterion below and in [`architecture.md`](architecture.md) §6a D5). Task detail
+recorded with the criterion below and in [`architecture.md`](../../architecture.md) §6a D5). Task detail
 is archived at
 [`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md).
 
 **Closing state:** `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` — from
 `145 / 22312` when the ratchet was last refreshed, and `13 / 22655` at the start of the closing
 session. **Every one of the nine is classified**, and stated for consumers in
-[`limitations.md`](limitations.md) — the first time this project has had a limitations statement
+[`limitations.md`](../../limitations.md) — the first time this project has had a limitations statement
 aimed at someone outside it.
 
 **What it delivered beyond the criteria**, because the tier moves exposed real defects rather than
@@ -439,7 +439,7 @@ relational context (ADR-013). It nevertheless references `Microsoft.EntityFramew
 and its whole test suite runs on two stores, one of which is a real relational database. Nothing
 here is broken; the question is what would break under a store that is neither InMemory nor SQLite.
 
-**What the opening audit established** (evidence in [`architecture.md`](architecture.md) §6a D3):
+**What the opening audit established** (evidence in [`architecture.md`](../../architecture.md) §6a D3):
 
 - The package reference is used for **exactly one question** at four call sites, and is a symptom
   rather than the disease. `InfoCarrierTypeMappingSource`, `InfoCarrierValueGeneratorSelector`,
@@ -470,7 +470,7 @@ here is broken; the question is what would break under a store that is neither I
   **Decided: answer (c)** — one declaration, read by both halves, D2's shape — with **no mechanism
   built in M9**, because (b) cannot express a fact like J10's `ValueTuple` join key and because a
   mechanism should follow a second backend rather than precede it. The full decision, and the table
-  of coarse-versus-fine facts that is its deliverable, is [`architecture.md`](architecture.md)
+  of coarse-versus-fine facts that is its deliverable, is [`architecture.md`](../../architecture.md)
   §6a **D5**.
   **Why restated rather than met as written:** the original wording cannot be satisfied inside M9 —
   there is no second backend to ask, and adding one is explicitly out of this milestone's scope. A
@@ -501,7 +501,7 @@ here is broken; the question is what would break under a store that is neither I
 ## CI strategy
 
 Two jobs, because the spec suite is legitimately red during build-out and
-[`CLAUDE.md`](../CLAUDE.md) forbids skipping tests to force green.
+[`CLAUDE.md`](../../../CLAUDE.md) forbids skipping tests to force green.
 
 **Job 1 — fast gate (must be green).** Build + `ExpressionRoundTripTest` + `InMemorySmokeTest`.
 Any failure blocks.

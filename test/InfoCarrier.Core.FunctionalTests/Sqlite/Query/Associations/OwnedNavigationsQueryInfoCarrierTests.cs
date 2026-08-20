@@ -125,7 +125,7 @@ public class OwnedNavigationsQueryInfoCarrierFixture : OwnedNavigationsFixtureBa
 }
 
 // The six OwnedNavigations facets (ADR-004), starting with no overrides. Every failure is real
-// information, triaged in docs/implementation-plan.md under C2.
+// information, triaged in docs/plans/v10/implementation-plan.md under C2.
 
 public class OwnedNavigationsCollectionQueryInfoCarrierTest(OwnedNavigationsQueryInfoCarrierFixture fixture)
     : OwnedNavigationsCollectionTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture)

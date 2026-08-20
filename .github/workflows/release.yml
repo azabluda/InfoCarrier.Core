@@ -163,7 +163,7 @@ jobs:
   # reasoning with was a key on somebody's laptop and a step nobody could repeat. A protected
   # ENVIRONMENT keeps the decision and drops the price: the job below does not start until a
   # required reviewer approves it, the key is an environment secret rather than a personal one,
-  # and every push is recorded against the run that made it. Dated note in docs/roadmap.md.
+  # and every push is recorded against the run that made it. Dated note in docs/plans/v10/roadmap.md.
   #
   # ONE-TIME SETUP, in two halves. BOTH ARE REQUIRED and each fails closed on its own.
   #

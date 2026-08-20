@@ -15,12 +15,12 @@ by *removing* the newer one. Phase J is archived; Phases H and I below are M8's 
 
 The suite stands at `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177` (`j21`). All nine
 are classified in the archived M9 plan, and stated for consumers in
-[`limitations.md`](limitations.md). None is a blocker for M8.
+[`limitations.md`](../../limitations.md). None is a blocker for M8.
 
 ## Phase H — the HTTP transport (spec: `superpowers/specs/2026-08-11-blazor-wasm-sample-design.md` §10 phase 1)
 
 Detailed steps are in
-[`superpowers/plans/2026-08-11-northwind-http-transport.md`](superpowers/plans/2026-08-11-northwind-http-transport.md).
+[`superpowers/plans/2026-08-11-northwind-http-transport.md`](superpowers/2026-08-11-northwind-http-transport.md).
 **That document is the "how"; this one is the record of what landed and what it measured.**
 
 - [x] **M8-1. The spec measurement is scoped to one project, and the M8 plan is open.** `<this commit>`
@@ -218,7 +218,7 @@ Recorded by M8-7 and M8-8 as findings rather than absorbed. Each names where it 
 ## Phase I — the browser (spec: `superpowers/specs/2026-08-11-blazor-wasm-sample-design.md` §10 phase 2)
 
 Detailed steps are in
-[`superpowers/plans/2026-08-16-northwind-blazor-wasm.md`](superpowers/plans/2026-08-16-northwind-blazor-wasm.md).
+[`superpowers/plans/2026-08-16-northwind-blazor-wasm.md`](superpowers/2026-08-16-northwind-blazor-wasm.md).
 **That document is the "how"; this one is the record of what landed and what it measured.**
 
 Phase 1 proved the wire, so a failure in this phase is a failure of the browser rather than of the
@@ -1154,7 +1154,7 @@ it, and a new warning now fails CI.
 ## Phase N — the documentation a consumer reads
 
 Two audiences, and the whole phase exists because they had been served by one set of files. The
-three READMEs are the *repository's* front doors; the site under [`../website/`](../website/) is
+three READMEs are the *repository's* front doors; the site under [`../website/`](../../../website/) is
 for a C# developer who has never seen this repository and does not want to. **Nothing internal
 goes on the site** — no ADR numbers, no phase labels, no test tiers, no wire internals beyond what
 a consumer must set.
@@ -1367,7 +1367,7 @@ rather than staying silent about it.
       | `docs/nuget-readme.md` | *Getting the packages* — a local feed over a downloaded `.nupkg` | *Installing* — the ordinary two lines |
       | `website/docs/getting-started/installation.md` | a **warning** admonition, then two workarounds | CLI / `PackageReference` / Package Manager tabs, with *from source* kept as an alternative |
       | `website/docs/index.md` | *"neither package is on nuget.org yet"* | the install line, preview caveat kept |
-      | `docs/roadmap.md` | *"Nothing has been published yet"* | published at `-preview.1`, and **why the suffix still stays** |
+      | `docs/plans/v10/roadmap.md` | *"Nothing has been published yet"* | published at `-preview.1`, and **why the suffix still stays** |
       | `docs/ci-cd.md` | *"`dotnet nuget push` to NuGet.org (needs `NUGET_API_KEY` secret)"* | what `release.yml` actually does |
 
       **`docs/ci-cd.md` was already wrong before this change, and only reading it to edit it found

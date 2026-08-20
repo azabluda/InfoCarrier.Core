@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET 10, EF Core 10, ASP.NET Core minimal APIs, SQLite, xUnit, `Microsoft.AspNetCore.Mvc.Testing`.
 
-**Spec:** [`docs/superpowers/specs/2026-08-11-blazor-wasm-sample-design.md`](../specs/2026-08-11-blazor-wasm-sample-design.md). This plan implements its **Phase 1** only (spec §10). Phase 2 (Blazor WASM, Fluent UI, inspector, trimming) gets its own plan.
+**Spec:** [`docs/plans/v10/superpowers/2026-08-11-blazor-wasm-sample-design.md`](2026-08-11-blazor-wasm-sample-design.md). This plan implements its **Phase 1** only (spec §10). Phase 2 (Blazor WASM, Fluent UI, inspector, trimming) gets its own plan.
 
 ## Global Constraints
 
@@ -22,7 +22,7 @@ Every task's requirements implicitly include these.
 - **No NuGet dependency on Remote.Linq or Aqua** (ADR-001).
 - **EF1001 warnings are expected and allowed.** Do not suppress them repo-wide.
 - **The two transport files carry no sample types.** `HttpInfoCarrierTransport.cs` and `InfoCarrierEndpointExtensions.cs` must not mention Northwind, so that promoting them to packages later is a file move (spec §4.1). A reviewer checks this by reading their `using` lines.
-- **One task per commit.** Commit message prefixed `Step M8-<n>:`. Tick this plan's checkboxes and add the matching entry to `docs/implementation-plan.md` **in the same commit** — the repo has been bitten by those two drifting apart. **Stage this plan file as well as `implementation-plan.md`**; the per-task `git add` lines below name the source files and do not repeat these two.
+- **One task per commit.** Commit message prefixed `Step M8-<n>:`. Tick this plan's checkboxes and add the matching entry to `docs/plans/v10/implementation-plan.md` **in the same commit** — the repo has been bitten by those two drifting apart. **Stage this plan file as well as `implementation-plan.md`**; the per-task `git add` lines below name the source files and do not repeat these two.
 - **Do not run the full spec suite unless a task says to.** It takes 6–9 minutes. Only Tasks 1, 2 and 7 call for `eng/measure.sh`, and each states the exact expected output.
 - **Report test results as `Passed: N, Failed: M, Total: T` read from actual output.** Never estimate or infer a count.
 
@@ -33,7 +33,7 @@ Every task's requirements implicitly include these.
 | File | Responsibility |
 |---|---|
 | `eng/measure.sh` *(modify)* | Scope the spec measurement to one project. |
-| `docs/implementation-plan.md` *(replace)* | M8's rolling checkbox record; Phase C's is archived. |
+| `docs/plans/v10/implementation-plan.md` *(replace)* | M8's rolling checkbox record; Phase C's is archived. |
 | `samples/Northwind.Shared/Model/*.cs` | Five POCOs. No EF configuration, no behaviour. |
 | `samples/Northwind.Shared/NorthwindContext.cs` | The one shared context and its `OnModelCreating`. |
 | `samples/Northwind.Shared/NorthwindSeed.cs` | Deterministic seed data. |
@@ -61,12 +61,12 @@ Adding a second test project to the solution makes `dotnet test` emit two summar
 
 **Files:**
 - Modify: `eng/measure.sh:43`
-- Modify: `docs/implementation-plan.md` (replace with the M8 plan)
-- Create: `docs/archive/implementation-plan-m6-phase-c.md`
+- Modify: `docs/plans/v10/implementation-plan.md` (replace with the M8 plan)
+- Create: `docs/plans/v10/archive/implementation-plan-m6-phase-c.md`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: a project-scoped `eng/measure.sh`; `docs/implementation-plan.md` with an M8 section whose entries later tasks tick.
+- Produces: a project-scoped `eng/measure.sh`; `docs/plans/v10/implementation-plan.md` with an M8 section whose entries later tasks tick.
 
 - [x] **Step 1: Record the current baseline number so the change can be proved neutral**
 
@@ -113,19 +113,19 @@ The REASONS diff must be empty. **If any line differs, stop.** The instrument ch
 - [x] **Step 4: Archive Phase C's plan and open M8's**
 
 ```bash
-git mv docs/implementation-plan.md docs/archive/implementation-plan-m6-phase-c.md
+git mv docs/plans/v10/implementation-plan.md docs/plans/v10/archive/implementation-plan-m6-phase-c.md
 ```
 
-Create a new `docs/implementation-plan.md`:
+Create a new `docs/plans/v10/implementation-plan.md`:
 
 ```markdown
 # Implementation plan — M8 (productization)
 
 Rolling checkbox detail for the **current** milestone only. M6's plan (Phases A–C) is in
-[`archive/implementation-plan-m6-phase-c.md`](archive/implementation-plan-m6-phase-c.md) and is
+[`archive/implementation-plan-m6-phase-c.md`](../archive/implementation-plan-m6-phase-c.md) and is
 never edited again.
 
-Milestone-level scope lives in [`roadmap.md`](roadmap.md). Do not put scope here.
+Milestone-level scope lives in [`roadmap.md`](../roadmap.md). Do not put scope here.
 
 The suite stands at `Total tests: 22453, Passed: 22219, Failed: 13, Skipped: 221` (`c96`). All 13
 are classified in C96 of the archived plan; none is a blocker for M8.
@@ -133,7 +133,7 @@ are classified in C96 of the archived plan; none is a blocker for M8.
 ## Phase H — the HTTP transport (spec: `superpowers/specs/2026-08-11-blazor-wasm-sample-design.md` §10 phase 1)
 
 Detailed steps are in
-[`superpowers/plans/2026-08-11-northwind-http-transport.md`](superpowers/plans/2026-08-11-northwind-http-transport.md).
+[`superpowers/plans/2026-08-11-northwind-http-transport.md`](2026-08-11-northwind-http-transport.md).
 **That document is the "how"; this one is the record of what landed and what it measured.**
 
 - [ ] **M8-1. The spec measurement is scoped to one project, and the M8 plan is open.** `<this commit>`
@@ -142,7 +142,7 @@ Detailed steps are in
 - [x] **Step 5: Commit**
 
 ```bash
-git add eng/measure.sh docs/implementation-plan.md docs/archive/implementation-plan-m6-phase-c.md
+git add eng/measure.sh docs/plans/v10/implementation-plan.md docs/plans/v10/archive/implementation-plan-m6-phase-c.md
 git commit -m "Step M8-1: scope the spec measurement to one project, and open the M8 plan
 
 eng/measure.sh ran dotnet test against the whole solution and parsed the LAST
@@ -153,7 +153,7 @@ FAILING: 13 TOTAL: 22453, with empty FIXED, BROKEN and REASONS diffs against c96
 
 eng/ratchet.sh needs no change -- CI has always run a single project.
 
-M6's plan is archived and docs/implementation-plan.md is reopened for M8."
+M6's plan is archived and docs/plans/v10/implementation-plan.md is reopened for M8."
 ```
 
 ---
@@ -555,7 +555,7 @@ Expected: `FAILING: 13  TOTAL: 22453`, with empty FIXED, BROKEN and REASONS diff
 - [x] **Step 11: Commit**
 
 ```bash
-git add samples/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx Directory.Packages.props docs/implementation-plan.md
+git add samples/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx Directory.Packages.props docs/plans/v10/implementation-plan.md
 git commit -m "Step M8-2: the shared Northwind model, and a test project of its own
 
 One NorthwindContext used by both halves, because the wire carries entity type
@@ -846,7 +846,7 @@ Expected: no `using` mentions `Northwind.Shared`, ASP.NET, or EF Core. Only `Sys
 - [x] **Step 9: Commit**
 
 ```bash
-git add samples/Northwind.Client.Transport/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx docs/implementation-plan.md
+git add samples/Northwind.Client.Transport/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx docs/plans/v10/implementation-plan.md
 git commit -m "Step M8-3: an IInfoCarrierTransport over HttpClient
 
 The transport seam is one method, so this is the whole client half. Tested
@@ -1180,7 +1180,7 @@ Expected: it starts, prints a listening URL, and creates `northwind.db` next to 
 - [x] **Step 11: Commit**
 
 ```bash
-git add samples/Northwind.Server/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx Directory.Packages.props docs/implementation-plan.md
+git add samples/Northwind.Server/ test/InfoCarrier.Core.TransportTests/ InfoCarrier.Core.slnx Directory.Packages.props docs/plans/v10/implementation-plan.md
 git commit -m "Step M8-4: the server endpoint, and the first real HTTP hop in this repo
 
 One route, all nine operations. The product's InfoCarrierEnvelopeServer already
@@ -1348,7 +1348,7 @@ stale for the same reason. Not a discrepancy to fix by trimming the suite.
 - [x] **Step 4: Commit**
 
 ```bash
-git add test/InfoCarrier.Core.TransportTests/ docs/implementation-plan.md
+git add test/InfoCarrier.Core.TransportTests/ docs/plans/v10/implementation-plan.md
 git commit -m "Step M8-5: a DbContext with no database answers a query over real HTTP
 
 The premise of the product, asserted across a network boundary for the first
@@ -1521,7 +1521,7 @@ fix by trimming the suite.
 - [x] **Step 4: Commit**
 
 ```bash
-git add test/InfoCarrier.Core.TransportTests/ docs/implementation-plan.md
+git add test/InfoCarrier.Core.TransportTests/ docs/plans/v10/implementation-plan.md
 git commit -m "Step M8-6: SaveChanges and transactions over real HTTP
 
 Four tests: several edits crossing as one save (the unit-of-work shape), an
@@ -1559,8 +1559,8 @@ Passed: 16, Failed: 0, Total: 16."
 **Files:**
 - Modify: `.github/workflows/build.yml`
 - Modify: `CLAUDE.md`
-- Modify: `docs/roadmap.md`
-- Modify: `docs/implementation-plan.md`
+- Modify: `docs/plans/v10/roadmap.md`
+- Modify: `docs/plans/v10/implementation-plan.md`
 
 **Interfaces:**
 - Consumes: everything.
@@ -1581,14 +1581,14 @@ In `.github/workflows/build.yml`, in the `fast-gate` job, after the existing `Te
 
 - [x] **Step 2: Correct the two stale roadmap items**
 
-In `docs/roadmap.md`:
+In `docs/plans/v10/roadmap.md`:
 
 - Replace the `Measured 2026-08-10 (artifacts/measure/c54): Total tests: 22355, Passed: 22006, Failed: 132, Skipped: 217` paragraph and the sentence beginning `The 132 are classified` with the current figure: `Measured 2026-08-11 (artifacts/measure/c96): Total tests: 22453, Passed: 22219, Failed: 13, Skipped: 221. All 13 are classified in the archived plan's C96; ten are permanent by design or upstream.`
 - Delete the `**Known defects to fix in M1:** build.yml restores InfoCarrier.Core.sln …` paragraph in §CI strategy. It described the workflow before `51f4684`; C39 fixed it on 2026-08-10 and CI has been correct since.
 
 - [x] **Step 3: Record what Phase 1 did *not* close**
 
-Append to `docs/implementation-plan.md` under Phase H:
+Append to `docs/plans/v10/implementation-plan.md` under Phase H:
 
 ```markdown
 **Three things Phase 1 leaves open, stated so Phase 2 does not rediscover them.**
@@ -1640,7 +1640,7 @@ Expected: build succeeds; `Passed: 16, Failed: 0, Total: 16`; and `FAILING: 13  
 - [x] **Step 6: Commit**
 
 ```bash
-git add .github/workflows/build.yml CLAUDE.md docs/roadmap.md docs/implementation-plan.md
+git add .github/workflows/build.yml CLAUDE.md docs/plans/v10/roadmap.md docs/plans/v10/implementation-plan.md
 git commit -m "Step M8-7: wire the transport tests into CI, and record what Phase 1 left open
 
 The fast gate runs the new project as a second step. It stays out of the spec
@@ -1701,7 +1701,7 @@ Spec suite unchanged at 13/22453."
   unbounded body read (below the product's own `MaxRequestBytes`, so that limit is unreachable
   behind a default Kestrel host) — plus a note that §5's authn/authz exclusion was decided against
   an unreachable path and should be decided again now, not inherited. Both properties are also
-  recorded in `docs/implementation-plan.md`'s Phase H "leaves open" list. `CLAUDE.md`'s two
+  recorded in `docs/plans/v10/implementation-plan.md`'s Phase H "leaves open" list. `CLAUDE.md`'s two
   `dotnet test` commands, still pointed at `InfoCarrier.Core.slnx`, re-pointed at
   `test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj` — the scope
   `eng/measure.sh` already uses and for the same reason: the solution also contains

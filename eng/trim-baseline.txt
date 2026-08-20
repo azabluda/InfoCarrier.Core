@@ -1,11 +1,11 @@
 # Trim-warning ratchet baseline — see eng/trim-ratchet.sh and the M8-17 entry in
-# docs/implementation-plan.md.
+# docs/plans/v10/implementation-plan.md.
 #
 # `ours` counts UNIQUE IL2xxx diagnostics whose declaring member is an InfoCarrier.Core type, from
 # a `dotnet publish -c Release` of samples/Northwind.Client with PublishTrimmed=true.
 #
 # THE SPEC CRITERION IS NOT MET AND THIS FILE IS THE RECORD OF THAT. The Blazor sample design
-# (docs/superpowers/specs/2026-08-11-blazor-wasm-sample-design.md §9, criterion 4) asked for "no IL
+# (docs/plans/v10/superpowers/2026-08-11-blazor-wasm-sample-design.md §9, criterion 4) asked for "no IL
 # warning attributable to InfoCarrier.Core". There are 86. They are not sloppiness: the wire carries
 # a type's NAME and the far end resolves it, so `Assembly.GetType(string)`, `MakeGenericMethod`,
 # `MakeGenericType` and a reflective object walk are what this provider is made of.

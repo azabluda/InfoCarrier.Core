@@ -1,11 +1,11 @@
 # Implementation Plan — M1: Query pipeline correctness + working signal
 
-Status: **IN PROGRESS** · Milestone [M1](roadmap.md#m1--query-pipeline-correctness--working-signal)
+Status: **IN PROGRESS** · Milestone [M1](../roadmap.md#m1--query-pipeline-correctness--working-signal)
 
 **Scope of this doc:** the current milestone only. Rewritten when M1 closes; the completed
 query-pipeline plan is archived at
-[`archive/2026-07-query-pipeline-plan.md`](archive/2026-07-query-pipeline-plan.md).
-Milestone-level scope belongs in [`roadmap.md`](roadmap.md), not here.
+[`archive/2026-07-query-pipeline-plan.md`](2026-07-query-pipeline-plan.md).
+Milestone-level scope belongs in [`roadmap.md`](../roadmap.md), not here.
 
 Each checkbox is one minimal, logically-complete substep, committed individually with the
 checkbox ticked **in the same commit** (CLAUDE.md).
@@ -259,8 +259,8 @@ code (roadmap M2).
 
 - [x] **L1.** Type allowlist enforced (ADR-008 constraint 2). Restores the M2 signal:
       32 → 1,421 failures, ~1,305 of them the projection split. ✅ `731cca2`
-- [x] **M2-0.** M2 design session — [`projection-split.md`](projection-split.md) +
-      [ADR-010](decisions.md#adr-010); research-findings §8 corrected (boundary is computed on
+- [x] **M2-0.** M2 design session — [`projection-split.md`](../../../projection-split.md) +
+      [ADR-010](../../../decisions.md#adr-010); research-findings §8 corrected (boundary is computed on
       the client, and is a rewrite rather than a cut). ✅ `<this commit>`
 
 ## Phase K — the residual 42, classified
