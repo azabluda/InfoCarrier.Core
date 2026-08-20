@@ -27,3 +27,33 @@ root = true
 # Disabling it would only have pre-empted every style rule anyone later wanted to adopt, silently.
 # ---------------------------------------------------------------------------------------------
 dotnet_diagnostic.IDE0005.severity = warning
+
+# ---------------------------------------------------------------------------------------------
+# IDE0073: file header.
+#
+# Every source file in this repository carries the same one-line licence notice. This makes that
+# a rule rather than a habit, and gives Visual Studio's *Fix All* something to apply, so a new
+# file gets the header without anyone remembering to paste it.
+#
+# `file_header_template` is the text WITHOUT the comment marker. The analyzer prepends `//`
+# itself; putting `//` in the template produces `// // Licensed...`.
+#
+# This is a build warning because `EnforceCodeStyleInBuild` is on, and warnings are errors when
+# `CI=true`. Every compiled file already complies, so turning it on changes no build today.
+# ---------------------------------------------------------------------------------------------
+file_header_template = Licensed under the MIT license. See license.txt file in the project root for license information.
+dotnet_diagnostic.IDE0073.severity = warning
+
+# ---------------------------------------------------------------------------------------------
+# EF's generated compiled-model baselines must NOT get the header.
+#
+# `CompiledModelInfoCarrierTest` compares the source EF generates against these files, so an
+# extra line at the top of one fails the test rather than tidying it. They are already
+# `<Compile Remove>`d in the test project, so the analyzer does not see them and this section is
+# inert today -- it is here so that un-excluding them does not quietly break the comparison.
+#
+# Regenerate them with `EF_TEST_REWRITE_BASELINES=1`, never by hand or by Fix All.
+# ---------------------------------------------------------------------------------------------
+[test/InfoCarrier.Core.FunctionalTests/InMemory/Scaffolding/Baselines/**.cs]
+file_header_template = unset
+dotnet_diagnostic.IDE0073.severity = none
