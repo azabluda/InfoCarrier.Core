@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    # `main` is the only trunk. `master` and `develop` are v1 and carry their own (AppVeyor)
-    # build; a workflow that lives only on this branch cannot run on theirs anyway, so naming
-    # them here would be dead configuration.
+    # `main` is the only trunk. The v1 line lives on `release/3.1` and carries its own (AppVeyor)
+    # build; a workflow that lives only on this branch cannot run on that one anyway, so naming
+    # it here would be dead configuration.
     branches: [main]
   pull_request:
     branches: [main]

@@ -4,7 +4,7 @@
 
 ### `build.yml` — Build & Test
 
-Trigger: `push` to `main`/`develop`, `pull_request` to `main`.
+Trigger: `push` to `main`, `pull_request` to `main`.
 
 Runs on `ubuntu-latest` only — no Windows matrix needed. SQL Server is provided
 via a Docker service container, which works identically on Ubuntu.
@@ -13,7 +13,7 @@ via a Docker service container, which works identically on Ubuntu.
 name: Build & Test
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
