@@ -292,8 +292,9 @@ Not yet implemented, in rough priority order:
   nothing. 0 broken across 22,453.
 - **`Query.Associations.*` + `BulkUpdates.*` are adopted and green — 322 of 336 and 251 of 257.**
   The standing "no InMemory counterpart, therefore out of scope" note was the A79 mistake again;
-  they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What is left is 14 + 6, all
-  classified in C20.
+  they are Tier B (C0–C4), and C19/C20 took them the rest of the way. What was left is 14 + 6, all
+  classified in C20 — and **both went further afterwards**: `Query.Associations` is **336 of 336**,
+  and `BulkUpdates` fell from 6 to 2 when C94 adopted EF's own #28886 skip.
 - ~~**CI is broken**~~ — **it is not, and had not been since Phase N** (C39, 2026-08-10). The
   `.sln`-vs-`.slnx` and `~InMemory`/`~SqlServer` claims that stood here described the file as it
   was before `51f4684`; the workflow has restored `.slnx`, run two jobs and invoked
@@ -349,3 +350,85 @@ about the mechanism.** "The ranges coincide" was correct and load-bearing. "Ther
 is being mistaken for a borrowed placeholder" was one step too far, and the dump that confirmed the
 first half refuted the second in the same four lines. Read what the instrument prints, not what it
 was expected to print.
+
+## How the rules were learned
+
+`CLAUDE.md` states nine rules in nine lines. Each of these paragraphs is where one of them came
+from, and they lived in `CLAUDE.md` next to the rules themselves until N31 — six of them ended by
+stating, word for word, a rule printed a dozen lines below. The stories are worth keeping and the
+duplication was not.
+
+### Read the reasons diff, not the count
+
+**The four `Scaffolding.CompiledModel` tests are the standing example of why the count is the wrong
+instrument**: C90, C91 and C92 each closed a real defect and each measured **26 → 26**, because
+every fix moved the same four tests one stage further in, and only C93 turned them green.
+**Read the reasons diff, not the count.**
+
+### A classification is not evidence, and age is not evidence
+
+**There are no unexplained wrong answers, and after C85 there are almost no wrong answers at all.**
+Group a run's `[FAIL]` lines by their first message line: `Assert.Equal() Failure: Values differ` is
+**2**, and both are C64's `Correlated_collection_with_distinct_3_levels`, whose assertion no correct
+answer can satisfy — re-derived in C96, which also confirmed EF's InMemory suite refuses the query
+outright. **Re-derive it; do not restate it.** It has been wrong in both directions twice —
+C65 found a green test counted as a wrong answer, and C85 found two that were EF's own documented
+SQLite limitation (#33522) counted into B12 because they shared a message line. **Grep
+`EFCore.Sqlite.FunctionalTests` for the name before calling a Tier B `Values differ` ours — and
+apply that to old failures, not only to newly-red ones. Age is not evidence.**
+
+### Read the row the store actually holds
+
+**The undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
+closed the last two outside it, and all three used the same two probes in the same order: what the
+metadata and the client say, then **read the row the store actually holds**. That second probe is
+what turned `Array_of_TimeOnly` from "ours" into EF issue #30730 in one run. The rest are a
+deliberate allowlist refusal (`Regex_IsMatch`, A46) or a known singleton. **`JsonTypes` is clear**
+— the nine that stood here were A64's locale, and C50 removed them by pinning the culture.
+
+### Before calling a family of failures a design question, check whether a sibling is green
+
+**"The A28 family" was hiding a third instance of C40's mechanism, and the tell was in the failing
+list rather than in any test (C56).** Twelve `ComplexNavigations` failures were filed under
+`AssertInvalidMaterializationType` and called a decision — the assert helper is `protected static`,
+so the only route seemed to be duplicating EF's query bodies. But `NorthwindMiscellaneous` asserts
+*the same refusal six times and passes every one*. The difference is only where the boundary falls:
+EF raises it in `QueryableMethodNormalizingExpressionVisitor`, downstream of ADR-006's capture
+point, so a **wholly shippable query gets the refusal from the server and always has**, and the
+twelve are the ones the split leaves on the client. **Before calling a family of failures a design
+question, check whether a sibling of it is green.**
+
+### When a rule breaks a named family of tests, read the family
+
+**EF's prose was not implementable and EF's own tests were (C59 → C68).** "Client evaluation is
+legal only in the final projection" measured **6 fixed, 18 broken** — and every one of the eighteen
+named `client_eval` or `client_projection`, which made them the specification rather than the
+obstacle. `Union`, `Count` and `FirstOrDefault` over a client projection are **allowed**; a
+**join key** over one is **refused**. So the line is not whether an operator composes over the
+projection but whether it *reads* it — `RowDecidingArguments` applied one level up. C59 missed it
+by two words: it walked **lambda bodies** as well as sources (so an outer `Where` "consumed" a
+subquery inside its own predicate — twelve of the eighteen), and it counted a constructed client
+**type** as client code. **When a rule breaks a named family of tests, read the family: it is
+usually stating the rule you actually want.**
+
+### Ask what an assertion assumes about the topology
+
+**A28 has a second face, and it is the one to check first when a spec test looks like a design
+question.** A28 proper is a spec test asserting a *materialization* limitation this provider does
+not have. B16 turned out to be the same shape asserting a *topology* it does not have: EF's test
+bases are written for one `DbContext`, this provider is two, and `Assert.Same(context, …)` has no
+answer under two. Three "routes" were measured against that test before anyone asked whether the
+assertion was reachable at all — and every one of them would have suppressed a hook a real
+deployment is entitled to define. **Ask what the assertion assumes about the topology before
+treating it as a statement about the provider.**
+
+### Two failures of the same shape are one defect until measured otherwise
+
+**Two failures of the same shape are one defect until measured otherwise, and the shape is
+usually "which of the two models was asked".** Four consecutive steps closed 152 failures with
+four small changes, and every one of them was a question the client's model could not answer:
+which properties may be store-generated (B6), which had no value set (B9), which navigations are
+loaded (B10), and whether a no-tracking row carries complex values at all (B11). Read the
+*assertion*, not the count — `AssertOwnedBranch` dereferencing a null and `AssertAddress`
+comparing `expected is null` to `actual is null` each named their defect outright.
+
