@@ -34,12 +34,6 @@ theme:
   # a typeface. Setting this to `false` makes the built site self-contained: the only things it
   # loads are its own bundle and, on a page with a diagram, the Mermaid that ships inside it.
   font: false
-  # The mark shipped on both NuGet packages, so the tab, the header and the package listing are
-  # one identity. Both files are generated from `docs/assets/icon-source.png` by `eng/make-icon.py`
-  # -- MkDocs cannot reach outside `docs_dir`, so the site needs its own copy either way, and
-  # generating it beats copying a 128px PNG that then drifts.
-  logo: assets/logo.png
-  favicon: assets/favicon.ico
   icon:
     repo: fontawesome/brands/github
   features:
