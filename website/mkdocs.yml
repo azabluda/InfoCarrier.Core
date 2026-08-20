@@ -4,13 +4,7 @@
 # a test tier; `docs/` is where those live and it is deliberately not this site's source. Two
 # audiences, two sets of files, and mixing them is what makes internal documents read as promises.
 #
-# Preview it locally, with live reload:
-#     eng/docs-serve.sh
-#
-# Build it once, the way CI does:
-#     eng/docs-serve.sh --build
-#
-# Both create `.venv` from website/requirements.txt if it is missing. The long form still works:
+# Build it locally the way CI does:
 #     python -m venv .venv && .venv/Scripts/pip install -r website/requirements.txt
 #     .venv/Scripts/mkdocs build --strict --config-file website/mkdocs.yml
 #
@@ -40,15 +34,6 @@ theme:
   # a typeface. Setting this to `false` makes the built site self-contained: the only things it
   # loads are its own bundle and, on a page with a diagram, the Mermaid that ships inside it.
   font: false
-  # NO `logo:` ON PURPOSE -- it was tried and removed. Material sizes a header logo at 1.2rem,
-  # where this badge is an illegible smudge, and sizing it up makes the mark set the header's
-  # height: 156px of sticky indigo on every page, measured. The mark is at the foot of the
-  # navigation instead, in `stylesheets/extra.css`, where it has 96px and costs no chrome.
-  #
-  # `assets/logo.png` and `assets/favicon.ico` are generated from `docs/assets/icon-source.png` by
-  # `eng/make-icon.py` -- MkDocs cannot reach outside `docs_dir`, so the site needs its own copy
-  # either way, and generating it beats copying a file that then drifts.
-  favicon: assets/favicon.ico
   icon:
     repo: fontawesome/brands/github
   features:
@@ -115,11 +100,6 @@ markdown_extensions:
       alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
-
-# One stylesheet, and it carries its own reasoning. Material is themed through CSS custom
-# properties, so nothing here needs a `custom_dir` or a template override.
-extra_css:
-  - stylesheets/extra.css
 
 plugins:
   - search
