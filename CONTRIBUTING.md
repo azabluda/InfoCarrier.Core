@@ -70,7 +70,7 @@ One logical change per commit. Say what changed and why it was worth changing. T
 
 | Doc | Contents |
 |---|---|
-| [`docs/limitations.md`](docs/limitations.md) | Every known limitation, with an example |
+| [`website/docs/limitations.md`](website/docs/limitations.md) | Every known limitation, with an example. Published to the site; the only copy |
 | [`docs/security-review.md`](docs/security-review.md) | The deserialization path, its bound, and what is accepted |
 | [`docs/architecture.md`](docs/architecture.md) | Components, test strategy, open questions |
 | [`docs/decisions.md`](docs/decisions.md) | ADR log: the decisions and why |
