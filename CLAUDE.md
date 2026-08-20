@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 EF Core 10 database provider that remotes LINQ queries and change-tracking over a wire
 protocol. Client `DbContext` has no database; the server executes against a real provider.
@@ -191,133 +191,40 @@ from the **CLR type alone**, through a service no provider replaces.
 
 ## Current state
 
-**M9 is CLOSED (2026-08-17), M8 is NOT.** M9's four exit criteria are met — the document-mapping
-seam (so `InfoCarrier.Core` no longer references `EFCore.Relational`), the test project organised
-by backend store, four bases moved to the tier that translates, and the capability axis
-*identified, decided and recorded* rather than built (`architecture.md` §6a **D5**, answer (c);
-the original wording required a second backend, which M9 excluded). Task detail is archived at
-`docs/plans/v10/archive/implementation-plan-m9-phase-j.md` and is never edited again;
+**M9 is CLOSED (2026-08-17). M8 is NOT.** M9 met its four exit criteria: the document-mapping seam
+(so `InfoCarrier.Core` no longer references `EFCore.Relational`), the test project organised by
+backend store, four bases moved to the tier that translates, and the capability axis identified,
+decided and recorded rather than built (`architecture.md` §6a **D5**, answer (c)). Task detail is
+archived in `docs/plans/v10/archive/implementation-plan-m9-phase-j.md` and is never edited again;
 `docs/plans/v10/implementation-plan.md` holds M8's Phases H and I only.
-**The nine remaining failures now have a consumer-facing statement — `docs/limitations.md`** — and
-that is the document to keep true, because it is the only one written for someone outside this
-repository. It says one unsupported scenario, one query to treat with caution, two message-text
-differences, and two queries this provider *answers* that other EF providers reject.
-**Six standing classifications were found wrong when checked against EF's own suites in the closing
-session alone**, one of which had read "SQLite-tier, a store limitation" for two milestones and was
-ours, one line (J19). *A classification is not evidence, and age is not evidence.*
 
-**M6 is CLOSED (2026-08-11).** Every spec base EF ships that this provider can host is adopted —
-`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is green, `AdHocJsonQuery` last and
-61 of 61. It closed in four steps once B12 was decided: C80 took B12 (36 fixed), C81 added ADR-013
-and the JSON *write* coverage, C82 adopted the last base, C83 fixed the exception-fidelity gap C82
-found. **The standing price for all of it — "626 + 322 lines of relational mirror and seven
-abstract seeds" — was a price for a route nobody was going to take.**
+**M6 is CLOSED (2026-08-11).** Every spec base EF ships that this provider can host is adopted, and
+`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is what enforces it. That test, not a
+list in this file, is the current answer to "which bases are in".
 
-Query, projection split and SaveChanges all work end-to-end. The suite stands at
-**`Total tests: 22656, Passed: 22466, Failed: 13, Skipped: 177`** (2026-08-17, `j15`) across the
-Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `FindTestBase`,
-`LoadTestBase`, `ManyToManyTrackingTestBase`, `FieldMappingTestBase`, `WithConstructorsTestBase`,
-`CompositeKeyEndToEndTestBase`, `NotificationEntitiesTestBase`, `ComplexTypesTrackingTestBase`,
-`ComplexNavigationsQueryTestBase`, `GearsOfWarQueryTestBase`, all sixteen
-`Query.Translations` bases, the nine `ModelBuilding.ModelBuilderTest` bases and the five
-`AdHoc*Query` bases, `OwnedQueryTestBase` and the shared-type query bases on Tier A, plus
-`OptimisticConcurrency`, `ConferencePlanner`, `FunkyDataQuery`, `ComplexTypeQuery`,
-`AdHocComplexTypeQuery`, `PrimitiveCollectionsQuery`, `NonSharedPrimitiveCollectionsQuery`,
-`JsonQuery`, `StoreGenerated`, the sixteen `Types.TypeTest` classes, `Query.Associations.*` and
-`BulkUpdates.*` on Tier B, and the two spatial bases on Tier A.
-`PropertyValues`, `Find`, `ManyToManyTracking`,
-`CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
-`OverzealousInitialization`, `FieldMapping`, `Load`, `Updates`, `WithConstructors`,
-`ComplexTypeQuery`, `Spatial` and both `ManyToMany*Load` bases are clear.
-**Every failure is classified — A54 in `docs/plans/v10/implementation-plan.md` for the 44 that predate A59,
-the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
-Tier B adoptions added, and Phase C's C1–C96 for the rest — **C96 re-derives the whole tail**, and
-**Phase J's "The residual 13, examined properly" re-derives it again against M9's run** — read out of `artifacts/measure/`,
-currently `j15`. C55–C96 took 132 to 13, and none of the 13 is C86's own new tests — those are 5 of 5; `Query.Associations` is 336 of 336, and
-`MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are all clear.
-**There is no largest block any more: the 13 sit in eight different classes — five hold two each,
-three hold one each** (grouped from `artifacts/measure/j15.txt`; the earlier "six pairs and one
-singleton, in seven classes" was C96's composition and M9's tier moves changed it). **After J15 not
-one of them is of unknown standing**, which had not been true before: J15 seeded the `Dashboard`
-set EF leaves empty and showed that `Composition_over_collection_of_complex_mapped_as_scalar`
-returns the **right answer**, so it is A28 proper rather than A28 by assertion.
-`JsonQuery` fell from 40 to 4 when C80 took B12 and to **0** when C96 took the
-eighteenth of EF's own APPLY overrides, `PrimitiveCollectionsQuery` from 4 to 1 when C88 took B22,
-`Scaffolding.CompiledModel` from 4 to **0** across C90–C93, and `BulkUpdates` from 6 to 2 when C94
-took EF's own #28886 skip. **All 13 are re-derived one at a time in C96** — grouped by class *and*
-by message, with EF's own suites grepped for every name.
-**`total` fell to 22453 in C94 and that was deliberate** — xUnit reports a *skipped theory* as one
-test rather than as its parameterizations, so two skipped theories turn 4 tests into 2. It is the
-only lowering `test/known-failures.txt` has, and it is written up there. A shrinking total with no
-such note is a crashed host.
-**The four `Scaffolding.CompiledModel` tests are the standing example of why the count is the wrong
-instrument**: C90, C91 and C92 each closed a real defect and each measured **26 → 26**, because
-every fix moved the same four tests one stage further in, and only C93 turned them green.
-**Read the reasons diff, not the count.**
+Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
+505 failing and stands at **825 of 825**.
 
-**There are no unexplained wrong answers, and after C85 there are almost no wrong answers at all.**
-Group a run's `[FAIL]` lines by their first message line: `Assert.Equal() Failure: Values differ` is
-**2**, and both are C64's `Correlated_collection_with_distinct_3_levels`, whose assertion no correct
-answer can satisfy — re-derived in C96, which also confirmed EF's InMemory suite refuses the query
-outright. **Re-derive it; do not restate it.** It has been wrong in both directions twice —
-C65 found a green test counted as a wrong answer, and C85 found two that were EF's own documented
-SQLite limitation (#33522) counted into B12 because they shared a message line. **Grep
-`EFCore.Sqlite.FunctionalTests` for the name before calling a Tier B `Values differ` ours — and
-apply that to old failures, not only to newly-red ones. Age is not evidence.**
+**`Total tests: 22656, Passed: 22466, Failed: 13, Skipped: 177`** (2026-08-17, `j15`).
+**All four figures come out of the run's own summary block, and none of them is arithmetic** — a
+`c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
+falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
+the one deliberate lowering, in C94, where two skipped theories turned 4 tests into 2.
 
-**The undiagnosed exceptions are down to those inside `JsonQuery`** — C42 closed one, C61 and C62
-closed the last two outside it, and all three used the same two probes in the same order: what the
-metadata and the client say, then **read the row the store actually holds**. That second probe is
-what turned `Array_of_TimeOnly` from "ours" into EF issue #30730 in one run. The rest are a
-deliberate allowlist refusal (`Regex_IsMatch`, A46) or a known singleton. **`JsonTypes` is clear**
-— the nine that stood here were A64's locale, and C50 removed them by pinning the culture.
+**All 13 failures are classified and not one is of unknown standing.** They sit in eight classes,
+five holding two and three holding one. The tables are in `docs/plans/v10/implementation-plan.md`
+— A54, A59, A61–A65, B3a–B16 and C1–C96 — and Phase J's "The residual 13, examined properly"
+re-derives the whole tail against M9's run. The run itself is in `artifacts/measure/`, currently
+`j15`. `Query.Associations` is 336 of 336, and `MaterializationInterception`,
+`OptimisticConcurrency` and `ComplexNavigations` are clear. Wrong answers are down to **2**, both
+C64's `Correlated_collection_with_distinct_3_levels`, whose assertion no correct answer can
+satisfy.
 
-**"The A28 family" was hiding a third instance of C40's mechanism, and the tell was in the failing
-list rather than in any test (C56).** Twelve `ComplexNavigations` failures were filed under
-`AssertInvalidMaterializationType` and called a decision — the assert helper is `protected static`,
-so the only route seemed to be duplicating EF's query bodies. But `NorthwindMiscellaneous` asserts
-*the same refusal six times and passes every one*. The difference is only where the boundary falls:
-EF raises it in `QueryableMethodNormalizingExpressionVisitor`, downstream of ADR-006's capture
-point, so a **wholly shippable query gets the refusal from the server and always has**, and the
-twelve are the ones the split leaves on the client. **Before calling a family of failures a design
-question, check whether a sibling of it is green.**
-
-**`Skipped` is 217, and was 217 in `c10b` too.** The number recorded against `c10b` was `208` —
-carried over from `b21b`, where it was right — and `Passed` was then derived from it rather than
-read. Phase C's adoptions brought nine of EF's own skips with them. `Failed` and `Total` were
-correct throughout, so nothing was judged wrongly, but **all four figures come out of the run's
-own summary block; none of them is arithmetic.**
-
-**EF's prose was not implementable and EF's own tests were (C59 → C68).** "Client evaluation is
-legal only in the final projection" measured **6 fixed, 18 broken** — and every one of the eighteen
-named `client_eval` or `client_projection`, which made them the specification rather than the
-obstacle. `Union`, `Count` and `FirstOrDefault` over a client projection are **allowed**; a
-**join key** over one is **refused**. So the line is not whether an operator composes over the
-projection but whether it *reads* it — `RowDecidingArguments` applied one level up. C59 missed it
-by two words: it walked **lambda bodies** as well as sources (so an outer `Where` "consumed" a
-subquery inside its own predicate — twelve of the eighteen), and it counted a constructed client
-**type** as client code. **When a rule breaks a named family of tests, read the family: it is
-usually stating the rule you actually want.**
-
-**A28 has a second face, and it is the one to check first when a spec test looks like a design
-question.** A28 proper is a spec test asserting a *materialization* limitation this provider does
-not have. B16 turned out to be the same shape asserting a *topology* it does not have: EF's test
-bases are written for one `DbContext`, this provider is two, and `Assert.Same(context, …)` has no
-answer under two. Three "routes" were measured against that test before anyone asked whether the
-assertion was reachable at all — and every one of them would have suppressed a hook a real
-deployment is entitled to define. **Ask what the assertion assumes about the topology before
-treating it as a statement about the provider.**
-
-**Two failures of the same shape are one defect until measured otherwise, and the shape is
-usually "which of the two models was asked".** Four consecutive steps closed 152 failures with
-four small changes, and every one of them was a question the client's model could not answer:
-which properties may be store-generated (B6), which had no value set (B9), which navigations are
-loaded (B10), and whether a no-tracking row carries complex values at all (B11). Read the
-*assertion*, not the count — `AssertOwnedBranch` dereferencing a null and `AssertAddress`
-comparing `expected is null` to `actual is null` each named their defect outright.
-
-Lazy loading works (Phase L): it began at 505 of 505 failing and is **825 of 825** across
-`LoadInfoCarrierTest` and `LazyLoadProxyInfoCarrierTest`.
+**The consumer-facing statement of what is missing is
+[`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep
+true, because it is the only one here written for someone outside this repository. It names one
+unsupported scenario, one query to treat with caution, two message-text differences, and two queries
+this provider *answers* that other EF providers reject.
 
 **What is not implemented.** Everything else that this section used to list has closed.
 
@@ -342,7 +249,9 @@ they are these:
   permanently unreachable while the feature they needed had shipped five milestones earlier.
 - **Before calling a family of failures a design question, check whether a sibling is green.**
 - **A classification is not evidence, and age is not evidence.** Grep EF's own suites for the test
-  name before calling a failure this provider's.
+  name before calling a failure this provider's. Six standing classifications were found wrong that
+  way in M9's closing session alone, one of which had read "SQLite-tier, a store limitation" for two
+  milestones and was ours, one line (J19).
 - **Ask what an assertion assumes about the topology** before treating it as a statement about the
   provider. This repository is two `DbContext` instances; `Assert.Same(context, …)` has no answer.
 - **When a rule breaks a named family of tests, read the family.** It is usually stating the rule
