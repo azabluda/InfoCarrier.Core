@@ -32,7 +32,7 @@ public class InfoCarrierComplianceTest : ComplianceTestBase
 
     /// <summary>
     ///     Bases that are conceptually inapplicable to InfoCarrier — each with the reason.
-    ///     Seeded in M1-I3; see docs/implementation-plan.md.
+    ///     Seeded in M1-I3; see docs/plans/v10/implementation-plan.md.
     /// </summary>
     protected override ICollection<Type> IgnoredTestBases { get; } = [];
 }

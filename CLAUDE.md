@@ -128,8 +128,8 @@ here, and both are cheap to avoid:
 |---|---|
 | `docs/decisions.md` | **ADR log.** LOCKED entries are binding. |
 | `docs/infocarrier-core-requirements.md` | Authoritative requirements spec |
-| `docs/roadmap.md` | **Stable** milestone plan for the whole project |
-| `docs/implementation-plan.md` | **Rolling** checkbox detail for the *current* milestone only |
+| `docs/plans/v10/roadmap.md` | **Stable** milestone plan for the whole project |
+| `docs/plans/v10/implementation-plan.md` | **Rolling** checkbox detail for the *current* milestone only |
 | `docs/architecture.md` | Components, test strategy, open questions |
 | `docs/research-findings.md` | EF Core 10 pipeline findings backing the ADRs |
 | `docs/decisions.md` **ADR-013** | The test project may reference `EFCore.Relational.Specification.Tests`. **Before adopting a relational spec base, check whether it assumes the *client* is relational** — a non-virtual `UseTransaction` calling `GetDbTransaction()` makes a base unreachable here, and cost 142 tests to discover. |
@@ -139,7 +139,7 @@ here, and both are cheap to avoid:
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
 in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
 `implementation-plan.md`, which is rewritten at each milestone boundary (previous ones land in
-`docs/archive/`, never edited again). Putting task detail in the roadmap, or scope changes in
+`docs/plans/v10/archive/`, never edited again). Putting task detail in the roadmap, or scope changes in
 the plan, is what caused the drift these two docs replaced.
 
 **Reversing a LOCKED ADR requires a dated supersession edit in `docs/decisions.md`** — not a
@@ -157,10 +157,10 @@ Edits there are invisible to git and will be lost.
 **Never `[Skip]`, delete, or override a spec test to make the suite green.** The inherited
 `EFCore.Specification.Tests` classes *are* the coverage goal (ADR-004); a red test is
 information. If a test targets genuinely unimplemented functionality, leave it failing and
-note it in `docs/implementation-plan.md`. Silently suppressing tests was v1's stated failure
+note it in `docs/plans/v10/implementation-plan.md`. Silently suppressing tests was v1's stated failure
 mode.
 
-**Update the plan checkbox in the same commit as the work.** `docs/implementation-plan.md`
+**Update the plan checkbox in the same commit as the work.** `docs/plans/v10/implementation-plan.md`
 drifted out of sync with git once already (F1–F7 were committed while still shown unchecked).
 One substep per commit, message prefixed `Step <id>:`.
 
@@ -196,8 +196,8 @@ seam (so `InfoCarrier.Core` no longer references `EFCore.Relational`), the test 
 by backend store, four bases moved to the tier that translates, and the capability axis
 *identified, decided and recorded* rather than built (`architecture.md` §6a **D5**, answer (c);
 the original wording required a second backend, which M9 excluded). Task detail is archived at
-`docs/archive/implementation-plan-m9-phase-j.md` and is never edited again;
-`docs/implementation-plan.md` holds M8's Phases H and I only.
+`docs/plans/v10/archive/implementation-plan-m9-phase-j.md` and is never edited again;
+`docs/plans/v10/implementation-plan.md` holds M8's Phases H and I only.
 **The nine remaining failures now have a consumer-facing statement — `docs/limitations.md`** — and
 that is the document to keep true, because it is the only one written for someone outside this
 repository. It says one unsupported scenario, one query to treat with caution, two message-text
@@ -229,7 +229,7 @@ Northwind query bases and `GraphUpdatesTestBase`, `PropertyValuesTestBase`, `Fin
 `CompositeKeyEndToEnd`, `NotificationEntities`, `FieldsOnlyLoad`,
 `OverzealousInitialization`, `FieldMapping`, `Load`, `Updates`, `WithConstructors`,
 `ComplexTypeQuery`, `Spatial` and both `ManyToMany*Load` bases are clear.
-**Every failure is classified — A54 in `docs/implementation-plan.md` for the 44 that predate A59,
+**Every failure is classified — A54 in `docs/plans/v10/implementation-plan.md` for the 44 that predate A59,
 the A59/A61/A62/A63/A65 tables for the 75 those batches added, Phase B's B3a–B16 for what the
 Tier B adoptions added, and Phase C's C1–C96 for the rest — **C96 re-derives the whole tail**, and
 **Phase J's "The residual 13, examined properly" re-derives it again against M9's run** — read out of `artifacts/measure/`,

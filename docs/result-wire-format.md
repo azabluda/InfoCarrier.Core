@@ -1,6 +1,6 @@
 # Result Wire Format — Design
 
-Status: **IMPLEMENTED (2026-08-01)** · Milestone [M2](roadmap.md) · Implements
+Status: **IMPLEMENTED (2026-08-01)** · Milestone [M2](plans/v10/roadmap.md) · Implements
 [`wire-protocol.md`](wire-protocol.md) §2.1 and [ADR-008](decisions.md) constraints 1 and 5.
 
 **Result: 1,109 → 3,692 passing of 4,247.** All three target error classes eliminated —

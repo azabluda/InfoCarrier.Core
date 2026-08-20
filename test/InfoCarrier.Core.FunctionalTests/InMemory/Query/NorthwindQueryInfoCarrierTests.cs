@@ -10,7 +10,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
 // EF Core's own NorthwindQuery*InMemoryTest classes.
 //
 // These start with NO overrides on purpose. Every failure is real information, triaged in
-// docs/implementation-plan.md into: conceptually inapplicable to a remoting provider, backing-
+// docs/plans/v10/implementation-plan.md into: conceptually inapplicable to a remoting provider, backing-
 // store limitation, or an InfoCarrier gap. Only the first two ever earn an override, and only
 // with a stated reason — never to make the suite green (CLAUDE.md).
 //
@@ -36,7 +36,7 @@ public class NorthwindFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFix
     : NorthwindFunctionsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture);
 
 // Classes that assert an InMemory store limitation live in their own files, each mirroring
-// EF Core's own *InMemoryTest override set. See docs/roadmap.md M3 for the inventory.
+// EF Core's own *InMemoryTest override set. See docs/plans/v10/roadmap.md M3 for the inventory.
 
 public class NorthwindNavigationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierFixture<NoopModelCustomizer> fixture)
     : NorthwindNavigationsQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)

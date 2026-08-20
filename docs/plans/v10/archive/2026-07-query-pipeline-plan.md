@@ -6,8 +6,8 @@
 > [`../implementation-plan.md`](../implementation-plan.md) (current milestone detail).
 > Kept as the record of what was built and which commit built it. **Do not edit.**
 
-Build order per [ADR-003](../decisions.md) · Design per [ADR-006](../decisions.md) (raw
-capture), [ADR-008](../decisions.md), [`research-findings.md`](../research-findings.md).
+Build order per [ADR-003](../../../decisions.md) · Design per [ADR-006](../../../decisions.md) (raw
+capture), [ADR-008](../../../decisions.md), [`research-findings.md`](../../../research-findings.md).
 
 Each checkbox is one minimal, logically-complete substep, committed individually.
 Not every substep is independently compilable — the milestone is the commit boundary.

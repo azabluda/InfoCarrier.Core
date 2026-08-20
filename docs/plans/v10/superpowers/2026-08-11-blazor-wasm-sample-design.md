@@ -136,7 +136,7 @@ not reference.
 ### 3.3 Shared configuration is the point, not an implementation detail
 
 One shared `NorthwindContext` is the first worked example of a founding idea recorded as **D2** in
-[`architecture.md`](../../architecture.md) §6a: *one model configuration that both halves derive
+[`architecture.md`](../../../architecture.md) §6a: *one model configuration that both halves derive
 from and augment*.
 
 It is worth reading the sample as **evidence about D2's central expectation** — that the shared part
@@ -185,7 +185,7 @@ A reviewer should be able to check that by reading their `using` lines.
 
 ### 4.2 Open question carried, not answered — `Payload` is `byte[]`
 
-Recorded in full as **D1** in [`architecture.md`](../../architecture.md) §6a. Summary: the outer
+Recorded in full as **D1** in [`architecture.md`](../../../architecture.md) §6a. Summary: the outer
 envelope is JSON and `Payload` is `byte[]`, so the expression tree crosses as base64 — about 33%
 larger and unreadable.
 

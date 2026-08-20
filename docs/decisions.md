@@ -5,7 +5,7 @@ and rationale.
 
 > **Status note.** The pre-implementation research phase closed 2026-07-22
 > ([`research-findings.md`](research-findings.md)); the project is now in **implementation**
-> (see [`roadmap.md`](roadmap.md)). Each entry is marked:
+> (see [`roadmap.md`](plans/v10/roadmap.md)). Each entry is marked:
 > - **LOCKED** — decided and binding; reversing requires a dated supersession edit here.
 > - **PROVISIONAL** — current best understanding, **subject to change** as research
 >   continues. Provisional entries shape the specs but are not yet commitments; each links
@@ -158,7 +158,7 @@ identically. See [`research-infrastructure.md`](research-infrastructure.md).
 > **Record note.** [`research-findings.md`](research-findings.md) §"Locked consequences"
 > declared this ADR locked on 2026-07-22, and
 > [`expression-serialization.md`](expression-serialization.md) §3 +
-> [`implementation-plan.md`](implementation-plan.md) both cite it — but the entry was never
+> [`implementation-plan.md`](plans/v10/implementation-plan.md) both cite it — but the entry was never
 > written into this log. Recorded here retroactively from those sources. No decision changed;
 > this closes a dangling reference.
 

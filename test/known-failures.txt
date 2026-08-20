@@ -22,7 +22,7 @@
 # 2026-08-10 (C39) — first refresh since the file was written, and it was eight months of Phase
 # A/B/C adoptions stale: 111/5215 against an actual 145/22312. CI would have failed on the
 # failure count while the total quadrupled. Every failure behind this number is classified —
-# Phase C's C1–C20 and the A/B tables in docs/implementation-plan.md.
+# Phase C's C1–C20 and the A/B tables in docs/plans/v10/implementation-plan.md.
 #
 # 2026-08-10 (C40) — 145 -> 144, the string-Include path validator. Lowered in the same commit
 # as the fix, which is what the header above asks for.
@@ -151,7 +151,7 @@
 # information and both are the wire's, not the store's: DynamicValueMapper.MapToNode takes its
 # collection branch on a key type that merely implements IEnumerable, and RehydrateObject cannot
 # construct a nested generic test type with no parameterless constructor. Both classified in J1 of
-# docs/implementation-plan.md. Figures read off the run's own summary block, never by arithmetic:
+# docs/plans/v10/implementation-plan.md. Figures read off the run's own summary block, never by arithmetic:
 # 22453 / 22224 / 15 / 214 (`j1b`).
 # 2026-08-16 (J2) - 15 -> 18, A DELIBERATE RISE, and `skipped` 214 -> 210. CustomConverters moved
 # from Tier A to Tier B. Its four skips were EF's own CustomConvertersInMemoryTest refusing issue
@@ -161,7 +161,7 @@
 # Optional_datetime_reading_null_from_database is no longer a silent no-op. The three that fail are
 # new information: an EF-internal GroupBy grouping type reaching the deserialization allowlist, an
 # untranslated Join over converted columns, and one A28-family test whose base asserts a limitation
-# this provider does not have. Classified in J2 of docs/implementation-plan.md.
+# this provider does not have. Classified in J2 of docs/plans/v10/implementation-plan.md.
 # Figures read off the run's own summary block: 22453 / 22225 / 18 / 210 (`j2b`).
 # 2026-08-16 (J4) - unchanged at 18/22453. The functional tests are organised by backend store now
 # (InMemory/ 57, Sqlite/ 25, TestUtilities/ 16, 18 store-independent). This file needed NO edit for

@@ -240,7 +240,7 @@ correlation-id requirement should be revisited when one does.
 
 ## 8a. Amendment — the trigger fired
 
-Amended **2026-08-12**, as part of the M8-8 fix wave (`docs/implementation-plan.md`), because §8's
+Amended **2026-08-12**, as part of the M8-8 fix wave (`docs/plans/v10/implementation-plan.md`), because §8's
 own condition — "before a network transport ships" — has now been met: `test/InfoCarrier.Core.TransportTests`
 and the samples under `samples/` add a real HTTP transport, previously in-process only. This
 amendment records what changed character as a result. It recommends no fix; it records that two
@@ -273,5 +273,5 @@ should be made again, not inherited.
   network-reachability had already been weighed.
 
 No code change accompanies this amendment. Both properties are recorded in
-`docs/implementation-plan.md`'s Phase H "what Phase 1 leaves open" list alongside the three items
+`docs/plans/v10/implementation-plan.md`'s Phase H "what Phase 1 leaves open" list alongside the three items
 already there.

@@ -6,7 +6,7 @@ milestone is [`../implementation-plan.md`](../implementation-plan.md).
 
 **Closed at `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`** (`j21`), from
 `13 / 22655` at the milestone's last pre-close measurement. Every one of the nine is classified
-below, and the consumer-facing statement of them is [`../limitations.md`](../limitations.md).
+below, and the consumer-facing statement of them is [`../limitations.md`](../../../limitations.md).
 
 ---
 
@@ -16,7 +16,7 @@ Scope lives in [`roadmap.md`](../roadmap.md) §M9. **M8 is not closed**, so this
 milestones at once for the first time; Phase J is appended rather than replacing Phases H and I,
 and the whole file is rewritten when M8 closes.
 
-The audit that opened this phase is in [`architecture.md`](../architecture.md) §6a, D3 (amended) and
+The audit that opened this phase is in [`architecture.md`](../../../architecture.md) §6a, D3 (amended) and
 D4 (new). Two things it established are worth restating here because they shape the order below:
 the package reference is a **symptom**, and the **fixed query-boundary allowlist** is the
 assumption nobody had recorded.
@@ -524,7 +524,7 @@ Measured one at a time, because a combined move cannot tell which base moved the
       exposure is a property of the wire protocol as it stands, and **this API widens nothing**.
       Binding a token to its creator stays worth doing and stays M8's item.
       What does need deciding is ownership: a joined transaction must not commit or roll back on
-      dispose. [`architecture.md`](../architecture.md) §6a **D6**.
+      dispose. [`architecture.md`](../../../architecture.md) §6a **D6**.
 
 ### J4 — the test project organised by backend store
 
@@ -888,7 +888,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 - [x] **J6. Ask the backend what it can evaluate — a second axis, beside the allowlist.**
       **DECIDED 2026-08-17: answer (c), no mechanism in M9.** The decision, its argument, and the
       table of coarse-versus-fine facts that is its actual deliverable are in
-      [`architecture.md`](../architecture.md) §6a **D5**; the exit criterion is restated in
+      [`architecture.md`](../../../architecture.md) §6a **D5**; the exit criterion is restated in
       [`roadmap.md`](../roadmap.md). Two things are worth repeating here because they are what decided
       it: **(b) cannot express J10** — a `ValueTuple` join key refused where an anonymous type and a
       `Tuple` are accepted is a property of the *tree shape*, and no provider manifest carries that
@@ -901,7 +901,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
       conjunction. A backend must never widen it. The missing axis is separate and only ever
       **narrows** what is shipped: *can the thing at the other end evaluate this?*
       Four candidate answers, the difficulty of the automatic one, and why nothing is blocked on it
-      today are in [`architecture.md`](../architecture.md) §6a **D5**. **Design first, as D3 was.**
+      today are in [`architecture.md`](../../../architecture.md) §6a **D5**. **Design first, as D3 was.**
 
 ### Recorded, not scheduled
 
@@ -1128,7 +1128,7 @@ should travel as its provider value**, the way `ChangeEntryMapper` already sends
 - [x] **J20. `Regex` is admitted to `TypeAllowlist`, reversing A46.** `<this commit>`
       `Total tests: 22658, Passed: 22471, Failed: 10, Skipped: 177` (`j20` against `j19`):
       **2 fixed, 0 broken. 12 → 10.** `eng/trim-ratchet.sh`: `OURS: 88 <= 88`.
-      **The decision and its argument live in [`security-review.md`](../security-review.md) §4a**, which
+      **The decision and its argument live in [`security-review.md`](../../../security-review.md) §4a**, which
       is where a change to an ADR-008 control belongs; this entry records only what was measured.
 
       **A46 was a decision, not a finding, and it was never argued on the merits.** It recorded that

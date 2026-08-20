@@ -1,15 +1,15 @@
 ﻿# Implementation Plan — M2: Projection split
 
-Status: **IN PROGRESS** · Milestone [M2](roadmap.md#m2--projection-split-requirements-3)
+Status: **IN PROGRESS** · Milestone [M2](../roadmap.md#m2--projection-split-requirements-3)
 
 **Scope of this doc:** the current milestone only. Milestone-level scope belongs in
-[`roadmap.md`](roadmap.md), not here. Design authority for this milestone is
-[`projection-split.md`](projection-split.md) ([ADR-010](decisions.md#adr-010)); read it before
+[`roadmap.md`](../roadmap.md), not here. Design authority for this milestone is
+[`projection-split.md`](../../../projection-split.md) ([ADR-010](../../../decisions.md#adr-010)); read it before
 touching any phase below.
 
-Previous plans: [`archive/2026-08-m1-query-correctness-plan.md`](archive/2026-08-m1-query-correctness-plan.md)
+Previous plans: [`archive/2026-08-m1-query-correctness-plan.md`](2026-08-m1-query-correctness-plan.md)
 (M1 — including the standing failure taxonomy and the Phase K classification of the residual 42),
-[`archive/2026-07-query-pipeline-plan.md`](archive/2026-07-query-pipeline-plan.md).
+[`archive/2026-07-query-pipeline-plan.md`](2026-07-query-pipeline-plan.md).
 Archived plans are never edited again.
 
 Each checkbox is one minimal, logically-complete substep, committed individually with the
@@ -47,7 +47,7 @@ The split with no projection rewrite: ship server-executable subtrees whole, run
 locally. Correct but coarse; A must never be *silently* wrong, which is what A4 is for.
 
 - [x] **A1.** `Query/WireTypeCollector` — the types a node would put on the wire
-      ([`projection-split.md`](projection-split.md) §3.1), enumerated from the same sources
+      ([`projection-split.md`](../../../projection-split.md) §3.1), enumerated from the same sources
       `ExpressionToNodeTranslator` writes `TypeNode`s from. The drift guard compares **per node**,
       not whole-tree: types repeat across a tree, so a whole-tree comparison passed even with
       `Member.DeclaringType` dropped. Six omissions mutation-tested, all caught. ✅ `<this commit>`
@@ -3018,7 +3018,7 @@ ships a test on, and where both exist the tier that *translates* is the one whos
 - [x] **C48. The security review — and the type allowlist's safety turns out to be a conjunction.**
       **`Total tests: 22347, Passed: 21987, Failed: 143, Skipped: 217`** (`c48`) — **143 → 143,
       0 fixed, 0 broken.** Total up 18 for the adversarial tests.
-      [`docs/security-review.md`](security-review.md). ✅ `<this commit>`
+      [`docs/security-review.md`](../../../security-review.md). ✅ `<this commit>`
 
       M5's last criterion. The review walks the ten stages from bytes to execution and says which
       control governs each; the useful part is what reading `TypeAllowlist` adversarially turned
@@ -7326,7 +7326,7 @@ failures are left red and classified rather than worked immediately.
       is ADR-008's constraint 2, the thing that stops a serialized tree from naming arbitrary
       types. SQLite and SQL Server translate `Regex.IsMatch` to SQL; the InMemory store runs it
       as .NET. **Whether this provider should allowlist it is a design decision for
-      `docs/roadmap.md`, not a fix**, and it is deliberately not made here.
+      `docs/plans/v10/roadmap.md`, not a fix**, and it is deliberately not made here.
 
 - [x] **A47.** The nine `ModelBuilding.ModelBuilderTest` bases.
       **`Total tests: 17136, Passed: 16952, Failed: 26, Skipped: 158`** — **703 tests added, every
@@ -8540,10 +8540,10 @@ has to preserve what each operator expects of its source, and a transparent iden
 
 ---
 
-## Phase X — transparent identifiers ([`transparent-identifiers.md`](transparent-identifiers.md), ADR-011)
+## Phase X — transparent identifiers ([`transparent-identifiers.md`](../../../transparent-identifiers.md), ADR-011)
 
 - [x] **X0.** Design session: read EF's `TryFlattenGroupJoinSelectMany` at source, wrote the
-      spec, recorded [ADR-011](decisions.md#adr-011). ✅ `db5dcdd`
+      spec, recorded [ADR-011](../../../decisions.md#adr-011). ✅ `db5dcdd`
 
 - [x] **X1.** Mirror `TryFlattenGroupJoinSelectMany` on the client, before the boundary analysis.
       **First attempt measured `111 → 111` and was reverted. The revert was a mistake** — see X6,
@@ -8744,7 +8744,7 @@ Small families with unrelated causes, taken one at a time. Each is measured on i
       *server's* context instance. The measured answer is 7 rows in every case, which is the
       server default `TenantPrefix = "B"`; the client's `"F"` never crosses the wire.
 
-      This is an architectural consequence of [ADR-006](decisions.md)'s capture point, not an
+      This is an architectural consequence of [ADR-006](../../../decisions.md)'s capture point, not an
       oversight, and it needs a decision rather than a patch. The options are for the client to
       apply filters itself before shipping (duplicating EF's filter machinery, which handles
       inheritance and navigations) or to ship filter parameter values with the request (which
@@ -8924,7 +8924,7 @@ that list is for bases *conceptually inapplicable* to a remoting provider, and C
 it for the spatial bases on the ground that "not built yet" does not qualify. The same refusal
 binds here. **So M6 is blocked on the B12 decision** (C21), not on available work.
 
-Then archive this doc as `docs/archive/2026-08-m6-coverage-expansion-plan.md` and rewrite it for
+Then archive this doc as `docs/plans/v10/archive/2026-08-m6-coverage-expansion-plan.md` and rewrite it for
 **M7 — SQL Server (Tier C)**, whose spatial half is already done and must not be re-planned
 (C15/C17/C18).
 

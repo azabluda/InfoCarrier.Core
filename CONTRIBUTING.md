@@ -77,6 +77,6 @@ One logical change per commit. Say what changed and why it was worth changing. T
 | [`docs/wire-protocol.md`](docs/wire-protocol.md) | Client and server contract |
 | [`docs/expression-serialization.md`](docs/expression-serialization.md) | How a LINQ tree becomes bytes |
 | [`docs/projection-split.md`](docs/projection-split.md) | What runs on the server, what runs on the client |
-| [`docs/roadmap.md`](docs/roadmap.md) | Milestones and CI strategy |
+| [`docs/plans/v10/roadmap.md`](docs/plans/v10/roadmap.md) | Milestones and CI strategy |
 | [`docs/build-warnings.md`](docs/build-warnings.md) | Which warnings are fatal, which are suppressed, where, and why |
 | [`docs/versioning.md`](docs/versioning.md) | How a version is decided, and how to cut a release |

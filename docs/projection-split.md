@@ -304,7 +304,7 @@ Each phase is a commit, and each must leave the suite **no worse** than the prev
   reaching the translation failure they assert. Each either returns to asserting its original
   failure or is deleted.
 
-## 9. Exit criteria (from [`roadmap.md`](roadmap.md) M2)
+## 9. Exit criteria (from [`roadmap.md`](plans/v10/roadmap.md) M2)
 
 - Boundary detection in the client; client applies the residual projection. *(relocated from the
   server per §2 — roadmap updated)*

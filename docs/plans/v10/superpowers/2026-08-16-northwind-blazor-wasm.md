@@ -5,7 +5,7 @@ saves a unit of work and runs a transaction against the Phase 1 server — in a 
 wire inspector showing every envelope, and publishing trimmed with no IL warning attributable to
 `InfoCarrier.Core`.
 
-**Spec:** [`../specs/2026-08-11-blazor-wasm-sample-design.md`](../specs/2026-08-11-blazor-wasm-sample-design.md).
+**Spec:** [`../specs/2026-08-11-blazor-wasm-sample-design.md`](2026-08-11-blazor-wasm-sample-design.md).
 This plan implements its **Phase 2** (spec §10); Phase 1 landed as M8-1 … M8-9.
 
 **Exit:** the spec's §9 success criteria, all five.
@@ -54,7 +54,7 @@ Every task's requirements implicitly include these.
   so promoting them is a file move (spec §4.1). The inspector must therefore be a **decorator**
   over `IInfoCarrierTransport` living in the client project — not a change to either file.
 - **One task per commit**, message prefixed `Step M8-<n>:`, with this plan's checkbox and the
-  matching `docs/implementation-plan.md` entry in the **same** commit.
+  matching `docs/plans/v10/implementation-plan.md` entry in the **same** commit.
 - **`eng/measure.sh` only where a task says so.** It costs 6–9 minutes. Only M8-11 and M8-16 touch
   anything the spec suite can see; the rest are `samples/` and cannot move it.
 - **Report test results as `Passed: N, Failed: M, Total: T`** read from actual output.
@@ -79,7 +79,7 @@ Every task's requirements implicitly include these.
 
 ### Task M8-10: Open this plan
 
-- [x] **Step 1:** Write this file and the Phase I section of `docs/implementation-plan.md`.
+- [x] **Step 1:** Write this file and the Phase I section of `docs/plans/v10/implementation-plan.md`.
 - [x] **Step 2:** Commit. No code, so no test run.
 
 ---
@@ -108,7 +108,7 @@ verification. A missing type cannot pass it.
       **Amended during the work:** the step as written said to carry over all three settings the
       old `Options` had, including `ReferenceHandler.Preserve`. That one **cannot** come along, and
       it turned out not to have been doing anything — see M8-11's entry in
-      `docs/implementation-plan.md`.
+      `docs/plans/v10/implementation-plan.md`.
 - [x] **Step 2:** Point `SystemTextJsonInfoCarrierSerializer` at `InfoCarrierJsonContext.Default.Options`.
 - [x] **Step 3:** Build; run `test/InfoCarrier.Core.TransportTests`.
 - [x] **Step 4:** `bash eng/measure.sh m8-11 c96`. **Expected: `FAILING: 13  TOTAL: 22453`, with
@@ -189,7 +189,7 @@ action.
       against the client's provider. The server is only the `--startup-project`, because a Blazor
       WASM project emits no `deps.json` and `dotnet ef` cannot load one.
 - [x] **Step 2:** Wire `UseModel` on the client; confirm the app still works. **It did not, at
-      first** — see the `Issue31751` finding in `docs/implementation-plan.md`.
+      first** — see the `Issue31751` finding in `docs/plans/v10/implementation-plan.md`.
 - [x] **Step 3:** `bash eng/measure.sh m8-16 m8-11` — expected unchanged.
 - [x] **Step 4:** Commit.
 
@@ -206,6 +206,6 @@ action.
       premise rather than an oversight; the honest annotation would be `[RequiresUnreferencedCode]`
       on the public query API, which is a product decision. Gated by `eng/trim-ratchet.sh`.
 - [x] **Step 4:** Add the publish to CI's fast gate.
-- [x] **Step 5:** Record what Phase 2 did **not** close, in `docs/implementation-plan.md`, with the
+- [x] **Step 5:** Record what Phase 2 did **not** close, in `docs/plans/v10/implementation-plan.md`, with the
       same candour Phase 1's M8-7 used.
 - [x] **Step 6:** Final measurement and commit.
