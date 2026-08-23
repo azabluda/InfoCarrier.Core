@@ -59,7 +59,8 @@ PostgreSQL, SQLite, or whatever provider it uses.
 ## Why you might want this
 
 The client composes the query it needs, in an API you already know, against the same `DbContext`
-and entity classes the server uses. No endpoint per screen, and no DTO layer to keep in step.
+and entity classes the server uses. There is no endpoint per screen, and no DTO layer to keep in
+step.
 
 An HTTP transport ships in the package. To use gRPC, a message bus, or a direct call in the same
 process, write one small class. `IInfoCarrierTransport` has one method.
@@ -91,10 +92,10 @@ the rest. `SaveChanges` including many-to-many graphs. Explicit and lazy loading
 savepoints, `ExecuteUpdate` and `ExecuteDelete`, complex types, JSON-mapped collections, spatial
 types and compiled models.
 
-Lazy loading works, and every navigation you touch is one round trip, which is a different price
-here than against a local database. [Loading related data](guide/loading-related-data.md) compares
-the three ways to load. In a browser client it does not work at all, for a reason that is the
-browser's: see [Blazor WebAssembly](platforms/blazor-webassembly.md).
+Lazy loading costs one round trip for every navigation you touch, a different price here than
+against a local database. [Loading related data](guide/loading-related-data.md) compares the three
+ways to load. In a browser client it does not work at all, for a reason that is the browser's: see
+[Blazor WebAssembly](platforms/blazor-webassembly.md).
 
 The provider runs Microsoft's own EF Core specification suite, the same suite the SQL Server,
 SQLite and InMemory providers run:

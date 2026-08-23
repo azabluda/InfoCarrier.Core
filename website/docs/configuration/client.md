@@ -27,7 +27,7 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
 | `HttpInfoCarrierTransport` | `IInfoCarrierTransport` | you are not using HTTP, or want to decorate every request |
 | `TransportInfoCarrierClient` | `IInfoCarrierClient` | you are hosting the server in an unusual way |
 
-All three hold no mutable state, so build them once and share them. One client serves every
+None of the three holds mutable state, so build them once and share them. One client serves every
 `DbContext` in the application, including concurrent ones, which is why the DI example below
 registers it as a singleton.
 
@@ -122,6 +122,8 @@ caches the service provider for you.
 
 ## Client-side query filters and interceptors
 
-They work, and they run on the client. The server still executes your query against its own model, so
-a global query filter defined on the server is applied there and cannot be bypassed from a client.
-A filter defined only on the client is a convenience, not a boundary.
+They work, and they run on the client. A filter defined only on the client is a convenience: the
+server executes your query against its own model, so the server's filters are the ones that decide
+what comes back. They are a default rather than a boundary, because `IgnoreQueryFilters()` travels
+in the expression tree and the server honours it. See
+[The server is the boundary](server.md#the-server-is-the-boundary).

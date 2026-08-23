@@ -28,10 +28,11 @@ request, because each is an operation the server has to perform. If the second s
     pinned to your token. Keep transactions short, and never let one span a user thinking about a
     dialog.
 
-    **A client that vanishes mid-transaction pins all three until the server process exits.**
-    There is no idle timeout and nothing reaps an abandoned token. `DisposeAsync` on the client
-    covers every ordinary path including exceptions; it cannot cover a client that never runs
-    again. Once such a transaction has written, it holds the store's write lock.
+    **A client that vanishes mid-transaction pins the context, the connection and the token until
+    the server process exits.** There is no idle timeout and nothing reaps an abandoned token.
+    `DisposeAsync` on the client covers every ordinary path including exceptions; it cannot cover
+    a client that never runs again. Once such a transaction has written, it holds the store's
+    write lock.
 
     **The token only resolves on the server instance that minted it.** The registry is
     process-local, so a load-balanced deployment needs session affinity for the life of a

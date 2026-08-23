@@ -4,13 +4,13 @@ A browser client works, and it is the case this provider is most obviously for: 
 browser composing real LINQ, with the database behind your server. The sample's three pages run in
 WebAssembly, trimmed.
 
-Three things work differently here, and the first two are the browser's rather than this
-provider's. A console or desktop client has neither.
+Three things work differently here. The first two are the browser's rather than this provider's,
+and a console or desktop client has neither.
 
 The packages are the same as anywhere else: `InfoCarrier.Core` in the client, and
 `InfoCarrier.Core.AspNetCore` in the server that answers it. See
 [Installation](../getting-started/installation.md) and
-[Configuring the server](../configuration/server.md); the sample this page refers to throughout is
+[Configuring the server](../configuration/server.md). The sample this page refers to throughout is
 [Run the samples](../getting-started/samples.md).
 
 ## Automatic lazy loading is impossible
@@ -67,9 +67,9 @@ from first: an annotation such as `Relational:TableName` on a client model is th
 
 ## Trimming
 
-The client publishes with `PublishTrimmed=true` and runs. The published sample was driven through all
-three pages: queries, the projection split, both navigation loads, a unit of work and a committed
-transaction.
+The client publishes with `PublishTrimmed=true` and runs. The published sample was driven through
+all three pages, covering queries, the projection split, both navigation loads, a unit of work and
+a committed transaction.
 
 It reports IL trim warnings attributable to `InfoCarrier.Core`, which is expected. The wire carries a
 type's name and the far end resolves it, so `Assembly.GetType(string)` and `MakeGenericMethod` are

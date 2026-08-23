@@ -64,9 +64,9 @@ recent[0].Freight = 0m;
 await context.SaveChangesAsync();
 ```
 
-That query is not evaluated on the client. It crosses the wire as an expression tree, and the
-server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider the server uses. On
-the server, `app.MapInfoCarrier()` is the endpoint that receives it.
+That query is not evaluated on the client. It crosses the wire as an expression tree, and your
+server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider it uses. On the
+server, `app.MapInfoCarrier()` is the endpoint that receives it.
 
 [Your first client and server](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/)
 builds the whole pair, and [the samples](samples/) run one command each.

@@ -42,9 +42,9 @@ On the client, authenticate the `HttpClient`. See
 
 ### 2. Decide what a caller may see, on the server's model
 
-A global query filter on the server's model applies to every query by default, and a filter
-declared only on the client's model is a convenience, because the client is code you shipped to
-someone else's machine.
+A global query filter on the server's model applies to every query by default. A filter declared
+only on the client's model is a convenience, because the client is code you shipped to someone
+else's machine.
 
 **A filter is a default, not a boundary.** `IgnoreQueryFilters()` is an ordinary EF Core operator
 that travels in the expression tree, and the server honours it. Query filters also do not apply to
@@ -60,7 +60,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 ```
 
 That check is the server's `SaveChanges` override or an EF interceptor: everything a client submits
-is replayed through it, and neither is anything the client can address.
+is replayed through it, and the client cannot name either one.
 
 ## The shape of the exposure
 

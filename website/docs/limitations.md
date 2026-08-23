@@ -6,8 +6,8 @@ does not behave the way a normal EF Core provider behaves, so you can judge whet
 affects your application.
 
 It is complete for what the suite covers: if the suite has a scenario and it is not on this page,
-it passes. The suite is a provider-conformance suite, so it says nothing about performance, payload
-size, concurrency under load, or the relational APIs this provider does not have.
+it passes. A conformance suite says nothing about performance, payload size, concurrency under
+load, or the relational APIs this provider does not have.
 
 ```
 Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
@@ -139,7 +139,7 @@ EF Core provider.
 
 Two scenarios in EF's suite assert that a provider rejects the query, and this provider answers
 them correctly instead. A test suite you port from another provider will expect an exception here,
-and LINQ you write against this permissiveness will not run on a relational provider directly.
+and LINQ that relies on this leniency will not run unchanged on a relational provider.
 
 Composing LINQ over a collection stored through a value converter:
 

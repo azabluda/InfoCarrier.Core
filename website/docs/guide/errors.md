@@ -1,7 +1,7 @@
 # Handling errors
 
-The journey can fail as well as the server, and they are different exception types because the
-response to each is different.
+The journey can fail as well as the server. The two are different exception types, because they
+call for different responses.
 
 ## A failure the server reported
 

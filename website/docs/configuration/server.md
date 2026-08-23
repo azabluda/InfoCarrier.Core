@@ -81,12 +81,12 @@ commit or rollback, which is why transactions should be short. See
 The server executes the client's query against the server's model, so a global query filter defined
 there applies by default and a client cannot remove it by composing more operators on top.
 
-**It is not a boundary a hostile client cannot cross.** `IgnoreQueryFilters()` is an ordinary EF
-Core operator, it travels in the expression tree like any other, and the server honours it. And
-query filters do not apply to writes at all: a client can submit a `SaveChanges` for a row whose key
-belongs to someone else. Treat a filter as a default, and put anything a caller must not be able to
-turn off in a server-side check the client cannot name: a `SaveChanges` override, an EF interceptor,
-or a scope on the endpoint.
+**A hostile client can get past it.** `IgnoreQueryFilters()` is an ordinary EF Core operator, it
+travels in the expression tree like any other, and the server honours it. And query filters do not
+apply to writes at all: a client can submit a `SaveChanges` for a row whose key belongs to someone
+else. Treat a filter as a default, and put anything a caller must not be able to turn off in a
+server-side check the client cannot name: a `SaveChanges` override, an EF interceptor, or a scope
+on the endpoint.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -105,4 +105,4 @@ convenience on the client.
 Both halves build a model from the same `DbContext` source, and the wire names entity types and
 properties, so deploy them together: a property the client names and the server does not know is a
 failed request. Enable a model-shaping option on both sides or neither. A browser client is the
-deliberate exception, on the [Blazor WebAssembly](../platforms/blazor-webassembly.md) page.
+deliberate exception, covered on the [Blazor WebAssembly](../platforms/blazor-webassembly.md) page.

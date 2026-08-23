@@ -26,8 +26,8 @@ var app = builder.Build();
 app.MapInfoCarrier();
 ```
 
-The endpoint checks the protocol version and answers a mismatch with `400`. A failure inside a
-request it did run comes back inside a normal response, and surfaces on the client as the exception
+The endpoint checks the protocol version and answers a mismatch with `400`. A failure in a request
+the server did run comes back inside a normal response, and surfaces on the client as the exception
 EF would have thrown locally. Your server's own model, query filters and interceptors apply, because
 it is an ordinary EF Core application.
 
