@@ -26,12 +26,15 @@ EF Core provider.
 ## Installation
 
 ```sh
-dotnet add package InfoCarrier.Core             # the client and the server
-dotnet add package InfoCarrier.Core.AspNetCore  # the server endpoint
+# In the client project, and in the server project too.
+dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+
+# In the server project only.
+dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1
 ```
 
-Use the `--version` option to install a 10.0 preview. Without it, NuGet resolves the newest stable
-release, which belongs to the earlier 3.1 line.
+Both halves need .NET 10 and EF Core 10. Name the version, as above: without `--version`, NuGet
+resolves the newest stable release, which belongs to the earlier and incompatible 3.1 line.
 
 ## Basic usage
 

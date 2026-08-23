@@ -25,7 +25,11 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
 |---|---|---|
 | `SystemTextJsonInfoCarrierSerializer` | `IInfoCarrierSerializer` | you want a different format on the wire |
 | `HttpInfoCarrierTransport` | `IInfoCarrierTransport` | you are not using HTTP, or want to decorate every request |
-| `TransportInfoCarrierClient` | `IInfoCarrierClient` | almost never |
+| `TransportInfoCarrierClient` | `IInfoCarrierClient` | you are hosting the server in an unusual way |
+
+All three hold no mutable state, so build them once and share them. One client serves every
+`DbContext` in the application, including concurrent ones, which is why the DI example below
+registers it as a singleton.
 
 ## The HTTP transport
 

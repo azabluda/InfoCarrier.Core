@@ -1,8 +1,7 @@
 # Security
 
 Your server executes an expression tree that arrived over the network. That is the product, and the
-thing to think about before deploying it. This page says what the library does about it and what it
-leaves to you.
+thing to think about before deploying it.
 
 ## What the library bounds
 
@@ -31,7 +30,7 @@ Two things to do, both required.
 
 ### 1. Authenticate the transport
 
-It is an ordinary ASP.NET Core endpoint, so use ordinary ASP.NET Core:
+The endpoint takes ordinary ASP.NET Core conventions:
 
 ```csharp
 app.MapInfoCarrier()
@@ -43,9 +42,14 @@ On the client, authenticate the `HttpClient`. See
 
 ### 2. Decide what a caller may see, on the server's model
 
-A global query filter on the server's model is applied to every query and cannot be composed past
-from a client, which makes it the right place for row-level authorization. A filter declared only on
-the client's model is a convenience: the client is code you shipped to someone else's machine.
+A global query filter on the server's model applies to every query by default, and a filter
+declared only on the client's model is a convenience, because the client is code you shipped to
+someone else's machine.
+
+**A filter is a default, not a boundary.** `IgnoreQueryFilters()` is an ordinary EF Core operator
+that travels in the expression tree, and the server honours it. Query filters also do not apply to
+writes, so a client can submit a `SaveChanges` for a row whose key belongs to another tenant.
+Anything a caller must not be able to switch off belongs in a check the client cannot name.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -55,8 +59,8 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 }
 ```
 
-For writes, the server's `SaveChanges` override or an EF interceptor is the equivalent place.
-Everything a client submits is replayed through it.
+That check is the server's `SaveChanges` override or an EF interceptor: everything a client submits
+is replayed through it, and neither is anything the client can address.
 
 ## The shape of the exposure
 
@@ -77,8 +81,8 @@ expose it to the public internet without authentication.
 
 ## Transport security
 
-Use HTTPS. The envelope is not encrypted or signed by this library, and a request that can be read
-can be modified.
+Use HTTPS. The envelope is not encrypted or signed by this library, so a request that can be read
+can be modified, and TLS terminating at a gateway leaves the hop behind it unprotected.
 
 ## Reporting a vulnerability
 

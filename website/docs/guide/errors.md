@@ -1,7 +1,7 @@
 # Handling errors
 
-Two things can go wrong that would not go wrong locally: the server can fail, and the journey can
-fail. They are different exception types, because the response to each is different.
+The journey can fail as well as the server, and they are different exception types because the
+response to each is different.
 
 ## A failure the server reported
 
@@ -58,7 +58,13 @@ var serverStack = ex.InnerException?.Data["InfoCarrier.ServerStackTrace"] as str
 
 If the request never reached a server, or what came back was not a valid response, you get
 `InfoCarrierTransportException`. This is not a database error and must not be handled as one: the
-data is unknown, not wrong, and retrying may work.
+data is unknown, not wrong.
+
+For a query, retrying is safe. **For `SaveChanges` it is not**, because the failure does not tell
+you whether the server committed: the request may have died on the way out, or the answer may have
+died on the way back. Nothing in the envelope carries a request id, so there is no way to ask
+afterwards. Either make the unit of work naturally idempotent, with a key you supply rather than a
+store-generated one, or read back and reconcile before you retry.
 
 ```csharp
 try

@@ -4,8 +4,14 @@ A browser client works, and it is the case this provider is most obviously for: 
 browser composing real LINQ, with the database behind your server. The sample's three pages run in
 WebAssembly, trimmed.
 
-Two constraints apply. Both are the browser's, not this provider's; a console or desktop client has
-neither.
+Three things work differently here, and the first two are the browser's rather than this
+provider's. A console or desktop client has neither.
+
+The packages are the same as anywhere else: `InfoCarrier.Core` in the client, and
+`InfoCarrier.Core.AspNetCore` in the server that answers it. See
+[Installation](../getting-started/installation.md) and
+[Configuring the server](../configuration/server.md); the sample this page refers to throughout is
+[Run the samples](../getting-started/samples.md).
 
 ## Automatic lazy loading is impossible
 
@@ -20,22 +26,22 @@ so you see the traffic while the value never arrives. `ILazyLoader.Load()` is sy
 injecting it instead does not help.
 
 Do not call `UseLazyLoadingProxies()` in a browser client. Leaving it off means an unloaded
-navigation is simply `null`, which is honest and debuggable. Load explicitly:
+navigation is `null`. Load explicitly:
 
 ```csharp
 await context.Entry(order).Reference(o => o.Customer).LoadAsync();
 await context.Entry(order).Collection(o => o.Lines).LoadAsync();
 ```
 
-Nothing is lost: the original query never fetched the navigation either, and asking still costs one
-round trip.
+The round-trip count is unchanged, but every call site that touches a navigation becomes `async`,
+so a component cannot reach one from markup.
 
 !!! note "The asymmetry with the server is safe"
 
-    Your server may still call `UseLazyLoadingProxies()`, because it is not a browser. Proxies change
-    how an entity is constructed on the side that enables them, and the wire carries entity type
-    names. The sample is wired this way: proxies on the server, none in the browser. It is the one
-    deliberate exception to enabling model-shaping options on both halves.
+    Your server may still call `UseLazyLoadingProxies()`. Proxies change how an entity is
+    constructed on the side that enables them, and the wire carries entity type names rather than
+    proxy types, so the two halves stay in step. It is the one deliberate exception to enabling
+    model-shaping options on both halves.
 
 ## A compiled model is more trouble than it is worth here
 
@@ -56,9 +62,8 @@ takes its configuration from the server's service provider and ignores an
 the server's table names and proxy settings, and the browser runs on the wrong model while appearing
 to work.
 
-Build the model at start-up instead, as the sample does. If you do use a compiled model, check which
-context it came from first: an annotation such as `Relational:TableName` on a client model is the
-tell.
+Build the model at start-up instead. If you do use a compiled model, check which context it came
+from first: an annotation such as `Relational:TableName` on a client model is the tell.
 
 ## Trimming
 

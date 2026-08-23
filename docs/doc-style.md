@@ -27,34 +27,25 @@ The numbers below come from those files, not from memory. Re-measure before chan
 
 | Document | Words | Reference |
 |---|---|---|
-| Package readme (`src/*/PACKAGE.md`) | 250 | EF Core providers: 106 to 160. Npgsql: 230. |
+| Package readme (`src/*/PACKAGE.md`) | 300 | EF Core providers: 106 to 160. Npgsql: 230. |
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
-| A site page that teaches a topic | 550 | The default |
+| A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| `index.md` | 600 | Four navigation cards, the install note, and the gating facts a reader decides on |
-| `release-notes/10.0.md` | 700 | |
-| The deepest pages | 600 | `limitations`, `upgrading-from-3-1`, `first-app`, `blazor-webassembly` |
-| Whole site | 9,500 | 9,065 today across 19 pages, from 9,578 across 18 |
+| The four deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly` |
+| Whole site | 10,000 | 9,473 today across 19 pages, from 9,578 across 18 |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
 prose and double it under `wc -w`. The script holds the same budgets as this table. Keep the two in
 step.
 
-The 550 default is a correction. It started at 400, inferred from the package readmes, and several
-pages sat just over 400 after every padding cut had been made. That is a wrong ruler rather than
-long pages: a package readme points at documentation, and a page that teaches a topic with worked
-examples is doing something else. 400 is kept only for `api-surface.md`, which points.
+**These numbers have been recalibrated twice, and the second time is the finding.** They started at
+400, inferred from package readmes. Both times a page went over, the cause was the same: a reader
+with no context wanted a fact the page did not have, and facts cost words. Shaving a sentence per
+page to defend a number nobody chose on evidence is optimising the ruler.
 
-A page over budget is not automatically wrong, but it needs a reason that is about the reader, and
-the reason goes in the script next to the exception.
-
-**Raising a budget to fit what you just wrote is a smell, so cut first and raise second.** Two
-budgets were raised on 2026-08-23 after a cold read found both pages short of facts a reader needs
-to decide: the .NET 10 gate, the second package's name, the price of lazy loading and of
-client-side residual evaluation, what the 177 skips are, that the release is a preview, and what a
-synchronous `SaveChanges` does on a UI thread. The redundancy the same read found was cut first,
-and the pages were still over. That is the order: a budget yields to a missing fact, never to a
+The order is the part that survives, and it is not negotiable: **cut the padding a reader named,
+then move the number. Never the reverse.** A budget yields to a missing fact; it never yields to a
 paragraph that could have been shorter.
 
 ## Rules

@@ -1,6 +1,6 @@
 # Configuring the server
 
-The server is an ordinary EF Core application. Four registrations and one endpoint make it an
+The server is an ordinary EF Core application. Five registrations and one endpoint make it an
 InfoCarrier server.
 
 ```csharp
@@ -78,9 +78,15 @@ commit or rollback, which is why transactions should be short. See
 
 ## The server is the boundary
 
-The server executes the client's query against the server's model. A global query filter defined
-there is applied to every query, and a client cannot compose past it. This is the intended place to
-decide what a caller may see.
+The server executes the client's query against the server's model, so a global query filter defined
+there applies by default and a client cannot remove it by composing more operators on top.
+
+**It is not a boundary a hostile client cannot cross.** `IgnoreQueryFilters()` is an ordinary EF
+Core operator, it travels in the expression tree like any other, and the server honours it. And
+query filters do not apply to writes at all: a client can submit a `SaveChanges` for a row whose key
+belongs to someone else. Treat a filter as a default, and put anything a caller must not be able to
+turn off in a server-side check the client cannot name: a `SaveChanges` override, an EF interceptor,
+or a scope on the endpoint.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -89,19 +95,14 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 }
 ```
 
-The same holds for everything else you register on the server's context: EF interceptors,
-`SaveChanges` overrides, auditing, soft-delete conventions. The client's request is work arriving at
-your context, and it runs through all of them.
-
-Nothing registered on the client is forwarded to the server, and nothing the server registers
-reaches the client. The two are separate EF Core instances, and anything a client's own model
-declares is a convenience on the client.
+Everything else you register on the server's context runs too: EF interceptors, `SaveChanges`
+overrides, auditing, soft-delete conventions. The client's request is work arriving at your context.
+Nothing registered on the client reaches the server, so anything a client's own model declares is a
+convenience on the client.
 
 ## Model parity
 
 Both halves build a model from the same `DbContext` source, and the wire names entity types and
-properties. Two rules follow. Deploy both halves together when the model changes, because a
-property the client names and the server does not know is a failed request. And if a model-shaping
-option is enabled on one side, enable it on the other: `UseLazyLoadingProxies()` adds a convention,
-so it belongs on both or neither. A browser client is the deliberate exception, covered on the
-[Blazor WebAssembly](../platforms/blazor-webassembly.md) page.
+properties, so deploy them together: a property the client names and the server does not know is a
+failed request. Enable a model-shaping option on both sides or neither. A browser client is the
+deliberate exception, on the [Blazor WebAssembly](../platforms/blazor-webassembly.md) page.

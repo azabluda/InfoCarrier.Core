@@ -535,3 +535,12 @@ From wire-protocol §5 and research-findings §10 — resolved in the milestone 
 | Q6/W4 streaming vs identity resolution | M8 |
 | Server-held transaction lifetime: idle timeout, token ownership, multi-instance (see M8 above) | M8 |
 | ~~Q7 spatial Z/M via WKT~~ ✅ **done 2026-08-10** (C15/C17/C18, landed in M6) | ~~M7~~ |
+| **`IgnoreQueryFilters` crosses the wire and the server honours it**, so a global query filter is not an authorization boundary. Three strategies, one preferred, in [`cold-read-findings.md`](cold-read-findings.md) §1 | post-v10 |
+| **Idempotency for a retried unit of work.** A transport failure leaves the outcome unknown and there is no request id to ask with. Same file, §2 | post-v10 |
+| **Nothing observable at runtime**: no logger category, no round-trip counter. Same file, §2 | post-v10 |
+| **Client/server version-skew policy.** The envelope carries a `ProtocolVersion`; nothing states what a fleet on mixed builds should expect. Same file, §2 | post-v10 |
+
+**[`cold-read-findings.md`](cold-read-findings.md) is the full record**, from seven readers who were
+each given a slice of the user-facing documentation, a persona and a task, and told to read only
+their own files. It separates what was fixed at once, what is product work, what is a
+documentation gap, and four false positives recorded so they are not raised again.

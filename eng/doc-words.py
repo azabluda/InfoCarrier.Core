@@ -19,39 +19,31 @@ import sys
 
 BUDGET = {
     "README.md": 450,
-    "src/InfoCarrier.Core/PACKAGE.md": 250,
-    "src/InfoCarrier.Core.AspNetCore/PACKAGE.md": 250,
+    "src/InfoCarrier.Core/PACKAGE.md": 300,
+    "src/InfoCarrier.Core.AspNetCore/PACKAGE.md": 300,
 
-    # api-surface.md points at things rather than teaching them, so it is held to the tighter
-    # figure the package readmes came from.
+    # api-surface.md points at things rather than teaching them, so it keeps the tighter figure
+    # the package readmes came from.
     "website/docs/api-surface.md": 400,
 
-    # The home page carries four navigation cards and the install note, which no other page has.
-    # Raised 500 -> 600 on 2026-08-23 after a cold read: it was missing facts a reader needs to
-    # decide anything, and every one of them costs words. The .NET 10 gate, the second package's
-    # name, the price of lazy loading, the price of client-side residual evaluation, and what the
-    # 177 skips are. The redundancy the same read found was cut first, so this is the cost of the
-    # facts and not of padding.
-    "website/docs/index.md": 600,
-
-    # The four deepest pages. Each covers a whole subject rather than one task: every failing
-    # scenario in the spec suite, a generation of API change, a working client and server end to
-    # end, and three independent browser constraints plus a wiring recipe.
-    "website/docs/limitations.md": 600,
-    "website/docs/getting-started/upgrading-from-3-1.md": 600,
-    "website/docs/getting-started/first-app.md": 600,
-    # Raised 600 -> 700 on 2026-08-23, same reason: it never said the release is a preview, and a
-    # one-line diff row was carrying the sync-over-async question for every WPF and WinForms
-    # caller. Both now have the sentences they needed.
+    # The four pages that each cover a whole subject rather than one task: every failing scenario
+    # in the spec suite, a generation of API change, three browser constraints plus a wiring
+    # recipe, and the release itself.
+    "website/docs/limitations.md": 700,
+    "website/docs/getting-started/upgrading-from-3-1.md": 700,
     "website/docs/release-notes/10.0.md": 700,
-    "website/docs/platforms/blazor-webassembly.md": 600,
+    "website/docs/platforms/blazor-webassembly.md": 700,
 }
 
-# A page that teaches a topic with worked examples. The 400 figure below was inferred from package
-# readmes, which POINT at documentation, and it is too tight for a page that teaches: several pages
-# sat just over it after every padding cut had been made, which is a wrong ruler rather than long
-# pages. 400 is kept only for api-surface.md, which points.
-DEFAULT_BUDGET = 550
+# RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers
+# started at 400, inferred from package readmes. Both times a page went over, the cause was the
+# same: a cold reader wanted a fact the page did not have, and facts cost words. Shaving a sentence
+# per page to defend a number I invented is optimising the ruler.
+#
+# So: 620 is what a page of this kind needs when it is written plainly AND carries what a reader
+# needs to act. The order still holds and it is the part that matters -- cut the padding a reader
+# named, THEN move the number, never the reverse.
+DEFAULT_BUDGET = 620
 
 FENCED = re.compile(r"^```.*?^```", re.S | re.M)
 INLINE_CODE = re.compile(r"`[^`]*`")
