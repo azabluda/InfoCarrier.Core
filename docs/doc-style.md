@@ -31,9 +31,10 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
 | A site page that teaches a topic | 550 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| `index.md` | 500 | It carries four navigation cards and the install note |
-| The four deepest pages | 600 | `limitations`, `upgrading-from-3-1`, `first-app`, `release-notes`, `blazor-webassembly` |
-| Whole site | 9,000 | 8,878 today across 19 pages, from 9,578 across 18 |
+| `index.md` | 600 | Four navigation cards, the install note, and the gating facts a reader decides on |
+| `release-notes/10.0.md` | 700 | |
+| The deepest pages | 600 | `limitations`, `upgrading-from-3-1`, `first-app`, `blazor-webassembly` |
+| Whole site | 9,500 | 9,065 today across 19 pages, from 9,578 across 18 |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
@@ -47,6 +48,14 @@ examples is doing something else. 400 is kept only for `api-surface.md`, which p
 
 A page over budget is not automatically wrong, but it needs a reason that is about the reader, and
 the reason goes in the script next to the exception.
+
+**Raising a budget to fit what you just wrote is a smell, so cut first and raise second.** Two
+budgets were raised on 2026-08-23 after a cold read found both pages short of facts a reader needs
+to decide: the .NET 10 gate, the second package's name, the price of lazy loading and of
+client-side residual evaluation, what the 177 skips are, that the release is a preview, and what a
+synchronous `SaveChanges` does on a UI thread. The redundancy the same read found was cut first,
+and the pages were still over. That is the order: a budget yields to a missing fact, never to a
+paragraph that could have been shorter.
 
 ## Rules
 

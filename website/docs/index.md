@@ -21,8 +21,8 @@ recent[0].Freight = 0m;
 await context.SaveChangesAsync();   // one unit of work, executed on the server
 ```
 
-That query is not evaluated on the client. It crosses the wire as an expression tree, and your
-server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider the server uses.
+That query crosses the wire as an expression tree. Your server runs it against SQL Server,
+PostgreSQL, SQLite, or whatever provider it uses.
 
 <div class="grid cards" markdown>
 
@@ -47,21 +47,22 @@ server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider the 
 !!! note "Installing"
 
     ```sh
-    dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+    dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # client and server
+    dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # server endpoint
     ```
 
-    Use the `--version` option. Without it, NuGet resolves the newest stable release, which belongs
-    to the earlier 3.1 line and is not compatible with this one. If you are moving an application
-    off that line, see [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
+    Both halves need .NET 10 and EF Core 10. Use the `--version` option: without it, NuGet resolves
+    the newest stable release, which belongs to the earlier 3.1 line and is not compatible with this
+    one. If you are moving an application off that line, see
+    [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
 
 ## Why you might want this
 
-A rich client that needs more than a REST façade otherwise costs an endpoint per screen and a DTO
-per endpoint. Here the client composes the query it needs, in an API you already know, against the
-same `DbContext` and entity classes the server uses.
+The client composes the query it needs, in an API you already know, against the same `DbContext`
+and entity classes the server uses. No endpoint per screen, and no DTO layer to keep in step.
 
-HTTP is included. To use gRPC, a message bus, or a direct call in the same process, write one small
-class. `IInfoCarrierTransport` has one method.
+An HTTP transport ships in the package. To use gRPC, a message bus, or a direct call in the same
+process, write one small class. `IInfoCarrierTransport` has one method.
 
 ## How it fits together
 
@@ -73,17 +74,27 @@ graph LR
     B --> A
 ```
 
-The client's `DbContext` compiles your query, decides which part the server can run, and sends that
-part. The server executes it against its own model, with its own query filters and interceptors,
-and returns rows. The client materializes them into tracked entities and runs whatever is left
-locally. `SaveChanges` works the same way: the change tracker produces a set of change entries, the
-server replays them against a real `DbContext`, and store-generated values come back.
+The client's `DbContext` compiles your query and decides which part the server can run. The server
+executes that part against its own model, with its own query filters and interceptors.
+`SaveChanges` works the same way: the change tracker produces change entries, the server replays
+them against a real `DbContext`, and store-generated values come back.
+
+Whatever the server cannot run, the client runs over the rows that came back. That is what makes a
+projection with your own method in it work, and it is the cost to watch: a filter the server cannot
+translate is applied after the rows have crossed the wire.
+[Querying](guide/querying.md) shows which part goes where.
 
 ## What works
 
-Queries, the client/server split of a projection, `SaveChanges` including many-to-many graphs, lazy
-loading, explicit loading, transactions with savepoints, `ExecuteUpdate` and `ExecuteDelete`,
-complex types, JSON-mapped collections, spatial types and compiled models.
+Queries, including a projection split so that the server does the data access and the client runs
+the rest. `SaveChanges` including many-to-many graphs. Explicit and lazy loading, transactions with
+savepoints, `ExecuteUpdate` and `ExecuteDelete`, complex types, JSON-mapped collections, spatial
+types and compiled models.
+
+Lazy loading works, and every navigation you touch is one round trip, which is a different price
+here than against a local database. [Loading related data](guide/loading-related-data.md) compares
+the three ways to load. In a browser client it does not work at all, for a reason that is the
+browser's: see [Blazor WebAssembly](platforms/blazor-webassembly.md).
 
 The provider runs Microsoft's own EF Core specification suite, the same suite the SQL Server,
 SQLite and InMemory providers run:
@@ -93,10 +104,12 @@ Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
 ```
 
 Every one of the nine is written up on the [limitations](limitations.md) page in terms of the code
-that triggers it.
+that triggers it. The 177 skips are EF Core's own: tests EF itself skips for the store behind
+them.
 
 ## Security
 
-Your server executes an expression tree that arrived over the network, bounded by a default-deny
-allowlist over node kinds, types and methods. Authentication and authorization are not in scope and
-remain yours. The [security page](security.md) has the detail.
+Your server executes an expression tree that arrived over the network. Deserialization refuses
+anything outside a default-deny allowlist over node kinds, types and methods, before your server
+sees a tree at all. Authentication and authorization are not in scope and remain yours. The
+[security page](security.md) has the detail.

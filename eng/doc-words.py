@@ -26,9 +26,13 @@ BUDGET = {
     # figure the package readmes came from.
     "website/docs/api-surface.md": 400,
 
-    # The home page also carries four navigation cards and the install note, which no other page
-    # has and which a reader does not experience as prose.
-    "website/docs/index.md": 500,
+    # The home page carries four navigation cards and the install note, which no other page has.
+    # Raised 500 -> 600 on 2026-08-23 after a cold read: it was missing facts a reader needs to
+    # decide anything, and every one of them costs words. The .NET 10 gate, the second package's
+    # name, the price of lazy loading, the price of client-side residual evaluation, and what the
+    # 177 skips are. The redundancy the same read found was cut first, so this is the cost of the
+    # facts and not of padding.
+    "website/docs/index.md": 600,
 
     # The four deepest pages. Each covers a whole subject rather than one task: every failing
     # scenario in the spec suite, a generation of API change, a working client and server end to
@@ -36,7 +40,10 @@ BUDGET = {
     "website/docs/limitations.md": 600,
     "website/docs/getting-started/upgrading-from-3-1.md": 600,
     "website/docs/getting-started/first-app.md": 600,
-    "website/docs/release-notes/10.0.md": 600,
+    # Raised 600 -> 700 on 2026-08-23, same reason: it never said the release is a preview, and a
+    # one-line diff row was carrying the sync-over-async question for every WPF and WinForms
+    # caller. Both now have the sentences they needed.
+    "website/docs/release-notes/10.0.md": 700,
     "website/docs/platforms/blazor-webassembly.md": 600,
 }
 
