@@ -62,8 +62,10 @@ services.AddSingleton<IInfoCarrierClient>(sp =>
 
 ## Payload limits
 
-The serializer applies a size bound to what it will deserialize. It is a security control, so it is
-default-on for the direction that matters.
+The serializer applies a size bound to what it will deserialize. One `InfoCarrierPayloadLimits`
+object travels with it and each half enforces the half that applies: the server bounds the request
+it receives, the client bounds the response it receives. Only the server's side is default-on,
+because that is the side reading bytes from an untrusted peer.
 
 ```csharp
 var serializer = new SystemTextJsonInfoCarrierSerializer(
@@ -75,15 +77,14 @@ var serializer = new SystemTextJsonInfoCarrierSerializer(
 | | Default | Why |
 |---|---|---|
 | `MaxRequestBytes` | 64 MiB (`InfoCarrierPayloadLimits.DefaultMaxRequestBytes`) | An unauthenticated peer making your server allocate is the threat. No legitimate query tree comes near this. |
-| `MaxResponseBytes` | `null`, no bound | You asked for the result. This library has no basis for capping how large an answer your own query may have. |
+| `MaxResponseBytes` | `null`, no bound | You asked for the result, and the library has no basis for capping how large an answer your own query may have. Set it if a runaway query should fail loudly rather than exhaust memory, or if the hop back is not one you trust. |
 
 Pass `null` to opt out of a bound. It is spelled as an explicit `null` rather than a very large
-number so that opting out is visible in your code. Setting `MaxResponseBytes` on the client is a
-paging policy rather than a security control, and a useful one if you want a runaway query to fail
-loudly rather than exhaust memory.
+number so that opting out is visible in your code.
 
-The server has its own serializer with its own limits. Both halves deserialize, so both need
-bounding. See [Configuring the server](server.md#payload-limits).
+`MaxRequestBytes` set here bounds nothing on the client, which never deserializes a request. It
+matters on the server, and the server builds its own serializer with its own limits. See
+[Configuring the server](server.md#payload-limits).
 
 ## Synchronous calls
 
@@ -129,8 +130,7 @@ caches the service provider for you.
 
 ## Client-side query filters and interceptors
 
-They work, and they run on the client. A filter defined only on the client is a convenience: the
-server executes your query against its own model, so the server's filters are the ones that decide
-what comes back. They are a default rather than a boundary, because `IgnoreQueryFilters()` travels
-in the expression tree and the server honours it. See
-[The server is the boundary](server.md#the-server-is-the-boundary).
+They work, and they run on the client, so a filter defined only on the client is a convenience.
+The server's own filters decide what comes back, and they are a default rather than a boundary,
+because `IgnoreQueryFilters()` travels in the expression tree and the server honours it. See
+[Where the checks go](server.md#where-the-checks-go).

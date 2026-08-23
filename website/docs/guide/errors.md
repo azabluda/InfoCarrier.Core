@@ -5,8 +5,9 @@ call for different responses.
 
 ## A failure the server reported
 
-The server's exception is carried back as data and raised again on the client, keeping its type,
-its message and its inner chain. You catch what you would catch locally.
+The server's exception is carried back as data and raised again on the client, with its message and
+its inner chain. You catch what you would catch locally, and where the client has the exception's
+type loaded it is raised as that type.
 
 ```csharp
 try
@@ -23,9 +24,9 @@ catch (DbUpdateException ex)
 }
 ```
 
-Where the original is a type your client has no reason to reference, such as a `SqlException`, it
-arrives as `InfoCarrierServerException` with the thrown type's name in a property, so no `catch`
-clause obliges a client to reference a database driver.
+Where it does not, such as a `SqlException` in a client that references no database driver, it
+arrives as `InfoCarrierServerException` with the thrown type's name in a property. That is the same
+rule stated at the end of this page, and it is the only one: what the client has loaded.
 
 ```csharp
 catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerException server)
@@ -59,13 +60,21 @@ If the request never reached a server, or what came back was not a valid respons
 `InfoCarrierTransportException`. This is not a database error and must not be handled as one: the
 data is unknown, not wrong.
 
-For a query, retrying is safe. **For `SaveChanges` it is not**, because the failure does not tell
-you whether the server committed: the request may have died on the way out, or the answer may have
-died on the way back. Nothing in the envelope carries a request id, so there is no way to ask
-afterwards. The remedy is a key you supply rather than a store-generated one, **with a unique constraint on the
-server's database that enforces it**. Without the constraint a supplied key is not idempotent and
-the retry simply inserts twice. Reading back and reconciling before you retry is not equivalent: the
-first save can still commit between your read and your retry.
+Retrying a read is safe. **Retrying anything that writes is not**, because the failure does not
+tell you whether the server committed: the request may have died on the way out, or the answer may
+have died on the way back. Nothing in the envelope carries a request id, so there is no way to ask
+afterwards.
+
+That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` are written on an
+`IQueryable` and read like queries, and they are writes. For an insert, the remedy is a key you supply rather than a store-generated one, **with a unique
+constraint on the server's database that enforces it**. Without the constraint a supplied key is not
+idempotent and the retry simply inserts twice.
+
+**An update has no such remedy here.** A retried `balance = balance - 100` debits twice, and nothing
+in the protocol can tell you whether the first one landed. Make the operation one whose repetition
+is harmless, such as setting a value rather than adjusting one, or carry your own applied-once
+marker in the row and check it on the server. Reading back before you retry is not equivalent: the
+first write can still commit between your read and your retry.
 
 ```csharp
 try

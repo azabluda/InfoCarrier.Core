@@ -51,10 +51,16 @@ else's machine.
 that travels in the expression tree, and the server honours it. Query filters also do not apply to
 writes, so a client can submit a `SaveChanges` for a row whose key belongs to another tenant.
 
-For writes, the check a client cannot name is the server's `SaveChanges` override or an EF
+**For writes**, the check a client cannot name is the server's `SaveChanges` override or an EF
 interceptor, and you read the values you check from the store rather than from the entity the client
-sent. **For reads there is no such hook**: what a client can ask for is decided by which entity types
-are in the shared model, which is why keeping a type out of it is the read-side control.
+sent.
+
+**For reads** there are two, and you will want both. The coarse one is the shared model: a client
+composes over the entity types you put in it and nothing else, so a type that must never leave the
+server belongs on a context only the server has. The fine one is that the server executes the
+client's tree through its own query provider, so an EF query interceptor registered on the server
+sees that tree and can rewrite it, including re-applying a predicate the client stripped. That is
+the hook a row-level rule belongs in, and it is yours to write and yours to test.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -64,16 +70,18 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 }
 ```
 
-That check is the server's `SaveChanges` override or an EF interceptor: everything a client submits
-is replayed through it, and the client cannot name either one.
+Everything a client submits is replayed through that override or interceptor, and the client cannot
+name either one.
 
 ## The shape of the exposure
 
 A client can compose any query over the entity types your shared model exposes. That is the feature,
 and it has four consequences.
 
-Expensive queries are reachable. A caller can ask for a cross join. Bound it with query filters, a
-paging convention, a rate limit at the gateway, or a statement timeout on the database.
+Expensive queries are reachable. A caller can ask for a cross join. Bound it where the caller
+cannot reach: a rate limit at the gateway, a statement timeout on the database, or a query
+interceptor on the server. A query filter is not a bound here for the same reason it is not a
+boundary above.
 
 Exception messages travel, with their stack traces. If yours carry connection strings, file paths or
 internal identifiers, catch and rewrite them at the server boundary.
