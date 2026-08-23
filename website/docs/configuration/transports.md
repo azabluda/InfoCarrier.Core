@@ -1,6 +1,6 @@
 # Custom transports
 
-Shipping a request is one interface with one method:
+A transport is one interface with one method:
 
 ```csharp
 public interface IInfoCarrierTransport

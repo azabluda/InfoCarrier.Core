@@ -73,8 +73,8 @@ builds the whole pair, and [the samples](samples/) run one command each.
 Queries and the client/server projection split, `SaveChanges` including many-to-many graphs, lazy
 loading, explicit loading, transactions with savepoints, `ExecuteUpdate` and `ExecuteDelete`,
 complex types, JSON-mapped owned collections, spatial types, compiled models, and Blazor
-WebAssembly published trimmed. HTTP ships in the box, and `IInfoCarrierTransport` is one method,
-so gRPC, WCF or a message bus is a small class of your own.
+WebAssembly published trimmed. HTTP is included. To use gRPC, WCF or a message bus, write one small
+class. `IInfoCarrierTransport` has one method.
 
 The provider runs Microsoft's own EF Core specification suite, the same suite the SQL Server,
 SQLite and InMemory providers run. The

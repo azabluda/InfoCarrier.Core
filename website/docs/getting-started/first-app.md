@@ -169,7 +169,7 @@ Read on:
 
 ## Testing without a network
 
-`IInfoCarrierTransport` is one method, so a test can hand the request straight to the server. This
+`IInfoCarrierTransport` has one method, so a test can send the request straight to the server. This
 transport serializes both ways, so nothing travels by reference that would not survive HTTP:
 
 ```csharp

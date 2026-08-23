@@ -300,16 +300,36 @@ a sentence does the work.
   came from package readmes, which point rather than teach.
 - **`eng/doc-words.py` is new**, and was not in the plan. `wc -w` counts fenced code and link URLs,
   which made it useless as a gate.
+- **The humanizer skill was not run in file mode, page by page, as section 2 says it should be.** It
+  was invoked once, which loaded its full rule set into the session, and the rules were applied while
+  each file was written, then checked afterwards by grepping every user-facing file for its patterns:
+  the §7 word list, "not just X but Y", false ranges, title-case headings, emoji, curly quotes, §23
+  filler, and the §27 and §28 openers. That audit is real and it came back clean. It is not the same
+  as running the skill over each file, and the rule in `doc-style.md` still asks for the latter.
 
 ### Left open
 
-- Four mentions of gRPC remain, in `README.md`, `index.md`, `transports.md` and the release-notes
-  page. Each says the transport interface is one method and a gRPC binding is a class a consumer can
-  write, which is a present capability rather than a plan. If "do not mention it" was meant
-  literally, these four are the ones to remove.
+- Mentions of gRPC remain, in `README.md`, `index.md`, `transports.md` and the release-notes page.
+  Each says the transport interface has one method and a gRPC binding is a class a consumer can
+  write, which is a present capability rather than a plan. **Kept deliberately, 2026-08-23, by the
+  owner's decision**, when the sentence carrying them was rewritten: naming gRPC, a message bus and
+  an in-process call shows a reader what the seam is for.
 - `docs/infocarrier-core-requirements.md` §4.4 and `docs/wire-protocol.md` W4 still describe
   streaming as something the wire protocol should support. Those are internal design documents
   rather than promises to a consumer, and amending the authoritative requirements spec is a larger
   decision than this plan covers.
 - The published release body links to `/release-notes/10.0/`, which 404s until this branch reaches
   `main`, because `.github/workflows/docs.yml` publishes the site from `main`.
+
+
+### Follow-up, same day
+
+The sentence "`IInfoCarrierTransport` is a single method, so gRPC, a message bus or an in-process
+call remains a small class of your own" was rewritten in simpler English. It existed in six places
+in three different wordings, and all six now read the same way: HTTP is included; to use gRPC, a
+message bus or an in-process call, write one small class; `IInfoCarrierTransport` has one method.
+Short sentences, one idea each, and the examples kept.
+
+`docs/release-bodies/v10.0.0-preview.1.superseded-2026-08-23.md` was deleted at the owner's request.
+The GitHub release body it archived is gone for good, and everything a reader needed from it is on
+the release-notes page.

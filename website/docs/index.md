@@ -61,8 +61,8 @@ per endpoint. Here the client composes the query it needs, in an API you already
 same `DbContext` and entity classes the server uses. Nothing new to learn, and no DTO layer to keep
 in sync.
 
-HTTP ships in the box, and `IInfoCarrierTransport` is one method, so gRPC, a message bus or a
-direct in-process call is a small class of your own.
+HTTP is included. To use gRPC, a message bus, or a direct call in the same process, write one small
+class. `IInfoCarrierTransport` has one method.
 
 ## How it fits together
 

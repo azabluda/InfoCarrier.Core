@@ -72,7 +72,7 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
 ```
 
 Delete your old client implementation. If you are not on HTTP, implement `IInfoCarrierTransport`
-instead, which is one method that moves an envelope and interprets nothing. See
+instead. It has one method. That method moves the request and reads nothing in it. See
 [Custom transports](../configuration/transports.md).
 
 ### 4. The server endpoint ships too
