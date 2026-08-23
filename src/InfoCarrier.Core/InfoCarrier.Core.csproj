@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Entity Framework Core database provider that remotes LINQ queries and change-tracking over a wire protocol.</Description>
     <RootNamespace>InfoCarrier.Core</RootNamespace>
     <AssemblyName>InfoCarrier.Core</AssemblyName>
     <IsPackable>true</IsPackable>

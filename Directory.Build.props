@@ -61,7 +61,13 @@
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <Company>InfoCarrier.Core</Company>
     <Product>InfoCarrier.Core</Product>
-    <Description>Entity Framework Core database provider that remotes LINQ queries and change-tracking over a wire protocol.</Description>
+    <!--
+      The default for every project, and the shipped description of InfoCarrier.Core itself;
+      InfoCarrier.Core.AspNetCore overrides it. One sentence, written for someone reading a
+      nuget.org search result rather than for a maintainer. EF Core's own is
+      "SQLite database provider for Entity Framework Core." See docs/doc-style.md.
+    -->
+    <Description>Entity Framework Core provider for the client side of a multi-tier application: a real DbContext on the client, the database on your server.</Description>
     <RepositoryType>git</RepositoryType>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
@@ -122,7 +128,13 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/azabluda/InfoCarrier.Core</PackageProjectUrl>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
-    <PackageTags>entity-framework-core;efcore;ef-core-provider;linq;n-tier;multi-tier;blazor;wpf;expression-trees;change-tracking</PackageTags>
+    <!--
+      The first seven are the ecosystem names EF Core itself tags with (Directory.Build.props in
+      subrepos/efcore), because that is what a search on nuget.org actually matches. The rest say
+      what THIS package is for. Feature words like linq, expression-trees and change-tracking used
+      to be here and were dropped: nobody searches nuget.org for a feature of EF Core.
+    -->
+    <PackageTags>Entity Framework Core;entity-framework-core;EF;EFCore;EntityFrameworkCore;O/RM;Data;ef-core-provider;n-tier;multi-tier;client-server;Blazor;WPF;MAUI</PackageTags>
 
     <!--
       Each packable project ships its OWN PACKAGE.md, next to the csproj, packed as README.md.
