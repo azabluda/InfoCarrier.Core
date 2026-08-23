@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+<!--
+  The two icon links Material's own template cannot emit.
+
+  `theme.favicon` in mkdocs.yml is a single `<link rel="icon">` and that is all base.html renders,
+  so anything a browser looks for under a different `rel` has to be added here.
+
+  BOTH OF THESE ARE THE ONLY ROUTE TO THE THING THEY POINT AT. Safari does not read the web
+  manifest when it needs a home-screen icon -- `rel="apple-touch-icon"` is the only way to reach
+  it -- and nothing reads the manifest at all unless a `rel="manifest"` link names it.
+
+  `| url` is mkdocs' own filter and is not optional here: the site is published under
+  /InfoCarrier.Core/, so a root-absolute href would 404 on every page. Inside the manifest the same
+  problem is solved differently -- its "src" and "start_url" resolve against the manifest's own URL,
+  which is why they are written relative there.
+-->
+{% block extrahead %}
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ 'assets/icons/apple-touch-icon.png' | url }}">
+  <link rel="manifest" href="{{ 'site.webmanifest' | url }}">
+{% endblock %}
