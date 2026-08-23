@@ -29,19 +29,24 @@ The numbers below come from those files, not from memory. Re-measure before chan
 |---|---|---|
 | Package readme (`src/*/PACKAGE.md`) | 250 | EF Core providers: 106 to 160. Npgsql: 230. |
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
-| A reference page on the site | 400 | |
-| A page under `guide/` | 550 | It teaches a topic with worked examples; a reference page points |
-| `limitations.md`, `upgrading-from-3-1.md`, `first-app.md`, `release-notes/` | 600 | |
-| Whole site | 9,000 | |
+| A site page that teaches a topic | 550 | The default |
+| A site page that points | 400 | `api-surface.md` only |
+| `index.md` | 500 | It carries four navigation cards and the install note |
+| The four deepest pages | 600 | `limitations`, `upgrading-from-3-1`, `first-app`, `release-notes`, `blazor-webassembly` |
+| Whole site | 10,000 | It was 13,000 before the rewrite |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
-prose and double it under `wc -w`. The script drops all of that and holds the same budgets as this
-table, so keep the two in step.
+prose and double it under `wc -w`. The script holds the same budgets as this table. Keep the two in
+step.
+
+The 550 default is a correction. It started at 400, inferred from the package readmes, and several
+pages sat just over 400 after every padding cut had been made. That is a wrong ruler rather than
+long pages: a package readme points at documentation, and a page that teaches a topic with worked
+examples is doing something else. 400 is kept only for `api-surface.md`, which points.
 
 A page over budget is not automatically wrong, but it needs a reason that is about the reader, and
-the reason goes in the script next to the exception. `index.md` has the only one so far: it carries
-four navigation cards and the install note, which no other page has.
+the reason goes in the script next to the exception.
 
 ## Rules
 
