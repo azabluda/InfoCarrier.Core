@@ -113,10 +113,18 @@ your package works without any additional setup beyond simple package installati
 The narrative goes on the site, at `website/docs/release-notes/<version>.md`, where it is
 versioned, linkable and maintained with the rest of the documentation.
 
-The GitHub release body is a stub: an identity line, a link to the release notes, a link to the
-limitations page, and the install command. Npgsql's release body for 10.0.0 is three lines and two
-links. GitHub keeps no history of a release body, so the stub lives in the repository and is
-applied with `gh release edit <tag> --notes-file <file>`.
+The GitHub release body is a stub: an identity line, the install command, the one thing that will
+break, and four links. Npgsql's release body for 10.0.0 is three lines and two links; ours is 116
+words, down from 1,019.
+
+GitHub keeps no history of a release body, so the stub lives in `docs/release-bodies/<tag>.md` and
+is applied with `gh release edit <tag> --notes-file docs/release-bodies/<tag>.md`. A body being
+replaced is archived beside it as `<tag>.superseded-<date>.md` before the edit, because the copy on
+GitHub is the only one there was.
+
+**A release body must not link to a site page that has not been deployed yet.** The site publishes
+from `main` (`.github/workflows/docs.yml`), so a link to a page added on a branch is a 404 until
+that branch merges.
 
 ## Before committing
 
