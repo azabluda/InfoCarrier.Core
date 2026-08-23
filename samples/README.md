@@ -12,7 +12,13 @@ a **console**. Both build the same `NorthwindContext` from `Northwind.Shared`, b
 
 ## Run it in a browser
 
-One terminal, one command. The server hosts the client's files, so there is one origin and no CORS.
+Nothing to install: [**open it in Codespaces**](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1)
+and `.devcontainer/devcontainer.json` builds the sample, starts the server and opens the demo. The
+first launch takes a couple of minutes, because there is no prebuild — see the comments in that
+file for why not.
+
+Locally it is one terminal, one command. The server hosts the client's files, so there is one
+origin and no CORS.
 
 ```bash
 dotnet run --project samples/Northwind.Server
