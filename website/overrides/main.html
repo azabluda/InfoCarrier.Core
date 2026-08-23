@@ -1,21 +1,64 @@
 {% extends "base.html" %}
 
 <!--
-  The two icon links Material's own template cannot emit.
+  The head tags Material's own template cannot emit.
 
   `theme.favicon` in mkdocs.yml is a single `<link rel="icon">` and that is all base.html renders,
-  so anything a browser looks for under a different `rel` has to be added here.
+  so anything a browser looks for under a different `rel` has to be added here. Open Graph is not
+  in base.html at all -- Material emits those tags only through its `social` plugin, which builds
+  a card image per page and is not enabled here.
 
-  BOTH OF THESE ARE THE ONLY ROUTE TO THE THING THEY POINT AT. Safari does not read the web
+  THE ICON LINKS ARE EACH THE ONLY ROUTE TO THE THING THEY POINT AT. Safari does not read the web
   manifest when it needs a home-screen icon -- `rel="apple-touch-icon"` is the only way to reach
   it -- and nothing reads the manifest at all unless a `rel="manifest"` link names it.
 
-  `| url` is mkdocs' own filter and is not optional here: the site is published under
-  /InfoCarrier.Core/, so a root-absolute href would 404 on every page. Inside the manifest the same
-  problem is solved differently -- its "src" and "start_url" resolve against the manifest's own URL,
-  which is why they are written relative there.
+  TWO KINDS OF URL HERE, AND SWAPPING THEM BREAKS BOTH. The icon links use `| url`, mkdocs' own
+  filter, because the site is published under /InfoCarrier.Core/ and a root-absolute href would
+  404 on every page. Open Graph is the opposite: it is read by a crawler that has no page to
+  resolve against, so `og:url` and `og:image` MUST be absolute, which is what `config.site_url`
+  is for. Inside the manifest the problem is solved a third way -- its "src" and "start_url"
+  resolve against the manifest's own URL, so they are written relative there.
 -->
 {% block extrahead %}
   <link rel="apple-touch-icon" sizes="180x180" href="{{ 'assets/icons/apple-touch-icon.png' | url }}">
   <link rel="manifest" href="{{ 'site.webmanifest' | url }}">
+
+  {#-
+    Title and description follow base.html's own precedence, so a shared link shows the page's
+    own words rather than the site's on every page but the home one.
+  -#}
+  {% if page.meta and page.meta.title %}
+    {% set og_title = page.meta.title ~ " - " ~ config.site_name %}
+  {% elif page.title and not page.is_homepage %}
+    {% set og_title = (page.title | striptags) ~ " - " ~ config.site_name %}
+  {% else %}
+    {% set og_title = config.site_name %}
+  {% endif %}
+  {% if page.meta and page.meta.description %}
+    {% set og_description = page.meta.description %}
+  {% else %}
+    {% set og_description = config.site_description %}
+  {% endif %}
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_description }}">
+  {% if page.canonical_url %}
+    <meta property="og:url" content="{{ page.canonical_url }}">
+  {% endif %}
+
+  {#-
+    A 512 SQUARE, AND `summary` RATHER THAN `summary_large_image` TO MATCH IT. The wide card wants
+    a 1200x630 landscape image; handed a square it letterboxes or crops one. `summary` is the card
+    designed around a square thumbnail, so declaring it makes the icon the right asset instead of
+    a compromise. The dimensions below are the generated file's -- if TARGETS in eng/make-icons.py
+    ever changes that size, these two numbers change with it.
+  -#}
+  <meta property="og:image" content="{{ config.site_url }}assets/icons/icon-512.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="The {{ config.site_name }} icon">
+  <meta name="twitter:card" content="summary">
 {% endblock %}
