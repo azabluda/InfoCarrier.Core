@@ -1,7 +1,7 @@
 # Security
 
 Your server executes an expression tree that arrived over the network. That is the product, and the
-thing to think about before deploying it. This page is what the library does about it and what it
+thing to think about before deploying it. This page says what the library does about it and what it
 leaves to you.
 
 ## What the library bounds
@@ -78,7 +78,7 @@ expose it to the public internet without authentication.
 ## Transport security
 
 Use HTTPS. The envelope is not encrypted or signed by this library, and a request that can be read
-can be modified. The transport is the layer that establishes trust, which is why it is a seam you own.
+can be modified.
 
 ## Reporting a vulnerability
 

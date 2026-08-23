@@ -73,6 +73,6 @@ interpret one.
 
 ## Source documentation
 
-Every public type carries XML documentation, so IntelliSense and the symbol package are the fastest
-reference for anything not listed here. The packages ship symbols and SourceLink, so you can step
-into the provider from a debugger.
+Every public type carries XML documentation, so IntelliSense is the fastest reference for anything
+not listed here. The packages ship symbols and SourceLink, so you can step into the provider from a
+debugger.

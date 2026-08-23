@@ -92,7 +92,7 @@ If you encounter a bug, have a question, or would like to request a feature,
 Built on [Entity Framework Core](https://github.com/dotnet/efcore) and judged by its test suite.
 
 [InfoCarrier.Core 1.0 to 3.1](https://github.com/azabluda/InfoCarrier.Core/tree/release/3.1), by
-[on/off it-solutions gmbh](http://www.onoff-it-solutions.info), proved the idea, on
+[on/off it-solutions gmbh](http://www.onoff-it-solutions.info), proved the idea, and built it on
 [Remote.Linq](https://github.com/6bee/Remote.Linq) and
 [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn. Version 10 has its own serializer
 and no longer depends on them.

@@ -12,8 +12,8 @@ public interface IInfoCarrierTransport
 ```
 
 An `InfoCarrierEnvelope` is a serializable record. Get one to the server, get the answer back, and
-you have a transport. HTTP is the default because it is what most applications want, not because
-anything depends on it.
+you have a transport. HTTP is the default because it is what most applications want. Nothing in the
+library depends on it.
 
 ## Decorating the HTTP one
 

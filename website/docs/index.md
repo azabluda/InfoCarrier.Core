@@ -51,15 +51,14 @@ server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider the 
     ```
 
     Use the `--version` option. Without it, NuGet resolves the newest stable release, which belongs
-    to the earlier 3.1 line and is not compatible with this one. Moving an application off that
-    line? See [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
+    to the earlier 3.1 line and is not compatible with this one. If you are moving an application
+    off that line, see [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
 
 ## Why you might want this
 
 A rich client that needs more than a REST façade otherwise costs an endpoint per screen and a DTO
 per endpoint. Here the client composes the query it needs, in an API you already know, against the
-same `DbContext` and entity classes the server uses. Nothing new to learn, and no DTO layer to keep
-in sync.
+same `DbContext` and entity classes the server uses.
 
 HTTP is included. To use gRPC, a message bus, or a direct call in the same process, write one small
 class. `IInfoCarrierTransport` has one method.

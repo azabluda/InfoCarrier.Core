@@ -47,7 +47,7 @@ dotnet run --project samples/Northwind.Demo
 
 It walks through a filtered query, a projection, an aggregate, lazy loading, a unit of work and a
 rolled-back transaction, printing the running round-trip count as it goes. The counts are the
-interesting part: touching a navigation costs a request when it is touched, and two edits cost one
+interesting part: a navigation costs a request at the moment you touch it, and two edits cost one
 save. Delete `northwind.db` first for the transcript's exact numbers.
 
 This client lazy-loads normally, unlike the browser one. It is not WebAssembly, so a synchronous

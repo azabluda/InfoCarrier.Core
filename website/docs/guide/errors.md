@@ -1,7 +1,7 @@
 # Handling errors
 
 Two things can go wrong that would not go wrong locally: the server can fail, and the journey can
-fail. They are deliberately different exception types, because the response to each is different.
+fail. They are different exception types, because the response to each is different.
 
 ## A failure the server reported
 
@@ -73,7 +73,7 @@ catch (InfoCarrierTransportException ex)
 ```
 
 The underlying failure, an `HttpRequestException` or a serialization error, is kept as
-`InnerException`, because it names the layer that actually failed. When the server answers with a
+`InnerException`, because it names the layer that failed. When the server answers with a
 non-success status, the message carries the status code and the response body.
 
 Depending on where the failure surfaces, EF may wrap the transport exception, so check both:

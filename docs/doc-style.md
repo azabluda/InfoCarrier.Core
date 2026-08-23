@@ -65,10 +65,15 @@ the reason goes in the script next to the exception.
 4. **Admonition boxes (`!!!`) follow the same test, and at most one per page.** A box that repeats
    the paragraph above it in a coloured frame is decoration.
 
-5. **No design rationale.** Why the package is split, why a dependency was dropped, what a decision
-   cost, what a previous attempt got wrong: none of it belongs in a user-facing document. It goes
-   in `docs/architecture.md` or `docs/decisions.md`. A reader installing a package does not need
-   the repository's history to use it.
+5. **No design rationale about this repository.** What a decision cost, what a previous attempt got
+   wrong, which milestone something landed in, why a dependency was dropped: none of it belongs in
+   a user-facing document. It goes in `docs/architecture.md` or `docs/decisions.md`.
+
+   **A one-clause "why the API looks like this" is not that, and stays**, when a reader acts on it.
+   Three sentences were checked against this rule and kept: why the ASP.NET Core endpoint is a
+   separate package (it decides which package you reference), why opting out of a payload bound is
+   spelled `null` (you will meet the API), and why no geometry mapper ships (you have to write one).
+   The test is whether the reader does something differently for having read it.
 
 6. **No unreleased feature is named as a plan.** No "still to come", no "coming soon", no roadmap.
    A capability a reader can build today may be described as a capability. A capability this
