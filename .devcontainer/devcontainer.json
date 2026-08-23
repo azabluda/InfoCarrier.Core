@@ -1,0 +1,59 @@
+// The "Try it in Codespaces" link in README.md lands here. It builds the sample and starts it,
+// so a visitor sees the running demo without typing a command.
+//
+// NO PREBUILD IS CONFIGURED, AND THAT IS THE POINT. Codespaces compute is billed to the account
+// that owns the codespace -- the visitor's, out of their monthly included hours -- so the demo
+// costs this repository nothing. Prebuild storage is the one thing billed to the repository
+// OWNER, which is why there is none. The price paid instead is a first launch of about six
+// minutes, measured on the 2-core machine: base image, SDK, restore, build. A resume is seconds.
+//
+// IF A PREBUILD IS EVER ADDED: a prebuild runs `onCreateCommand` and `updateContentCommand` and
+// does NOT run `postCreateCommand`. The build below is therefore in `onCreateCommand`, so that
+// enabling a prebuild would warm it rather than silently skip it.
+{
+    "name": "InfoCarrier.Core",
+
+    // A base image with no .NET, plus the SDK global.json pins, rather than a .NET image.
+    //
+    // THE FIRST ATTEMPT USED mcr.microsoft.com/devcontainers/dotnet:1-10.0 AND FAILED: that tag
+    // still ships 10.0.100-rc.2, global.json pins 10.0.201, and `dotnet build` exited 155 with
+    // "A compatible .NET SDK was not found". Codespaces then abandoned the container and dropped
+    // the visitor into an Alpine recovery container -- an image that lags is not a slow demo, it
+    // is no demo at all. The Feature installs an exact version, so this cannot drift.
+    //
+    // KEEP THIS VERSION AND global.json IN STEP. They are two statements of one fact.
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        "ghcr.io/devcontainers/features/dotnet:2": { "version": "10.0.201" }
+    },
+
+    // The SAMPLE, never InfoCarrier.Core.slnx. The solution holds the two test projects, and
+    // restoring those pulls the EF Core specification-test packages -- minutes of download for a
+    // visitor who wants to look at a grid.
+    //
+    // `|| true` IS DELIBERATE, and it is what the first failure taught. A non-zero exit here does
+    // not merely skip the build: it fails container creation, skips every later command, and hands
+    // the visitor a recovery container with no .NET in it. Letting the container come up puts the
+    // same error in the `demo` terminal below, where a person can read it.
+    "onCreateCommand": "dotnet build samples/Northwind.Server -c Debug || true",
+
+    // Object form so the server gets its own named terminal: the log stays readable and the
+    // visitor can stop it. The server hosts the Blazor client too, so this is the whole demo.
+    "postAttachCommand": { "demo": "dotnet run --project samples/Northwind.Server" },
+
+    // The port in samples/Northwind.Server/Properties/launchSettings.json. `openPreview` opens
+    // the demo in a browser pane inside the editor as soon as the port opens.
+    "forwardPorts": [5199],
+    "portsAttributes": {
+        "5199": {
+            "label": "Northwind demo",
+            "onAutoForward": "openPreview"
+        }
+    },
+
+    "customizations": {
+        "vscode": {
+            "extensions": ["ms-dotnettools.csharp"]
+        }
+    }
+}

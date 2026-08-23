@@ -50,6 +50,17 @@ done
 echo "Passed: ${passed}, Failed: ${failed}, Total: ${total}"
 echo "Baseline: failed=${baseline_failed}, total=${baseline_total} (${baseline_file})"
 
+# The spec-suite badge in README.md is built from these three numbers, and build.yml reads them
+# from here rather than parsing the TRX a second time: one parser, one place to fix. Written
+# before the gates below, because a run that fails the ratchet still has numbers worth publishing
+# -- the badge is meant to go red with them.
+counters_file="$(dirname "$trx")/counters.env"
+{
+    echo "total=${total}"
+    echo "passed=${passed}"
+    echo "failed=${failed}"
+} > "$counters_file"
+
 status=0
 
 if [ "$total" -lt "$baseline_total" ]; then

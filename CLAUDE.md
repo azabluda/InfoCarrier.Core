@@ -26,7 +26,7 @@ estimate a count, and never derive one figure from the others.
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
-| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. |
+| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
 | `eng/make-icon.py` | Regenerates `docs/assets/icon.png` from the source artwork. Run it when the artwork changes. |
 
@@ -188,20 +188,22 @@ list in this file, is the current answer to "which bases are in".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 22656, Passed: 22466, Failed: 13, Skipped: 177`** (2026-08-17, `j15`).
+**`Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`** (2026-08-18, `n8-minver`).
 **All four figures come out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
 the one deliberate lowering, in C94, where two skipped theories turned 4 tests into 2.
 
-**All 13 failures are classified and not one is of unknown standing.** They sit in eight classes,
-five holding two and three holding one. The tables are in `docs/plans/v10/implementation-plan.md`
-— A54, A59, A61–A65, B3a–B16 and C1–C96 — and Phase J's "The residual 13, examined properly"
-re-derives the whole tail against M9's run. The run itself is in `artifacts/measure/`, currently
-`j15`. `Query.Associations` is 336 of 336, and `MaterializationInterception`,
-`OptimisticConcurrency` and `ComplexNavigations` are clear. Wrong answers are down to **2**, both
-C64's `Correlated_collection_with_distinct_3_levels`, whose assertion no correct answer can
-satisfy.
+**All 9 failures are classified and not one is of unknown standing.** They sit in six classes,
+three holding two and three holding one. The tables are in
+`docs/plans/v10/archive/implementation-plan-m9-phase-j.md` — A54, A59, A61–A65, B3a–B16 and
+C1–C96 — whose "The residual 13, examined properly" re-derives the whole tail **as it stood at
+thirteen**; J20 and J21 lowered it after that, and `test/known-failures.txt` carries the dated
+reading for each. **The archive is never edited, so its count is the count of the day it was
+written and the baseline file is the current one.** `Query.Associations` is 336 of 336, and
+`MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are clear. Wrong
+answers are down to **2**, both C64's `Correlated_collection_with_distinct_3_levels`, whose
+assertion no correct answer can satisfy.
 
 **The consumer-facing statement of what is missing is
 [`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep

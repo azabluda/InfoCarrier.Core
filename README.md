@@ -4,14 +4,15 @@
 
 **Use the full power of Entity Framework Core in a client application that has no database.**
 
+[![Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml)
+[![Spec suite](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fazabluda%2FInfoCarrier.Core%2Fbadges%2Fspec-suite.json)](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml)
 [![NuGet](https://img.shields.io/nuget/vpre/InfoCarrier.Core?label=InfoCarrier.Core&color=004880)](https://www.nuget.org/packages/InfoCarrier.Core)
-[![NuGet](https://img.shields.io/nuget/vpre/InfoCarrier.Core.AspNetCore?label=InfoCarrier.Core.AspNetCore&color=004880)](https://www.nuget.org/packages/InfoCarrier.Core.AspNetCore)
-[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
-[![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0-512BD4)](https://github.com/dotnet/efcore)
+[![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0%20on%20.NET%2010-512BD4)](https://github.com/dotnet/efcore)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](license.txt)
 
 [**Documentation**](https://azabluda.github.io/InfoCarrier.Core/) &nbsp;·&nbsp;
 [Samples](samples/) &nbsp;·&nbsp;
+[**Try it in Codespaces**](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1) &nbsp;·&nbsp;
 [Contributing](CONTRIBUTING.md)
 
 </div>
