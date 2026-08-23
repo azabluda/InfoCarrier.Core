@@ -11,8 +11,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](license.txt)
 
 [**Documentation**](https://azabluda.github.io/InfoCarrier.Core/) &nbsp;·&nbsp;
-[**Try it in Codespaces**](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1) &nbsp;·&nbsp;
 [Samples](samples/) &nbsp;·&nbsp;
+[**Try it in Codespaces**](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1) &nbsp;·&nbsp;
 [Contributing](CONTRIBUTING.md)
 
 </div>
