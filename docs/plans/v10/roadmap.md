@@ -371,9 +371,14 @@ Three separable pieces, and only the first can be done outside the library:
 | Surviving more than one server instance | **library / deployment** | The registry is process-local, so a token only resolves on the instance that created it — horizontal scaling needs affinity or a shared registry. The sample is single-instance and does not hit this. |
 
 **Exit criteria**
-- HTTP and gRPC transport bindings (only in-process exists today).
-- Streaming results as `IAsyncEnumerable<T>` (requirements §4.4, wire-protocol W4) — the
-  server currently buffers into an `ArrayList`.
+- HTTP transport binding (only in-process existed when this was written).
+- ~~gRPC transport binding~~ and ~~streaming results as `IAsyncEnumerable<T>`~~ **OUT OF SCOPE FOR
+  v10, 2026-08-23, by the owner's decision.** Neither ships in the 10.x line. `IInfoCarrierTransport`
+  is one method, so a gRPC binding stays a consumer-side class; the server continues to buffer a
+  result set into an `ArrayList` and a consumer pages large results. The requirement they came from
+  (requirements §4.4, wire-protocol W4) is deferred past this generation, not withdrawn.
+  **Consequence for documentation:** neither may be named as a plan in any user-facing document
+  (`docs/doc-style.md` rule 6), and neither is the reason the version says `-preview`.
 - Compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5).
 - AOT/trimming verification (requirements §4.5).
 - ~~Sample apps~~ **DONE** (Phases H/I) — a Blazor WebAssembly client and a console client, both
@@ -386,9 +391,11 @@ Three separable pieces, and only the first can be done outside the library:
   the ASP.NET Core endpoint carries a framework reference a client must not. `release.yml` packs on a `v*` tag, runs both gates, checks the tag
   against the packaged version, and attaches the files to a GitHub Release. **Publishing to
   nuget.org is deliberately manual** — a pushed version is immutable, so no API key lives in this
-  repository. **Both packages are published at `-preview.1`, and `-preview` should stay until the
-  criteria below are met**: the suffix is the promise not yet made about `IInfoCarrierTransport`,
-  and a gRPC binding or streaming results may still change it.
+  repository. **Both packages are published at `-preview.1`, and `-preview` stays until the
+  public surface is settled**: the suffix is the promise not yet made about
+  `IInfoCarrierTransport` and the rest of the shipped API, and a stable `10.0.0` is the commitment
+  not to break it. **No user-facing document gives a reason for the suffix** (2026-08-23): the
+  version number carries the information, as it does for every EF Core preview.
 
   **AMENDED 2026-08-18 (N8), and the amendment is about *where the human stands*, not whether
   there is one.** The rule above is unchanged: a pushed NuGet version can be unlisted but never

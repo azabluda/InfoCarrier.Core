@@ -92,9 +92,15 @@
       which EF a package targets. It also keeps a repository with no release tag yet inside the
       10.0 line rather than starting at 0.0.
 
-      `-preview` should stay until M8's exit criteria are met: there is no gRPC binding and results
-      do not stream yet, and both may touch IInfoCarrierTransport. A stable 10.0.0 is a promise not
-      to break that surface.
+      `-preview` stays until the public surface is settled. A stable 10.0.0 is a promise not to
+      break it, and that promise is not ready to be made.
+
+      Do NOT restate that reason in a user-facing document. It used to say "until a gRPC binding
+      and streaming results are settled", and that sentence propagated into the README, the package
+      readme, the site index, the installation page, the limitations page and the GitHub release
+      body as a roadmap promise. Both features went out of scope for v10 on 2026-08-23 (roadmap,
+      M8 exit criteria) and every copy had to be hunted down. The version number carries the
+      information on its own, which is what EF Core relies on. See docs/doc-style.md rule 6.
 
       MinVer needs the tags, so any workflow that builds must check out with `fetch-depth: 0`.
       A shallow clone has no tags, and the version silently becomes a default.
