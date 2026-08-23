@@ -27,6 +27,9 @@ BUDGET = {
     "website/docs/limitations.md": 600,
     "website/docs/getting-started/upgrading-from-3-1.md": 600,
     "website/docs/getting-started/first-app.md": 600,
+    # A release-notes page covers a whole generation of change, and it is the ONE place where
+    # writing about the previous version is correct rather than a smell.
+    "website/docs/release-notes/10.0.md": 600,
 }
 DEFAULT_BUDGET = 400
 

@@ -5,10 +5,10 @@ and runs.
 
 ## 1. The shared model
 
-Put the entity classes and the `DbContext` in a project both halves reference. This is not a
-convention — it is what makes the wire format work. The payload names entity types and properties,
-and the two ends resolve those names against **their own** models, so the models must agree.
-Sharing the source makes that true by construction.
+Put the entity classes and the `DbContext` in a project both halves reference. This is what makes
+the wire format work: the payload names entity types and properties, the two ends resolve those
+names against their own models, and sharing the source makes the two models agree by
+construction.
 
 ```csharp title="Shop.Shared/Model.cs"
 using Microsoft.EntityFrameworkCore;
@@ -48,11 +48,9 @@ public class ShopContext(DbContextOptions options) : DbContext(options)
 }
 ```
 
-!!! note "Take `DbContextOptions`, not `DbContextOptions<ShopContext>`"
-
-    The client builds its options with `UseInfoCarrier` and the server with `UseSqlServer` (or
-    whatever it uses). A constructor taking the non-generic `DbContextOptions` accepts both, so one
-    context class serves both halves.
+The constructor takes the non-generic `DbContextOptions` on purpose. The client builds its options
+with `UseInfoCarrier` and the server with `UseSqlServer`, and the non-generic form accepts both, so
+one context class serves both halves.
 
 ## 2. The server
 
@@ -86,9 +84,9 @@ app.MapInfoCarrier();
 app.Run();
 ```
 
-`InProcessInfoCarrierServer` is the piece that executes a request against a real `DbContext`. The
-name says *in-process* because it runs the query in the same process as the database connection —
-it is the normal server-side implementation, not a test double.
+`InProcessInfoCarrierServer` executes a request against a real `DbContext`. The name says
+*in-process* because it runs the query in the same process as the database connection. It is the
+normal server-side implementation, not a test double.
 
 ## 3. The client
 
@@ -116,7 +114,7 @@ Three objects, each replaceable:
 | | |
 |---|---|
 | `SystemTextJsonInfoCarrierSerializer` | turns envelopes into bytes. Source-generated, so it works in a trimmed build. |
-| `HttpInfoCarrierTransport` | posts the bytes and reads the answer. One method — see [Custom transports](../configuration/transports.md). |
+| `HttpInfoCarrierTransport` | posts the bytes and reads the answer. One method: see [Custom transports](../configuration/transports.md). |
 | `TransportInfoCarrierClient` | the client the provider talks to. |
 
 In a DI application, register them instead:
@@ -165,9 +163,9 @@ await context.SaveChangesAsync();   // one round trip, two rows
 
 Read on:
 
-- [Querying](../guide/querying.md) — what runs where, and how to tell.
-- [Saving changes](../guide/saving-changes.md) — units of work, graphs, generated keys.
-- [Transactions](../guide/transactions.md) — including one transaction across two contexts.
+- [Querying](../guide/querying.md): what runs where, and how to tell.
+- [Saving changes](../guide/saving-changes.md): units of work, graphs, generated keys.
+- [Transactions](../guide/transactions.md): including one transaction across two contexts.
 
 ## Testing without a network
 
