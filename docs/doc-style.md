@@ -113,9 +113,13 @@ your package works without any additional setup beyond simple package installati
 The narrative goes on the site, at `website/docs/release-notes/<version>.md`, where it is
 versioned, linkable and maintained with the rest of the documentation.
 
-The GitHub release body is a stub: an identity line, the install command, the one thing that will
-break, and four links. Npgsql's release body for 10.0.0 is three lines and two links; ours is 116
-words, down from 1,019.
+**A release body says what changed in THIS release.** It is not a place to describe the product: a
+reader on a release page either already knows what the package is or is one click from the
+documentation. One clause of identity is the budget, and then the news.
+
+The shape is three groups, about 350 words: **Breaking**, **New**, **Verified**, each a list of one
+line per item, then the install command and the links. No bold lead-in on the list items, because
+rule 3 applies here too and the opening words of each line already act as the label.
 
 GitHub keeps no history of a release body, so the stub lives in `docs/release-bodies/<tag>.md` and
 is applied with `gh release edit <tag> --notes-file docs/release-bodies/<tag>.md`. A body being
