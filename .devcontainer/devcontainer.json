@@ -4,7 +4,8 @@
 // NO PREBUILD IS CONFIGURED, AND THAT IS THE POINT. Codespaces compute is billed to the account
 // that owns the codespace -- the visitor's, out of their monthly included hours -- so the demo
 // costs this repository nothing. Prebuild storage is the one thing billed to the repository
-// OWNER, which is why there is none. The price paid instead is the first-run wait below.
+// OWNER, which is why there is none. The price paid instead is a first launch of about six
+// minutes, measured on the 2-core machine: base image, SDK, restore, build. A resume is seconds.
 //
 // IF A PREBUILD IS EVER ADDED: a prebuild runs `onCreateCommand` and `updateContentCommand` and
 // does NOT run `postCreateCommand`. The build below is therefore in `onCreateCommand`, so that

@@ -14,8 +14,8 @@ a **console**. Both build the same `NorthwindContext` from `Northwind.Shared`, b
 
 Nothing to install: [**open it in Codespaces**](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1)
 and `.devcontainer/devcontainer.json` builds the sample, starts the server and opens the demo. The
-first launch takes a couple of minutes, because there is no prebuild — see the comments in that
-file for why not.
+first launch takes about six minutes, measured, because there is no prebuild — see the comments
+in that file for why not. It is quick after that: a stopped codespace resumes in seconds.
 
 Locally it is one terminal, one command. The server hosts the client's files, so there is one
 origin and no CORS.
