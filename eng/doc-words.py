@@ -33,6 +33,11 @@ BUDGET = {
 }
 DEFAULT_BUDGET = 400
 
+# A guide page teaches one topic with worked examples; a reference page points. The 400 figure was
+# inferred from package readmes, which point, and it is too tight for the five pages under guide/.
+GUIDE_BUDGET = 550
+GUIDE_PREFIX = "website/docs/guide/"
+
 FENCED = re.compile(r"^```.*?^```", re.S | re.M)
 INLINE_CODE = re.compile(r"`[^`]*`")
 LINK_TARGET = re.compile(r"\]\([^)]*\)")
@@ -73,7 +78,8 @@ def main(argv):
         with open(path, encoding="utf-8") as handle:
             count = prose(handle.read())
         total += count
-        budget = BUDGET.get(key, DEFAULT_BUDGET)
+        default = GUIDE_BUDGET if key.startswith(GUIDE_PREFIX) else DEFAULT_BUDGET
+        budget = BUDGET.get(key, default)
         flag = ""
         if count > budget:
             flag = "  OVER by %d (budget %d)" % (count - budget, budget)

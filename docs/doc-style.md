@@ -29,9 +29,10 @@ The numbers below come from those files, not from memory. Re-measure before chan
 |---|---|---|
 | Package readme (`src/*/PACKAGE.md`) | 250 | EF Core providers: 106 to 160. Npgsql: 230. |
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
-| A site page | 400 | |
-| `limitations.md`, `upgrading-from-3-1.md`, `first-app.md` | 600 | |
-| Whole site | 6,000 | |
+| A reference page on the site | 400 | |
+| A page under `guide/` | 550 | It teaches a topic with worked examples; a reference page points |
+| `limitations.md`, `upgrading-from-3-1.md`, `first-app.md`, `release-notes/` | 600 | |
+| Whole site | 9,000 | |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in

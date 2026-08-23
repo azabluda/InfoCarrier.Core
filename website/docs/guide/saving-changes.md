@@ -1,7 +1,7 @@
 # Saving changes
 
-`SaveChanges` is a **unit of work**, and on a remote provider that is more than a figure of speech:
-everything the change tracker holds travels in one request, is replayed against a real `DbContext`
+`SaveChanges` is a unit of work, and on a remote provider that is more than a figure of speech.
+Everything the change tracker holds travels in one request, is replayed against a real `DbContext`
 on the server, and is written in one `SaveChanges` there.
 
 ```csharp
@@ -18,8 +18,8 @@ context.Orders.Add(new Order
 int written = await context.SaveChangesAsync();   // one round trip, returns 2
 ```
 
-One edit and one insert, **one** request. Batch your work into a unit rather than saving after
-every change.
+One edit and one insert, one request. Batch your work into a unit rather than saving after every
+change.
 
 ## Store-generated values come back
 
@@ -35,7 +35,7 @@ await context.SaveChangesAsync();
 Console.WriteLine(order.Id);   // the key the server's database issued
 ```
 
-The same applies to any store-generated property — computed columns, default values, concurrency
+The same applies to any store-generated property: computed columns, default values, concurrency
 tokens.
 
 !!! note "Before the save, read the key from the entry"
@@ -79,7 +79,7 @@ context.Orders.Remove(order);
 await context.SaveChangesAsync();
 ```
 
-To delete without loading the row first, use `ExecuteDeleteAsync` — see
+To delete without loading the row first, use `ExecuteDeleteAsync`. See
 [Querying](querying.md#bulk-operations).
 
 ## Concurrency
@@ -111,13 +111,13 @@ Only the entries the change tracker considers changed, and only what the server 
 them: which entity type, which key, which properties changed, and their values. Entities you merely
 queried and did not touch stay on the client.
 
-That has a consequence worth knowing: **the server's context is not your context.** It replays your
-changes against a fresh `DbContext` on its own model, then discards it. Server-side query filters,
-interceptors and `SaveChanges` overrides are applied there and are the server's business, which is
-also what stops a client from writing anything the server's model does not expose.
+The server's context is not your context. It replays your changes against a fresh `DbContext` on
+its own model, then discards it. Server-side query filters, interceptors and `SaveChanges` overrides
+are applied there, which is also what stops a client from writing anything the server's model does
+not expose.
 
 ## Errors
 
-A failure on the server — a constraint violation, a trigger, a validation exception in an
-interceptor — arrives on the client as the exception EF would have thrown locally, with its message
+A failure on the server, such as a constraint violation or a validation exception in an
+interceptor, arrives on the client as the exception EF would have thrown locally, with its message
 and inner chain preserved. See [Handling errors](errors.md).
