@@ -33,6 +33,13 @@ BUDGET = {
     "website/docs/getting-started/upgrading-from-3-1.md": 700,
     "website/docs/release-notes/10.0.md": 700,
     "website/docs/platforms/blazor-webassembly.md": 700,
+
+    # Added to the 700 tier 2026-08-24, after a verification read. Each covers a whole subject
+    # rather than one task: the security model, and the entire failure taxonomy. Both gained
+    # facts that were verified in source and that a reader had asked for by name, and the padding
+    # the same readers named was cut first.
+    "website/docs/security.md": 700,
+    "website/docs/guide/errors.md": 700,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

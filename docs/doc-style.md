@@ -31,7 +31,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
 | A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| The four deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly` |
+| The deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `security`, `guide/errors` |
 | Whole site | 10,000 | 9,473 today across 19 pages, from 9,578 across 18 |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced

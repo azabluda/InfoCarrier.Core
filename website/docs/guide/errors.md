@@ -1,6 +1,6 @@
 # Handling errors
 
-The journey can fail as well as the server. The two are different exception types, because they
+The server can fail, and so can the trip to it. Those are different exception types, because they
 call for different responses.
 
 ## A failure the server reported
@@ -23,10 +23,9 @@ catch (DbUpdateException ex)
 }
 ```
 
-Deeper in the chain, where the original exception is a type your client has no reason to reference,
-such as a `SqliteException`, it arrives as `InfoCarrierServerException`. The name of what the server
-threw is a property rather than the type, so a `catch` clause never obliges a client to reference a
-database driver.
+Where the original is a type your client has no reason to reference, such as a `SqlException`, it
+arrives as `InfoCarrierServerException` with the thrown type's name in a property, so no `catch`
+clause obliges a client to reference a database driver.
 
 ```csharp
 catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerException server)
@@ -63,8 +62,10 @@ data is unknown, not wrong.
 For a query, retrying is safe. **For `SaveChanges` it is not**, because the failure does not tell
 you whether the server committed: the request may have died on the way out, or the answer may have
 died on the way back. Nothing in the envelope carries a request id, so there is no way to ask
-afterwards. Either make the unit of work naturally idempotent, with a key you supply rather than a
-store-generated one, or read back and reconcile before you retry.
+afterwards. The remedy is a key you supply rather than a store-generated one, **with a unique constraint on the
+server's database that enforces it**. Without the constraint a supplied key is not idempotent and
+the retry simply inserts twice. Reading back and reconciling before you retry is not equivalent: the
+first save can still commit between your read and your retry.
 
 ```csharp
 try
@@ -79,8 +80,8 @@ catch (InfoCarrierTransportException ex)
 ```
 
 The underlying failure, an `HttpRequestException` or a serialization error, is kept as
-`InnerException`, because it names the layer that failed. When the server answers with a
-non-success status, the message carries the status code and the response body.
+`InnerException`. When the server answers with a non-success status, the message carries the status
+code and the response body.
 
 Depending on where the failure surfaces, EF may wrap the transport exception, so check both:
 
@@ -116,7 +117,15 @@ List<Customer> customers = await context.Customers.ToListAsync(cts.Token);
 
 ## What the server does not tell you
 
-A fault carries the type name, the message, the inner chain and the stack trace, and nothing else
-about the server: no paths beyond what a stack trace contains, no connection strings, no
-configuration. If your own exception messages carry information a client should not see, review
-that on the server. See [Security](../security.md).
+A fault carries the type name, the message, the inner chain and the stack trace. The library adds
+nothing to that: no configuration, no connection string, no server path beyond whatever the stack
+trace itself holds, which with symbols deployed is your build's source paths.
+
+**Your own messages travel verbatim**, and a provider's exception is your own message here. A
+`SqlException` names the server instance and the database in its text, and that text reaches the
+client. Catch and rewrite at the server boundary anything a client should not read. See
+[Security](../security.md).
+
+Rebuilding a fault does not resolve arbitrary types. The client looks only in assemblies it has
+already loaded, accepts only a non-abstract `Exception` subtype, never loads an assembly to satisfy
+a name, and falls back to `InfoCarrierServerException` when nothing matches.

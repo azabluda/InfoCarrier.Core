@@ -6,18 +6,19 @@ thing to think about before deploying it.
 ## What the library bounds
 
 Deserialization is default-deny. The node kinds a payload may contain, the types it may name and the
-methods it may call are each checked against an allowlist, and anything not on it is refused rather
-than resolved. No assembly is loaded to satisfy a payload. The allowlist excludes the members that
-would turn a resolved `Type` back into a call, which is the classic route from "a tree can name a
-type" to "a tree can invoke anything".
+methods it may call are each checked against an allowlist, anything not on it is refused rather than
+resolved, and no assembly is loaded to satisfy a payload. The allowlist excludes the members that
+would turn a resolved `Type` back into a call, the classic route from "a tree can name a type" to "a
+tree can invoke anything".
 
 There is a size bound too, applied before parsing begins and defaulting to 64 MiB on requests
 towards the server. A flat array of a hundred million constants is only three levels deep, so a
 depth limit alone does not bound the memory a parse costs. See
 [server configuration](configuration/server.md#payload-limits).
 
-A client also cannot reach past the server's model. The query is executed against the server's
-`DbContext`, with its global query filters and its interceptors.
+A client also cannot name a type the server's model does not have. The query runs against the
+server's `DbContext`, so the entity types in your shared model are the whole of what a client can
+compose over. That surface is a real bound. A query filter is not one, for the reason below.
 
 ## What is yours
 
@@ -49,7 +50,11 @@ else's machine.
 **A filter is a default, not a boundary.** `IgnoreQueryFilters()` is an ordinary EF Core operator
 that travels in the expression tree, and the server honours it. Query filters also do not apply to
 writes, so a client can submit a `SaveChanges` for a row whose key belongs to another tenant.
-Anything a caller must not be able to switch off belongs in a check the client cannot name.
+
+For writes, the check a client cannot name is the server's `SaveChanges` override or an EF
+interceptor, and you read the values you check from the store rather than from the entity the client
+sent. **For reads there is no such hook**: what a client can ask for is decided by which entity types
+are in the shared model, which is why keeping a type out of it is the read-side control.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -66,9 +71,6 @@ is replayed through it, and the client cannot name either one.
 
 A client can compose any query over the entity types your shared model exposes. That is the feature,
 and it has four consequences.
-
-The shared model is your API surface. Data that should never leave the server belongs out of it, or
-on a server-only context.
 
 Expensive queries are reachable. A caller can ask for a cross join. Bound it with query filters, a
 paging convention, a rate limit at the gateway, or a statement timeout on the database.

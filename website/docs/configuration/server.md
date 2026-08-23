@@ -72,21 +72,23 @@ a low ceiling is usually safe. Cap the request bytes at your gateway too: this b
 tracker. A client request is self-contained, and leftover tracked entities from a previous request
 would collide with the next one.
 
-The exception is a transaction. `BeginTransaction` pins one context, and its connection, until the
-commit or rollback, which is why transactions should be short. See
-[Transactions](../guide/transactions.md).
+The exception is a transaction, and it is the one case where server state outlives a request.
+`BeginTransaction` pins one context and its connection until the commit or rollback, on the instance
+that minted the token, so a load-balanced deployment needs session affinity for the life of a
+transaction. [Transactions](../guide/transactions.md) has that and what an abandoned one costs.
 
-## The server is the boundary
+## Where the checks go
 
-The server executes the client's query against the server's model, so a global query filter defined
-there applies by default and a client cannot remove it by composing more operators on top.
+A global query filter on the server's model applies to every query by default, which is what you
+want for your own honest client. **It is not a control.** `IgnoreQueryFilters()` is an ordinary EF
+Core operator, it travels in the expression tree like any other, and the server honours it. Query
+filters also do not apply to writes, so a client can submit a `SaveChanges` for a row whose key
+belongs to someone else.
 
-**A hostile client can get past it.** `IgnoreQueryFilters()` is an ordinary EF Core operator, it
-travels in the expression tree like any other, and the server honours it. And query filters do not
-apply to writes at all: a client can submit a `SaveChanges` for a row whose key belongs to someone
-else. Treat a filter as a default, and put anything a caller must not be able to turn off in a
-server-side check the client cannot name: a `SaveChanges` override, an EF interceptor, or a scope
-on the endpoint.
+So put a write check in the server's `SaveChanges` override or an EF interceptor, reading the values
+you check from the store rather than from the entity the client sent. For reads, what a client can
+ask for is decided by which entity types are in the shared model. [Security](../security.md) has
+both in full.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -27,9 +27,9 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
 | `HttpInfoCarrierTransport` | `IInfoCarrierTransport` | you are not using HTTP, or want to decorate every request |
 | `TransportInfoCarrierClient` | `IInfoCarrierClient` | you are hosting the server in an unusual way |
 
-None of the three holds mutable state, so build them once and share them. One client serves every
-`DbContext` in the application, including concurrent ones, which is why the DI example below
-registers it as a singleton.
+All three are safe to share, and that is a contract rather than an accident of the current build.
+Construct them once: one client serves every `DbContext` in the application, including concurrent
+ones, which is why the DI example below registers it as a singleton.
 
 ## The HTTP transport
 
