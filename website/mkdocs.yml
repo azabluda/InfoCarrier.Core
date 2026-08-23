@@ -29,6 +29,19 @@ edit_uri: edit/main/website/docs/
 theme:
   name: material
   language: en
+  # `overrides/` adds the two icon links base.html has no setting for -- the apple-touch icon and
+  # the manifest. See website/overrides/main.html for why neither can be expressed here.
+  custom_dir: overrides
+  # A three-frame .ico (16/32/48), which is the whole favicon story: one request, and the tab, the
+  # bookmark bar and a pinned taskbar tile each get pixels rendered for their size. Separate
+  # 16/32/48 PNGs alongside it would be three more `<link>` tags for pixels this file already has.
+  # Every icon under assets/icons/ is generated -- `py eng/make-icons.py`, never edited by hand.
+  favicon: assets/icons/favicon.ico
+  # The header mark. WITHOUT THIS Material does not fall back to the favicon -- it draws its own
+  # default `material/library` glyph, a generic book, which is what stood here until now. The
+  # header renders this at `height:1.2rem` (24px) and the mobile drawer at 2.4rem, so the file is
+  # 96px rather than another copy of the 192: it is the only icon fetched on every page view.
+  logo: assets/icons/logo.png
   # System fonts rather than the theme's default Google Fonts. The default fetches Roboto from
   # fonts.googleapis.com on every page view, which sends every visitor's IP to a third party for
   # a typeface. Setting this to `false` makes the built site self-contained: the only things it

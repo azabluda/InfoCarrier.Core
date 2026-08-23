@@ -28,7 +28,7 @@ estimate a count, and never derive one figure from the others.
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
 | `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
-| `eng/make-icon.py` | Regenerates `docs/assets/icon.png` from the source artwork. Run it when the artwork changes. |
+| `eng/make-icons.py` | Regenerates every shipped icon — the 128px NuGet one and the site's favicon, apple-touch and manifest icons — from `docs/assets/icon-source.png`. Run it when the artwork changes; none of its outputs is ever edited by hand. |
 
 ## Measuring and gating
 
