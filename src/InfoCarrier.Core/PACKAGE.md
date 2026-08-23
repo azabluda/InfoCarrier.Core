@@ -4,11 +4,11 @@ navigation fix-up, lazy loading and transactions, but no connection string and n
 Queries and units of work travel to your application server, which executes them with an ordinary
 EF Core provider.
 
-Reference this package from your client and from your server. The `DbContext` and the entity
-classes are shared source, so both halves build the same model.
+Reference it from your client and your server. The `DbContext` and the entity classes are shared
+source, so both halves build the same model.
 
 Use the `--version` option to install a 10.0 preview. Without it, NuGet resolves the newest stable
-release, which belongs to the earlier 3.1 line and is not compatible with this one.
+release, which belongs to the earlier and incompatible 3.1 line.
 
 ## Usage
 
@@ -28,8 +28,7 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 
 Everything after that is ordinary EF Core. A query is not evaluated on the client: it crosses the
 wire as an expression tree, and the server runs it against its own provider.
-
-`HttpInfoCarrierTransport` is in this package. To serve the requests it sends, add
+`HttpInfoCarrierTransport` is in this package; to serve what it sends, add
 [InfoCarrier.Core.AspNetCore](https://www.nuget.org/packages/InfoCarrier.Core.AspNetCore) to your
 server.
 
@@ -43,8 +42,7 @@ which builds a working pair in one page.
 See the [documentation site](https://azabluda.github.io/InfoCarrier.Core/) for querying, saving
 changes, transactions, custom transports and Blazor WebAssembly. The
 [limitations page](https://azabluda.github.io/InfoCarrier.Core/limitations/) lists every scenario
-that behaves differently here from another EF Core provider, with a worked example for each. Read
-it before you adopt.
+that behaves differently here from another EF Core provider. Read it before you adopt.
 
 ## Feedback
 

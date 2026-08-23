@@ -33,8 +33,14 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | `limitations.md`, `upgrading-from-3-1.md`, `first-app.md` | 600 | |
 | Whole site | 6,000 | |
 
-`wc -w` is the measurement. A page over budget is not automatically wrong, but it needs a reason
-that is about the reader.
+**`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
+code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
+prose and double it under `wc -w`. The script drops all of that and holds the same budgets as this
+table, so keep the two in step.
+
+A page over budget is not automatically wrong, but it needs a reason that is about the reader, and
+the reason goes in the script next to the exception. `index.md` has the only one so far: it carries
+four navigation cards and the install note, which no other page has.
 
 ## Rules
 
@@ -115,9 +121,9 @@ headings), §29 (a heading restated in the first sentence) and §31 (dramatic fr
 Then:
 
 ```bash
-eng/docs-serve.sh --build          # mkdocs build --strict: broken link or missing nav page fails
-wc -w <file>                       # against the budget above
-grep -c "—" <file>                 # must be 0
+eng/docs-serve.sh --build              # mkdocs build --strict: a broken link fails the build
+py eng/doc-words.py --all --budget     # prose words against the budgets above; exit 1 if over
+grep -c "—" <file>                     # must be 0
 ```
 
 Reading the page aloud is the check the measurements cannot make.
