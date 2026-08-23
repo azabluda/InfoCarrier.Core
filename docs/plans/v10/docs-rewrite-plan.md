@@ -251,3 +251,65 @@ mechanical and because leaving it until the rewrites means arguing about the sam
 D3 and D4 next, because the README and the package readmes are the two documents most readers see,
 and they are 1,380 words of the 14,400. D5 is the bulk of the work and the least urgent. D6 and D7
 are small. D8 closes it.
+
+
+---
+
+## 5. Outcome, 2026-08-23
+
+All eight steps executed on branch `docs/rewrite`.
+
+### Measured, in prose words (`py eng/doc-words.py`)
+
+| | Before | After |
+|---|---|---|
+| GitHub release body | 1,019 | 116 |
+| Package readme | one shared file, 648, in both packages | two files, 247 and 200, one per package |
+| Repository README | 340 | 380 |
+| The site | 9,578 across 18 pages | 8,878 across 19 |
+| The same 18 site pages | 9,578 | 8,325 |
+| Em dashes, everything user-facing | 157 | 0 |
+| Bold spans in prose | about 140 | 4 |
+| Admonition boxes | 13 | 5, at most one per page |
+| gRPC or streaming named as a plan | 6 places | 0 |
+
+**A correction to the D5d commit message.** It reads "13,000 prose words to 9,695". Those are two
+different rulers: 13,000 was the `wc -w` figure for the site before the rewrite, and 9,695 was the
+prose figure for the whole user-facing set after it. The honest pair is the table above. In `wc -w`
+terms the site went from 12,876 to 12,100, and most of that total is code blocks either way, which
+is why `eng/doc-words.py` exists.
+
+### What the numbers do not show
+
+The site fell 13% in prose on the same pages, which is smaller than the release body's 89% or the
+package readme's split. That is the right shape: the site pages were long because they were dense,
+and the release body and the package readme were long because they were repeating themselves and
+arguing their own design decisions. The style changes carry more of the improvement than the count
+does: no em dashes, no bold-as-emphasis, no design rationale, no roadmap, and no boxed warning where
+a sentence does the work.
+
+### Deviations from the plan as written
+
+- **D2 shrank.** It was a mechanical pass over 23 files, but D3 to D6 rewrite every one of those
+  files anyway, so doing it separately meant editing each twice. D2 became the two internal records
+  that produced the user-facing copies (`roadmap.md`'s M8 exit criteria and the `Directory.Build.props`
+  comment), and the text removals happened inside each rewrite. Verified by grep in D8.
+- **D6 moved earlier.** `upgrading-from-3-1.md` links to the release-notes page, so `mkdocs --strict`
+  failed until that page existed. It landed in D5b.
+- **The default page budget moved from 400 to 550.** Recorded in `doc-style.md` as a correction: 400
+  came from package readmes, which point rather than teach.
+- **`eng/doc-words.py` is new**, and was not in the plan. `wc -w` counts fenced code and link URLs,
+  which made it useless as a gate.
+
+### Left open
+
+- Four mentions of gRPC remain, in `README.md`, `index.md`, `transports.md` and the release-notes
+  page. Each says the transport interface is one method and a gRPC binding is a class a consumer can
+  write, which is a present capability rather than a plan. If "do not mention it" was meant
+  literally, these four are the ones to remove.
+- `docs/infocarrier-core-requirements.md` §4.4 and `docs/wire-protocol.md` W4 still describe
+  streaming as something the wire protocol should support. Those are internal design documents
+  rather than promises to a consumer, and amending the authoritative requirements spec is a larger
+  decision than this plan covers.
+- The published release body links to `/release-notes/10.0/`, which 404s until this branch reaches
+  `main`, because `.github/workflows/docs.yml` publishes the site from `main`.

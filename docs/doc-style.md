@@ -33,7 +33,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | A site page that points | 400 | `api-surface.md` only |
 | `index.md` | 500 | It carries four navigation cards and the install note |
 | The four deepest pages | 600 | `limitations`, `upgrading-from-3-1`, `first-app`, `release-notes`, `blazor-webassembly` |
-| Whole site | 10,000 | It was 13,000 before the rewrite |
+| Whole site | 9,000 | 8,878 today across 19 pages, from 9,578 across 18 |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
