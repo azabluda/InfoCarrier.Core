@@ -117,9 +117,15 @@ versioned, linkable and maintained with the rest of the documentation.
 reader on a release page either already knows what the package is or is one click from the
 documentation. One clause of identity is the budget, and then the news.
 
-The shape is three groups, about 350 words: **Breaking**, **New**, **Verified**, each a list of one
-line per item, then the install command and the links. No bold lead-in on the list items, because
-rule 3 applies here too and the opening words of each line already act as the label.
+The shape is one clause of identity, then **six lines at most, one per major change**, then the
+install command and the links. About 150 words. No group headings and no bold lead-in on the list
+items: with six lines there is nothing to group, and rule 3 applies here too.
+
+**Major means a reader has to act on it or decide something.** Not compatible, the target framework,
+a dropped dependency, something that now ships that did not, a new boundary, and how it is verified.
+Everything else is the release-notes page, which is what the first link is for. A draft of this body
+carried eighteen items in three groups and was correctly called too detailed: a release body is a
+notice, not the changelog.
 
 GitHub keeps no history of a release body, so the stub lives in `docs/release-bodies/<tag>.md` and
 is applied with `gh release edit <tag> --notes-file docs/release-bodies/<tag>.md`. A body being
