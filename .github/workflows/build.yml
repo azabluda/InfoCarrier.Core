@@ -72,6 +72,11 @@ jobs:
     name: Spec ratchet
     runs-on: ubuntu-latest
 
+    # Write access is for the `badges` branch only -- see the last step. Stated on the job rather
+    # than the workflow so the fast gate keeps the read-only default.
+    permissions:
+      contents: write
+
     steps:
       # Full history, because MinVer reads the version off the git tags and a shallow
       # clone has none. Without this the build still succeeds and silently produces a
@@ -106,6 +111,7 @@ jobs:
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
       - name: Ratchet
+        id: ratchet
         run: ./eng/ratchet.sh artifacts/test-results/results.trx test/known-failures.txt
 
       - name: Upload results
@@ -114,3 +120,46 @@ jobs:
         with:
           name: test-results
           path: artifacts/test-results
+
+      # Publishes the numbers the ratchet just read to the `badges` branch, where shields.io reads
+      # them for README.md's spec-suite badge. The figures come from the counters file ratchet.sh
+      # writes, so the TRX is parsed once and by one parser.
+      #
+      # `always()`, because a run that FAILS the ratchet still has numbers and the badge should
+      # show them, in red. A badge frozen on the last green run is a badge that lies.
+      #
+      # AND NO SECRET. The usual recipe for this badge is a Gist plus a personal access token,
+      # which would be the first long-lived credential in this repository -- release.yml is built
+      # the way it is precisely to avoid having one. GITHUB_TOKEN can push, so it does. `badges`
+      # is an orphan branch holding this one file and sharing no history with main; the step fails
+      # loudly if that branch is missing rather than creating it, because a badge branch appearing
+      # by accident is how a badge starts pointing at nothing.
+      - name: Publish spec-suite badge
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COLOR: ${{ steps.ratchet.outcome == 'success' && 'green' || 'red' }}
+        run: |
+          set -euo pipefail
+          . artifacts/test-results/counters.env
+
+          # 22658 -> 22,658. Five digits are hard to read in a badge without the separators.
+          comma() { echo "$1" | sed -E ':a;s/([0-9])([0-9]{3})($|,)/\1,\2\3/;ta'; }
+
+          work=$(mktemp -d)
+          git clone --depth 1 --branch badges \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$work"
+
+          printf '{"schemaVersion":1,"label":"spec suite","message":"%s / %s passing","color":"%s"}\n' \
+            "$(comma "$passed")" "$(comma "$total")" "$COLOR" > "$work/spec-suite.json"
+
+          cd "$work"
+          git add spec-suite.json
+          if git diff --staged --quiet; then
+            echo "Badge unchanged; nothing to push."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Spec suite: ${passed} / ${total} passing"
+          git push
