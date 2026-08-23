@@ -12,16 +12,29 @@
 {
     "name": "InfoCarrier.Core",
 
-    // Ships the SDK already. Installing it through a devcontainer Feature instead adds an SDK
-    // download to every cold start, which is the slowest part of a start that has no prebuild.
-    // `global.json` pins 10.0.201 with rollForward=latestMinor, so this image must carry an SDK
-    // at that feature band or higher; if it ever lags, restore fails loudly rather than quietly.
-    "image": "mcr.microsoft.com/devcontainers/dotnet:1-10.0",
+    // A base image with no .NET, plus the SDK global.json pins, rather than a .NET image.
+    //
+    // THE FIRST ATTEMPT USED mcr.microsoft.com/devcontainers/dotnet:1-10.0 AND FAILED: that tag
+    // still ships 10.0.100-rc.2, global.json pins 10.0.201, and `dotnet build` exited 155 with
+    // "A compatible .NET SDK was not found". Codespaces then abandoned the container and dropped
+    // the visitor into an Alpine recovery container -- an image that lags is not a slow demo, it
+    // is no demo at all. The Feature installs an exact version, so this cannot drift.
+    //
+    // KEEP THIS VERSION AND global.json IN STEP. They are two statements of one fact.
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        "ghcr.io/devcontainers/features/dotnet:2": { "version": "10.0.201" }
+    },
 
     // The SAMPLE, never InfoCarrier.Core.slnx. The solution holds the two test projects, and
     // restoring those pulls the EF Core specification-test packages -- minutes of download for a
     // visitor who wants to look at a grid.
-    "onCreateCommand": "dotnet build samples/Northwind.Server -c Debug",
+    //
+    // `|| true` IS DELIBERATE, and it is what the first failure taught. A non-zero exit here does
+    // not merely skip the build: it fails container creation, skips every later command, and hands
+    // the visitor a recovery container with no .NET in it. Letting the container come up puts the
+    // same error in the `demo` terminal below, where a person can read it.
+    "onCreateCommand": "dotnet build samples/Northwind.Server -c Debug || true",
 
     // Object form so the server gets its own named terminal: the log stays readable and the
     // visitor can stop it. The server hosts the Blazor client too, so this is the whole demo.
