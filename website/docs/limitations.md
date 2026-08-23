@@ -6,8 +6,7 @@ does not behave the way a normal EF Core provider behaves, so you can judge whet
 affects your application.
 
 It is complete for what the suite covers: if the suite has a scenario and it is not on this page,
-it passes. A conformance suite says nothing about performance, payload size, concurrency under
-load, or the relational APIs this provider does not have.
+it passes.
 
 ```
 Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
@@ -188,3 +187,8 @@ These are not defects. They follow from where the client sits.
 Every entry above corresponds to tests in EF Core's specification suite that run on every build.
 The number of failing tests is gated in continuous integration, so it cannot grow without being
 noticed. When an entry is fixed, or a new one appears, this page changes with it.
+
+What the suite measures bounds what this page can promise. A conformance suite says nothing about
+performance, payload size or concurrency under load, and nothing about the relational APIs this
+provider does not have. A scenario it never exercises is outside the sentence at the top of this
+page.

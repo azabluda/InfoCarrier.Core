@@ -5,13 +5,9 @@ browser composing real LINQ, with the database behind your server. The sample's 
 WebAssembly, trimmed.
 
 Three things work differently here. The first two are the browser's rather than this provider's,
-and a console or desktop client has neither.
-
-The packages are the same as anywhere else: `InfoCarrier.Core` in the client, and
-`InfoCarrier.Core.AspNetCore` in the server that answers it. See
-[Installation](../getting-started/installation.md) and
-[Configuring the server](../configuration/server.md). The sample this page refers to throughout is
-[Run the samples](../getting-started/samples.md).
+and a console or desktop client has neither. Everything else on this page assumes a working server,
+which is [Configuring the server](../configuration/server.md), and the sample referred to
+throughout is [Run the samples](../getting-started/samples.md).
 
 ## Automatic lazy loading is impossible
 
@@ -78,6 +74,9 @@ caller's model names". The trimmer cannot prove that reflection safe for an arbi
 not the same as it breaking yours. Test the paths your model uses.
 
 ## Wiring a browser client
+
+The client references `InfoCarrier.Core` and nothing else; the server that answers it adds
+`InfoCarrier.Core.AspNetCore`. See [Installation](../getting-started/installation.md).
 
 Everything singleton, because one user and one tab means a scope has no lifetime behind it. And a
 context factory rather than a context, so each page owns its own unit of work.

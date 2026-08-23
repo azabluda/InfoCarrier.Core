@@ -85,6 +85,13 @@ loudly rather than exhaust memory.
 The server has its own serializer with its own limits. Both halves deserialize, so both need
 bounding. See [Configuring the server](server.md#payload-limits).
 
+## Synchronous calls
+
+A synchronous `DbContext` call blocks on the async path, so the calling thread waits out the round
+trip. Every await inside the provider uses `ConfigureAwait(false)`, so it does not deadlock on a UI
+synchronization context, but a WPF or WinForms caller on the UI thread freezes the window until the
+answer arrives. Use the async API from a UI thread.
+
 ## Logging
 
 Turn on standard EF Core logging while you are learning what crosses the wire:
