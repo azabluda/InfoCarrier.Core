@@ -125,10 +125,17 @@
     <PackageTags>entity-framework-core;efcore;ef-core-provider;linq;n-tier;multi-tier;blazor;wpf;expression-trees;change-tracking</PackageTags>
 
     <!--
-      The package README is docs/nuget-readme.md rather than the repository README, and the reason
-      is mechanical: nuget.org renders a README but resolves images only against ABSOLUTE URLs, so
-      the banner the repository README opens with would show as a broken image. The repository
-      README also links to a dozen relative docs paths that mean nothing inside a package.
+      Each packable project ships its OWN PACKAGE.md, next to the csproj, packed as README.md.
+      That is what every EF Core provider does — subrepos/efcore has 21 of them — and it is why
+      each one can be short. The single shared readme this replaced spent half its length telling
+      the reader which half applied to them.
+
+      NOT the repository README, and the reason is mechanical: nuget.org renders a README but
+      resolves images only against ABSOLUTE URLs, so the banner the repository README opens with
+      would show as a broken image. The repository README also links to relative docs paths that
+      mean nothing inside a package.
+
+      Length and shape are governed by docs/doc-style.md. Read it before editing either file.
     -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
