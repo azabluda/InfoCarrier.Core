@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Entity Framework Core database provider that remotes LINQ queries and change-tracking over a wire protocol.</Description>
     <RootNamespace>InfoCarrier.Core</RootNamespace>
     <AssemblyName>InfoCarrier.Core</AssemblyName>
     <IsPackable>true</IsPackable>
@@ -19,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)..\..\docs\nuget-readme.md" Pack="true" PackagePath="README.md" />
+    <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
     <None Include="$(MSBuildThisFileDirectory)..\..\docs\assets\icon.png" Pack="true" PackagePath="icon.png" Visible="false" />
   </ItemGroup>
 

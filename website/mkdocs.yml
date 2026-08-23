@@ -140,3 +140,4 @@ nav:
       - Security: security.md
       - Limitations: limitations.md
       - Public API: api-surface.md
+      - Release notes 10.0: release-notes/10.0.md

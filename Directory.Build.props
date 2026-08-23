@@ -61,7 +61,13 @@
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <Company>InfoCarrier.Core</Company>
     <Product>InfoCarrier.Core</Product>
-    <Description>Entity Framework Core database provider that remotes LINQ queries and change-tracking over a wire protocol.</Description>
+    <!--
+      The default for every project, and the shipped description of InfoCarrier.Core itself;
+      InfoCarrier.Core.AspNetCore overrides it. One sentence, written for someone reading a
+      nuget.org search result rather than for a maintainer. EF Core's own is
+      "SQLite database provider for Entity Framework Core." See docs/doc-style.md.
+    -->
+    <Description>Entity Framework Core provider for the client side of a multi-tier application: a real DbContext on the client, the database on your server.</Description>
     <RepositoryType>git</RepositoryType>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
@@ -92,9 +98,15 @@
       which EF a package targets. It also keeps a repository with no release tag yet inside the
       10.0 line rather than starting at 0.0.
 
-      `-preview` should stay until M8's exit criteria are met: there is no gRPC binding and results
-      do not stream yet, and both may touch IInfoCarrierTransport. A stable 10.0.0 is a promise not
-      to break that surface.
+      `-preview` stays until the public surface is settled. A stable 10.0.0 is a promise not to
+      break it, and that promise is not ready to be made.
+
+      Do NOT restate that reason in a user-facing document. It used to say "until a gRPC binding
+      and streaming results are settled", and that sentence propagated into the README, the package
+      readme, the site index, the installation page, the limitations page and the GitHub release
+      body as a roadmap promise. Both features went out of scope for v10 on 2026-08-23 (roadmap,
+      M8 exit criteria) and every copy had to be hunted down. The version number carries the
+      information on its own, which is what EF Core relies on. See docs/doc-style.md rule 6.
 
       MinVer needs the tags, so any workflow that builds must check out with `fetch-depth: 0`.
       A shallow clone has no tags, and the version silently becomes a default.
@@ -116,13 +128,26 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/azabluda/InfoCarrier.Core</PackageProjectUrl>
     <RepositoryUrl>https://github.com/azabluda/InfoCarrier.Core.git</RepositoryUrl>
-    <PackageTags>entity-framework-core;efcore;ef-core-provider;linq;n-tier;multi-tier;blazor;wpf;expression-trees;change-tracking</PackageTags>
+    <!--
+      The first seven are the ecosystem names EF Core itself tags with (Directory.Build.props in
+      subrepos/efcore), because that is what a search on nuget.org actually matches. The rest say
+      what THIS package is for. Feature words like linq, expression-trees and change-tracking used
+      to be here and were dropped: nobody searches nuget.org for a feature of EF Core.
+    -->
+    <PackageTags>Entity Framework Core;entity-framework-core;EF;EFCore;EntityFrameworkCore;O/RM;Data;ef-core-provider;n-tier;multi-tier;client-server;Blazor;WPF;MAUI</PackageTags>
 
     <!--
-      The package README is docs/nuget-readme.md rather than the repository README, and the reason
-      is mechanical: nuget.org renders a README but resolves images only against ABSOLUTE URLs, so
-      the banner the repository README opens with would show as a broken image. The repository
-      README also links to a dozen relative docs paths that mean nothing inside a package.
+      Each packable project ships its OWN PACKAGE.md, next to the csproj, packed as README.md.
+      That is what every EF Core provider does — subrepos/efcore has 21 of them — and it is why
+      each one can be short. The single shared readme this replaced spent half its length telling
+      the reader which half applied to them.
+
+      NOT the repository README, and the reason is mechanical: nuget.org renders a README but
+      resolves images only against ABSOLUTE URLs, so the banner the repository README opens with
+      would show as a broken image. The repository README also links to relative docs paths that
+      mean nothing inside a package.
+
+      Length and shape are governed by docs/doc-style.md. Read it before editing either file.
     -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
 

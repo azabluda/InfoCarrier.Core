@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>ASP.NET Core server binding for InfoCarrier.Core: one endpoint that hands an InfoCarrier envelope to the server. Separate from InfoCarrier.Core because it needs a framework reference to Microsoft.AspNetCore.App, which a WPF, MAUI or Blazor WebAssembly client must not carry.</Description>
+    <!--
+      One sentence. nuget.org truncates a description on the search results page, and the reason
+      the endpoint is a separate package is design rationale: it belongs in the FrameworkReference
+      comment below, not on a package listing. See docs/doc-style.md rule 5.
+    -->
+    <Description>ASP.NET Core server binding for InfoCarrier.Core: one endpoint that executes a client's queries and units of work against a real database.</Description>
     <RootNamespace>InfoCarrier.Core.AspNetCore</RootNamespace>
     <AssemblyName>InfoCarrier.Core.AspNetCore</AssemblyName>
     <IsPackable>true</IsPackable>
@@ -11,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)..\..\docs\nuget-readme.md" Pack="true" PackagePath="README.md" />
+    <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
     <None Include="$(MSBuildThisFileDirectory)..\..\docs\assets\icon.png" Pack="true" PackagePath="icon.png" Visible="false" />
   </ItemGroup>
 

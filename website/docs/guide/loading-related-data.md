@@ -1,9 +1,8 @@
 # Loading related data
 
-Every way EF Core loads a navigation works here. The difference is that each one has a visible
-price: a round trip.
+Every way EF Core loads a navigation works here, and each one costs a round trip you can see.
 
-## Eager loading — one round trip
+## Eager loading, one round trip
 
 `Include` is part of the query, so the related rows arrive with the principals:
 
@@ -25,10 +24,10 @@ List<Customer> customers = await context.Customers
     .ToListAsync();
 ```
 
-**This is the one to reach for by default.** One request that returns a graph beats several
-requests that return the same graph in pieces.
+Reach for this by default. One request that returns a graph beats several requests that return the
+same graph in pieces.
 
-## Explicit loading — one round trip, when you ask
+## Explicit loading, one round trip when you ask
 
 Load a navigation on an entity you already have:
 
@@ -51,7 +50,7 @@ int count = await context.Entry(customer)
     .CountAsync(o => o.Freight > 50m);
 ```
 
-## Lazy loading — a round trip per touch
+## Lazy loading, a round trip per touch
 
 Lazy loading works, through EF Core's proxies package as usual:
 
@@ -67,16 +66,13 @@ string company = order.Customer!.Company;   // fetches the customer now
 int lines = order.Lines.Count;              // and its lines now
 ```
 
-Two things to weigh before enabling it:
+Every touched navigation is a request, so a loop over 100 orders that reads `order.Customer` makes
+100 requests: the classic N+1, and much more expensive over a network than against a local database.
+A navigation getter is also synchronous, so a lazy load blocks the calling thread on the round trip.
+In a UI application that means loading off the UI thread, or accepting the freeze.
 
-- **Every touched navigation is a request.** A loop over 100 orders that reads `order.Customer`
-  makes 100 requests. This is the classic N+1, and over a network it is much more expensive than
-  it is against a local database.
-- **A navigation getter is synchronous**, so a lazy load blocks the calling thread on the round
-  trip. In a UI application that means loading off the UI thread or accepting the freeze.
-
-If you enable proxies, enable them on **both** halves. The two models have to agree about
-everything the wire names, and proxies add a model convention.
+Enable proxies on both halves. The two models have to agree about everything the wire names, and
+proxies add a model convention.
 
 !!! danger "Not in Blazor WebAssembly"
 
@@ -106,4 +102,4 @@ var summary = await context.Orders
 ```
 
 The join happens on the server, and what comes back is three values per row rather than two whole
-entities. For a read-only grid this is usually the right shape — combine it with `AsNoTracking`.
+entities. For a read-only grid this is usually the right shape. Combine it with `AsNoTracking`.

@@ -118,6 +118,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
 | `docs/decisions.md` **ADR-013** | The test project may reference `EFCore.Relational.Specification.Tests`. **Before adopting a relational spec base, check whether it assumes the *client* is relational** — a non-virtual `UseTransaction` calling `GetDbTransaction()` makes a base unreachable here, and cost 142 tests to discover. |
 | `docs/security-review.md` | **M5's review of the deserialization path** (C48). Read §2 before adding anything to `TypeAllowlist`: its safety is a conjunction across several clauses, and `Binder`/`MethodInfo`/`Activator` each break it alone. |
 | `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why.** The build is clean (`0 Warning(s)`) and warnings are errors **in CI only** — `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` reproduces it — the configuration matters. Read before adding any `NoWarn`. |
+| `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
 in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
@@ -207,14 +208,19 @@ assertion no correct answer can satisfy.
 
 **The consumer-facing statement of what is missing is
 [`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep
-true, because it is the only one here written for someone outside this repository. It names one
-unsupported scenario, one query to treat with caution, two message-text differences, and two queries
-this provider *answers* that other EF providers reject.
+true. It names one unsupported scenario, one query to treat with caution, two message-text
+differences, and two queries this provider *answers* that other EF providers reject. It is not the
+only consumer-facing document any more: the whole set (README, `src/*/PACKAGE.md`, `website/`, the
+GitHub release bodies) is governed by **[`docs/doc-style.md`](docs/doc-style.md)**, which is the
+file to read before editing any of them.
 
 **What is not implemented.** Everything else that this section used to list has closed.
 
-- A shipped gRPC binding, and streaming results as `IAsyncEnumerable`. Both may change
-  `IInfoCarrierTransport`, which is why the version still says `preview`.
+- **A gRPC binding and streaming results as `IAsyncEnumerable` are OUT OF SCOPE for v10**
+  (2026-08-23, owner's decision; `roadmap.md`, M8 exit criteria). Neither ships in the 10.x line,
+  and **neither may be named as a plan in any user-facing document** (`doc-style.md` rule 6).
+  `-preview` stays because the public surface is not settled, and **no user-facing document gives a
+  reason for the suffix** — the version number carries it, as it does for every EF Core preview.
 - Two `ComplexTypesTracking` parameterizations: a property-bag complex *collection* on an `Added`
   entity. J22 traced it to an upstream defect on a path only this provider takes, and the route
   around it has to reproduce constructor binding, so it is priced and not taken.

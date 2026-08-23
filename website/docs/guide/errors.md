@@ -1,13 +1,12 @@
 # Handling errors
 
-Two things can go wrong that would not go wrong locally: the **server** can fail, and the **journey**
-can fail. They are deliberately different exception types, because the response to each is
-different.
+Two things can go wrong that would not go wrong locally: the server can fail, and the journey can
+fail. They are deliberately different exception types, because the response to each is different.
 
 ## A failure the server reported
 
-The server's exception is carried back as data and raised again on the client, keeping its **type**,
-its **message** and its **inner chain**. So you catch what you would catch locally:
+The server's exception is carried back as data and raised again on the client, keeping its type,
+its message and its inner chain. You catch what you would catch locally.
 
 ```csharp
 try
@@ -24,9 +23,10 @@ catch (DbUpdateException ex)
 }
 ```
 
-Deeper in the chain, where the original exception is a type your client has no reason to reference
-— a `SqliteException`, a `SqlException`, a driver's own type — it arrives as
-`InfoCarrierServerException`, which still names what the server actually threw:
+Deeper in the chain, where the original exception is a type your client has no reason to reference,
+such as a `SqliteException`, it arrives as `InfoCarrierServerException`. The name of what the server
+threw is a property rather than the type, so a `catch` clause never obliges a client to reference a
+database driver.
 
 ```csharp
 catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerException server)
@@ -38,10 +38,6 @@ catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerExcepti
 }
 ```
 
-Making every client reference every database driver, just so a `catch` clause could name the type,
-would be a worse trade than losing the name from the clause — so the name lives in a property
-instead.
-
 A real chain from a foreign-key violation looks like this:
 
 ```text
@@ -50,22 +46,19 @@ DbUpdateException                     the client's own, from EF
       └── InfoCarrierServerException  ServerExceptionTypeName = "Microsoft.Data.Sqlite.SqliteException"
 ```
 
-### The server's stack trace
-
-It is preserved, and deliberately not spliced into the client-side exception's own stack — that
-would be lying about where your client is. It travels in `Exception.Data`:
+The server's stack trace is preserved, and deliberately not spliced into the client-side
+exception's own stack, which would misreport where your client is. It travels in `Exception.Data`,
+and it is the only view you get of what happened on the other side, so log it.
 
 ```csharp
 var serverStack = ex.InnerException?.Data["InfoCarrier.ServerStackTrace"] as string;
 ```
 
-Log it. It is the only view you get of what happened on the other side.
-
 ## A failure of the journey
 
 If the request never reached a server, or what came back was not a valid response, you get
-`InfoCarrierTransportException` instead. This is not a database error and must not be handled as
-one:
+`InfoCarrierTransportException`. This is not a database error and must not be handled as one: the
+data is unknown, not wrong, and retrying may work.
 
 ```csharp
 try
@@ -75,18 +68,15 @@ try
 catch (InfoCarrierTransportException ex)
 {
     // Offline, DNS, TLS, a 502 from a proxy, a captive portal returning HTML.
-    // Retrying may work. The data is unknown, not wrong.
     logger.LogWarning(ex, "the application server could not be reached");
 }
 ```
 
-The underlying failure — an `HttpRequestException`, a serialization error — is kept as
+The underlying failure, an `HttpRequestException` or a serialization error, is kept as
 `InnerException`, because it names the layer that actually failed. When the server answers with a
-non-success status, the message carries the status code **and the response body**: a bare status
-code is indistinguishable from a dozen unrelated causes to whoever has to diagnose it.
+non-success status, the message carries the status code and the response body.
 
-Depending on where the failure surfaces, the transport exception may be wrapped by EF, so check
-both:
+Depending on where the failure surfaces, EF may wrap the transport exception, so check both:
 
 ```csharp
 catch (Exception ex) when (ex is InfoCarrierTransportException
@@ -102,18 +92,15 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 | `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
 | `InfoCarrierTransportException` | The request did not complete | Retry, queue, or tell the user they are offline |
 
-## Do not match on message text
-
-Where a query cannot be translated, this provider throws `InvalidOperationException`, exactly as EF
-Core does — but the wording differs from other providers' in a couple of cases. Message text is not
-a supported contract on **any** EF Core provider; catch the type. See
+Catch the type, not the message. Message text is not a supported contract on any EF Core provider,
+and a couple of messages here are worded differently from other providers'. See
 [Limitations](../limitations.md).
 
 ## Cancellation
 
 Every async method takes a `CancellationToken` and passes it through to the transport. A cancelled
-request raises `OperationCanceledException` and is never reported as a transport failure — it is
-your own signal, not something that went wrong.
+request raises `OperationCanceledException` and is never reported as a transport failure, because
+it is your own signal rather than something that went wrong.
 
 ```csharp
 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -123,8 +110,7 @@ List<Customer> customers = await context.Customers.ToListAsync(cts.Token);
 
 ## What the server does not tell you
 
-Where the server maps a failure into a fault, it sends the type name, the message, the inner chain
-and the stack trace. It does not send anything else about itself — no server paths beyond what a
-stack trace contains, no connection strings, no configuration. If your exception messages carry
-information a client should not see, that is worth reviewing on the server: see
-[Security](../security.md).
+A fault carries the type name, the message, the inner chain and the stack trace, and nothing else
+about the server: no paths beyond what a stack trace contains, no connection strings, no
+configuration. If your own exception messages carry information a client should not see, review
+that on the server. See [Security](../security.md).

@@ -1,6 +1,6 @@
 # Custom transports
 
-Shipping a request is one interface with one method:
+A transport is one interface with one method:
 
 ```csharp
 public interface IInfoCarrierTransport
@@ -18,7 +18,7 @@ anything depends on it.
 ## Decorating the HTTP one
 
 The most common reason to touch this seam is to observe or adjust every request without replacing
-the transport. A decorator does that in a few lines:
+the transport, and a decorator does that in a few lines:
 
 ```csharp
 public sealed class LoggingTransport(IInfoCarrierTransport inner, ILogger<LoggingTransport> logger)
@@ -59,8 +59,8 @@ per-request telemetry.
 ## In-process
 
 For tests, or for a client and server that live in the same process, hand the envelope straight to
-the server. Serializing both ways keeps the test honest — nothing travels by reference that would
-not survive HTTP:
+the server. Serializing both ways keeps the test honest, because nothing then travels by reference
+that would not survive HTTP:
 
 ```csharp
 using InfoCarrier.Core;
@@ -112,24 +112,22 @@ public sealed class MyTransport(IMyChannel channel, IInfoCarrierSerializer seria
 
 Three rules the HTTP transport follows and yours should:
 
-1. **Pass the cancellation token through.** A cancelled request is the caller's signal.
-2. **Throw `InfoCarrierTransportException` for a failure of the journey** — unreachable server,
-   malformed answer, protocol error. Do not let a raw `JsonException` or an `HttpRequestException`
-   surface: that is a lie about where the fault is. A failure the *server* reported is not this; it
+1. Pass the cancellation token through. A cancelled request is the caller's signal.
+2. Throw `InfoCarrierTransportException` for a failure of the journey: unreachable server, malformed
+   answer, protocol error. Do not let a raw `JsonException` or an `HttpRequestException` surface,
+   which would misreport where the fault is. A failure the server itself reported is not this; it
    arrives inside the envelope as data.
-3. **Include the detail in the message.** The HTTP transport includes both the status code and the
-   response body, because a bare status is indistinguishable from a dozen unrelated causes to
-   whoever has to diagnose it.
+3. Include the detail in the message. The HTTP transport includes both the status code and the
+   response body, because a bare status is indistinguishable from a dozen unrelated causes.
 
 The server half is whatever hosts your protocol, ending in a call to
 `InfoCarrierEnvelopeServer.DispatchAsync`.
 
 ## A different serializer
 
-`IInfoCarrierSerializer` is four methods — `Serialize`, `Deserialize`, and their async
-counterparts — over a `byte[]`. The library never assumes JSON. Implement it for MessagePack or
-protobuf if the payload size matters to you, and register the same implementation on **both**
-halves.
+`IInfoCarrierSerializer` is four methods over a `byte[]`: `Serialize`, `Deserialize` and their async
+counterparts. The library never assumes JSON. Implement it for MessagePack or protobuf if the
+payload size matters to you, and register the same implementation on both halves.
 
 The one thing to keep is the size bound: a deserializer that will parse anything it is handed is
 what `InfoCarrierPayloadLimits` exists to prevent. See
