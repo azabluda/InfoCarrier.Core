@@ -1,7 +1,6 @@
 # Loading related data
 
-Every way EF Core loads a navigation works here. The difference is that each one has a visible
-price: a round trip.
+Every way EF Core loads a navigation works here, and each one costs a round trip you can see.
 
 ## Eager loading, one round trip
 
@@ -67,11 +66,10 @@ string company = order.Customer!.Company;   // fetches the customer now
 int lines = order.Lines.Count;              // and its lines now
 ```
 
-Two things to weigh before enabling it. Every touched navigation is a request, so a loop over 100
-orders that reads `order.Customer` makes 100 requests: the classic N+1, and much more expensive over
-a network than against a local database. And a navigation getter is synchronous, so a lazy load
-blocks the calling thread on the round trip, which in a UI application means loading off the UI
-thread or accepting the freeze.
+Every touched navigation is a request, so a loop over 100 orders that reads `order.Customer` makes
+100 requests: the classic N+1, and much more expensive over a network than against a local database.
+A navigation getter is also synchronous, so a lazy load blocks the calling thread on the round trip.
+In a UI application that means loading off the UI thread, or accepting the freeze.
 
 Enable proxies on both halves. The two models have to agree about everything the wire names, and
 proxies add a model convention.

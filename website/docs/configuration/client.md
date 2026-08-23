@@ -83,7 +83,7 @@ bounding. See [Configuring the server](server.md#payload-limits).
 
 ## Logging
 
-Standard EF Core logging, worth turning on while you are learning what crosses the wire:
+Turn on standard EF Core logging while you are learning what crosses the wire:
 
 ```csharp
 optionsBuilder
@@ -96,8 +96,8 @@ See [Custom transports](transports.md).
 
 ## The internal service provider
 
-Two features are configured by building EF's internal service provider yourself: registering a
-[value mapper](value-mappers.md) on the client, and replacing a provider service.
+Build EF's internal service provider yourself for two things: to register a
+[value mapper](value-mappers.md) on the client, and to replace a provider service.
 
 ```csharp
 ServiceProvider providerServices = new ServiceCollection()

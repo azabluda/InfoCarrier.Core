@@ -18,8 +18,9 @@ A mapper claims such a value and writes it as one wire primitive instead.
 
 ## What ships
 
-`IPAddress` and `Uri`. Both are BCL types whose members throw for perfectly ordinary instances, so an
-application storing one has opted into nothing and should not have to discover this seam.
+`IPAddress` and `Uri`. Both are BCL types whose members throw for perfectly ordinary instances. An
+application that stores one has chosen nothing unusual, so it should not have to discover this seam
+at all.
 
 They are registered for you on the client. On the server you register them yourself, because a
 server builds its own service collection:

@@ -1,8 +1,8 @@
 # Saving changes
 
-`SaveChanges` is a unit of work, and on a remote provider that is more than a figure of speech.
-Everything the change tracker holds travels in one request, is replayed against a real `DbContext`
-on the server, and is written in one `SaveChanges` there.
+`SaveChanges` is one unit of work and one request. Everything the change tracker holds travels
+together, the server replays it against a real `DbContext`, and it is written in one `SaveChanges`
+there.
 
 ```csharp
 Order order = await context.Orders.SingleAsync(o => o.Id == 2);
