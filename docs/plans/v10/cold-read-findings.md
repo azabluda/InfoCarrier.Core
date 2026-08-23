@@ -68,6 +68,20 @@ verified.** Before building it, check: what an unnamed (default) filter does und
 the server learns which filters the client's model declares without trusting the client to say, and
 whether `ExecuteUpdate` and `ExecuteDelete` honour filters at all.
 
+### One line that might close it, from the verification read
+
+**Can the serializer's method allowlist simply exclude `IgnoreQueryFilters`?** The reader put it
+best: "If it can, the whole problem becomes a configuration line." `security.md` already says the
+allowlist governs "the methods it may call", and `QuerySplitter.QueryMarkers` is a fixed set of
+seven names, so refusing one of them may be a smaller change than any of the three strategies
+above. **Unverified.** Check what the splitter does with a marker the allowlist refuses: whether
+the query fails cleanly, or degrades to the shape the `QuerySplitter.cs:103` comment describes,
+where the marker stays on the client and does nothing.
+
+If it works, it is also the wrong default on its own. Refusing the marker outright is strategy (b),
+which breaks the administrative screen that legitimately wants soft-deleted rows. It would be the
+mechanism under strategy (c), not a substitute for deciding.
+
 ### The rest of the boundary, unexamined
 
 Raised by the same two readers, not yet checked in source:
@@ -166,3 +180,42 @@ Real, and larger than a correction. Ordered by how often a reader hit them.
 - **"nine `…Async` methods".** A reader could not derive nine and suspected an error. It is nine:
   `QueryData`, `SaveChanges`, `BeginTransaction`, `CommitTransaction`, `RollbackTransaction`,
   `CreateSavepoint`, `RollbackToSavepoint`, `ReleaseSavepoint`, `SupportsSavepoints`.
+
+
+---
+
+## 5. The verification read, 2026-08-24
+
+A fifth reader was given the four security-relevant pages and a comprehension test rather than a
+review: "can a client see another tenant's rows, and quote every sentence you used to decide."
+
+**It answered correctly**, from the pages alone, and reached the right verdict for its situation:
+conditional yes on the library, no on the architecture as documented. What tipped it toward yes is
+worth keeping in mind the next time a page is tempted to reassure:
+
+> Documentation that discloses its own holes is documentation I can plan against. The reassuring
+> kind is the kind that burns you.
+
+**It also found four contradictions, every one of them introduced by the corrections themselves.**
+That is the pattern to watch: each round of fixes created a fresh inconsistency somewhere the fix
+did not look. It has now happened twice, which is why a pass that finds contradictions gets re-run
+rather than assumed clean.
+
+### What it wants that is not a writing problem
+
+1. **A read-path control that survives `IgnoreQueryFilters()`.** Its adoption gate, and reasonably
+   so. Today the honest answer is "keep the type out of the shared model", which is a real control
+   but a coarse one: it cannot express "this tenant's rows of this type". §1 above is the design
+   question.
+2. **The allowlist itself, and any review of it.** "A default-deny allowlist claim is only as good
+   as the list, and the list is not here." `security.md` asserts the central security property of
+   the product and offers nothing to check it against: no contents, no link, no review record, no
+   threat model. `docs/security-review.md` exists in this repository and is not referenced from the
+   site at all. **That is the cheapest large win available**, and it is a decision about what to
+   publish rather than a writing task.
+3. **A security contact and a disclosure policy.** The page says to contact the maintainer through
+   the repository, with no address, no window and no advisory history. For a dependency holding
+   financial records the reader called this a procurement finding on its own.
+4. **The `SaveChanges`-override tenant check, as code.** Both pages now name the hook and neither
+   shows it. The step teams get wrong is reading the value you check from the store rather than
+   from the entity the client sent, and prose is a weak way to say that.
