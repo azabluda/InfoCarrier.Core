@@ -1,6 +1,22 @@
 # Build warnings — what is fatal, what is not, and why
 
-The build is **clean**: `dotnet build InfoCarrier.Core.slnx` reports `0 Warning(s), 0 Error(s)`.
+The build reports **0 errors in both configurations**, and the warning count is not the same in
+each. Measured on a full rebuild:
+
+| Command | Result |
+|---|---|
+| `dotnet build InfoCarrier.Core.slnx` (Debug) | `0 Warning(s), 0 Error(s)` |
+| `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` | `5 Warning(s), 0 Error(s)` |
+
+**The five are green, not tolerated debt.** They are `IL2110` and `IL2111` from the framework's
+own Razor output in `samples/Northwind.Client`, and that project downgrades exactly those two
+codes from error to warning so that `eng/trim-ratchet.sh` can keep counting them. The row in the
+table below is the full reasoning. Every other warning is still an error under `CI=true`.
+
+**Do not restate this as "the build is clean".** That sentence stood here for five milestones,
+measured in Debug, in a document whose own next paragraph says Debug cannot show the diagnostics
+that matter. An incremental build hides them too, because nothing recompiles.
+
 This document exists so that the next person does not have to re-derive how it got that way, or
 guess which suppressions are deliberate.
 
