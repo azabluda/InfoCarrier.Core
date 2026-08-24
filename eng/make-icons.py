@@ -26,11 +26,6 @@ WHAT SURVIVED THE CUT, AND WHY EACH ONE IS LOAD-BEARING:
                        for and every smaller device downscales it.
   icon-192, icon-512   Android home screen, and the install prompt's splash. Chrome wants one icon
                        at 192 or larger to consider a site installable and uses 512 for the splash.
-  logo                 the site header, where Material draws it at 1.2rem -- 24px -- and the mobile
-                       drawer, which draws it at 2.4rem. 96 covers the larger of those at 2x and
-                       the header at 4x, and it is a tenth of icon-192's weight. That matters here
-                       and nowhere else in this list: the header logo loads on EVERY page, while
-                       nothing on this list above it is fetched more than once, if ever.
 
   No SVG: the artwork is raster, lit and bevelled, and a traced approximation would be a different
   mark. No maskable variant: Android's maskable safe zone is the middle 80%, and this mark is
@@ -57,9 +52,8 @@ SRC = os.path.join("docs", "assets", "icon-source.png")
 WEB = os.path.join("website", "docs", "assets", "icons")
 
 # (path, canvas, margin). The margin keeps the mark off the edge where something else frames it --
-# a home-screen icon crops or rounds the corners. The favicon frames, and the header logo, get
-# none: at 16px a spare pixel of mark is worth more than breathing room nobody can see, and the
-# header already spaces the logo itself (`.md-header__button.md-logo{padding:.4rem}`).
+# a home-screen icon crops or rounds the corners. The favicon frames get none: at 16px a spare
+# pixel of mark is worth more than breathing room nobody can see.
 #
 # NUGET IS THE ONE THAT LOOKS LIKE IT WANTS A MARGIN AND DOES NOT. nuget.org neither crops nor
 # rounds -- it sets `width:32px;height:32px;object-fit:contain` on the package page and caps search
@@ -70,7 +64,6 @@ TARGETS = [
     (os.path.join(WEB, "apple-touch-icon.png"), 180, 6),
     (os.path.join(WEB, "icon-192.png"), 192, 6),
     (os.path.join(WEB, "icon-512.png"), 512, 16),
-    (os.path.join(WEB, "logo.png"), 96, 0),                     # the site header's own mark
 ]
 
 ICO = os.path.join(WEB, "favicon.ico")

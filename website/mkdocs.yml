@@ -37,11 +37,9 @@ theme:
   # 16/32/48 PNGs alongside it would be three more `<link>` tags for pixels this file already has.
   # Every icon under assets/icons/ is generated -- `py eng/make-icons.py`, never edited by hand.
   favicon: assets/icons/favicon.ico
-  # The header mark. WITHOUT THIS Material does not fall back to the favicon -- it draws its own
-  # default `material/library` glyph, a generic book, which is what stood here until now. The
-  # header renders this at `height:1.2rem` (24px) and the mobile drawer at 2.4rem, so the file is
-  # 96px rather than another copy of the 192: it is the only icon fetched on every page view.
-  logo: assets/icons/logo.png
+  # NO `logo:`, AND THAT IS DELIBERATE -- the mark belongs on the tab, not in the header. Material
+  # does not fall back to the favicon when this is absent: it draws its own `material/library`
+  # glyph, a generic book, which is what the header shows and is what is wanted here.
   # System fonts rather than the theme's default Google Fonts. The default fetches Roboto from
   # fonts.googleapis.com on every page view, which sends every visitor's IP to a third party for
   # a typeface. Setting this to `false` makes the built site self-contained: the only things it
