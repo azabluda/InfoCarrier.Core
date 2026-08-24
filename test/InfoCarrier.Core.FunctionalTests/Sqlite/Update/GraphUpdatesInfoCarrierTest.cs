@@ -32,9 +32,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 ///     </para>
 ///     <para>
 ///         Every test in the base runs inside
-///         <c>TestHelpers.ExecuteWithStrategyInTransactionAsync</c>, so the fixture opts into
-///         <see cref="InfoCarrierEventId.TransactionIgnoredWarning" /> and reseeds afterwards —
-///         exactly what EF's InMemory base does, and for the same reason: without a real
+///         <c>TestHelpers.ExecuteWithStrategyInTransactionAsync</c>, and the fixture reseeds
+///         afterwards, exactly as EF's InMemory base does and for the same reason: without a real
 ///         transaction there is no rollback to undo the test's mutations.
 ///     </para>
 /// </remarks>
@@ -119,10 +118,6 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
-
-        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-            => base.AddOptions(builder)
-                .ConfigureWarnings(w => w.Log(InfoCarrierEventId.TransactionIgnoredWarning));
 
         /// <summary>
         ///     <c>GraphUpdatesSqliteTestBase</c>'s model additions, adopted whole (J14).

@@ -91,10 +91,6 @@ public abstract class QueryExpressionInterceptionInfoCarrierTestBase(
             IServiceCollection serviceCollection,
             IEnumerable<IInterceptor> injectedInterceptors)
             => base.InjectInterceptors(serviceCollection.AddEntityFrameworkInfoCarrier(), injectedInterceptors);
-
-        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-            => base.AddOptions(builder)
-                .ConfigureWarnings(c => c.Ignore(InfoCarrierEventId.TransactionIgnoredWarning));
     }
 }
 
@@ -182,10 +178,6 @@ public abstract class SaveChangesInterceptionInfoCarrierTestBase(
             IServiceCollection serviceCollection,
             IEnumerable<IInterceptor> injectedInterceptors)
             => base.InjectInterceptors(serviceCollection.AddEntityFrameworkInfoCarrier(), injectedInterceptors);
-
-        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-            => base.AddOptions(builder)
-                .ConfigureWarnings(c => c.Ignore(InfoCarrierEventId.TransactionIgnoredWarning));
     }
 }
 

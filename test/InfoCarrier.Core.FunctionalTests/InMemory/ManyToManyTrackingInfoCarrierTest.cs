@@ -69,7 +69,6 @@ public class ManyToManyTrackingInfoCarrierTest(ManyToManyTrackingInfoCarrierTest
 
         public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
             => base.AddOptions(builder)
-                .ConfigureWarnings(w => w.Log(InfoCarrierEventId.TransactionIgnoredWarning))
                 .UseQueryTrackingBehavior(QueryTrackingBehavior.TrackAll);
 
         /// <summary>

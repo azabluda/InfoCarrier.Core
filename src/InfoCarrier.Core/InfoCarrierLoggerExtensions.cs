@@ -21,10 +21,9 @@ public static class InfoCarrierLoggerExtensions
     ///         supplies through <c>UseLoggerFactory</c>. It says nothing about
     ///         <c>DbContextOptionsBuilder.LogTo</c>, which reaches a context through
     ///         <c>IDbContextLogger</c> and is answered by <see cref="IDiagnosticsLogger.NeedsEventData" />
-    ///         and <c>DispatchEventData</c> instead. A first version of this method had the first
-    ///         half only; the event fired, <c>ShouldLog</c> returned <see langword="false" /> because
-    ///         no logger factory was configured, and <c>LogTo</c> saw nothing. That is the most
-    ///         common way a developer reads EF logs, so it was the one path that had to work.
+    ///         and <c>DispatchEventData</c> instead. Keep both: with <c>ShouldLog</c> alone the
+    ///         event reaches nothing when a context configures <c>LogTo</c> and no logger factory,
+    ///         which is the most common way a developer reads EF logs.
     ///     </para>
     ///     <para>
     ///         Both guards matter for cost, not only for correctness. The split is decided per

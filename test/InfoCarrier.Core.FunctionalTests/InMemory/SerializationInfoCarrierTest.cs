@@ -69,15 +69,6 @@ public class F1InfoCarrierFixture : F1FixtureBase<byte[]>
             onAddServices: s => s.AddSingleton<ISingletonInterceptor, F1MaterializationInterceptor>(),
             configureConventions: ConfigureConventions);
 
-    /// <inheritdoc />
-    /// <remarks>
-    ///     Mirrors <c>F1InMemoryFixtureBase</c>, which ignores InMemory's equivalent warning: this
-    ///     provider ignores transactions on Tier A (roadmap M4).
-    /// </remarks>
-    public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-        => base.AddOptions(builder)
-            .ConfigureWarnings(w => w.Ignore(InfoCarrierEventId.TransactionIgnoredWarning));
-
     /// <summary>
     ///     The same model as the client's, over the backing store's convention set.
     /// </summary>

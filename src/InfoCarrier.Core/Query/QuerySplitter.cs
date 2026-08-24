@@ -172,16 +172,13 @@ public sealed class QuerySplitter
 
         IReadOnlyList<Expression> augmented = AugmentWithNavigations(analysis.Shippable, residualBody);
 
-        // Only here, never on the pass-through return above. A query the server runs whole is the
-        // common case and must stay as cheap as it was before the split existed, and it has
-        // nothing to report.
+        // Only here, never on the pass-through return above: a query the server runs whole has
+        // nothing to report and must stay as cheap as it is.
         //
-        // WHAT THIS IS FOR is the one split that is dangerous rather than merely interesting.
-        // A projection the server cannot run is documented and safe: the filter still ships, so
-        // the wire carries the rows the caller asked for. A *filter* the server cannot run is the
-        // inverse — the frontier cut lands below the `Where`, the server runs the query root
-        // alone, and the whole table crosses. The answer is correct, which is exactly why nothing
-        // else tells you. Before this event the client said nothing about either.
+        // A split is a wire cost the caller cannot otherwise see. The server sends every row the
+        // shipped part yields, and this client discards whatever the residual drops, so the bytes
+        // that crossed can exceed the rows the caller receives. The answer is correct either way,
+        // which is why nothing else says anything.
         _queryLogger?.QuerySplit(augmented.Count);
 
         return new SplitQuery(

@@ -1,6 +1,6 @@
 ﻿# Roadmap
 
-Status: **M8 closed (2026-08-24). M5 has one open criterion (the remote cancel signal, W6); M7 is untouched** · Milestone-level plan for the whole project.
+Status: **M8 closed (2026-08-24). M7's SQL Server half dropped (2026-08-24). M5 has one open criterion, the remote cancel signal (W6), and it is the only work left** · Milestone-level plan for the whole project.
 
 This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
 only when scope changes.
@@ -293,11 +293,30 @@ verbatim and executed against the backend (C82).
 C82 + C83, four steps, ~40 fixed and one new ADR. **A price is only ever a price for the route
 that was in mind at the time.**
 
-### M7 — SQL Server (Tier C) + spatial *(spatial half already complete)*
+### M7 — SQL Server (Tier C) + spatial — **SPATIAL DONE; THE SQL SERVER HALF IS DROPPED 2026-08-24**
 
-**Exit criteria**
-- Docker SQL Server backend store; nightly CI job (ADR-009 Tier C).
-- `rowversion` concurrency, computed columns, sequences, TPT/TPC.
+**The SQL Server tier is dropped, by the owner's decision, 2026-08-24.** It does not ship in the
+10.x line and it is not deferred to a later one: it is withdrawn.
+
+**What is dropped is a TEST TIER, not support for a store.** The server side of this product is an
+ordinary EF Core application, so it runs against whatever provider the server references, SQL Server
+included. Requirements §5 names SQL Server among the server backends and that is unaffected. What
+was planned here and is now not planned is a *third* backend for this repository's own suite, beside
+InMemory (Tier A) and SQLite (Tier B), with a Docker store and a nightly job. ADR-009's tier model
+keeps its two tiers; Tier C is simply never built.
+
+**What the drop costs, stated so nobody rediscovers it as a surprise.** Four things had no other
+home: `rowversion` concurrency, computed columns, sequences, and TPT/TPC inheritance mapping. None
+is exercised by any tier that runs today. So this repository has no evidence about them either way,
+and no user-facing document may claim they work.
+
+**The direction the owner would rather spend it on is a non-relational backend**, recorded in the
+deferred table below. That is future scope and nothing is committed.
+
+~~**Exit criteria**~~
+- ~~Docker SQL Server backend store; nightly CI job (ADR-009 Tier C).~~ **DROPPED 2026-08-24.**
+- ~~`rowversion` concurrency, computed columns, sequences, TPT/TPC.~~ **DROPPED 2026-08-24**, and
+  untested by anything that remains.
 - ~~NetTopologySuite with **Z/M ordinates preserved** (requirements §2.8) — v1 lost them.~~
   ✅ **Done 2026-08-10, in M6. Do not plan this again.**
 
@@ -603,6 +622,7 @@ From wire-protocol §5 and research-findings §10 — resolved in the milestone 
 | **`IgnoreQueryFilters` crosses the wire and the server honours it**, so a global query filter is not an authorization boundary. Three strategies, one preferred, in [`cold-read-findings.md`](cold-read-findings.md) §1. **Deferred deliberately 2026-08-24**, owner's decision: v10 ships with this gap open, and the reasoning is below | post-v10 |
 | **Idempotency for a retried unit of work.** A transport failure leaves the outcome unknown and there is no request id to ask with. Same file, §2 | post-v10 |
 | **Nothing observable at runtime**: no logger category, no round-trip counter. Same file, §2 | post-v10 |
+| **A non-relational backend tier, for example an ephemeral MongoDB.** Raised 2026-08-24 as the direction preferred over the dropped SQL Server tier. Every store this repository tests today is relational or InMemory, so nothing exercises a backend whose query translation refuses different things. **Nothing is committed and no design exists.** M9 already made the provider store-neutral (`InfoCarrier.Core` does not reference `EFCore.Relational`), which is what would make this cheap to attempt | future scope |
 | **Client/server version-skew policy.** The envelope carries a `ProtocolVersion`; nothing states what a fleet on mixed builds should expect. Same file, §2 | post-v10 |
 
 ### `IgnoreQueryFilters`: why v10 ships with it open

@@ -89,8 +89,7 @@ public class ProxyGraphUpdatesInfoCarrierTest
                     configureConventions: ConfigureConventions);
 
             public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-                => AddProxyOptions(
-                    base.AddOptions(builder.ConfigureWarnings(w => w.Ignore(InfoCarrierEventId.TransactionIgnoredWarning))));
+                => AddProxyOptions(base.AddOptions(builder));
 
             /// <summary>
             ///     Reseeds through the <em>backend</em> context rather than the client one.

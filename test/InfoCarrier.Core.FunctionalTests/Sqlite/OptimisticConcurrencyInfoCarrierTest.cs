@@ -170,12 +170,6 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
                 onAddServices: s => s.AddSingleton<ISingletonInterceptor, ServerSideF1MaterializationInterceptor>(),
                 configureConventions: ConfigureConventions);
 
-        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-            // Mirrors F1InMemoryFixtureBase, which ignores InMemory's equivalent warning: every
-            // test here opens a transaction, and this provider ignores transactions (roadmap M4).
-            => base.AddOptions(builder)
-                .ConfigureWarnings(w => w.Ignore(InfoCarrierEventId.TransactionIgnoredWarning));
-
         /// <summary>
         ///     Rebuilds the store from scratch, server-side.
         /// </summary>

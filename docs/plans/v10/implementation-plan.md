@@ -20,13 +20,14 @@ classified in the archived M9 plan and stated for consumers in
 
 ## What is open, across the whole roadmap
 
-Two milestones, and this file holds the first:
+**One criterion, in one milestone: M5's remote cancel signal (W6).** It is below, and it is the only
+work left in the roadmap.
 
-- **M5, one criterion: the remote cancel signal (W6).** Below.
-- **M7, whole: SQL Server as Tier C.** The spatial half is already complete. Not started, and not
-  in this file until it is the current milestone.
+M7's SQL Server tier was dropped on 2026-08-24 by the owner's decision, so M7 has nothing open: its
+spatial half completed early, in M6. The preferred direction instead is a non-relational backend
+tier, which is recorded in `roadmap.md` as future scope with nothing committed.
 
-Nothing else is open. M1's `N5`/`N6` documentation tail closed with the documentation rewrite.
+M1's `N5`/`N6` documentation tail closed with the documentation rewrite.
 
 ## Phase P — the remote cancel signal (W6, M5's last criterion)
 
@@ -56,6 +57,23 @@ what the server is already told".
   `QueryProvider.Execute(query)` for a single result, and a plain `foreach` over
   `BuildQueryable(query)` for a sequence. Neither can be interrupted, so the store keeps working
   for a client that has gone.
+
+**Why no test caught this, and it is not an oversight in the suite.** EF ships two cancellation
+tests, `ToListAsync_can_be_canceled` and `ToListAsync_with_canceled_token` in
+`NorthwindMiscellaneousQueryTestBase`, and **both are green here**. Read what they assert: the
+first cancels a token and accepts *either* an `OperationCanceledException` *or* a complete
+nine-row result; the second passes an already-cancelled token and expects
+`OperationCanceledException` plus a `QueryCanceled` log event. Every assertion is about what the
+**caller** sees, and this provider gives the caller exactly the right thing. Neither test can ask
+whether any work continued afterwards, because in EF's model there is no separate process for it
+to continue in.
+
+**That is the standing shape of this repository's blind spots**, and it has now cost twice. The
+type allowlist "passed" for months because the in-process transport shared an `AppDomain`, so an
+assembly scan found types no network server could have (ADR-008's note, ~31% of the suite). Same
+cause: **a one-process suite cannot see a two-process defect.** Where a gap is on the far side of
+the wire, the spec suite is silent by construction and a test of ours is the only thing that will
+speak.
 
 - [ ] **P1. Execute the server query asynchronously and pass the token.** The sequence path needs
       async enumeration instead of the `foreach` that fills an `ArrayList`; the single-result path

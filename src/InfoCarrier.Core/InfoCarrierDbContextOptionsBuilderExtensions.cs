@@ -33,7 +33,7 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         InfoCarrierOptionsExtension extension = GetOrCreateExtension(optionsBuilder)
             .WithInfoCarrierClient(client);
 
-        // `ConfigureWarnings` **before** `AddOrUpdateExtension`, which is the order every EF
+        // `EnsureCoreOptionsFirst` **before** `AddOrUpdateExtension`, which is the order every EF
         // provider uses and is not arbitrary. `DbContextOptions.Extensions` yields extensions by
         // *insertion ordinal*, and that order is what `BuildOptionsFragment` prints in the
         // context-initialized log line. Configuring warnings is what first creates
@@ -41,7 +41,7 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         // — `"NoTracking using InfoCarrier"`, which is the shape `LoggingTestBase` composes its
         // expectation in (`ExpectedMessage("NoTracking " + DefaultOptions)`) and the shape every
         // other provider produces. Adding ours first printed `"using InfoCarrier NoTracking"`.
-        ConfigureWarnings(optionsBuilder);
+        EnsureCoreOptionsFirst(optionsBuilder);
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
         return optionsBuilder;
     }
@@ -64,20 +64,23 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder, client);
 
     /// <summary>
-    ///     Defaults <see cref="InfoCarrierEventId.TransactionIgnoredWarning" /> to
-    ///     <see cref="WarningBehavior.Throw" />, as EF Core's InMemory provider does for its own.
-    ///     Transactions are implemented, so the warning fires only where one is genuinely ignored,
-    ///     and a silent ignore is worse than a loud one; <c>TryWithExplicit</c> leaves an
-    ///     application's own setting alone.
+    ///     Adds <see cref="CoreOptionsExtension" /> to the builder before this provider's own
+    ///     extension goes in, so that EF's core options keep the lower insertion ordinal.
     /// </summary>
-    private static void ConfigureWarnings(DbContextOptionsBuilder optionsBuilder)
+    /// <remarks>
+    ///     <para>
+    ///         <b>The ordering is the entire purpose and it is observable.</b>
+    ///         <c>DbContextOptions.Extensions</c> yields extensions by insertion ordinal, and that
+    ///         order is what the context-initialized log line prints. Core options first produces
+    ///         <c>"NoTracking using InfoCarrier"</c>, which is the shape <c>LoggingTestBase</c>
+    ///         composes its expectation in and the shape every other provider produces. Adding
+    ///         this provider's extension first printed <c>"using InfoCarrier NoTracking"</c>.
+    ///     </para>
+    /// </remarks>
+    private static void EnsureCoreOptionsFirst(DbContextOptionsBuilder optionsBuilder)
     {
         CoreOptionsExtension coreOptionsExtension =
             optionsBuilder.Options.FindExtension<CoreOptionsExtension>() ?? new CoreOptionsExtension();
-
-        coreOptionsExtension = coreOptionsExtension.WithWarningsConfiguration(
-            coreOptionsExtension.WarningsConfiguration.TryWithExplicit(
-                InfoCarrierEventId.TransactionIgnoredWarning, WarningBehavior.Throw));
 
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(coreOptionsExtension);
     }

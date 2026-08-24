@@ -198,8 +198,15 @@ sample apps, packaging), two out of scope for v10 (gRPC and streaming; the compi
 and requirements §4.5 answered in two halves (trimming verified, Native AOT not supported). Task
 detail is archived in `docs/plans/v10/archive/implementation-plan-m8-phases-h-n.md` and is never
 edited again. **`docs/plans/v10/implementation-plan.md` now holds M5's one remaining criterion, the
-remote cancel signal (W6)**, which is the only open criterion of any open milestone; M7 (SQL Server
-as Tier C) is untouched and is not in the plan file until it is current.
+remote cancel signal (W6)**, and it is now the only work left in the whole roadmap.
+
+**M7's SQL Server tier is DROPPED (2026-08-24, owner's decision), not deferred.** What is withdrawn
+is a *third test tier* for this repository's suite, never support for the store: the server side is
+an ordinary EF application and runs against whatever provider it references, so requirements §5 is
+unaffected and ADR-009 keeps its two tiers. **The cost is that `rowversion` concurrency, computed
+columns, sequences and TPT/TPC are exercised by nothing that runs**, so this repository has no
+evidence about them and no user-facing document may claim they work. A non-relational backend tier
+is recorded as future scope with nothing committed.
 
 **M9 is CLOSED (2026-08-17).** The paragraph below was written while M8 was still open.
 **M9 is CLOSED (2026-08-17). M8 is NOT.** M9 met its four exit criteria: the document-mapping seam
