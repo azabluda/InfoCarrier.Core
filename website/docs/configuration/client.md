@@ -62,9 +62,9 @@ services.AddSingleton<IInfoCarrierClient>(sp =>
 
 ## Payload limits
 
-The serializer applies a size bound to what it will deserialize. One `InfoCarrierPayloadLimits`
-object travels with it, and each end enforces the bound that applies to it: the server bounds the
-request it receives, the client bounds the response it receives. Only the server's side is
+The serializer applies a size limit to what it will deserialize. One `InfoCarrierPayloadLimits`
+object travels with it, and each end enforces the limit that applies to it: the server caps the
+request it receives, the client caps the response it receives. Only the server's side is
 default-on, because that is the side reading bytes from an untrusted peer.
 
 ```csharp
@@ -77,12 +77,12 @@ var serializer = new SystemTextJsonInfoCarrierSerializer(
 | | Default | Why |
 |---|---|---|
 | `MaxRequestBytes` | 64 MiB (`InfoCarrierPayloadLimits.DefaultMaxRequestBytes`) | An unauthenticated peer making your server allocate is the threat. No legitimate query tree comes near this. |
-| `MaxResponseBytes` | `null`, no bound | You asked for the result, and the library has no basis for capping how large an answer your own query may have. Set it if a runaway query should fail loudly rather than exhaust memory, or if the hop back is not one you trust. |
+| `MaxResponseBytes` | `null`, no limit | You asked for the result, and the library has no basis for capping how large an answer your own query may have. Set it if a runaway query should fail loudly rather than exhaust memory, or if the hop back is not one you trust. |
 
-Pass `null` to opt out of a bound. It is spelled as an explicit `null` rather than a very large
+Pass `null` to opt out of a limit. It is spelled as an explicit `null` rather than a very large
 number so that opting out is visible in your code.
 
-`MaxRequestBytes` set here bounds nothing on the client, which never deserializes a request. It
+`MaxRequestBytes` set here caps nothing on the client, which never deserializes a request. It
 matters on the server, and the server builds its own serializer with its own limits. See
 [Configuring the server](server.md#payload-limits).
 

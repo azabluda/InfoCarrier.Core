@@ -3,28 +3,28 @@
 Your server executes an expression tree that arrived over the network. That is the product, and the
 thing to think about before deploying it.
 
-## What the library bounds
+## What the library stops
 
 Deserialization is default-deny. The node kinds a payload may contain, the types it may name and the
-methods it may call are each checked against an allowlist, anything not on it is refused rather than
-resolved, and no assembly is loaded to satisfy a payload. The allowlist excludes the members that
-would turn a resolved `Type` back into a call, the classic route from "a tree can name a type" to "a
-tree can invoke anything".
+methods it may call are each checked against an allowlist; anything not on it is refused rather than
+resolved, and the library loads no assembly to satisfy a payload. The allowlist excludes the
+members that would turn a resolved `Type` back into a call, the classic route from "a tree can name
+a type" to "a tree can invoke anything".
 
 The review behind that is published, including the weaknesses accepted rather than solved and
 the reasoning for each: [security-review.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md).
-It is written for someone auditing this, not for someone adopting it. Read §2 first: the bound is a
-conjunction across several clauses, and the clause-by-clause argument is what makes the claim above
-checkable rather than a promise.
+It is written for someone auditing this, not for someone adopting it. Read §2 first: the boundary
+is a conjunction across several clauses, and the clause-by-clause argument is what makes the claim
+above checkable rather than a promise.
 
-There is a size bound too, applied before parsing begins and defaulting to 64 MiB on requests
+There is a size limit too, applied before parsing begins and defaulting to 64 MiB on requests
 towards the server. A flat array of a hundred million constants is only three levels deep, so a
-depth limit alone does not bound the memory a parse costs. See
+depth limit alone does not cap the memory a parse costs. See
 [server configuration](configuration/server.md#payload-limits).
 
 A client also cannot name a type the server's model does not have. The query runs against the
 server's `DbContext`, so the entity types in your shared model are the whole of what a client can
-compose over. That surface is a real bound. A query filter is not one, for the reason below.
+compose over. That surface is a real boundary. A query filter is not one, for the reason below.
 
 ## What is yours
 
@@ -59,21 +59,21 @@ writes, so a client can submit a `SaveChanges` for a row whose key belongs to an
 
 A rule a caller must not be able to switch off goes where the caller cannot reach: a query
 interceptor on the server for reads, and the server's `SaveChanges` override or an EF interceptor
-for writes. [Multi-tenancy](multi-tenancy.md) is the worked version, including the scope trap
-that makes a correct-looking tenant filter read the wrong tenant.
+for writes. Everything a client's `SaveChanges` sends is replayed through that override or
+interceptor, and the client can name neither.
 
-Everything a client submits is replayed through that override or interceptor, and the client cannot
-name either one.
+[Multi-tenancy](multi-tenancy.md) is the worked version, including the scope trap that makes a
+correct-looking tenant filter read the wrong tenant.
 
 ## The shape of the exposure
 
 A client can compose any query over the entity types your shared model exposes. That is the feature,
 and it has three consequences.
 
-Expensive queries are reachable. A caller can ask for a cross join. Bound it where the caller
+Expensive queries are reachable. A caller can ask for a cross join. Cap the cost where the caller
 cannot reach: a rate limit at the gateway, a statement timeout on the database, or a query
-interceptor on the server. A query filter is not a bound here for the same reason it is not a
-boundary above.
+interceptor on the server. A query filter will not do it, for the same reason it is not a boundary
+above.
 
 Exception messages travel, with their stack traces. If yours carry connection strings, file paths or
 internal identifiers, catch and rewrite them at the server boundary.

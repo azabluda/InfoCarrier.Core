@@ -5,9 +5,9 @@ call for different responses.
 
 ## A failure the server reported
 
-The server's exception is carried back as data and raised again on the client, with its message and
-its inner chain. You catch what you would catch locally, and where the client has the exception's
-type loaded it is raised as that type.
+The library carries the server's exception back as data and raises it again on the client, with its
+message and its inner chain. You catch what you would catch locally, and where the client has the
+exception's type loaded you get that type.
 
 ```csharp
 try
@@ -25,8 +25,8 @@ catch (DbUpdateException ex)
 ```
 
 So a `SqlException`, in a client that references no database driver, arrives as
-`InfoCarrierServerException` with the thrown type's name in a property. No `catch` clause is ever
-obliged to reference a database driver.
+`InfoCarrierServerException` with the thrown type's name in a property. No `catch` clause ever
+needs to reference a database driver.
 
 ```csharp
 catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerException server)
@@ -46,9 +46,9 @@ DbUpdateException                     the client's own, from EF
       └── InfoCarrierServerException  ServerExceptionTypeName = "Microsoft.Data.Sqlite.SqliteException"
 ```
 
-The library keeps the server's stack trace and deliberately does not splice it into the
-client-side exception's own stack, which would misreport where your client is. It travels in
-`Exception.Data`, and it is the only view you get of what happened on the other side, so log it.
+The library keeps the server's stack trace and does not splice it into the client-side exception's
+own stack, which would misreport where your client is. It travels in `Exception.Data`, and it is the
+only view you get of what happened on the other side, so log it.
 
 ```csharp
 var serverStack = ex.InnerException?.Data["InfoCarrier.ServerStackTrace"] as string;
@@ -61,25 +61,25 @@ If the request never reached a server, or what came back was not a valid respons
 data is unknown, not wrong.
 
 Retrying a read is safe. **Retrying anything that writes is not**, because the failure does not
-tell you whether the server committed: the request may have died on the way out, or the answer may
-have died on the way back. Nothing in the envelope carries a request id, so there is no way to ask
-afterwards.
+tell you whether the server committed: the request may have died on the way out, or the answer on
+the way back. Nothing in the envelope carries a request id, so there is no way to ask afterwards.
 
 That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` are written on an
 `IQueryable` and read like queries, and they are writes.
 
-If a transaction was open when the connection dropped, do not retry into it. The server holds it on
-the instance that began it, and a retry landing anywhere else cannot join it. See
-[Transactions](transactions.md). For an insert, the remedy is a key you
-supply rather than a store-generated one, with a unique constraint on the server's database that
-enforces it. Without the constraint a supplied key is not idempotent and the retry simply inserts
-twice.
+For an insert, the remedy is a key you supply rather than a store-generated one, with a unique
+constraint on the server's database that enforces it. Without the constraint a supplied key is not
+idempotent and the retry inserts twice.
 
 **An update has no such remedy here.** A retried `balance = balance - 100` debits twice, and nothing
 in the protocol can tell you whether the first one landed. Make the operation one whose repetition
 is harmless, such as setting a value rather than adjusting one, or carry your own applied-once
 marker in the row and check it on the server. Reading back before you retry is not equivalent: the
 first write can still commit between your read and your retry.
+
+If a transaction was open when the connection dropped, do not retry into it. The server holds it on
+the instance that began it, and a retry landing anywhere else cannot join it. See
+[Transactions](transactions.md).
 
 ```csharp
 try
@@ -93,7 +93,7 @@ catch (InfoCarrierTransportException ex)
 }
 ```
 
-The underlying failure, an `HttpRequestException` or a serialization error, is kept as
+The underlying failure, an `HttpRequestException` or a serialization error, arrives as
 `InnerException`. When the server answers with a non-success status, the message carries the status
 code and the response body.
 
@@ -114,7 +114,8 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 | `InfoCarrierTransportException` | The request did not complete | Retry a read. Do not retry a write: see [A failure of the journey](#a-failure-of-the-journey) |
 
 Catch the type, not the message: message text is not a supported contract on any EF Core provider,
-and a couple here are worded differently. See [Limitations](../limitations.md).
+and a couple of messages here are worded differently from other providers'. See
+[Limitations](../limitations.md).
 
 ## Cancellation
 
@@ -139,5 +140,5 @@ trace itself holds, which with symbols deployed is your build's source paths.
 client. Catch and rewrite at the server boundary anything a client should not read. See
 [Security](../security.md).
 
-Resolving a fault's type is also the limit on the return direction: a fault cannot make the client
-load an assembly, or construct anything that is not an exception.
+Resolving a fault's type is also the boundary on the return direction: a fault cannot make the
+client load an assembly, or construct anything that is not an exception.

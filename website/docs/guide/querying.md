@@ -124,6 +124,6 @@ server, where the real provider is. Expose them as server-side operations of you
 Every materialized query is a request, so a loop that queries per item makes one request per item.
 Compose the query instead, or fetch what you need with `Include`.
 
-Requests towards the server have a default size bound; answers coming back have none, because the
+Requests towards the server have a default size limit; answers coming back have none, because the
 library has no basis for capping how large an answer your own query may have. To set one, see
 [client configuration](../configuration/client.md#payload-limits).

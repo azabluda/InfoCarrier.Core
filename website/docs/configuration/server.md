@@ -49,7 +49,7 @@ The client's transport must name the same route. See
 
 A malformed body, or a client speaking a different protocol version, is answered with `400` and a
 plain-text message naming the problem, with no stack trace and no server paths. Anything the server
-ran and that failed comes back inside a normal response as a fault. See
+ran and that failed comes back as a fault inside a normal response. See
 [Handling errors](../guide/errors.md).
 
 ## Payload limits
@@ -63,9 +63,9 @@ builder.Services.AddSingleton<IInfoCarrierSerializer>(
         new InfoCarrierPayloadLimits(maxRequestBytes: 8 * 1024 * 1024)));
 ```
 
-A query tree is kilobytes and a `SaveChanges` request is bounded by the graph the client tracked, so
-a low ceiling is usually safe. Cap the request bytes at your gateway too. This bound is what catches
-whatever the gateway lets through.
+A query tree is kilobytes, and a `SaveChanges` request is no bigger than the graph the client
+tracked, so a low limit is usually safe. Cap the request bytes at your gateway too; this limit
+catches whatever the gateway lets through.
 
 ## Context lifetime
 
@@ -82,7 +82,7 @@ transaction. [Transactions](../guide/transactions.md) has that and what an aband
 
 A global query filter on the server's model applies to every query by default, which is what you
 want for your own honest client. **It is not a control.** `IgnoreQueryFilters()` is an ordinary EF
-Core operator, it travels in the expression tree like any other, and the server honours it. Query
+Core operator: it travels in the expression tree like any other, and the server honours it. Query
 filters also do not apply to writes, so a client can submit a `SaveChanges` for a row whose key
 belongs to someone else.
 
@@ -90,6 +90,8 @@ So put a write check in the server's `SaveChanges` override or an EF interceptor
 in a query interceptor, which sees the client's tree before EF translates it.
 [Multi-tenancy](../multi-tenancy.md) works both of them through, and [Security](../security.md) has
 the threat model.
+
+Keep the filter anyway, as the default for your own client:
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)

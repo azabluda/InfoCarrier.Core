@@ -129,6 +129,6 @@ The server half is whatever hosts your protocol, ending in a call to
 counterparts. The library never assumes JSON. Implement it for MessagePack or protobuf if the
 payload size matters to you, and register the same implementation on both halves.
 
-The one thing to keep is the size bound: a deserializer that will parse anything it is handed is
+The one thing to keep is the size limit: a deserializer that will parse anything it is handed is
 what `InfoCarrierPayloadLimits` exists to prevent. See
 [Configuring the server](server.md#payload-limits).

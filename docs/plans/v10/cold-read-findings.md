@@ -92,7 +92,7 @@ For strategy (c) a flat deny set is still not enough: the server has to decide *
 the client's own model declares it, and the deny gate sees a method name and its arguments, not the
 model. The named-filter overload carries filter names as arguments, which is the thread to pull.
 
-### The rest of the boundary, unexamined### The rest of the boundary, unexamined
+### The rest of the boundary, unexamined
 
 Raised by the same two readers, not yet checked in source:
 
@@ -100,8 +100,12 @@ Raised by the same two readers, not yet checked in source:
   another tenant's key. This is ordinary EF behaviour, and the pages pointed at query filters as
   the tenancy answer without saying the write path is a separate problem. `server.md` now says so;
   what the server should *do* about it is undecided.
-- **Do `ExecuteUpdate` and `ExecuteDelete` honour query filters?** Unchecked. Cross-tenant bulk
-  delete is the worst case in the set.
+- **Do `ExecuteUpdate` and `ExecuteDelete` honour query filters?** Still unchecked, and it is an EF
+  Core semantics question rather than one about this provider. **Do not confuse it with the routing
+  question, which IS settled**: neither has a separate server path here, so both travel in the tree
+  and execute through the server's query provider like a query. That is why the read-side query
+  interceptor is the hook that sees them and a `SaveChanges` override is not, and it is what
+  `multi-tenancy.md` states. Whether EF then applies a filter to them is the open half.
 - **What else in `QueryMarkers` weakens a server-side guarantee?** `IgnoreAutoIncludes` and
   `AsTracking` are in the same set and were not examined.
 - **Is there any CPU, wall-clock, node-count or depth bound on evaluating a submitted tree?**
