@@ -66,7 +66,11 @@ have died on the way back. Nothing in the envelope carries a request id, so ther
 afterwards.
 
 That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` are written on an
-`IQueryable` and read like queries, and they are writes. For an insert, the remedy is a key you
+`IQueryable` and read like queries, and they are writes.
+
+If a transaction was open when the connection dropped, do not retry into it. The server holds it on
+the instance that began it, and a retry landing anywhere else cannot join it. See
+[Transactions](transactions.md). For an insert, the remedy is a key you
 supply rather than a store-generated one, with a unique constraint on the server's database that
 enforces it. Without the constraint a supplied key is not idempotent and the retry simply inserts
 twice.
@@ -107,11 +111,10 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 | `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
 | `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
 | `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
-| `InfoCarrierTransportException` | The request did not complete | Retry, queue, or tell the user they are offline |
+| `InfoCarrierTransportException` | The request did not complete | Retry a read. Do not retry a write: see [A failure of the journey](#a-failure-of-the-journey) |
 
-Catch the type, not the message. Message text is not a supported contract on any EF Core provider,
-and a couple of messages here are worded differently from other providers'. See
-[Limitations](../limitations.md).
+Catch the type, not the message: message text is not a supported contract on any EF Core provider,
+and a couple here are worded differently. See [Limitations](../limitations.md).
 
 ## Cancellation
 
@@ -136,5 +139,5 @@ trace itself holds, which with symbols deployed is your build's source paths.
 client. Catch and rewrite at the server boundary anything a client should not read. See
 [Security](../security.md).
 
-That resolution is also the bound on the return direction: a fault cannot make the client load an
-assembly, or construct anything that is not an exception.
+Resolving a fault's type is also the limit on the return direction: a fault cannot make the client
+load an assembly, or construct anything that is not an exception.

@@ -6,16 +6,16 @@ the server honours it, and filters never apply to writes. [Security](security.md
 reasoning; this page is what to do instead.
 
 Keep the filters. They stop your own client leaking by accident and keep tenant predicates out of
-every call site. Just do not count them when the caller is hostile.
+every call site. Just do not count them against a hostile caller.
 
 ## Reads
 
 Two controls, and a multi-tenant application wants both.
 
-The shared model is the coarse one. A client composes over the entity types you put in the
-shared project and nothing else. A type that must never leave the server belongs on a context only
-the server has. This is absolute and it is cheap, but it works per type, so it cannot express
-"this tenant's rows of this type".
+The shared model is the coarse one. A client composes over the entity types you put in the shared
+project and nothing else, so a type that must never leave the server belongs on a context only the
+server has. Absolute, and cheap, but it works per type: it cannot say "this tenant's rows of this
+type".
 
 A query interceptor on the server is the fine one. The server executes the client's tree through
 its own query provider, so EF's pipeline runs there in full and an `IQueryExpressionInterceptor`
@@ -36,8 +36,9 @@ address.
 ## Resolving the tenant on the server
 
 `InProcessInfoCarrierServer` resolves your `DbContext` from a scope it creates itself, off the
-service provider it was constructed with. Registered the usual way, as a singleton, that provider is
-the root one. **The scope is therefore not the ASP.NET Core request scope.**
+service provider handed to its constructor. You register it as a singleton, and a singleton is
+resolved from the root container, so the provider it holds is the root provider. The scope it makes
+is a child of the root. **It is not the ASP.NET Core request scope.**
 
 A scoped service that middleware populates is therefore a different, empty instance by the time your
 filter reads it. Nothing throws; the tenant is whatever the default is.
@@ -73,14 +74,14 @@ captured once when the model is first built and then cached with it.
 1. A client sends `IgnoreQueryFilters()`. The rows still come back scoped.
 2. A client submits a `SaveChanges` for a key belonging to another tenant. The server refuses.
 3. A client sends `ExecuteDelete` over another tenant's rows. Nothing is deleted.
-4. Two tenants in flight at once. Neither sees the other's rows, and neither sees the first
-   tenant's filter.
+4. Two tenants querying at once. Neither sees the other's rows, and the second tenant's query is
+   filtered by its own tenant rather than by the first one's.
 
-The fourth catches the scope and model-caching mistakes above, and a single-tenant test run never
-will.
+The fourth catches both mistakes above, because a filter that read the wrong tenant, or a model
+cached with the first tenant's value, looks perfectly correct until a second tenant arrives. A
+single-tenant run never finds either.
 
 ## What this page does not cover
 
-Authentication. Nothing on the wire carries an identity, and the library has no concept of a user or
-a role. Authenticate the transport and gate the endpoint before any of the above matters. See
-[Security](security.md).
+Authentication. Nothing on the wire carries an identity, so authenticate the transport and gate the
+endpoint before any of the above matters. See [Security](security.md).
