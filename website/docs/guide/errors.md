@@ -119,9 +119,9 @@ and a couple of messages here are worded differently from other providers'. See
 
 ## Cancellation
 
-Every async method takes a `CancellationToken` and passes it through to the transport. A cancelled
-request raises `OperationCanceledException` and is never reported as a transport failure, because
-it is your own signal rather than something that went wrong.
+Every async method takes a `CancellationToken`, and it travels to the server, which stops the query
+it is running. A cancelled request raises `OperationCanceledException` and is never reported as a
+transport failure.
 
 ```csharp
 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

@@ -151,10 +151,19 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
         return new Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression(entityType);
     }
 
-    private async Task<object?> ExecuteQueryAsync(Expression query, QueryDataRequest request, CancellationToken cancellationToken)
+    private Task<object?> ExecuteQueryAsync(Expression query, QueryDataRequest request, CancellationToken cancellationToken)
     {
-        await Task.CompletedTask.ConfigureAwait(false);
-
+        // EVERY PATH HERE IS ASYNC AND TAKES THE TOKEN, and that is the whole point of this
+        // method's shape. The token arrives from the transport: `MapInfoCarrier` hands
+        // `HttpContext.RequestAborted` to `InfoCarrierEnvelopeServer.DispatchAsync`, which hands
+        // it to `IInfoCarrierServer.QueryDataAsync`, which hands it here. It used to be accepted
+        // and never read, so a client that cancelled stopped waiting while the server read the
+        // store to the end and built an answer nobody would receive. On a wide-area link that is
+        // the ordinary case, not the rare one: a user closes a screen.
+        //
+        // Passing it to EF's async path is what makes the store stop, not merely this loop: EF
+        // gives the token to the `DbCommand`, so the provider can cancel the command itself.
+        //
         // A single-result query (Single/First/Count/Any/…) has the *result* as its expression
         // type, not a sequence. It must go straight through the provider: wrapping it in
         // EntityQueryable<T> and enumerating is invalid, because EntityQueryable<T> requires
@@ -162,11 +171,58 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
         // an IEnumerable-returning executor.
         if (request.ReturnsSingleResult)
         {
-            return QueryProvider.Execute(query);
+            return (Task<object?>)ExecuteSingleMethod
+                .MakeGenericMethod(query.Type)
+                .Invoke(null, [QueryProvider, query, cancellationToken])!;
         }
 
+        return (Task<object?>)BufferMethod
+            .MakeGenericMethod(GetElementType(query.Type))
+            .Invoke(null, [BuildQueryable(query), cancellationToken])!;
+    }
+
+    // Both are closed over the query's own runtime type, which only the caller's model knows.
+    // That is the same premise the rest of this provider rests on, and the same reason the trim
+    // analyzer cannot prove either of them.
+    private static readonly MethodInfo ExecuteSingleMethod =
+        typeof(ServerQueryExecutor).GetMethod(nameof(ExecuteSingle), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    private static readonly MethodInfo BufferMethod =
+        typeof(ServerQueryExecutor).GetMethod(nameof(Buffer), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    /// <summary>
+    ///     Runs a single-result query through EF's async provider so the token reaches the store.
+    /// </summary>
+    /// <remarks>
+    ///     <c>TResult</c> is the query's own result type, and EF's contract for a scalar is that
+    ///     the caller asks for <c>Task&lt;TResult&gt;</c>. That is why this asks for
+    ///     <c>Task&lt;TResult&gt;</c> and awaits it, rather than asking for <c>TResult</c>.
+    /// </remarks>
+    private static async Task<object?> ExecuteSingle<TResult>(
+        Microsoft.EntityFrameworkCore.Query.IAsyncQueryProvider provider,
+        Expression query,
+        CancellationToken cancellationToken)
+        => await provider.ExecuteAsync<Task<TResult>>(query, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    ///     Buffers a sequence query, cancellably.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Buffering is deliberate and this is not the place to remove it.</b> The whole
+    ///         result set is materialized before anything is written to the wire, because identity
+    ///         resolution on the client needs it and because streaming results is out of scope for
+    ///         v10 (wire protocol W4, roadmap M8). What changes here is only that the buffering
+    ///         can now be abandoned partway.
+    ///     </para>
+    /// </remarks>
+    private static async Task<object?> Buffer<TElement>(IQueryable source, CancellationToken cancellationToken)
+    {
         var results = new ArrayList();
-        foreach (object? item in BuildQueryable(query))
+
+        await foreach (TElement item in ((IAsyncEnumerable<TElement>)source)
+            .WithCancellation(cancellationToken)
+            .ConfigureAwait(false))
         {
             results.Add(item);
         }

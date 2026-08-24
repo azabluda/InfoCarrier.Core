@@ -63,5 +63,21 @@
 # annotated method's OWN body, and these 88 sit in methods EF reaches through its own interfaces,
 # which `UseInfoCarrier` never calls. `total` rises 853 -> 854: the sample's call site now carries
 # its own IL2026, acknowledged with a narrow pragma in Program.cs rather than hidden project-wide.
-ours=88
-total=854
+# 2026-08-24 — 88 -> 89, A DELIBERATE RISE OF ONE. `ServerQueryExecutor.ExecuteQueryAsync` now runs
+# the server-side query through EF's async path so that the cancellation token reaching it from the
+# transport is actually used (M5's last criterion, W6). The token was accepted and dropped: a client
+# that cancelled stopped waiting while the server read the store to the end.
+#
+# Both paths need the query's own runtime type -- the element type for a sequence, the result type
+# for a single result -- and only the caller's model knows it, so both dispatch through
+# `MakeGenericMethod`. Both calls sit in one method, so they cost ONE unique diagnostic: IL2060 on
+# `ExecuteQueryAsync`. This is the premise this file already describes, and there is no
+# reflection-free shape available: `IInfoCarrierServer.QueryDataAsync` is non-generic by contract,
+# because the wire cannot know the element type at compile time.
+#
+# The alternative was to poll the token between rows in the existing synchronous loop, which needs
+# no reflection and costs no warning. It was rejected: it would stop this loop but not the store
+# command, so the database would keep working for a client that had gone. That is the cost the fix
+# exists to remove.
+ours=89
+total=855

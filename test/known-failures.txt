@@ -316,26 +316,29 @@
 #
 # `failed` is unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22661 / 22475 / 9 / 177 (`query-split-log`).
-# 2026-08-24 -- DELIBERATELY RED, AND THE NEXT COMMIT MAKES IT GREEN. failed 9 -> 10 and total
-# 22661 -> 22662. The rise is one new test of ours, and it fails on purpose: the fix it measures
-# lands in the commit that follows this one.
+# 2026-08-24 -- failed 10 -> 9. THE GREEN HALF: the commit before this one added the test and left
+# the server broken, so `failed` was raised to 10 there with the account of why. This commit is the
+# fix, so the number comes back down in the same commit as the fix, which is the standing rule.
 #
-# The test is InMemorySmokeTest.The_server_stops_a_query_when_the_caller_cancels. It replays a real
-# query request into InProcessInfoCarrierServer with an already-cancelled token and expects
-# OperationCanceledException. Against the server as it stands in THIS commit it fails with
-# "Assert.ThrowsAny() Failure: No exception was thrown", because ExecuteQueryAsync accepts the
-# token and never reads it, so the synchronous loop returns both rows.
+# 22661 -> 22662, one new test of ours. M5's last criterion: the server now uses the
+# cancellation token the transport already handed it, so a client that cancels stops the query on
+# the server instead of only stopping its own wait.
 #
-# A second test lands here too, in the OTHER project, which this file does not count:
-# ServerCancellationPathTest in InfoCarrier.Core.TransportTests takes InfoCarrier.Core.TransportTests
-# from 17 tests to 18 and from 0 failures to 1. It asks the same question over HTTP and fails with
-# "the server did not use EF's async command path".
+# `InMemorySmokeTest.The_server_stops_a_query_when_the_caller_cancels` captures a real query
+# envelope through the in-process transport and replays that request straight into
+# `InProcessInfoCarrierServer.QueryDataAsync` with an already-cancelled token. Replaying
+# server-side is the design, not an accident of convenience: a client-side cancel aborts the
+# transport first and proves nothing about the far side.
 #
-# RAISING `failed` IS NORMALLY FORBIDDEN WITHOUT A REASON, and this is the reason: the owner asked
-# for the evidence to be visible in the history, red first and green after, rather than asserted in
-# a commit message. CI tests the newest commit of a branch, so a red commit in the middle of one is
-# never built on its own.
+# PROVED FAILABLE. With ServerQueryExecutor.ExecuteQueryAsync stashed back to its synchronous form
+# the test fails with "Assert.ThrowsAny() Failure: No exception was thrown" -- the old loop
+# ignoring the token and returning both rows.
 #
-# Figures read off the run's own summary block: 22662 / 22475 / 10 / 177 (`red-before-fix`).
-failed=10
+# NO EF TEST COULD HAVE CAUGHT THE DEFECT. EF ships ToListAsync_can_be_canceled and
+# ToListAsync_with_canceled_token and both are green here; both assert only what the CALLER saw,
+# because in EF's model there is no second process for work to continue in.
+#
+# `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22662 / 22476 / 9 / 177 (`cancellation-final`).
+failed=9
 total=22662
