@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
@@ -17,6 +18,14 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     /// <param name="optionsBuilder">The options builder.</param>
     /// <param name="client">The client that ships operations to the server.</param>
     /// <returns>The same builder for chaining.</returns>
+    [RequiresUnreferencedCode(
+         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
+         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
+         + "client does run; test the paths your model actually uses. See "
+         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
+     RequiresDynamicCode(
+         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
+         + "generic types over types the payload names, neither of which Native AOT can generate.")]
     public static DbContextOptionsBuilder UseInfoCarrier(
         this DbContextOptionsBuilder optionsBuilder,
         IInfoCarrierClient client)
@@ -40,6 +49,14 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     /// <summary>
     ///     Configures the context to use the InfoCarrier provider (generic overload).
     /// </summary>
+    [RequiresUnreferencedCode(
+         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
+         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
+         + "client does run; test the paths your model actually uses. See "
+         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
+     RequiresDynamicCode(
+         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
+         + "generic types over types the payload names, neither of which Native AOT can generate.")]
     public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
         this DbContextOptionsBuilder<TContext> optionsBuilder,
         IInfoCarrierClient client)

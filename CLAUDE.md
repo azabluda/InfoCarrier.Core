@@ -47,7 +47,9 @@ Three levels, because each one hides a mistake the level below it catches:
 
 **Which gate to run before which commit.** `eng/measure.sh` says nothing about trimming and the trim
 gate says nothing about behaviour. They are separate axes, and M9's J8 was committed green on one
-while failing the other in CI.
+while failing the other in CI. **And neither says anything about Native AOT**: trimming does not ask
+whether code can be *generated*, so the 59 IL3050 diagnostics a `PublishAot` publish reports are
+invisible to `trim-ratchet.sh`. Nothing gates that axis, because Native AOT is not supported.
 
 | Change touches | Run |
 |---|---|
@@ -231,6 +233,15 @@ file to read before editing any of them.
   repeats per request is the serialize/translate work, and that gives the same answer every time.
   **The suite measures answers, so a missing cache is invisible to it** — do not read 22472 passing
   as evidence that this shipped. ADR-008 constraint 6 stays as written and stays unexercised.
+- **Native AOT is not supported, and it was measured rather than assumed** (2026-08-24;
+  `roadmap.md` M8 exit criteria, `findings.md`). A `PublishAot` publish of `samples/Northwind.Demo`
+  reports **155 unique IL diagnostics, 153 ours, and 59 of those are IL3050** —
+  `RequiresDynamicCode`, a code the trim analyzer never emits. **The trim ratchet therefore says
+  nothing about AOT and never did.** The publish also failed at the native link step for a missing
+  platform linker, so no native binary has been produced or run. `UseInfoCarrier` carries
+  `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`, as EF Core's own `DbContext`
+  constructors do; **that annotation did not lower the 88 and was not going to** — it exempts only
+  the annotated method's own body. Trimming itself is verified and works.
 - **`IgnoreQueryFilters` is not refused by the server, and v10 ships that way** (2026-08-24,
   owner's decision; `roadmap.md` §"`IgnoreQueryFilters`: why v10 ships with it open"). A global
   query filter is therefore not an authorization boundary against a hostile client, for reads and

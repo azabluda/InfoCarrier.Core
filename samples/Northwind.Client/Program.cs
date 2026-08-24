@@ -45,6 +45,19 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services =>
 // A factory, not a context: each page owns its own unit of work, which is exactly what the Order
 // page is there to show. A DbContext held for the lifetime of the app would accumulate tracked
 // entities across pages and make "one SaveChanges for several edits" mean nothing.
+//
+// IL2026 IS ACKNOWLEDGED HERE, NOT SILENCED IN THE PROJECT FILE, AND THE DIFFERENCE IS THE POINT.
+// `UseInfoCarrier` carries [RequiresUnreferencedCode] and [RequiresDynamicCode] because this
+// provider resolves types by the name on the wire and builds expression trees at run time. That is
+// the provider telling a trimmed consumer the truth, and every consumer of a trimmed client meets
+// this warning at their own call site. THIS SAMPLE IS WHAT THEY DO ABOUT IT: acknowledge it where
+// the decision is made, having tested the paths this model uses -- which M8-17 did, driving all
+// three pages against the published trimmed output.
+//
+// A `WarningsNotAsErrors` entry beside IL2110/IL2111 would be wrong. Those two are the framework's
+// own Razor output, nothing here can fix them, and they are not about this call. This one is ours,
+// it is about this call, and hiding it project-wide would also hide the next one.
+#pragma warning disable IL2026 // UseInfoCarrier is [RequiresUnreferencedCode]; see above.
 builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => options
     .UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>())
 
@@ -68,5 +81,6 @@ builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => op
     // constructed on the side that enables them, plus a `LazyLoader` service property on that
     // side's model -- neither is something the wire names, and A49 is about names.
     );
+#pragma warning restore IL2026
 
 await builder.Build().RunAsync();

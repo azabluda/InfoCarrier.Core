@@ -398,7 +398,23 @@ Three separable pieces, and only the first can be done outside the library:
   **Consequence for documentation:** it may not be named as a plan in any user-facing document
   (`docs/doc-style.md` rule 6). No user-facing document mentions caching today, so nothing needs
   removing.
-- AOT/trimming verification (requirements §4.5).
+- **AOT/trimming verification (requirements §4.5): trimming is verified, Native AOT is measured and
+  not supported.** §4.5 says "where feasible", and the two halves have different answers.
+  **Trimming: done.** The Blazor client publishes with `PublishTrimmed=true` and runs; M8-17 drove
+  all three pages against the published output. 88 IL diagnostics are ours and gated by direction
+  in `eng/trim-ratchet.sh`. The §4.5 clause about `System.Text.Json` source generators is met: the
+  envelope is source-generated (M8-11).
+  **Native AOT: measured 2026-08-24, and it is not a supported configuration for v10.** A
+  `PublishAot` publish of the console sample reports **155 unique IL diagnostics, 153 ours, of which
+  59 are IL3050** (`RequiresDynamicCode`) — a class the trim gate never sees. The provider builds
+  and compiles expression trees at run time from the payload, which is the one thing Native AOT
+  cannot do. **The publish also did not finish**: it failed at the native link step for a missing
+  platform linker on the measuring machine, so nothing proves a native binary would run either way.
+  Full account in [`findings.md`](findings.md).
+  **The honest annotation shipped instead of a fix.** `UseInfoCarrier` carries
+  `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`, matching what EF Core puts on
+  `DbContext`'s own constructors. It did not lower the 88 and was not expected to once the mechanism
+  was understood; it tells a consumer at their call site.
 - ~~Sample apps~~ **DONE** (Phases H/I) — a Blazor WebAssembly client and a console client, both
   against a SQLite-backed ASP.NET Core server.
 - ~~NuGet packaging, `release.yml`~~ **DONE (M8-19, M8-20, M8-22)** — **`InfoCarrier.Core`** and

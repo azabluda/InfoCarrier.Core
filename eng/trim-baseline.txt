@@ -47,5 +47,21 @@
 # `total` also falls, 1129 -> 853, and that is NOT this change: EF Core's own count dropped from 864
 # to 585 with the package/SDK movement since M8-17. Recorded so the next reader does not read a
 # 276-warning improvement as ours.
+# 2026-08-24 — THIS FILE MEASURES TRIMMING AND SAYS NOTHING ABOUT NATIVE AOT. Recorded because the
+# two were read as one axis until they were measured separately. A `PublishAot` publish of
+# samples/Northwind.Demo reports 155 unique IL diagnostics, 153 of them ours, and 59 of those are
+# IL3050 (RequiresDynamicCode) -- a code the trim analyzer NEVER emits, because trimming does not
+# ask whether code can be GENERATED. So a third of the AOT picture is invisible here and always was.
+# That publish did not finish either: it failed at the native link step for a missing platform
+# linker, so no native binary has ever been produced or run. Native AOT is not a supported
+# configuration for v10 (roadmap.md, M8 exit criteria); this ratchet is not the thing that would
+# tell you if that changed. The two counts are NOT comparable and must not be subtracted: different
+# samples, different tools (ILLink vs ILCompiler), different unique-keys.
+#
+# 2026-08-24 — `ours` unchanged at 88 after `UseInfoCarrier` gained [RequiresUnreferencedCode] and
+# [RequiresDynamicCode]. Recorded because the opposite was expected. The attribute exempts only the
+# annotated method's OWN body, and these 88 sit in methods EF reaches through its own interfaces,
+# which `UseInfoCarrier` never calls. `total` rises 853 -> 854: the sample's call site now carries
+# its own IL2026, acknowledged with a narrow pragma in Program.cs rather than hidden project-wide.
 ours=88
-total=853
+total=854

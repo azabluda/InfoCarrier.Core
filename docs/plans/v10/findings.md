@@ -313,6 +313,44 @@ named it in one filtered run** (C19, 153 closed), and the same probe established
 that `ExecuteDelete` had never been broken at all. The standing probe rule is "establish that the
 code *ran*"; point it one step earlier — *where is this being cut* — before pricing a gap.
 
+**Native AOT was measured for the first time on 2026-08-24, and the measurement says the two axes
+are not one axis.** The trim ratchet has gated `samples/Northwind.Client` since M8-17 and reports 88
+diagnostics of ours. A `dotnet publish -r win-x64 -p:PublishAot=true` of the console sample
+(`samples/Northwind.Demo`) reports **155 unique IL diagnostics, 153 of them ours**, and the split is
+the finding: **59 are IL3050**, `RequiresDynamicCode`, a code the trim analyzer never emits because
+trimming does not ask whether code can be *generated*. So more than a third of the AOT picture is
+invisible to the gate this repository already runs, and "trimming is measured" was never evidence
+about AOT.
+
+**The publish did not finish, and the reason is the machine rather than the code.** It failed at the
+native link step with `Platform linker not found`: Native AOT on Windows needs the Desktop
+Development for C++ workload, which this machine does not have. ILCompiler's analysis had already
+run by then, which is why there is a number at all. **Nothing here proves a native binary would
+work**, and nobody should write that it does. `ubuntu-latest` ships clang, so CI could complete the
+link if this is ever worth gating.
+
+By file, ours concentrate exactly where the trim warnings do: `ProjectionRewriter` 26,
+`DynamicValueMapper` 18, `QuerySplitter` 16, `QueryExecutor` 14, `NodeToExpressionTranslator` 13.
+That is the provider's premise again, now with the second half named: the wire carries a type's
+name, the far end resolves it, **and then builds and compiles an expression tree over it**.
+`Expression.Lambda(...).Compile()` and `MakeGenericType` are what a remoting LINQ provider is made
+of, and Native AOT is the one runtime that cannot do either.
+
+**The two counts are not comparable and must not be subtracted.** They come from different samples
+(Blazor client versus console client), different tools (ILLink versus ILCompiler) and different
+unique-keys (`eng/trim-ratchet.sh` keys on code plus declaring member; the AOT tally keys on code
+plus file, line and column). 153 minus 88 is not a number that means anything.
+
+**What the annotation did, and did not do (2026-08-24).** `UseInfoCarrier` now carries
+`[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`, which is what EF Core itself puts on
+`DbContext`'s constructors, checked in `subrepos/efcore` before it was copied. **It did not lower
+the 88, and the expectation that it would was wrong.** Those warnings sit in methods EF reaches
+through its own interfaces, not in anything reachable from `UseInfoCarrier`'s body, and the
+attribute exempts only the annotated method's own body. The ratchet measured 88 before and 88
+after. **What the attribute buys is a consumer being told at their own call site**, which is the
+thing that was missing: before it, a consumer publishing trimmed learned about this provider's
+reflection from EF Core's generic warning or from nothing at all.
+
 ## Two closed investigations
 
 **The runtime culture is pinned to invariant, and that was a ratchet fix rather than a test fix

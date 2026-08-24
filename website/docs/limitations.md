@@ -181,6 +181,7 @@ These are not defects. They follow from where the client sits.
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |
+| Native AOT is not supported: remoting a query means compiling an expression tree at run time. Trimming is separate, and it works. | [Blazor WebAssembly](platforms/blazor-webassembly.md#trimming) |
 
 ## What this page cannot tell you
 
