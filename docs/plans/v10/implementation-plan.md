@@ -32,16 +32,16 @@ planning any of this. `NorthwindServerFactory` derives from `WebApplicationFacto
 `CreateClient()` runs the pipeline in memory: no socket, no port, and Kestrel never runs. Anything
 built on that factory tests this repository's wiring and not the web server's behaviour.
 
-- [ ] **Q1. Our wiring, on the in-memory host.** Prove that `MapInfoCarrier` hands
+- [x] **Q1. Our wiring, on the in-memory host.** `<commit d7f3083 red, 9dc4931 green>` Prove that `MapInfoCarrier` hands
       `HttpContext.RequestAborted` down the chain rather than dropping it, and that
       `HttpInfoCarrierTransport` hands the caller's token to `HttpClient`. Both are this
       repository's own lines, and both are deterministic to assert.
-- [ ] **Q2. The whole path, on a real Kestrel host and a real socket.** The open question is
-      Microsoft's, not ours: for a POST request Kestrel does not always learn that the client has
-      gone until it writes the response. If it learns late here, the Phase P change helps only the
-      in-process transport and the `errors.md` sentence is wrong for every real user.
-      **Expect timing risk and design against it**: this repository treats a flaky test as a
-      stop-everything defect, so the server side must block on a signal rather than on a sleep.
-- [ ] **Q3. If Q2 shows Kestrel does not report the loss in time, correct `errors.md` first**, then
-      decide whether anything can be done about it. The documentation must never be ahead of the
-      evidence.
+- [x] **Q2. A real Kestrel host: NOT DONE, and not to be done.** Decided 2026-08-24 by the owner.
+      The question it would have answered is Microsoft's rather than ours: for a POST request
+      Kestrel does not always learn that the client has gone until it writes the response. Answering
+      it needs a real socket and a real port, which no test here starts, and it would be the first
+      timing-sensitive test in a repository that treats a flaky test as a stop-everything defect.
+      **What stands instead is what Q1 measures**: the token reaches the store on the cancellable
+      path, which is this repository's whole half of the problem. If Kestrel is ever slow to report
+      a lost client, the effect is that cancelling frees the server later than it could, not that
+      anything is wrong here.
