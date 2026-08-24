@@ -282,7 +282,7 @@ new wire vocabulary — is retained.
 
 **Context.** `from c in cs from o in c.Orders … select c` contains no anonymous type that the
 caller wrote; the C# compiler inserts a *transparent identifier* so later clauses can still see
-`c`. [ADR-010](#adr-010) treats an anonymous type as a type boundary, which is right for a
+`c`. [ADR-010](#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01) treats an anonymous type as a type boundary, which is right for a
 projection the caller asked for and wrong for compiler plumbing: every operator above the
 identifier falls to the client, taking 36 of the 111 remaining failures with it — 16 of them
 wrong answers rather than refusals, because a left join's `DefaultIfEmpty()` yields `null` and
@@ -352,7 +352,7 @@ A claimed value travels as **one wire primitive** — a `string` or a `byte[]`, 
 **Rationale.** Declining is what makes this safe to add: with no mapper registered the two hooks
 are loops that do not run, so nothing that does not opt in can change. Carrying the original type
 on the node is what makes the reverse side able to find the mapper at all, and it keeps
-[ADR-008](#adr-008) constraint 2 intact — the type named is a mapped property type, which
+[ADR-008](#adr-008-serializer-design-rlinqaqua-patterns-ef-metadata-driven-locked-2026-07-22-recorded-2026-08-01) constraint 2 intact — the type named is a mapped property type, which
 `TypeAllowlist.ForModel` already admits, so no allowlist widening is implied and none was made.
 **No wire-format change**: this adds no message, no node kind and no field.
 

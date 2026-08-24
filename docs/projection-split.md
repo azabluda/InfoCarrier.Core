@@ -1,7 +1,7 @@
 # Projection split — design spec (milestone M2)
 
 Status: **design approved 2026-08-01**, implementation not started.
-Authority for requirements §3. Recorded as [ADR-010](decisions.md#adr-010).
+Authority for requirements §3. Recorded as [ADR-010](decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01).
 
 Companion docs: [`result-wire-format.md`](result-wire-format.md) (how rows travel),
 [`expression-serialization.md`](expression-serialization.md) (how trees travel),

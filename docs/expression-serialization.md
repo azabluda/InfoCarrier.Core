@@ -1,6 +1,6 @@
 # Expression Serialization — Research & Design
 
-Status: **PRE-IMPLEMENTATION (research in progress)** · Decision frame: [ADR-001](decisions.md#adr-001--serialization-engine-greenfield-spec-only---locked-2026-07-19) (greenfield, spec-only — LOCKED), [ADR-008](decisions.md) (design direction — PROVISIONAL).
+Status: **PRE-IMPLEMENTATION (research in progress)** · Decision frame: [ADR-001](decisions.md#adr-001-serialization-engine-greenfield-spec-only-locked-2026-07-19) (greenfield, spec-only — LOCKED), [ADR-008](decisions.md) (design direction — PROVISIONAL).
 
 This document is the specification for how InfoCarrier.Core v2 serializes
 `System.Linq.Expressions.Expression` trees for the wire. It records (a) what we learned

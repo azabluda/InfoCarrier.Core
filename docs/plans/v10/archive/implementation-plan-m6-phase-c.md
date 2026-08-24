@@ -1,10 +1,10 @@
 ﻿# Implementation Plan — M2: Projection split
 
-Status: **IN PROGRESS** · Milestone [M2](../roadmap.md#m2--projection-split-requirements-3)
+Status: **IN PROGRESS** · Milestone [M2](../roadmap.md#m2-projection-split-requirements-3-complete)
 
 **Scope of this doc:** the current milestone only. Milestone-level scope belongs in
 [`roadmap.md`](../roadmap.md), not here. Design authority for this milestone is
-[`projection-split.md`](../../../projection-split.md) ([ADR-010](../../../decisions.md#adr-010)); read it before
+[`projection-split.md`](../../../projection-split.md) ([ADR-010](../../../decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01)); read it before
 touching any phase below.
 
 Previous plans: [`archive/2026-08-m1-query-correctness-plan.md`](2026-08-m1-query-correctness-plan.md)
@@ -8543,7 +8543,7 @@ has to preserve what each operator expects of its source, and a transparent iden
 ## Phase X — transparent identifiers ([`transparent-identifiers.md`](../../../transparent-identifiers.md), ADR-011)
 
 - [x] **X0.** Design session: read EF's `TryFlattenGroupJoinSelectMany` at source, wrote the
-      spec, recorded [ADR-011](../../../decisions.md#adr-011). ✅ `db5dcdd`
+      spec, recorded [ADR-011](../../../decisions.md#adr-011-transparent-identifiers-are-re-carried-not-reassembled-locked-2026-08-02). ✅ `db5dcdd`
 
 - [x] **X1.** Mirror `TryFlattenGroupJoinSelectMany` on the client, before the boundary analysis.
       **First attempt measured `111 → 111` and was reverted. The revert was a mistake** — see X6,

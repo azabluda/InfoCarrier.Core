@@ -11,6 +11,12 @@ resolved, and no assembly is loaded to satisfy a payload. The allowlist excludes
 would turn a resolved `Type` back into a call, the classic route from "a tree can name a type" to "a
 tree can invoke anything".
 
+**The review behind that is published**, including the weaknesses accepted rather than solved and
+the reasoning for each: [security-review.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md).
+It is written for someone auditing this, not for someone adopting it. Read §2 first: the bound is a
+conjunction across several clauses, and the clause-by-clause argument is what makes the claim above
+checkable rather than a promise.
+
 There is a size bound too, applied before parsing begins and defaulting to 64 MiB on requests
 towards the server. A flat array of a hundred million constants is only three levels deep, so a
 depth limit alone does not bound the memory a parse costs. See
@@ -51,24 +57,10 @@ else's machine.
 that travels in the expression tree, and the server honours it. Query filters also do not apply to
 writes, so a client can submit a `SaveChanges` for a row whose key belongs to another tenant.
 
-**For writes**, the check a client cannot name is the server's `SaveChanges` override or an EF
-interceptor, and you read the values you check from the store rather than from the entity the client
-sent.
-
-**For reads** there are two, and you will want both. The coarse one is the shared model: a client
-composes over the entity types you put in it and nothing else, so a type that must never leave the
-server belongs on a context only the server has. The fine one is that the server executes the
-client's tree through its own query provider, so an EF query interceptor registered on the server
-sees that tree and can rewrite it, including re-applying a predicate the client stripped. That is
-the hook a row-level rule belongs in, and it is yours to write and yours to test.
-
-```csharp
-protected override void OnModelCreating(ModelBuilder modelBuilder)
-{
-    modelBuilder.Entity<Order>().HasQueryFilter(o => o.TenantId == _tenant.Current);
-    modelBuilder.Entity<Document>().HasQueryFilter(d => d.OwnerId == _user.Id);
-}
-```
+A rule a caller must not be able to switch off goes where the caller cannot reach: a query
+interceptor on the server for reads, and the server's `SaveChanges` override or an EF interceptor
+for writes. **[Multi-tenancy](multi-tenancy.md) is the worked version**, including the scope trap
+that makes a correct-looking tenant filter read the wrong tenant.
 
 Everything a client submits is replayed through that override or interceptor, and the client cannot
 name either one.

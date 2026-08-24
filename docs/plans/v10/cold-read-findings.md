@@ -68,21 +68,31 @@ verified.** Before building it, check: what an unnamed (default) filter does und
 the server learns which filters the client's model declares without trusting the client to say, and
 whether `ExecuteUpdate` and `ExecuteDelete` honour filters at all.
 
-### One line that might close it, from the verification read
+### Can the allowlist just refuse the marker? Checked, and no
 
-**Can the serializer's method allowlist simply exclude `IgnoreQueryFilters`?** The reader put it
-best: "If it can, the whole problem becomes a configuration line." `security.md` already says the
-allowlist governs "the methods it may call", and `QuerySplitter.QueryMarkers` is a fixed set of
-seven names, so refusing one of them may be a smaller change than any of the three strategies
-above. **Unverified.** Check what the splitter does with a marker the allowlist refuses: whether
-the query fails cleanly, or degrades to the shape the `QuerySplitter.cs:103` comment describes,
-where the marker stays on the client and does nothing.
+A reader hoped so: "If it can, the whole problem becomes a configuration line." It cannot, and the
+reason is worth writing down because it shapes strategy (c).
 
-If it works, it is also the wrong default on its own. Refusing the marker outright is strategy (b),
-which breaks the administrative screen that legitimately wants soft-deleted rows. It would be the
-mechanism under strategy (c), not a substitute for deciding.
+The method gate in `NodeToExpressionTranslator.Admit` is **public-by-default**: a payload may name
+any *public* method on a type the type allowlist admits, and
+`TypeAllowlist` admits `EntityFrameworkQueryableExtensions` (line 60). `AllowedNonPublicMethods`
+beside it is an **allow** list for two *non-public* methods (`NotQuiteInclude`, `ExecuteUpdate`),
+not a deny list. `IgnoreQueryFilters` is public, so nothing today can refuse it by name.
 
-### The rest of the boundary, unexamined
+So refusing it needs a new deny set consulted in `Admit`. Small, but a mechanism rather than a
+setting. Two things in its favour when it is built:
+
+- **The failure is clean.** `Admit` throws `InvalidOperationException` naming the method, on the
+  server, at deserialization, before anything executes. A refused marker faults the request rather
+  than silently degrading.
+- **The gate is on the server**, where it belongs. `QuerySplitter.QueryMarkers` is the client half
+  and a hostile client does not run it.
+
+For strategy (c) a flat deny set is still not enough: the server has to decide *per filter* whether
+the client's own model declares it, and the deny gate sees a method name and its arguments, not the
+model. The named-filter overload carries filter names as arguments, which is the thread to pull.
+
+### The rest of the boundary, unexamined### The rest of the boundary, unexamined
 
 Raised by the same two readers, not yet checked in source:
 

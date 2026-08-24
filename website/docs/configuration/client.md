@@ -133,4 +133,4 @@ caches the service provider for you.
 They work, and they run on the client, so a filter defined only on the client is a convenience.
 The server's own filters decide what comes back, and they are a default rather than a boundary,
 because `IgnoreQueryFilters()` travels in the expression tree and the server honours it. See
-[Where the checks go](server.md#where-the-checks-go).
+[Where the checks go](server.md#where-the-checks-go) and [Multi-tenancy](../multi-tenancy.md).

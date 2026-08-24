@@ -85,10 +85,10 @@ Core operator, it travels in the expression tree like any other, and the server 
 filters also do not apply to writes, so a client can submit a `SaveChanges` for a row whose key
 belongs to someone else.
 
-So put a write check in the server's `SaveChanges` override or an EF interceptor, reading the values
-you check from the store rather than from the entity the client sent. For reads, what a client can
-ask for is decided by which entity types are in the shared model. [Security](../security.md) has
-both in full.
+So put a write check in the server's `SaveChanges` override or an EF interceptor, and a read check
+in a query interceptor, which sees the client's tree before EF translates it.
+[Multi-tenancy](../multi-tenancy.md) works both through, and [Security](../security.md) has the
+threat model.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
