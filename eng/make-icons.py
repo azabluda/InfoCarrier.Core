@@ -33,13 +33,14 @@ WHAT SURVIVED THE CUT, AND WHY EACH ONE IS LOAD-BEARING:
                        nothing on this list above it is fetched more than once, if ever.
 
   No SVG: the artwork is raster, lit and bevelled, and a traced approximation would be a different
-  mark. No maskable variant: Android's maskable safe zone is the middle 80%, and a hexagon padded
-  to survive that crop is small enough in the tile to look like a mistake.
+  mark. No maskable variant: Android's maskable safe zone is the middle 80%, and this mark is
+  already a rounded tile whose lit rim is the point of it -- padded to survive that crop it sits
+  small enough inside Android's own tile to look like a mistake.
 
 TRANSPARENCY IS KEPT EVERYWHERE, no invented background. iOS composites a transparent home-screen
 icon on black, which the artwork's near-black rim and neon edge are already lit for -- it reads as
 a tile. A white or navy plate was tried and both were worse: white shrinks the mark to fit its
-padding, navy sits close enough to the hexagon's own fill to flatten it.
+padding, navy sits close enough to the mark's own fill to flatten it.
 
 AND THE SOURCE ARRIVES AS ARTWORK, with a real alpha channel, which is why this script is a fit and
 a resize rather than a flood fill. Earlier sources were browser screenshots -- square, opaque, white
@@ -75,6 +76,19 @@ TARGETS = [
 ICO = os.path.join(WEB, "favicon.ico")
 ICO_SIZES = [16, 32, 48]
 
+# The alpha below which a pixel is empty space rather than part of the mark.
+#
+# `Image.getbbox()` ALONE IS NOT ENOUGH, and it fails silently. It trims only pixels that are zero
+# in every band, so one row of alpha=1 -- invisible over any background, and exactly what a soft
+# outer glow fades into -- holds the box open. A source arrived carrying that haze 55px past the
+# mark on one side and 8px on another, and its icons came out both smaller than the canvas allows
+# and visibly off-centre, because the padding left behind was uneven.
+#
+# 2 IS NOT A TUNED NUMBER, and that is the point: on that source the box moves at most 3px for any
+# floor from 2 all the way to 128. Nothing between the haze and the mark is being cut, so the soft
+# edge comes along, which is what keeps the glow on the rendered icon.
+ALPHA_FLOOR = 2
+
 
 def render(mark, canvas, margin):
     """Fit the mark inside `canvas`, centred, leaving `margin` px on the tightest axis."""
@@ -91,9 +105,10 @@ def render(mark, canvas, margin):
 def main():
     src = Image.open(SRC).convert("RGBA")
 
-    # Trim to what is actually opaque, so every margin below is measured from the mark rather than
+    # Trim to what is actually visible, so every margin below is measured from the mark rather than
     # from however much transparent space the source happens to carry around it.
-    mark = src.crop(src.getbbox())
+    visible = src.getchannel("A").point(lambda a: 255 if a >= ALPHA_FLOOR else 0)
+    mark = src.crop(visible.getbbox())
 
     os.makedirs(WEB, exist_ok=True)
 
@@ -115,7 +130,8 @@ def main():
     assert written == sorted(ICO_SIZES), f"{ICO} got frames {written}, wanted {sorted(ICO_SIZES)}"
     print(f"{ICO:48s} {'/'.join(str(n) for n in written)}  {os.path.getsize(ICO)} bytes")
 
-    print(f"\nall from {SRC}  {src.size[0]}x{src.size[1]}, mark {mark.width}x{mark.height}")
+    print(f"\nall from {SRC}  {src.size[0]}x{src.size[1]}, mark {mark.width}x{mark.height}"
+          f" (trimmed at alpha {ALPHA_FLOOR})")
 
 
 if __name__ == "__main__":
