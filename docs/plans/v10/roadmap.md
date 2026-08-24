@@ -384,7 +384,20 @@ Three separable pieces, and only the first can be done outside the library:
   (requirements §4.4, wire-protocol W4) is deferred past this generation, not withdrawn.
   **Consequence for documentation:** neither may be named as a plan in any user-facing document
   (`docs/doc-style.md` rule 6), and neither is the reason the version says `-preview`.
-- Compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5).
+- ~~Compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5)~~ **OUT OF
+  SCOPE FOR v10, 2026-08-24, by the owner's decision.** It does not ship in the 10.x line.
+  **It was never a correctness item, and that is why it can move.** The client already avoids
+  repeating EF's compile work: EF's own `ICompiledQueryCache` caches what `IDatabase.CompileQuery`
+  returns, which is why `InfoCarrierDatabase` resolves the client per execution rather than
+  capturing it (`InfoCarrierDatabase.cs:93`). What repeats without this item is the serialize,
+  deserialize and translate work on each request, and that repetition gives the same answer every
+  time. The suite measures answers, so it cannot see this at all.
+  ADR-008 constraint 6 (canonical, deterministic serialization) stays as written and stays
+  unexercised; nothing in the code contradicts it. Q10, the server-side delegate cache, moves with
+  it, for the same reason and by the same decision.
+  **Consequence for documentation:** it may not be named as a plan in any user-facing document
+  (`docs/doc-style.md` rule 6). No user-facing document mentions caching today, so nothing needs
+  removing.
 - AOT/trimming verification (requirements §4.5).
 - ~~Sample apps~~ **DONE** (Phases H/I) — a Blazor WebAssembly client and a console client, both
   against a SQLite-backed ASP.NET Core server.
@@ -536,14 +549,46 @@ From wire-protocol §5 and research-findings §10 — resolved in the milestone 
 | W2 store-generated value keying (resolved §9, needs implementing) | M3 |
 | W3 transaction token | M4 |
 | W5 exception fidelity · W6 cancellation | M5 |
-| Q5 canonical form + compiled-query cache · Q10 server delegate cache | M8 |
+| Q5 canonical form + compiled-query cache · Q10 server delegate cache. **Out of scope for v10, 2026-08-24**, owner's decision; it is a latency item and never a correctness one (M8 above) | post-v10 |
 | Q6/W4 streaming vs identity resolution | M8 |
 | Server-held transaction lifetime: idle timeout, token ownership, multi-instance (see M8 above) | M8 |
 | ~~Q7 spatial Z/M via WKT~~ ✅ **done 2026-08-10** (C15/C17/C18, landed in M6) | ~~M7~~ |
-| **`IgnoreQueryFilters` crosses the wire and the server honours it**, so a global query filter is not an authorization boundary. Three strategies, one preferred, in [`cold-read-findings.md`](cold-read-findings.md) §1 | post-v10 |
+| **`IgnoreQueryFilters` crosses the wire and the server honours it**, so a global query filter is not an authorization boundary. Three strategies, one preferred, in [`cold-read-findings.md`](cold-read-findings.md) §1. **Deferred deliberately 2026-08-24**, owner's decision: v10 ships with this gap open, and the reasoning is below | post-v10 |
 | **Idempotency for a retried unit of work.** A transport failure leaves the outcome unknown and there is no request id to ask with. Same file, §2 | post-v10 |
 | **Nothing observable at runtime**: no logger category, no round-trip counter. Same file, §2 | post-v10 |
 | **Client/server version-skew policy.** The envelope carries a `ProtocolVersion`; nothing states what a fleet on mixed builds should expect. Same file, §2 | post-v10 |
+
+### `IgnoreQueryFilters`: why v10 ships with it open
+
+**Decided 2026-08-24 by the owner. v10 ships without a query filter that a hostile client cannot
+switch off.** Recording the reasoning here because a security-relevant gap that is deferred without
+one gets re-litigated, or worse, quietly forgotten.
+
+**It is deferred, not unmitigated.** The documented control is a query interceptor on the server,
+which re-applies the tenant predicate whatever the incoming tree says, and a client cannot reach it.
+Beside it sits the coarse control of the shared model: a type that must never leave the server goes
+on a context only the server has. `multi-tenancy.md` works both through and `security.md` carries the
+threat model, so a reader who follows the pages gets a boundary that holds. What v10 does not give is
+a boundary that holds for a reader who *ignores* the pages and reaches for a query filter, which is
+the natural thing to reach for.
+
+**The deferral has a scope, and it is only the honest-client case that is safe.** Two operations
+are affected, not one: `IgnoreQueryFilters()` disables the filter for reads, and it disables it for
+`ExecuteUpdate` and `ExecuteDelete` too, because those translate from a query
+(cold-read-findings §1). A `SaveChanges` never sees a filter at all. So the gap is read and bulk
+write, and the interceptor covers all three.
+
+**What deciding it later costs, checked before deferring.** Strategy (c), the preferred one, refuses
+an ignore-request for a filter the server added on its own while allowing one the client's model also
+declares. That needs a deny gate in `NodeToExpressionTranslator.Admit` and a per-filter decision the
+gate cannot make today, because it sees a method name and its arguments rather than the model. None
+of that is a wire-format change, and the envelope does not have to grow a field. So the decision does
+not get more expensive by waiting, which is the property that makes deferring it reasonable rather
+than convenient.
+
+**Two things that must not drift while it waits.** No user-facing document may claim a query filter
+is an authorization boundary, and none does today. And no document may name the fix as a plan
+(`docs/doc-style.md` rule 6).
 
 **[`cold-read-findings.md`](cold-read-findings.md) is the full record**, from seven readers who were
 each given a slice of the user-facing documentation, a persona and a task, and told to read only
