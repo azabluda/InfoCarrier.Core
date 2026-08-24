@@ -197,10 +197,22 @@ checking it — the name has to be resolved to know what it denotes — but noth
 until it clears the list. This closes the remote-code-execution vector: the deserializer can no
 longer be told to instantiate an arbitrary type by name.
 
-The *method* allowlist half of constraint 2 remains open: `ResolveMethod` binds any method on an
-allowed declaring type. Narrower than before (the declaring type must now be allowed) but not
-the "Queryable / Enumerable / `EF.Functions` / model-bound members" restriction this ADR calls
-for. Still required before a network transport ships (roadmap M5).
+**The *method* allowlist half of constraint 2 closed in C30 (2026-08-10), and this paragraph said
+otherwise until 2026-08-24.** `NodeToExpressionTranslator.Admit` now requires two things at once:
+the declaring type must clear `TypeAllowlist`, and the method must be **public**, or one of the two
+non-public methods named in `AllowedNonPublicMethods` (`NotQuiteInclude`, `ExecuteUpdate`).
+
+**That is not literally the list this ADR asked for**, and saying so is the point of recording it
+here. The ADR wrote "Queryable / Enumerable / `EF.Functions` / model-bound members"; what shipped is
+public-by-default on an allowed declaring type. The decision is unchanged and this is not a
+supersession: constraint 2 asked for a default-deny method gate and there is one. What a future
+reader needs to know is its exact shape, because it decides what is reachable. `IgnoreQueryFilters`
+is public on an allowed type, so nothing today can refuse it by name, which is the mechanism behind
+the open design question in
+[`plans/v10/cold-read-findings.md`](plans/v10/cold-read-findings.md) §1.
+
+The network transport shipped in M8 with this gate in place, which is what the old wording,
+"still required before a network transport ships", was asking for.
 
 > **What enabling it revealed.** Failures went 32 → 1,421 of 4,247. **1,197 are anonymous or
 > other compiler-generated projection types, and ~108 more are client-only DTOs** — together
@@ -210,7 +222,13 @@ for. Still required before a network transport ships (roadmap M5).
 > This is the same class of self-deception recorded against G4e, at roughly eighty times the
 > scale.
 
-Constraint 6 (canonical form) is not yet exercised — no compiled-query cache exists.
+Constraint 6 (canonical form) is not exercised: no compiled-query cache exists, and
+**building one is out of scope for v10** (2026-08-24, owner's decision; `plans/v10/roadmap.md`, M8
+exit criteria). The constraint itself stands unchanged and nothing in the code contradicts it. It
+was never a correctness item, which is why it could be deferred without touching this ADR's
+substance: EF's own `ICompiledQueryCache` already caches what the client's `CompileQuery` returns,
+so what repeats per request is serialization and translation, and that returns the same answer every
+time.
 
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 

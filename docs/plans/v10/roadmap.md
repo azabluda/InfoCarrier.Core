@@ -442,6 +442,33 @@ Three separable pieces, and only the first can be done outside the library:
   also broken, see [`versioning.md`](../../versioning.md)), and **every code push publishes to GitHub
   Packages** as an internal feed. Full account in [`versioning.md`](../../versioning.md).
 
+**Where M8 stands as a set, read 2026-08-24.** Every one of the six exit criteria above now has a
+resolution rather than a status: three done (HTTP transport, sample apps, NuGet packaging and
+`release.yml`), two out of scope for v10 by the owner's decision (gRPC and streaming; the
+compiled-query cache), and §4.5 answered in two halves (trimming verified, Native AOT measured and
+not supported). **Nothing on that list is waiting on work.**
+
+Two things are open and neither is an M8 exit criterion, which is why reading the list as a set was
+worth doing:
+
+- **The server-held transaction lifetime**, described at the top of this section. Deprioritized
+  2026-08-16 because the pattern it protects is not the recommended one, and it is a hardening item
+  rather than a blocker. It is stated for consumers in `guide/transactions.md`.
+- **M5's remaining criterion: the remote cancel signal** (W6). The cooperative half shipped in C66;
+  a client that abandons a request cannot tell the server to stop working on it. **This belongs to
+  M5 and not to M8**, and the header line of this document has said "M5 has one open criterion"
+  since before M8 began.
+
+**Whether M8 closes is the owner's call and this note does not make it.** What it records is that
+the exit criteria no longer decide the answer.
+
+**Native AOT is deliberately not gated in CI** (2026-08-24, owner's decision). `ubuntu-latest` ships
+clang, so a `PublishAot` job could complete the native link that the local measurement could not,
+and the answer would be a real one. It is not worth a job: Native AOT is not a supported
+configuration, so nothing would act on the result, and a gate nobody acts on is a gate that goes
+stale and then gets believed. The measurement in [`findings.md`](findings.md) is the record, and it
+is dated.
+
 ### M9 — Provider neutrality and store coverage — **CLOSED 2026-08-17**
 
 **Opened 2026-08-16, closed 2026-08-17.** M8's remaining exit criteria stay open; this milestone

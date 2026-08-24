@@ -66,8 +66,9 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     /// <summary>
     ///     Defaults <see cref="InfoCarrierEventId.TransactionIgnoredWarning" /> to
     ///     <see cref="WarningBehavior.Throw" />, as EF Core's InMemory provider does for its own.
-    ///     The provider ignores transactions until milestone M4, and a silent ignore is worse than
-    ///     a loud one; <c>TryWithExplicit</c> leaves an application's own setting alone.
+    ///     Transactions are implemented, so the warning fires only where one is genuinely ignored,
+    ///     and a silent ignore is worse than a loud one; <c>TryWithExplicit</c> leaves an
+    ///     application's own setting alone.
     /// </summary>
     private static void ConfigureWarnings(DbContextOptionsBuilder optionsBuilder)
     {
