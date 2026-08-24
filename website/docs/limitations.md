@@ -9,7 +9,7 @@ It is complete for what the suite covers: if the suite has a scenario and it is 
 it passes.
 
 ```
-Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
+Total tests: 22662, Passed: 22476, Failed: 9, Skipped: 177
 ```
 
 Measured against `10.0.0-preview.1`. The 177 skips are EF Core's own, tests EF itself skips for the
