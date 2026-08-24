@@ -371,7 +371,12 @@ Three separable pieces, and only the first can be done outside the library:
 | Surviving more than one server instance | **library / deployment** | The registry is process-local, so a token only resolves on the instance that created it — horizontal scaling needs affinity or a shared registry. The sample is single-instance and does not hit this. |
 
 **Exit criteria**
-- HTTP transport binding (only in-process existed when this was written).
+- ~~HTTP transport binding~~ **DONE (M8-3, M8-4, promoted to the products in Phase K)** — only
+  in-process existed when this was written. `HttpInfoCarrierTransport` is the client half, in
+  `InfoCarrier.Core`; `MapInfoCarrier` is the server half, in `InfoCarrier.Core.AspNetCore`.
+  Both ship in the two packages, so nothing is left in `samples/`. **The Phase I note that said
+  this criterion "remains formally open" was true when it was written and is stale:** it
+  described the two files while they still lived beside the sample.
 - ~~gRPC transport binding~~ and ~~streaming results as `IAsyncEnumerable<T>`~~ **OUT OF SCOPE FOR
   v10, 2026-08-23, by the owner's decision.** Neither ships in the 10.x line. `IInfoCarrierTransport`
   is one method, so a gRPC binding stays a consumer-side class; the server continues to buffer a

@@ -82,9 +82,8 @@ transaction. [Transactions](../guide/transactions.md) has that and what an aband
 
 A global query filter on the server's model applies to every query by default, which is what you
 want for your own honest client. **It is not a control.** `IgnoreQueryFilters()` is an ordinary EF
-Core operator: it travels in the expression tree like any other, and the server honours it. Query
-filters also do not apply to writes, so a client can submit a `SaveChanges` for a row whose key
-belongs to someone else.
+Core operator: it travels in the expression tree like any other, and the server honours it. No query
+filter reaches `SaveChanges`, so a client can submit a row whose key belongs to someone else.
 
 So put a write check in the server's `SaveChanges` override or an EF interceptor, and a read check
 in a query interceptor, which sees the client's tree before EF translates it.

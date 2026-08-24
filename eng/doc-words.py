@@ -44,6 +44,14 @@ BUDGET = {
     # that is restructured, not before. See docs/plans/v10/cold-read-findings.md.
     "website/docs/security.md": 750,
     "website/docs/guide/errors.md": 750,
+
+    # Added to the 700 tier 2026-08-24. Same tier rule as the four above: it covers a whole
+    # subject rather than one task (reads, writes, resolving the tenant on the server, and what
+    # to test). It went over on the day `ExecuteUpdate` and `ExecuteDelete` were confirmed to
+    # honour query filters, which turned one clause about writes into two paragraphs because the
+    # two kinds of write now follow different rules. The signposting sentence the addition
+    # introduced was cut first, which is the order doc-style.md fixes; that recovered 10 of 45.
+    "website/docs/multi-tenancy.md": 700,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

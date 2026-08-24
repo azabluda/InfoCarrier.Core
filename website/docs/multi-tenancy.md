@@ -2,7 +2,7 @@
 
 The question for a multi-tenant server is what stops a caller reading another tenant's rows. A
 global query filter does not, on its own: `IgnoreQueryFilters()` travels in the expression tree and
-the server honours it, and filters never apply to writes. [Security](security.md) has that
+the server honours it, and no filter reaches `SaveChanges`. [Security](security.md) has that
 reasoning; this page is what to do instead.
 
 Keep the filters. They stop your own client leaking by accident and keep tenant predicates out of
@@ -24,10 +24,14 @@ predicate there, whatever the incoming tree says. The client cannot reach it.
 
 ## Writes
 
-A client can submit a `SaveChanges` for a row whose key belongs to another tenant, and no filter
-stands in the way. The check goes in the server's `SaveChanges` override or an EF interceptor, and
-a client can name neither. `ExecuteDelete` and `ExecuteUpdate` have no separate server path, so a
-`SaveChanges` override does not run for them; the query interceptor above guards those.
+`SaveChanges` is not a query, so no filter stands in its way and a client can submit a row whose key
+belongs to another tenant. The check goes in the server's `SaveChanges` override or an EF
+interceptor, and a client can name neither.
+
+`ExecuteDelete` and `ExecuteUpdate` translate from a query, so a filter does narrow the rows they
+touch. That is not a boundary either, because `IgnoreQueryFilters()` switches it off for them as it
+does for a read. Neither has a separate server path, so a `SaveChanges` override never runs for
+them, and the query interceptor above is what guards them.
 
 **Read the values you check from the store, not from the entity the client sent.** A client controls
 the original values in its own payload, so comparing the incoming row's tenant against the incoming

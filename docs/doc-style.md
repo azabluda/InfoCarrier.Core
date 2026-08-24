@@ -31,8 +31,15 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
 | A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| The deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `security`, `guide/errors` |
-| Whole site | 10,000 | 9,473 today across 19 pages, from 9,578 across 18 |
+| The deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy` |
+| Two pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24 |
+| Whole site | not gated | 11,466 today across 23 files |
+
+The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own
+budget and nothing against the total, so a site-wide number here can only ever be a record of where
+the set stood the last time somebody measured it. It read 9,473 across 19 pages when this table was
+written and now reads 11,466 across 23, and the growth is four new pages plus the corrections the
+cold reads asked for.
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in

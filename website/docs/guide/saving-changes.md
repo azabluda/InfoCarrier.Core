@@ -19,7 +19,8 @@ int written = await context.SaveChangesAsync();   // one round trip, returns 2
 ```
 
 One edit and one insert, one request. Batch your work into a unit rather than saving after every
-change.
+change. Work that cannot fit in one save needs a transaction, which holds the several requests on
+one server-side connection. See [Transactions](transactions.md).
 
 ## Store-generated values come back
 
@@ -120,4 +121,13 @@ not expose.
 
 A failure on the server, such as a constraint violation or a validation exception in an
 interceptor, arrives on the client as the exception EF would have thrown locally, with its message
-and inner chain preserved. See [Handling errors](errors.md).
+and inner chain preserved.
+
+A failure of the trip is a different case, and it is the one that costs data. `SaveChanges` is a
+single request, so a transport failure leaves the outcome unknown rather than failed: the request
+may have died on the way out, or the answer on the way back. Retrying it can write twice. If the
+save was one of several inside a transaction, that transaction is still open on the server and only
+the instance that began it can end it.
+
+[Handling errors](errors.md) has what is safe to retry and what is not, and
+[Transactions](transactions.md) has what an abandoned transaction costs.

@@ -65,8 +65,9 @@ from shared source, so a filter present on both is one the client declared, and 
 only on the server is one the server added on its own. The server can therefore honour an
 ignore-request for a named filter its client-visible model also has, and refuse it otherwise. **Not
 verified.** Before building it, check: what an unnamed (default) filter does under this rule, how
-the server learns which filters the client's model declares without trusting the client to say, and
-whether `ExecuteUpdate` and `ExecuteDelete` honour filters at all.
+the server learns which filters the client's model declares without trusting the client to say.
+(The third item on that list, whether `ExecuteUpdate` and `ExecuteDelete` honour filters at all, is
+answered below: they do.)
 
 ### Can the allowlist just refuse the marker? Checked, and no
 
@@ -100,12 +101,26 @@ Raised by the same two readers, not yet checked in source:
   another tenant's key. This is ordinary EF behaviour, and the pages pointed at query filters as
   the tenancy answer without saying the write path is a separate problem. `server.md` now says so;
   what the server should *do* about it is undecided.
-- **Do `ExecuteUpdate` and `ExecuteDelete` honour query filters?** Still unchecked, and it is an EF
-  Core semantics question rather than one about this provider. **Do not confuse it with the routing
-  question, which IS settled**: neither has a separate server path here, so both travel in the tree
-  and execute through the server's query provider like a query. That is why the read-side query
-  interceptor is the hook that sees them and a `SaveChanges` override is not, and it is what
-  `multi-tenancy.md` states. Whether EF then applies a filter to them is the open half.
+- **Do `ExecuteUpdate` and `ExecuteDelete` honour query filters? YES, and the answer was already
+  in this repository's own suite.** Closed 2026-08-24. It is an EF Core semantics question, and EF
+  answers it with a spec base: `FiltersInheritanceBulkUpdatesTestBase` runs the same delete and
+  update assertions against a model where `Animal` carries `HasQueryFilter(a => a.CountryId == 1)`,
+  and `InheritanceQueryFixtureBase.GetFilteredExpectedData` narrows the expected rows to match. A
+  provider that skipped the filter would fail every one of them on the row count.
+  **This provider adopts that base** as `FiltersInheritanceBulkUpdatesInfoCarrierTest`
+  (`test/InfoCarrier.Core.FunctionalTests/Sqlite/BulkUpdates/BulkUpdatesInfoCarrierTests.cs`), on
+  Tier B, and it is green: no `BulkUpdates` entry appears in `test/known-failures.txt`.
+  **The routing question was already settled and is a different one**: neither operation has a
+  separate server path here, so both travel in the tree and execute through the server's query
+  provider like a query. That is why the read-side query interceptor is the hook that sees them and
+  a `SaveChanges` override is not, and it is what `multi-tenancy.md` states.
+  **The consequence for tenancy is the uncomfortable half.** Because a filter reaches these
+  operations through the query pipeline, `IgnoreQueryFilters()` switches it off there too, and that
+  marker travels (§1 above). So `IgnoreQueryFilters().ExecuteDelete()` is the write-side version of
+  the read-side hole, and the same server-side interceptor is the same answer.
+  **The finding under the finding: a question filed as unchecked EF semantics was answered by a
+  test this repository already runs.** The cold read could not know that, but the standing rule
+  applies unchanged: grep the suite before calling something unverified.
 - **What else in `QueryMarkers` weakens a server-side guarantee?** `IgnoreAutoIncludes` and
   `AsTracking` are in the same set and were not examined.
 - **Is there any CPU, wall-clock, node-count or depth bound on evaluating a submitted tree?**
@@ -153,10 +168,16 @@ build, and two readers raised it independently.
 
 Real, and larger than a correction. Ordered by how often a reader hit them.
 
-1. **What happens when the WAN drops mid-unit-of-work.** Each page handles the failure it owns and
-   hands the cross-cutting case elsewhere: `transactions.md` defers failure to `errors.md`,
-   `errors.md` never mentions an open transaction, `saving-changes.md` never mentions transactions.
-   Nobody owns the most common production event.
+1. **What happens when the WAN drops mid-unit-of-work. CLOSED 2026-08-24.** Each page handled the
+   failure it owned and handed the cross-cutting case elsewhere: `transactions.md` deferred failure
+   to `errors.md`, `errors.md` never mentioned an open transaction, `saving-changes.md` never
+   mentioned transactions. Nobody owned the most common production event.
+   `errors.md` gained the open-transaction case in the round that followed this entry.
+   `saving-changes.md` now carries the other half: that a save which cannot fit in one request needs
+   a transaction, and that a transport failure leaves a save's outcome unknown rather than failed,
+   with both onward links. **The entry above was already half stale when it was read back**, which
+   is the recurring cost of a findings list that outlives the round it describes: check the page
+   before acting on the finding.
 2. **The split rule covers projections only.** `querying.md` explains an untranslatable projection.
    A helper method in a `Where` is what teams actually write, and the page's own hedge, "the
    projection usually tells you which one you are in", concedes the gap and stops.
