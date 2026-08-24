@@ -55,7 +55,7 @@ Clear the mechanical failures masking the real state, and get a CI signal that c
 ### M2 — Projection split (requirements §3) ✅ **complete**
 
 The one genuinely unsolved design problem. **Spec written 2026-08-01:**
-[`projection-split.md`](../../projection-split.md), recorded as [ADR-010](../../decisions.md#adr-010).
+[`projection-split.md`](../../projection-split.md), recorded as [ADR-010](../../decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01).
 
 Two things changed from the research-findings §8 sketch. The boundary is computed **on the
 client**, not the server — the allowlist rejects during deserialization, so the server never gets
@@ -104,7 +104,7 @@ minimal-column payload (W1).
 >   line in the right place took three attempts, costing 235 and then 69 tests respectively when
 >   drawn too widely.
 > - **Transparent identifiers are the remaining ceiling** — now specified in
->   [`transparent-identifiers.md`](../../transparent-identifiers.md) / [ADR-011](../../decisions.md#adr-011). `from … join … select new { a, b }`
+>   [`transparent-identifiers.md`](../../transparent-identifiers.md) / [ADR-011](../../decisions.md#adr-011-transparent-identifiers-are-re-carried-not-reassembled-locked-2026-08-02). `from … join … select new { a, b }`
 >   makes an anonymous type EF handles internally and we must treat as a boundary, so everything
 >   downstream lands on the client. Deferring the reassembly and threading tuple slots through
 >   downstream operators is the next real gain, and is the "operator pushdown" the spec deferred.
@@ -115,7 +115,7 @@ minimal-column payload (W1).
   it unblocks SaveChanges, and until it lands most other failures are masked behind it.
 - ✅ Server-side type allowlist enforced, so client-only types cannot be materialized
   server-side even in-process. Projection tests fail again before they are fixed.
-- ✅ Design spec + ADR — [`projection-split.md`](../../projection-split.md), [ADR-010](../../decisions.md#adr-010).
+- ✅ Design spec + ADR — [`projection-split.md`](../../projection-split.md), [ADR-010](../../decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01).
 - ✅ Boundary detection **in the client**; client applies the residual projection.
   `ServerQueryExecutor` unchanged, as the design's own test required.
 - ✅ Minimal-column payload (wire-protocol W1) — the same mechanism as the boundary rewrite, not
@@ -308,7 +308,7 @@ aborted the test host:
 | Piece | Plan | What it is |
 |---|---|---|
 | Type mapping | C15 | The NetTopologySuite branch every provider carries, in `InfoCarrierTypeMappingSource`. Worth 19 tests by itself: the client — not SpatiaLite — was what could not map a `Point`. |
-| Value-mapper seam | C17, [ADR-012](../../decisions.md#adr-012) | Product API. A geometry travels as one wire primitive instead of being walked reflectively, which is what overflowed the stack in C9. |
+| Value-mapper seam | C17, [ADR-012](../../decisions.md#adr-012-a-value-mapper-seam-for-clr-types-the-wire-cannot-walk-locked-2026-08-09) | Product API. A geometry travels as one wire primitive instead of being walked reflectively, which is what overflowed the stack in C9. |
 | WKT mapper | C18 | **Test-side**, so `InfoCarrier.Core` still does not reference NetTopologySuite — v1's arrangement, kept. |
 
 **Z and M survive because the format is WKT, not v1's GeoJSON**, which carries neither. That is
@@ -535,3 +535,12 @@ From wire-protocol §5 and research-findings §10 — resolved in the milestone 
 | Q6/W4 streaming vs identity resolution | M8 |
 | Server-held transaction lifetime: idle timeout, token ownership, multi-instance (see M8 above) | M8 |
 | ~~Q7 spatial Z/M via WKT~~ ✅ **done 2026-08-10** (C15/C17/C18, landed in M6) | ~~M7~~ |
+| **`IgnoreQueryFilters` crosses the wire and the server honours it**, so a global query filter is not an authorization boundary. Three strategies, one preferred, in [`cold-read-findings.md`](cold-read-findings.md) §1 | post-v10 |
+| **Idempotency for a retried unit of work.** A transport failure leaves the outcome unknown and there is no request id to ask with. Same file, §2 | post-v10 |
+| **Nothing observable at runtime**: no logger category, no round-trip counter. Same file, §2 | post-v10 |
+| **Client/server version-skew policy.** The envelope carries a `ProtocolVersion`; nothing states what a fleet on mixed builds should expect. Same file, §2 | post-v10 |
+
+**[`cold-read-findings.md`](cold-read-findings.md) is the full record**, from seven readers who were
+each given a slice of the user-facing documentation, a persona and a task, and told to read only
+their own files. It separates what was fixed at once, what is product work, what is a
+documentation gap, and four false positives recorded so they are not raised again.

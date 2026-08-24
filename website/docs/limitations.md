@@ -5,12 +5,15 @@ SQL Server, SQLite and InMemory providers run. This page lists every scenario in
 does not behave the way a normal EF Core provider behaves, so you can judge whether any of them
 affects your application.
 
-It is a complete list, not a selection. If a scenario is not here, the suite covers it and it
-passes.
+It is complete for what the suite covers: if the suite has a scenario and it is not on this page,
+it passes.
 
 ```
 Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
 ```
+
+Measured against `10.0.0-preview.1`. The 177 skips are EF Core's own, tests EF itself skips for the
+store behind them, not suppressions added here.
 
 ## Not supported
 
@@ -68,8 +71,8 @@ public class ProductSpec
 modelBuilder.Entity<Product>().ComplexProperty(e => e.Spec);
 ```
 
-Every other complex-type shape is supported, including nested complex types and complex collections,
-as long as the type is a class rather than a dictionary.
+Nested complex types and complex collections are fine, as long as the type is a class rather than a
+dictionary.
 
 The cause is a defect in EF Core's own materializer, reached because this provider rebuilds entities
 on the server from the values sent over the wire. Tracked upstream as
@@ -108,8 +111,8 @@ Products = o.Lines.Select(l => l.ProductName).ToList(),   // then .Distinct() in
 
 ## Differences that are not limitations
 
-These behave correctly. They are listed because the behaviour differs from another EF Core
-provider, and you may notice when porting code or tests.
+These behave correctly, and differ from another EF Core provider only in ways you would notice
+when porting code or tests.
 
 ### Exception message text for an untranslatable query
 
@@ -133,9 +136,9 @@ EF Core provider.
 
 ### Queries this provider answers that other providers reject
 
-Two scenarios in EF's suite assert that a provider rejects the query. This provider answers them
-correctly instead. Nothing needs doing about it, but a test suite you port from another provider
-will expect an exception here.
+Two scenarios in EF's suite assert that a provider rejects the query, and this provider answers
+them correctly instead. A test suite you port from another provider will expect an exception here,
+and LINQ that relies on this leniency will not run unchanged on a relational provider.
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -179,8 +182,12 @@ These are not defects. They follow from where the client sits.
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |
 
-## How this page is maintained
+## What this page cannot tell you
 
 Every entry above corresponds to tests in EF Core's specification suite that run on every build.
 The number of failing tests is gated in continuous integration, so it cannot grow without being
 noticed. When an entry is fixed, or a new one appears, this page changes with it.
+
+What the suite measures bounds what this page can promise. A conformance suite says nothing about
+performance, payload size or concurrency under load, and nothing about the relational APIs this
+provider does not have. A scenario it never exercises is outside what this page claims at the top.

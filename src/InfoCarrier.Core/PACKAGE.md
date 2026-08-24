@@ -4,16 +4,18 @@ navigation fix-up, lazy loading and transactions, but no connection string and n
 Queries and units of work travel to your application server, which executes them with an ordinary
 EF Core provider.
 
-Reference it from your client and your server. The `DbContext` and the entity classes are shared
-source, so both halves build the same model.
+Reference it from your client, and from your server alongside `InfoCarrier.Core.AspNetCore`,
+which depends on it. The `DbContext` and the entity classes are shared source, so both halves build
+the same model.
 
-Use the `--version` option to install a 10.0 preview. Without it, NuGet resolves the newest stable
-release, which belongs to the earlier and incompatible 3.1 line.
+Both halves need .NET 10 and EF Core 10. Name the version when you install:
+`dotnet add package InfoCarrier.Core --version 10.0.0-preview.1`. Without `--version`, NuGet
+resolves the newest stable release, which belongs to the earlier and incompatible 3.1 line.
 
 ## Usage
 
-Call the `UseInfoCarrier` method to choose the InfoCarrier provider for your `DbContext`, passing
-a client built over a transport. For example:
+Build a client over a transport, then call `UseInfoCarrier` to choose the InfoCarrier provider for
+your `DbContext`. For example:
 
 ```csharp
 var serializer = new SystemTextJsonInfoCarrierSerializer();
@@ -22,9 +24,16 @@ var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
 IInfoCarrierClient client = new TransportInfoCarrierClient(
     new HttpInfoCarrierTransport(http, serializer), serializer);
 
-protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    => optionsBuilder.UseInfoCarrier(client);
+DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
+    .UseInfoCarrier(client)
+    .Options;
+
+await using var context = new ShopContext(options);
 ```
+
+`client` is safe to share: it holds no mutable state, so one instance serves every `DbContext` in
+your application. `MapInfoCarrier()` and the transport both default to the route `infocarrier`,
+so the `BaseAddress` above needs no path.
 
 Everything after that is ordinary EF Core. A query is not evaluated on the client: it crosses the
 wire as an expression tree, and the server runs it against its own provider.
@@ -32,15 +41,12 @@ wire as an expression tree, and the server runs it against its own provider.
 [InfoCarrier.Core.AspNetCore](https://www.nuget.org/packages/InfoCarrier.Core.AspNetCore) to your
 server.
 
-## Getting started
-
-See [Your first client and server](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/),
-which builds a working pair in one page.
-
 ## Additional documentation
 
-See the [documentation site](https://azabluda.github.io/InfoCarrier.Core/) for querying, saving
-changes, transactions, custom transports and Blazor WebAssembly. The
+[Your first client and server](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/)
+builds a working pair in one page, and the
+[documentation site](https://azabluda.github.io/InfoCarrier.Core/) covers querying, saving changes,
+transactions, custom transports and Blazor WebAssembly. The
 [limitations page](https://azabluda.github.io/InfoCarrier.Core/limitations/) lists every scenario
 that behaves differently here from another EF Core provider. Read it before you adopt.
 

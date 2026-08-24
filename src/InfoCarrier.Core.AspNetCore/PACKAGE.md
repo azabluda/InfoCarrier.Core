@@ -4,7 +4,9 @@ receives a client's queries and units of work and executes them against a real d
 
 Reference this package from your server only. Your client needs `InfoCarrier.Core` alone.
 
-Use the `--version` option to install a 10.0 preview, and give both packages the same version.
+Both halves need .NET 10 and EF Core 10. Name the version when you install:
+`dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1`, and give both packages
+the same version.
 
 ## Usage
 
@@ -24,9 +26,10 @@ var app = builder.Build();
 app.MapInfoCarrier();
 ```
 
-The endpoint checks the protocol version, dispatches the request, and returns a server-side failure
-to the client as a fault. Your server's own model, query filters and interceptors apply, because it
-is an ordinary EF Core application.
+The endpoint checks the protocol version and answers a mismatch with `400`. A failure in a request
+the server did run comes back inside a normal response, and surfaces on the client as the exception
+EF would have thrown locally. Your server's own model, query filters and interceptors apply, because
+it is an ordinary EF Core application.
 
 Authentication and authorization are yours. No identity travels in the request, so authenticate the
 transport and use query filters on the server's model to decide what a caller may see.

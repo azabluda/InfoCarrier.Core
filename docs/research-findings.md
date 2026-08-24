@@ -176,7 +176,7 @@ projections may.
 
 ## 8. Q-split (A2) — Projection boundary — RESOLVED (deferred execution, not tree surgery)
 
-> ⚠️ **Corrected 2026-08-01 — placement reversed, mechanism retained ([ADR-010](decisions.md#adr-010)).**
+> ⚠️ **Corrected 2026-08-01 — placement reversed, mechanism retained ([ADR-010](decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01)).**
 > The paragraph below says the *server* detects the boundary. Once ADR-008 constraint 2 was
 > implemented (Step L1), that became impossible: rejection happens inside
 > `TypeNodeResolver.Resolve` during *deserialization*, so a tree naming an anonymous type throws

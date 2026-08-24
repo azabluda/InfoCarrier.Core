@@ -12,8 +12,8 @@ public interface IInfoCarrierTransport
 ```
 
 An `InfoCarrierEnvelope` is a serializable record. Get one to the server, get the answer back, and
-you have a transport. HTTP is the default because it is what most applications want, not because
-anything depends on it.
+you have a transport. HTTP is the default because it is what most applications want. Nothing in the
+library depends on it.
 
 ## Decorating the HTTP one
 
@@ -129,6 +129,6 @@ The server half is whatever hosts your protocol, ending in a call to
 counterparts. The library never assumes JSON. Implement it for MessagePack or protobuf if the
 payload size matters to you, and register the same implementation on both halves.
 
-The one thing to keep is the size bound: a deserializer that will parse anything it is handed is
+The one thing to keep is the size limit: a deserializer that will parse anything it is handed is
 what `InfoCarrierPayloadLimits` exists to prevent. See
 [Configuring the server](server.md#payload-limits).

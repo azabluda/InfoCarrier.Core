@@ -27,26 +27,26 @@ The numbers below come from those files, not from memory. Re-measure before chan
 
 | Document | Words | Reference |
 |---|---|---|
-| Package readme (`src/*/PACKAGE.md`) | 250 | EF Core providers: 106 to 160. Npgsql: 230. |
+| Package readme (`src/*/PACKAGE.md`) | 300 | EF Core providers: 106 to 160. Npgsql: 230. |
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
-| A site page that teaches a topic | 550 | The default |
+| A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| `index.md` | 500 | It carries four navigation cards and the install note |
-| The four deepest pages | 600 | `limitations`, `upgrading-from-3-1`, `first-app`, `release-notes`, `blazor-webassembly` |
-| Whole site | 9,000 | 8,878 today across 19 pages, from 9,578 across 18 |
+| The deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `security`, `guide/errors` |
+| Whole site | 10,000 | 9,473 today across 19 pages, from 9,578 across 18 |
 
 **`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
 prose and double it under `wc -w`. The script holds the same budgets as this table. Keep the two in
 step.
 
-The 550 default is a correction. It started at 400, inferred from the package readmes, and several
-pages sat just over 400 after every padding cut had been made. That is a wrong ruler rather than
-long pages: a package readme points at documentation, and a page that teaches a topic with worked
-examples is doing something else. 400 is kept only for `api-surface.md`, which points.
+**These numbers have been recalibrated twice, and the second time is the finding.** They started at
+400, inferred from package readmes. Both times a page went over, the cause was the same: a reader
+with no context wanted a fact the page did not have, and facts cost words. Shaving a sentence per
+page to defend a number nobody chose on evidence is optimising the ruler.
 
-A page over budget is not automatically wrong, but it needs a reason that is about the reader, and
-the reason goes in the script next to the exception.
+The order is the part that survives, and it is not negotiable: **cut the padding a reader named,
+then move the number. Never the reverse.** A budget yields to a missing fact; it never yields to a
+paragraph that could have been shorter.
 
 ## Rules
 
@@ -65,10 +65,15 @@ the reason goes in the script next to the exception.
 4. **Admonition boxes (`!!!`) follow the same test, and at most one per page.** A box that repeats
    the paragraph above it in a coloured frame is decoration.
 
-5. **No design rationale.** Why the package is split, why a dependency was dropped, what a decision
-   cost, what a previous attempt got wrong: none of it belongs in a user-facing document. It goes
-   in `docs/architecture.md` or `docs/decisions.md`. A reader installing a package does not need
-   the repository's history to use it.
+5. **No design rationale about this repository.** What a decision cost, what a previous attempt got
+   wrong, which milestone something landed in, why a dependency was dropped: none of it belongs in
+   a user-facing document. It goes in `docs/architecture.md` or `docs/decisions.md`.
+
+   **A one-clause "why the API looks like this" is not that, and stays**, when a reader acts on it.
+   Three sentences were checked against this rule and kept: why the ASP.NET Core endpoint is a
+   separate package (it decides which package you reference), why opting out of a payload bound is
+   spelled `null` (you will meet the API), and why no geometry mapper ships (you have to write one).
+   The test is whether the reader does something differently for having read it.
 
 6. **No unreleased feature is named as a plan.** No "still to come", no "coming soon", no roadmap.
    A capability a reader can build today may be described as a capability. A capability this

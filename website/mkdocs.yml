@@ -138,6 +138,7 @@ nav:
   - Reference:
       - Blazor WebAssembly: platforms/blazor-webassembly.md
       - Security: security.md
+      - Multi-tenancy: multi-tenancy.md
       - Limitations: limitations.md
       - Public API: api-surface.md
       - Release notes 10.0: release-notes/10.0.md

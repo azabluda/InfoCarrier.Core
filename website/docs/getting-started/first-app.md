@@ -54,7 +54,7 @@ one context class serves both halves.
 
 ## 2. The server
 
-An ordinary ASP.NET Core application with an ordinary EF Core provider, plus four registrations and
+An ordinary ASP.NET Core application with an ordinary EF Core provider, plus five registrations and
 one endpoint.
 
 ```csharp title="Shop.Server/Program.cs"
@@ -65,6 +65,8 @@ using Shop;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+string connectionString = builder.Configuration.GetConnectionString("Shop")!;
+
 // Your real database. Nothing about this line is InfoCarrier's business.
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlServer(connectionString));
 
@@ -74,6 +76,8 @@ builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>()
 builder.Services
     .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+    // `IPAddress` and `Uri` cannot be walked member by member. The client registers these
+    // for itself; a server builds its own service collection, so it has to ask.
     .AddInfoCarrierStandardValueMappers();
 
 WebApplication app = builder.Build();
@@ -166,6 +170,8 @@ Read on:
 - [Querying](../guide/querying.md): what runs where, and how to tell.
 - [Saving changes](../guide/saving-changes.md): units of work, graphs, generated keys.
 - [Transactions](../guide/transactions.md): including one transaction across two contexts.
+- [Handling errors](../guide/errors.md): what a failed server and a failed network look like, and
+  why they are different exception types.
 
 ## Testing without a network
 

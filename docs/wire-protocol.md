@@ -1,7 +1,7 @@
 # Wire Protocol — Contract Specification
 
 Status: **PRE-IMPLEMENTATION (contract shape defined; concrete message types are research
-output, not final)** · Related: [ADR-001](decisions.md#adr-001--serialization-engine-greenfield-spec-only---locked-2026-07-19), [`expression-serialization.md`](expression-serialization.md), [`architecture.md`](architecture.md).
+output, not final)** · Related: [ADR-001](decisions.md#adr-001-serialization-engine-greenfield-spec-only-locked-2026-07-19), [`expression-serialization.md`](expression-serialization.md), [`architecture.md`](architecture.md).
 
 The wire protocol is the contract between InfoCarrier client and server. It is
 **transport-agnostic** (HTTP, gRPC, in-process, or any other transport) and

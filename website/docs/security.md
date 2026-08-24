@@ -1,24 +1,30 @@
 # Security
 
 Your server executes an expression tree that arrived over the network. That is the product, and the
-thing to think about before deploying it. This page is what the library does about it and what it
-leaves to you.
+thing to think about before deploying it.
 
-## What the library bounds
+## What the library stops
 
 Deserialization is default-deny. The node kinds a payload may contain, the types it may name and the
-methods it may call are each checked against an allowlist, and anything not on it is refused rather
-than resolved. No assembly is loaded to satisfy a payload. The allowlist excludes the members that
-would turn a resolved `Type` back into a call, which is the classic route from "a tree can name a
-type" to "a tree can invoke anything".
+methods it may call are each checked against an allowlist; anything not on it is refused rather than
+resolved, and the library loads no assembly to satisfy a payload. The allowlist excludes the
+members that would turn a resolved `Type` back into a call, the classic route from "a tree can name
+a type" to "a tree can invoke anything".
 
-There is a size bound too, applied before parsing begins and defaulting to 64 MiB on requests
+The review behind that is published, including the weaknesses accepted rather than solved and
+the reasoning for each: [security-review.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md).
+It is written for someone auditing this, not for someone adopting it. Read §2 first: the boundary
+is a conjunction across several clauses, and the clause-by-clause argument is what makes the claim
+above checkable rather than a promise.
+
+There is a size limit too, applied before parsing begins and defaulting to 64 MiB on requests
 towards the server. A flat array of a hundred million constants is only three levels deep, so a
-depth limit alone does not bound the memory a parse costs. See
+depth limit alone does not cap the memory a parse costs. See
 [server configuration](configuration/server.md#payload-limits).
 
-A client also cannot reach past the server's model. The query is executed against the server's
-`DbContext`, with its global query filters and its interceptors.
+A client also cannot name a type the server's model does not have. The query runs against the
+server's `DbContext`, so the entity types in your shared model are the whole of what a client can
+compose over. That surface is a real boundary. A query filter is not one, for the reason below.
 
 ## What is yours
 
@@ -31,7 +37,7 @@ Two things to do, both required.
 
 ### 1. Authenticate the transport
 
-It is an ordinary ASP.NET Core endpoint, so use ordinary ASP.NET Core:
+The endpoint takes ordinary ASP.NET Core conventions:
 
 ```csharp
 app.MapInfoCarrier()
@@ -43,31 +49,31 @@ On the client, authenticate the `HttpClient`. See
 
 ### 2. Decide what a caller may see, on the server's model
 
-A global query filter on the server's model is applied to every query and cannot be composed past
-from a client, which makes it the right place for row-level authorization. A filter declared only on
-the client's model is a convenience: the client is code you shipped to someone else's machine.
+A global query filter on the server's model applies to every query by default. A filter declared
+only on the client's model is a convenience, because the client is code you shipped to someone
+else's machine.
 
-```csharp
-protected override void OnModelCreating(ModelBuilder modelBuilder)
-{
-    modelBuilder.Entity<Order>().HasQueryFilter(o => o.TenantId == _tenant.Current);
-    modelBuilder.Entity<Document>().HasQueryFilter(d => d.OwnerId == _user.Id);
-}
-```
+**A filter is a default, not a boundary.** `IgnoreQueryFilters()` is an ordinary EF Core operator
+that travels in the expression tree, and the server honours it. Query filters also do not apply to
+writes, so a client can submit a `SaveChanges` for a row whose key belongs to another tenant.
 
-For writes, the server's `SaveChanges` override or an EF interceptor is the equivalent place.
-Everything a client submits is replayed through it.
+A rule a caller must not be able to switch off goes where the caller cannot reach: a query
+interceptor on the server for reads, and the server's `SaveChanges` override or an EF interceptor
+for writes. Everything a client's `SaveChanges` sends is replayed through that override or
+interceptor, and the client can name neither.
+
+[Multi-tenancy](multi-tenancy.md) is the worked version, including the scope trap that makes a
+correct-looking tenant filter read the wrong tenant.
 
 ## The shape of the exposure
 
 A client can compose any query over the entity types your shared model exposes. That is the feature,
-and it has four consequences.
+and it has three consequences.
 
-The shared model is your API surface. Data that should never leave the server belongs out of it, or
-on a server-only context.
-
-Expensive queries are reachable. A caller can ask for a cross join. Bound it with query filters, a
-paging convention, a rate limit at the gateway, or a statement timeout on the database.
+Expensive queries are reachable. A caller can ask for a cross join. Cap the cost where the caller
+cannot reach: a rate limit at the gateway, a statement timeout on the database, or a query
+interceptor on the server. A query filter will not do it, for the same reason it is not a boundary
+above.
 
 Exception messages travel, with their stack traces. If yours carry connection strings, file paths or
 internal identifiers, catch and rewrite them at the server boundary.
@@ -77,8 +83,8 @@ expose it to the public internet without authentication.
 
 ## Transport security
 
-Use HTTPS. The envelope is not encrypted or signed by this library, and a request that can be read
-can be modified. The transport is the layer that establishes trust, which is why it is a seam you own.
+Use HTTPS. The envelope is not encrypted or signed by this library, so a request that can be read
+can be modified, and TLS terminating at a gateway leaves the hop behind it unprotected.
 
 ## Reporting a vulnerability
 

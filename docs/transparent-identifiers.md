@@ -1,7 +1,7 @@
 # Transparent identifiers — design spec
 
 Status: **X2 and X3 implemented; X1 tried and reverted.** Measured 111 → 101.
-Extends [`projection-split.md`](projection-split.md) §6a. Recorded as [ADR-011](decisions.md#adr-011).
+Extends [`projection-split.md`](projection-split.md) §6a. Recorded as [ADR-011](decisions.md#adr-011-transparent-identifiers-are-re-carried-not-reassembled-locked-2026-08-02).
 
 Measured 2026-08-02: **36 of 111 remaining failures** are this problem, across both test tiers.
 
@@ -16,7 +16,7 @@ The same happens for `join … into … from … in …`, and for `let`.
 
 EF never has to care. Its server pipeline handles anonymous types natively, so the identifier
 just flows through translation. This provider cannot: an anonymous type is by definition absent
-from the server's assembly, so [ADR-010](decisions.md#adr-010) treats it as a type boundary — and
+from the server's assembly, so [ADR-010](decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01) treats it as a type boundary — and
 every operator above the identifier falls to the client.
 
 That is not merely slow. The client half then reads a navigation the server never sent, and the

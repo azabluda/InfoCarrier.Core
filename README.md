@@ -26,12 +26,15 @@ EF Core provider.
 ## Installation
 
 ```sh
-dotnet add package InfoCarrier.Core             # the client and the server
-dotnet add package InfoCarrier.Core.AspNetCore  # the server endpoint
+# In the client project, and in the server project too.
+dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+
+# In the server project only.
+dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1
 ```
 
-Use the `--version` option to install a 10.0 preview. Without it, NuGet resolves the newest stable
-release, which belongs to the earlier 3.1 line.
+Both halves need .NET 10 and EF Core 10. Name the version, as above: without `--version`, NuGet
+resolves the newest stable release, which belongs to the earlier and incompatible 3.1 line.
 
 ## Basic usage
 
@@ -61,9 +64,9 @@ recent[0].Freight = 0m;
 await context.SaveChangesAsync();
 ```
 
-That query is not evaluated on the client. It crosses the wire as an expression tree, and the
-server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider the server uses. On
-the server, `app.MapInfoCarrier()` is the endpoint that receives it.
+That query is not evaluated on the client. It crosses the wire as an expression tree, and your
+server runs it against SQL Server, PostgreSQL, SQLite, or whatever provider it uses. On the
+server, `app.MapInfoCarrier()` is the endpoint that receives it.
 
 [Your first client and server](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/)
 builds the whole pair, and [the samples](samples/) run one command each.
@@ -92,7 +95,7 @@ If you encounter a bug, have a question, or would like to request a feature,
 Built on [Entity Framework Core](https://github.com/dotnet/efcore) and judged by its test suite.
 
 [InfoCarrier.Core 1.0 to 3.1](https://github.com/azabluda/InfoCarrier.Core/tree/release/3.1), by
-[on/off it-solutions gmbh](http://www.onoff-it-solutions.info), proved the idea, on
+[on/off it-solutions gmbh](http://www.onoff-it-solutions.info), proved the idea, and built it on
 [Remote.Linq](https://github.com/6bee/Remote.Linq) and
 [aqua-core](https://github.com/6bee/aqua-core) by Christof Senn. Version 10 has its own serializer
 and no longer depends on them.

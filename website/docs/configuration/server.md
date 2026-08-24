@@ -1,6 +1,6 @@
 # Configuring the server
 
-The server is an ordinary EF Core application. Four registrations and one endpoint make it an
+The server is an ordinary EF Core application. Five registrations and one endpoint make it an
 InfoCarrier server.
 
 ```csharp
@@ -49,7 +49,7 @@ The client's transport must name the same route. See
 
 A malformed body, or a client speaking a different protocol version, is answered with `400` and a
 plain-text message naming the problem, with no stack trace and no server paths. Anything the server
-ran and that failed comes back inside a normal response as a fault. See
+ran and that failed comes back as a fault inside a normal response. See
 [Handling errors](../guide/errors.md).
 
 ## Payload limits
@@ -63,8 +63,9 @@ builder.Services.AddSingleton<IInfoCarrierSerializer>(
         new InfoCarrierPayloadLimits(maxRequestBytes: 8 * 1024 * 1024)));
 ```
 
-A query tree is kilobytes and a `SaveChanges` request is bounded by the graph the client tracked, so
-a low ceiling is usually safe. Cap the request bytes at your gateway too: this bound is the last line.
+A query tree is kilobytes, and a `SaveChanges` request is no bigger than the graph the client
+tracked, so a low limit is usually safe. Cap the request bytes at your gateway too; this limit
+catches whatever the gateway lets through.
 
 ## Context lifetime
 
@@ -72,15 +73,25 @@ a low ceiling is usually safe. Cap the request bytes at your gateway too: this b
 tracker. A client request is self-contained, and leftover tracked entities from a previous request
 would collide with the next one.
 
-The exception is a transaction. `BeginTransaction` pins one context, and its connection, until the
-commit or rollback, which is why transactions should be short. See
-[Transactions](../guide/transactions.md).
+The exception is a transaction, and it is the one case where server state outlives a request.
+`BeginTransaction` pins one context and its connection until the commit or rollback, on the instance
+that minted the token, so a load-balanced deployment needs session affinity for the life of a
+transaction. [Transactions](../guide/transactions.md) has that and what an abandoned one costs.
 
-## The server is the boundary
+## Where the checks go
 
-The server executes the client's query against the server's model. A global query filter defined
-there is applied to every query, and a client cannot compose past it. This is the intended place to
-decide what a caller may see.
+A global query filter on the server's model applies to every query by default, which is what you
+want for your own honest client. **It is not a control.** `IgnoreQueryFilters()` is an ordinary EF
+Core operator: it travels in the expression tree like any other, and the server honours it. Query
+filters also do not apply to writes, so a client can submit a `SaveChanges` for a row whose key
+belongs to someone else.
+
+So put a write check in the server's `SaveChanges` override or an EF interceptor, and a read check
+in a query interceptor, which sees the client's tree before EF translates it.
+[Multi-tenancy](../multi-tenancy.md) works both of them through, and [Security](../security.md) has
+the threat model.
+
+Keep the filter anyway, as the default for your own client:
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -89,19 +100,14 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 }
 ```
 
-The same holds for everything else you register on the server's context: EF interceptors,
-`SaveChanges` overrides, auditing, soft-delete conventions. The client's request is work arriving at
-your context, and it runs through all of them.
-
-Nothing registered on the client is forwarded to the server, and nothing the server registers
-reaches the client. The two are separate EF Core instances, and anything a client's own model
-declares is a convenience on the client.
+Everything else you register on the server's context runs too: EF interceptors, `SaveChanges`
+overrides, auditing, soft-delete conventions. The client's request is work arriving at your context.
+Nothing registered on the client reaches the server, so anything a client's own model declares is a
+convenience.
 
 ## Model parity
 
 Both halves build a model from the same `DbContext` source, and the wire names entity types and
-properties. Two rules follow. Deploy both halves together when the model changes, because a
-property the client names and the server does not know is a failed request. And if a model-shaping
-option is enabled on one side, enable it on the other: `UseLazyLoadingProxies()` adds a convention,
-so it belongs on both or neither. A browser client is the deliberate exception, covered on the
-[Blazor WebAssembly](../platforms/blazor-webassembly.md) page.
+properties, so deploy them together: a property the client names and the server does not know is a
+failed request. Enable a model-shaping option on both sides or neither. A browser client is the
+deliberate exception, covered on the [Blazor WebAssembly](../platforms/blazor-webassembly.md) page.

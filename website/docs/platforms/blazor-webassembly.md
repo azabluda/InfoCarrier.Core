@@ -4,8 +4,10 @@ A browser client works, and it is the case this provider is most obviously for: 
 browser composing real LINQ, with the database behind your server. The sample's three pages run in
 WebAssembly, trimmed.
 
-Two constraints apply. Both are the browser's, not this provider's; a console or desktop client has
-neither.
+Three things work differently here. The first two are the browser's rather than this provider's,
+and a console or desktop client has neither. Everything else on this page assumes a working server,
+which is [Configuring the server](../configuration/server.md), and the sample referred to
+throughout is [Run the samples](../getting-started/samples.md).
 
 ## Automatic lazy loading is impossible
 
@@ -20,22 +22,22 @@ so you see the traffic while the value never arrives. `ILazyLoader.Load()` is sy
 injecting it instead does not help.
 
 Do not call `UseLazyLoadingProxies()` in a browser client. Leaving it off means an unloaded
-navigation is simply `null`, which is honest and debuggable. Load explicitly:
+navigation is `null`. Load explicitly:
 
 ```csharp
 await context.Entry(order).Reference(o => o.Customer).LoadAsync();
 await context.Entry(order).Collection(o => o.Lines).LoadAsync();
 ```
 
-Nothing is lost: the original query never fetched the navigation either, and asking still costs one
-round trip.
+The round-trip count is unchanged, but every call site that touches a navigation becomes `async`,
+so a component cannot reach one from markup.
 
 !!! note "The asymmetry with the server is safe"
 
-    Your server may still call `UseLazyLoadingProxies()`, because it is not a browser. Proxies change
-    how an entity is constructed on the side that enables them, and the wire carries entity type
-    names. The sample is wired this way: proxies on the server, none in the browser. It is the one
-    deliberate exception to enabling model-shaping options on both halves.
+    Your server may still call `UseLazyLoadingProxies()`. Proxies change how an entity is
+    constructed on the side that enables them, and the wire carries entity type names rather than
+    proxy types, so the two halves stay in step. It is the one deliberate exception to enabling
+    model-shaping options on both halves.
 
 ## A compiled model is more trouble than it is worth here
 
@@ -56,25 +58,27 @@ takes its configuration from the server's service provider and ignores an
 the server's table names and proxy settings, and the browser runs on the wrong model while appearing
 to work.
 
-Build the model at start-up instead, as the sample does. If you do use a compiled model, check which
-context it came from first: an annotation such as `Relational:TableName` on a client model is the
-tell.
+Build the model at start-up instead. If you do use a compiled model, check which context it came
+from first: an annotation such as `Relational:TableName` on a client model is the tell.
 
 ## Trimming
 
-The client publishes with `PublishTrimmed=true` and runs. The published sample was driven through all
-three pages: queries, the projection split, both navigation loads, a unit of work and a committed
-transaction.
+The client publishes with `PublishTrimmed=true` and runs. The published sample was driven through
+all three pages, covering queries, the projection split, both navigation loads, a unit of work and
+a committed transaction.
 
-It reports IL trim warnings attributable to `InfoCarrier.Core`, which is expected. The wire carries a
-type's name and the far end resolves it, so `Assembly.GetType(string)` and `MakeGenericMethod` are
-what this provider is made of, and `[DynamicallyAccessedMembers]` cannot describe "whatever type the
-caller's model names". The trimmer cannot prove that reflection safe for an arbitrary model, which is
-not the same as it breaking yours. Test the paths your model uses.
+The publish reports IL trim warnings attributable to `InfoCarrier.Core`, which is expected. The wire
+carries a type's name and the far end resolves it, so `Assembly.GetType(string)` and
+`MakeGenericMethod` are what this provider is made of, and `[DynamicallyAccessedMembers]` cannot
+describe "whatever type the caller's model names". The trimmer cannot prove that reflection safe for
+an arbitrary model, which is not the same as it breaking yours. Test the paths your model uses.
 
 ## Wiring a browser client
 
-Everything singleton, because one user and one tab means a scope has no lifetime behind it. And a
+The client references `InfoCarrier.Core` and nothing else; the server that answers it adds
+`InfoCarrier.Core.AspNetCore`. See [Installation](../getting-started/installation.md).
+
+Everything singleton, because one user and one tab means a scope has no lifetime behind it, and a
 context factory rather than a context, so each page owns its own unit of work.
 
 ```csharp
