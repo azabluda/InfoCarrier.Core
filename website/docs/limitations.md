@@ -12,7 +12,7 @@ it passes.
 Total tests: 22662, Passed: 22476, Failed: 9, Skipped: 177
 ```
 
-Measured against `10.0.0-preview.1`. The 177 skips are EF Core's own, tests EF itself skips for the
+Measured against `10.0.0`. The 177 skips are EF Core's own, tests EF itself skips for the
 store behind them, not suppressions added here.
 
 ## Not supported

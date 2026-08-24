@@ -260,8 +260,8 @@ file to read before editing any of them.
 - **A gRPC binding and streaming results as `IAsyncEnumerable` are OUT OF SCOPE for v10**
   (2026-08-23, owner's decision; `roadmap.md`, M8 exit criteria). Neither ships in the 10.x line,
   and **neither may be named as a plan in any user-facing document** (`doc-style.md` rule 6).
-  `-preview` stays because the public surface is not settled, and **no user-facing document gives a
-  reason for the suffix** — the version number carries it, as it does for every EF Core preview.
+  **No user-facing document may give a reason for a version suffix** — the version number carries
+  it, as it does for every EF Core release. `10.0.0` carries no suffix.
 - **The compiled-query cache keyed by canonical serialization (ADR-008 constraint 6, Q5) and the
   server delegate cache (Q10) are OUT OF SCOPE for v10** (2026-08-24, owner's decision;
   `roadmap.md`, M8 exit criteria). **It was never a correctness item**, which is why it could move:

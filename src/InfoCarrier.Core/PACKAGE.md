@@ -8,9 +8,8 @@ Reference it from your client, and from your server alongside `InfoCarrier.Core.
 which depends on it. The `DbContext` and the entity classes are shared source, so both halves build
 the same model.
 
-Both halves need .NET 10 and EF Core 10. Name the version when you install:
-`dotnet add package InfoCarrier.Core --version 10.0.0-preview.1`. Without `--version`, NuGet
-resolves the newest stable release, which belongs to the earlier and incompatible 3.1 line.
+Both halves need .NET 10 and EF Core 10. Install with
+`dotnet add package InfoCarrier.Core`.
 
 ## Usage
 

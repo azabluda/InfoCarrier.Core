@@ -87,7 +87,7 @@
       from M8-22, so the glob also matched InfoCarrier.Core.AspNetCore and every tagged release
       would have failed on it. MinVer removes the disagreement instead of policing it.
 
-      To release:  git tag -a v10.0.0-preview.2 -m "..."  &&  git push origin v10.0.0-preview.2
+      To release:  git tag -a v10.0.1 -m "..."  &&  git push origin v10.0.1
       To see what a build will produce:  dotnet msbuild -getProperty:Version
 
       An untagged commit builds as the next patch with a height — `10.0.1-alpha.0.7` — which is
@@ -98,10 +98,11 @@
       which EF a package targets. It also keeps a repository with no release tag yet inside the
       10.0 line rather than starting at 0.0.
 
-      `-preview` stays until the public surface is settled. A stable 10.0.0 is a promise not to
-      break it, and that promise is not ready to be made.
+      10.0.0 CARRIES NO SUFFIX. A stable version is a promise not to break the public surface,
+      and that promise is made as of that release.
 
-      Do NOT restate that reason in a user-facing document. It used to say "until a gRPC binding
+      Do NOT give a reason for a suffix in a user-facing document, should a later line carry one
+      again. The note that stood here used to say "until a gRPC binding
       and streaming results are settled", and that sentence propagated into the README, the package
       readme, the site index, the installation page, the limitations page and the GitHub release
       body as a roadmap promise. Both features went out of scope for v10 on 2026-08-23 (roadmap,

@@ -90,10 +90,11 @@ paragraph that could have been shorter.
 7. **"The client has no database" appears once per document**, in the opening paragraph. It is the
    premise of the product, not the pitch. Repeating it reads as a sales claim rather than a fact.
 
-8. **The install version appears once per document, in the install command.** One plain sentence
-   may explain that an unversioned install resolves to the older stable line. No box, no bold, no
-   three-variant command list. EF Core covers exactly this situation in one sentence: "Use the
-   `--version` option to specify a preview version to install."
+8. **A `dotnet add package` command names no version.** The newest stable is the one a reader
+   wants, and that is what an unversioned install resolves to. A `PackageReference` or a Central
+   Package Management example must name one, because the syntax requires it. No box, no bold, no
+   three-variant command list. This rule read the other way until `10.0.0`, when the newest
+   stable was `3.1.1` and an unversioned install landed on the wrong line without warning.
 
 9. **Headings in sentence case.**
 

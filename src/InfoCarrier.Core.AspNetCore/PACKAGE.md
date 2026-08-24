@@ -4,9 +4,8 @@ receives a client's queries and units of work and executes them against a real d
 
 Reference this package from your server only. Your client needs `InfoCarrier.Core` alone.
 
-Both halves need .NET 10 and EF Core 10. Name the version when you install:
-`dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1`, and give both packages
-the same version.
+Both halves need .NET 10 and EF Core 10. Install with
+`dotnet add package InfoCarrier.Core.AspNetCore`, and give both packages the same version.
 
 ## Usage
 

@@ -4,7 +4,7 @@
 
 [![Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml)
 [![Spec suite](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fazabluda%2FInfoCarrier.Core%2Fbadges%2Fspec-suite.json)](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml)
-[![NuGet](https://img.shields.io/nuget/vpre/InfoCarrier.Core?label=InfoCarrier.Core&color=004880)](https://www.nuget.org/packages/InfoCarrier.Core)
+[![NuGet](https://img.shields.io/nuget/v/InfoCarrier.Core?label=InfoCarrier.Core&color=004880)](https://www.nuget.org/packages/InfoCarrier.Core)
 [![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0%20on%20.NET%2010-512BD4)](https://github.com/dotnet/efcore)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](license.txt)
 
@@ -27,14 +27,13 @@ EF Core provider.
 
 ```sh
 # In the client project, and in the server project too.
-dotnet add package InfoCarrier.Core --version 10.0.0-preview.1
+dotnet add package InfoCarrier.Core
 
 # In the server project only.
-dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1
+dotnet add package InfoCarrier.Core.AspNetCore
 ```
 
-Both halves need .NET 10 and EF Core 10. Name the version, as above: without `--version`, NuGet
-resolves the newest stable release, which belongs to the earlier and incompatible 3.1 line.
+Both halves need .NET 10 and EF Core 10.
 
 ## Basic usage
 

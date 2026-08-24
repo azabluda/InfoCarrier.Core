@@ -47,14 +47,12 @@ PostgreSQL, SQLite, or whatever provider it uses.
 !!! note "Installing"
 
     ```sh
-    dotnet add package InfoCarrier.Core --version 10.0.0-preview.1              # client and server
-    dotnet add package InfoCarrier.Core.AspNetCore --version 10.0.0-preview.1   # server endpoint
+    dotnet add package InfoCarrier.Core              # client and server
+    dotnet add package InfoCarrier.Core.AspNetCore   # server endpoint
     ```
 
-    Both halves need .NET 10 and EF Core 10. Use the `--version` option: without it, NuGet resolves
-    the newest stable release, which belongs to the earlier 3.1 line and is not compatible with this
-    one. If you are moving an application off that line, see
-    [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
+    Both halves need .NET 10 and EF Core 10. If you are moving an application off the earlier
+    `3.1` line, see [Upgrading from 3.1](getting-started/upgrading-from-3-1.md).
 
 ## Why you might want this
 

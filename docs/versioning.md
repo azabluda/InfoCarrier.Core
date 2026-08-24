@@ -8,12 +8,12 @@ How a version number is decided, where it is stored, and how each of the three f
 build time and hands the number to MSBuild.
 
 ```bash
-git tag -a v10.0.0-preview.2 -m "InfoCarrier.Core 10.0.0-preview.2"
-git push origin v10.0.0-preview.2
+git tag -a v10.0.1 -m "InfoCarrier.Core 10.0.1"
+git push origin v10.0.1
 ```
 
-That tag produces `InfoCarrier.Core 10.0.0-preview.2` and
-`InfoCarrier.Core.AspNetCore 10.0.0-preview.2`, and nothing else has to be edited, remembered or
+That tag produces `InfoCarrier.Core 10.0.1` and
+`InfoCarrier.Core.AspNetCore 10.0.1`, and nothing else has to be edited, remembered or
 kept in step.
 
 ## Why not a property in `Directory.Build.props`
@@ -47,8 +47,9 @@ Remove the disagreement and the gate has nothing to do.
 | `PATCH` | Ours. Bump it for a fix that changes no contract. |
 | `-preview.N`, `-rc.N` | **Keep the dot.** SemVer compares dot-separated identifiers, so `preview.10` sorts above `preview.9`. Written `preview10`, they compare as text and sort backwards. |
 
-`-preview` stays until there is a gRPC binding and streaming results, because both may change
-`IInfoCarrierTransport` and a stable `10.0.0` is a promise not to.
+`10.0.0` carries no suffix. A stable version is a promise not to break the public surface, and
+that promise is made as of that release. Do not restate the reason for a suffix in a user-facing
+document: `Directory.Build.props` records what the last attempt cost.
 
 **The commit SHA is not part of the package version.** nuget.org does not carry SemVer build
 metadata. It goes into `InformationalVersion` instead, which is where a diagnostic needs it:
@@ -110,13 +111,13 @@ This needs no machinery. One version applies to every project, and the `ProjectR
 dependency come out at that version:
 
 ```xml
-<dependency id="InfoCarrier.Core" version="10.0.0-preview.1" />
+<dependency id="InfoCarrier.Core" version="10.0.0" />
 ```
 
 Lock-step is the right model here because the two packages share a wire protocol — a version pair
 is a protocol pair. Independent versioning would buy nothing and cost a compatibility matrix.
 
-(NuGet reads `version="10.0.0-preview.1"` as a *minimum*, not an exact match. That is standard and
+(NuGet reads `version="10.0.0"` as a *minimum*, not an exact match. That is standard and
 deliberate: releasing both together means the newest of each always agree.)
 
 ## Where a build goes
@@ -229,8 +230,8 @@ nuget.org first — which matters here, because neither does.
 
 1. Land the work. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both ratchets green.
 2. Update `website/docs/limitations.md` if the failure set moved.
-3. Tag: `git tag -a v10.0.0-preview.2 -m "InfoCarrier.Core 10.0.0-preview.2"`.
-4. Push the tag: `git push origin v10.0.0-preview.2`.
+3. Tag: `git tag -a v10.0.1 -m "InfoCarrier.Core 10.0.1"`.
+4. Push the tag: `git push origin v10.0.1`.
 5. Watch `release.yml`. It runs both gates, packs, and creates the Release.
 6. Approve `publish-nuget` when you mean it.
 7. **Apply the release body, because the workflow does not.** `release.yml` creates the Release
@@ -239,7 +240,8 @@ nuget.org first — which matters here, because neither does.
    Archive a body being replaced as `<tag>.superseded-<date>.md` first, because GitHub keeps no
    history of one. Skipping this is not visible from the repository, which is how the published
    `v10.0.0-preview.1` body drifted from its copy here.
-8. Update the version named in `README.md`, `docs/nuget-readme.md` and the site's installation page.
+8. Update any version a document names by hand: the `PackageReference` and Central Package
+   Management examples on the site, and the counts on the limitations and release-notes pages.
 
-Step 8 is the one thing still done by hand, and it is deliberate: an install instruction naming a
-version is worth more to a reader than one that says "latest".
+The `dotnet add package` commands name no version, so they need no edit. They did until `10.0.0`,
+because the newest stable was then `3.1.1` and an unversioned install silently resolved to it.
