@@ -11,7 +11,7 @@ resolved, and no assembly is loaded to satisfy a payload. The allowlist excludes
 would turn a resolved `Type` back into a call, the classic route from "a tree can name a type" to "a
 tree can invoke anything".
 
-**The review behind that is published**, including the weaknesses accepted rather than solved and
+The review behind that is published, including the weaknesses accepted rather than solved and
 the reasoning for each: [security-review.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md).
 It is written for someone auditing this, not for someone adopting it. Read §2 first: the bound is a
 conjunction across several clauses, and the clause-by-clause argument is what makes the claim above
@@ -59,7 +59,7 @@ writes, so a client can submit a `SaveChanges` for a row whose key belongs to an
 
 A rule a caller must not be able to switch off goes where the caller cannot reach: a query
 interceptor on the server for reads, and the server's `SaveChanges` override or an EF interceptor
-for writes. **[Multi-tenancy](multi-tenancy.md) is the worked version**, including the scope trap
+for writes. [Multi-tenancy](multi-tenancy.md) is the worked version, including the scope trap
 that makes a correct-looking tenant filter read the wrong tenant.
 
 Everything a client submits is replayed through that override or interceptor, and the client cannot
@@ -68,7 +68,7 @@ name either one.
 ## The shape of the exposure
 
 A client can compose any query over the entity types your shared model exposes. That is the feature,
-and it has four consequences.
+and it has three consequences.
 
 Expensive queries are reachable. A caller can ask for a cross join. Bound it where the caller
 cannot reach: a rate limit at the gateway, a statement timeout on the database, or a query

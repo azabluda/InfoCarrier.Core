@@ -182,7 +182,7 @@ These are not defects. They follow from where the client sits.
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |
 
-## How this page is maintained
+## What this page cannot tell you
 
 Every entry above corresponds to tests in EF Core's specification suite that run on every build.
 The number of failing tests is gated in continuous integration, so it cannot grow without being
@@ -190,5 +190,4 @@ noticed. When an entry is fixed, or a new one appears, this page changes with it
 
 What the suite measures bounds what this page can promise. A conformance suite says nothing about
 performance, payload size or concurrency under load, and nothing about the relational APIs this
-provider does not have. A scenario it never exercises is outside the sentence at the top of this
-page.
+provider does not have. A scenario it never exercises is outside what this page claims at the top.

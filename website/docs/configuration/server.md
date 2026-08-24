@@ -64,7 +64,8 @@ builder.Services.AddSingleton<IInfoCarrierSerializer>(
 ```
 
 A query tree is kilobytes and a `SaveChanges` request is bounded by the graph the client tracked, so
-a low ceiling is usually safe. Cap the request bytes at your gateway too: this bound is the last line.
+a low ceiling is usually safe. Cap the request bytes at your gateway too. This bound is what catches
+whatever the gateway lets through.
 
 ## Context lifetime
 
@@ -87,8 +88,8 @@ belongs to someone else.
 
 So put a write check in the server's `SaveChanges` override or an EF interceptor, and a read check
 in a query interceptor, which sees the client's tree before EF translates it.
-[Multi-tenancy](../multi-tenancy.md) works both through, and [Security](../security.md) has the
-threat model.
+[Multi-tenancy](../multi-tenancy.md) works both of them through, and [Security](../security.md) has
+the threat model.
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -100,7 +101,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 Everything else you register on the server's context runs too: EF interceptors, `SaveChanges`
 overrides, auditing, soft-delete conventions. The client's request is work arriving at your context.
 Nothing registered on the client reaches the server, so anything a client's own model declares is a
-convenience on the client.
+convenience.
 
 ## Model parity
 

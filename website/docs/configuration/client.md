@@ -63,9 +63,9 @@ services.AddSingleton<IInfoCarrierClient>(sp =>
 ## Payload limits
 
 The serializer applies a size bound to what it will deserialize. One `InfoCarrierPayloadLimits`
-object travels with it and each half enforces the half that applies: the server bounds the request
-it receives, the client bounds the response it receives. Only the server's side is default-on,
-because that is the side reading bytes from an untrusted peer.
+object travels with it, and each end enforces the bound that applies to it: the server bounds the
+request it receives, the client bounds the response it receives. Only the server's side is
+default-on, because that is the side reading bytes from an untrusted peer.
 
 ```csharp
 var serializer = new SystemTextJsonInfoCarrierSerializer(

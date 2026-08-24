@@ -24,9 +24,9 @@ catch (DbUpdateException ex)
 }
 ```
 
-Where it does not, such as a `SqlException` in a client that references no database driver, it
-arrives as `InfoCarrierServerException` with the thrown type's name in a property. That is the same
-rule stated at the end of this page, and it is the only one: what the client has loaded.
+So a `SqlException`, in a client that references no database driver, arrives as
+`InfoCarrierServerException` with the thrown type's name in a property. No `catch` clause is ever
+obliged to reference a database driver.
 
 ```csharp
 catch (DbUpdateException ex) when (ex.InnerException is InfoCarrierServerException server)
@@ -46,9 +46,9 @@ DbUpdateException                     the client's own, from EF
       └── InfoCarrierServerException  ServerExceptionTypeName = "Microsoft.Data.Sqlite.SqliteException"
 ```
 
-The server's stack trace is preserved, and deliberately not spliced into the client-side
-exception's own stack, which would misreport where your client is. It travels in `Exception.Data`,
-and it is the only view you get of what happened on the other side, so log it.
+The library keeps the server's stack trace and deliberately does not splice it into the
+client-side exception's own stack, which would misreport where your client is. It travels in
+`Exception.Data`, and it is the only view you get of what happened on the other side, so log it.
 
 ```csharp
 var serverStack = ex.InnerException?.Data["InfoCarrier.ServerStackTrace"] as string;
@@ -66,9 +66,10 @@ have died on the way back. Nothing in the envelope carries a request id, so ther
 afterwards.
 
 That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` are written on an
-`IQueryable` and read like queries, and they are writes. For an insert, the remedy is a key you supply rather than a store-generated one, **with a unique
-constraint on the server's database that enforces it**. Without the constraint a supplied key is not
-idempotent and the retry simply inserts twice.
+`IQueryable` and read like queries, and they are writes. For an insert, the remedy is a key you
+supply rather than a store-generated one, with a unique constraint on the server's database that
+enforces it. Without the constraint a supplied key is not idempotent and the retry simply inserts
+twice.
 
 **An update has no such remedy here.** A retried `balance = balance - 100` debits twice, and nothing
 in the protocol can tell you whether the first one landed. Make the operation one whose repetition
@@ -135,6 +136,5 @@ trace itself holds, which with symbols deployed is your build's source paths.
 client. Catch and rewrite at the server boundary anything a client should not read. See
 [Security](../security.md).
 
-Rebuilding a fault does not resolve arbitrary types. The client looks only in assemblies it has
-already loaded, accepts only a non-abstract `Exception` subtype, never loads an assembly to satisfy
-a name, and falls back to `InfoCarrierServerException` when nothing matches.
+That resolution is also the bound on the return direction: a fault cannot make the client load an
+assembly, or construct anything that is not an exception.

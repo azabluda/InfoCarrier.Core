@@ -67,18 +67,18 @@ The client publishes with `PublishTrimmed=true` and runs. The published sample w
 all three pages, covering queries, the projection split, both navigation loads, a unit of work and
 a committed transaction.
 
-It reports IL trim warnings attributable to `InfoCarrier.Core`, which is expected. The wire carries a
-type's name and the far end resolves it, so `Assembly.GetType(string)` and `MakeGenericMethod` are
-what this provider is made of, and `[DynamicallyAccessedMembers]` cannot describe "whatever type the
-caller's model names". The trimmer cannot prove that reflection safe for an arbitrary model, which is
-not the same as it breaking yours. Test the paths your model uses.
+The publish reports IL trim warnings attributable to `InfoCarrier.Core`, which is expected. The wire
+carries a type's name and the far end resolves it, so `Assembly.GetType(string)` and
+`MakeGenericMethod` are what this provider is made of, and `[DynamicallyAccessedMembers]` cannot
+describe "whatever type the caller's model names". The trimmer cannot prove that reflection safe for
+an arbitrary model, which is not the same as it breaking yours. Test the paths your model uses.
 
 ## Wiring a browser client
 
 The client references `InfoCarrier.Core` and nothing else; the server that answers it adds
 `InfoCarrier.Core.AspNetCore`. See [Installation](../getting-started/installation.md).
 
-Everything singleton, because one user and one tab means a scope has no lifetime behind it. And a
+Everything singleton, because one user and one tab means a scope has no lifetime behind it, and a
 context factory rather than a context, so each page owns its own unit of work.
 
 ```csharp
