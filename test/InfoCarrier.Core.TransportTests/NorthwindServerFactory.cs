@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Northwind.Shared;
 
@@ -41,10 +42,17 @@ public sealed class NorthwindServerFactory : WebApplicationFactory<Program>
                 d => d.ServiceType == typeof(DbContextOptions<NorthwindContext>));
             services.Remove(descriptor);
 
+            // Interceptors come from the host's own service collection and are passed to EF
+            // explicitly. Registering `IInterceptor` in the application provider alone does not
+            // reach this context: it was tried first, and both counters of a
+            // `DbCommandInterceptor` stayed at zero, which is how the indirection was found.
+            // A test that needs to watch what the server does to the store adds
+            // `services.AddSingleton<IInterceptor>(...)` through `WithWebHostBuilder`.
             services.AddDbContext<NorthwindContext>(
-                options => options
+                (serviceProvider, options) => options
                     .UseSqlite($"Filename={_databasePath}")
-                    .UseLazyLoadingProxies());
+                    .UseLazyLoadingProxies()
+                    .AddInterceptors(serviceProvider.GetServices<IInterceptor>()));
         });
     }
 

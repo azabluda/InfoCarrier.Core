@@ -316,5 +316,26 @@
 #
 # `failed` is unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22661 / 22475 / 9 / 177 (`query-split-log`).
-failed=9
-total=22661
+# 2026-08-24 -- DELIBERATELY RED, AND THE NEXT COMMIT MAKES IT GREEN. failed 9 -> 10 and total
+# 22661 -> 22662. The rise is one new test of ours, and it fails on purpose: the fix it measures
+# lands in the commit that follows this one.
+#
+# The test is InMemorySmokeTest.The_server_stops_a_query_when_the_caller_cancels. It replays a real
+# query request into InProcessInfoCarrierServer with an already-cancelled token and expects
+# OperationCanceledException. Against the server as it stands in THIS commit it fails with
+# "Assert.ThrowsAny() Failure: No exception was thrown", because ExecuteQueryAsync accepts the
+# token and never reads it, so the synchronous loop returns both rows.
+#
+# A second test lands here too, in the OTHER project, which this file does not count:
+# ServerCancellationPathTest in InfoCarrier.Core.TransportTests takes InfoCarrier.Core.TransportTests
+# from 17 tests to 18 and from 0 failures to 1. It asks the same question over HTTP and fails with
+# "the server did not use EF's async command path".
+#
+# RAISING `failed` IS NORMALLY FORBIDDEN WITHOUT A REASON, and this is the reason: the owner asked
+# for the evidence to be visible in the history, red first and green after, rather than asserted in
+# a commit message. CI tests the newest commit of a branch, so a red commit in the middle of one is
+# never built on its own.
+#
+# Figures read off the run's own summary block: 22662 / 22475 / 10 / 177 (`red-before-fix`).
+failed=10
+total=22662

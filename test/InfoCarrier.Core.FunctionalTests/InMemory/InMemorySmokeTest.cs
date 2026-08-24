@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
@@ -70,6 +71,62 @@ public class InMemorySmokeTest
         Assert.Equal("beta", blogs[1].Title);
     }
 
+
+    [ConditionalFact]
+    public async Task The_server_stops_a_query_when_the_caller_cancels()
+    {
+        // THE SERVER SIDE IS WHAT THIS ASSERTS, and no test EF ships can. EF's own
+        // `ToListAsync_can_be_canceled` and `ToListAsync_with_canceled_token` are both green here
+        // and both only ask what the CALLER saw; in EF's model there is no second process for work
+        // to continue in, so there is nothing else to ask. Here there is: the token reaches
+        // `ServerQueryExecutor` from the transport, and it used to be accepted and dropped, so a
+        // client that cancelled stopped waiting while the server read the store to the end.
+        //
+        // Capture a real request and replay it straight into the server with a cancelled token.
+        // That removes the client from the picture entirely -- a client-side cancel would abort
+        // the transport first and prove nothing about the far side.
+        string databaseName = Guid.NewGuid().ToString();
+
+        IServiceProvider serverProvider = BuildServerProvider(databaseName);
+        using (IServiceScope scope = serverProvider.CreateScope())
+        {
+            var seed = scope.ServiceProvider.GetRequiredService<SmokeContext>();
+            seed.Blogs.AddRange(new Blog { Id = 1, Title = "alpha" }, new Blog { Id = 2, Title = "beta" });
+            seed.SaveChanges();
+        }
+
+        var server = new InProcessInfoCarrierServer(serverProvider);
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var envelopeServer = new InfoCarrierEnvelopeServer(server, serializer);
+
+        InfoCarrierEnvelope? capturedQuery = null;
+        var transport = new InProcessInfoCarrierTransport(
+            async (envelope, token) =>
+            {
+                if (envelope.Operation == InfoCarrierOperation.Query)
+                {
+                    capturedQuery = envelope;
+                }
+
+                return await envelopeServer.DispatchAsync(envelope, token);
+            },
+            serializer);
+
+        var clientOptions = new DbContextOptionsBuilder<SmokeContext>()
+            .UseInfoCarrier(new TransportInfoCarrierClient(transport, serializer))
+            .Options;
+
+        await using (var context = new SmokeContext(clientOptions))
+        {
+            Assert.Equal(2, (await context.Blogs.ToListAsync()).Count);
+        }
+
+        QueryDataRequest request = serializer.Deserialize<QueryDataRequest>(capturedQuery!.Payload)!;
+
+        // The same request the run above answered with two rows, now with a cancelled token.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => server.QueryDataAsync(request, new CancellationToken(true)));
+    }
 
     /// <summary>
     ///     A type the server's allowlist does not admit, so a call to it cannot be shipped.
