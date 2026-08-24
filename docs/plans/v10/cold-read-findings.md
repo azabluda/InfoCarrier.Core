@@ -178,9 +178,26 @@ Real, and larger than a correction. Ordered by how often a reader hit them.
    with both onward links. **The entry above was already half stale when it was read back**, which
    is the recurring cost of a findings list that outlives the round it describes: check the page
    before acting on the finding.
-2. **The split rule covers projections only.** `querying.md` explains an untranslatable projection.
-   A helper method in a `Where` is what teams actually write, and the page's own hedge, "the
-   projection usually tells you which one you are in", concedes the gap and stops.
+2. **The split rule covers projections only. CLOSED 2026-08-24, and the finding's premise was
+   wrong.** `querying.md` explains an untranslatable projection, and the reader was right that a
+   helper method in a `Where` is what teams actually write. The inference drawn from that, that the
+   page therefore leaves a hazard undocumented, does not hold.
+   **A `Where` the server cannot run throws.** `QuerySplitter.RejectClientEvaluation` allows
+   client-side work only where it is a projection reassembly, and raises EF's own
+   `TranslationFailedWithDetails` for anything else. So that query lands in the page's third case,
+   "the query cannot be translated", which the page already covers correctly. There is no silent
+   full fetch and there never was.
+   **How the wrong answer survived a careful reading, because that is the transferable part.**
+   `projection-split.md` §3.3 sends a client-typed `Where` to §3.5; §3.5 says ship the maximal
+   `ServerOk` subtree containing a query root; `ServerBoundaryAnalyzer` implements exactly that.
+   Design document and code agreed, and both describe the **frontier**. Neither mentions the guard
+   that runs between the analysis and the residual. A test found it in one run.
+   `InMemorySmokeTest.A_filter_the_server_cannot_run_throws_rather_than_fetching_everything` now
+   pins it so the next reader does not have to.
+   **Nothing is added to `querying.md`.** Decided 2026-08-24 by the owner: the distinction between
+   an operator that cannot be shipped and one that cannot be translated is provider internals, and
+   a consumer who writes an untranslatable `Where` gets EF's own message either way. The three
+   cases the page states are complete.
 3. **Payload shape.** Nothing on cartesian duplication from a nested `Include`, on `AsSplitQuery`
    or its absence, or on buffering versus streaming. Round trips are documented; bytes are not, and
    a WAN charges for bytes.

@@ -1,6 +1,6 @@
 ﻿# Roadmap
 
-Status: **M6 done (2026-08-11); M5 has one open criterion, M7/M8 next** · Milestone-level plan for the whole project.
+Status: **M8 closed (2026-08-24). M5 has one open criterion (the remote cancel signal, W6); M7 is untouched** · Milestone-level plan for the whole project.
 
 This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
 only when scope changes.
@@ -318,7 +318,7 @@ model XY at SRID 0 and would pass all 173 tests against a mapper that silently d
 
 Both spatial bases are adopted on **Tier A**, 169 of 173.
 
-### M8 — Productization
+### M8 — Productization — **CLOSED 2026-08-24**
 
 **Server-held transaction lifetime — OPEN, and it is the library's, not the sample's.**
 Recorded 2026-08-16 after the Blazor sample made it reachable. `InProcessInfoCarrierServer`
@@ -442,8 +442,8 @@ Three separable pieces, and only the first can be done outside the library:
   also broken, see [`versioning.md`](../../versioning.md)), and **every code push publishes to GitHub
   Packages** as an internal feed. Full account in [`versioning.md`](../../versioning.md).
 
-**Where M8 stands as a set, read 2026-08-24.** Every one of the six exit criteria above now has a
-resolution rather than a status: three done (HTTP transport, sample apps, NuGet packaging and
+**M8 CLOSED 2026-08-24, and this is the reading that closed it.** Every one of the six exit criteria
+above has a resolution rather than a status: three done (HTTP transport, sample apps, NuGet packaging and
 `release.yml`), two out of scope for v10 by the owner's decision (gRPC and streaming; the
 compiled-query cache), and §4.5 answered in two halves (trimming verified, Native AOT measured and
 not supported). **Nothing on that list is waiting on work.**
@@ -459,8 +459,12 @@ worth doing:
   M5 and not to M8**, and the header line of this document has said "M5 has one open criterion"
   since before M8 began.
 
-**Whether M8 closes is the owner's call and this note does not make it.** What it records is that
-the exit criteria no longer decide the answer.
+**The owner closed it on that reading, 2026-08-24.** The two items above are open and neither
+belongs to M8: the transaction lifetime is a hardening item that is documented for consumers, and
+the remote cancel signal is M5's. Task detail moved to
+[`archive/implementation-plan-m8-phases-h-n.md`](archive/implementation-plan-m8-phases-h-n.md) and
+is never edited again. [`implementation-plan.md`](implementation-plan.md) now holds M5's remaining
+criterion.
 
 **Native AOT is deliberately not gated in CI** (2026-08-24, owner's decision). `ubuntu-latest` ships
 clang, so a `PublishAot` job could complete the native link that the local measurement could not,

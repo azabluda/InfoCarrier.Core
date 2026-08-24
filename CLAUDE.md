@@ -170,6 +170,19 @@ keeps "prefer public API where one exists" enforceable. A `NoWarn` would remove 
 **Do not add a NuGet dependency on Remote.Linq or Aqua** (ADR-001). They are specification
 material only.
 
+**Client-side work is allowed only where it is a projection reassembly, and everything else
+throws.** `QuerySplitter.RejectClientEvaluation` raises EF's own `TranslationFailed` /
+`TranslationFailedWithDetails`, so an untranslatable `Where` behaves here exactly as it does on
+every other EF provider. **This was got wrong once by reading the design document and the analyzer
+and stopping there**: `projection-split.md` §3.3 sends a client-typed `Where` to §3.5, §3.5 says
+"ship the maximal `ServerOk` subtree containing a query root", and `ServerBoundaryAnalyzer` agrees
+— which together read as "the cut lands below the `Where`, the server runs the root alone, and the
+whole table crosses silently". **Both documents describe the frontier and neither mentions the
+guard that runs between them.** `InMemorySmokeTest.A_filter_the_server_cannot_run_throws_rather_than_fetching_everything`
+pins it. The rule that generalises: **a design document plus the code it describes can both be
+right and still not tell you what happens, when the thing you need is a guard that sits between
+them.**
+
 **Anything the wire computes from a type mapping is computed twice, by two different providers,
 and is only sound if the two agree.** The client's model is built by this provider and the
 server's by the backing store, so `FindTypeMapping()` is not one answer but two. B4: a
@@ -180,6 +193,15 @@ from the **CLR type alone**, through a service no provider replaces.
 
 ## Current state
 
+**M8 is CLOSED (2026-08-24).** Every exit criterion has a resolution: three done (HTTP transport,
+sample apps, packaging), two out of scope for v10 (gRPC and streaming; the compiled-query cache),
+and requirements §4.5 answered in two halves (trimming verified, Native AOT not supported). Task
+detail is archived in `docs/plans/v10/archive/implementation-plan-m8-phases-h-n.md` and is never
+edited again. **`docs/plans/v10/implementation-plan.md` now holds M5's one remaining criterion, the
+remote cancel signal (W6)**, which is the only open criterion of any open milestone; M7 (SQL Server
+as Tier C) is untouched and is not in the plan file until it is current.
+
+**M9 is CLOSED (2026-08-17).** The paragraph below was written while M8 was still open.
 **M9 is CLOSED (2026-08-17). M8 is NOT.** M9 met its four exit criteria: the document-mapping seam
 (so `InfoCarrier.Core` no longer references `EFCore.Relational`), the test project organised by
 backend store, four bases moved to the tier that translates, and the capability axis identified,

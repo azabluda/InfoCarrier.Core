@@ -71,6 +71,117 @@ public class InMemorySmokeTest
     }
 
 
+    /// <summary>
+    ///     A type the server's allowlist does not admit, so a call to it cannot be shipped.
+    /// </summary>
+    public static class ClientOnly
+    {
+        public static string Describe(string? title) => $"<{title}>";
+
+        public static bool TitleIsLong(string? title) => title is { Length: > 4 };
+    }
+
+    [ConditionalFact]
+    public async Task A_projection_the_server_cannot_run_is_logged_as_a_split()
+    {
+        // ESTABLISHES THAT THE EVENT FIRES, which is the only reason this test exists. A log
+        // nobody raises and a log nobody needs look identical from outside, and this repository
+        // has read that ambiguity wrongly before.
+        //
+        // A projection is the shape that splits. `ClientOnly` is not on the type allowlist, so
+        // the `Select` cannot ship; the server runs the filtered query and this client builds the
+        // projection over the rows that came back. Note the `Where` still ships, which is the
+        // property the guide states and the reason this split is safe rather than merely legal.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using (SmokeContext seed = CreateClient(store))
+        {
+            seed.Blogs.AddRange(
+                new Blog { Id = 1, Title = "alpha" },
+                new Blog { Id = 2, Title = "be" });
+            await seed.SaveChangesAsync();
+        }
+
+        var log = new List<string>();
+
+        await using (var context = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>()
+                .UseInfoCarrier(store)
+                .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
+                .Options))
+        {
+            var described = await context.Blogs
+                .Where(b => b.Id == 1)
+                .Select(b => new { b.Id, Label = ClientOnly.Describe(b.Title) })
+                .ToListAsync();
+
+            Assert.Equal("<alpha>", Assert.Single(described).Label);
+        }
+
+        Assert.Contains(log, line => line.Contains("Part of the query cannot be sent to the server"));
+    }
+
+    [ConditionalFact]
+    public async Task A_query_the_server_runs_whole_logs_no_split()
+    {
+        // The other half, and the one that keeps the event honest: the common case must stay
+        // silent. Without this, an event that fired on every query would still pass the test
+        // above.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using (SmokeContext seed = CreateClient(store))
+        {
+            seed.Blogs.Add(new Blog { Id = 1, Title = "alpha" });
+            await seed.SaveChangesAsync();
+        }
+
+        var log = new List<string>();
+
+        await using (var context = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>()
+                .UseInfoCarrier(store)
+                .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
+                .Options))
+        {
+            List<Blog> matched = await context.Blogs.Where(b => b.Title == "alpha").ToListAsync();
+
+            Assert.Single(matched);
+        }
+
+        Assert.Empty(log);
+    }
+
+    [ConditionalFact]
+    public async Task A_filter_the_server_cannot_run_throws_rather_than_fetching_everything()
+    {
+        // PINS `RejectClientEvaluation`, AND IT WAS WRITTEN AFTER GETTING THIS WRONG. Reading
+        // projection-split.md §3.3 ("a `Where` over a client type ... falls back to §3.5") and
+        // §3.5 (ship the maximal ServerOk subtree containing a query root) says the cut lands
+        // below the `Where`, the server runs the query root alone, and the whole table crosses
+        // the wire silently. `ServerBoundaryAnalyzer` agrees. Both are describing the *frontier*,
+        // and neither mentions the guard that runs between them.
+        //
+        // `QuerySplitter.RejectClientEvaluation` allows client-side work only where it is a
+        // projection reassembly. A `Where` is not one, so this throws EF's own
+        // `TranslationFailedWithDetails` and this provider converges with every other EF
+        // provider. There is no silent full fetch. THE DESIGN DOCUMENT PLUS THE ANALYZER WAS NOT
+        // ENOUGH TO KNOW THAT, and this test is what closed the gap between reading and knowing.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using (SmokeContext seed = CreateClient(store))
+        {
+            seed.Blogs.Add(new Blog { Id = 1, Title = "alpha" });
+            await seed.SaveChangesAsync();
+        }
+
+        await using SmokeContext context = CreateClient(store);
+
+        InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => context.Blogs.Where(b => ClientOnly.TitleIsLong(b.Title)).ToListAsync());
+
+        Assert.Contains("could not be translated", thrown.Message);
+    }
+
     private static InMemoryInfoCarrierBackendTestStore CreateStore()
         => new(
             Guid.NewGuid().ToString(),

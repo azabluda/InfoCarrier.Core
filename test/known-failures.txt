@@ -299,5 +299,22 @@
 # IOrderedEnumerable<T> and re-broken eight Contains_with_local_ordered_enumerable_* tests. The
 # discriminator is IsMappedPropertyType. 1 fixed, 0 broken across 22658; trim ratchet unchanged at 88.
 # Figures read off the run's own summary block: 22658 / 22472 / 9 / 177 (`j21`).
+# 2026-08-24 -- TOTAL RISES 22658 -> 22661, AND THE RISE IS THREE NEW TESTS OF OURS, not a change
+# in the spec suite. `InfoCarrierEventId.QuerySplit` shipped, and `InMemorySmokeTest` gained three
+# cases for it: a projection the server cannot run logs the event, a query the server runs whole
+# logs nothing, and a filter the server cannot run throws rather than fetching everything.
+#
+# The gate only ever fails on a FALLING total (a crashed host), so a rise passes either way. The
+# number is raised here so that it keeps doing its job: left at 22658, a crash that lost three
+# tests would have gone unnoticed.
+#
+# The third test is the one worth knowing about. `QuerySplitter.RejectClientEvaluation` allows
+# client-side work only where it is a projection reassembly, so an untranslatable `Where` throws
+# EF's own message and this provider converges with every other EF provider. That was got wrong
+# first by reading projection-split.md and ServerBoundaryAnalyzer, which agree with each other and
+# both describe the frontier rather than the guard between them.
+#
+# `failed` is unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22661 / 22475 / 9 / 177 (`query-split-log`).
 failed=9
-total=22658
+total=22661
