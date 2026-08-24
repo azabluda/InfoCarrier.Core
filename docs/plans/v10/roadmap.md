@@ -1,6 +1,6 @@
 ﻿# Roadmap
 
-Status: **M8 closed (2026-08-24). M7's SQL Server half dropped (2026-08-24). M5 has one open criterion, the remote cancel signal (W6), and it is the only work left** · Milestone-level plan for the whole project.
+Status: **Every milestone is closed. M5 closed 2026-08-24, last of them; M8 closed and M7's SQL Server half dropped the same day** · Milestone-level plan for the whole project.
 
 This doc is **stable** — it lists milestones, their exit criteria, and their order. It changes
 only when scope changes.
@@ -168,7 +168,7 @@ Untestable before M3: EF InMemory raises `TransactionIgnoredWarning` with
   (wire-protocol W3).
 - Client disposal/rollback cleans up server-side (requirements §2.9).
 
-### M5 — Wire hardening 🔒 **release blocker**
+### M5 — Wire hardening — **CLOSED 2026-08-24**
 
 **No network transport may ship before this milestone completes.**
 
@@ -229,8 +229,20 @@ constraints it must meet when it lands.
   every request and **nothing that unwrapped one** — the only dispatcher was inline in a smoke
   test and handled one of nine operations. `InfoCarrierEnvelopeServer` is the missing half, and
   all 22321 tests now cross a real envelope with the version checked before dispatch.)
-- Exception fidelity across the wire (W5) ✅ (C46, 2026-08-10) and cancellation (W6) —
-  **cooperative half ✅ (C66, 2026-08-10), remote cancel signal open.**
+- Exception fidelity across the wire (W5) ✅ (C46, 2026-08-10) and cancellation (W6) ✅
+  **complete 2026-08-24.** The cooperative half landed in C66; the remote half landed in Phase P,
+  and it needed no new mechanism. The token already travelled from `MapInfoCarrier` to
+  `ServerQueryExecutor` and was dropped at the last step. **Two decisions were taken with it,
+  2026-08-24, by the owner:**
+  **(1) No `Cancel` operation goes on the wire.** A tenth operation carrying a request id needs a
+  server-side registry of live requests, and that registry has the shape this roadmap already
+  records as a defect under M8: unbounded, process-local, keyed by something a vanished client
+  never mentions again. The transport's own disconnect signal costs nothing, needs no protocol
+  version, and cannot leak, because ASP.NET Core owns its lifetime. Build a wire message only if a
+  transport appears that cannot report a lost client, and record the reason before building it.
+  **(2) What such a transport must do is deliberately left open.** Both transports that ship can
+  report a lost client: HTTP has `RequestAborted`, and the in-process transport shares the caller's
+  token directly. A rule written now would be a guess about a transport nobody has designed.
 
   W5 is `InfoCarrierFault`: a failure travels as data and is raised again on the client, keeping
   the type, the message and the inner chain — which is what EF's spec tests assert on, so the
@@ -305,10 +317,25 @@ was planned here and is now not planned is a *third* backend for this repository
 InMemory (Tier A) and SQLite (Tier B), with a Docker store and a nightly job. ADR-009's tier model
 keeps its two tiers; Tier C is simply never built.
 
-**What the drop costs, stated so nobody rediscovers it as a surprise.** Four things had no other
-home: `rowversion` concurrency, computed columns, sequences, and TPT/TPC inheritance mapping. None
-is exercised by any tier that runs today. So this repository has no evidence about them either way,
-and no user-facing document may claim they work.
+**What the drop costs, separated properly. A first version of this paragraph said all four features
+had "no evidence either way", and that was too broad for three of them.** The question a remoting
+provider has to ask is not "does the store do this" but "does anything on the wire depend on it",
+and for three of the four the answer is a mechanism that is tested.
+
+| Feature | The mechanism this provider owns | Evidence |
+|---|---|---|
+| Computed columns | A value the server generates and returns. In the model that is `ValueGenerated.OnAddOrUpdate`; `HasComputedColumnSql` is only how a store produces it. | `StoreGeneratedTestBase` is adopted and green, and it parameterizes `OnAddOrUpdate` heavily. No `StoreGenerated` entry in `test/known-failures.txt`. |
+| Sequences / hi-lo | The same: a key the server issues, carried back and matched to the client's placeholder. | The store-generated key path is the most heavily exercised write path here (C76 and the correlation-id mechanism). |
+| `rowversion` | A store-generated concurrency token, compared server-side against original values the wire carries. | `ConcurrencyTokenTest`, `OptimisticConcurrencyInfoCarrierTest` and `ConcurrencyDetectorInfoCarrierTest`: 67 pass, 0 fail. |
+| **TPT / TPC** | **This one is different, and it is the real gap.** It changes the *model*, and this provider builds a model on the client as well as on the server. | **None. No TPT or TPC test class exists here at any tier**; the inheritance base that is adopted, `InheritanceQueryInfoCarrierTest`, is TPH. |
+
+So the honest statement is: **three of the four rest on mechanisms with direct green coverage, and
+what is untested about them is the store's own behaviour, which is an ordinary EF Core concern on
+the server and never crosses this wire.** TPT and TPC are the one open question, because a mapping
+strategy is a model concern and the client has a model too.
+
+**No user-facing document may claim any of the four works**, which is unchanged: green coverage of
+a mechanism is not a claim about a store this suite never runs.
 
 **The direction the owner would rather spend it on is a non-relational backend**, recorded in the
 deferred table below. That is future scope and nothing is committed.

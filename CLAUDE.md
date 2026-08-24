@@ -203,9 +203,16 @@ remote cancel signal (W6)**, and it is now the only work left in the whole roadm
 **M7's SQL Server tier is DROPPED (2026-08-24, owner's decision), not deferred.** What is withdrawn
 is a *third test tier* for this repository's suite, never support for the store: the server side is
 an ordinary EF application and runs against whatever provider it references, so requirements §5 is
-unaffected and ADR-009 keeps its two tiers. **The cost is that `rowversion` concurrency, computed
-columns, sequences and TPT/TPC are exercised by nothing that runs**, so this repository has no
-evidence about them and no user-facing document may claim they work. A non-relational backend tier
+unaffected and ADR-009 keeps its two tiers. **The cost is smaller than it first looks and is stated
+per feature in `roadmap.md`, because a first reading of it lumped four features together and was
+too broad for three of them.** Computed columns, sequences and `rowversion` all reduce, on this
+side of the wire, to mechanisms with direct green coverage: store-generated values
+(`StoreGeneratedTestBase`, including `OnAddOrUpdate`) and concurrency tokens (67 pass). What is
+untested about those three is the *store's* behaviour, which is an ordinary EF concern on the
+server and never crosses this wire. **TPT/TPC is the one real gap**: it changes the model, and this
+provider builds a model on the client too, and no TPT or TPC test class exists here at any tier.
+**No user-facing document may claim any of the four works** — green coverage of a mechanism is not
+a claim about a store this suite never runs. A non-relational backend tier
 is recorded as future scope with nothing committed.
 
 **M9 is CLOSED (2026-08-17).** The paragraph below was written while M8 was still open.
