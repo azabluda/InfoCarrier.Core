@@ -82,12 +82,38 @@ ICO_SIZES = [16, 32, 48]
 # edge comes along, which is what keeps the glow on the rendered icon.
 ALPHA_FLOOR = 2
 
+# How far from square a mark may be and still be scaled to fill the canvas exactly.
+#
+# WHY NOT JUST PRESERVE THE ASPECT. Because the canvas is square and the leftover is not spread,
+# it is a band. This artwork is 3.3% wider than tall, which sounds negligible and is not: at 16px
+# it makes the mark 16x15 and leaves a whole empty ROW, 6% of the icon's height, and the centring
+# puts all of it at the bottom because (16-15)//2 is 0. It is plainly visible in a browser tab.
+# Every size pays it -- 1 row at 32, 2 at 48, 4 at 128, 17 at 512.
+#
+# 3.3% IS THE ARTWORK, NOT A STRAY GLOW PIXEL, which is why the trim above cannot fix it: the
+# bounding box measures 1.0336 at alpha 2, 1.0328 at alpha 128 and 1.0319 at alpha 250. The tile
+# itself is that shape.
+#
+# So the choice is a distortion or a band, and on a rounded tile a 3.3% stretch is invisible while
+# the band is not. Cropping to square was the third option and was worse: it eats the lit rim on
+# the left and right while leaving it on the top and bottom, which reads as a mistake at 48px.
+#
+# THE TOLERANCE IS THE GUARD. A mark further from square than this keeps its aspect and gets the
+# band, because at that point the shape is the point of it -- a wordmark stretched 20% is a
+# different wordmark.
+SQUARE_TOLERANCE = 0.08
+
 
 def render(mark, canvas, margin):
     """Fit the mark inside `canvas`, centred, leaving `margin` px on the tightest axis."""
     target = canvas - 2 * margin
-    scale = min(target / mark.width, target / mark.height)
-    size = (max(1, round(mark.width * scale)), max(1, round(mark.height * scale)))
+
+    if abs(mark.width / mark.height - 1) <= SQUARE_TOLERANCE:
+        size = (target, target)
+    else:
+        scale = min(target / mark.width, target / mark.height)
+        size = (max(1, round(mark.width * scale)), max(1, round(mark.height * scale)))
+
     scaled = mark.resize(size, Image.LANCZOS)
 
     icon = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
