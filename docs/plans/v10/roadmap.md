@@ -644,6 +644,22 @@ from `test-report.yml` instead, because a fork's token cannot create one.
 every push. `mkdocs build --strict` checks that a page exists and not that an `#anchor` does, so
 without this a renamed heading breaks inbound links and the build stays green.
 
+**Enforcement, since 2026-08-26.** Until that date none of this was enforced: `main` had no
+protection and the one ruleset was disabled and targeted no refs, so the ratchet computed the right
+verdict and nothing acted on it. A repository ruleset on the default branch now requires a pull
+request with one approving review, requires `Docs gates`, `Fast gate` and `Spec ratchet` to pass,
+and blocks force-pushes and deletion of `main`. **`Spec suite` is deliberately not required**, for
+the reason above: it is green unconditionally, so requiring it would require nothing.
+
+Two choices in it are deliberate and would otherwise read as mistakes. **Repository admin is on the
+bypass list in `Always` mode**, which exempts the owner from every rule including direct and force
+pushes; that is correct while this is a single-maintainer repository, and it becomes
+`For pull requests only` once collaborators are established — the owner then goes through pull
+requests but can still merge without waiting on the approval or the checks. And **branches must be
+up to date before merging**, which costs a full re-run of the eight-minute suite immediately before
+each merge; that price is paid on purpose, because the alternative is merging a pull request whose
+green was measured against an older `main`.
+
 **There is no third tier and no nightly job.** This said "Tier C (Docker SQL Server) runs nightly
 from M7" until 2026-08-25. That tier was dropped on 2026-08-24 (M7 above), and no scheduled
 workflow ever existed: the repository has five workflows and none runs on a cron — the fifth, `test-report.yml`, is triggered by `workflow_run` and not by a schedule.
