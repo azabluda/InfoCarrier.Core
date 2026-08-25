@@ -88,7 +88,11 @@ adopt.
 ## Getting support
 
 If you encounter a bug, have a question, or would like to request a feature,
-[open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).
+[open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new). For a vulnerability,
+use a [draft security advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new)
+instead, as [SECURITY.md](SECURITY.md) describes.
+
+Fixes go to the `10.0` line. The `1.0` to `3.1` line last shipped on 2021-05-07 and gets none.
 
 ## Credits
 

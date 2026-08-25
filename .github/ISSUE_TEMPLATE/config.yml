@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/azabluda/InfoCarrier.Core/security/advisories/new
+    about: Never in a public issue. A draft advisory stays private until it is published.
+  - name: Documentation
+    url: https://azabluda.github.io/InfoCarrier.Core/
+    about: Installation, configuration, the security model, and the limitations page.

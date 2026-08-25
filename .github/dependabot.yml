@@ -1,0 +1,37 @@
+# Dependabot version updates. Security updates are a separate repository setting and are already on.
+#
+# THE EF CORE FAMILY IS IGNORED ON PURPOSE, and this is the whole point of the file.
+#
+# This repository builds a LIBRARY, so the version it references becomes the FLOOR a consumer
+# inherits: `<dependency id="Microsoft.EntityFrameworkCore" version="10.0.0" />` in the nuspec means
+# ">= 10.0.0", not "= 10.0.0". Accepting a bump to a newer EF patch would raise that floor and stop
+# the package resolving for anyone on an earlier EF 10, for no gain. Central Package Management
+# makes it one number for every project here, so a bump "for the tests" is a bump for consumers too.
+#
+# Raise it deliberately, and only when this provider needs a fix that shipped in that patch. Npgsql
+# does exactly that: its 10.0.0 declares [10.0.0, 11.0.0) and its 10.0.2 declares [10.0.4, 11.0.0),
+# because by then it needed the later one.
+#
+# Monthly rather than weekly for what is left: this repository pins the .NET SDK to a single line,
+# so a faster cadence produces pull requests that say nothing and train people to ignore them.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    ignore:
+      # The consumer's floor. See above.
+      - dependency-name: Microsoft.EntityFrameworkCore*
+      # Framework packages that move with the .NET release band rather than on their own.
+      - dependency-name: Microsoft.AspNetCore*
+      - dependency-name: Microsoft.Extensions.*
+      - dependency-name: System.*
+
+  # The workflows pin actions by major version, so this catches a v4 to v5 move that nothing else
+  # would surface.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

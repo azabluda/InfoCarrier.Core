@@ -1,0 +1,22 @@
+name: Feature request
+description: Something this provider cannot do that you need.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to do
+      description: The application problem, not the API you have in mind for it.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today instead
+      description: A workaround, however ugly, is the strongest evidence that the gap is real.
+    validations:
+      required: true
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: How another EF Core provider handles it, if one does

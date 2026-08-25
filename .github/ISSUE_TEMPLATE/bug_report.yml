@@ -1,0 +1,61 @@
+name: Bug report
+description: Something behaves differently from a normal EF Core provider.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things settle most reports here, so they are asked first: the query, and whether the
+        same query works when the server's provider runs it directly. This provider remotes an
+        expression tree, so a failure is either in the remoting or in the store, and that one
+        comparison says which.
+
+        For a vulnerability, do not use this form. Open a
+        [draft security advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "10.0.0"
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: The server's EF Core provider
+      placeholder: "Npgsql 10.0.0, SQL Server, SQLite, InMemory"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: The query or the SaveChanges call
+      description: The smallest version that still fails. Include the entity types it touches.
+      render: csharp
+    validations:
+      required: true
+  - type: dropdown
+    id: direct
+    attributes:
+      label: Does the same code work against that provider directly, with no InfoCarrier?
+      options:
+        - "Yes, it works directly and fails through InfoCarrier"
+        - "No, it fails directly too"
+        - "Not tried"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The exception with its stack trace, or the wrong result beside the expected one.
+    validations:
+      required: true
+  - type: textarea
+    id: checked
+    attributes:
+      label: Checked against the limitations page
+      description: >-
+        https://azabluda.github.io/InfoCarrier.Core/limitations/ lists every scenario in EF Core's
+        specification suite that does not behave normally here. If yours is on it, say which entry
+        and what you need beyond what it says.

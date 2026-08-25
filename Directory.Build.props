@@ -164,6 +164,25 @@
     -->
     <PackageIcon>icon.png</PackageIcon>
 
+    <!--
+      THE PACKAGE IS COMPARED WITH THE ONE BEFORE IT, and a break fails the pack. A stable version
+      is a promise not to break the public surface, and this is the SDK's own way of checking the
+      promise: it downloads the baseline package from nuget.org and compares assemblies, so there
+      is no API list in this repository to keep in step by hand.
+
+      NOT `Microsoft.CodeAnalysis.PublicApiAnalyzers`, and that was checked rather than assumed.
+      `subrepos/efcore` has no `PublicAPI.Shipped.txt` anywhere, no reference to that analyzer, and
+      no ApiCompat in its own build: EF Core's API review happens outside its repository. Adopting
+      the analyzer here was tried and it also fights the System.Text.Json source generator, which
+      emits 168 public members on the two `JsonSerializerContext` classes that RS0016 demands in a
+      baseline file and RS0041 then flags, none of them written here.
+
+      The baseline is a PRERELEASE on purpose while one is the newest thing published. Raise it to
+      10.0.0 with the release, and after that to each previous stable.
+    -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>10.0.0-preview.1</PackageValidationBaselineVersion>
+
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

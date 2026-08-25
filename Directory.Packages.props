@@ -11,7 +11,21 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
     <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.14.4" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <!--
+      A RANGE, NOT A POINT, AND IT IS THE ONE NUMBER CONSUMERS INHERIT. NuGet reads a bare
+      `Version="10.0.0"` in a nuspec as ">= 10.0.0" with no ceiling, so the package would resolve
+      against EF Core 11. This provider is built on EF internals by design (19 files carry
+      `#pragma warning disable EF1001`), and a major EF release moves them, so an unbounded range
+      trades a clear restore error for a runtime failure inside IStateManager.
+
+      Npgsql declares the same shape: its 10.0.0 is [10.0.0, 11.0.0) and its 10.0.2 is
+      [10.0.4, 11.0.0), the floor raised deliberately once it needed a later patch.
+
+      THE FLOOR IS THE POINT OF THE LOWER BOUND. It is what a consumer is forced onto, so do not
+      raise it to chase a patch; raise it only when this provider needs a fix that shipped in one.
+      .github/dependabot.yml ignores this family for exactly that reason.
+    -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="[10.0.0,11.0.0)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
@@ -27,14 +41,17 @@
       Raising it changes no declared dependency of InfoCarrier.Core, which references only
       Microsoft.EntityFrameworkCore and Microsoft.EntityFrameworkCore.Relational.
 
-      CORRECTED 2026-08-17 (M8-19), and only the last sentence was wrong. It IS a declared
-      dependency of the *package*: transitive pinning promotes a pin into the nuspec, so
-      InfoCarrier.Core.10.0.0-preview.1 declares Microsoft.Extensions.DependencyInjection >= 10.0.9
-      even though no csproj references it. Left as it is — the floor is real (EF Core's SQLite
-      package reaches it), and consumers of an EF provider acquire that package anyway — but it is
-      recorded because a dependency nobody chose is exactly what nobody looks for. Turning
-      CentralPackageTransitivePinningEnabled off for the packable projects is the alternative, and
-      it reintroduces the NU1109 this pin exists to prevent.
+      CORRECTED 2026-08-17 (M8-19), then CORRECTED AGAIN 2026-08-25, and the second correction
+      withdraws the first. M8-19 said transitive pinning promotes this pin into the nuspec, so the
+      package would declare Microsoft.Extensions.DependencyInjection >= 10.0.9 although no csproj
+      references it. It does not. Read out of a packed nuspec on 2026-08-25:
+
+        <dependency id="Microsoft.EntityFrameworkCore" version="10.0.0" exclude="Build,Analyzers" />
+
+      That is the whole dependency group. The pin is a build-time floor and nothing more, so no
+      dependency nobody chose reaches a consumer. The floor itself is still real and still needed:
+      EF Core's SQLite package reaches 10.0.9, and turning CentralPackageTransitivePinningEnabled
+      off for the packable projects reintroduces the NU1109 this pin exists to prevent.
     -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <!--
