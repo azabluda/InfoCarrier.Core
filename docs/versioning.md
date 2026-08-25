@@ -228,12 +228,18 @@ nuget.org first — which matters here, because neither does.
 ## Releasing, start to finish
 
 1. Land the work. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both ratchets green.
-2. Update `docs/limitations.md` if the failure set moved.
+2. Update `website/docs/limitations.md` if the failure set moved.
 3. Tag: `git tag -a v10.0.0-preview.2 -m "InfoCarrier.Core 10.0.0-preview.2"`.
 4. Push the tag: `git push origin v10.0.0-preview.2`.
 5. Watch `release.yml`. It runs both gates, packs, and creates the Release.
 6. Approve `publish-nuget` when you mean it.
-7. Update the version named in `README.md`, `docs/nuget-readme.md` and the site's installation page.
+7. **Apply the release body, because the workflow does not.** `release.yml` creates the Release
+   with GitHub's generated notes plus a paragraph about the reviewer gate, and that is not the
+   body this repository wrote: `gh release edit <tag> --notes-file docs/release-bodies/<tag>.md`.
+   Archive a body being replaced as `<tag>.superseded-<date>.md` first, because GitHub keeps no
+   history of one. Skipping this is not visible from the repository, which is how the published
+   `v10.0.0-preview.1` body drifted from its copy here.
+8. Update the version named in `README.md`, `docs/nuget-readme.md` and the site's installation page.
 
-Step 7 is the one thing still done by hand, and it is deliberate: an install instruction naming a
+Step 8 is the one thing still done by hand, and it is deliberate: an install instruction naming a
 version is worth more to a reader than one that says "latest".

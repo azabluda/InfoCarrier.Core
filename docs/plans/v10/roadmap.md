@@ -16,20 +16,22 @@ Authority: [`infocarrier-core-requirements.md`](../../infocarrier-core-requireme
 
 ## Where we are
 
+**Every milestone is closed.** M5 was the last, on 2026-08-24, when the remote half of cancellation
+(W6) landed: the server reads the token the transport already handed it, so a caller who abandons
+a request stops the query at the store rather than only stopping its own wait.
+
 The query pipeline is complete end to end — capture → serialize → transport → server rebind →
 EF execute → client materialization with identity resolution. The **projection split (M2)**,
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-Measured 2026-08-11 (`artifacts/measure/c96`): **`Total tests: 22453, Passed: 22219,
-Failed: 13, Skipped: 221`**. All 13 are classified in the archived plan's C96; ten are permanent
-by design or upstream.
+**`Total tests: 22662, Passed: 22476, Failed: 9, Skipped: 177`.** All nine are classified, and
+`test/known-failures.txt` carries the dated reading for each. What is missing is stated for
+consumers in [`limitations.md`](../../../website/docs/limitations.md).
 
-**M5 is one criterion from done.** Node kinds (C36), payload size (C37), the envelope and protocol
-version (C45), exception fidelity (C46) and the security review (C48) all landed on 2026-08-10;
-**cancellation (W6) is the only thing left**, and `security-review.md` §6 already records what it
-must get right. The whole suite now runs through a real envelope with faults crossing as data,
-which is what makes the error behaviour testable at all.
+**This section has been wrong before.** It read "M5 is one criterion from done" and quoted a
+2026-08-11 measurement for a day after M5 closed, which put the first screen of the stable plan
+at odds with its own milestone headers. Re-read it whenever a milestone closes.
 
 ---
 
@@ -628,7 +630,13 @@ Any failure blocks.
 baseline in `test/known-failures.txt`. **Fail only if failures increase.** Nothing is skipped
 or hidden, progress is monotonic, and the baseline drops as milestones land.
 
-Tier C (Docker SQL Server) runs nightly from M7, never on the per-commit path.
+**Job 3 — documentation gates.** `eng/doc-links.py` and `eng/doc-words.py --all --budget`, on
+every push. `mkdocs build --strict` checks that a page exists and not that an `#anchor` does, so
+without this a renamed heading breaks inbound links and the build stays green.
+
+**There is no third tier and no nightly job.** This said "Tier C (Docker SQL Server) runs nightly
+from M7" until 2026-08-25. That tier was dropped on 2026-08-24 (M7 above), and no scheduled
+workflow ever existed: the repository has four workflows and none runs on a cron.
 
 ---
 

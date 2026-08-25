@@ -21,6 +21,33 @@ env:
   CI: true
 
 jobs:
+  # The documentation gates, which cost seconds and need no .NET.
+  #
+  # `mkdocs build --strict` in docs.yml checks that a linked PAGE exists. It does NOT check the
+  # `#anchor` after it, so renaming a heading breaks every inbound link and the site build stays
+  # green. Three links died that way once, one of them on the security path, which is what
+  # eng/doc-links.py was written for. It lived only in a contributor's memory until this job.
+  #
+  # Here rather than in docs.yml because docs.yml is filtered to `website/**`, and doc-links.py
+  # reads README.md, src/**/*.md and docs/**/*.md as well.
+  docs-gates:
+    name: Docs gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Links, including anchors
+        run: python eng/doc-links.py
+
+      - name: Prose word budgets
+        run: python eng/doc-words.py --all --budget
+
   # Must be green. Build plus the two suites that are expected to pass unconditionally:
   # serializer round-trip and the end-to-end vertical slice.
   fast-gate:
