@@ -4,6 +4,12 @@
 # CLAUDE.md forbids skipping a test to force green. CI therefore gates on direction — failures
 # must not rise, and the total must not shrink.
 #
+# THIS FILE IS HALF THE BASELINE. The other half is known-failures.names.txt, which holds the
+# failing test names and nothing else -- no header, no comments -- because eng/ratchet.sh feeds it
+# to `comm` and `comm` cannot skip comments. The two move together: a commit that changes `failed`
+# below must copy artifacts/test-results/failures.txt over the names file. The names are what makes
+# "fixed four, broke four" fail the gate, which the count below cannot see.
+#
 # Lower `failed` in the same commit as the fix that lowers it. Raise it only with a reason in the
 # commit message; the last deliberate rise was step L1, which turned on the type allowlist and
 # converted ~1,305 illusory passes into real M2 failures.

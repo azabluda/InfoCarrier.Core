@@ -26,7 +26,8 @@ estimate a count, and never derive one figure from the others.
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
-| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. |
+| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. **It gates on the failing test NAMES as well**, read by `eng/trx-failures.py` and diffed against `test/known-failures.names.txt`: a change that fixes four tests and breaks four others leaves the count untouched. It publishes that delta to `$GITHUB_STEP_SUMMARY`, which the test report action cannot do because it does not know the baseline. |
+| `eng/trx-failures.py <results.trx>` | The failing test names in a TRX, sorted, one per line. What `test/known-failures.names.txt` holds and what `ratchet.sh` diffs. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
@@ -235,6 +236,12 @@ Query, projection split and SaveChanges work end-to-end. Lazy loading works: Pha
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
 the one deliberate lowering, in C94, where two skipped theories turned 4 tests into 2.
+
+**The baseline is two files and they move together.** `test/known-failures.txt` holds the counts
+and the reasoning; `test/known-failures.names.txt` holds the failing test names and nothing else,
+because `comm` cannot read a file with comments in it. A commit that lowers the count must copy
+`artifacts/test-results/failures.txt` over the names file, and the ratchet says so in a `::notice::`
+when it sees the count fall.
 
 **All 9 failures are classified and not one is of unknown standing.** They sit in six classes,
 three holding two and three holding one. The tables are in
