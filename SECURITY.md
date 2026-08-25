@@ -36,4 +36,4 @@ has to build against them.
 
 ## Versions
 
-Fixes go to the `10.0` line. The `1.0` to `3.1` line last shipped in 2020 and gets none.
+Fixes go to the `10.0` line. The `1.0` to `3.1` line last shipped on 2021-05-07 and gets none.
