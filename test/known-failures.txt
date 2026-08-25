@@ -346,5 +346,5 @@
 #
 # `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22662 / 22476 / 9 / 177 (`cancellation-final`).
-failed=9
-total=22662
+failed=8
+total=22663
