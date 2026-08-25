@@ -214,6 +214,28 @@ correlation id becomes a handle by which one caller can affect another caller's 
 request** — so the id must be unguessable and scoped to its connection. Recorded here because it is
 the one open M5 item with a security consequence.
 
+### 6a. Amendment 2026-08-25 — W6 closed, and not by the mechanism this section describes
+
+**This section is now history and its warning does not apply.** W6 landed on 2026-08-24 through
+the transport, not through the envelope: `MapInfoCarrier` hands `HttpContext.RequestAborted` down
+the chain, and `ServerQueryExecutor.ExecuteQueryAsync` gives that token to EF, which gives it to
+the `DbCommand`. A caller who abandons a request drops the connection, and the store cancels the
+command. **Nothing reads `InfoCarrierEnvelope.CorrelationId`**, so no id has become a handle by
+which one caller can affect another's in-flight request, and the "unguessable and scoped to its
+connection" requirement above has nothing to attach to.
+
+`CorrelationId` still exists on the envelope and is still part of the public surface. What it does
+is narrower than this section assumed: the server copies it onto the response, because every
+response is built as `request with { ... }`, so a caller that sets one gets it back. It carries no
+authority and addresses nothing, which is why it is not a handle. Its own comment said otherwise
+until 2026-08-25 and now says this.
+
+**The requirement is not retired, it is relocated.** Should a later release make a correlation id
+address an in-flight request, everything §6 says about unguessability and connection scope applies
+from that moment. The same property is already live elsewhere and is a real gap: the W3
+transaction token addresses server-held state and is not bound to its creator. That is stated for
+consumers in `website/docs/security.md` and in `SECURITY.md`, and tracked in `roadmap.md` M8.
+
 ## 7. The response direction, held to a different standard
 
 `InfoCarrierFaultMapper` (W5, C46) resolves an exception type **by name** and constructs it. That is

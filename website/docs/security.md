@@ -68,7 +68,7 @@ correct-looking tenant filter read the wrong tenant.
 ## The shape of the exposure
 
 A client can compose any query over the entity types your shared model exposes. That is the feature,
-and it has three consequences.
+and it has four consequences.
 
 Expensive queries are reachable. A caller can ask for a cross join. Cap the cost where the caller
 cannot reach: a rate limit at the gateway, a statement timeout on the database, or a query
@@ -81,6 +81,10 @@ internal identifiers, catch and rewrite them at the server boundary.
 The endpoint is not a read-only API. `SaveChanges` and `ExecuteDelete` are part of it, so do not
 expose it to the public internet without authentication.
 
+A transaction token is a bearer token. The server does not bind it to the caller who opened the
+transaction, so anyone holding one can commit or roll it back. Nothing reaps an abandoned one
+either; [Transactions](guide/transactions.md) covers that.
+
 ## Transport security
 
 Use HTTPS. The envelope is not encrypted or signed by this library, so a request that can be read
@@ -88,5 +92,6 @@ can be modified, and TLS terminating at a gateway leaves the hop behind it unpro
 
 ## Reporting a vulnerability
 
-For anything you would rather not disclose publicly, contact the maintainer through the repository
-first. Otherwise, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).
+Report it privately: [open a draft security advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new).
+GitHub notifies the maintainer without making the report public.
+[SECURITY.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/SECURITY.md) states the scope.
