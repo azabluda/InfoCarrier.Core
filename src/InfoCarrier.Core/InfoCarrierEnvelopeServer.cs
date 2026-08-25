@@ -73,8 +73,9 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
             //
             // `OperationCanceledException` is excluded because cancellation is not a server-side
             // failure to report — it is the caller's own token, and the caller is entitled to see
-            // its own `OperationCanceledException` rather than a rebuilt copy. That is W6's
-            // question and it is still open.
+            // its own `OperationCanceledException` rather than a rebuilt copy. W6 closed on that
+            // footing: the server stops the query when the token trips, and the exception stays
+            // the caller's.
             return request with
             {
                 Payload = _serializer.Serialize<object?>(null),

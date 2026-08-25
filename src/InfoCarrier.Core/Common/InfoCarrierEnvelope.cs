@@ -12,7 +12,7 @@ namespace InfoCarrier.Core.Common;
 ///     the type cannot say which leg it is on, and the leg that matters is the one where an
 ///     untrusted caller chooses the bytes. A client that would rather not bound the responses it
 ///     buffers can raise <see cref="InfoCarrierPayloadLimits.MaxRequestBytes" /> on its own
-///     serializer. Distinguishing the two properly is part of M5's still-open envelope criterion.
+///     serializer. The type does not distinguish the two legs.
 /// </remarks>
 public sealed record InfoCarrierEnvelope : IInfoCarrierRequest
 {
@@ -40,8 +40,10 @@ public sealed record InfoCarrierEnvelope : IInfoCarrierRequest
     public required byte[] Payload { get; init; }
 
     /// <summary>
-    ///     An optional correlation/cancellation token for async + streaming cancellation
-    ///     (wire-protocol W6). Null when not used.
+    ///     An optional caller-supplied id. The server copies it onto the response to the request
+    ///     it answers, so a caller that has more than one request in flight over one transport can
+    ///     match an answer to the request that produced it. Nothing in this package sets it, and
+    ///     it is null when a caller does not.
     /// </summary>
     public string? CorrelationId { get; init; }
 
