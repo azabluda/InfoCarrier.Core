@@ -154,14 +154,24 @@ jobs:
       # tests are visible on the pull request without downloading the artifact. It creates a check
       # run named `Spec suite`; its title carries the three counters.
       #
-      # THE RATCHET IS STILL THE GATE, and this step must never become one. `fail-on-error: true`
-      # makes the check run red, which is what was asked for -- 9 tests really do fail -- but it
-      # also calls setFailed, which would fail this job on every run and leave `ratchet.sh`'s exit
-      # status meaning nothing. `continue-on-error: true` is what keeps those apart: the check run
-      # is created and marked failed before setFailed is reached, and the job stays green.
+      # THE RATCHET IS THE GATE. This step reports and never gates, and `fail-on-error: false` is
+      # what makes that true of the CHECK as well as of the job: the action's conclusion is
+      # `failOnError && anyFailed`, so with it off the check run completes green. Nothing else
+      # changes -- the title still reads `... 9 failed ...`, and the report and the annotations are
+      # identical. The count is on the check; the verdict is the ratchet's.
       #
-      # For the same reason `Spec suite` MUST NOT be added to branch protection's required checks.
-      # It is red by design, and a required red check blocks every merge.
+      # THIS WAS RED FOR EXACTLY ONE PULL REQUEST, on purpose, and reversed the same day. A pull
+      # request LIST shows one icon per row, the rollup of every check, and it takes the worst one.
+      # So #57 sat above forty green ticks wearing a red cross that meant "nine tests fail, as they
+      # have since M2". Every later pull request, Dependabot's included, would have worn the same
+      # one. That is the check-blindness this comment used to warn about, arriving through the door
+      # it was watching.
+      #
+      # `continue-on-error` stays, for the other reason: a 403, a missing artifact or a bad parse
+      # is a reporting problem, and a reporting problem must not fail a build whose tests ran.
+      #
+      # `Spec suite` MUST NOT be added to branch protection's required checks. It is now green
+      # unconditionally, so requiring it would require nothing at all.
       #
       # `list-suites` and `list-tests` are not optional at this size. A check run's output is capped
       # at 65535 bytes and the action trims the listing at an arbitrary point above it, so at 22662
@@ -193,7 +203,7 @@ jobs:
           list-suites: 'failed'
           list-tests: 'failed'
           max-annotations: '50'
-          fail-on-error: 'true'
+          fail-on-error: 'false'
           fail-on-empty: 'true'
 
       # Publishes the numbers the ratchet just read to the `badges` branch, where shields.io reads
