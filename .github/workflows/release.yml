@@ -153,7 +153,8 @@ jobs:
             Publishing uses **Trusted Publishing**: the job exchanges a GitHub OIDC token for an
             API key valid for one hour. No publishing secret is stored in this repository.
 
-            Known limitations for this release: [`docs/limitations.md`](docs/limitations.md).
+            Known limitations for this release:
+            https://azabluda.github.io/InfoCarrier.Core/limitations/
 
   # ------------------------------------------------------------------------------------------
   # The irreversible step, and the only one in this repository that needs a human.

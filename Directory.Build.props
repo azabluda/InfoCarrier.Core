@@ -88,7 +88,12 @@
       would have failed on it. MinVer removes the disagreement instead of policing it.
 
       To release:  git tag -a v10.0.1 -m "..."  &&  git push origin v10.0.1
-      To see what a build will produce:  dotnet msbuild -getProperty:Version
+      To see what a build will produce:  dotnet pack, and read the file name.
+
+      NOT `dotnet msbuild -getProperty:Version`, which this said until 2026-08-25 and which
+      answers 1.0.0. `-getProperty` evaluates without running targets, and MinVer sets the
+      version IN a target, so what comes back is the SDK default. It reads like a catastrophe
+      on release day and it is only the wrong question.
 
       An untagged commit builds as the next patch with a height — `10.0.1-alpha.0.7` — which is
       unique, ordered, and exactly what an internal CI feed wants.
@@ -178,11 +183,14 @@
       emits 168 public members on the two `JsonSerializerContext` classes that RS0016 demands in a
       baseline file and RS0041 then flags, none of them written here.
 
-      The baseline is a PRERELEASE on purpose while one is the newest thing published. Raise it to
-      10.0.0 with the release, and after that to each previous stable.
+      RAISE THIS WITH EACH RELEASE, to the newest published stable, and delete any suppression
+      that described a break against the version it replaces. It was 10.0.0-preview.1 until
+      2026-08-25 and moved once 10.0.0 was downloadable from nuget.org, which is the
+      constraint: validation fetches the baseline package, so it cannot name one that is not
+      published yet.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>10.0.0-preview.1</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>10.0.0</PackageValidationBaselineVersion>
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>

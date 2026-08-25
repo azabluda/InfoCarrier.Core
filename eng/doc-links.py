@@ -75,6 +75,13 @@ def main(argv):
         + sorted(glob.glob("docs/**/*.md", recursive=True))
     )
     files = [f for f in files if os.path.exists(f)]
+
+    # A superseded release body is a VERBATIM record of text that was published on GitHub, where
+    # GitHub keeps no history of its own. It is never edited, for the same reason a plan archive is
+    # never edited, so a link that was broken when it shipped stays broken here. That is the record
+    # working, not the gate failing. `v10.0.0.superseded-2026-08-25.md` is the first one, and the
+    # link it preserves is what sent this check looking at release.yml, which had the wrong path.
+    files = [f for f in files if ".superseded-" not in os.path.basename(f)]
     bad = check(files)
     print("doc-links: %d link%s broken in %d files" % (bad, "" if bad == 1 else "s", len(files)))
     return 1 if bad else 0
