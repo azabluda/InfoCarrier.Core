@@ -45,7 +45,7 @@ jobs:
     steps:
       # Full history: SourceLink stamps the commit into the package, and a shallow clone gives
       # it nothing to stamp.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
