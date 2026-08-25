@@ -100,9 +100,11 @@ jobs:
     runs-on: ubuntu-latest
 
     # Write access is for the `badges` branch only -- see the last step. Stated on the job rather
-    # than the workflow so the fast gate keeps the read-only default.
+    # than the workflow so the fast gate keeps the read-only default. `checks: write` is for the
+    # test report below, which creates a check run of its own.
     permissions:
       contents: write
+      checks: write
 
     steps:
       # Full history, because MinVer reads the version off the git tags and a shallow
@@ -147,6 +149,52 @@ jobs:
         with:
           name: test-results
           path: artifacts/test-results
+
+      # Renders the TRX the ratchet just read as a browsable report, so the counts and the failing
+      # tests are visible on the pull request without downloading the artifact. It creates a check
+      # run named `Spec suite`; its title carries the three counters.
+      #
+      # THE RATCHET IS STILL THE GATE, and this step must never become one. `fail-on-error: true`
+      # makes the check run red, which is what was asked for -- 9 tests really do fail -- but it
+      # also calls setFailed, which would fail this job on every run and leave `ratchet.sh`'s exit
+      # status meaning nothing. `continue-on-error: true` is what keeps those apart: the check run
+      # is created and marked failed before setFailed is reached, and the job stays green.
+      #
+      # For the same reason `Spec suite` MUST NOT be added to branch protection's required checks.
+      # It is red by design, and a required red check blocks every merge.
+      #
+      # `list-suites` and `list-tests` are not optional at this size. A check run's output is capped
+      # at 65535 bytes and the action trims the listing at an arbitrary point above it, so at 22662
+      # tests a full listing would always be cut. `failed` lists the failures and the classes that
+      # own them, which is the part worth reading anyway.
+      #
+      # `fail-on-empty` is belt to eng/ratchet.sh's braces: the ratchet runs first and already exits
+      # 1 on a missing TRX, which is the failure this job must not swallow. Here it only marks the
+      # step, because continue-on-error covers this one.
+      #
+      # Skipped for a pull request from a fork, where the token is read-only and creating a check
+      # run returns 403. On a push the expression is `null != true`, so pushes still run it. The
+      # fix for forks is a second `workflow_run` workflow; it is not written because every pull
+      # request here is from this repository, Dependabot's included.
+      #
+      # Pinned by commit SHA, unlike the actions/* above -- see .github/dependabot.yml, which notes
+      # that the workflows pin by major version. This is the first third-party action here and the
+      # exception is deliberate: a tag can be moved to point at other code, a commit SHA cannot.
+      # Dependabot updates SHA pins the same way it updates tags.
+      - name: Test report
+        if: always() && github.event.pull_request.head.repo.fork != true
+        continue-on-error: true
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2  # v3.0.0
+        with:
+          name: Spec suite
+          path: artifacts/test-results/results.trx
+          reporter: dotnet-trx
+          use-actions-summary: 'false'
+          list-suites: 'failed'
+          list-tests: 'failed'
+          max-annotations: '50'
+          fail-on-error: 'true'
+          fail-on-empty: 'true'
 
       # Publishes the numbers the ratchet just read to the `badges` branch, where shields.io reads
       # them for README.md's spec-suite badge. The figures come from the counters file ratchet.sh

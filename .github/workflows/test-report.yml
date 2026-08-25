@@ -1,0 +1,70 @@
+name: Test report
+
+# The spec-suite check run for a pull request FROM A FORK, and for nothing else.
+#
+# build.yml creates that check run itself, in the `spec-ratchet` job, right where the TRX is
+# produced. It cannot do so for a fork: a workflow triggered by a fork's pull request runs with a
+# read-only token, and `checks.create` returns 403. This is the test reporter's own documented way
+# around that -- the build uploads the TRX as an artifact, and a second workflow, running in this
+# repository's context with a writable token, reads the artifact and creates the check.
+#
+# TWO THINGS ABOUT `workflow_run` THAT ARE EASY TO GET WRONG.
+#
+# It runs the copy of this file on the DEFAULT BRANCH, never the copy on the pull request's branch.
+# So a change here has no effect until it is merged, and it cannot be tested on a pull request the
+# way the step in build.yml can. Read that as the price of covering forks.
+#
+# It is a privileged context: the writable token is this repository's. Nothing here checks out or
+# executes the fork's code, and nothing here may start to. It reads one artifact and renders it.
+#
+# The failure DELTA does not come from here. eng/ratchet.sh writes that to the build's own job
+# summary, which needs no permissions and therefore already works on a fork's pull request.
+
+on:
+  workflow_run:
+    # Must match `name:` in build.yml exactly. Renaming that workflow silently stops this one.
+    workflows: ['Build & Test']
+    types: [completed]
+
+permissions:
+  contents: read
+  # To list and download the artifact belonging to the run that triggered this one.
+  actions: read
+  # The whole point: creating the check run the fork's own run could not.
+  checks: write
+
+jobs:
+  report:
+    name: Spec suite
+    runs-on: ubuntu-latest
+
+    # Forks only. build.yml covers every other case, and letting both run would put two check runs
+    # with the same name on one commit.
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name != github.repository
+
+    steps:
+      # Every input matches the step in build.yml, for the reasons given there: the listings are
+      # capped to failures because a check run's output stops at 65535 bytes and 22662 tests do
+      # not fit; `fail-on-error: true` puts the real result on the check; and continue-on-error
+      # keeps a reporting problem from being reported as a build problem.
+      #
+      # `artifact` plus `path` is the difference. `path` is relative to the inside of the artifact,
+      # which build.yml uploads from `artifacts/test-results`, so the TRX sits at its root.
+      #
+      # Pinned by commit SHA -- see the note in build.yml.
+      - name: Test report
+        continue-on-error: true
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2  # v3.0.0
+        with:
+          artifact: test-results
+          name: Spec suite
+          path: '*.trx'
+          reporter: dotnet-trx
+          use-actions-summary: 'false'
+          list-suites: 'failed'
+          list-tests: 'failed'
+          max-annotations: '50'
+          fail-on-error: 'true'
+          fail-on-empty: 'true'

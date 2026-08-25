@@ -630,13 +630,20 @@ Any failure blocks.
 baseline in `test/known-failures.txt`. **Fail only if failures increase.** Nothing is skipped
 or hidden, progress is monotonic, and the baseline drops as milestones land.
 
+**The reports.** The ratchet writes a delta to the run's job summary — the counts against the
+baseline, plus the tests fixed and broken by name. A `dorny/test-reporter` step turns the same TRX
+into a `Spec suite` check run, so a pull request carries the counters in a check title. That check
+is red by design and **must never be a required check**; `eng/ratchet.sh`'s exit status is the
+gate, and `continue-on-error` is what keeps the two apart. A fork's pull request gets the check
+from `test-report.yml` instead, because a fork's token cannot create one.
+
 **Job 3 — documentation gates.** `eng/doc-links.py` and `eng/doc-words.py --all --budget`, on
 every push. `mkdocs build --strict` checks that a page exists and not that an `#anchor` does, so
 without this a renamed heading breaks inbound links and the build stays green.
 
 **There is no third tier and no nightly job.** This said "Tier C (Docker SQL Server) runs nightly
 from M7" until 2026-08-25. That tier was dropped on 2026-08-24 (M7 above), and no scheduled
-workflow ever existed: the repository has four workflows and none runs on a cron.
+workflow ever existed: the repository has five workflows and none runs on a cron — the fifth, `test-report.yml`, is triggered by `workflow_run` and not by a schedule.
 
 ---
 
