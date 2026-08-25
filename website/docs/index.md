@@ -1,10 +1,10 @@
 # InfoCarrier.Core
 
 InfoCarrier.Core is an Entity Framework Core provider for the client side of a multi-tier
-application. Your client gets a real `DbContext` with LINQ, change tracking, the identity map,
-navigation fix-up, lazy loading and transactions, but no connection string and no database driver.
-Queries and units of work travel to your application server, which executes them with an ordinary
-EF Core provider.
+application. Your client is a WPF, Blazor WebAssembly, MAUI or console app. It gets a real
+`DbContext` with LINQ, change tracking, the identity map, navigation fix-up, lazy loading and
+transactions, but no connection string and no database driver. Queries and units of work travel to
+your application server, which executes them with an ordinary EF Core provider.
 
 ```csharp
 // A WPF, Blazor WebAssembly, MAUI or console app.

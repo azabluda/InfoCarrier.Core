@@ -330,6 +330,17 @@ in three different wordings, and all six now read the same way: HTTP is included
 message bus or an in-process call, write one small class; `IInfoCarrierTransport` has one method.
 Short sentences, one idea each, and the examples kept.
 
+**Corrected 2026-08-26. Both figures above are wrong, and the claim of uniformity was too.** The
+family is nine statements in eight source files, not six: `README.md`, `website/docs/index.md`,
+`src/InfoCarrier.Core/PACKAGE.md`, `website/docs/release-notes/10.0.md`,
+`website/docs/configuration/transports.md` (twice), `website/docs/getting-started/first-app.md`,
+and both files in `docs/release-bodies/`. They did not all read the same way: `README.md` still
+said "HTTP is included. To use gRPC, WCF or a message bus" until today. Only two of the nine do
+the same job and should match word for word, the README and the site front page, and those two do
+now. The other seven differ correctly, because a reference page, an install page and a release
+body are not a pitch. The original paragraph is left as written, because it records what was
+believed that day.
+
 `docs/release-bodies/v10.0.0-preview.1.superseded-2026-08-23.md` was deleted at the owner's request.
 The GitHub release body it archived is gone for good, and everything a reader needed from it is on
 the release-notes page.

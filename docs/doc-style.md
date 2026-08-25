@@ -33,7 +33,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | A site page that points | 400 | `api-surface.md` only |
 | The deepest pages | 700 | `limitations`, `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy` |
 | Two pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24 |
-| Whole site | not gated | 11,609 today across 23 files |
+| Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 
 The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own
 budget and nothing against the total, so a site-wide number here can only ever be a record of where

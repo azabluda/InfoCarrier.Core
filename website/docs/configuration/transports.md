@@ -91,7 +91,7 @@ transport you write should hand the envelope to it rather than reimplementing th
 
 ## A different protocol
 
-For gRPC, a message bus, WCF or named pipes, the client half is the same shape as HTTP:
+For gRPC, a message bus or named pipes, the client half is the same shape as HTTP:
 
 ```csharp
 public sealed class MyTransport(IMyChannel channel, IInfoCarrierSerializer serializer)

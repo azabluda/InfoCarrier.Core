@@ -1,8 +1,8 @@
 `InfoCarrier.Core` is an Entity Framework Core provider for the client side of a multi-tier
-application. Your client gets a real `DbContext` with LINQ, change tracking, the identity map,
-navigation fix-up, lazy loading and transactions, but no connection string and no database driver.
-Queries and units of work travel to your application server, which executes them with an ordinary
-EF Core provider.
+application. Your client is a WPF, Blazor WebAssembly, MAUI or console app. It gets a real
+`DbContext` with LINQ, change tracking, the identity map, navigation fix-up, lazy loading and
+transactions, but no connection string and no database driver. Queries and units of work travel to
+your application server, which executes them with an ordinary EF Core provider.
 
 Reference it from your client, and from your server alongside `InfoCarrier.Core.AspNetCore`,
 which depends on it. The `DbContext` and the entity classes are shared source, so both halves build
@@ -17,6 +17,7 @@ Build a client over a transport, then call `UseInfoCarrier` to choose the InfoCa
 your `DbContext`. For example:
 
 ```csharp
+// A WPF, Blazor WebAssembly, MAUI or console app.
 var serializer = new SystemTextJsonInfoCarrierSerializer();
 var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
 

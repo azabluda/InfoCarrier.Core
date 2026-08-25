@@ -18,10 +18,10 @@
 ---
 
 InfoCarrier.Core is an Entity Framework Core provider for the client side of a multi-tier
-application. Your client gets a real `DbContext` with LINQ, change tracking, the identity map,
-navigation fix-up, lazy loading and transactions, but no connection string and no database driver.
-Queries and units of work travel to your application server, which executes them with an ordinary
-EF Core provider.
+application. Your client is a WPF, Blazor WebAssembly, MAUI or console app. It gets a real
+`DbContext` with LINQ, change tracking, the identity map, navigation fix-up, lazy loading and
+transactions, but no connection string and no database driver. Queries and units of work travel to
+your application server, which executes them with an ordinary EF Core provider.
 
 ## Installation
 
@@ -41,6 +41,7 @@ The `DbContext` and the entity classes are shared source between the client and 
 both halves build the same model. On the client, point the context at a transport:
 
 ```csharp
+// A WPF, Blazor WebAssembly, MAUI or console app.
 var serializer = new SystemTextJsonInfoCarrierSerializer();
 using var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
 
@@ -74,9 +75,12 @@ builds the whole pair, and [the samples](samples/) run one command each.
 
 Queries and the client/server projection split, `SaveChanges` including many-to-many graphs, lazy
 loading, explicit loading, transactions with savepoints, `ExecuteUpdate` and `ExecuteDelete`,
-complex types, JSON-mapped owned collections, spatial types, compiled models, and Blazor
-WebAssembly published trimmed. HTTP is included. To use gRPC, WCF or a message bus, write one small
-class. `IInfoCarrierTransport` has one method.
+complex types, JSON-mapped owned collections, spatial types, compiled models, and
+[Blazor WebAssembly](https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/)
+published trimmed.
+
+An HTTP transport ships in the package. To use gRPC, a message bus, or a direct call in the same
+process, write one small class. `IInfoCarrierTransport` has one method.
 
 The provider runs Microsoft's own EF Core specification suite, the same suite the SQL Server,
 SQLite and InMemory providers run. The
