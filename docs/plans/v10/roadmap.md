@@ -633,8 +633,11 @@ or hidden, progress is monotonic, and the baseline drops as milestones land.
 **The reports.** The ratchet writes a delta to the run's job summary — the counts against the
 baseline, plus the tests fixed and broken by name. A `dorny/test-reporter` step turns the same TRX
 into a `Spec suite` check run, so a pull request carries the counters in a check title. That check
-is red by design and **must never be a required check**; `eng/ratchet.sh`'s exit status is the
-gate, and `continue-on-error` is what keeps the two apart. A fork's pull request gets the check
+reports and never gates: `fail-on-error: false` keeps it green, so the count rides on the check
+title while `eng/ratchet.sh`'s exit status stays the verdict. It **must never be a required check**,
+because a check that is green unconditionally requires nothing. It was red for one pull request and
+reversed the same day — a pull request list shows one rollup icon per row and takes the worst check,
+so every row would have worn a cross meaning "nine tests fail, as they always have". A fork's pull request gets the check
 from `test-report.yml` instead, because a fork's token cannot create one.
 
 **Job 3 — documentation gates.** `eng/doc-links.py` and `eng/doc-words.py --all --budget`, on

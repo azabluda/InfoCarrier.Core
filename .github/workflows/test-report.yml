@@ -47,8 +47,9 @@ jobs:
     steps:
       # Every input matches the step in build.yml, for the reasons given there: the listings are
       # capped to failures because a check run's output stops at 65535 bytes and 22662 tests do
-      # not fit; `fail-on-error: true` puts the real result on the check; and continue-on-error
-      # keeps a reporting problem from being reported as a build problem.
+      # not fit; `fail-on-error: false` keeps the check green because the ratchet is the gate and a
+      # permanently red check is one nobody reads; and continue-on-error keeps a reporting problem
+      # from being reported as a build problem.
       #
       # `artifact` plus `path` is the difference. `path` is relative to the inside of the artifact,
       # which build.yml uploads from `artifacts/test-results`, so the TRX sits at its root.
@@ -66,5 +67,5 @@ jobs:
           list-suites: 'failed'
           list-tests: 'failed'
           max-annotations: '50'
-          fail-on-error: 'true'
+          fail-on-error: 'false'
           fail-on-empty: 'true'
