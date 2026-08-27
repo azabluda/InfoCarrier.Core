@@ -549,6 +549,50 @@ internal sealed class QueryExecutor<TElement>
                     ? Substitute(WithoutNullEntities(value, queryParameter.Type), queryParameter.Type)
                     : base.VisitExtension(node);
 
+        /// <summary>
+        ///     Whether the visit is inside an inline collection the caller wrote out — a
+        ///     <c>new[] { i, j }</c> or a <c>new List&lt;int&gt; { i, j }</c>.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         A scalar inside one stays a plain constant, and this is issue #59's one
+        ///         exception. Boxing makes every element an evaluatable member read, so EF's
+        ///         funcletizer folds the <em>whole array</em> into a single parameter and the
+        ///         inline-collection shape is gone. `Column_collection_equality_inline_collection_with_parameters`
+        ///         is the test that says so: `c.Ints == new[] { i, j }` then reaches SQL as a
+        ///         column compared to one array parameter, which nothing translates.
+        ///     </para>
+        ///     <para>
+        ///         This is §6's 2026-08-02 amendment seen from the other side. That one spelled a
+        ///         collection <em>out</em> so relational EF would recognise the shape; this one
+        ///         declines to take the shape apart for the same reason. EF keeps the shape for
+        ///         itself because its elements are real <c>QueryParameterExpression</c>s, which
+        ///         this side cannot produce — the client captures downstream of them (ADR-006).
+        ///     </para>
+        /// </remarks>
+        private bool _insideInlineCollection;
+
+        protected override Expression VisitNewArray(NewArrayExpression node)
+            => VisitInlineCollection(node, base.VisitNewArray);
+
+        protected override Expression VisitListInit(ListInitExpression node)
+            => VisitInlineCollection(node, base.VisitListInit);
+
+        private Expression VisitInlineCollection<TNode>(TNode node, Func<TNode, Expression> visit)
+            where TNode : Expression
+        {
+            bool outer = _insideInlineCollection;
+            _insideInlineCollection = true;
+            try
+            {
+                return visit(node);
+            }
+            finally
+            {
+                _insideInlineCollection = outer;
+            }
+        }
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (node.Method.DeclaringType != typeof(EF))
@@ -645,7 +689,9 @@ internal sealed class QueryExecutor<TElement>
         /// </summary>
         /// <remarks>
         ///     <para>
-        ///         A <b>scalar</b> is a plain constant, which is §6's rule and is unchanged.
+        ///         A <b>scalar</b> is boxed as well, since issue #59. §6 originally made it a
+        ///         plain constant, and a constant reaches the backing store as a SQL
+        ///         <em>literal</em> rather than a SQL parameter.
         ///     </para>
         ///     <para>
         ///         A <b>collection</b> is boxed, so that the server's own funcletizer lifts it back
@@ -720,10 +766,59 @@ internal sealed class QueryExecutor<TElement>
             // *value* the caller stores, and EF's own providers carry it as a parameter with the
             // property's converter applied. `IOrderedEnumerable<T>` is never a property type, and
             // neither is an anonymous type.
-            if (!PrimitiveCoercion.IsWirePrimitive(parameterType)
-                && parameterType != typeof(object)
-                && _queryContext.Context.Model.FindRuntimeEntityType(parameterType) is null
-                && IsMappedPropertyType(_queryContext.Context.Model, parameterType))
+            // **A wire primitive is boxed too, since 2026-08-27 (issue #59), and this reverses
+            // §6's original rule rather than narrowing it.** §6 said a scalar becomes a plain
+            // constant. Measured on the SQLite tier by logging the *server's*
+            // `RelationalEventId.CommandExecuted`, that produced `WHERE "b"."Title" = 'beta'` with
+            // `[Parameters=[]]`, where the same query written directly against the server context
+            // produced `WHERE "b"."Title" = @title`. Every distinct value is therefore a distinct
+            // statement and — because `ExpressionEqualityComparer.CompareConstant` reads tree
+            // constants into the key — a distinct entry in the server's compiled-query cache.
+            //
+            // **Boxing here invents nothing.** This method is reached only from the two visitors
+            // above, and only for a node EF's *own* funcletizer already decided was a parameter on
+            // the client. A literal the caller wrote in source never arrives here, and
+            // `EF.Constant` is excluded one level up by `_insideEFCall`. So the box restores the
+            // decision the wire discarded.
+            //
+            // The J21 clauses below are kept as they were, and each still excludes a type the box
+            // cannot carry: `object` (whose real type differs per value), an entity type (which EF
+            // expands to a key comparison itself), and anything the model does not store as a
+            // property — an anonymous type is the case that matters, and `IOrderedEnumerable<T>`
+            // is already excluded by the collection branch above.
+            // **An `object`-typed parameter is boxed too, since 2026-08-27 (issue #59), and it is
+            // not an edge case: it is `Find()`.** EF's `ExpressionExtensions.BuildPredicate` builds
+            // a key lookup as `EF.Property<object>(e, name) == keyValues[i]` whenever the key is a
+            // non-numeric value type — a `Guid` above all — so the parameter's declared type is
+            // `object` and the J21 guard below excluded it. A layer-1 sweep of the whole suite
+            // counted **3,927 of these in the SQLite tier alone**, every one reaching the store as
+            // a literal where EF's own client sends a parameter.
+            //
+            // The declared type stays `object`. EF compares against `keyValues[i]`, an indexer
+            // returning `object`, on this very path, so an object-typed parameter is a shape EF
+            // already handles here. Re-typing the box to the runtime type would change what
+            // `CreateEqualsExpression` is given.
+            //
+            // **The runtime type is read here, and that is the exception to J19's rule, not a
+            // lapse from it.** Every other clause decides from `parameterType` because the declared
+            // type is the honest question. `object` is the one declared type that answers nothing,
+            // so there is nothing else to ask. The first attempt boxed on the declared type alone
+            // and broke 21 `KeysWithConvertersInfoCarrierTest` tests with *"Object must implement
+            // IConvertible"* — a `BytesStructKey` is not a value the wire carries as a primitive,
+            // and `object` had hidden that. Restricting to a wire-primitive runtime type keeps the
+            // `Guid` and `DateTime` key lookups and leaves the converted struct keys alone.
+            //
+            // A null is left alone. §6's caution about `object` is about a collection's *element*
+            // type, where elements of differing real types tell EF less spelled out than gathered;
+            // that is the branch above, and this one is a scalar.
+            if (!_insideInlineCollection
+                && (PrimitiveCoercion.IsWirePrimitive(parameterType)
+                    || (parameterType == typeof(object)
+                        && value is not null
+                        && PrimitiveCoercion.IsWirePrimitive(value.GetType()))
+                    || (parameterType != typeof(object)
+                        && _queryContext.Context.Model.FindRuntimeEntityType(parameterType) is null
+                        && IsMappedPropertyType(_queryContext.Context.Model, parameterType))))
             {
                 return Boxed(value, parameterType);
             }

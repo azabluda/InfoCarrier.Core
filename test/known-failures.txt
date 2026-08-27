@@ -346,5 +346,48 @@
 #
 # `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22662 / 22476 / 9 / 177 (`cancellation-final`).
+# 22662 -> 22666, four new tests of ours. Issue #59: a scalar query parameter reached the server
+# as a plain `ConstantExpression`, so the backing store saw a SQL *literal* where every other EF
+# client sees a SQL parameter -- one statement and one compiled-query cache entry per distinct
+# value. `QueryExecutor.Substitute` now boxes a wire primitive as well, which is what makes the
+# server's own funcletizer lift it back into a parameter.
+#
+# MEASURED, not reasoned. `ServerParameterizationTest` logs the *server* context's
+# `RelationalEventId.CommandExecuted` through `SharedTestStoreProperties.OnAddOptions`, runs each
+# query twice -- over the wire and directly against the server -- and asserts one statement, not
+# two. Parameter *names* are normalized first: a parameter crosses inside `ParameterBox<T>`, so
+# EF names it after the box's property. `@Value` against `@title` is expected; `'beta'` against
+# `@title` was the defect.
+#
+# PROVED FAILABLE. With the fix stashed, exactly two of the four fail -- the scalar string and the
+# scalar int -- and `Contains` and `Skip`/`Take` still pass. That boundary is the defect's.
+#
+# ONE EXCEPTION, and the first run found it. Boxing every scalar broke
+# `Column_collection_equality_inline_collection_with_parameters`: in `c.Ints == new[] { i, j }`
+# every element became an evaluatable member read, so EF folded the whole array into one
+# parameter and the inline-collection shape was gone. `_insideInlineCollection` keeps a scalar
+# inside a `NewArrayExpression` or `ListInitExpression` a constant. That is research-findings §6's
+# 2026-08-02 amendment seen from the other side.
+#
+# `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22666 / 22480 / 9 / 177 (`issue59-v2`).
+# 22666 -> 22667, a fifth test of ours, and a second half to issue #59 that a whole-suite sweep
+# found after the first half was already green.
+#
+# `ExpressionExtensions.BuildPredicate` builds a key lookup as
+# `EF.Property<object>(e, name) == keyValues[i]` for every key that is a value type and not
+# numeric -- a `Guid` above all. The parameter's declared type is therefore `object`, and J21's
+# `parameterType != typeof(object)` guard excluded it, so `Find()` sent the key as a literal.
+# **3,927 of those in the SQLite tier alone**, counted by instrumenting `Substitute` and running
+# the suite. `Find` is not an edge case; it is the hottest path an application has.
+#
+# THE FIRST FIX WAS WRONG AND THE SUITE SAID SO. Boxing on the declared type alone broke 21
+# `KeysWithConvertersInfoCarrierTest` tests with "Object must implement IConvertible": a
+# `BytesStructKey` is not a wire primitive and `object` had hidden that. The runtime type is read
+# here, which is the one place J19's "decide from the declared type" cannot apply, because `object`
+# is the one declared type that answers nothing.
+#
+# `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22667 / 22481 / 9 / 177 (`issue59-final`).
 failed=9
-total=22662
+total=22667

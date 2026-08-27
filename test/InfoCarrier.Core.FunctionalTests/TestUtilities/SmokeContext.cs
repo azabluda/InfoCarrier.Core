@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 
@@ -76,4 +76,24 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     public DbSet<Post> Posts => Set<Post>();
 
     public DbSet<Tag> Tags => Set<Tag>();
+
+    public DbSet<GuidKeyed> GuidKeyed => Set<GuidKeyed>();
+}
+
+/// <summary>
+///     An entity with a <see cref="System.Guid" /> key, for
+///     <c>ServerParameterizationTest</c> (issue #59).
+/// </summary>
+/// <remarks>
+///     The key type is the whole point and an <see cref="int" /> will not do.
+///     <c>ExpressionExtensions.BuildPredicate</c> compares a <em>numeric</em> key through
+///     <c>EF.Property&lt;TKey&gt;</c>, and every other key type — a <c>Guid</c> above all —
+///     through <c>EF.Property&lt;object&gt;</c>. Only the second shape produces the
+///     <c>object</c>-typed parameter this exists to pin.
+/// </remarks>
+public class GuidKeyed
+{
+    public Guid Id { get; set; }
+
+    public string? Label { get; set; }
 }

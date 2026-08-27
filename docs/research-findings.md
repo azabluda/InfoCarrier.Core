@@ -159,6 +159,39 @@ never produces): Block/Loop/Try/Goto/Switch/Label/DebugInfo/Throw/Dynamic. EF ex
 > substitutes EF's extracted parameters back in as constants, and **a constant is a different thing
 > to EF than a parameter is**. Only a wire primitive is safe to inline.
 
+> ⚠️ **Superseded for WIRE PRIMITIVES too, 2026-08-27 (issue #59), which reverses the original rule
+> rather than narrowing it. "Scalars are unchanged" is now false, and the last sentence above is
+> the one that was wrong.** A wire primitive is not safe to inline either, and the reason is one
+> nobody here had looked at: **nothing in this suite has ever read the SQL the server generates.**
+> `InfoCarrierTestStoreFactory` builds a `TestSqlLoggerFactory`, but it belongs to the *client*,
+> which has no database and emits none, and `InfoCarrierBackendTestStore` wires no logger at all.
+>
+> **Measured** by attaching `LogTo` to the server context through
+> `SharedTestStoreProperties.OnAddOptions`. `Where(b => b.Title == title)` reached SQLite as
+> `WHERE "b"."Title" = 'beta'` with `[Parameters=[]]`, where the same query written directly
+> against the server context produced `WHERE "b"."Title" = @title`. So every distinct value was a
+> distinct statement, and — by this section's own J21 observation about
+> `ExpressionEqualityComparer.CompareConstant` — a distinct entry in the server's compiled-query
+> cache. `Contains` and `Skip`/`Take` were already correct, which is what made the boundary
+> visible.
+>
+> **Boxing invents no parameterization.** `Substitute` is reached only for a node EF's own
+> funcletizer already made a parameter on the client, and `EF.Constant` is excluded by
+> `_insideEFCall`. The box restores a decision the wire discarded.
+>
+> **One new guard, and the first full run found it.** A scalar inside an inline collection the
+> caller wrote — `c.Ints == new[] { i, j }` — must stay a constant. Boxed, every element becomes an
+> evaluatable member read, EF folds the whole array into a single parameter, and the
+> inline-collection shape is gone; `Column_collection_equality_inline_collection_with_parameters`
+> failed on exactly that. `_insideInlineCollection` is the guard. **This is the 2026-08-02
+> amendment seen from the other side**: that one spelled a collection out so relational EF would
+> see the shape, this one declines to take the shape apart.
+>
+> **0 fixed, 0 broken, 9 failures unchanged across 22,666** (`issue59-v2`). The suite could not
+> have found this, because it compares answers and the answers were always right.
+> `ServerParameterizationTest` is the differential test that can: same query over the wire and
+> directly against the server, statements compared after normalizing parameter names.
+
 v1's bug: wrapping parameter values in a custom generic struct `ValueWrapper<T>` as a tree
 constant broke translation. **Rule:** substitute compiled-query parameters as **plain
 `ConstantExpression` of the runtime value** (typed to the parameter's type), resolved from
