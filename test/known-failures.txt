@@ -346,5 +346,30 @@
 #
 # `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22662 / 22476 / 9 / 177 (`cancellation-final`).
+# 22662 -> 22666, four new tests of ours. Issue #59: a scalar query parameter reached the server
+# as a plain `ConstantExpression`, so the backing store saw a SQL *literal* where every other EF
+# client sees a SQL parameter -- one statement and one compiled-query cache entry per distinct
+# value. `QueryExecutor.Substitute` now boxes a wire primitive as well, which is what makes the
+# server's own funcletizer lift it back into a parameter.
+#
+# MEASURED, not reasoned. `ServerParameterizationTest` logs the *server* context's
+# `RelationalEventId.CommandExecuted` through `SharedTestStoreProperties.OnAddOptions`, runs each
+# query twice -- over the wire and directly against the server -- and asserts one statement, not
+# two. Parameter *names* are normalized first: a parameter crosses inside `ParameterBox<T>`, so
+# EF names it after the box's property. `@Value` against `@title` is expected; `'beta'` against
+# `@title` was the defect.
+#
+# PROVED FAILABLE. With the fix stashed, exactly two of the four fail -- the scalar string and the
+# scalar int -- and `Contains` and `Skip`/`Take` still pass. That boundary is the defect's.
+#
+# ONE EXCEPTION, and the first run found it. Boxing every scalar broke
+# `Column_collection_equality_inline_collection_with_parameters`: in `c.Ints == new[] { i, j }`
+# every element became an evaluatable member read, so EF folded the whole array into one
+# parameter and the inline-collection shape was gone. `_insideInlineCollection` keeps a scalar
+# inside a `NewArrayExpression` or `ListInitExpression` a constant. That is research-findings §6's
+# 2026-08-02 amendment seen from the other side.
+#
+# `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22666 / 22480 / 9 / 177 (`issue59-v2`).
 failed=9
-total=22662
+total=22666
