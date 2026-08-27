@@ -46,9 +46,15 @@ body {
     border-bottom: 1px solid var(--neutral-stroke-divider-rest);
 }
 
+/*
+    The product's own mark, the same file the tab icon uses. `display: block` because an inline
+    image sits on the text baseline and leaves a descender's worth of gap under it, which the
+    header's `align-items: center` then centres including the gap.
+*/
 .app-logo {
-    font-size: 1.05rem;
-    line-height: 1;
+    width: 1.15rem;
+    height: 1.15rem;
+    display: block;
 }
 
 .app-mark {

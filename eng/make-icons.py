@@ -26,6 +26,10 @@ WHAT SURVIVED THE CUT, AND WHY EACH ONE IS LOAD-BEARING:
                        for and every smaller device downscales it.
   icon-192, icon-512   Android home screen, and the install prompt's splash. Chrome wants one icon
                        at 192 or larger to consider a site installable and uses 512 for the splash.
+  icon-64              the Blazor sample, serving its tab icon AND the mark in its breadcrumb from
+                       one file. 64 covers a 32px tab at 2x and an 18px breadcrumb at 3x. No .ico
+                       here: the sample is served by `dotnet run` to a modern browser, which reads
+                       a PNG `rel=icon`, and nobody pins it to a taskbar.
 
   No SVG: the artwork is raster, lit and bevelled, and a traced approximation would be a different
   mark. No maskable variant: Android's maskable safe zone is the middle 80%, and this mark is
@@ -51,6 +55,8 @@ SRC = os.path.join("docs", "assets", "icon-source.png")
 
 WEB = os.path.join("website", "docs", "assets", "icons")
 
+SAMPLE = os.path.join("samples", "Northwind.Client", "wwwroot")
+
 # (path, canvas, margin). The margin keeps the mark off the edge where something else frames it --
 # a home-screen icon crops or rounds the corners. The favicon frames get none: at 16px a spare
 # pixel of mark is worth more than breathing room nobody can see.
@@ -64,6 +70,7 @@ TARGETS = [
     (os.path.join(WEB, "apple-touch-icon.png"), 180, 6),
     (os.path.join(WEB, "icon-192.png"), 192, 6),
     (os.path.join(WEB, "icon-512.png"), 512, 16),
+    (os.path.join(SAMPLE, "icon-64.png"), 64, 0),
 ]
 
 ICO = os.path.join(WEB, "favicon.ico")

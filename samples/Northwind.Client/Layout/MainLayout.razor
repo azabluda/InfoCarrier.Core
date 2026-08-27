@@ -7,14 +7,16 @@
     a grid cannot collapse into block flow the way stacked flex containers can.
 
     Emoji rather than FluentIcon: Fluent UI ships its icon set as a separate, large package, and a
-    sample about the wire should not pull one in to decorate a nav menu. Emoji cost nothing.
+    sample about the wire should not pull one in to decorate a nav menu. Emoji cost nothing. The
+    breadcrumb's leading mark is the exception, and not an icon set either: it is the product's own
+    shipped artwork, one file serving the tab icon too.
 *@
 
 <FluentDesignTheme Mode="DesignThemeModes.System" StorageName="infocarrier-theme" />
 
 <div class="app-shell">
     <header class="app-header">
-        <span class="app-logo">📡</span>
+        <img class="app-logo" src="icon-64.png" alt="" />
         <span class="app-mark">InfoCarrier<span class="app-mark-dim">.Core</span></span>
         <span class="app-sep">/</span>
         <span class="app-title">Northwind</span>
