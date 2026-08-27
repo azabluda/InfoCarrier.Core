@@ -110,6 +110,38 @@ DB per batch. See [`ci-cd.md`](ci-cd.md).
 3. Relationships, owned types, inheritance.
 4. Spatial, advanced queries.
 
+### 5.2 Differential SQL testing, and reading the server's SQL
+
+Added 2026-08-28, after #59 — a defect no test in the suite could see, because the suite compares
+**answers** and the answers were right. A scalar query parameter was reaching the backing store as a
+SQL *literal* where every other EF client sends a SQL parameter.
+
+**The category this suite was missing is not "assert the SQL".** EF's relational bases pin generated
+SQL against golden strings, and those are the backing store's business: they fail when SQLite changes
+its dialect, which EF already tests, and they would fail here for a cosmetic reason as well, since a
+parameter crosses inside `ParameterBox<T>` and EF names it after the box's property.
+
+The category is **differential**:
+
+> Run the query twice — once from the client over the wire, once directly against the server
+> context — capture both statements, and assert they are the same after normalizing parameter names.
+
+That asks the one question this project has and EF does not: *does the middleman change the
+statement?* It needs no golden strings, so it survives an EF version bump, and it fails the moment
+the wire turns a parameter into a literal, reorders a join, or drops an index-friendly predicate.
+`ServerParameterizationTest` is the first of these.
+
+**Reading the server's SQL at all.** `InfoCarrierTestStoreFactory` does build a
+`TestSqlLoggerFactory`, but it belongs to the *client*, which has no database and emits none. Set
+`INFOCARRIER_SERVER_SQL=1` and `InfoCarrierBackendTestStore` writes every server command to
+`server-sql.log` in the test output directory. Off in every normal run, asserts nothing, and exists
+so that a failing Tier B test can be re-run and read rather than reasoned about. `ServerSqlLog`
+records why it is a switch and a file rather than output attached to a failing test.
+
+**What is still missing** is the provenance the harness cannot have: whether a literal in the SQL
+came from a constant the caller wrote or from a parameter this provider inlined. Only
+`QueryExecutor.Substitute` knows, and issue #49 covers shipping that as a diagnostic event.
+
 ### 5.1 EF Core 3.1 → 10 port risks (from v1 study)
 
 | Risk | Detail |
