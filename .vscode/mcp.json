@@ -1,9 +1,3 @@
 {
-  "servers": {
-    "codegraph": {
-      "command": "npx",
-      "args": ["-y", "@colbymchenry/codegraph", "serve", "--mcp", "--path", "subrepos"],
-      "env": { "CODEGRAPH_NO_DAEMON": "1" }
-    }
-  }
+	"servers": {}
 }
