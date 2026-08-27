@@ -786,8 +786,36 @@ internal sealed class QueryExecutor<TElement>
             // expands to a key comparison itself), and anything the model does not store as a
             // property — an anonymous type is the case that matters, and `IOrderedEnumerable<T>`
             // is already excluded by the collection branch above.
+            // **An `object`-typed parameter is boxed too, since 2026-08-27 (issue #59), and it is
+            // not an edge case: it is `Find()`.** EF's `ExpressionExtensions.BuildPredicate` builds
+            // a key lookup as `EF.Property<object>(e, name) == keyValues[i]` whenever the key is a
+            // non-numeric value type — a `Guid` above all — so the parameter's declared type is
+            // `object` and the J21 guard below excluded it. A layer-1 sweep of the whole suite
+            // counted **3,927 of these in the SQLite tier alone**, every one reaching the store as
+            // a literal where EF's own client sends a parameter.
+            //
+            // The declared type stays `object`. EF compares against `keyValues[i]`, an indexer
+            // returning `object`, on this very path, so an object-typed parameter is a shape EF
+            // already handles here. Re-typing the box to the runtime type would change what
+            // `CreateEqualsExpression` is given.
+            //
+            // **The runtime type is read here, and that is the exception to J19's rule, not a
+            // lapse from it.** Every other clause decides from `parameterType` because the declared
+            // type is the honest question. `object` is the one declared type that answers nothing,
+            // so there is nothing else to ask. The first attempt boxed on the declared type alone
+            // and broke 21 `KeysWithConvertersInfoCarrierTest` tests with *"Object must implement
+            // IConvertible"* — a `BytesStructKey` is not a value the wire carries as a primitive,
+            // and `object` had hidden that. Restricting to a wire-primitive runtime type keeps the
+            // `Guid` and `DateTime` key lookups and leaves the converted struct keys alone.
+            //
+            // A null is left alone. §6's caution about `object` is about a collection's *element*
+            // type, where elements of differing real types tell EF less spelled out than gathered;
+            // that is the branch above, and this one is a scalar.
             if (!_insideInlineCollection
                 && (PrimitiveCoercion.IsWirePrimitive(parameterType)
+                    || (parameterType == typeof(object)
+                        && value is not null
+                        && PrimitiveCoercion.IsWirePrimitive(value.GetType()))
                     || (parameterType != typeof(object)
                         && _queryContext.Context.Model.FindRuntimeEntityType(parameterType) is null
                         && IsMappedPropertyType(_queryContext.Context.Model, parameterType))))

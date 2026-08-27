@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.RegularExpressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
@@ -63,6 +63,50 @@ public partial class ServerParameterizationTest
         => AssertSameStatement(
             2,
             static (blogs, take) => blogs.OrderBy(b => b.Id).Skip(1).Take(take));
+
+    /// <summary>
+    ///     A key lookup on a <see cref="Guid" /> key, which is the case a whole-suite sweep found
+    ///     after the scalar one was fixed.
+    /// </summary>
+    /// <remarks>
+    ///     <c>ExpressionExtensions.BuildPredicate</c> builds this as
+    ///     <c>EF.Property&lt;object&gt;(e, "Id") == keyValues[i]</c>, so the parameter's declared
+    ///     type is <c>object</c> and the guard that excluded <c>object</c> excluded every
+    ///     non-numeric key lookup with it — 3,927 of them in the SQLite tier alone, each reaching
+    ///     the store as a literal. `Find` is not an edge case.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_Guid_key_lookup_stays_a_parameter()
+    {
+        Guid id = new("11111111-1111-1111-1111-111111111111");
+
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new GuidKeyed { Id = id, Label = "one" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            Assert.NotNull(await client.GuidKeyed.FindAsync(id));
+        }
+
+        string overTheWire = SingleStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            Assert.NotNull(await server.Set<GuidKeyed>().FindAsync(id));
+        }
+
+        Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
 
     /// <summary>
     ///     Runs <paramref name="query" /> over the wire and again directly against the server, and

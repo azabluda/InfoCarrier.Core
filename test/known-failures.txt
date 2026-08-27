@@ -371,5 +371,23 @@
 #
 # `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22666 / 22480 / 9 / 177 (`issue59-v2`).
+# 22666 -> 22667, a fifth test of ours, and a second half to issue #59 that a whole-suite sweep
+# found after the first half was already green.
+#
+# `ExpressionExtensions.BuildPredicate` builds a key lookup as
+# `EF.Property<object>(e, name) == keyValues[i]` for every key that is a value type and not
+# numeric -- a `Guid` above all. The parameter's declared type is therefore `object`, and J21's
+# `parameterType != typeof(object)` guard excluded it, so `Find()` sent the key as a literal.
+# **3,927 of those in the SQLite tier alone**, counted by instrumenting `Substitute` and running
+# the suite. `Find` is not an edge case; it is the hottest path an application has.
+#
+# THE FIRST FIX WAS WRONG AND THE SUITE SAID SO. Boxing on the declared type alone broke 21
+# `KeysWithConvertersInfoCarrierTest` tests with "Object must implement IConvertible": a
+# `BytesStructKey` is not a wire primitive and `object` had hidden that. The runtime type is read
+# here, which is the one place J19's "decide from the declared type" cannot apply, because `object`
+# is the one declared type that answers nothing.
+#
+# `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22667 / 22481 / 9 / 177 (`issue59-final`).
 failed=9
-total=22666
+total=22667
