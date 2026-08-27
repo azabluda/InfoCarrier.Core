@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
@@ -207,6 +207,15 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
     {
         builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
+
+        // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
+        // file rather than output attached to a failing test.
+        if (ServerSqlLog.IsEnabled)
+        {
+            builder = builder.LogTo(
+                ServerSqlLog.Write,
+                [Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted]);
+        }
 
         return _testStoreProperties.OnAddOptions?.Invoke(builder) ?? builder;
     }
