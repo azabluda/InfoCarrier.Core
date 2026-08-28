@@ -730,8 +730,21 @@ internal sealed class QueryExecutor<TElement>
                 // collection is materialized on the far side as a `List<T>`, so a parameter typed
                 // `IOrderedEnumerable<T>` cannot be handed one — the server rebuilt the value and
                 // then failed to assign it, eight `Contains_with_local_ordered_enumerable_*` deep.
+                //
+                // **`DynamicValueMapper.CanRebuildCollection` is the third clause, and it is the
+                // #62 fix.** The first two ask whether a `List<T>` satisfies the declared type,
+                // which is narrower than what the far side can actually build:
+                // `ConstructCollection` also reaches a single-argument constructor, a set
+                // interface, a static `CreateRange` and an add-to-new loop. So a `HashSet<T>`, an
+                // `ImmutableArray<T>` and a `ReadOnlyCollection<T>` were each excluded here and
+                // reached the store as `IN ('alpha', 'gamma')` where EF's own client sends
+                // `IN (@p, @p)` — measured by `ServerParameterizationTest` against the SQL the
+                // server ran, not argued. The clause asks the rebuilder itself rather than
+                // restating its rules, so the two sides cannot drift; `IOrderedEnumerable<T>` is
+                // still refused, because nothing in `ConstructCollection` can produce one.
                 && (parameterType.IsArray
-                    || parameterType.IsAssignableFrom(typeof(List<>).MakeGenericType(elementType)));
+                    || parameterType.IsAssignableFrom(typeof(List<>).MakeGenericType(elementType))
+                    || DynamicValueMapper.CanRebuildCollection(parameterType, elementType));
 
             if (collectionShaped)
             {

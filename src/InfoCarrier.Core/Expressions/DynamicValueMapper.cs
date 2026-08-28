@@ -1,6 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Reflection;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -975,6 +976,52 @@ public class DynamicValueMapper(
         => pv.Value is not null
             ? FromDynamicValue(pv.Value)
             : PrimitiveCoercion.Coerce(pv.PrimitiveValue, targetType);
+
+    /// <summary>
+    ///     Whether <see cref="ConstructCollection" /> can rebuild <paramref name="declaredType" />
+    ///     from a list of <paramref name="elementType" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Asked on the <em>client</em>, by <c>QueryExecutor.Substitute</c>, before it decides
+    ///         whether a collection parameter may cross inside a <c>ParameterBox&lt;T&gt;</c>. The
+    ///         box's property is declared as the parameter's own type, so boxing is only safe where
+    ///         this side can hand that type back. Asking the rebuilder itself is what keeps the two
+    ///         answers from drifting: the client's guard used to be
+    ///         <c>IsAssignableFrom(List&lt;T&gt;)</c>, which is narrower than what
+    ///         <see cref="ConstructCollection" /> actually manages, and a <c>HashSet&lt;T&gt;</c>,
+    ///         an <c>ImmutableArray&lt;T&gt;</c> and a <c>ReadOnlyCollection&lt;T&gt;</c> were each
+    ///         inlined as SQL literals for that reason alone (#62).
+    ///     </para>
+    ///     <para>
+    ///         An empty list is enough to answer it, and the answer is cached: <c>CreateRange</c>
+    ///         scans an assembly's exported types, which is far too expensive to repeat per
+    ///         parameter per execution.
+    ///     </para>
+    /// </remarks>
+    /// <param name="declaredType">The parameter's declared type.</param>
+    /// <param name="elementType">Its element type.</param>
+    /// <returns><see langword="true" /> if the far side can produce that type.</returns>
+    internal static bool CanRebuildCollection(Type declaredType, Type elementType)
+        => RebuildableCollections.GetOrAdd(
+            (declaredType, elementType),
+            static key =>
+            {
+                try
+                {
+                    return ConstructCollection(
+                        key.DeclaredType,
+                        key.ElementType,
+                        (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(key.ElementType))!) is not null;
+                }
+                catch (Exception e) when (e is MissingMethodException or NotSupportedException or InvalidOperationException)
+                {
+                    return false;
+                }
+            });
+
+    private static readonly ConcurrentDictionary<(Type DeclaredType, Type ElementType), bool> RebuildableCollections
+        = new();
 
     /// <summary>
     ///     Rebuilds <paramref name="items" /> as <paramref name="type" /> via a single-argument

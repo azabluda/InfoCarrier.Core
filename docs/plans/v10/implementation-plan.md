@@ -73,25 +73,47 @@ only a fraction of what it hid.
       relational *client* API, which is #60's decision, and a base that is merely undecided must stay
       visible. Measured: no test moved. 22668 / 22480 / 11 / 177, FIXED none, BROKEN none, REASONS
       unchanged (`issue56-ignored`).
-- [ ] **R3. Extend `ServerParameterizationTest` with #62's four categories.** **It needs no fixture
-      change and no new machinery, which corrects what R1's commit message said.** #63's file and
-      switch are for diagnosis; the *assertion* already exists.
-      `Sqlite/ServerParameterizationTest.cs` captures the server's SQL through
-      `SharedTestStoreProperties.OnAddOptions` and compares the statement a wire query produces
-      against the same query written directly on the server context, with parameter names
-      normalized. Five cases stood before this step. **Categories 2 and 3 are now checked and both
-      hypotheses are correct**: a `HashSet`, an `ImmutableArray` and a `ReadOnlyCollection` all
-      reach the store as `IN ('alpha', 'gamma')` where the direct query gets `IN (@p, @p)`, and
-      `Where(b => b == blog)` reaches it as `"b"."Id" = 2` where the direct query gets `= @p`. Four
-      cases committed red, as Q1 did. `failed` 11 -> 15, `total` 22668 -> 22672. Categories 1 and 4
-      remain: converted struct keys and complex types each need a new entity in `SqliteSmokeContext`.
-- [ ] **R4. `ITestSqlLoggerFactory` on the query fixtures — a prerequisite for R5, not for #62.**
+- [ ] **R3. `ITestSqlLoggerFactory` on the query fixtures — a prerequisite for R4, not for #62.**
       This is what the new compliance test asks for, and its 27 fixtures are only reachable once a
       fixture can hand a test the server's SQL through EF's own type. **Note what adopting it
       implies**: EF's relational query bases assert with `AssertSql` against golden strings, which
       pins the *backend's* dialect. `ServerParameterizationTest`'s own remarks argue against golden
       strings for this repository, and that argument has to be answered here rather than skipped —
       a base whose whole content is `AssertSql` is #56's "SQL plumbing only" group.
-- [ ] **R5. Classify the remaining 148.** Each is adopt-on-Tier-B, or an ignore entry with a reason.
+- [ ] **R4. Classify the remaining 148.** Each is adopt-on-Tier-B, or an ignore entry with a reason.
       #56 carries the hand classification; this step replaces it with an enforced one. The TPT and
       TPC bases that prompted the issue are the first ones worth taking.
+
+## Phase S — the query parameters still inlined as SQL literals (#62)
+
+**Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
+inlined substitutions in four categories, of which #62 says "None has been checked against the
+server's SQL. Each is a hypothesis."
+
+**No product diagnostic was needed to check them, and #49 was closed for saying otherwise.**
+`Sqlite/ServerParameterizationTest.cs` already runs a query twice — over the wire and directly on
+the server context — and compares the two statements, with parameter names normalized. The
+provenance problem that would justify a counter inside `Substitute` does not exist inside a test,
+because the test author wrote the query.
+
+- [x] **S1. Check categories 2 and 3.** `<commit 62527cc>` Four cases. Both hypotheses correct:
+      a `HashSet`, an `ImmutableArray` and a `ReadOnlyCollection` reached the store as
+      `IN ('alpha', 'gamma')` where the direct query got `IN (@p, @p)`, and `Where(b => b == blog)`
+      reached it as `"b"."Id" = 2` where the direct query got `= @p`. Committed red, as Q1 did.
+      `failed` 11 -> 15, `total` 22668 -> 22672.
+- [x] **S2. Fix category 3, the collection types.** The client's guard asked whether a `List<T>`
+      satisfies the declared type. The far side can do more than that: `ConstructCollection` also
+      reaches a single-argument constructor, a set interface, a static `CreateRange` and an
+      add-to-new loop. The fix asks the rebuilder itself, through a new
+      `DynamicValueMapper.CanRebuildCollection`, so the two sides cannot drift — and
+      `IOrderedEnumerable<T>` is still refused, because nothing in `ConstructCollection` produces
+      one. `failed` 15 -> 12, FIXED the three collection cases, BROKEN none. 22672 / 22483 / 12 /
+      177 (`issue62-fix-collections`). Trim ratchet 89 <= 89, unchanged.
+- [ ] **S3. Fix category 2, the entity constant.** `Substitute` excludes an entity-typed parameter
+      because EF expands entity equality into a key comparison itself. The measurement shows the
+      expansion then carries a *literal* key: EF reads the key off a `ConstantExpression` eagerly,
+      where a member read would have been parameterized. The wire already sends an entity by
+      reference and rebuilds it with its key (`MaterializeEntityReference`), which is what makes
+      boxing one plausible.
+- [ ] **S4. Check categories 1 and 4.** Converted struct keys declared `object`, and complex-type
+      values. Each needs a new entity in `SqliteSmokeContext`, as `GuidKeyed` was added for #59.

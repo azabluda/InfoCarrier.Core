@@ -447,5 +447,24 @@
 #
 # FIXED none, BROKEN the four named above, REASONS one new `Assert.Equal` group.
 # Figures read off the run's own summary block: 22672 / 22480 / 15 / 177 (`issue62-cases`).
-failed=15
+# 2026-08-28, issue #62, category 3. `failed` 15 -> 12, `total` unchanged. The three collection
+# cases above go green and nothing else moves.
+#
+# The client's guard asked whether a `List<T>` satisfies the parameter's declared type. That is
+# narrower than what the far side can actually build: `DynamicValueMapper.ConstructCollection` also
+# reaches a single-argument constructor, a set interface, a static `CreateRange` and an add-to-new
+# loop, all of which already shipped. So a `HashSet<T>`, an `ImmutableArray<T>` and a
+# `ReadOnlyCollection<T>` were inlined for no reason but the guard.
+#
+# The fix asks the rebuilder itself, through a new `CanRebuildCollection` that calls
+# `ConstructCollection` with an empty list and caches the answer. Restating its rules on the client
+# would have been the third place they live and the first place they drift.
+# `IOrderedEnumerable<T>` is still refused, and it must stay refused: boxing it broke eight
+# `Contains_with_local_ordered_enumerable_*` tests, and nothing in `ConstructCollection` can
+# produce one, so the new clause declines it for the same reason the old one did.
+#
+# FIXED the three collection cases, BROKEN none.
+# Figures read off the run's own summary block: 22672 / 22483 / 12 / 177
+# (`issue62-fix-collections`). Trim ratchet: OURS 89 <= 89, unchanged.
+failed=12
 total=22672
