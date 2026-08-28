@@ -123,12 +123,18 @@ because the test author wrote the query.
       gets `@p` in both places. Two entities added to `SqliteSmokeContext` to carry them, as
       `GuidKeyed` was added for #59, and adding them broke nothing. Committed red. `failed` 11 ->
       13, `total` 22672 -> 22674.
-- [ ] **S5. Fix category 1, the converted struct key.** This is the one #59 tried and backed out
+- [x] **S5. Fix category 1, the converted struct key.** This is the one #59 tried and backed out
       of: boxing on the declared type alone broke 21 `KeysWithConvertersInfoCarrierTest` tests with
       "Object must implement IConvertible", because the box's value must round-trip and a converted
       key is not a wire primitive. #62's question is whether the value can cross in its *converted*
       form. **Read `known-failures.txt`'s #59 entries before starting**: the first attempt at this
-      is written up there and the reason it failed is not obvious from the code.
+      is written up there and the reason it failed is not obvious from the code. **Done, and
+      reproducing #59's failure first is what located the fault**: the box is the problem, not the
+      value. `ParameterBox<object>` loses the runtime type, `ParameterBox<BytesStructKey>` does not,
+      and that second shape is already green wherever the declared type is the struct. So the key is
+      boxed on its runtime type and an `Expression.Convert` restores the node type. `failed` 13 ->
+      12, all 21 `KeysWithConverters` tests green. 22674 / 22485 / 12 / 177
+      (`issue62-fix-structkey`). Trim ratchet 89 <= 89.
 - [ ] **S6. Fix category 4, the complex value.** EF splits a complex value into one parameter per
       property; this side sends one constant. Unlike S5 there is no failed attempt on record, and
       the entity fix in S3 is the nearest precedent.
