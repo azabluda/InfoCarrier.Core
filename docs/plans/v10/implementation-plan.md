@@ -1,9 +1,11 @@
-# Implementation plan — no milestone is open
+# Implementation plan — post-10.0 work, no milestone open
 
 Milestone-level scope lives in [`roadmap.md`](roadmap.md). Do not put scope here.
 
 **Every milestone closed on 2026-08-24.** M5 was the last, and this file was rewritten because of
-it. Closed milestones are archived and never edited again:
+it. What follows Phase Q is issue-driven rather than milestone-driven: each section names the GitHub
+issue it serves, and **which release the work lands in is not decided here** — the issues carry that,
+and it may be a 10.0.x patch or a later minor. Closed milestones are archived and never edited again:
 
 | Milestone | Plan |
 |---|---|
@@ -45,3 +47,47 @@ built on that factory tests this repository's wiring and not the web server's be
       path, which is this repository's whole half of the problem. If Kestrel is ever slow to report
       a lost client, the effect is that cancelling frees the server later than it could, not that
       anything is wrong here.
+
+## Phase R — the compliance gate, and the relational spec inventory (#56)
+
+**Not a milestone.** #56 found that `InfoCarrierComplianceTest`, the test CLAUDE.md calls the current
+answer to "which bases are in", could not see a single base in `EFCore.Relational.Specification.Tests`.
+`ComplianceTestBase.GetBaseTestClasses` reads its own assembly, which is the core one. The gate was
+answering a smaller question than it claimed, and the TPT and TPC gap that prompted the issue was
+only a fraction of what it hid.
+
+- [x] **R1. Let the gate see the relational assembly.** `<commit 935adfa>` Inherit EF's
+      `RelationalComplianceTestBase`, which ships exactly that override and is what EF's own
+      relational providers use. A hand-written override was tried first and deleted as a duplicate.
+      `failed` 9 -> 11 and `total` 22667 -> 22668, both recorded in `test/known-failures.txt`:
+      `All_test_bases_must_be_implemented` turns red with the true inventory, and
+      `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` arrives as a new test naming 27
+      fixtures.
+- [x] **R2. Ignore what is server-only, with a reason on each entry.** `IgnoredTestBases` was empty.
+      Twelve entries added, each verified against the base's own source rather than its name:
+      migrations and design-time scaffolding (4), the two SQL generators, the three ADO.NET
+      interception bases, the relational DI registrations, and the three precompiled-query bases,
+      which pregenerate a provider's SQL at build time on a client that compiles no SQL. 160 listed
+      bases become 148. **The other two "do not adopt" groups in #56 are deliberately still listed**:
+      the `RelationalModelBuilderTest` nested bases and the `FromSql`/`ToQueryString` family need a
+      relational *client* API, which is #60's decision, and a base that is merely undecided must stay
+      visible. Measured: no test moved. 22668 / 22480 / 11 / 177, FIXED none, BROKEN none, REASONS
+      unchanged (`issue56-ignored`).
+- [ ] **R3. Extend `ServerParameterizationTest` with #62's four categories.** **It needs no fixture
+      change and no new machinery, which corrects what R1's commit message said.** #63's file and
+      switch are for diagnosis; the *assertion* already exists.
+      `Sqlite/ServerParameterizationTest.cs` captures the server's SQL through
+      `SharedTestStoreProperties.OnAddOptions` and compares the statement a wire query produces
+      against the same query written directly on the server context, with parameter names
+      normalized. Five cases stand today. #62's four unexamined categories are four more cases in
+      that file.
+- [ ] **R4. `ITestSqlLoggerFactory` on the query fixtures — a prerequisite for R5, not for #62.**
+      This is what the new compliance test asks for, and its 27 fixtures are only reachable once a
+      fixture can hand a test the server's SQL through EF's own type. **Note what adopting it
+      implies**: EF's relational query bases assert with `AssertSql` against golden strings, which
+      pins the *backend's* dialect. `ServerParameterizationTest`'s own remarks argue against golden
+      strings for this repository, and that argument has to be answered here rather than skipped —
+      a base whose whole content is `AssertSql` is #56's "SQL plumbing only" group.
+- [ ] **R5. Classify the remaining 148.** Each is adopt-on-Tier-B, or an ignore entry with a reason.
+      #56 carries the hand classification; this step replaces it with an enforced one. The TPT and
+      TPC bases that prompted the issue are the first ones worth taking.

@@ -2,6 +2,9 @@
 
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Update;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -32,7 +35,44 @@ public class InfoCarrierComplianceTest : RelationalComplianceTestBase
 
     /// <summary>
     ///     Bases that are conceptually inapplicable to InfoCarrier — each with the reason.
-    ///     Seeded in M1-I3; see docs/plans/v10/implementation-plan.md.
+    ///     Seeded in M1-I3; the relational entries were added for #56.
     /// </summary>
-    protected override ICollection<Type> IgnoredTestBases { get; } = [];
+    /// <remarks>
+    ///     A base that is merely unadopted must NOT be listed here. Everything below needs a
+    ///     service or an object that does not exist on this side of the wire, and no amount of
+    ///     work in this repository would change that.
+    /// </remarks>
+    protected override ICollection<Type> IgnoredTestBases { get; } =
+    [
+        // Migrations run DDL against a database. The client has none. The server is an ordinary
+        // EF application, and EF already tests migrations for the provider it references.
+        typeof(MigrationsInfrastructureTestBase<>),
+        typeof(MigrationsTestBase<>),
+
+        // Asserts the SQL an IMigrationsSqlGenerator emits, resolved from the context's services.
+        typeof(MigrationsSqlGeneratorTestBase),
+
+        // Same shape: CreateSqlGenerator() must return an IUpdateSqlGenerator.
+        typeof(UpdateSqlGeneratorTestBase),
+
+        // Asserts that EntityFrameworkRelationalServicesBuilder.RelationalServices are registered.
+        // InfoCarrier.Core stopped referencing EFCore.Relational in M9 and registers none of them.
+        typeof(RelationalServiceCollectionExtensionsTestBase),
+
+        // Interception of DbCommand, DbConnection and DbTransaction. The client holds no ADO.NET
+        // object to intercept. On the server this is ordinary EF, which EF tests.
+        typeof(CommandInterceptionTestBase),
+        typeof(ConnectionInterceptionTestBase),
+        typeof(TransactionInterceptionTestBase),
+
+        // Resolves IReverseEngineerScaffolder and IMigrationsScaffolder from the provider's
+        // design-time services. Both scaffold from a database, which the client does not have.
+        typeof(DesignTimeTestBase<>),
+
+        // Precompiled queries pregenerate a provider's SQL at build time on the client. This
+        // client compiles no SQL at all: the server generates it per request, after the wire.
+        typeof(PrecompiledQueryRelationalTestBase),
+        typeof(PrecompiledSqlPregenerationQueryRelationalTestBase),
+        typeof(AdHocPrecompiledQueryRelationalTestBase),
+    ];
 }
