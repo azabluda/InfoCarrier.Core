@@ -136,9 +136,9 @@ EF Core provider.
 
 ### Queries this provider answers that other providers reject
 
-Two scenarios in EF's suite assert that a provider rejects the query, and this provider answers
-them correctly instead. A test suite you port from another provider will expect an exception here,
-and LINQ that relies on this leniency will not run unchanged on a relational provider.
+Three scenarios in EF's suite assert that a provider rejects the query. This provider answers them.
+A test suite you port from another provider will expect an exception, and LINQ that relies on this
+will not run unchanged there.
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -168,6 +168,21 @@ modelBuilder.Entity<User>()
 
 var role = Role.Seller;
 context.Users.Where(u => u.Roles.Contains(role)).ToList();
+// EF Core providers: throws.   This provider: returns the matching rows.
+```
+
+Filtering a complex collection, then `Contains`:
+
+```csharp
+modelBuilder.Entity<RootEntity>()
+    .ComplexCollection(e => e.AssociateCollection);   // stored by table splitting
+
+var associates = LoadAssociates();
+context.RootEntities
+    .Where(e => e.AssociateCollection
+        .Where(a => a.Id > associates[0].Id)
+        .Contains(associates[1]))
+    .ToList();
 // EF Core providers: throws.   This provider: returns the matching rows.
 ```
 
