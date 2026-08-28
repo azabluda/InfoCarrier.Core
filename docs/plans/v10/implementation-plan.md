@@ -117,5 +117,18 @@ because the test author wrote the query.
       boxing one plausible. It was the change most likely to cost something elsewhere and it cost
       nothing: `failed` 12 -> 11, FIXED the entity case, BROKEN none. 22672 / 22484 / 11 / 177
       (`issue62-fix-entity`). Trim ratchet 89 <= 89, unchanged.
-- [ ] **S4. Check categories 1 and 4.** Converted struct keys declared `object`, and complex-type
-      values. Each needs a new entity in `SqliteSmokeContext`, as `GuidKeyed` was added for #59.
+- [x] **S4. Check categories 1 and 4.** Both hypotheses correct, so **all four of #62's categories
+      are now checked and all four are real**. A converted struct key reaches the store as
+      `"s"."Id" = 7`, and a complex value as `"a"."Address_City" = 'Oslo'`, where the direct query
+      gets `@p` in both places. Two entities added to `SqliteSmokeContext` to carry them, as
+      `GuidKeyed` was added for #59, and adding them broke nothing. Committed red. `failed` 11 ->
+      13, `total` 22672 -> 22674.
+- [ ] **S5. Fix category 1, the converted struct key.** This is the one #59 tried and backed out
+      of: boxing on the declared type alone broke 21 `KeysWithConvertersInfoCarrierTest` tests with
+      "Object must implement IConvertible", because the box's value must round-trip and a converted
+      key is not a wire primitive. #62's question is whether the value can cross in its *converted*
+      form. **Read `known-failures.txt`'s #59 entries before starting**: the first attempt at this
+      is written up there and the reason it failed is not obvious from the code.
+- [ ] **S6. Fix category 4, the complex value.** EF splits a complex value into one parameter per
+      property; this side sends one constant. Unlike S5 there is no failed attempt on record, and
+      the entity fix in S3 is the nearest precedent.

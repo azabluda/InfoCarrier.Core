@@ -486,5 +486,31 @@
 # FIXED the entity case, BROKEN none.
 # Figures read off the run's own summary block: 22672 / 22484 / 11 / 177 (`issue62-fix-entity`).
 # Trim ratchet: OURS 89 <= 89, unchanged.
-failed=11
-total=22672
+# 2026-08-28, issue #62, categories 1 and 4. `failed` 11 -> 13 and `total` 22672 -> 22674. Two NEW
+# tests, both red on purpose, and with them **all four of #62's categories are checked and all four
+# are real**. None was, before today.
+#
+# Category 1, a struct key behind a value converter, through `Find`:
+#     over the wire:  WHERE "s"."Id" = 7
+#     run directly:   WHERE "s"."Id" = @p
+#
+# Category 4, a complex type compared as a whole:
+#     over the wire:  "a"."Address_City" = 'Oslo'
+#     run directly:   "a"."Address_City" = @p
+#
+# Two entities were added to `SqliteSmokeContext` to carry them, as `GuidKeyed` was added for #59:
+# `StructKeyed` with an `IntStructKey` key and a converter, and `Addressed` with a complex
+# `Address`. **Adding them broke nothing**: 22674 tests, two broken and both of them the new cases.
+#
+# Neither is fixed yet, and neither is the same fix as the two that landed today.
+# Category 1 is the one #59 already tried and backed out of: boxing on the declared type alone
+# broke 21 `KeysWithConvertersInfoCarrierTest` tests with "Object must implement IConvertible",
+# because the box's value must round-trip and a converted key is not a wire primitive. The open
+# question #62 states is whether the value can cross in its *converted* form.
+# Category 4 is a complex value that EF splits into one parameter per property, where this side
+# sends one constant.
+#
+# FIXED none, BROKEN the two named above.
+# Figures read off the run's own summary block: 22674 / 22484 / 13 / 177 (`issue62-cases-1-4`).
+failed=13
+total=22674

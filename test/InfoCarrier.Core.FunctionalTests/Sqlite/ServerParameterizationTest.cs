@@ -163,6 +163,90 @@ public partial class ServerParameterizationTest
             static (blogs, blog) => blogs.Where(b => b == blog));
 
     /// <summary>
+    ///     A key lookup on a struct key behind a value converter, category 1 of issue #62.
+    /// </summary>
+    /// <remarks>
+    ///     The declared parameter type is <c>object</c>, as it is for every non-numeric key, and
+    ///     <c>Substitute</c> boxes one of those only when its runtime type is a wire primitive. An
+    ///     <c>IntStructKey</c> is not, so the key is inlined. Boxing on the declared type alone was
+    ///     tried during #59 and broke 21 <c>KeysWithConvertersInfoCarrierTest</c> tests with
+    ///     "Object must implement IConvertible"; the open question is whether the value can cross
+    ///     in its <em>converted</em> form instead.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_converted_struct_key_lookup_matches_the_direct_query()
+    {
+        IntStructKey id = new(7);
+
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new StructKeyed { Id = id, Label = "one" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            Assert.NotNull(await client.StructKeyed.FindAsync(id));
+        }
+
+        string overTheWire = SingleStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            Assert.NotNull(await server.Set<StructKeyed>().FindAsync(id));
+        }
+
+        Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
+
+    /// <summary>
+    ///     A complex type compared as a whole, category 4 of issue #62.
+    /// </summary>
+    /// <remarks>
+    ///     EF splits a complex value into one parameter per property. The question is whether this
+    ///     side sends one constant instead, which would reach the store as literals.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_complex_type_value_matches_the_direct_query()
+    {
+        Address address = new() { City = "Oslo", Postcode = "0150" };
+
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new Addressed { Id = 1, Address = new Address { City = "Oslo", Postcode = "0150" } });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            _ = await client.Addressed.Where(e => e.Address == address).ToListAsync();
+        }
+
+        string overTheWire = SingleStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            _ = await server.Set<Addressed>().Where(e => e.Address == address).ToListAsync();
+        }
+
+        Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
+
+    /// <summary>
     ///     Runs <paramref name="query" /> over the wire and again directly against the server, and
     ///     asserts the store saw one statement, not two.
     /// </summary>

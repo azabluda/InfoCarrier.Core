@@ -78,6 +78,68 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     public DbSet<Tag> Tags => Set<Tag>();
 
     public DbSet<GuidKeyed> GuidKeyed => Set<GuidKeyed>();
+
+    public DbSet<StructKeyed> StructKeyed => Set<StructKeyed>();
+
+    public DbSet<Addressed> Addressed => Set<Addressed>();
+
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.Entity<StructKeyed>()
+            .Property(e => e.Id)
+            .HasConversion(k => k.Value, v => new IntStructKey(v));
+
+        modelBuilder.Entity<Addressed>().ComplexProperty(e => e.Address);
+    }
+}
+
+/// <summary>
+///     An entity whose key is a struct behind a value converter, for <c>ServerParameterizationTest</c>
+///     (issue #62, category 1).
+/// </summary>
+/// <remarks>
+///     The converter is the point. <c>ExpressionExtensions.BuildPredicate</c> compares a
+///     non-numeric key through <c>EF.Property&lt;object&gt;</c>, and <c>Substitute</c> boxes an
+///     <c>object</c>-typed parameter only when its <em>runtime</em> type is a wire primitive. An
+///     <see cref="IntStructKey" /> is not one, so <c>Find</c> on such a key still sends a literal.
+///     Whether the value can cross in its <em>converted</em> form is what #62 asks.
+/// </remarks>
+public class StructKeyed
+{
+    public IntStructKey Id { get; set; }
+
+    public string? Label { get; set; }
+}
+
+/// <summary>
+///     A struct key, converted to <see cref="int" /> by the model.
+/// </summary>
+/// <param name="Value">The underlying value.</param>
+public readonly record struct IntStructKey(int Value);
+
+/// <summary>
+///     An entity with a complex property, for <c>ServerParameterizationTest</c> (issue #62,
+///     category 4). EF splits a complex value into one parameter per property; the question is
+///     whether this side sends one constant instead.
+/// </summary>
+public class Addressed
+{
+    public int Id { get; set; }
+
+    public Address Address { get; set; } = new();
+}
+
+/// <summary>
+///     A complex type, compared as a whole by the test.
+/// </summary>
+public class Address
+{
+    public string? City { get; set; }
+
+    public string? Postcode { get; set; }
 }
 
 /// <summary>
