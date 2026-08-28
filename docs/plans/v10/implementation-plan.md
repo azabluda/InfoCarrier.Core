@@ -145,5 +145,14 @@ because the test author wrote the query.
       `website/docs/limitations.md` needs the query added to its "answers where others refuse"
       section. `failed` 12 -> 11. 22674 / 22486 / 11 / 177 (`issue62-fix-complex-full`). Trim
       ratchet 89 <= 89.
-- [ ] **S7. `limitations.md`: one more query this provider answers and other providers refuse.**
-      User-facing, so the humanizer skill runs on the result before it lands.
+- [x] **S7. `limitations.md`: one more query this provider answers and other providers refuse.**
+      User-facing, so the humanizer skill ran on the result. The section says three scenarios rather
+      than two. The page was ten words over its 700-word budget once the third was added, so the
+      pass had to earn them back; it measures 698 and `doc-links.py` passes with anchors.
+- [x] **S8. Eight cases pinning where the wire could change the statement's shape.** #62's four
+      categories were all found by counting substitutions, and a count only finds a value that was
+      already inlined. These come from the other direction: four on the comparison (a null string, a
+      `StartsWith` argument, an empty `Contains` list, a value in the projection) and four on
+      structure (`Include`, `GroupBy`, `Any` over a navigation, a nullable value type). **All eight
+      passed on the first run**, which is the result rather than a disappointment: eight assumptions
+      became eight assertions. `failed` unchanged at 11, `total` 22674 -> 22682.
