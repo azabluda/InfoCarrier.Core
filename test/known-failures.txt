@@ -622,5 +622,28 @@
 # `Assert.Throws() Failure: No exception was thrown` went 2 -> 3, and nothing else moved.
 # Figures read off the run's own summary block: 22780 / 22587 / 12 / 181
 # (`tpt-model-validator`).
-failed=12
-total=22780
+# 2026-08-29, issue #56, the TPC sibling. `failed` 12 -> 13, `total` 22780 -> 22878. Ninety-eight
+# more tests, ninety-three green on the first run, and the figures are IDENTICAL to TPT's: 1 failed,
+# 93 passed, 4 skipped, 98 total, same test, same reason.
+#
+# **That identity is the point of adopting it.** `InfoCarrierModelValidator` was written against one
+# base, and one base cannot tell a fix for the TPT mapping from a fix for TPT's fixture. Two bases
+# reaching the same numbers by the same route says the validator addresses the mapping. TPC needed
+# no product change at all: the new class and its fixture are the whole diff.
+#
+# `UseGeneratedKeys` is `false` on the fixture, copied from EF's own
+# `TPCInheritanceQuerySqliteFixture` rather than guessed. TPC gives each concrete type its own
+# table, so keys must be unique across all of them, which needs a generator shared between tables --
+# a sequence or HiLo. SQLite has neither. This is a property of the backing store and says nothing
+# about the wire.
+#
+# The one new failure is `TPCInheritanceQueryInfoCarrierTest.Using_from_sql_throws`, the exact twin
+# of TPT's, and it has the same cause: the client keeps a shadow discriminator the server's model
+# drops, so EF's `FindDiscriminatorProperty() == null` guard never fires. Two failures of the same
+# shape are one defect, and this one now has two witnesses instead of one.
+#
+# FIXED none, BROKEN one, and that one is named above. REASONS: the single line
+# `Assert.Throws() Failure: No exception was thrown` went 3 -> 4, and nothing else moved.
+# Figures read off the run's own summary block: 22878 / 22680 / 13 / 185 (`tpc-adopt`).
+failed=13
+total=22878
