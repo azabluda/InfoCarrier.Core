@@ -893,11 +893,45 @@ internal sealed class QueryExecutor<TElement>
         ///     process ever built.
         /// </remarks>
         private static bool IsMappedPropertyType(IModel model, Type type)
-            => MappedPropertyTypes
-                .GetValue(model, static m => [.. m.GetEntityTypes()
-                    .SelectMany(e => e.GetProperties())
-                    .Select(p => p.ClrType)])
-                .Contains(type);
+            => MappedPropertyTypes.GetValue(model, static m => Collect(m)).Contains(type);
+
+        /// <summary>
+        ///     Every CLR type the model stores as a value: a property's type, and a complex
+        ///     property's own type, walked through nesting.
+        /// </summary>
+        /// <remarks>
+        ///     <b>The complex half is the #62 category 4 fix.</b> A complex property is not in
+        ///     <c>GetProperties()</c> — it is in <c>GetComplexProperties()</c>, and reading only
+        ///     the first meant <c>Where(e =&gt; e.Address == address)</c> found no mapped type,
+        ///     declined the box and reached the store as <c>"a"."Address_City" = 'Oslo'</c> where
+        ///     the direct query produced <c>= @p</c>. The value is as much a value the caller
+        ///     stores as any scalar is; only the metadata accessor differed.
+        /// </remarks>
+        private static HashSet<Type> Collect(IModel model)
+        {
+            HashSet<Type> types = [];
+
+            foreach (IEntityType entityType in model.GetEntityTypes())
+            {
+                Walk(entityType);
+            }
+
+            return types;
+
+            void Walk(ITypeBase structuralType)
+            {
+                foreach (IProperty property in structuralType.GetProperties())
+                {
+                    types.Add(property.ClrType);
+                }
+
+                foreach (IComplexProperty complexProperty in structuralType.GetComplexProperties())
+                {
+                    types.Add(complexProperty.ClrType);
+                    Walk(complexProperty.ComplexType);
+                }
+            }
+        }
 
         private static readonly ConditionalWeakTable<IModel, HashSet<Type>> MappedPropertyTypes = new();
 

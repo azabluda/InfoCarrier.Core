@@ -135,6 +135,15 @@ because the test author wrote the query.
       boxed on its runtime type and an `Expression.Convert` restores the node type. `failed` 13 ->
       12, all 21 `KeysWithConverters` tests green. 22674 / 22485 / 12 / 177
       (`issue62-fix-structkey`). Trim ratchet 89 <= 89.
-- [ ] **S6. Fix category 4, the complex value.** EF splits a complex value into one parameter per
+- [x] **S6. Fix category 4, the complex value.** EF splits a complex value into one parameter per
       property; this side sends one constant. Unlike S5 there is no failed attempt on record, and
-      the entity fix in S3 is the nearest precedent.
+      the entity fix in S3 is the nearest precedent. **Done. A complex property is not in
+      `GetProperties()` but in `GetComplexProperties()`, and the predicate read only the first.**
+      The fix broke `Contains_with_nested_and_composed_operators`, which asserted a throw; two
+      narrowings failed to restore the throw, and running the base directly showed its own assertion
+      passes. So that override was a workaround whose limitation has gone, and it is deleted —
+      `website/docs/limitations.md` needs the query added to its "answers where others refuse"
+      section. `failed` 12 -> 11. 22674 / 22486 / 11 / 177 (`issue62-fix-complex-full`). Trim
+      ratchet 89 <= 89.
+- [ ] **S7. `limitations.md`: one more query this provider answers and other providers refuse.**
+      User-facing, so the humanizer skill runs on the result before it lands.
