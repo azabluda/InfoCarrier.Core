@@ -466,5 +466,25 @@
 # FIXED the three collection cases, BROKEN none.
 # Figures read off the run's own summary block: 22672 / 22483 / 12 / 177
 # (`issue62-fix-collections`). Trim ratchet: OURS 89 <= 89, unchanged.
-failed=12
+# 2026-08-28, issue #62, category 2. `failed` 12 -> 11, `total` unchanged. The entity case goes
+# green and nothing else moves.
+#
+# J21's comment excluded an entity-typed parameter from boxing on the grounds that EF "expands it
+# to a key comparison itself". The expansion is real; the assumption underneath it was not. EF
+# reads the key **off a `ConstantExpression` eagerly**, so `Where(b => b == blog)` reached SQLite
+# as `WHERE "b"."Id" = 2` while the same query on the server context produced `WHERE "b"."Id" = @p`.
+# What EF expands is the question, not whether it expands.
+#
+# Nothing new crosses the wire. An entity already travels as an `EntityKeyNode` and is rebuilt by
+# `MaterializeEntityReference` with its key populated, and that method exists precisely because EF
+# rewrites `entity1 == entity2` into a key comparison. The box changes the shape of the node that
+# holds the entity, not the node.
+#
+# **Boxing entities was the change most likely to cost something elsewhere, and it cost nothing**:
+# 22672 tests, one fixed, none broken.
+#
+# FIXED the entity case, BROKEN none.
+# Figures read off the run's own summary block: 22672 / 22484 / 11 / 177 (`issue62-fix-entity`).
+# Trim ratchet: OURS 89 <= 89, unchanged.
+failed=11
 total=22672

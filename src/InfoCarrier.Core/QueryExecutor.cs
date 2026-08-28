@@ -824,14 +824,32 @@ internal sealed class QueryExecutor<TElement>
             // A null is left alone. §6's caution about `object` is about a collection's *element*
             // type, where elements of differing real types tell EF less spelled out than gathered;
             // that is the branch above, and this one is a scalar.
+            // **An entity is boxed too, since 2026-08-28 (issue #62), and the J21 comment above
+            // states the assumption this reverses.** It reads "an entity type (which EF expands to
+            // a key comparison itself)", and that expansion does happen — but EF reads the key
+            // *off a `ConstantExpression` eagerly*, so `Where(b => b == blog)` reached SQLite as
+            // `WHERE "b"."Id" = 2` where the same query on the server context produced
+            // `WHERE "b"."Id" = @p`. The expansion is not the question; what it expands is. A
+            // member read is a captured variable to `ExpressionTreeFuncletizer`, and the key it
+            // then lifts is a parameter.
+            //
+            // Nothing new crosses the wire. An entity already travels as an `EntityKeyNode` and is
+            // rebuilt by `MaterializeEntityReference` with its key populated — which exists,
+            // in its own words, because "EF rewrites `Contains(entity)` and `entity1 == entity2`
+            // into comparisons over key values". The box changes the shape of the node that holds
+            // it, not the node.
+            IEntityType? entityType = parameterType == typeof(object)
+                ? null
+                : _queryContext.Context.Model.FindRuntimeEntityType(parameterType);
+
             if (!_insideInlineCollection
                 && (PrimitiveCoercion.IsWirePrimitive(parameterType)
                     || (parameterType == typeof(object)
                         && value is not null
                         && PrimitiveCoercion.IsWirePrimitive(value.GetType()))
                     || (parameterType != typeof(object)
-                        && _queryContext.Context.Model.FindRuntimeEntityType(parameterType) is null
-                        && IsMappedPropertyType(_queryContext.Context.Model, parameterType))))
+                        && (entityType is not null
+                            || IsMappedPropertyType(_queryContext.Context.Model, parameterType)))))
             {
                 return Boxed(value, parameterType);
             }

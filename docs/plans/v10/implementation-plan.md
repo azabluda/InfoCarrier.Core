@@ -109,11 +109,13 @@ because the test author wrote the query.
       `IOrderedEnumerable<T>` is still refused, because nothing in `ConstructCollection` produces
       one. `failed` 15 -> 12, FIXED the three collection cases, BROKEN none. 22672 / 22483 / 12 /
       177 (`issue62-fix-collections`). Trim ratchet 89 <= 89, unchanged.
-- [ ] **S3. Fix category 2, the entity constant.** `Substitute` excludes an entity-typed parameter
+- [x] **S3. Fix category 2, the entity constant.** `Substitute` excludes an entity-typed parameter
       because EF expands entity equality into a key comparison itself. The measurement shows the
       expansion then carries a *literal* key: EF reads the key off a `ConstantExpression` eagerly,
       where a member read would have been parameterized. The wire already sends an entity by
       reference and rebuilds it with its key (`MaterializeEntityReference`), which is what makes
-      boxing one plausible.
+      boxing one plausible. It was the change most likely to cost something elsewhere and it cost
+      nothing: `failed` 12 -> 11, FIXED the entity case, BROKEN none. 22672 / 22484 / 11 / 177
+      (`issue62-fix-entity`). Trim ratchet 89 <= 89, unchanged.
 - [ ] **S4. Check categories 1 and 4.** Converted struct keys declared `object`, and complex-type
       values. Each needs a new entity in `SqliteSmokeContext`, as `GuidKeyed` was added for #59.
