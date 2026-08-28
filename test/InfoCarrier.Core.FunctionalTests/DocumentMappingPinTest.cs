@@ -64,6 +64,27 @@ public class DocumentMappingPinTest
             InfoCarrierValueGenerationConvention.DefaultValueSqlAnnotation);
     }
 
+    // `InfoCarrierHierarchyMappingConvention`'s four. The three strategy VALUES are pinned as well
+    // as the annotation name, because they are compared against rather than merely read: a rename
+    // of `"TPT"` would leave this client keeping a discriminator the server had dropped, which is
+    // silent wrong data rather than an error.
+    [ConditionalFact]
+    public void The_mapping_strategy_annotation_and_values_are_still_EFs()
+    {
+        Assert.Equal(
+            RelationalAnnotationNames.MappingStrategy,
+            InfoCarrierHierarchyMappingConvention.MappingStrategyAnnotation);
+        Assert.Equal(
+            RelationalAnnotationNames.TphMappingStrategy,
+            InfoCarrierHierarchyMappingConvention.TphMappingStrategy);
+        Assert.Equal(
+            RelationalAnnotationNames.TptMappingStrategy,
+            InfoCarrierHierarchyMappingConvention.TptMappingStrategy);
+        Assert.Equal(
+            RelationalAnnotationNames.TpcMappingStrategy,
+            InfoCarrierHierarchyMappingConvention.TpcMappingStrategy);
+    }
+
     [ConditionalFact]
     public void The_walk_agrees_with_EF_for_every_type_including_nested_ones()
     {

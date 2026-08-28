@@ -34,6 +34,11 @@ public class InfoCarrierConventionSetBuilder(
         // the store, the client has to reach it too.
         conventionSet.ModelFinalizingConventions.Add(new InfoCarrierValueGenerationConvention());
 
+        // And the same again for inheritance. Core EF gives every hierarchy a discriminator, and
+        // the convention that takes it back for TPT and TPC is relational. Without this the client
+        // keeps a discriminator the server's model has dropped.
+        conventionSet.ModelFinalizingConventions.Add(new InfoCarrierHierarchyMappingConvention());
+
         return conventionSet;
     }
 }

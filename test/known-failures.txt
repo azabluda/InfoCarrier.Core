@@ -645,5 +645,45 @@
 # FIXED none, BROKEN one, and that one is named above. REASONS: the single line
 # `Assert.Throws() Failure: No exception was thrown` went 3 -> 4, and nothing else moved.
 # Figures read off the run's own summary block: 22878 / 22680 / 13 / 185 (`tpc-adopt`).
-failed=13
-total=22878
+# 2026-08-29, issue #56, the client keeps the discriminator the server drops. `failed` 13 -> 11,
+# `total` 22878 -> 22879. **The count is back where it stood before any of this work**, with 197
+# more tests in the suite.
+#
+# Core EF's `DiscriminatorConvention` gives every hierarchy a discriminator. The convention that
+# takes it away again for TPT and TPC, `EntityTypeHierarchyMappingConvention`, ships in
+# `Microsoft.EntityFrameworkCore.Relational`, which this client does not have. So a TPT or TPC model
+# built here kept a discriminator the server's model had dropped -- a fact computed twice by two
+# providers and disagreeing, which is the failure mode CLAUDE.md names and B4 cost 106 failures.
+#
+# `InfoCarrierHierarchyMappingConvention` closes it, registered beside
+# `InfoCarrierValueGenerationConvention`, which was added for exactly the same reason one milestone
+# earlier: a fact only a relational convention states, on a client that runs none.
+#
+# **NOT a seam, and that was decided rather than skipped.** `IInfoCarrierDocumentMapping` is an
+# interface because Cosmos genuinely answers its question differently -- a document store recognises
+# an ordinal key by shape, not by a container column. Inheritance is not like that: Cosmos maps
+# hierarchies with a discriminator always and has no TPT or TPC, so this convention finds no
+# annotations there and leaves the discriminator alone, which is already correct. An interface with
+# one implementation and no second answer in sight is not a seam.
+#
+# **The narrowing is the part that could have gone wrong.** EF compares `GetTableName()`, which
+# falls back through a convention to the DbSet name, so a derived type with no `ToTable` still
+# answers with its root's table. This client has no such fallback, so comparing raw annotations
+# would read "root names a table, derived names none" as a difference and strip the discriminator
+# from a plain TPH model. The test here is that the DERIVED type names a store object of its own
+# which differs from the nearest one an ancestor names. BROKEN none across 22879 tests is what says
+# that narrowing holds; the four strings and the three strategy VALUES are pinned in
+# `DocumentMappingPinTest`, values included because they are compared against rather than read.
+#
+# **What this does NOT fix is anything a user was hitting.** `Using_from_sql_throws` asserts EF
+# refuses `FromSqlRaw` on a non-TPH root, and this provider does not offer `FromSql` at all (#60).
+# Queries and writes both worked with the phantom discriminator present:
+# `InheritanceQueryTestBase.Can_insert_update_delete` inserts a derived type, updates an FK on it
+# and deletes it through the BASE set, across four contexts in one transaction, and passed on both
+# bases before this change. The argument for the fix is a loaded gun, not one that has gone off.
+#
+# FIXED both `Using_from_sql_throws`, BROKEN none. REASONS: that line went 4 -> 2.
+# Figures read off the run's own summary block: 22879 / 22683 / 11 / 185
+# (`hierarchy-convention`). Trim ratchet: OURS 89 <= 89, unchanged.
+failed=11
+total=22879
