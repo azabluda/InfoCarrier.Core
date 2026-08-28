@@ -79,8 +79,12 @@ only a fraction of what it hid.
       `Sqlite/ServerParameterizationTest.cs` captures the server's SQL through
       `SharedTestStoreProperties.OnAddOptions` and compares the statement a wire query produces
       against the same query written directly on the server context, with parameter names
-      normalized. Five cases stand today. #62's four unexamined categories are four more cases in
-      that file.
+      normalized. Five cases stood before this step. **Categories 2 and 3 are now checked and both
+      hypotheses are correct**: a `HashSet`, an `ImmutableArray` and a `ReadOnlyCollection` all
+      reach the store as `IN ('alpha', 'gamma')` where the direct query gets `IN (@p, @p)`, and
+      `Where(b => b == blog)` reaches it as `"b"."Id" = 2` where the direct query gets `= @p`. Four
+      cases committed red, as Q1 did. `failed` 11 -> 15, `total` 22668 -> 22672. Categories 1 and 4
+      remain: converted struct keys and complex types each need a new entity in `SqliteSmokeContext`.
 - [ ] **R4. `ITestSqlLoggerFactory` on the query fixtures — a prerequisite for R5, not for #62.**
       This is what the new compliance test asks for, and its 27 fixtures are only reachable once a
       fixture can hand a test the server's SQL through EF's own type. **Note what adopting it

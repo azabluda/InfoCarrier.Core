@@ -416,5 +416,36 @@
 #
 # FIXED none, BROKEN the two named above, REASONS unchanged.
 # Figures read off the run's own summary block: 22668 / 22480 / 11 / 177 (`issue56-compliance`).
-failed=11
-total=22668
+# 2026-08-28, issue #62. `failed` 11 -> 15 and `total` 22668 -> 22672. Four NEW tests, all red on
+# purpose, and the rise is the point of them.
+#
+# #62 lists four categories of query parameter that still reach the backing store as a SQL literal
+# after #59, and says of all four: "None has been checked against the server's SQL. Each is a
+# hypothesis." Two of them are now checked, by four cases added to
+# `Sqlite/ServerParameterizationTest.cs` -- which needed no new machinery, because that test
+# already runs a query both over the wire and directly on the server and compares the two
+# statements.
+#
+# Both hypotheses are correct.
+#
+# Category 3, a collection the box cannot rebuild -- `HashSet<T>`, `ImmutableArray<T>`,
+# `ReadOnlyCollection<T>`:
+#     over the wire:  WHERE "b"."Title" IN ('alpha', 'gamma')
+#     run directly:   WHERE "b"."Title" IN (@p, @p)
+#
+# Category 2, an entity compared as a whole, `Where(b => b == blog)`:
+#     over the wire:  WHERE "b"."Id" = 2
+#     run directly:   WHERE "b"."Id" = @p
+#
+# So this is #59's defect in two narrower forms, and the cost is the same one: a distinct statement
+# and a distinct compiled-query cache entry on the server per distinct value.
+#
+# Red first and green later, as Q1 did. The fix is in `QueryExecutor.Substitute`, whose boxing
+# rules have broken tests twice when changed, so it is a separate commit with both gates run.
+# Categories 1 and 4 of #62 are still unchecked: converted struct keys and complex types each need
+# a new entity in `SqliteSmokeContext`, as `GuidKeyed` was added for #59.
+#
+# FIXED none, BROKEN the four named above, REASONS one new `Assert.Equal` group.
+# Figures read off the run's own summary block: 22672 / 22480 / 15 / 177 (`issue62-cases`).
+failed=15
+total=22672

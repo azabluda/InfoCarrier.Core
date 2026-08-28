@@ -1,5 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -107,6 +109,58 @@ public partial class ServerParameterizationTest
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
     }
+
+    /// <summary>
+    ///     A collection the box cannot hand back, category 3 of issue #62.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Substitute</c> boxes a collection only where the parameter's declared type can
+    ///         accept the <c>List&lt;T&gt;</c> the far side rebuilds. A <c>HashSet&lt;T&gt;</c>
+    ///         cannot, so the value is spelled out as a constant instead. The question these three
+    ///         cases answer is whether that reaches the store as a literal list or as parameters,
+    ///         and the only way to know is to read the statement.
+    ///     </para>
+    ///     <para>
+    ///         <c>IOrderedEnumerable&lt;T&gt;</c> is deliberately absent. Boxing it broke eight
+    ///         <c>Contains_with_local_ordered_enumerable_*</c> tests, and that carve-out is
+    ///         documented in <c>Substitute</c> itself.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_HashSet_parameter_matches_the_direct_query()
+        => AssertSameStatement(
+            new HashSet<string> { "alpha", "gamma" },
+            static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
+
+    /// <inheritdoc cref="A_HashSet_parameter_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task An_ImmutableArray_parameter_matches_the_direct_query()
+        => AssertSameStatement(
+            ImmutableArray.Create("alpha", "gamma"),
+            static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
+
+    /// <inheritdoc cref="A_HashSet_parameter_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_ReadOnlyCollection_parameter_matches_the_direct_query()
+        => AssertSameStatement(
+            new ReadOnlyCollection<string>(["alpha", "gamma"]),
+            static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
+
+    /// <summary>
+    ///     An entity compared as a whole, category 2 of issue #62.
+    /// </summary>
+    /// <remarks>
+    ///     EF expands <c>b == blog</c> into a comparison of the key, so what reaches the store is a
+    ///     key value and not an entity. The open question is whether that key lands as a parameter
+    ///     here as it does on EF's own client, or as a literal: <c>Substitute</c> excludes an
+    ///     entity-typed parameter from boxing on the grounds that EF expands it itself.
+    /// </remarks>
+    [ConditionalFact]
+    public Task An_entity_constant_matches_the_direct_query()
+        => AssertSameStatement(
+            new Blog { Id = 2, Title = "beta" },
+            static (blogs, blog) => blogs.Where(b => b == blog));
 
     /// <summary>
     ///     Runs <paramref name="query" /> over the wire and again directly against the server, and
