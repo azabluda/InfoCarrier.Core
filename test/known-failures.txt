@@ -585,5 +585,42 @@
 #
 # FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22682 / 22494 / 11 / 177 (`issue62-breadth`).
-failed=11
-total=22682
+# 2026-08-29, issue #56, the first TPT coverage in this repository. `failed` 11 -> 12,
+# `total` 22682 -> 22780. NINETY-EIGHT new tests, of which ninety-three are green on the first run;
+# the rise of one is the cost of the whole base, not a regression in anything that passed.
+#
+# The probe began at 84 of 98 failing, and all 84 had ONE cause: EF's core `ModelValidator` throws
+# `NoDiscriminatorProperty` for any hierarchy with derived types and no discriminator. That rule
+# belongs to TPH, and `RelationalModelValidator` overrides the same method to take an `else` branch
+# for the discriminator-less case, which is what makes TPT and TPC legal there. This provider
+# registered no validator at all, so the client got the core one.
+#
+# `InfoCarrierModelValidator` now lifts that rule, following `InMemoryModelValidator` -- a
+# non-relational provider that subclasses the core validator -- as its precedent. **The key is the
+# ABSENCE of a discriminator and not the mapping strategy**: EF's own `TPTInheritanceQueryFixture`
+# never calls `UseTptMappingStrategy`, it calls `ToTable` once per type, so a check for the
+# `Relational:MappingStrategy` annotation would never have fired. `RelationalModelValidator` does
+# not read it for this decision either. It is sound here because the client maps to no store and
+# names the concrete type on the wire, in `TypeNode.EntityTypeName`, rather than reading a
+# discriminator column.
+#
+# THE ONE NEW FAILURE, `TPTInheritanceQueryInfoCarrierTest.Using_from_sql_throws`, is a genuine
+# client/server model divergence and is left red per ADR-004. The test asserts that `FromSqlRaw` on
+# a non-TPH root throws. `RelationalQueryableExtensions.GenerateFromSqlQueryRoot` guards on
+# `(BaseType != null || GetDirectlyDerivedTypes().Any()) && FindDiscriminatorProperty() == null`.
+# Nothing was thrown at all, and the only path to that is `FindDiscriminatorProperty()` returning
+# NON-null -- a wrong exception type would have been reported as one. So the CLIENT has a shadow
+# discriminator on `Bird` that the SERVER's TPT model does not: the fixture only ignores the
+# discriminator on `Drink`, and relational conventions remove `Bird`'s when `ToTable` is called per
+# type, while this client has no such convention. This is the shape CLAUDE.md warns about -- a fact
+# computed twice by two providers that must agree. Removing it needs a convention that reads the
+# per-type table annotations, which is #60's seam question, so it is priced and not taken here.
+#
+# EF ships no SQLite override of this test; SQL Server overrides it only to call `base`.
+#
+# FIXED none, BROKEN one, and that one is named above. REASONS: the single line
+# `Assert.Throws() Failure: No exception was thrown` went 2 -> 3, and nothing else moved.
+# Figures read off the run's own summary block: 22780 / 22587 / 12 / 181
+# (`tpt-model-validator`).
+failed=12
+total=22780
