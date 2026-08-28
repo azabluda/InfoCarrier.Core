@@ -512,5 +512,60 @@
 #
 # FIXED none, BROKEN the two named above.
 # Figures read off the run's own summary block: 22674 / 22484 / 13 / 177 (`issue62-cases-1-4`).
-failed=13
+# 2026-08-28, issue #62, category 1. `failed` 13 -> 12, `total` unchanged. The converted struct key
+# case goes green, all 21 `KeysWithConvertersInfoCarrierTest` tests stay green, nothing else moves.
+#
+# **#59's failed attempt was reproduced first, deliberately.** Widening the clause so an
+# `object`-typed parameter is boxed whatever its runtime type gives 21 `KeysWithConverters`
+# failures with "Object must implement IConvertible", exactly as recorded. Reproducing it is what
+# located the fault, because the message names a conversion and the cause is not one.
+#
+# **The box is the problem, not the value.** `ParameterBox<object>` declares `Value` as `object`,
+# so the runtime type is gone by the time the far side rebuilds it, and a `BytesStructKey` is not
+# something the wire can put back without one. `ParameterBox<BytesStructKey>` has no such problem:
+# it is exactly what the mapped-property clause already sends when the declared type IS the struct,
+# and that path has been green since J21.
+#
+# So the key is boxed on its RUNTIME type and an `Expression.Convert` restores the node type. J21's
+# caution that "re-typing the box to the runtime type would change what `CreateEqualsExpression` is
+# given" is answered by the conversion: what EF is handed is still typed `object`.
+#
+# FIXED the converted struct key case, BROKEN none.
+# Figures read off the run's own summary block: 22674 / 22485 / 12 / 177
+# (`issue62-fix-structkey`). Trim ratchet: OURS 89 <= 89, unchanged.
+# 2026-08-28, issue #62, category 4. `failed` 12 -> 11, `total` unchanged. **All four of #62's
+# categories are now checked and all four are fixed.**
+#
+# A complex property is not in `GetProperties()`. It is in `GetComplexProperties()`, and
+# `IsMappedPropertyType` read only the first. So `Where(e => e.Address == address)` found no mapped
+# type, declined the box, and reached the store as `"a"."Address_City" = 'Oslo'` where the direct
+# query produced `= @p`. A complex value is as much a value the caller stores as any scalar is;
+# only the metadata accessor differed.
+#
+# **The interesting part is the test this broke, and how the first two answers to it were wrong.**
+# Boxing a complex value let
+# `ComplexPropertiesStructuralEqualityQueryInfoCarrierTest.Contains_with_nested_and_composed_operators`
+# stop throwing. That test asserted `InvalidOperationException`, quoting EF's own
+# `ComplexTableSplittingStructuralEqualityRelationalTestBase`, which says "the exception is correct,
+# since the collections in the test data are null for table splitting".
+#
+# Narrowing was tried twice and neither narrowing restored the exception -- first excluding complex
+# collections, then dropping the nested walk. Two failed narrowings is the signal that the fix was
+# not too broad. **Running the base directly settled it: the base's own assertion passes.** The
+# query returns the right answer against EF's expected data, verified rather than inferred from the
+# absence of an exception.
+#
+# So this is a query this provider answers and EF's relational providers refuse, which
+# `website/docs/limitations.md` already has a section for, and our override was a workaround whose
+# limitation has gone. It is deleted. `OwnedNavigationsQueryInfoCarrierTests` keeps its identical
+# override, measured in the same run: that one still throws.
+#
+# The full walk -- nesting and complex collections included -- was then re-measured against the
+# narrowed one and is byte-identical: FIXED none, BROKEN none, REASONS unchanged. The narrowing had
+# lost its reason, so it is not kept.
+#
+# FIXED the complex value case, BROKEN none.
+# Figures read off the run's own summary block: 22674 / 22486 / 11 / 177
+# (`issue62-fix-complex-full`). Trim ratchet: OURS 89 <= 89, unchanged.
+failed=11
 total=22674

@@ -838,6 +838,30 @@ internal sealed class QueryExecutor<TElement>
             // in its own words, because "EF rewrites `Contains(entity)` and `entity1 == entity2`
             // into comparisons over key values". The box changes the shape of the node that holds
             // it, not the node.
+            // **A converted key declared `object` is boxed on its RUNTIME type and converted back
+            // in the tree, since 2026-08-28 (issue #62, category 1).** #59 tried the obvious thing
+            // — widen the clause below so an `object`-typed parameter is boxed whatever its runtime
+            // type — and it broke 21 `KeysWithConvertersInfoCarrierTest` tests with "Object must
+            // implement IConvertible", reproduced here before this was written. The reason is the
+            // box, not the value: `ParameterBox<object>` declares `Value` as `object`, so the type
+            // is gone by the time the far side rebuilds it, and a `BytesStructKey` is not something
+            // the wire can put back without one.
+            //
+            // `ParameterBox<BytesStructKey>` has no such problem — it is exactly what the mapped
+            // property clause below already sends when the declared type IS the struct, and that
+            // path is green. So box on the runtime type and let an `Expression.Convert` restore the
+            // node type. The J21 comment's caution that "re-typing the box to the runtime type
+            // would change what `CreateEqualsExpression` is given" is answered by the conversion:
+            // the node handed to EF is still typed `object`.
+            if (!_insideInlineCollection
+                && parameterType == typeof(object)
+                && value is not null
+                && !PrimitiveCoercion.IsWirePrimitive(value.GetType())
+                && IsMappedPropertyType(_queryContext.Context.Model, value.GetType()))
+            {
+                return Expression.Convert(Boxed(value, value.GetType()), typeof(object));
+            }
+
             IEntityType? entityType = parameterType == typeof(object)
                 ? null
                 : _queryContext.Context.Model.FindRuntimeEntityType(parameterType);
@@ -869,11 +893,45 @@ internal sealed class QueryExecutor<TElement>
         ///     process ever built.
         /// </remarks>
         private static bool IsMappedPropertyType(IModel model, Type type)
-            => MappedPropertyTypes
-                .GetValue(model, static m => [.. m.GetEntityTypes()
-                    .SelectMany(e => e.GetProperties())
-                    .Select(p => p.ClrType)])
-                .Contains(type);
+            => MappedPropertyTypes.GetValue(model, static m => Collect(m)).Contains(type);
+
+        /// <summary>
+        ///     Every CLR type the model stores as a value: a property's type, and a complex
+        ///     property's own type, walked through nesting.
+        /// </summary>
+        /// <remarks>
+        ///     <b>The complex half is the #62 category 4 fix.</b> A complex property is not in
+        ///     <c>GetProperties()</c> — it is in <c>GetComplexProperties()</c>, and reading only
+        ///     the first meant <c>Where(e =&gt; e.Address == address)</c> found no mapped type,
+        ///     declined the box and reached the store as <c>"a"."Address_City" = 'Oslo'</c> where
+        ///     the direct query produced <c>= @p</c>. The value is as much a value the caller
+        ///     stores as any scalar is; only the metadata accessor differed.
+        /// </remarks>
+        private static HashSet<Type> Collect(IModel model)
+        {
+            HashSet<Type> types = [];
+
+            foreach (IEntityType entityType in model.GetEntityTypes())
+            {
+                Walk(entityType);
+            }
+
+            return types;
+
+            void Walk(ITypeBase structuralType)
+            {
+                foreach (IProperty property in structuralType.GetProperties())
+                {
+                    types.Add(property.ClrType);
+                }
+
+                foreach (IComplexProperty complexProperty in structuralType.GetComplexProperties())
+                {
+                    types.Add(complexProperty.ClrType);
+                    Walk(complexProperty.ComplexType);
+                }
+            }
+        }
 
         private static readonly ConditionalWeakTable<IModel, HashSet<Type>> MappedPropertyTypes = new();
 

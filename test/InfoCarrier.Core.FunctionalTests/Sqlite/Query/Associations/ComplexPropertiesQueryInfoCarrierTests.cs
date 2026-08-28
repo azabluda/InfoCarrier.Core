@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -234,21 +234,26 @@ public class ComplexPropertiesSetOperationsQueryInfoCarrierTest(ComplexPropertie
                 base.Over_different_collection_properties)).Message);
 }
 
+/// <remarks>
+///     <para>
+///         <b>The <c>Contains_with_nested_and_composed_operators</c> override is gone, and #62 is
+///         why.</b> It asserted <c>InvalidOperationException</c>, quoting EF's own
+///         <c>ComplexTableSplittingStructuralEqualityRelationalTestBase</c>: <i>"Collections are
+///         not supported with table splitting, only JSON. Note that the exception is correct,
+///         since the collections in the test data are null for table splitting."</i>
+///     </para>
+///     <para>
+///         Once a complex value crosses as a parameter rather than as inlined literals, the query
+///         translates and <b>the base's own assertion passes</b> — checked by running the base
+///         directly, not inferred from the absence of an exception. So this is a query this
+///         provider answers and EF's relational providers refuse, which
+///         <c>website/docs/limitations.md</c> already has a section for. An override of ours that
+///         outlives its limitation is a workaround to delete, and this one has.
+///     </para>
+///     <para>
+///         <c>OwnedNavigationsQueryInfoCarrierTests</c> keeps its identical override, and that is
+///         not an oversight: it still throws, and it was measured in the same run.
+///     </para>
+/// </remarks>
 public class ComplexPropertiesStructuralEqualityQueryInfoCarrierTest(ComplexPropertiesQueryInfoCarrierFixture fixture)
-    : ComplexPropertiesStructuralEqualityTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture)
-{
-    /// <summary>
-    ///     <c>ComplexTableSplittingStructuralEqualityRelationalTestBase</c>'s, with EF's reason
-    ///     verbatim: <i>"Collections are not supported with table splitting, only JSON. Note that
-    ///     the exception is correct, since the collections in the test data are null for table
-    ///     splitting."</i>
-    /// </summary>
-    /// <remarks>
-    ///     A complex property on a relational store <em>is</em> table splitting, so that base is
-    ///     the one that describes this fixture even though it is not in this class's chain. The
-    ///     exception is the server's and says so —
-    ///     <c>Translation of 'EF.Property&lt;int?&gt;(CollectionResultExpression: … RootEntity.AssociateCollection#AssociateType.NestedCollection …, "Id")' failed</c>.
-    /// </remarks>
-    public override Task Contains_with_nested_and_composed_operators()
-        => Assert.ThrowsAsync<InvalidOperationException>(base.Contains_with_nested_and_composed_operators);
-}
+    : ComplexPropertiesStructuralEqualityTestBase<ComplexPropertiesQueryInfoCarrierFixture>(fixture);

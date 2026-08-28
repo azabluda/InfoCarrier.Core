@@ -123,12 +123,27 @@ because the test author wrote the query.
       gets `@p` in both places. Two entities added to `SqliteSmokeContext` to carry them, as
       `GuidKeyed` was added for #59, and adding them broke nothing. Committed red. `failed` 11 ->
       13, `total` 22672 -> 22674.
-- [ ] **S5. Fix category 1, the converted struct key.** This is the one #59 tried and backed out
+- [x] **S5. Fix category 1, the converted struct key.** This is the one #59 tried and backed out
       of: boxing on the declared type alone broke 21 `KeysWithConvertersInfoCarrierTest` tests with
       "Object must implement IConvertible", because the box's value must round-trip and a converted
       key is not a wire primitive. #62's question is whether the value can cross in its *converted*
       form. **Read `known-failures.txt`'s #59 entries before starting**: the first attempt at this
-      is written up there and the reason it failed is not obvious from the code.
-- [ ] **S6. Fix category 4, the complex value.** EF splits a complex value into one parameter per
+      is written up there and the reason it failed is not obvious from the code. **Done, and
+      reproducing #59's failure first is what located the fault**: the box is the problem, not the
+      value. `ParameterBox<object>` loses the runtime type, `ParameterBox<BytesStructKey>` does not,
+      and that second shape is already green wherever the declared type is the struct. So the key is
+      boxed on its runtime type and an `Expression.Convert` restores the node type. `failed` 13 ->
+      12, all 21 `KeysWithConverters` tests green. 22674 / 22485 / 12 / 177
+      (`issue62-fix-structkey`). Trim ratchet 89 <= 89.
+- [x] **S6. Fix category 4, the complex value.** EF splits a complex value into one parameter per
       property; this side sends one constant. Unlike S5 there is no failed attempt on record, and
-      the entity fix in S3 is the nearest precedent.
+      the entity fix in S3 is the nearest precedent. **Done. A complex property is not in
+      `GetProperties()` but in `GetComplexProperties()`, and the predicate read only the first.**
+      The fix broke `Contains_with_nested_and_composed_operators`, which asserted a throw; two
+      narrowings failed to restore the throw, and running the base directly showed its own assertion
+      passes. So that override was a workaround whose limitation has gone, and it is deleted —
+      `website/docs/limitations.md` needs the query added to its "answers where others refuse"
+      section. `failed` 12 -> 11. 22674 / 22486 / 11 / 177 (`issue62-fix-complex-full`). Trim
+      ratchet 89 <= 89.
+- [ ] **S7. `limitations.md`: one more query this provider answers and other providers refuse.**
+      User-facing, so the humanizer skill runs on the result before it lands.
