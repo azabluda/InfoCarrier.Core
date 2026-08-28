@@ -24,7 +24,7 @@ namespace InfoCarrier.Core.FunctionalTests;
 ///         out of the list so this test keeps reporting it.
 ///     </para>
 /// </remarks>
-public class InfoCarrierComplianceTest : ComplianceTestBase
+public class InfoCarrierComplianceTest : RelationalComplianceTestBase
 {
     /// <inheritdoc />
     protected override Assembly TargetAssembly

@@ -389,5 +389,32 @@
 #
 # `failed` unchanged at 9, FIXED none, BROKEN none, REASONS unchanged.
 # Figures read off the run's own summary block: 22667 / 22481 / 9 / 177 (`issue59-final`).
-failed=9
-total=22667
+# 2026-08-28, issue #56. `failed` 9 -> 11 and `total` 22667 -> 22668, both deliberate.
+#
+# `InfoCarrierComplianceTest` now inherits EF's `RelationalComplianceTestBase` instead of
+# `ComplianceTestBase`. `ComplianceTestBase.GetBaseTestClasses` reads
+# `typeof(ComplianceTestBase).Assembly`, which is `EFCore.Specification.Tests`, so every base in
+# `EFCore.Relational.Specification.Tests` was invisible to the gate -- all of them, not only the
+# TPT and TPC ones that prompted the issue. The test CLAUDE.md calls "the current answer to which
+# bases are in" was answering a smaller question than it claimed.
+#
+# EF ships the fix. `RelationalComplianceTestBase` overrides `GetBaseTestClasses` to concat the
+# relational assembly, and it is what EF's own relational providers inherit. A hand-written
+# override was written first and then deleted, because it duplicated that method verbatim.
+#
+# Two tests move and neither is a regression.
+#
+# `All_test_bases_must_be_implemented` was green and is now red, listing 160 unadopted relational
+# bases. `IgnoredTestBases` is left empty on purpose, so the list is the true inventory rather
+# than a hand count. Classifying it is the rest of #56.
+#
+# `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` is a NEW test, which is why
+# `total` rises by one. It names 27 query fixtures. That is not a permanent limitation: it is the
+# same gap #63 worked around with a file and an environment variable. A fixture here could expose
+# the *server's* SQL through `ITestSqlLoggerFactory`, which is what #62 needs to check its four
+# categories against real SQL. Left red on purpose.
+#
+# FIXED none, BROKEN the two named above, REASONS unchanged.
+# Figures read off the run's own summary block: 22668 / 22480 / 11 / 177 (`issue56-compliance`).
+failed=11
+total=22668
