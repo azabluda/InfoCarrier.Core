@@ -41,6 +41,11 @@ public static class InfoCarrierServiceCollectionExtensions
             // `InfoCarrierKeyDiscoveryConvention`.
             .TryAdd<IProviderConventionSetBuilder, InfoCarrierConventionSetBuilder>()
 
+            // A hierarchy with no discriminator is legal on this client, because the server's
+            // provider owns the inheritance mapping and the wire names the concrete type — see
+            // `InfoCarrierModelValidator`.
+            .TryAdd<IModelValidator, InfoCarrierModelValidator>()
+
             // Required of every provider by `EntityFrameworkServicesBuilder.CoreServices`, and
             // deliberately unimplementable here — see `InfoCarrierQueryPipelineFactories`. Both
             // throw with the reason. Registering them replaces EF's generic "no service has been

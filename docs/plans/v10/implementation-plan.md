@@ -73,16 +73,35 @@ only a fraction of what it hid.
       relational *client* API, which is #60's decision, and a base that is merely undecided must stay
       visible. Measured: no test moved. 22668 / 22480 / 11 / 177, FIXED none, BROKEN none, REASONS
       unchanged (`issue56-ignored`).
-- [ ] **R3. `ITestSqlLoggerFactory` on the query fixtures — a prerequisite for R4, not for #62.**
-      This is what the new compliance test asks for, and its 27 fixtures are only reachable once a
-      fixture can hand a test the server's SQL through EF's own type. **Note what adopting it
-      implies**: EF's relational query bases assert with `AssertSql` against golden strings, which
-      pins the *backend's* dialect. `ServerParameterizationTest`'s own remarks argue against golden
-      strings for this repository, and that argument has to be answered here rather than skipped —
-      a base whose whole content is `AssertSql` is #56's "SQL plumbing only" group.
+- [ ] **R3. `ITestSqlLoggerFactory` on the query fixtures — and it is NOT a prerequisite for R4.**
+      **Corrected 2026-08-29, after R5 measured it.** This step used to claim two things and both
+      were wrong for the family R4 starts with. *It is already satisfied*:
+      `InfoCarrierTestStoreFactory.CreateListLoggerFactory` returns a `TestSqlLoggerFactory` rather
+      than a bare `ListLoggerFactory`, precisely so the non-virtual `TestSqlLoggerFactory` property
+      several spec fixtures expose can cast to it, and `TPTInheritanceQueryFixture` is one of them.
+      R5 proves it: 98 tests were collected and run, where a failed cast would have thrown in the
+      fixture's constructor and run none. *And there are no golden strings here*:
+      `TPTInheritanceQueryTestBase` contains **zero** `AssertSql` calls.
+      What remains of this step is real but smaller — the bases whose content genuinely *is*
+      `AssertSql` pin the backend's dialect, and #56's "SQL plumbing only" group has to be answered
+      rather than skipped. **R4 does not wait on it.**
 - [ ] **R4. Classify the remaining 148.** Each is adopt-on-Tier-B, or an ignore entry with a reason.
       #56 carries the hand classification; this step replaces it with an enforced one. The TPT and
       TPC bases that prompted the issue are the first ones worth taking.
+- [x] **R5. `TPTInheritanceQueryTestBase` on Tier B, and the client validator it needed.** The first
+      TPT coverage in this repository, and the probe that prices the other nine TPT and TPC bases.
+      **The probe began at 84 of 98 failing with a single cause**, which is the whole value of
+      running it before pricing anything: EF's core `ModelValidator` requires a discriminator on
+      every hierarchy, `RelationalModelValidator` overrides that method to allow one without, and
+      this provider registered no validator at all. `InfoCarrierModelValidator` lifts the rule,
+      with `InMemoryModelValidator` — a non-relational provider subclassing the core validator — as
+      the precedent. **The first design keyed on the TPT/TPC mapping-strategy annotation and would
+      never have fired**: EF's fixture expresses TPT with `ToTable` per type and never sets that
+      annotation. The absence of a discriminator is the signal, as it is in EF's own relational
+      validator. 93 of 98 green; the one new red is a real client/server model divergence
+      (`Using_from_sql_throws`), left failing per ADR-004 and written up in
+      `test/known-failures.txt`. `failed` 11 -> 12, `total` 22682 -> 22780
+      (`tpt-model-validator`).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
