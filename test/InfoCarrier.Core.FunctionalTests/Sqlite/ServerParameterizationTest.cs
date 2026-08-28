@@ -111,6 +111,90 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     Four cases where a <em>constant</em> and a <em>parameter</em> do not merely differ in
+    ///     the literal: they make EF translate the query differently.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The cases above all began as an inlined value that should have been a parameter, and
+    ///         each was found by counting substitutions. These four come from the other direction:
+    ///         ask where the wire could plausibly change the <em>shape</em> of the statement, and
+    ///         pin those places whether or not a defect is there today.
+    ///     </para>
+    ///     <para>
+    ///         A null, a <c>StartsWith</c> argument, an empty <c>Contains</c> list and a value in
+    ///         the projection are the four EF handles specially. A null compiles to <c>IS NULL</c>
+    ///         when EF can see it and to a null-semantics expansion when it cannot; a
+    ///         <c>StartsWith</c> constant can become a plain <c>LIKE 'x%'</c> where a parameter
+    ///         cannot; an empty list is a constant-folded predicate; and a projected value is the
+    ///         one place a parameter appears outside a predicate.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_null_string_parameter_matches_the_direct_query()
+        => AssertSameStatement<string?, Blog>(
+            null,
+            static (blogs, title) => blogs.Where(b => b.Title == title));
+
+    /// <inheritdoc cref="A_null_string_parameter_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_StartsWith_parameter_matches_the_direct_query()
+        => AssertSameStatement<string, Blog>(
+            "al",
+            static (blogs, prefix) => blogs.Where(b => b.Title!.StartsWith(prefix)));
+
+    /// <inheritdoc cref="A_null_string_parameter_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task An_empty_collection_parameter_matches_the_direct_query()
+        => AssertSameStatement<List<string>, Blog>(
+            [],
+            static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
+
+    /// <inheritdoc cref="A_null_string_parameter_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_parameter_in_the_projection_matches_the_direct_query()
+        => AssertSameStatement<string, string>(
+            "!",
+            static (blogs, suffix) => blogs.Select(b => b.Title + suffix));
+
+    /// <summary>
+    ///     Four more, where the parameter sits inside a construct that changes the statement's
+    ///     structure rather than one of its comparisons.
+    /// </summary>
+    /// <remarks>
+    ///     An <c>Include</c> is a join, a <c>GroupBy</c> is a <c>GROUP BY</c>, an <c>Any</c> over a
+    ///     navigation is a correlated <c>EXISTS</c>, and a nullable value type is the shape J19's
+    ///     null rule is about. Each is a place where a middleman that mishandled the parameter
+    ///     would show up as a different statement rather than a different literal.
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_parameter_under_Include_matches_the_direct_query()
+        => AssertSameStatement<string, Blog>(
+            "beta",
+            static (blogs, title) => blogs.Include(b => b.Posts).Where(b => b.Title == title));
+
+    /// <inheritdoc cref="A_parameter_under_Include_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_parameter_under_GroupBy_matches_the_direct_query()
+        => AssertSameStatement<int, string?>(
+            2,
+            static (blogs, minId) => blogs.Where(b => b.Id >= minId).GroupBy(b => b.Title).Select(g => g.Key));
+
+    /// <inheritdoc cref="A_parameter_under_Include_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_parameter_inside_Any_matches_the_direct_query()
+        => AssertSameStatement<string, Blog>(
+            "first",
+            static (blogs, heading) => blogs.Where(b => b.Posts.Any(p => p.Heading == heading)));
+
+    /// <inheritdoc cref="A_parameter_under_Include_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_nullable_value_type_parameter_matches_the_direct_query()
+        => AssertSameStatement<int?, Blog>(
+            2,
+            static (blogs, id) => blogs.Where(b => b.Id == id));
+
+    /// <summary>
     ///     A collection the box cannot hand back, category 3 of issue #62.
     /// </summary>
     /// <remarks>
@@ -250,9 +334,9 @@ public partial class ServerParameterizationTest
     ///     Runs <paramref name="query" /> over the wire and again directly against the server, and
     ///     asserts the store saw one statement, not two.
     /// </summary>
-    private async Task AssertSameStatement<TValue>(
+    private async Task AssertSameStatement<TValue, TResult>(
         TValue value,
-        Func<IQueryable<Blog>, TValue, IQueryable<Blog>> query)
+        Func<IQueryable<Blog>, TValue, IQueryable<TResult>> query)
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await store.InitializeAsync(

@@ -567,5 +567,23 @@
 # FIXED the complex value case, BROKEN none.
 # Figures read off the run's own summary block: 22674 / 22486 / 11 / 177
 # (`issue62-fix-complex-full`). Trim ratchet: OURS 89 <= 89, unchanged.
+# 2026-08-28, issue #62, breadth. `failed` unchanged at 11, `total` 22674 -> 22682. Eight NEW tests
+# and all eight green, so the rise is coverage and not a regression.
+#
+# The four categories #62 lists were all found by counting substitutions, which only ever finds a
+# value that was inlined. These eight come from the other direction: ask where the wire could
+# change the SHAPE of the statement, and pin those places whether or not a defect is there today.
+#
+# Four on the comparison — a null string, a `StartsWith` argument, an empty `Contains` list, and a
+# value used in the projection. Four on the statement's structure — a parameter under `Include`,
+# under `GroupBy`, inside `Any` over a navigation, and a nullable value type. Each is a place where
+# EF translates a constant and a parameter differently, so a middleman that mishandled one would
+# show up as a different statement rather than a different literal.
+#
+# **All eight passed on the first run, and that is the result, not a disappointment.** It says the
+# remaining risk in this area is low, and it converts eight assumptions into eight assertions.
+#
+# FIXED none, BROKEN none, REASONS unchanged.
+# Figures read off the run's own summary block: 22682 / 22494 / 11 / 177 (`issue62-breadth`).
 failed=11
-total=22674
+total=22682
