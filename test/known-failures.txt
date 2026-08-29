@@ -719,5 +719,45 @@
 # FIXED none, BROKEN three, all named above. REASONS: one new line,
 # `System.InvalidCastException : Unable to cast ... InfoCarrierTestStore ... RelationalTestStore`.
 # Figures read off the run's own summary block: 23023 / 22820 / 14 / 189 (`inheritance-family`).
-failed=14
-total=23023
+# 2026-08-29, issue #56, relationships and many-to-many under TPT and TPC. `failed` 14 -> 26,
+# `total` 23023 -> 24271. **1248 new tests, 1236 green**, and all twelve reds are one thing.
+#
+# Six bases: `TPTRelationshipsQueryTestBase`, `TPCRelationshipsQueryTestBase`, and the four
+# many-to-many bases, tracking and no-tracking, TPT and TPC. These navigate BETWEEN hierarchies, so
+# one query touches the store objects of a derived type, its base, and the derived types across a
+# navigation -- several joins the client never sees.
+#
+# **EF declares its own `TPCRelationshipsQuerySqliteTest` `internal`, which stops xUnit collecting
+# it, and gives no reason.** Ours is an ordinary public class: a red test is information (ADR-004)
+# and silently disabling one is what v1 did. It passes apart from the two split cases below.
+#
+# EIGHT FAILURES WERE EF'S OWN CONVERGENCE and are now green. `APPLY` is not SQLite syntax and EF
+# overrides the same two theories on all four of its many-to-many SQLite classes. The overrides were
+# deliberately NOT written before the first run: writing one in advance imports a workaround whose
+# limitation might not cross a wire, and C-something already deleted one that outlived its cause.
+# Measured first, then adopted, using the `AssertApplyNotSupported` idiom three classes here already
+# had.
+#
+# **A FILTERED PROBE GOT THIS WRONG AND THE FULL GATE CAUGHT IT.** The filter
+# `FullyQualifiedName~ManyToManyQueryInfoCarrier` does NOT match
+# `ManyToManyNoTrackingQueryInfoCarrier`, so four of the six classes never ran; the probe reported 8
+# failures where the run found 20, and the overrides landed on half the classes that needed them.
+# The lesson is the one CLAUDE.md already states -- never a verdict from partial output -- and the
+# new part is that a `~` filter is partial output too.
+#
+# **THE TWELVE THAT REMAIN ARE #60, AND THEY PRICE IT FOR THE FIRST TIME.** Every one is a `_split`
+# variant. EF does not override them because on a relational client `AsSplitQuery` avoids the
+# `APPLY` entirely; here the marker never reaches the server, so they run as a single query. They
+# fail in TWO shapes, and the second matters:
+#   * 8 throw `ApplyNotSupported`, which is loud and harmless.
+#   * 4 do not throw. `Include_on_derived_type_with_queryable_Cast_split` returns an OVER-INCLUDED
+#     graph -- `AssertIncludeObject` expected False and got True.
+# #60 argues `AsSplitQuery` is safe because it "changes the plan and not the result set". On this
+# provider that does not hold, because the marker VANISHES rather than being refused. That is
+# evidence for #60's option 3, a marker the server must recognise so an unknown one fails loudly.
+#
+# FIXED none, BROKEN twelve, all named above and all one classification.
+# Figures read off the run's own summary block: 24271 / 24040 / 26 / 205
+# (`relationships-manytomany-v2`).
+failed=26
+total=24271

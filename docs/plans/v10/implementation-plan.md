@@ -135,6 +135,19 @@ only a fraction of what it hid.
       The three reds are ADR-013 — `NormalizeDelimitersInRawString` casts the store to
       `RelationalTestStore` — and all three are raw SQL, so they join #60's blocked set.
       `failed` 11 -> 14, `total` 22879 -> 23023 (`inheritance-family`).
+- [x] **R9. Relationships and many-to-many, under TPT and TPC.** Six bases, 1248 new tests, 1236
+      green. These navigate *between* hierarchies, so one query touches a derived type, its base and
+      the derived types across a navigation. Eight failures were EF's own `ApplyNotSupported`
+      convergence and are now green, adopted **after** measuring rather than copied in advance.
+      **A filtered probe got this wrong and the full gate caught it**: `~ManyToManyQueryInfoCarrier`
+      does not match `ManyToManyNoTrackingQueryInfoCarrier`, so a third of the classes never ran and
+      the probe reported 8 where the run found 20. A `~` filter is partial output too.
+      **The twelve that remain price #60 for the first time.** All are `_split`; the marker never
+      reaches the server, so they run as one query. Eight throw `ApplyNotSupported`; **four do not
+      throw at all** and return an over-included graph. #60 argues `AsSplitQuery` changes the plan
+      and not the result set — that does not hold here, because the marker vanishes rather than
+      being refused, which is evidence for its option 3.
+      `failed` 14 -> 26, `total` 23023 -> 24271 (`relationships-manytomany-v2`).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
