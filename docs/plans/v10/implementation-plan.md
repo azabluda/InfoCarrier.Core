@@ -102,6 +102,28 @@ only a fraction of what it hid.
       (`Using_from_sql_throws`), left failing per ADR-004 and written up in
       `test/known-failures.txt`. `failed` 11 -> 12, `total` 22682 -> 22780
       (`tpt-model-validator`).
+- [x] **R6. `TPCInheritanceQueryTestBase` on Tier B, and what running the sibling proved.** No
+      product change: the test class and its fixture are the whole diff, and the figures came back
+      **identical to TPT's** — 1 failed, 93 passed, 4 skipped, 98 total, the same test and the same
+      reason. That identity is why it was worth adopting before writing anything else. One base
+      cannot distinguish a fix for the TPT *mapping* from a fix for TPT's *fixture*; two bases
+      reaching the same numbers by the same route can. It also gives the remaining divergence a
+      second witness, which is what makes it a defect rather than a curiosity.
+      `UseGeneratedKeys` is `false`, copied from EF's own `TPCInheritanceQuerySqliteFixture`:
+      TPC needs a key generator shared across tables and SQLite has neither sequences nor HiLo.
+      `failed` 12 -> 13, `total` 22780 -> 22878 (`tpc-adopt`).
+- [x] **R7. The client keeps the discriminator the server drops.** Core EF gives every hierarchy a
+      discriminator; the convention that takes it back for TPT and TPC ships in
+      `EFCore.Relational`, which this client does not have. `InfoCarrierHierarchyMappingConvention`
+      closes that, registered beside `InfoCarrierValueGenerationConvention`, which exists for the
+      identical reason. **Deliberately not a seam**: `IInfoCarrierDocumentMapping` is an interface
+      because Cosmos answers *its* question differently, and inheritance is not like that — Cosmos
+      always uses a discriminator and has no TPT or TPC, so this convention finds no annotations
+      there and is already correct. **The narrowing was the risk**, not the fix: EF compares
+      `GetTableName()`, which falls back to the `DbSet` name, so a naive annotation comparison would
+      strip the discriminator from plain TPH. BROKEN none across 22879 tests is what says the
+      boundary holds. `failed` 13 -> 11, `total` 22878 -> 22879 (`hierarchy-convention`), trim
+      ratchet 89 <= 89. **The count is back where it stood before R5**, with 197 more tests.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
