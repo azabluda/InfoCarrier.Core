@@ -916,5 +916,32 @@
 # async. **The classification held; the seeding was the surprise.**
 #
 # Figures read off the run's own summary block: 26896 / 26545 / 116 / 235 (`groupd-operators`).
+# 2026-08-29, issue #56, two more Group C moves. `failed` UNCHANGED at 116, `total` UNCHANGED at
+# 26896. FIXED none, BROKEN none, REASONS unchanged -- the signature of a clean tier move: the same
+# tests, against a different store, with the same outcome.
+#
+# `CompositeKeysQueryRelationalTestBase` is the cheapest shape there is: EF's own class is a
+# one-liner, the base declares no `UseTransaction` and calls the transaction helper zero times, and
+# both were checked rather than assumed. 14 tests.
+#
+# **`StoreGeneratedFixupRelationalTestBase` is the opposite, and it is the best result of the
+# sweep.** The Tier A class carried TWO workarounds and this move DELETES both. It declared
+# `EnforcesFKs => false`, because InMemory enforces no foreign keys, and it overrode
+# `ExecuteWithStrategyInTransactionAsync` to empty the store by hand, because InMemory has no
+# transaction to roll back. On SQLite both facts reverse. The overrides are gone, `EnforcesFKs` is
+# `true` as EF's own SQLite class has it, and the rollback does the cleaning.
+#
+# **The base calls the transaction helper 118 times and the run is 118 tests, 0 failures.** That
+# number is the check: every one now executes inside a real transaction with foreign keys enforced.
+# `UseTransaction` is `protected virtual` with an empty body on the core base -- verified before
+# writing -- so the override reaches it; EF's SQLite class uses `GetDbTransaction()`, which ADR-013
+# makes unreachable here, so this one uses `UseInfoCarrierTransaction`.
+#
+# **Three Group C moves now, and each said something different.** PropertyValues exposed a 45-test
+# defect (#69). StoreGeneratedFixup turned two dead paths into 118 live ones and passed.
+# CompositeKeys changed nothing at all. The difference is only visible after the move, which is the
+# argument for the policy.
+#
+# Figures read off the run's own summary block: 26896 / 26545 / 116 / 235 (`groupc-batch2`).
 failed=116
 total=26896

@@ -219,6 +219,19 @@ only a fraction of what it hid.
       **The distinction that makes ADR-013 usable**: it is not that a non-virtual `UseTransaction`
       disqualifies a base, but that a base failing *wholesale* yields nothing. One use costs a
       test; 136 costs the base.
+- [x] **R15. Two more Group C moves — and the policy's second face.** `failed` and `total` both
+      **unchanged**, FIXED none, BROKEN none: the signature of a clean tier move.
+      `CompositeKeysQueryRelationalTestBase` is the cheapest shape — a one-liner both sides, no
+      `UseTransaction`, zero helper uses, both checked. 14 tests.
+      **`StoreGeneratedFixupRelationalTestBase` deletes two workarounds rather than adding one.**
+      Tier A declared `EnforcesFKs => false` and hand-emptied the store because InMemory has neither
+      foreign keys nor rollback. On SQLite both reverse. The base calls the transaction helper
+      **118 times and the run is 118 tests, 0 failures** — every one now inside a real transaction
+      with foreign keys enforced. `UseTransaction` is `protected virtual` with an empty body,
+      verified before writing.
+      **Three moves, three different answers**: PropertyValues exposed a 45-test defect (#69),
+      StoreGeneratedFixup turned dead paths live and passed, CompositeKeys changed nothing. Only
+      the move tells you which — which is the argument for the policy.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
