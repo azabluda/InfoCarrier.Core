@@ -80,10 +80,21 @@ on the server from the values sent over the wire. Tracked upstream as
 
 ## Use with caution
 
-### Three-level correlated collections with `Distinct`
+### Projecting a collection, then `Distinct` or a set operation
 
-Affects you if you project nested collections three levels deep and apply `Distinct` to the
-innermost one.
+A relational provider rejects this query, and rejects it the same way with `Union` in place of
+`Distinct`. This provider reassembles the collection on the client, so it answers instead.
+
+```csharp
+context.Customers
+    .Select(c => new { c.City, Orders = c.Orders.ToList() })
+    .Distinct()
+    .ToList();
+// EF Core providers: throws.   This provider: returns the rows.
+```
+
+Three levels deep the answer is also unverifiable: no provider executes the query, so there is no
+reference result to compare against.
 
 ```csharp
 var report = context.Customers
@@ -98,10 +109,6 @@ var report = context.Customers
     })
     .ToList();
 ```
-
-The query runs and returns a result. No EF Core provider supports this query: SQL Server, SQLite
-and InMemory all reject it. Because no provider executes it, there is no reference answer to check
-this one against, so the result returned here is unverified.
 
 Apply `Distinct` after materializing instead:
 
@@ -136,9 +143,9 @@ EF Core provider.
 
 ### Queries this provider answers that other providers reject
 
-Three scenarios in EF's suite assert that a provider rejects the query. This provider answers them.
-A test suite you port from another provider will expect an exception, and LINQ that relies on this
-will not run unchanged there.
+Three other scenarios in EF's suite assert that a provider rejects the query. This provider answers
+them. A test suite you port from another provider will expect an exception, and LINQ that relies on
+this will not run unchanged there.
 
 Composing LINQ over a collection stored through a value converter:
 
