@@ -891,5 +891,30 @@
 #
 # Figures read off the run's own summary block: 26862 / 26511 / 116 / 235
 # (`propertyvalues-tierb`).
+# 2026-08-29, issue #56, three Group D bases. `failed` UNCHANGED at 116, `total` 26862 -> 26896.
+# 34 new tests, all green: FIXED none, BROKEN none, REASONS unchanged.
+#
+# `OperatorsQueryTestBase`, `OperatorsProceduralQueryTestBase` and `OptionalDependentQueryTestBase`.
+# All three are Tier B by ADR-009's rule -- EF ships a SQLite class for each and no InMemory
+# counterpart -- and all three take the BASE rather than EF's SQLite subclass, whose overrides are
+# `AssertSql` golden strings. The operators bases generate a large cross-product of operators over
+# generated models and compare against LINQ to Objects, which makes them a wide net for a wire that
+# has to carry an operator tree faithfully.
+#
+# **THREE MORE WERE WRITTEN, MEASURED AND BACKED OUT IN THE SAME PASS, AND THAT IS RECORDED HERE
+# BECAUSE THE NEXT PERSON WILL TRY THEM.** `EntitySplittingTestBase`,
+# `EntitySplittingQueryTestBase` and `NonSharedModelUpdatesTestBase` gave **120 failures out of
+# 121**. 114 were `Assert.Equal() Failure: Values differ, Expected: 4, Actual: 0` -- every query
+# returning ZERO ROWS, with the stack in `TestHelpers.AssertResults` rather than the change
+# tracker. That is an UNSEEDED STORE: a gap in `NonSharedModelInfoCarrierHarness` for bases that
+# seed data, not a defect in this provider. ADR-013 already names this shape -- "142 identical
+# harness failures are not information about this provider" -- so they are not adopted until the
+# harness seeds.
+#
+# The other 6 of the 120 were predicted exactly: ADR-013's non-virtual `UseTransaction`, used once
+# by `EntitySplittingTestBase` and four times by `NonSharedModelUpdatesTestBase`, doubled for
+# async. **The classification held; the seeding was the surprise.**
+#
+# Figures read off the run's own summary block: 26896 / 26545 / 116 / 235 (`groupd-operators`).
 failed=116
-total=26862
+total=26896

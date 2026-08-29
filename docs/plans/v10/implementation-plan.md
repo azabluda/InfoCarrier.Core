@@ -203,6 +203,22 @@ only a fraction of what it hid.
       against a real database — **Tier A was green on a path it never executed.**
       Note for pacing: this base adds *zero* methods, so it is among the cheapest to write.
       Cheap to write is not cheap in reds.
+- [x] **R14. Group D classified, and three of its twelve adopted.** The 17 bases outside Group C
+      were classified against *measured* properties rather than names. **One is not adoptable**:
+      `Update.JsonUpdateTestBase` is the base ADR-013 names — non-virtual `UseTransaction` used by
+      136 of its own tests — and the ADR already records the decision. **Four are issue 60**: the
+      two `NorthwindSplitInclude` bases, `QueryNoClientEvalTestBase` and `WarningsTestBase`. The
+      other twelve are adoptable.
+      Three adopted, all green on the first run: `OperatorsQueryTestBase`,
+      `OperatorsProceduralQueryTestBase`, `OptionalDependentQueryTestBase`. `failed` unchanged at
+      116, `total` 26862 -> 26896 (`groupd-operators`).
+      **Three more were written, measured and backed out**: the entity-splitting family returned
+      120 failures of 121, 114 of them queries returning zero rows. That is an unseeded store — a
+      gap in `NonSharedModelInfoCarrierHarness` for bases that seed data — and ADR-013's rule is
+      that wholesale harness failures are not information. They wait on harness work.
+      **The distinction that makes ADR-013 usable**: it is not that a non-virtual `UseTransaction`
+      disqualifies a base, but that a base failing *wholesale* yields nothing. One use costs a
+      test; 136 costs the base.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
