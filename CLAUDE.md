@@ -3,6 +3,14 @@
 EF Core 10 database provider that remotes LINQ queries and change-tracking over a wire
 protocol. Client `DbContext` has no database; the server executes against a real provider.
 
+## C# navigation
+
+`.mcp.json` registers the `roslyn-codelens` MCP server for this repository. **For C# work its
+tools are the default and grep is the exception.** Which tool answers which question, and how to
+check the loaded solution first:
+
+@.claude/roslyn-codelens.md
+
 ## Commands
 
 ```powershell
