@@ -264,6 +264,33 @@ only a fraction of what it hid.
       **This is EF's own `InternalEntityEntry` values constructor, copied.** EF only ever calls it
       with dictionaries it controls, so the collision is latent upstream rather than a defect there.
 
+- [x] **R18. Three Northwind bases moved — and the store itself was missing a view.**
+      `failed` 116 -> 118, `total` 26896 -> 26900. FIXED none, BROKEN 2, REASONS: the one family,
+      34 -> 36. **The four new tests are the relational bases' own and all four pass.**
+      `NorthwindSetOperations`, `NorthwindInclude` and `NorthwindKeylessEntities`. The probe went 14
+      red to 6, and every step of that reduction is a rule this repository already had:
+      **Eight were APPLY.** EF's own `NorthwindIncludeQuerySqliteTest` overrides exactly four
+      methods and no others, and the four measured red here are the same four. A query that reaches
+      the store and is refused by it is convergence with the reference provider.
+      **One was EF issue #21627**, `KeylessEntity_with_nav_defining_query`, where EF's SQLite class
+      asserts a `SqliteException`; the store refuses it identically here, arriving wrapped.
+      **`KeylessEntity_by_database_view` was OURS, and it was a store gap rather than a query one.**
+      `ProductView` maps `ToView("Alphabetical list of products")`, and EF's SQLite suite passes
+      only because its Northwind store is a prebuilt `northwind.db` holding the real schema. This
+      tier builds its store from the model, and `NorthwindContext` **ignores `Product.CategoryID`**,
+      so there was nothing for a view to read. Mapping the column on the server context and writing
+      the view as a defining query took 4 red to 40 green. **The client model still ignores the
+      column**; a property the client does not know is skipped when the row is read back.
+      **The two that remain are the family**, `Collection_projection_before_set_operation_fails`.
+      Its sibling `..._after_set_operation_fails_if_distinct` passes, so this provider refuses that
+      shape exactly as a relational one does. **That pair is what sharpened the docs wording**: the
+      claim is not "collection projections with set operations", it is the *before* shape only.
+      The fixture gained `ITestSqlLoggerFactory`, which `RelationalQueryAsserter` casts to on the
+      failure path; without it a failing assertion would surface as `InvalidCastException` and hide
+      its own reason. Nothing new is constructed for it.
+      **`InheritanceRelationshipsQueryRelationalTestBase` was examined and HELD.** Every test it
+      adds is `AsSplitQuery`, which is #60's territory and an owner decision.
+
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

@@ -1002,5 +1002,45 @@
 #
 # Figures read off the run's own summary block: 26896 / 26545 / 116 / 235
 # (`groupc-lazyloadproxy`).
-failed=116
-total=26896
+# 2026-08-29, issue #56, three Northwind bases moved from Tier A to Tier B. `failed` 116 -> 118,
+# `total` 26896 -> 26900. FIXED none, BROKEN 2. REASONS: one line moved, the family's
+# "No exception was thrown" 34 -> 36.
+#
+# `NorthwindSetOperations`, `NorthwindInclude`, `NorthwindKeylessEntities`. The four new tests are
+# the relational bases' own additions and ALL FOUR PASS. The probe went 14 red to 6 before the
+# measure, and the reduction is this file's own rules applied in order:
+#
+# **EIGHT WERE APPLY, AND THAT IS CONVERGENCE.** EF's `NorthwindIncludeQuerySqliteTest` overrides
+# exactly four methods and no others; the four measured red here are the same four. Adopted.
+#
+# **ONE WAS EF ISSUE #21627.** `KeylessEntity_with_nav_defining_query`: EF's SQLite class asserts a
+# `SqliteException` for a `FromSql` mapping defect, and the store refuses it identically through
+# this wire, arriving wrapped. The assertion keeps the engine's own type name and message.
+#
+# **`KeylessEntity_by_database_view` WAS OURS, AND IT WAS THE STORE AND NOT THE QUERY.**
+# `ProductView` maps `ToView("Alphabetical list of products")`. EF's SQLite suite passes because its
+# Northwind store is a prebuilt `northwind.db` carrying the real schema; this tier builds its store
+# from the model, and `NorthwindContext` IGNORES `Product.CategoryID`, so there was nothing for a
+# view to read and the set came back empty against 69 expected. The server context now maps the
+# column and defines the view with a `CASE`, matching `NorthwindData`'s hard-coded category map
+# exactly -- no `Categories` table exists to join. 4 red became 40 green.
+# **The client model still ignores the column.** A property the client does not know about is
+# skipped when the row is read back, so the two models stay as they were on the wire.
+#
+# **THE TWO THAT REMAIN ARE THE KNOWN FAMILY**, `Collection_projection_before_set_operation_fails`,
+# where this provider answers and a relational one refuses. Its sibling
+# `Collection_projection_after_set_operation_fails_if_distinct` PASSES: this provider refuses that
+# shape exactly as they do. **That pair is what narrowed the user-facing claim** -- it is the
+# *before* shape only, not collection projections with set operations generally.
+#
+# The fixture gained `ITestSqlLoggerFactory`. `RelationalQueryAsserter` casts to it on the failure
+# path only, so without it a failing assertion would surface as `InvalidCastException` and hide its
+# own reason. Nothing new is constructed: the store factory already builds a `TestSqlLoggerFactory`.
+#
+# `InheritanceRelationshipsQueryRelationalTestBase` was examined in the same pass and HELD: every
+# test it adds is `AsSplitQuery`, which is #60's territory and an owner decision.
+#
+# Figures read off the run's own summary block: 26900 / 26547 / 118 / 235
+# (`groupc-northwind3`).
+failed=118
+total=26900
