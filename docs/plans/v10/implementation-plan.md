@@ -291,6 +291,37 @@ only a fraction of what it hid.
       **`InheritanceRelationshipsQueryRelationalTestBase` was examined and HELD.** Every test it
       adds is `AsSplitQuery`, which is #60's territory and an owner decision.
 
+- [x] **R19. The harness seeding gap, found and fixed — and it was not a seeding gap.**
+      `failed` 118 -> 122, `total` 26900 -> 27021. **121 new tests, 117 green.**
+      **The earlier reading was wrong.** The note said `NonSharedModelInfoCarrierHarness` does not
+      seed. It does. What it did not do is carry the *seeder*:
+      `NonSharedModelTestBase.ConfigureOptions` applies `AddOptions` to the **client** context only,
+      and `EntitySplittingQueryTestBase` seeds through `AddOptions(...).UseSeeding(...)`. A seeder
+      runs inside `EnsureCreated`, and `EnsureCreated` runs on the **server**, so it never fired.
+      **Proved before it was fixed**, per CLAUDE.md: the base was adopted, one test run, and it
+      answered `Expected: 5, Actual: 0`. After the fix that class is **114 of 114**.
+      **Only the seeders cross, not all of `AddOptions`.** The distinction is what the option acts
+      on: a seeder acts on the *store*, which is the server's, while warning behavior and
+      sensitive-data logging describe how a context behaves and each side owns its own. A29 stands.
+      They are read off a throwaway builder because `UseSeeding` has no getter. Passing `AddOptions`
+      at all eleven call sites changed nothing else: FIXED empty, and BROKEN is only the four below.
+      **Three bases adopted, splitting three ways on ADR-013.**
+      `EntitySplittingQueryTestBase`: 114 green, no overrides.
+      `NonSharedModelUpdatesTestBase`: **reachable despite the non-virtual `UseTransaction`.** It
+      calls `GetDbTransaction()`, but the method that *calls* it,
+      `ExecuteWithStrategyInTransactionAsync`, is `protected virtual`; overriding that hands
+      `TestHelpers` a different enlistment and never touches the unreachable member.
+      **ADR-013's rule is about a base whose ONLY route runs through the non-virtual member**, and
+      this refines it. `Principal_and_dependent_roundtrips_with_cycle_breaking` passes because of it.
+      `EntitySplittingTestBase`: `Can_roundtrip` green; `ExecuteDelete_throws_for_entity_splitting`
+      unreachable, because there the call is inline in the test body with no hook in between.
+      **One new finding, filed as #70.** `DbUpdateException.Entries` names every entry the client
+      sent rather than the one the store rejected. W5 already documents why the server's entries
+      cannot cross; what is missing is the wire carrying *which* failed. Matching by key would not
+      fix this case, since all three rows are `Added` with store-generated keys and the server has
+      no key for the failing one either. The ordinal in the sent list is what identifies it, which
+      makes it a protocol change and so filed rather than taken.
+
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

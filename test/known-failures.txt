@@ -1042,5 +1042,48 @@
 #
 # Figures read off the run's own summary block: 26900 / 26547 / 118 / 235
 # (`groupc-northwind3`).
-failed=118
-total=26900
+# 2026-08-29, issue #56, the NonSharedModel harness seeding gap fixed and three bases adopted.
+# `failed` 118 -> 122, `total` 26900 -> 27021. **121 NEW TESTS, 117 GREEN.** FIXED none, BROKEN 4.
+#
+# **THE EARLIER READING OF THIS GAP WAS WRONG, AND THAT IS THE FINDING.** The note said the harness
+# does not seed. It does. What it did not carry is the SEEDER:
+# `NonSharedModelTestBase.ConfigureOptions` applies `AddOptions` to the CLIENT context only, and
+# `EntitySplittingQueryTestBase` seeds through `AddOptions(...).UseSeeding(...)`. A seeder runs
+# inside `EnsureCreated`, and `EnsureCreated` runs on the SERVER, so it never fired and every query
+# answered zero rows.
+#
+# **Established before it was fixed**, as CLAUDE.md requires: the base was adopted, one test run,
+# `Expected: 5, Actual: 0`. After the fix the class is 114 of 114 -- the same 114.
+#
+# **Only the seeders cross, not the whole of `AddOptions`.** The distinction is what the option acts
+# on: a seeder acts on the STORE, which is the server's, while warning behavior and sensitive-data
+# logging describe how a context behaves and each side owns its own. A29 is untouched. They are read
+# back off a throwaway builder because `UseSeeding` has no getter. `AddOptions` is now passed at all
+# eleven harness call sites and changed nothing else: FIXED is empty.
+#
+# **THE FOUR NEW FAILURES ARE TWO CLASSES.**
+#
+# `ExecuteDelete_throws_for_entity_splitting`, sync and async: ADR-013, and unreachable. The test
+# calls `TestHelpers.ExecuteWithStrategyInTransactionAsync` INLINE with the base's
+# `public void UseTransaction`, which calls `GetDbTransaction()`. No virtual hook sits between them.
+# `Relational-specific methods can only be used when the context is using a relational database
+# provider.` Left failing rather than suppressed.
+#
+# **ADR-013 IS REFINED BY THE SIBLING, NOT CONFIRMED BY IT.** `NonSharedModelUpdatesTestBase` has
+# the same non-virtual `UseTransaction`, and it is REACHABLE: the method that calls it,
+# `ExecuteWithStrategyInTransactionAsync`, is `protected virtual`, so an override hands `TestHelpers`
+# a different enlistment and never touches the unreachable member. The rule is about a base whose
+# ONLY route runs through it. `Principal_and_dependent_roundtrips_with_cycle_breaking` passes.
+#
+# `DbUpdateException_Entries_is_correct_with_multiple_inserts`, sync and async: `Assert.Single()`
+# finds 3. **Filed as #70.** `DbUpdateException.Entries` names every entry the client sent rather
+# than the one the store rejected. W5's re-raise already documents why the server's entries cannot
+# cross a wire; what is missing is the wire carrying WHICH ones failed. Matching by key would not
+# fix this case -- all three rows are `Added` with store-generated keys, so the server has no key
+# for the failing one either. The ordinal in the sent list is what identifies it, which makes this a
+# protocol change. Not reachable on Tier A at all: InMemory has no unique index to violate.
+#
+# Figures read off the run's own summary block: 27021 / 26664 / 122 / 235
+# (`groupd-entitysplitting`).
+failed=122
+total=27021

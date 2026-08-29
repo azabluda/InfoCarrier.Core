@@ -9,18 +9,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
 /// <summary>
-///     <c>AdHocComplexTypeQueryTestBase</c> on ADR-009 <b>Tier B</b>.
+///     <c>EntitySplittingQueryTestBase</c> on ADR-009 <b>Tier B</b> (#56).
 /// </summary>
 /// <remarks>
-///     EF's complex-type query regression corpus, one model per reported bug. A77 reverted it from
-///     Tier A after establishing that EF's InMemory provider does not translate a complex property
-///     access at all — <c>"Translation of member 'ComplexContainer' … failed"</c> came out of EF's
-///     own translator, not this provider's. EF ships a SQLite counterpart and no InMemory one, so
-///     the base belongs here: the same two forwarded members as every other
-///     <c>NonSharedModelTestBase</c> suite, with the SQLite backend behind the wire.
+///     Entity splitting maps one entity type across several tables, so a single client query
+///     becomes a join the server has to reassemble. The base rather than EF's SQLite subclass,
+///     whose every override is an <c>AssertSql</c> golden string.
 /// </remarks>
-public class AdHocComplexTypeQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
-    : AdHocComplexTypeQueryTestBase(fixture)
+public class EntitySplittingQueryInfoCarrierTest(NonSharedFixture fixture) : EntitySplittingQueryTestBase(fixture)
 {
     private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
 
