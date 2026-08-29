@@ -795,5 +795,36 @@
 #
 # Figures read off the run's own summary block: 24479 / 24228 / 26 / 225
 # (`bulkupdates-inheritance`).
-failed=26
-total=24479
+# 2026-08-29, issue #56, table splitting under TPT. `failed` 26 -> 30, `total` 24479 -> 24508.
+# 29 new tests, 23 green, and the four reds have two causes, both proven rather than assumed.
+# One class closes TWO entries: `TableSplittingTestBase` is on the same chain.
+#
+# Table splitting and TPT pull in opposite directions -- one merges two entity types into a store
+# object, the other spreads a hierarchy across several -- and this base is where they meet. It is
+# the last of the TPT and TPC family. It takes the NON-SHARED-MODEL shape rather than a fixture
+# that owns a store, so it uses `NonSharedModelInfoCarrierHarness`, as
+# `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` does.
+#
+# **TWO REDS ARE ADR-013 IN ITS TEXTBOOK FORM, and no override can reach them.**
+# `TableSplittingTestBase.UseTransaction` calls `GetDbTransaction()` and is **non-virtual** --
+# `isVirtual: false`, checked rather than inferred. That is the exact property ADR-013 records as
+# having cost 142 tests to discover. `ExecuteUpdate_works_for_table_sharing` is the only pair that
+# routes through it, so the base costs two tests rather than being unreachable, which is why it is
+# adopted rather than skipped.
+#
+# **TWO REDS ARE TOPOLOGY, not behaviour.** `Warn_when_save_optional_dependent_with_null_values`
+# and its sensitive twin do
+# `TestSqlLoggerFactory.Log.Single(l => l.Level == LogLevel.Warning)`. The warning is
+# `RelationalResources.LogOptionalDependentWithAllNullProperties`, raised by the relational UPDATE
+# PIPELINE -- which runs on the SERVER. The client's logger never sees it, so `Single` finds
+# nothing. This repository is two `DbContext` instances and the assertion assumes one, which is the
+# class CLAUDE.md names: ask what an assertion assumes about the topology before treating it as a
+# statement about the provider.
+#
+# `Can_insert_dependent_with_just_one_parent` is EF's own override, verbatim from
+# `TPTTableSplittingSqliteTest` and for EF's stated reason -- the scenario is not valid for TPT.
+#
+# FIXED none, BROKEN four, all named and all classified.
+# Figures read off the run's own summary block: 24508 / 24251 / 30 / 227 (`tpt-tablesplitting`).
+failed=30
+total=24508

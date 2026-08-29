@@ -162,6 +162,18 @@ only a fraction of what it hid.
       the existing `AssertStoreRefuses` idiom. **No golden strings came with any of it, which
       settles R3 by demonstration**: EF's `AssertSql` lives in the provider subclass, not the base.
       `failed` unchanged at 26, `total` 24271 -> 24479 (`bulkupdates-inheritance`).
+- [x] **R11. Table splitting under TPT — the last of the family.** One class closing two entries,
+      29 new tests, 23 green. Table splitting merges two entity types into one store object while
+      TPT spreads a hierarchy across several, and this base is where they meet. It takes the
+      non-shared-model shape, so it uses `NonSharedModelInfoCarrierHarness`.
+      **Two reds are ADR-013 in its textbook form and no override can reach them**:
+      `TableSplittingTestBase.UseTransaction` calls `GetDbTransaction()` and is *non-virtual*
+      (`isVirtual: false`, checked). Only one pair of tests routes through it, so the base costs
+      two tests rather than being unreachable — which is why it is adopted rather than skipped.
+      **Two reds are topology**: the warning is raised by the relational update pipeline on the
+      *server* and asserted against the *client's* logger. Two contexts; the assertion assumes one.
+      `failed` 26 -> 30, `total` 24479 -> 24508 (`tpt-tablesplitting`).
+      **This closes every TPT and TPC base except the two GearsOfWar ones.**
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
