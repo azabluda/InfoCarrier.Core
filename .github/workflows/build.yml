@@ -202,7 +202,22 @@ jobs:
           use-actions-summary: 'false'
           list-suites: 'failed'
           list-tests: 'failed'
-          max-annotations: '50'
+
+          # `49` AND NOT `50`, WHICH IS THE ACTION'S OWN DOCUMENTED MAXIMUM. `get-annotations.ts` trims
+          # with `errors.splice(maxCount + 1)`, and `splice(start)` deletes from `start` onward, so it
+          # KEEPS `maxCount + 1` items. At 50 it posts 51, and `checks.update` caps `output.annotations`
+          # at 50 and rejects the call with `No more than 50 items are allowed; 51 were supplied`.
+          #
+          # The check run is created before that call and completed by it, so the rejection leaves
+          # `Spec suite` `in_progress` FOREVER: a permanently yellow row that no later run can finish,
+          # because a check run belongs to one commit. `continue-on-error` below hides it, which is why
+          # `Spec ratchet` still reported pass while the report it produces had silently stopped
+          # existing.
+          #
+          # Invisible until the suite passed 51 failing tests, because the annotation count IS the
+          # failing-test count and `splice(51)` does nothing to a shorter array. Main sat at 9 for
+          # months and reached 116 in one push (#56), which is when it first fired.
+          max-annotations: '49'
           fail-on-error: 'false'
           fail-on-empty: 'true'
 

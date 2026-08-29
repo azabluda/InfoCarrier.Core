@@ -968,5 +968,122 @@
 #
 # Figures read off the run's own summary block: 26896 / 26545 / 116 / 235
 # (`groupc-complextypes`).
-failed=116
-total=26896
+# 2026-08-29, issue #56, LazyLoadProxy moved from Tier A to Tier B. `failed` and `total` UNCHANGED
+# at 116 / 26896. FIXED none, BROKEN none, REASONS unchanged.
+#
+# **The move deletes 700 lines and adds 68.** The Tier A class ignored `Milk` and `Culture` on
+# twenty-nine entity types, because InMemory has no complex types, and then carried two 680-line
+# JSON strings restating the model that was left. The relational base maps both complex properties
+# itself, so all of it goes. Neither base declares `UseTransaction` and neither calls the
+# transaction helper, so no override was needed -- checked, not assumed.
+#
+# **EF's own `LazyLoadProxySqliteTest` differs from the core base by ONE TOKEN across both 680-line
+# strings**: `"Charge": 1.00` becomes `"Charge": 1.0`, because SQLite has no decimal type and the
+# scale that comes back is the scale the store wrote. Written here as the substitution rather than
+# as 1360 lines of duplicated JSON. A base whose text stops carrying the token makes the assertion
+# fail rather than silently pass, which is the property that makes that safe.
+#
+# **FOUR TESTS FAILED WITH `InvalidCastException: Double to Int32`, AND IT IS ONE PRODUCT DEFECT.**
+# `ClientResultMaterializer.Materialize` fills the value buffer by bare property name, and a complex
+# leaf's `Name` is the bare one -- `Host.Culture.Rating` is `"Rating"`. `Host.Rating` is a `double`
+# and the four `Rating` properties under `Culture` and `Milk` are `int`, so all four slots took the
+# same double. The method's own remark already warned that a complex value must not ride in that
+# dictionary because the names collide; the leak in the OTHER direction, a top-level value bleeding
+# INTO complex slots, was not considered. One condition fixes it: only a property whose
+# `DeclaringType is IEntityType` reads from the dictionary. `ApplyComplexValues` writes the complex
+# members afterwards through their CLR member, so the sentinel is what belongs in those slots.
+#
+# The method is EF's own `InternalEntityEntry` values constructor, copied. EF only ever calls that
+# with dictionaries it controls, so the collision is latent upstream rather than a defect there.
+#
+# **The probe is the reason this took minutes rather than a session.** The stack named a compiled
+# lambda and no property. A `catch (InvalidCastException)` dumping every flattened property's index,
+# CLR type and buffer value to a FILE -- xUnit swallows stdout -- printed the collision directly.
+#
+# Figures read off the run's own summary block: 26896 / 26545 / 116 / 235
+# (`groupc-lazyloadproxy`).
+# 2026-08-29, issue #56, three Northwind bases moved from Tier A to Tier B. `failed` 116 -> 118,
+# `total` 26896 -> 26900. FIXED none, BROKEN 2. REASONS: one line moved, the family's
+# "No exception was thrown" 34 -> 36.
+#
+# `NorthwindSetOperations`, `NorthwindInclude`, `NorthwindKeylessEntities`. The four new tests are
+# the relational bases' own additions and ALL FOUR PASS. The probe went 14 red to 6 before the
+# measure, and the reduction is this file's own rules applied in order:
+#
+# **EIGHT WERE APPLY, AND THAT IS CONVERGENCE.** EF's `NorthwindIncludeQuerySqliteTest` overrides
+# exactly four methods and no others; the four measured red here are the same four. Adopted.
+#
+# **ONE WAS EF ISSUE #21627.** `KeylessEntity_with_nav_defining_query`: EF's SQLite class asserts a
+# `SqliteException` for a `FromSql` mapping defect, and the store refuses it identically through
+# this wire, arriving wrapped. The assertion keeps the engine's own type name and message.
+#
+# **`KeylessEntity_by_database_view` WAS OURS, AND IT WAS THE STORE AND NOT THE QUERY.**
+# `ProductView` maps `ToView("Alphabetical list of products")`. EF's SQLite suite passes because its
+# Northwind store is a prebuilt `northwind.db` carrying the real schema; this tier builds its store
+# from the model, and `NorthwindContext` IGNORES `Product.CategoryID`, so there was nothing for a
+# view to read and the set came back empty against 69 expected. The server context now maps the
+# column and defines the view with a `CASE`, matching `NorthwindData`'s hard-coded category map
+# exactly -- no `Categories` table exists to join. 4 red became 40 green.
+# **The client model still ignores the column.** A property the client does not know about is
+# skipped when the row is read back, so the two models stay as they were on the wire.
+#
+# **THE TWO THAT REMAIN ARE THE KNOWN FAMILY**, `Collection_projection_before_set_operation_fails`,
+# where this provider answers and a relational one refuses. Its sibling
+# `Collection_projection_after_set_operation_fails_if_distinct` PASSES: this provider refuses that
+# shape exactly as they do. **That pair is what narrowed the user-facing claim** -- it is the
+# *before* shape only, not collection projections with set operations generally.
+#
+# The fixture gained `ITestSqlLoggerFactory`. `RelationalQueryAsserter` casts to it on the failure
+# path only, so without it a failing assertion would surface as `InvalidCastException` and hide its
+# own reason. Nothing new is constructed: the store factory already builds a `TestSqlLoggerFactory`.
+#
+# `InheritanceRelationshipsQueryRelationalTestBase` was examined in the same pass and HELD: every
+# test it adds is `AsSplitQuery`, which is #60's territory and an owner decision.
+#
+# Figures read off the run's own summary block: 26900 / 26547 / 118 / 235
+# (`groupc-northwind3`).
+# 2026-08-29, issue #56, the NonSharedModel harness seeding gap fixed and three bases adopted.
+# `failed` 118 -> 122, `total` 26900 -> 27021. **121 NEW TESTS, 117 GREEN.** FIXED none, BROKEN 4.
+#
+# **THE EARLIER READING OF THIS GAP WAS WRONG, AND THAT IS THE FINDING.** The note said the harness
+# does not seed. It does. What it did not carry is the SEEDER:
+# `NonSharedModelTestBase.ConfigureOptions` applies `AddOptions` to the CLIENT context only, and
+# `EntitySplittingQueryTestBase` seeds through `AddOptions(...).UseSeeding(...)`. A seeder runs
+# inside `EnsureCreated`, and `EnsureCreated` runs on the SERVER, so it never fired and every query
+# answered zero rows.
+#
+# **Established before it was fixed**, as CLAUDE.md requires: the base was adopted, one test run,
+# `Expected: 5, Actual: 0`. After the fix the class is 114 of 114 -- the same 114.
+#
+# **Only the seeders cross, not the whole of `AddOptions`.** The distinction is what the option acts
+# on: a seeder acts on the STORE, which is the server's, while warning behavior and sensitive-data
+# logging describe how a context behaves and each side owns its own. A29 is untouched. They are read
+# back off a throwaway builder because `UseSeeding` has no getter. `AddOptions` is now passed at all
+# eleven harness call sites and changed nothing else: FIXED is empty.
+#
+# **THE FOUR NEW FAILURES ARE TWO CLASSES.**
+#
+# `ExecuteDelete_throws_for_entity_splitting`, sync and async: ADR-013, and unreachable. The test
+# calls `TestHelpers.ExecuteWithStrategyInTransactionAsync` INLINE with the base's
+# `public void UseTransaction`, which calls `GetDbTransaction()`. No virtual hook sits between them.
+# `Relational-specific methods can only be used when the context is using a relational database
+# provider.` Left failing rather than suppressed.
+#
+# **ADR-013 IS REFINED BY THE SIBLING, NOT CONFIRMED BY IT.** `NonSharedModelUpdatesTestBase` has
+# the same non-virtual `UseTransaction`, and it is REACHABLE: the method that calls it,
+# `ExecuteWithStrategyInTransactionAsync`, is `protected virtual`, so an override hands `TestHelpers`
+# a different enlistment and never touches the unreachable member. The rule is about a base whose
+# ONLY route runs through it. `Principal_and_dependent_roundtrips_with_cycle_breaking` passes.
+#
+# `DbUpdateException_Entries_is_correct_with_multiple_inserts`, sync and async: `Assert.Single()`
+# finds 3. **Filed as #70.** `DbUpdateException.Entries` names every entry the client sent rather
+# than the one the store rejected. W5's re-raise already documents why the server's entries cannot
+# cross a wire; what is missing is the wire carrying WHICH ones failed. Matching by key would not
+# fix this case -- all three rows are `Added` with store-generated keys, so the server has no key
+# for the failing one either. The ordinal in the sent list is what identifies it, which makes this a
+# protocol change. Not reachable on Tier A at all: InMemory has no unique index to violate.
+#
+# Figures read off the run's own summary block: 27021 / 26664 / 122 / 235
+# (`groupd-entitysplitting`).
+failed=122
+total=27021

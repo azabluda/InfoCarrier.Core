@@ -20,10 +20,24 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     measurement (roadmap M3).
 /// </remarks>
 /// <typeparam name="TModelCustomizer">The model customizer.</typeparam>
-public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
+public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
+    : NorthwindQueryFixtureBase<TModelCustomizer>, ITestSqlLoggerFactory
     where TModelCustomizer : ITestModelCustomizer, new()
 {
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
+
+    /// <summary>
+    ///     Gets the SQL logger factory the relational query asserter reaches for.
+    /// </summary>
+    /// <remarks>
+    ///     <c>RelationalQueryAsserter</c> casts the fixture to <see cref="ITestSqlLoggerFactory" />
+    ///     and calls <c>OutputSql()</c> on the failure path only. Without the interface a failing
+    ///     assertion would surface as an <see cref="InvalidCastException" /> and hide its own
+    ///     reason. Nothing new is constructed: <c>InfoCarrierTestStoreFactory</c> already builds a
+    ///     <see cref="TestSqlLoggerFactory" /> rather than a bare <c>ListLoggerFactory</c>.
+    /// </remarks>
+    public TestSqlLoggerFactory TestSqlLoggerFactory
+        => (TestSqlLoggerFactory)ListLoggerFactory;
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

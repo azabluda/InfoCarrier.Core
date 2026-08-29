@@ -66,6 +66,10 @@ jobs:
           use-actions-summary: 'false'
           list-suites: 'failed'
           list-tests: 'failed'
-          max-annotations: '50'
+
+          # `49` and not `50`, for the off-by-one in `get-annotations.ts` that `build.yml` documents at
+          # length. Kept in step with it: the two inputs must match, or a fork's report and this
+          # repository's would differ in size for no stated reason.
+          max-annotations: '49'
           fail-on-error: 'false'
           fail-on-empty: 'true'

@@ -9,40 +9,32 @@ using Xunit.Abstractions;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>
-///     <c>TPTTableSplittingTestBase</c> on ADR-009 <b>Tier B</b> (#56).
+///     <c>EntitySplittingTestBase</c> on ADR-009 <b>Tier B</b> (#56).
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Two entity types in one table, under a hierarchy mapped to several.</b> Table
-///         splitting and TPT pull in opposite directions — one merges types into a store object,
-///         the other spreads a hierarchy across them — and this base is where they meet. It is the
-///         last of the TPT and TPC family, and it closes <c>TableSplittingTestBase</c> on the same
-///         chain.
+///         The write side of entity splitting. <c>EntitySplittingQueryInfoCarrierTest</c> covers
+///         reading one entity back out of several tables; this covers saving one into them, which
+///         nothing else in the suite does.
 ///     </para>
 ///     <para>
-///         <b>The non-shared-model shape, not the shared-store one.</b> Every other inheritance
-///         base adopted here takes a fixture that owns a store; this one builds a model per test
-///         through <c>NonSharedModelTestBase</c>, so it uses
-///         <c>NonSharedModelInfoCarrierHarness</c> as
-///         <c>NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest</c> does.
+///         <b>Its second test is unreachable, and the reason is ADR-013.</b>
+///         <c>ExecuteDelete_throws_for_entity_splitting</c> calls
+///         <c>TestHelpers.ExecuteWithStrategyInTransactionAsync</c> inline, passing the base's
+///         <c>public void UseTransaction</c>, which calls <c>GetDbTransaction()</c>. There is no
+///         virtual hook between the test and that member, so unlike
+///         <c>NonSharedModelUpdatesTestBase</c> there is nothing to override. It is left failing
+///         rather than suppressed, and classified in <c>known-failures.txt</c>.
 ///     </para>
 /// </remarks>
-public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutputHelper testOutputHelper)
-    : TPTTableSplittingTestBase(fixture, testOutputHelper)
+public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutputHelper testOutputHelper)
+    : EntitySplittingTestBase(fixture, testOutputHelper)
 {
     private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     EF's own override, verbatim from <c>TPTTableSplittingSqliteTest</c> and for EF's stated
-    ///     reason: the scenario is not valid for TPT. Adopted rather than invented.
-    /// </remarks>
-    public override Task Can_insert_dependent_with_just_one_parent()
-        => Task.CompletedTask;
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(

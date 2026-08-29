@@ -72,7 +72,7 @@ public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFi
         bool useServiceProvider = true)
     {
         Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions);
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,

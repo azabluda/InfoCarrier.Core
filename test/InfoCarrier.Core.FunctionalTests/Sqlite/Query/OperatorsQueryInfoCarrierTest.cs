@@ -45,7 +45,7 @@ public class OperatorsQueryInfoCarrierTest(NonSharedFixture fixture) : Operators
         bool useServiceProvider = true)
     {
         Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions);
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
@@ -75,7 +75,7 @@ public class OperatorsProceduralQueryInfoCarrierTest(NonSharedFixture fixture)
         bool useServiceProvider = true)
     {
         Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions);
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,

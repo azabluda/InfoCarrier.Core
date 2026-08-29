@@ -70,7 +70,8 @@ public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledMo
         // carries `InfoCarrierTypeMapping` on every property. Handing it to the InMemory server
         // would replace the model the server is meant to build for itself with the client's.
         _harness.Prepare(
-            typeof(TContext), _lastOnModelCreating, addServices, onConfiguring: null, configureConventions);
+            typeof(TContext), _lastOnModelCreating, addServices, onConfiguring: null, configureConventions,
+            AddOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,

@@ -43,6 +43,35 @@ public class NorthwindInfoCarrierSqliteServerContext(DbContextOptions options) :
 
         // The filter's search term is a per-instance value, so it cannot be baked into a static
         // SQL string the way the others are; it is compared in the query filter instead.
+        // `NorthwindContext` ignores `Product.CategoryID`, and EF's SQLite suite never notices
+        // because its Northwind store is a prebuilt `northwind.db` holding the real schema. This
+        // tier builds its store from the model, so the column has to exist for the view below to
+        // have anything to read. Server-side only: the client model still ignores it, and a
+        // property the client does not know about is skipped when the row is read back.
+        modelBuilder.Entity<Product>().Property(p => p.CategoryID);
+
+        // `NorthwindRelationalContext` maps this one `ToView("Alphabetical list of products")`,
+        // and EF's SQLite suite passes because its Northwind store is a prebuilt `northwind.db`
+        // that already holds the view. This tier builds its store from the model, so the view has
+        // to be written out. `NorthwindData` derives `CategoryName` from a hard-coded map of
+        // `CategoryID`, not from a `Categories` table, so a `CASE` reproduces it exactly and no
+        // join is needed. Without it the set was empty and 69 rows were expected.
+        modelBuilder.Entity<ProductView>().ToSqlQuery(
+            """
+            SELECT "p"."ProductID", "p"."ProductName", CASE "p"."CategoryID"
+                WHEN 1 THEN 'Beverages'
+                WHEN 2 THEN 'Condiments'
+                WHEN 3 THEN 'Confections'
+                WHEN 4 THEN 'Dairy Products'
+                WHEN 5 THEN 'Grains/Cereals'
+                WHEN 6 THEN 'Meat/Poultry'
+                WHEN 7 THEN 'Produce'
+                WHEN 8 THEN 'Seafood'
+            END AS "CategoryName"
+            FROM "Products" AS "p"
+            WHERE "p"."Discontinued" = 0
+            """);
+
         modelBuilder.Entity<CustomerQueryWithQueryFilter>().ToSqlQuery(
             """
             SELECT "c"."CompanyName", (

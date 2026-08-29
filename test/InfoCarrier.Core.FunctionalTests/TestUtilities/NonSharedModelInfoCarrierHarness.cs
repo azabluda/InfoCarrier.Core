@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -50,12 +51,17 @@ public sealed class NonSharedModelInfoCarrierHarness(
     ///     Records what the next store must be built for. Call from the adopting class's
     ///     <c>CreateContextFactory&lt;TContext&gt;</c>, before delegating to the base.
     /// </summary>
+    /// <param name="addOptions">
+    ///     The adopting class's own <c>AddOptions</c>, when it has one. Only the seeders are taken
+    ///     from it; see <see cref="ServerOptions" />.
+    /// </param>
     public void Prepare(
         Type contextType,
         Action<ModelBuilder>? onModelCreating,
         Func<IServiceCollection, IServiceCollection>? addServices,
         Action<DbContextOptionsBuilder>? onConfiguring = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null)
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? addOptions = null)
         => _pending = new SharedTestStoreProperties
         {
             ContextType = contextType,
@@ -63,22 +69,77 @@ public sealed class NonSharedModelInfoCarrierHarness(
             ConfigureConventions = configureConventions,
             OnAddServices = addServices,
 
-            // The server gets the test's own `onConfiguring`, unlike the fixture-wide `AddOptions`
-            // a shared fixture supplies (A29). It is a different thing: a `NonSharedModelTestBase`
-            // test writes `onConfiguring` for the one context it is about to build, and the server
-            // builds that same context. `Can_ignore_invalid_include_path_error` suppresses a
-            // warning there and asserts the query then runs — which it cannot if only the client
-            // hears about the suppression.
-            OnAddOptions = onConfiguring is null
-                ? null
-                : builder =>
-                {
-                    onConfiguring(builder);
-                    return builder;
-                },
+            OnAddOptions = ServerOptions(onConfiguring, addOptions),
 
             CopyDbContextParameters = CopyContextState,
         };
+
+    /// <summary>
+    ///     Builds the options delegate the server context is created with.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The server gets the test's own <c>onConfiguring</c>, unlike the fixture-wide
+    ///         <c>AddOptions</c> a shared fixture supplies (A29). It is a different thing: a
+    ///         <c>NonSharedModelTestBase</c> test writes <c>onConfiguring</c> for the one context
+    ///         it is about to build, and the server builds that same context.
+    ///         <c>Can_ignore_invalid_include_path_error</c> suppresses a warning there and asserts
+    ///         the query then runs, which it cannot if only the client hears about the suppression.
+    ///     </para>
+    ///     <para>
+    ///         <b>The seeders are the exception, and they are why this method exists.</b>
+    ///         <c>NonSharedModelTestBase.ConfigureOptions</c> applies <c>AddOptions</c> to the
+    ///         <em>client</em> only, and a base such as <c>EntitySplittingQueryTestBase</c> seeds
+    ///         through <c>AddOptions(...).UseSeeding(...)</c>. A seeder runs inside
+    ///         <c>EnsureCreated</c>, and <c>EnsureCreated</c> runs on the server, so the seeder
+    ///         never fired and every query answered zero rows against five expected.
+    ///     </para>
+    ///     <para>
+    ///         Only the seeders cross, not the whole of <c>AddOptions</c>. The distinction is what
+    ///         the option acts on: a seeder acts on the <em>store</em>, which is the server's, while
+    ///         warning behavior and sensitive-data logging describe how a context behaves and each
+    ///         side owns its own. They are read back off a throwaway builder because
+    ///         <c>UseSeeding</c> has no getter.
+    ///     </para>
+    /// </remarks>
+    private static Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? ServerOptions(
+        Action<DbContextOptionsBuilder>? onConfiguring,
+        Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? addOptions)
+    {
+        Action<DbContext, bool>? seeder = null;
+        Func<DbContext, bool, CancellationToken, Task>? asyncSeeder = null;
+
+        if (addOptions is not null)
+        {
+            var probe = new DbContextOptionsBuilder();
+            _ = addOptions(probe);
+
+            CoreOptionsExtension? core = probe.Options.FindExtension<CoreOptionsExtension>();
+            seeder = core?.Seeder;
+            asyncSeeder = core?.AsyncSeeder;
+        }
+
+        if (onConfiguring is null && seeder is null && asyncSeeder is null)
+        {
+            return null;
+        }
+
+        return builder =>
+        {
+            if (seeder is not null)
+            {
+                builder.UseSeeding(seeder);
+            }
+
+            if (asyncSeeder is not null)
+            {
+                builder.UseAsyncSeeding(asyncSeeder);
+            }
+
+            onConfiguring?.Invoke(builder);
+            return builder;
+        };
+    }
 
     /// <summary>
     ///     Mirrors the client context's own state onto the server context for one request.

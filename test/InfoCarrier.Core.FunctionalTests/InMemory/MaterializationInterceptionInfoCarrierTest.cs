@@ -57,7 +57,8 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
         // or both (B16): it is this harness declining to make a one-context spec base look like
         // two. Scoped to this class because only here is the forwarded payload *only* interceptors
         // — `PropertyValuesFixtureBase` registers one server-side on purpose and keeps it.
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices: null, onConfiguring: null, configureConventions);
+        _harness.Prepare(
+            typeof(TContext), onModelCreating, addServices: null, onConfiguring: null, configureConventions, AddOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
