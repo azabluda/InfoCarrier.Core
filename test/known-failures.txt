@@ -943,5 +943,30 @@
 # argument for the policy.
 #
 # Figures read off the run's own summary block: 26896 / 26545 / 116 / 235 (`groupc-batch2`).
+# 2026-08-29, issue #56, ComplexTypesTracking moved to Tier B. `failed` UNCHANGED at 116, `total`
+# UNCHANGED at 26896, REASONS unchanged. **The FIXED and BROKEN lists are the same two tests
+# changing namespace** -- `InMemory.ComplexTypesTrackingInfoCarrierTest` out,
+# `Sqlite.ComplexTypesTrackingInfoCarrierTest` in. A rename, not a behaviour change, and the names
+# file is updated for it.
+#
+# The two are J22's, unchanged by the store: `Can_track_entity_with_complex_property_bag_collections
+# (state: Added)`, async and sync. `System.ArgumentException : Incorrect number of arguments
+# supplied for call to method` is the constructor-binding signature J22 describes -- an upstream
+# defect on a path only this provider takes, priced and not taken.
+#
+# The move deletes two InMemory accommodations: the post-test reseed, because InMemory has no
+# transaction to roll back, and the `InMemoryEventId.TransactionIgnoredWarning` log, because
+# transactions were being ignored. On SQLite the transaction is real, so the rollback cleans and
+# the warning has nothing to say. The `UseTransaction` override is what makes that true -- the base
+# calls the helper three times and declares it `protected virtual`, checked before writing, and the
+# relational base's own override uses `GetDbTransaction()`, which ADR-013 puts out of reach.
+#
+# **`ManyToManyTrackingRelationalTestBase` was examined in the same pass and DEFERRED.** Its SQLite
+# fixture needs store-specific model configuration -- `HasDefaultValueSql("CURRENT_TIMESTAMP")` and
+# indexer default values -- for `SupportsDatabaseDefaults`. That is work on the server-side model,
+# not a fixture swap, so it does not belong in a batch of cheap moves.
+#
+# Figures read off the run's own summary block: 26896 / 26545 / 116 / 235
+# (`groupc-complextypes`).
 failed=116
 total=26896

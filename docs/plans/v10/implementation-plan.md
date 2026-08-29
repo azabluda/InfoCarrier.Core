@@ -232,6 +232,15 @@ only a fraction of what it hid.
       **Three moves, three different answers**: PropertyValues exposed a 45-test defect (#69),
       StoreGeneratedFixup turned dead paths live and passed, CompositeKeys changed nothing. Only
       the move tells you which — which is the argument for the policy.
+- [x] **R16. ComplexTypesTracking moved; ManyToManyTracking examined and deferred.** `failed` and
+      `total` unchanged, REASONS unchanged, and the FIXED/BROKEN lists are **the same two tests
+      changing namespace** — a rename, not a behaviour change. The two are J22's, unchanged by the
+      store. The move deletes two more InMemory accommodations: the post-test reseed and the
+      `TransactionIgnoredWarning` log, both meaningless once the transaction is real. Its
+      `UseTransaction` override is what makes it real, for the base's three helper uses.
+      **`ManyToManyTrackingRelationalTestBase` is deferred with a reason**: its SQLite fixture needs
+      store-specific model configuration — `HasDefaultValueSql("CURRENT_TIMESTAMP")`, indexer
+      defaults — for `SupportsDatabaseDefaults`. That is server-model work, not a fixture swap.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
