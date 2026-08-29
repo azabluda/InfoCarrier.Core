@@ -685,5 +685,39 @@
 # FIXED both `Using_from_sql_throws`, BROKEN none. REASONS: that line went 4 -> 2.
 # Figures read off the run's own summary block: 22879 / 22683 / 11 / 185
 # (`hierarchy-convention`). Trim ratchet: OURS 89 <= 89, unchanged.
-failed=11
-total=22879
+# 2026-08-29, issue #56, three more inheritance bases. `failed` 11 -> 14, `total` 22879 -> 23023.
+# 144 new tests, 141 of them green, and the three reds share one cause that is not this provider's.
+#
+# `TPHInheritanceQueryTestBase`, `TPTFiltersInheritanceQueryTestBase` and
+# `TPCFiltersInheritanceQueryTestBase`. **The two filters bases are green on the first run**, which
+# is R7's dividend rather than a coincidence: a global query filter over a hierarchy has to reach
+# every derived type, and under TPT and TPC those types live in different store objects, so it only
+# works if the client hands over a hierarchy the server resolves the same way.
+#
+# **TPH is here for the opposite reason.** TPT and TPC are what
+# `InfoCarrierHierarchyMappingConvention` strips a discriminator for; TPH is what it must leave
+# alone, and the narrowing that separates them is the part of that convention most likely to be
+# wrong. This base is the direct assertion of the half that must not change.
+#
+# NOT a duplicate of the Tier A inheritance test. That one adopts the CORE
+# `InheritanceQueryTestBase`; this is a different base which adds the tests that only mean something
+# when a discriminator is really written to a store, and EF hosts it on SQLite itself as
+# `InheritanceQuerySqliteTest`. ADR-009 gives each base one tier and they have one each.
+#
+# **No TPH filters class exists here, and its absence is the rule rather than an omission.** EF's
+# `TPHFiltersInheritanceQuerySqliteTest` derives from the CORE `FiltersInheritanceQueryTestBase`,
+# which `InMemory.Query.FiltersInheritanceQueryInfoCarrierTest` already adopts on Tier A. A second
+# class over the same base would be duplication and not coverage.
+#
+# THE THREE REDS ARE ADR-013, not a defect here. `FromSql_on_root`, `FromSql_on_derived` and
+# `Casting_to_base_type_joining_with_query_type_works` all reach
+# `NormalizeDelimitersInRawString`, which casts the test store to `RelationalTestStore`; this
+# client's store is not one. That is the exact category ADR-013 records as having cost 142 tests to
+# discover -- a base that assumes the CLIENT is relational -- and all three are raw SQL, which #60
+# lists as needing a `RelationalTestStore` before it can move. Left failing per ADR-004.
+#
+# FIXED none, BROKEN three, all named above. REASONS: one new line,
+# `System.InvalidCastException : Unable to cast ... InfoCarrierTestStore ... RelationalTestStore`.
+# Figures read off the run's own summary block: 23023 / 22820 / 14 / 189 (`inheritance-family`).
+failed=14
+total=23023

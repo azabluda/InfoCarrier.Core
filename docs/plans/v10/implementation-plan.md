@@ -124,6 +124,17 @@ only a fraction of what it hid.
       strip the discriminator from plain TPH. BROKEN none across 22879 tests is what says the
       boundary holds. `failed` 13 -> 11, `total` 22878 -> 22879 (`hierarchy-convention`), trim
       ratchet 89 <= 89. **The count is back where it stood before R5**, with 197 more tests.
+- [x] **R8. TPH, and the filtered variants of TPT and TPC.** 144 new tests, 141 green. **The two
+      filters bases passed on the first run**, which is R7's dividend rather than luck: a global
+      filter over a hierarchy must reach every derived type, and under TPT and TPC those live in
+      different store objects. **TPH is adopted for the opposite reason** — it is the mapping the
+      convention must leave alone, so it asserts the half of the narrowing that must not change.
+      Not a duplicate of the Tier A inheritance test, which adopts the *core* base; EF hosts this
+      one on SQLite itself. **No TPH filters class**: EF's derives from the core
+      `FiltersInheritanceQueryTestBase`, already adopted on Tier A, and one base gets one tier.
+      The three reds are ADR-013 — `NormalizeDelimitersInRawString` casts the store to
+      `RelationalTestStore` — and all three are raw SQL, so they join #60's blocked set.
+      `failed` 11 -> 14, `total` 22879 -> 23023 (`inheritance-family`).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
