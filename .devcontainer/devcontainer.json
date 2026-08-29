@@ -51,9 +51,17 @@
         }
     },
 
+    // The C# extension is what the demo needs. The other two are for collaborators working in
+    // this container rather than visitors reading it: the repository's Claude Code configuration
+    // is checked in (.mcp.json, .claude/), and a graph view is the fastest way to read the
+    // one-substep-per-commit history this project keeps.
     "customizations": {
         "vscode": {
-            "extensions": ["ms-dotnettools.csharp"]
+            "extensions": [
+                "ms-dotnettools.csharp",
+                "anthropic.claude-code",
+                "mhutchie.git-graph"
+            ]
         }
     }
 }
