@@ -188,6 +188,21 @@ only a fraction of what it hid.
       under TPT and TPC. **Whether that page should widen from three named queries to this family
       is a user-facing-docs decision and is not taken here.**
       `failed` 30 -> 66, `total` 24508 -> 26862 (`gearsofwar-tpt-tpc`).
+- [ ] **R13. Group C — move the relational bases from Tier A to Tier B.** 83 bases whose *core*
+      parent this suite already runs on InMemory, so adopting the relational subclass alongside it
+      would be duplication (ADR-009). The owner's policy, 2026-08-29, is to **move**, smallest
+      first: 27 add no methods at all, 30 add one to three, 25 add four or more and are held until
+      the defects the earlier moves surface are fixed.
+- [x] **R13a. PropertyValues, the first move — and it vindicated the policy immediately.**
+      `failed` 66 -> 116, **`total` unchanged at 26862**. The same tests existed before; about
+      twenty returned `Task.CompletedTask` and the fixture ignored `School` and two `Building`
+      properties outright, all because InMemory cannot host complex types. The move added no tests,
+      it **made existing ones real**, and 50 fail. **45 are one product defect**: `EF.Property<T>`
+      does not survive the wire on the store-values and `Reload` path, thrown on the server.
+      `Scalar_store_values_can_be_accessed_as_a_property_dictionary` passed on InMemory and fails
+      against a real database — **Tier A was green on a path it never executed.**
+      Note for pacing: this base adds *zero* methods, so it is among the cheapest to write.
+      Cheap to write is not cheap in reds.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

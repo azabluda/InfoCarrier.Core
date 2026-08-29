@@ -858,5 +858,38 @@
 #
 # FIXED none, BROKEN 36, all one classification.
 # Figures read off the run's own summary block: 26862 / 26561 / 66 / 235 (`gearsofwar-tpt-tpc`).
-failed=66
+# 2026-08-29, issue #56, PropertyValues moved from Tier A to Tier B. `failed` 66 -> 116, **`total`
+# UNCHANGED at 26862**. FIXED none, BROKEN 50, every one in the moved class.
+#
+# **The unchanged total is the whole point.** The same tests existed before. About twenty of them
+# returned `Task.CompletedTask`, and the fixture went further still, ignoring two `Building`
+# properties and the entire `School` entity so the model would build -- all because the Tier A
+# backing store is InMemory, which supports neither complex types nor complex collections. The move
+# did not add tests. **It made existing ones real, and 50 of them fail.**
+#
+# The class that was deleted asked for exactly this in its own remark: "Re-test each against Tier B
+# and delete it where it passes."
+#
+# **FORTY-FIVE OF THE FIFTY ARE ONE DEFECT, AND IT IS THIS PROVIDER'S.**
+# `System.InvalidOperationException : The EF.Property<T> method may only be used within Entity
+# Framework LINQ queries`, thrown **on the server**, on the round trip -- the stack runs through
+# `TransportInfoCarrierClient.RoundTripAsync`. The store-values and `Reload` path builds a query
+# using `EF.Property` and it does not survive the wire. `GetDatabaseValues` and `Reload` are
+# ordinary user-facing APIs, so this is a product defect and not a test artefact. Filed separately.
+# The other five: 3 `Collections differ`, 2 `complex property 'Building.Culture#Culture.License'
+# could not be found`.
+#
+# **TIER A WAS REPORTING GREEN ON A CODE PATH IT NEVER EXECUTED.**
+# `Scalar_store_values_can_be_accessed_as_a_property_dictionary` passed against InMemory and fails
+# against a real database. That is the justification for the Group C tier policy, produced by the
+# first base moved under it.
+#
+# **And it prices the policy.** `PropertyValuesRelationalTestBase` adds ZERO methods -- it is one of
+# the 27 "empty" relational subclasses, the cheapest kind to write. Cheap to write is not cheap in
+# reds. The remaining moves are ordered smallest-first for that reason, with the 25 large bases held
+# until defects like this one are fixed.
+#
+# Figures read off the run's own summary block: 26862 / 26511 / 116 / 235
+# (`propertyvalues-tierb`).
+failed=116
 total=26862
