@@ -968,5 +968,39 @@
 #
 # Figures read off the run's own summary block: 26896 / 26545 / 116 / 235
 # (`groupc-complextypes`).
+# 2026-08-29, issue #56, LazyLoadProxy moved from Tier A to Tier B. `failed` and `total` UNCHANGED
+# at 116 / 26896. FIXED none, BROKEN none, REASONS unchanged.
+#
+# **The move deletes 700 lines and adds 68.** The Tier A class ignored `Milk` and `Culture` on
+# twenty-nine entity types, because InMemory has no complex types, and then carried two 680-line
+# JSON strings restating the model that was left. The relational base maps both complex properties
+# itself, so all of it goes. Neither base declares `UseTransaction` and neither calls the
+# transaction helper, so no override was needed -- checked, not assumed.
+#
+# **EF's own `LazyLoadProxySqliteTest` differs from the core base by ONE TOKEN across both 680-line
+# strings**: `"Charge": 1.00` becomes `"Charge": 1.0`, because SQLite has no decimal type and the
+# scale that comes back is the scale the store wrote. Written here as the substitution rather than
+# as 1360 lines of duplicated JSON. A base whose text stops carrying the token makes the assertion
+# fail rather than silently pass, which is the property that makes that safe.
+#
+# **FOUR TESTS FAILED WITH `InvalidCastException: Double to Int32`, AND IT IS ONE PRODUCT DEFECT.**
+# `ClientResultMaterializer.Materialize` fills the value buffer by bare property name, and a complex
+# leaf's `Name` is the bare one -- `Host.Culture.Rating` is `"Rating"`. `Host.Rating` is a `double`
+# and the four `Rating` properties under `Culture` and `Milk` are `int`, so all four slots took the
+# same double. The method's own remark already warned that a complex value must not ride in that
+# dictionary because the names collide; the leak in the OTHER direction, a top-level value bleeding
+# INTO complex slots, was not considered. One condition fixes it: only a property whose
+# `DeclaringType is IEntityType` reads from the dictionary. `ApplyComplexValues` writes the complex
+# members afterwards through their CLR member, so the sentinel is what belongs in those slots.
+#
+# The method is EF's own `InternalEntityEntry` values constructor, copied. EF only ever calls that
+# with dictionaries it controls, so the collision is latent upstream rather than a defect there.
+#
+# **The probe is the reason this took minutes rather than a session.** The stack named a compiled
+# lambda and no property. A `catch (InvalidCastException)` dumping every flattened property's index,
+# CLR type and buffer value to a FILE -- xUnit swallows stdout -- printed the collision directly.
+#
+# Figures read off the run's own summary block: 26896 / 26545 / 116 / 235
+# (`groupc-lazyloadproxy`).
 failed=116
 total=26896

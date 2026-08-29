@@ -241,6 +241,29 @@ only a fraction of what it hid.
       **`ManyToManyTrackingRelationalTestBase` is deferred with a reason**: its SQLite fixture needs
       store-specific model configuration — `HasDefaultValueSql("CURRENT_TIMESTAMP")`, indexer
       defaults — for `SupportsDatabaseDefaults`. That is server-model work, not a fixture swap.
+- [x] **R17. LazyLoadProxy moved — the cheapest move so far, and it found a product defect.**
+      `failed` and `total` unchanged at 116 / 26896, FIXED and BROKEN both empty, REASONS unchanged.
+      **The move deletes 700 lines and adds 68.** The Tier A class ignored `Milk` and `Culture` on
+      twenty-nine entity types, because InMemory has no complex types, and then carried two 680-line
+      JSON strings restating the model that was left; the relational base maps both complex
+      properties itself, so all of it goes.
+      **EF's own SQLite class differs from the core base by one token across both strings** —
+      `"Charge": 1.00` becomes `1.0`, because SQLite has no decimal type and the scale that comes
+      back is the scale the store wrote. Written as the substitution rather than as 1360 lines of
+      duplicated JSON: a base that stops carrying the token fails the assertion rather than silently
+      passing, and `Can_serialize_proxies_to_JSON` passing is the proof the scale survives the wire.
+      **Four tests failed with `InvalidCastException: Double to Int32`, and it is one defect.**
+      `ClientResultMaterializer.Materialize` fills the value buffer by bare property name, and a
+      complex leaf's `Name` is bare — `Host.Culture.Rating` is `"Rating"`. `Host.Rating` is a
+      `double`; the four `Rating` properties under `Culture` and `Milk` are `int`, and all four
+      slots took the double. The file's own remark already warned that a complex value must not ride
+      in that dictionary because names collide; **the leak in the other direction, a top-level value
+      bleeding *into* complex slots, was not considered.** One condition fixes it: only a property
+      whose `DeclaringType is IEntityType` reads from the dictionary, and `ApplyComplexValues`
+      writes the complex members afterwards through their CLR member. Trim ratchet 89 <= 89.
+      **This is EF's own `InternalEntityEntry` values constructor, copied.** EF only ever calls it
+      with dictionaries it controls, so the collision is latent upstream rather than a defect there.
+
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

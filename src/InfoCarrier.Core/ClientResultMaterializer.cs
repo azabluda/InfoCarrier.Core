@@ -568,7 +568,17 @@ public class ClientResultMaterializer(
                 continue;
             }
 
-            buffer[index] = values.TryGetValue(property.Name, out object? value) ? value : property.Sentinel;
+            // Only the entity's own properties are keyed by name in the dictionary. A complex
+            // leaf's `Name` is the bare one -- `Host.Culture.Rating` is `"Rating"` -- so looking
+            // one up by name finds the entity's own `Host.Rating` instead, and `Host.Rating` is a
+            // `double` while every `Rating` under `Culture` and `Milk` is an `int`. Four slots of
+            // one `Host` took the same double and the materializer threw
+            // `InvalidCastException: Double to Int32`. `ApplyComplexValues` writes the complex
+            // members afterwards through their CLR member, so the sentinel is what belongs here.
+            buffer[index] = property.DeclaringType is IEntityType
+                && values.TryGetValue(property.Name, out object? value)
+                    ? value
+                    : property.Sentinel;
         }
 
         return MaterializerFor(runtimeType)(new MaterializationContext(new ValueBuffer(buffer), _context));
