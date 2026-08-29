@@ -174,6 +174,20 @@ only a fraction of what it hid.
       *server* and asserted against the *client's* logger. Two contexts; the assertion assumes one.
       `failed` 26 -> 30, `total` 24479 -> 24508 (`tpt-tablesplitting`).
       **This closes every TPT and TPC base except the two GearsOfWar ones.**
+- [x] **R12. Gears of War under TPT and TPC — the last two, and the largest.** 2354 new tests, 2318
+      green. **Every TPT and TPC base EF ships is now adopted.**
+      **3419 of 3529 passed before a single override was written.** The 24 distinct failing methods
+      were intersected against EF's own 23 SQLite overrides: 15 EF also overrides, 9 it does not.
+      **Fifteen were adopted, not twenty-three** — the other eight were never measured red here,
+      and copying them would import workarounds for limitations this wire does not reach. 98 fell
+      to 36.
+      **The 36 that remain are one family, already known.** The base asserts a correlated
+      collection with `Distinct` must be *refused*; this provider answers it, because the
+      projection split reassembles on the client. That is `limitations.md`'s "answers where others
+      refuse" section, which names three today — and one of the nine is **C64** itself, reproduced
+      under TPT and TPC. **Whether that page should widen from three named queries to this family
+      is a user-facing-docs decision and is not taken here.**
+      `failed` 30 -> 66, `total` 24508 -> 26862 (`gearsofwar-tpt-tpc`).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

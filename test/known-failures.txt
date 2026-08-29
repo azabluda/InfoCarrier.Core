@@ -826,5 +826,37 @@
 #
 # FIXED none, BROKEN four, all named and all classified.
 # Figures read off the run's own summary block: 24508 / 24251 / 30 / 227 (`tpt-tablesplitting`).
-failed=30
-total=24508
+# 2026-08-29, issue #56, Gears of War under TPT and TPC. `failed` 30 -> 66, `total` 24508 ->
+# 26862. **2354 new tests and 2318 green.** This is EF's hardest query model, and running it over a
+# hierarchy split across store objects is the broadest available statement that R7's mapping work
+# holds under load rather than only on the inheritance model. **It closes the last two TPT and TPC
+# bases: every one EF ships is now adopted.**
+#
+# **3419 of 3529 passed on the first run, before a single override was written.** The 24 distinct
+# failing methods were then intersected with EF's own 23 SQLite overrides, and the split was clean:
+# 15 EF also overrides, 9 it does not.
+#
+# **FIFTEEN OF EF'S TWENTY-THREE WERE ADOPTED, NOT ALL TWENTY-THREE.** The other eight were never
+# measured red here, and copying them would have imported workarounds for limitations this wire
+# does not reach -- the mistake this file already records as an override outliving its cause. Of
+# the fifteen: 11 need `APPLY`, which SQLite does not have; 3 are `DateTimeOffset` shapes SQLite
+# cannot translate; and one, `Where_subquery_with_ElementAt_using_column_as_index`, produces
+# `SQLite Error 1: 'no such column: s.Id'` -- the message measured here is IDENTICAL to the one EF
+# asserts, arriving wrapped, so the assertion keeps the engine's own type name and text through
+# the `AssertStoreRefuses` idiom. 98 failures fell to 36.
+#
+# **THE THIRTY-SIX THAT REMAIN ARE ONE FAMILY, AND IT IS ONE THIS REPOSITORY ALREADY KNOWS.** 32
+# fail with "no exception was thrown" and 4 with "exception type was not an exact match". The base
+# asserts that a correlated collection with `Distinct` MUST BE REFUSED, and this provider answers
+# it, because the projection split reassembles on the client. That is the "queries this provider
+# answers where other providers refuse" section of `website/docs/limitations.md`, which today names
+# three. **One of the nine is C64**: `Correlated_collection_with_distinct_3_levels`, already a
+# known failure whose assertion no correct answer can satisfy, now reproduced under TPT and TPC.
+#
+# **Whether `limitations.md` should widen that section from three named queries to this family is a
+# user-facing-docs decision and is NOT taken here.**
+#
+# FIXED none, BROKEN 36, all one classification.
+# Figures read off the run's own summary block: 26862 / 26561 / 66 / 235 (`gearsofwar-tpt-tpc`).
+failed=66
+total=26862
