@@ -148,6 +148,20 @@ only a fraction of what it hid.
       and not the result set — that does not hold here, because the marker vanishes rather than
       being refused, which is evidence for its option 3.
       `failed` 14 -> 26, `total` 23023 -> 24271 (`relationships-manytomany-v2`).
+- [x] **R10. Bulk updates over the three inheritance mappings.** Six classes closing **seven**
+      entries, 208 new tests, **every one green** — FIXED none, BROKEN none, REASONS unchanged.
+      These write, where every inheritance base before them only read.
+      **The `UseTransaction` override is on the FIXTURE here, and CLAUDE.md's stated tell would
+      have missed it.** `BulkUpdatesAsserter` calls `ExecuteWithStrategyInTransactionAsync` on every
+      assertion, but the hook is `InheritanceBulkUpdatesFixtureBase.UseTransaction`, declared
+      *abstract on the fixture* — so EF's own SQLite classes override nothing, which reads as
+      evidence that no transaction is involved. Inheriting EF's relational implementation would
+      have hit `GetDbTransaction()` and the documented 471 `database is locked`. The guardrail
+      needs widening: the override may be on the fixture.
+      Eight first-probe failures were EF's own `#31402` defect and are adopted as overrides through
+      the existing `AssertStoreRefuses` idiom. **No golden strings came with any of it, which
+      settles R3 by demonstration**: EF's `AssertSql` lives in the provider subclass, not the base.
+      `failed` unchanged at 26, `total` 24271 -> 24479 (`bulkupdates-inheritance`).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

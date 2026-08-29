@@ -759,5 +759,41 @@
 # FIXED none, BROKEN twelve, all named above and all one classification.
 # Figures read off the run's own summary block: 24271 / 24040 / 26 / 205
 # (`relationships-manytomany-v2`).
+# 2026-08-29, issue #56, bulk updates over the three inheritance mappings. `failed` UNCHANGED at
+# 26, `total` 24271 -> 24479. **208 new tests and every one green**: FIXED none, BROKEN none,
+# REASONS unchanged. Six classes close SEVEN compliance entries, because
+# `TPHInheritanceBulkUpdatesTestBase` and `FiltersInheritanceBulkUpdatesRelationalTestBase` sit on
+# one chain.
+#
+# These WRITE, where every inheritance base adopted before them only read. A bulk update against a
+# hierarchy has to name the right store object for the right derived type, and under TPT and TPC
+# there is more than one.
+#
+# **THE `UseTransaction` OVERRIDE IS ON THE FIXTURE HERE, AND CLAUDE.MD'S STATED TELL WOULD HAVE
+# MISSED IT.** That rule says to check the base's own transaction strategy, and to write the
+# override in the same commit as the store switch. Both halves apply -- `BulkUpdatesAsserter`
+# calls `TestHelpers.ExecuteWithStrategyInTransactionAsync` on EVERY assertion -- but the hook is
+# `InheritanceBulkUpdatesFixtureBase.UseTransaction`, declared **abstract on the FIXTURE**, which is
+# the only base family here that does that. EF's own six SQLite classes therefore override nothing,
+# which reads at first glance as evidence that no transaction is involved. Inheriting EF's
+# relational implementation would have called `GetDbTransaction()` (ADR-013) and produced the
+# documented symptom: inner contexts outside the transaction the outer one holds the write lock
+# for, and a run full of `SQLite Error 5: 'database is locked'`. **Widen the tell: the override may
+# be on the fixture, not the test class.**
+#
+# EIGHT FAILURES ON THE FIRST PROBE, ALL TPT, all `SQLite Error 1: 'no such column: a.Id'`. They are
+# EF'S OWN KNOWN DEFECT, tagged `// #31402` in `TPTInheritanceBulkUpdatesSqliteTest`: a TPT
+# `ExecuteUpdate` reaching a base property emits SQL naming a column the derived table does not
+# have. EF overrides both and asserts `SqliteException`. Convergence with the reference provider,
+# so the override is adopted -- through this repository's existing `AssertStoreRefuses` idiom, which
+# asserts the wrapped type name AND the engine's message rather than merely that something threw.
+#
+# **NO GOLDEN STRINGS CAME WITH THEM, and that settles plan item R3 by demonstration.** EF's SQLite
+# classes override every test with `AssertSql` and assert `Check_all_tests_overridden`; all of that
+# lives in the PROVIDER'S SUBCLASS, not in the base. Adopting the base takes the behaviour and
+# leaves the dialect behind.
+#
+# Figures read off the run's own summary block: 24479 / 24228 / 26 / 225
+# (`bulkupdates-inheritance`).
 failed=26
-total=24271
+total=24479
