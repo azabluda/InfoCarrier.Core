@@ -48,6 +48,32 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
     }
 
     [Fact]
+    public async Task A_failed_batch_insert_names_only_the_rejected_row_over_http()
+    {
+        using NorthwindContext context = NorthwindOverHttpTest.CreateClientContext(factory, out RecordingHandler recorder);
+
+        // ALFKI is a seeded customer, so the middle row is a duplicate primary key; the other two
+        // are new. Every other EF provider's DbUpdateException.Entries names the one row the store
+        // rejected. In-process the server's own update entries make that possible; over HTTP they
+        // cannot cross, so this only works if the wire carries the rejected row's ordinal (#70).
+        context.Customers.Add(new Customer { Id = "ZZZ01", CompanyName = "First", City = "A", Country = "X" });
+        context.Customers.Add(new Customer { Id = "ALFKI", CompanyName = "Dup", City = "B", Country = "X" });
+        context.Customers.Add(new Customer { Id = "ZZZ03", CompanyName = "Third", City = "C", Country = "X" });
+
+        int requestCountBeforeSave = recorder.RequestCount;
+
+        DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+
+        Assert.Equal(1, recorder.RequestCount - requestCountBeforeSave);
+
+        var entry = Assert.Single(exception.Entries);
+        Assert.Equal("ALFKI", ((Customer)entry.Entity).Id);
+
+        using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(factory);
+        Assert.False(await verify.Customers.AnyAsync(c => c.Id == "ZZZ01" || c.Id == "ZZZ03"));
+    }
+
+    [Fact]
     public async Task An_insert_gets_its_store_generated_key_back()
     {
         using NorthwindContext context = NorthwindOverHttpTest.CreateClientContext(factory);

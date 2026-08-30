@@ -1202,5 +1202,22 @@
 # FIXED none, BROKEN none. Measured with local per-class --filter runs (Join 132/132, Where
 # 406->408, Select 372/372); a full run OOMs this box, so the CI Spec ratchet confirms the
 # figures. known-failures.names.txt is unchanged (no failure added or removed).
-failed=72
+#
+# 2026-08-30, #70. `failed` 72 -> 70, `total` UNCHANGED at 27023. FIXED 2:
+#   InfoCarrier.Core.FunctionalTests.Sqlite.Update.NonSharedModelUpdatesInfoCarrierTest
+#     .DbUpdateException_Entries_is_correct_with_multiple_inserts (async: False and True)
+#
+# On a server SaveChanges failure the client's DbUpdateException.Entries named every entry it
+# sent, not the one the store rejected -- because the server's own update entries belong to a
+# context disposed with the request scope and cannot cross the wire (W5), and matching by key
+# does not help when the rejected row is Added with a store-generated key. Fix: the server tags
+# the exception with the rejected entries' CorrelationIds (their position in the sent batch,
+# which is all the client needs to pick its own entry back out); InfoCarrierFault carries it over
+# the wire; InfoCarrierDatabase.SaveChangesAsync's re-raise prefers those ordinals over the
+# whole-batch fallback. New src: ServerSaveChangesExecutor catch, InfoCarrierFault
+# .FailedCorrelationIds, InfoCarrierFaultMapper Capture/Rehydrate, InfoCarrierDatabase
+# .FailedByOrdinal. Covered on the HTTP wire by a new TransportTests case (separate project, not
+# in this baseline). BROKEN none. Names copied from CI's failures.txt on merge; the two removed
+# lines were the tail of the file. CI Spec ratchet confirms 27023 / ~26716 / 70 / 235.
+failed=70
 total=27023

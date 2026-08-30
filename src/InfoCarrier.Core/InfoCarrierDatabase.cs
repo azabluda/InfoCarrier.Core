@@ -201,7 +201,8 @@ public class InfoCarrierDatabase(
             // InMemory provider from `InMemoryTable`, the relational ones from
             // `AffectedCountModificationCommandBatch`. This provider *is* the store as far as the
             // client context is concerned.
-            IReadOnlyList<IUpdateEntry> conflicting = Translate(exception.Entries, sent);
+            IReadOnlyList<IUpdateEntry> conflicting =
+                FailedByOrdinal(exception, sent) ?? Translate(exception.Entries, sent);
 
             if ((await _updateLogger.OptimisticConcurrencyExceptionAsync(
                     _currentContext.Context, conflicting, exception, null, cancellationToken)
@@ -228,12 +229,15 @@ public class InfoCarrierDatabase(
             // entries of the server's context*. They cannot cross a wire under any encoding, and
             // in-process they only arrived because the exception was the same object.
             //
-            // So the exception is re-raised naming the entries *this* context sent. `Translate`
-            // matches the server's entries by key where it has them and falls back to the whole
-            // sent list where it does not, which after a wire crossing is always. That is the
-            // honest answer: the client knows exactly which of its own entries it submitted, and
-            // it is those the caller can do anything with.
-            throw new DbUpdateException(exception.Message, exception, Translate([], sent));
+            // So the exception is re-raised naming the entries *this* context sent. The server
+            // tags which ones the store rejected by their position in the batch (#70); where that
+            // tag is present `FailedByOrdinal` picks exactly those, and only where it is absent
+            // does the re-raise name the whole sent list — the honest answer when the server
+            // could not narrow it either.
+            throw new DbUpdateException(
+                exception.Message,
+                exception,
+                FailedByOrdinal(exception, sent) ?? Translate([], sent));
         }
 
         ApplyGeneratedValues(sent, result, mapper);
@@ -388,6 +392,38 @@ public class InfoCarrierDatabase(
             yield return owner;
             current = owner;
         }
+    }
+
+    /// <summary>
+    ///     The client's entries for the rows the server said it rejected, picked by the ordinal
+    ///     the server tagged the exception with (#70) — or <see langword="null" /> when there is
+    ///     no such tag and the caller must fall back to <see cref="Translate" />.
+    /// </summary>
+    /// <remarks>
+    ///     The ordinal is a position in <paramref name="sent" />, which is exactly how
+    ///     <see cref="Common.ChangeEntry.CorrelationId" /> was assigned, so it indexes the list
+    ///     directly. This is the only reliable narrowing after a wire crossing: the rejected row
+    ///     is often <c>Added</c> with a store-generated key, so neither side has a key value to
+    ///     match on. An out-of-range ordinal is skipped rather than trusted — a malformed tag must
+    ///     not throw a second failure over the first.
+    /// </remarks>
+    private static IReadOnlyList<IUpdateEntry>? FailedByOrdinal(Exception exception, List<IUpdateEntry> sent)
+    {
+        if (exception.Data[InfoCarrierFaultMapper.FailedCorrelationIdsKey] is not int[] { Length: > 0 } ordinals)
+        {
+            return null;
+        }
+
+        var matched = new List<IUpdateEntry>();
+        foreach (int ordinal in ordinals)
+        {
+            if (ordinal >= 0 && ordinal < sent.Count && !matched.Contains(sent[ordinal]))
+            {
+                matched.Add(sent[ordinal]);
+            }
+        }
+
+        return matched.Count > 0 ? matched : null;
     }
 
     /// <summary>

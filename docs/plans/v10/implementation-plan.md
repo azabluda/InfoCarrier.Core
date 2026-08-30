@@ -494,3 +494,37 @@ not a wire defect: it was a **model** defect on the client, and the wire was fai
       (sync and async), which throw `System.OutOfMemoryException` serialising this suite's
       known-largest result on a starved box; they pass under normal memory and are not in the
       baseline or the new names file.
+
+## Phase U — `DbUpdateException.Entries` names every entry sent, not the one rejected (#70)
+
+**Not a milestone.** Found by R19's adoption of `NonSharedModelUpdatesTestBase` on Tier B.
+`DbUpdateException_Entries_is_correct_with_multiple_inserts` (sync + async) failed: on a server
+`SaveChanges` failure the client's `DbUpdateException.Entries` carried **every** entry it sent
+rather than the one the store rejected. W5 already documents why the server's own update entries
+cannot cross — they belong to a context disposed with the request scope — and matching by key
+does not help when the rejected row is `Added` with a store-generated key, so neither side has a
+key for it. What identifies it is its **ordinal in the sent batch**, which the server knows.
+
+- [x] **U1. Carry the rejected entries' ordinals over the wire, and prefer them in the re-raise.**
+      `src/` change. `ServerSaveChangesExecutor` now wraps `SaveChangesAsync` in a
+      `catch (DbUpdateException)` that maps `exception.Entries` back to the client's
+      `ChangeEntry.CorrelationId`s (matched on the entity instance, since EF rebuilds the
+      `EntityEntry` wrappers) and stashes them on `Exception.Data` under
+      `InfoCarrierFaultMapper.FailedCorrelationIdsKey`. `InfoCarrierFault` gains
+      `FailedCorrelationIds`; `InfoCarrierFaultMapper.Capture`/`Rehydrate` lift it onto `Data` and
+      back, so the in-process path (same object) and the wire path agree.
+      `InfoCarrierDatabase.SaveChangesAsync`'s re-raise — for `DbUpdateException` and, as a strict
+      improvement, `DbUpdateConcurrencyException` — now does `FailedByOrdinal(exception, sent) ??
+      Translate(...)`: the ordinal indexes `sent` directly (that is how `CorrelationId` is
+      assigned), an out-of-range ordinal is skipped rather than trusted, and only where the tag is
+      absent does the old whole-batch fallback stand. The fault path is server → client, the
+      trusted direction (`InfoCarrierFaultMapper`'s own reasoning), and the payload is an `int[]`
+      of positions — no type resolution, no deserialization surface.
+      New HTTP-wire coverage: `NorthwindWritesOverHttpTest
+      .A_failed_batch_insert_names_only_the_rejected_row_over_http` (three `Customer` inserts, the
+      middle a duplicate primary key; asserts a single `Entries` naming that one, in one request).
+      TransportTests is a separate project and not in the spec baseline.
+      `failed` 72 → 70, `total` unchanged at 27023, FIXED 2, BROKEN none. `test/measure.sh` gate
+      and `eng/trim-ratchet.sh` (`ours` 89 ≤ 89). Local runs: the two pinned tests pass, the 19
+      TransportTests pass, and `OptimisticConcurrency` / `StoreGeneratedFixup` / `GraphUpdates`
+      (1763/1769) are unchanged; a full run OOMs this box, so the CI Spec ratchet confirms.
