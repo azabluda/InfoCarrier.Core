@@ -322,6 +322,18 @@ only a fraction of what it hid.
       no key for the failing one either. The ordinal in the sent list is what identifies it, which
       makes it a protocol change and so filed rather than taken.
 
+- [ ] **R20. The last four Northwind query bases moved to Tier B.** `NorthwindFunctions`,
+      `NorthwindNavigations`, `NorthwindAggregateOperators` and `NorthwindGroupBy` — the Northwind
+      query bases R18 did not take. None of the four relational bases adds an `AsSplitQuery` test,
+      a `UseTransaction` route or a `RelationalTestStore` cast, so none is gated on #60 or ADR-013:
+      each just swaps in `RelationalQueryAsserter` and adds at most a few message-shape overrides.
+      The move deletes the InMemory-limitation override sets the Tier A classes carried — one on
+      `NorthwindNavigations` (now inherited from the relational base), eight on
+      `NorthwindAggregateOperators`, six on `NorthwindGroupBy` — each of which the Tier A class had
+      already flagged for deletion once a relational backend landed. Adopted bare; the SQLite
+      override subset (EF's own `ApplyNotSupported` / `AssertTranslationFailed` members) is added
+      only for what the run measures red. `test/` only, so the gate is `eng/measure.sh`; measured
+      on CI's Spec ratchet because a local full run OOMs this box.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
