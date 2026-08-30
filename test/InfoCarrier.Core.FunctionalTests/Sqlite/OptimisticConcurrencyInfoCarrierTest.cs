@@ -17,8 +17,8 @@ using Xunit;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>
-///     <c>OptimisticConcurrencyTestBase</c> on ADR-009 Tier B — the SQLite backend, the only tier
-///     that can make a concurrency check at all.
+///     <c>OptimisticConcurrencyRelationalTestBase</c> on ADR-009 Tier B — the SQLite backend, the
+///     only tier that can make a concurrency check at all.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -27,12 +27,18 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         these tests. Running them here would assert InMemory's limits, not this provider's.
 ///     </para>
 ///     <para>
+///         <b>Re-parented from the core base onto the relational one in R23</b>, which adds one
+///         test, <c>Property_entry_original_value_is_set</c>. It passes: the concurrency check is
+///         the server's, and <c>RelationalStrings.UpdateConcurrencyException</c> is the message it
+///         raises, so the assertion holds across the wire unchanged.
+///     </para>
+///     <para>
 ///         The skipped tests below are EF's own <c>OptimisticConcurrencySqliteTestBase</c> skips,
 ///         mirrored one for one — the backend <em>is</em> SQLite, so its limits are ours.
 ///     </para>
 /// </remarks>
 public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarrierTest.InfoCarrierFixture fixture)
-    : OptimisticConcurrencyTestBase<OptimisticConcurrencyInfoCarrierTest.InfoCarrierFixture, byte[]>(fixture),
+    : OptimisticConcurrencyRelationalTestBase<OptimisticConcurrencyInfoCarrierTest.InfoCarrierFixture, byte[]>(fixture),
         IAsyncLifetime
 {
     /// <summary>
@@ -122,18 +128,24 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
     ///         <c>UseModel</c>, and <c>F1Context</c> has no <c>OnModelCreating</c> of its own — so
     ///         the usual <c>OnModelCreating</c> route this repo's stores take would leave the
     ///         server with a bare convention model and none of the concurrency tokens. The server
-    ///         is therefore handed its own copy of the model, built over SQLite's convention set
-    ///         so it carries the relational annotations the client's must not have.
+    ///         is therefore handed its own copy of the model, built over SQLite's convention set.
     ///     </para>
     ///     <para>
-    ///         The relational configuration in <see cref="BuildServerModel" /> is EF's
-    ///         <c>F1RelationalFixture.BuildModelExternal</c>. It is duplicated rather than
-    ///         inherited because that class ships in
-    ///         <c>Microsoft.EntityFrameworkCore.Relational.Specification.Tests</c>, which a
-    ///         non-relational provider has no business referencing.
+    ///         <b>The relational configuration is now inherited rather than duplicated (R23).</b>
+    ///         This class used to restate <c>F1RelationalFixture.BuildModelExternal</c> by hand,
+    ///         on the reading that a non-relational provider has no business referencing
+    ///         <c>EFCore.Relational.Specification.Tests</c> — which ADR-013 has since settled the
+    ///         other way for the test project. Deriving from it instead deletes the copy and picks
+    ///         up the six TPT and TPC circuit types the copy had omitted.
+    ///     </para>
+    ///     <para>
+    ///         It also puts EF's relational configuration on the <em>client's</em> model, because
+    ///         <c>F1FixtureBase.AddOptions</c> feeds <c>BuildModelExternal</c> a builder from this
+    ///         provider's convention set. Measured: <c>ToTable</c>, <c>HasColumnName</c> and the
+    ///         TPT/TPC mapping strategies are inert there, and all 34 running tests stay green.
     ///     </para>
     /// </remarks>
-    public class InfoCarrierFixture : F1FixtureBase<byte[]>
+    public class InfoCarrierFixture : F1RelationalFixture<byte[]>
     {
         private ITestStoreFactory _testStoreFactory;
 
@@ -251,46 +263,20 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         }
 
         /// <summary>
-        ///     The same model as the client's, plus the relational mapping the store needs.
+        ///     The same model as the client's, over SQLite's convention set.
         /// </summary>
+        /// <remarks>
+        ///     The relational configuration is <c>F1RelationalFixture.BuildModelExternal</c>'s and
+        ///     is now inherited rather than duplicated: the fixture derives from that class as of
+        ///     R23, so <c>base.BuildModelExternal</c> already applies it. The convention set is
+        ///     still SQLite's, so the server's model carries the relational metadata the store
+        ///     needs while the client's is built by this provider.
+        /// </remarks>
         private IModel BuildServerModel()
         {
             ModelBuilder builder = SqliteConventionSetBuilder.CreateModelBuilder();
 
             BuildModelExternal(builder);
-
-            builder.Entity<Chassis>().ToTable("Chassis");
-            builder.Entity<Team>().ToTable("Teams").Property(e => e.Id).ValueGeneratedNever();
-            builder.Entity<Driver>().ToTable("Drivers");
-            builder.Entity<Engine>().ToTable("Engines");
-            builder.Entity<EngineSupplier>().ToTable("EngineSuppliers");
-            builder.Entity<Gearbox>().ToTable("Gearboxes");
-            builder.Entity<Sponsor>().ToTable("Sponsors");
-
-            builder.Entity<Fan>().Property(e => e.Id).ValueGeneratedNever();
-            builder.Entity<FanTpt>(b =>
-            {
-                b.UseTptMappingStrategy();
-                b.Property(e => e.Id).ValueGeneratedNever();
-            });
-            builder.Entity<FanTpc>(b =>
-            {
-                b.UseTpcMappingStrategy();
-                b.Property(e => e.Id).ValueGeneratedNever();
-            });
-
-            builder.Entity<Circuit>(b =>
-            {
-                b.ToTable("Circuits");
-                b.Property(e => e.Name).HasColumnName("Name");
-                b.Property(e => e.Id).ValueGeneratedNever();
-            });
-            builder.Entity<City>(b =>
-            {
-                b.ToTable("Circuits");
-                b.Property(e => e.Name).HasColumnName("Name");
-                b.Property(e => e.Id).ValueGeneratedNever();
-            });
 
             return (IModel)builder.Model;
         }

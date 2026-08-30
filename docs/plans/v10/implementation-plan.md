@@ -409,6 +409,49 @@ only a fraction of what it hid.
       `ITestSqlLoggerFactory` list 25 → 23. Measured with local per-class runs (`--filter`); the
       CI Spec ratchet confirms `failed` and `total`.
 
+- [x] **R23. `OptimisticConcurrency` onto its relational base — and two of the four "cheap"
+      Group C candidates turned out not to be cheap at all.** The batch was picked by size:
+      `ConcurrencyDetectorDisabled`/`EnabledRelationalTestBase` (22 lines, one method each),
+      `OptimisticConcurrencyRelationalTestBase` (35 lines, one method) and
+      `JsonTypesRelationalTestBase` (226 lines, two methods, no transaction helper). **Reading the
+      bases rather than their line counts disqualified three of the five.**
+      **`OptimisticConcurrency` is adopted, and it is the one that worked.** It already ran on
+      Tier B against the *core* base, so this is a re-parent rather than a tier move. The
+      relational base adds `Property_entry_original_value_is_set` and requires the fixture to be an
+      `F1RelationalFixture<TRowVersion>`; both are fine. The new test passes — the concurrency
+      check is the server's and `RelationalStrings.UpdateConcurrencyException` is the message it
+      raises, so the assertion holds across the wire unchanged. 45 → 46, 34 passed, 12 skipped,
+      0 failed.
+      **Deriving from `F1RelationalFixture` also deletes a duplicate.** This fixture restated
+      `F1RelationalFixture.BuildModelExternal` by hand, on a comment saying a non-relational
+      provider has no business referencing `EFCore.Relational.Specification.Tests` — which is what
+      ADR-013 settled the other way for the test project. Inheriting it removes about thirty lines
+      and picks up the six TPT and TPC circuit types the copy had omitted. It also puts EF's
+      relational configuration on the **client's** model, because `F1FixtureBase.AddOptions` feeds
+      `BuildModelExternal` a builder from this provider's convention set: measured, `ToTable`,
+      `HasColumnName` and the TPT/TPC mapping strategies are inert there and every test stays
+      green.
+      **`ConcurrencyDetectorDisabledRelationalTestBase` and `ConcurrencyDetectorEnabledRelationalTestBase`
+      are #60, not Group C.** The single method each one adds is `FromSql`, over
+      `Products.FromSqlRaw(...)`. They belong with the `FromSql`/`ToQueryString` family R2 left
+      visible pending #60's decision, and the earlier reading of them as "one method, therefore
+      cheap" was a line count standing in for a look at the method. Not adopted.
+      **`JsonTypesRelationalTestBase` is an ADR-013 exclusion: it assumes the *client* is
+      relational.** Adopted bare and measured before being judged — 104 red of 576 — and **92 of
+      the 104 are one cast.** `AssertElementFacets` calls `element.FindRelationalTypeMapping()` on
+      the model under test, which here is the client's, and that throws
+      `InvalidCastException: InfoCarrier.Core.InfoCarrierTypeMapping → RelationalTypeMapping`
+      (69 directly; another 23 through `NoNestedCollections`, whose `Assert.Throws` catches the
+      cast instead of the relational message it wants). `AssertElementFacets` *is* `protected
+      virtual`, so ADR-013's amendment would allow an override — but the override would have to
+      reimplement the grandparent's body, because `base` reaches the relational one, and what it
+      would delete is every relational facet assertion in the base. That is the whole of what this
+      base contributes. Not adopted; `JsonTypes` stays on Tier A against the core base, where it is
+      green. Recorded here for R4 rather than added to `IgnoredTestBases`, as `Update.JsonUpdateTestBase`
+      was in R14.
+      `test/` only. Measured with local per-class runs (`--filter`); the CI Spec ratchet confirms
+      `failed` unchanged and `total` +1.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

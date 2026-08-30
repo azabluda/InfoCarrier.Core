@@ -1219,5 +1219,13 @@
 # .FailedByOrdinal. Covered on the HTTP wire by a new TransportTests case (separate project, not
 # in this baseline). BROKEN none. Names copied from CI's failures.txt on merge; the two removed
 # lines were the tail of the file. CI Spec ratchet confirms 27023 / ~26716 / 70 / 235.
+#
+# 2026-08-31, #56 (R23). `failed` UNCHANGED at 70, `total` 27023 -> 27024 for one new test.
+# OptimisticConcurrencyInfoCarrierTest is re-parented from the core OptimisticConcurrencyTestBase
+# onto OptimisticConcurrencyRelationalTestBase, which adds Property_entry_original_value_is_set.
+# It passes: the concurrency check is the server's and RelationalStrings.UpdateConcurrencyException
+# is the message it raises, so the assertion holds across the wire unchanged. The class goes
+# 45 -> 46 tests, 34 passed / 12 skipped / 0 failed, measured with a local --filter run.
+# FIXED none, BROKEN none. known-failures.names.txt is unchanged (no failure added or removed).
 failed=70
-total=27023
+total=27024
