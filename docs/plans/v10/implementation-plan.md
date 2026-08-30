@@ -379,6 +379,36 @@ only a fraction of what it hid.
       per-class runs (`--filter`); a full run OOMs this box, so the CI Spec ratchet confirms the
       figures.
 
+- [x] **R22. The four ComplexNavigations bases moved to Tier B.** `ComplexNavigationsQuery`,
+      `ComplexNavigationsCollectionsQuery` and their two shared-type siblings — the deepest
+      navigation corpus EF ships, and the cheapest Group C move left to write: all four relational
+      bases are 11 to 19 lines and add no test methods of their own. None declares
+      `UseTransaction` or calls `ExecuteWithStrategyInTransactionAsync`, at either level of the
+      chain, both checked rather than assumed. The two relational *fixture* bases implement
+      `ITestSqlLoggerFactory`, so the move also clears two entries from the compliance test's
+      second assertion. `test/` only, so the gate is `eng/measure.sh`.
+      **Adopted bare first**, per the measure-first rule. The bare run was 118 red of 1856, and
+      **the classification came out cleaner than any move so far: every one of the 118 is a test
+      EF's own SQLite suite overrides, and not one is this provider's.** 110 are
+      `SqliteStrings.ApplyNotSupported` — SQLite has no `APPLY` — and are adopted in EF's shape,
+      through a per-file `AssertApplyNotSupported` helper as six other Tier B classes here already
+      do. The other eight are two families of four, both of them the Tier A overrides that survive
+      the move because their reason is store-independent: `GroupJoin_client_method_in_OrderBy`
+      (client code in an `OrderBy` key, refused with the same details clause EF's SQLite class
+      asserts) and `Join_with_result_selector_returning_queryable_throws_validation_error` (C73's
+      refusal on the result element type, raised before the wire — **the one place these classes
+      do not follow EF's SQLite suite**, which expects `ApplyNotSupported` because on SQLite the
+      query gets as far as the translator).
+      **And two of EF's SQLite overrides are deliberately not adopted**:
+      `Projecting_collection_after_optional_reference_correlated_with_parent`, in both collections
+      classes, *passes* here — the projection split reassembles that collection on the client, so
+      SQLite is never asked for `APPLY`. Same category as R21's
+      `Select_bool_closure_with_order_by_property_with_cast_to_nullable` and
+      `limitations.md`'s "queries this provider answers that other EF providers refuse".
+      1856 of 1856 green. The compliance missing list goes 101 → 97, and its
+      `ITestSqlLoggerFactory` list 25 → 23. Measured with local per-class runs (`--filter`); the
+      CI Spec ratchet confirms `failed` and `total`.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
