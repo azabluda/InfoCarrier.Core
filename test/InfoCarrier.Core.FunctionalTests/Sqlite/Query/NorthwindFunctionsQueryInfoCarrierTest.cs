@@ -17,12 +17,29 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         exercises translates on a relational backend.
 ///     </para>
 ///     <para>
-///         Deliberately <b>no overrides</b>. Whatever a real SQLite backend cannot translate is
-///         what the run reports, and an override written before the run would be the assumption
-///         rather than the measurement (CLAUDE.md). EF's own <c>NorthwindFunctionsQuerySqliteTest</c>
-///         overrides four <c>Sum_over_round</c>/<c>Sum_over_truncate</c> members with
-///         <c>AssertTranslationFailed</c>; those are adopted here only if this run shows the same.
+///         The four overrides below are EF Core's own — <c>NorthwindFunctionsQuerySqliteTest</c>
+///         overrides exactly these with <c>AssertTranslationFailed</c>, and the four measured red
+///         here for the same reason: <c>Math.Round</c> / <c>Math.Truncate</c> inside a
+///         <c>Sum</c> projection has no SQLite translation. A query that reaches the store and is
+///         refused by it is convergence with the reference provider, not a defect here.
 ///     </para>
 /// </remarks>
 public class NorthwindFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : NorthwindFunctionsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture);
+    : NorthwindFunctionsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+{
+    /// <inheritdoc />
+    public override Task Sum_over_round_works_correctly_in_projection(bool async)
+        => AssertTranslationFailed(() => base.Sum_over_round_works_correctly_in_projection(async));
+
+    /// <inheritdoc />
+    public override Task Sum_over_round_works_correctly_in_projection_2(bool async)
+        => AssertTranslationFailed(() => base.Sum_over_round_works_correctly_in_projection_2(async));
+
+    /// <inheritdoc />
+    public override Task Sum_over_truncate_works_correctly_in_projection(bool async)
+        => AssertTranslationFailed(() => base.Sum_over_truncate_works_correctly_in_projection(async));
+
+    /// <inheritdoc />
+    public override Task Sum_over_truncate_works_correctly_in_projection_2(bool async)
+        => AssertTranslationFailed(() => base.Sum_over_truncate_works_correctly_in_projection_2(async));
+}

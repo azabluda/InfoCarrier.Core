@@ -1115,5 +1115,40 @@
 # `NorthwindMiscellaneousQueryInfoCarrierTest.Handle_materialization_properly_when_more_than_two_query_sources_are_involved`
 # sync+async, throwing `OutOfMemoryException` on this suite's largest result; they pass in CI and
 # are not in the names file.
-failed=72
+#
+# 2026-08-30, #56, Phase R20. `failed` 72 -> 78, `total` UNCHANGED at 27021. The last four
+# Northwind query bases -- Functions, Navigations, AggregateOperators, GroupBy -- moved from
+# ADR-009 Tier A (InMemory) to Tier B (SQLite). Measured on CI's Spec ratchet; a local full run
+# OOMs this box.
+#
+# The move made 34 tests red on the first (bare) run and fixed none. 28 of the 34 are convergence
+# with EF's own SQLite classes and are adopted as overrides in the same shape EF uses:
+#   * Functions: 4 x AssertTranslationFailed -- Math.Round / Math.Truncate inside a Sum projection
+#     has no SQLite translation (NorthwindFunctionsQuerySqliteTest overrides the same four).
+#   * AggregateOperators: Multiple_collection_navigation_with_FirstOrDefault_chained needs APPLY;
+#     Contains over a local tuple array has no translation.
+#   * GroupBy: 7 x SqliteStrings.ApplyNotSupported (APPLY is not SQLite syntax), plus
+#     Final_GroupBy_nominal_type_entity -- a `GroupBy(c => new RandomClass {...})` key names a
+#     client-only type (ADR-010), refused before the wire; the Tier A class already carried this
+#     one and its reason is store-independent, so it survives the move. EF's SQLite class does not
+#     override it.
+#
+# THE 6 THAT STAY RED ARE THE FINDING. NorthwindAggregateOperatorsQueryInfoCarrierTest's
+# Average_over_max_subquery, Average_over_nested_subquery and Type_casting_inside_sum (sync+async)
+# return an aggregate that differs from EF's expected value in the trailing digits:
+#     Average_over_max_subquery   expected 59.841269841269866666666666667
+#                                 actual   59.841269841269841666666666667
+#     Type_casting_inside_sum     expected 121.040
+#                                 actual   121.0400018058717258291
+# The queries carry a `(decimal)` cast over an int/float Average/Sum. EF's expected is the
+# `double` computation (IEnumerable<int>.Average() returns double, rounded at digit 15, then
+# widened); the server computes it through SQLite's decimal accumulator (ef_avg/ef_sum) and
+# returns the accurate value, which QueryAsserter.AssertEqual then rejects for not matching
+# exactly. This is the B4 family in CLAUDE.md -- a type mapping computed twice, once per provider,
+# and the two disagree on which aggregate translation the cast selects. Left failing per ADR-004;
+# no GitHub issue filed yet (the session could not create one -- see PR #74).
+#
+# BROKEN 6 (the three above, sync+async), FIXED none. Figures read off the CI Spec ratchet's TRX:
+# 27021 / 26708 / 78 / 235.
+failed=78
 total=27021

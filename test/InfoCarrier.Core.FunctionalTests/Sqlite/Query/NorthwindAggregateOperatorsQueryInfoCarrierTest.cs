@@ -2,7 +2,13 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
+
+// Internal EF Core API usage. This provider is built on EF Core internals by design
+// (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
+#pragma warning disable EF1001
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -20,11 +26,32 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         aggregates and for <c>Last</c> without an <c>ORDER BY</c>.
 ///     </para>
 ///     <para>
-///         Deliberately <b>no overrides</b> beyond the relational base's. EF's own
-///         <c>NorthwindAggregateOperatorsQuerySqliteTest</c> adds a handful of behaviour overrides
-///         (an <c>ApplyNotSupported</c> refusal, two anonymous/tuple-array <c>Contains</c>
-///         translation failures); those are adopted here only if this run shows the same.
+///         The two overrides below are EF Core's own, adopted after measuring:
+///         <c>Multiple_collection_navigation_with_FirstOrDefault_chained</c> needs <c>APPLY</c>,
+///         which is not SQLite syntax, and <c>Contains</c> over a local array of tuples has no
+///         translation. Both are convergence with EF's own <c>NorthwindAggregateOperatorsQuerySqliteTest</c>.
+///     </para>
+///     <para>
+///         <b>Three members are left failing and tracked, not overridden.</b>
+///         <c>Average_over_max_subquery</c>, <c>Average_over_nested_subquery</c> and
+///         <c>Type_casting_inside_sum</c> return an aggregate that differs from EF's expected value
+///         in the trailing digits: the <c>(decimal)</c> cast over an <c>int</c>/<c>float</c>
+///         aggregate resolves to a different translation on the two sides of the wire (the B4
+///         family in CLAUDE.md — a type mapping computed twice). Per ADR-004 a red spec test is
+///         information; the divergence is recorded in <c>test/known-failures.txt</c> under R20.
 ///     </para>
 /// </remarks>
 public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : NorthwindAggregateOperatorsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture);
+    : NorthwindAggregateOperatorsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+{
+    /// <inheritdoc />
+    public override async Task Multiple_collection_navigation_with_FirstOrDefault_chained(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Multiple_collection_navigation_with_FirstOrDefault_chained(async))).Message);
+
+    /// <inheritdoc />
+    public override Task Contains_with_local_tuple_array_closure(bool async)
+        => AssertTranslationFailed(() => base.Contains_with_local_tuple_array_closure(async));
+}

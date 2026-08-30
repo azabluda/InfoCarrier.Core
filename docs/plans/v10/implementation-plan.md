@@ -322,7 +322,7 @@ only a fraction of what it hid.
       no key for the failing one either. The ordinal in the sent list is what identifies it, which
       makes it a protocol change and so filed rather than taken.
 
-- [ ] **R20. The last four Northwind query bases moved to Tier B.** `NorthwindFunctions`,
+- [x] **R20. The last four Northwind query bases moved to Tier B.** `NorthwindFunctions`,
       `NorthwindNavigations`, `NorthwindAggregateOperators` and `NorthwindGroupBy` — the Northwind
       query bases R18 did not take. None of the four relational bases adds an `AsSplitQuery` test,
       a `UseTransaction` route or a `RelationalTestStore` cast, so none is gated on #60 or ADR-013:
@@ -330,10 +330,24 @@ only a fraction of what it hid.
       The move deletes the InMemory-limitation override sets the Tier A classes carried — one on
       `NorthwindNavigations` (now inherited from the relational base), eight on
       `NorthwindAggregateOperators`, six on `NorthwindGroupBy` — each of which the Tier A class had
-      already flagged for deletion once a relational backend landed. Adopted bare; the SQLite
-      override subset (EF's own `ApplyNotSupported` / `AssertTranslationFailed` members) is added
-      only for what the run measures red. `test/` only, so the gate is `eng/measure.sh`; measured
-      on CI's Spec ratchet because a local full run OOMs this box.
+      already flagged for deletion once a relational backend landed. `test/` only, so the gate is
+      `eng/measure.sh`; measured on CI's Spec ratchet because a local full run OOMs this box.
+      **Adopted bare first**: 34 tests red, none fixed. **28 are convergence with EF's own SQLite
+      classes** and are adopted as overrides in EF's shape — Functions gets four
+      `AssertTranslationFailed` (`Math.Round`/`Math.Truncate` in a `Sum` projection has no SQLite
+      translation); AggregateOperators gets an `ApplyNotSupported` and a local-tuple-array
+      `Contains` `AssertTranslationFailed`; GroupBy gets seven `SqliteStrings.ApplyNotSupported`
+      plus `Final_GroupBy_nominal_type_entity` (a `GroupBy` key of a client-only type, ADR-010,
+      refused before the wire — the Tier A override that survives the move because its reason is
+      store-independent, and one EF's SQLite class does *not* have). `Navigations` needs no
+      overrides — the one it had is now inherited. **The 6 that stay red are the finding**: three
+      AggregateOperators members (`Average_over_max_subquery`, `Average_over_nested_subquery`,
+      `Type_casting_inside_sum`, sync+async) return an aggregate that differs from EF's expected in
+      the trailing digits. The `(decimal)` cast over an `int`/`float` `Average`/`Sum` picks a
+      different translation on each side of the wire — EF's expected is the `double` computation,
+      the server's is SQLite's decimal accumulator, and `AssertEqual` compares exactly. B4 family;
+      left failing per ADR-004, recorded in `test/known-failures.txt`, needs a GitHub issue (PR #74
+      notes the session could not file one). `failed` 72 → 78, `total` unchanged 27021.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
