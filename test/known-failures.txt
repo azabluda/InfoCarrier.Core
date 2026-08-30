@@ -1146,7 +1146,7 @@
 # returns the accurate value, which QueryAsserter.AssertEqual then rejects for not matching
 # exactly. This is the B4 family in CLAUDE.md -- a type mapping computed twice, once per provider,
 # and the two disagree on which aggregate translation the cast selects. Left failing per ADR-004;
-# no GitHub issue filed yet (the session could not create one -- see PR #74).
+# tracked as issue #75.
 #
 # BROKEN 6 (the three above, sync+async), FIXED none. Figures read off the CI Spec ratchet's TRX:
 # 27021 / 26708 / 78 / 235.
