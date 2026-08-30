@@ -452,6 +452,31 @@ only a fraction of what it hid.
       `test/` only. Measured with local per-class runs (`--filter`); the CI Spec ratchet confirms
       `failed` unchanged and `total` +1.
 
+- [x] **R24. `DataAnnotation` moved to Tier B — the first Group C move whose *value* is the store
+      rather than the base.** The relational base adds only two tests, but the Tier A class carried
+      **six** overrides that each replaced a round trip with a metadata assertion because InMemory
+      enforces no store constraint. On a real database three of those six run for real and pass:
+      `ConcurrencyCheckAttribute_throws_if_value_in_database_changed` and the two
+      `RequiredAttribute` ones. That is R13a's lesson again — the move adds few tests and makes
+      existing ones real — except that here they pass.
+      **The `UseTransaction` override is written in the same commit as the store switch**, per
+      CLAUDE.md: the base routes five tests through `ExecuteWithStrategyInTransactionAsync`, four
+      in the core base and one in the relational one, and the tell is the base's own transaction
+      strategy rather than anything in the fixture.
+      The other three of the six are replaced by EF's own `DataAnnotationSqliteTest` overrides —
+      same bodies, same reasons, different store: SQLite enforces no column length
+      (`MaxLengthAttribute`, `StringLengthAttribute`) and has no `rowversion` (`TimestampAttribute`,
+      EF issue #2195, the same one this repo's `OptimisticConcurrencyInfoCarrierTest` skips eleven
+      tests for).
+      **One test is left failing, and it is R23's finding again at one-hundredth the size.** The
+      relational base's `Table_can_configure_TPT_with_Owned` asserts over
+      `context.Model.GetTableMappings()`, which needs the relational model, and the model under
+      assertion is the **client's** — which this provider does not build relationally (M9). Where
+      `JsonTypesRelationalTestBase` failed 92 tests on that assumption and is therefore not
+      adoptable, this base fails one, so it is adopted and the test is left failing per ADR-004.
+      That is exactly the distinction ADR-013's 2026-08-30 amendment draws.
+      95 / 0 / 95 → 97 / 96 / 1. `failed` 70 → 71, `total` +2. `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
