@@ -379,6 +379,17 @@ only a fraction of what it hid.
       per-class runs (`--filter`); a full run OOMs this box, so the CI Spec ratchet confirms the
       figures.
 
+- [ ] **R22. The four ComplexNavigations bases moved to Tier B.** `ComplexNavigationsQuery`,
+      `ComplexNavigationsCollectionsQuery` and their two shared-type siblings — the deepest
+      navigation corpus EF ships, and the cheapest Group C move left to write: all four relational
+      bases are 11 to 19 lines and add no test methods of their own. None declares
+      `UseTransaction` or calls `ExecuteWithStrategyInTransactionAsync`, at either level of the
+      chain, both checked rather than assumed. The two relational *fixture* bases implement
+      `ITestSqlLoggerFactory`, so the move also clears two entries from the compliance test's
+      second assertion. `test/` only, so the gate is `eng/measure.sh`.
+      **Adopted bare first**, per the measure-first rule: the SQLite override subset lands in a
+      follow-up commit, once the bare run says which tests are red and why.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
