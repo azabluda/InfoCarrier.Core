@@ -7,24 +7,24 @@ using Microsoft.EntityFrameworkCore.TestUtilities;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
 /// <summary>
-///     The same inherited base as <see cref="NorthwindWhereQueryInfoCarrierTest" />, on ADR-009
-///     Tier B (SQLite).
+///     <see cref="NorthwindWhereQueryRelationalTestBase{TFixture}" /> on ADR-009 Tier B (SQLite).
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Deliberately <strong>no overrides</strong>. The Tier A class carries eight, each
-///         asserting a limitation of the backing store or of EF itself; whether they still apply
-///         on a backend that genuinely translates is a question, not an assumption, and this
-///         class is how it gets answered. Overrides are added here only for what this run
-///         actually shows, with the reason stated.
+///         Derives from the <em>relational</em> base (#56), not the core one. The relational base
+///         adds one test the core base lacks —
+///         <c>EF_MultipleParameters_with_non_evaluatable_argument_throws</c> (+2, sync and async)
+///         — swaps in <c>RelationalQueryAsserter</c>, and turns
+///         <c>Where_bool_client_side_negated</c> into an <c>AssertTranslationFailed</c>, which is
+///         why that override is no longer declared here: it is inherited.
 ///     </para>
 ///     <para>
-///         The first run of this class is therefore expected to be red, and is information rather
-///         than a regression (CLAUDE.md).
+///         The other overrides below are this provider's own, added only for what a run actually
+///         showed. Red here is information (CLAUDE.md), not a regression.
 ///     </para>
 /// </remarks>
 public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : NorthwindWhereQueryTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+    : NorthwindWhereQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
     // -------------------------------------------------------------------------------------
     // UPSTREAM EF CORE LIMITATION — anonymous-type / tuple structural equality against a
@@ -64,9 +64,4 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     public override Task Where_compare_tuple_create_constructed_multi_value_not_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_create_constructed_multi_value_not_equal(async));
-
-    // Client evaluation outside the final projection, as on Tier A. EF Core's own
-    // NorthwindWhereQueryRelationalTestBase overrides this identically.
-    public override Task Where_bool_client_side_negated(bool async)
-        => AssertTranslationFailed(() => base.Where_bool_client_side_negated(async));
 }

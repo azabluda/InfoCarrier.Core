@@ -347,7 +347,37 @@ only a fraction of what it hid.
       different translation on each side of the wire — EF's expected is the `double` computation,
       the server's is SQLite's decimal accumulator, and `AssertEqual` compares exactly. B4 family;
       left failing per ADR-004, recorded in `test/known-failures.txt`, tracked as issue #75.
-      `failed` 72 → 78, `total` unchanged 27021.
+      `failed` 72 → 78, `total` unchanged 27021. (Issue #75 later closed those six — SQLite
+      version and store seeding, not the wire; see `test/known-failures.txt` `#77` block.)
+
+- [x] **R21. Three more Northwind query bases onto their relational bases.** `NorthwindWhere`,
+      `NorthwindJoin` and `NorthwindSelect` — the Northwind query Sqlite classes R18 and R20 did
+      not take. None has a Tier A counterpart, so this is not a tier move: each already ran on
+      Tier B against the *core* base and is re-parented onto the `*RelationalTestBase`, which swaps
+      in `RelationalQueryAsserter` (the fixture has implemented `ITestSqlLoggerFactory` since R18)
+      and folds in that base's expected-answer corrections. None of the three relational bases adds
+      an `AsSplitQuery` route, a `UseTransaction` route or a `RelationalTestStore` cast, so none is
+      gated on #60 or ADR-013. `test/` only, so the gate is `eng/measure.sh`.
+      **Join**: the relational base adds no test and no override — a pure asserter swap. 132 → 132,
+      all green.
+      **Where**: the relational base adds one theory,
+      `EF_MultipleParameters_with_non_evaluatable_argument_throws` (+2, sync and async), which
+      passes, and turns `Where_bool_client_side_negated` into `AssertTranslationFailed` — this
+      provider fails that translation identically, so the hand-written override that used to
+      restate it is deleted and inherited instead. 406 → 408, all green.
+      **Select**: `Reverse_without_explicit_ordering` was restated by hand here with a comment
+      that the class "cannot derive from" the relational base; it now can, so the restatement is
+      deleted and inherited. The base also turns
+      `Select_bool_closure_with_order_by_property_with_cast_to_nullable` into
+      `AssertTranslationFailed` — and **this provider answers that query** (its split evaluates the
+      `OrderBy` over a client constant projection and the server runs the rest), so the inherited
+      assertion is overridden back to the core answer-check, which passes. Same category as
+      `limitations.md`'s "queries this provider answers that other EF providers refuse". 372 → 372,
+      all green.
+      `failed` unchanged at 72, `total` 27021 → 27023, FIXED none, BROKEN none. The three relational
+      bases leave `InfoCarrierComplianceTest`'s missing list at 101 (was 104). Measured with local
+      per-class runs (`--filter`); a full run OOMs this box, so the CI Spec ratchet confirms the
+      figures.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
