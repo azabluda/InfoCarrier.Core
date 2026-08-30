@@ -581,7 +581,36 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
             tracked.Add((replay.Change.CorrelationId, entry, replay.EntityType, state));
         }
 
-        int count = await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        int count;
+        try
+        {
+            count = await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException exception)
+        {
+            // Name the entries the store actually rejected, by their position in the batch the
+            // client sent (#70). `exception.Entries` are this server context's update entries;
+            // that context is disposed with the request scope, so they cannot cross the wire and
+            // the client would otherwise re-raise naming every entry it sent. The correlation id
+            // is the position, which is all the client needs to pick its own entry back out.
+            //
+            // Matched on the entity instance rather than the `EntityEntry` wrapper: EF rebuilds
+            // the wrappers for `DbUpdateException.Entries` from the update entries, so identity is
+            // on the object, not the wrapper. On `Data` because that survives both the in-process
+            // path (same object) and the wire, through `InfoCarrierFaultMapper`.
+            int[] failed = [.. exception.Entries
+                .Select(e => e.Entity)
+                .Select(entity => tracked.FirstOrDefault(t => ReferenceEquals(t.Entry.Entity, entity)))
+                .Where(t => t.Entry is not null)
+                .Select(t => t.CorrelationId)];
+
+            if (failed.Length > 0)
+            {
+                exception.Data[InfoCarrierFaultMapper.FailedCorrelationIdsKey] = failed;
+            }
+
+            throw;
+        }
 
         return new SaveChangesResult
         {

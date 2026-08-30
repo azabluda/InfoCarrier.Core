@@ -42,6 +42,15 @@ public static class InfoCarrierFaultMapper
     /// </summary>
     public const string ServerStackTraceKey = "InfoCarrier.ServerStackTrace";
 
+    /// <summary>
+    ///     The <see cref="Exception.Data" /> key under which a <c>DbUpdateException</c> carries the
+    ///     correlation ids of the entries the store rejected (#70). The server sets it before the
+    ///     exception leaves <c>ServerSaveChangesExecutor</c>; <see cref="Capture" /> lifts it onto
+    ///     <see cref="InfoCarrierFault.FailedCorrelationIds" /> and <see cref="Rehydrate" /> puts
+    ///     it back, so the in-process path (same object) and the wire path agree.
+    /// </summary>
+    public const string FailedCorrelationIdsKey = "InfoCarrier.FailedCorrelationIds";
+
     private static readonly ConcurrentDictionary<string, Type?> ResolvedTypes = new(StringComparer.Ordinal);
 
     /// <summary>
@@ -60,6 +69,7 @@ public static class InfoCarrierFaultMapper
             Message = exception.Message,
             StackTrace = exception.StackTrace,
             Inner = exception.InnerException is { } inner ? Capture(inner) : null,
+            FailedCorrelationIds = exception.Data[FailedCorrelationIdsKey] as int[],
         };
     }
 
@@ -78,6 +88,14 @@ public static class InfoCarrierFaultMapper
             // Not spliced into the exception's own stack, which belongs to where the client threw
             // it, and not appended to the message, which spec tests compare exactly.
             exception.Data[ServerStackTraceKey] = serverStack;
+        }
+
+        if (fault.FailedCorrelationIds is { } failed)
+        {
+            // Back onto Data, where InfoCarrierDatabase.SaveChangesAsync reads it to name the
+            // rejected entries rather than every entry it sent (#70). A fresh array, because the
+            // fault's is shared with a deserialized graph.
+            exception.Data[FailedCorrelationIdsKey] = failed.ToArray();
         }
 
         return exception;
