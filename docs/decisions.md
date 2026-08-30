@@ -482,3 +482,31 @@ priced the *absence of this package*, and `AdHocJsonQueryRelationalTestBase` con
 `InfoCarrierTestStoreFactory.CreateListLoggerFactory` now returns a `TestSqlLoggerFactory` — which
 derives from `ListLoggerFactory` — because relational fixtures expose it through a non-virtual
 cast. On a client with no database it records no SQL and nothing in this suite asserts any.
+
+**Amended 2026-08-30.** The gate above reads as a binary — `protected virtual UseTransaction`
+adopts, non-virtual does not — and three later adoptions (R11, R14, R19 in
+[`plans/v10/implementation-plan.md`](plans/v10/implementation-plan.md)) measured cases where a
+non-virtual `UseTransaction` did **not** put the base out of reach. The disqualifying condition is
+narrower than "the base has a non-virtual `UseTransaction`": it is that **every route to the base's
+coverage passes through a relational-only member with no `protected virtual` hook above it**.
+Applied as a three-way test:
+
+1. **A `protected virtual` method sits between the test bodies and the relational call** —
+   `UseTransaction` itself, or a caller such as `ExecuteWithStrategyInTransactionAsync`. Adopt,
+   overriding that method. `ComplexCollectionJsonUpdateTestBase` (above) and
+   `NonSharedModelUpdatesTestBase` (R19): the latter's `UseTransaction` is non-virtual and calls
+   `GetDbTransaction()`, but `ExecuteWithStrategyInTransactionAsync` is `protected virtual`, so
+   overriding it hands `TestHelpers` a different enlistment and the non-virtual member is never
+   reached. `Principal_and_dependent_roundtrips_with_cycle_breaking` passes because of it.
+2. **The relational call is inline in some test bodies with no hook between it and the test.**
+   Adopt anyway; those specific tests are unreachable and cost N reds, each recorded in
+   `test/known-failures.txt`. `TableSplittingTestBase` (R11) costs two tests;
+   `EntitySplittingTestBase` (R19) has `Can_roundtrip` green and only
+   `ExecuteDelete_throws_for_entity_splitting` unreachable.
+3. **Every test routes through the non-virtual member.** Not adopted. `JsonUpdateTestBase` (above)
+   is this case at 142/142 — identical harness failures that say nothing about this provider.
+
+R14 states the principle: *"it is not that a non-virtual `UseTransaction` disqualifies a base, but
+that a base failing wholesale yields nothing. One use costs a test; 136 costs the base."* The
+`JsonUpdateTestBase` decision (not adopted) and the `ComplexCollectionJsonUpdateTestBase` decision
+(adopted, 18 of 18) are unchanged.
