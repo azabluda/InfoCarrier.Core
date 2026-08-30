@@ -23,8 +23,16 @@
     //
     // KEEP THIS VERSION AND global.json IN STEP. They are two statements of one fact.
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+    // `dotnet` is the demo's whole requirement. `github-cli` and `python` are for collaborators,
+    // not visitors: `gh` is how a branch reaches CI for review, and the `eng/` gates
+    // (`trim-ratchet.sh`, `doc-links.py`, `doc-words.py`, `trx-failures.py`) are Python. The base
+    // image ships neither. All three are pinned by digest in devcontainer-lock.json, same as the
+    // SDK -- run `devcontainer upgrade` after changing a version here, never hand-edit the lock.
     "features": {
-        "ghcr.io/devcontainers/features/dotnet:2": { "version": "10.0.201" }
+        "ghcr.io/devcontainers/features/dotnet:2": { "version": "10.0.201" },
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/python:1": { "version": "3.12", "installTools": false }
     },
 
     // The SAMPLE, never InfoCarrier.Core.slnx. The solution holds the two test projects, and
