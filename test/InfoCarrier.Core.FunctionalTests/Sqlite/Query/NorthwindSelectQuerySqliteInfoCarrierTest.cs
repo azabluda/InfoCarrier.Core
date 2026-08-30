@@ -1,9 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
+using Microsoft.EntityFrameworkCore.TestModels.Northwind;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
@@ -14,16 +14,20 @@ using Xunit;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
 /// <summary>
-///     <see cref="NorthwindSelectQueryTestBase{TFixture}" /> on ADR-009 Tier B (SQLite).
+///     <see cref="NorthwindSelectQueryRelationalTestBase{TFixture}" /> on ADR-009 Tier B (SQLite).
 /// </summary>
 /// <remarks>
-///     Overrides only for what a run actually showed. Whether the Tier A class's overrides still apply on a backend that
-///     genuinely translates is a question this class answers by measurement; overrides are added
-///     only for what a run actually shows, with the reason stated. Red here is information
+///     Derives from the <em>relational</em> base (#56), not the core one. That base swaps in
+///     <c>RelationalQueryAsserter</c> and turns two core tests into translation-failure
+///     assertions — <c>Reverse_without_explicit_ordering</c> (which this class used to restate by
+///     hand, with a comment that it "cannot derive from" the relational base; it now can, because
+///     the fixture implements <c>ITestSqlLoggerFactory</c> since R18) and
+///     <c>Select_bool_closure_with_order_by_property_with_cast_to_nullable</c>. It adds no test the
+///     core base lacks. Overrides only for what a run actually showed. Red here is information
 ///     (CLAUDE.md), not a regression.
 /// </remarks>
 public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : NorthwindSelectQueryTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+    : NorthwindSelectQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
     // -------------------------------------------------------------------------------------
     // BACKING-STORE LIMITATION — SQLite has no APPLY, and a correlated collection projection
@@ -153,14 +157,8 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
     // the same backend, adopted verbatim now that the split ships the whole query.
     // -------------------------------------------------------------------------------------
 
-    // `Reverse` with nothing to reverse: SQL has no row order to invert. Every relational
-    // provider fails this, so EF puts the override on NorthwindSelectQueryRelationalTestBase --
-    // a base this class cannot derive from, because it also swaps in a RelationalQueryAsserter
-    // that needs relational test infrastructure. The assertion is the one that base makes.
-    public override Task Reverse_without_explicit_ordering(bool async)
-        => AssertTranslationFailedWithDetails(
-            () => base.Reverse_without_explicit_ordering(async),
-            RelationalStrings.MissingOrderingInSelectExpression);
+    // `Reverse` with nothing to reverse (Reverse_without_explicit_ordering) is now inherited
+    // from NorthwindSelectQueryRelationalTestBase, which asserts exactly this failure.
 
     // EF's NorthwindSelectQuerySqliteTest asserts exactly this failure for exactly this test.
     public override Task
@@ -170,4 +168,23 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             () => base
                 .SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
                     async));
+
+    // -------------------------------------------------------------------------------------
+    // THIS PROVIDER ANSWERS A QUERY EF's RELATIONAL PROVIDERS REJECT.
+    // NorthwindSelectQueryRelationalTestBase turns this into AssertTranslationFailed: a
+    // relational provider cannot ORDER BY a client-side constant projection. This provider's
+    // split evaluates the ordering over the constant on the client (it is a no-op over a single
+    // distinct value) and the server runs the rest, so the query returns the correct rows.
+    // Restored to the core assertion — the answer is checked, and it is right. Same category as
+    // limitations.md's "queries this provider answers that other EF providers refuse".
+    // -------------------------------------------------------------------------------------
+    public override async Task Select_bool_closure_with_order_by_property_with_cast_to_nullable(bool async)
+    {
+        var boolean = false;
+
+        await AssertQuery(
+            async,
+            ss => ss.Set<Customer>().Select(c => new { f = boolean }).OrderBy(e => (bool?)e.f),
+            assertOrder: true);
+    }
 }

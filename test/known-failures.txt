@@ -1175,5 +1175,32 @@
 #     `UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)` after seeding.
 #
 # FIXED 6, BROKEN none. Figures read off the CI Spec ratchet's TRX: 27021 / 26714 / 72 / 235.
+#
+# 2026-08-30, #56, Phase R21. `failed` UNCHANGED at 72, `total` 27021 -> 27023. Three Northwind
+# query Sqlite classes -- NorthwindWhere, NorthwindJoin, NorthwindSelect -- re-parented from the
+# core *QueryTestBase onto the *QueryRelationalTestBase, the same move R18 and R20 made for the
+# other Northwind query bases. Not a tier move: none of the three has a Tier A counterpart, so
+# each already ran on Tier B; the relational base just swaps in RelationalQueryAsserter (the
+# fixture has implemented ITestSqlLoggerFactory since R18) and folds in expected-answer overrides.
+#
+# The +2 is the one theory NorthwindWhereQueryRelationalTestBase adds that the core base lacks,
+# EF_MultipleParameters_with_non_evaluatable_argument_throws (sync+async), which passes. Join and
+# Select add no test.
+#
+# No new failure. Two inherited AssertTranslationFailed overrides needed handling:
+#   * Where_bool_client_side_negated -- this provider fails the translation identically, so the
+#     hand-written restatement in NorthwindWhereQuerySqliteInfoCarrierTest is deleted and the
+#     relational base's is inherited.
+#   * Select_bool_closure_with_order_by_property_with_cast_to_nullable -- this provider ANSWERS
+#     this query (ORDER BY over a client-constant projection: the split evaluates the ordering on
+#     the client, the server runs the rest), where EF's relational providers refuse to translate
+#     it. Overridden back to the core answer-check in NorthwindSelectQuerySqliteInfoCarrierTest;
+#     same category as limitations.md's "queries this provider answers that other providers
+#     refuse". Reverse_without_explicit_ordering, previously restated by hand in the Select class
+#     with a "cannot derive from the relational base" comment, is now inherited.
+#
+# FIXED none, BROKEN none. Measured with local per-class --filter runs (Join 132/132, Where
+# 406->408, Select 372/372); a full run OOMs this box, so the CI Spec ratchet confirms the
+# figures. known-failures.names.txt is unchanged (no failure added or removed).
 failed=72
-total=27021
+total=27023
