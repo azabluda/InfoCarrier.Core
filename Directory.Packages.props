@@ -55,27 +55,18 @@
     -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <!--
-      TRANSITIVE PINS THAT CLOSE NU1903 ADVISORIES. Neither package is referenced by anything in
-      this repository, and neither reaches either product: `dotnet list package` with the
-      `vulnerable` switch reports InfoCarrier.Core and InfoCarrier.Core.AspNetCore clean. They
-      arrive behind EF Core's own providers, so the fix is a version floor rather than a
-      suppression. Nothing here is being accepted as a risk.
-
-      SQLitePCLRaw 2.1.11 to 2.1.13 (GHSA-2m69-gcr7-jv3q, high). Reached through
-      Microsoft.Data.Sqlite.Core by Northwind.Server and both test projects. The four packages are
-      one family and ship in lockstep, so pinning `lib.e_sqlite3` alone would leave `core`,
-      `bundle_` and `provider_` a version behind it.
+      TRANSITIVE PIN THAT CLOSES NU1903 ADVISORIES. Not referenced directly by anything here and
+      does not reach either shipped package (`dotnet list package` with the vulnerable switch
+      reports InfoCarrier.Core and InfoCarrier.Core.AspNetCore clean); it arrives behind
+      Microsoft.EntityFrameworkCore.SqlServer / Microsoft.Data.SqlClient, reached ONLY by
+      InfoCarrier.Core.FunctionalTests. A version floor rather than a suppression because the fix
+      is a clean minor bump.
 
       System.Security.Cryptography.Xml 9.0.0 to 10.0.11 (EIGHT high advisories: GHSA-23rf-6693-g89p,
       GHSA-37gx-xxp4-5rgx, GHSA-6588-8gv4-xfgh, GHSA-8q5v-6pqq-x66h, GHSA-cvvh-rhrc-wg4q,
-      GHSA-g8r8-53c2-pm3f, GHSA-mmjf-rqrv-855v, GHSA-w3x6-4m5h-cxqf). Reached ONLY by
-      InfoCarrier.Core.FunctionalTests, through Microsoft.EntityFrameworkCore.SqlServer and
-      Microsoft.Data.SqlClient. 10.0.x rather than a 9.0.x patch because everything targets net10.0.
+      GHSA-g8r8-53c2-pm3f, GHSA-mmjf-rqrv-855v, GHSA-w3x6-4m5h-cxqf). 10.0.x rather than a 9.0.x
+      patch because everything targets net10.0.
     -->
-    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
-    <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.13" />
-    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
-    <PackageVersion Include="SQLitePCLRaw.provider.e_sqlite3" Version="2.1.13" />
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.11" />
 
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />

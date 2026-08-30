@@ -48,4 +48,27 @@
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      SQLitePCLRaw is not pinned anywhere in this repo, so it resolves to EF Core's own floor,
+      2.1.11 / SQLite 3.49.1. That version carries GHSA-2m69-gcr7-jv3q, suppressed here.
+
+      Why not take the fix (2.1.13, SQLite 3.50.2+): 3.50.2 also switched CAST(real AS TEXT)
+      from 15 significant digits to full precision. Four Northwind aggregate spec tests here
+      (NorthwindAggregateOperatorsQueryInfoCarrierTest.Average_over_max_subquery and
+      Average_over_nested_subquery, sync and async) compare a `(decimal)` cast aggregate against
+      an EF Core expected computed as `(decimal)(double)`, which snaps to 15 digits; the SQLite
+      side is `ef_avg(CAST(realAvg AS TEXT))`. Through 3.49 both carried 15 digits and agreed;
+      on 3.50.2+ `ef_avg` keeps more and the result diverges in the last place. Plain EF Core
+      SQLite fails these four the same way on 3.50.2+, and the diverging value is a mid query
+      `AVG` that is never stored, so no seed or model change reaches it (the `Discount` seed
+      rounding in NorthwindQueryInfoCarrierSqliteFixture fixes a different, unrelated pair).
+
+      Safe to suppress: this project ships nothing (IsPackable=false), is never packaged, and
+      runs only EF generated SQL against throwaway local .db files. Revisit when EF Core updates
+      these expected values or ships its own SQLite override.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
 </Project>

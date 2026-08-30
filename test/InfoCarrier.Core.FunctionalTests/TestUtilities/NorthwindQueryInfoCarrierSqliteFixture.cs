@@ -54,6 +54,35 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     protected override bool ShouldLogCategory(string logCategory)
         => logCategory == DbLoggerCategory.Query.Name;
 
+    /// <summary>
+    ///     Snaps <c>OrderDetail.Discount</c> back to its two-decimal value after seeding.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Discount</c> is a <see cref="float" />. <c>NorthwindData</c>'s <c>0.15f</c> lands
+    ///         in SQLite's 8-byte <c>REAL</c> column as <c>0.150000005960464…</c> — the 32-bit
+    ///         value shown at 64-bit width — where EF Core's own SQLite suite reads a clean
+    ///         <c>0.15</c> because it uses a prebuilt <c>northwind.db</c> rather than seeding from
+    ///         the model (this tier has to build its store from the model; see
+    ///         <see cref="NorthwindInfoCarrierSqliteServerContext" />).
+    ///     </para>
+    ///     <para>
+    ///         That widening gives <c>ef_sum(CAST("Discount" AS TEXT))</c> a per-row residual, and
+    ///         <c>NorthwindAggregateOperatorsQueryInfoCarrierTest.Type_casting_inside_sum</c>
+    ///         (sync + async) sums the whole table, so it differs from EF's expected <c>121.040</c>
+    ///         by about 1.8e-6. <c>round(x, 2)</c> over every row restores the values EF's curated
+    ///         store holds; every Northwind discount is a two-decimal number, so the already-exact
+    ///         rows (<c>0</c>, <c>0.25</c>) are rewritten with themselves.
+    ///     </para>
+    /// </remarks>
+    protected override async Task SeedAsync(NorthwindContext context)
+    {
+        await base.SeedAsync(context);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)""");
+    }
+
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)
         => server.TenantPrefix = client.TenantPrefix;
 }

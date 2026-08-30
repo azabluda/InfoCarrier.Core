@@ -28,4 +28,14 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      SQLitePCLRaw is unpinned repo-wide and resolves to 2.1.11 / SQLite 3.49.1, kept off the
+      2.1.13 fix for four aggregate spec tests (full rationale in
+      InfoCarrier.Core.FunctionalTests.csproj). 2.1.11 carries GHSA-2m69-gcr7-jv3q; suppressed
+      here because this test project ships nothing.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
 </Project>
