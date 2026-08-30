@@ -21,5 +21,21 @@
       "Edit(subrepos/**)",
       "Write(subrepos/**)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/file-hygiene.py\"",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "Checking file hygiene"
+          }
+        ]
+      }
+    ]
   }
 }
