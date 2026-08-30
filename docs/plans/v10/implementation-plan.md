@@ -395,3 +395,46 @@ because the test author wrote the query.
       structure (`Include`, `GroupBy`, `Any` over a navigation, a nullable value type). **All eight
       passed on the first run**, which is the result rather than a disappointment: eight assumptions
       became eight assertions. `failed` unchanged at 11, `total` 22674 -> 22682.
+
+## Phase T — the client model's missing struct complex types (#69)
+
+**Not a milestone.** R13a's move of `PropertyValues` to Tier B made 50 tests real and 45 of them
+failed with `EF.Property<T> may only be used within Entity Framework LINQ queries`, raised on the
+server. #69 called it "does not survive the wire on the store-values and `Reload` path". It was
+not a wire defect: it was a **model** defect on the client, and the wire was faithful.
+
+- [x] **T1. The client type-mapping source claimed every value type as a scalar.**
+      `<commit red PENDING, green PENDING>` `InfoCarrierTypeMappingSource.FindMapping` returned a
+      mapping for `clrType.IsValueType` unconditionally, so `PropertyDiscoveryConvention` claimed
+      the **struct** complex types (`Culture.License`, `Manufacturer.Tog`, `License.Tag`, …) as
+      primitive properties before `ComplexPropertyDiscoveryConvention` could see them. The client
+      model then lost every nested complex property whose CLR type is a struct while the SQLite
+      server's model — whose mapping source returns null for those structs — kept them. On that
+      divergence `EntityFinder.BuildProjection`, which `GetDatabaseValues()` and `Reload()` run
+      against the **client** model, emitted `EF.Property<TStruct>(complex, "License")` for a value
+      the server can only read as a complex type; the server materialised the whole entity and
+      client-evaluated the projection into `EF.Property` at shaping. Server SQL confirmed it:
+      `SELECT <all 30 Building columns> … WHERE "BuildingId" = @Value` where a working projection
+      gives `SELECT "b"."Name"`. **Established before the fix**, as CLAUDE.md requires — the client
+      and server complex-type trees were dumped side by side, and the client's was missing `License`
+      and `Tog` at every level. The fix maps a value type as a scalar only when EF recognises it as
+      one: it has a `JsonValueReaderWriter` (every BCL primitive, `Guid`/`DateTime`/`decimal`/…, and
+      every enum) — a plain `struct` does not. Converted struct keys are unaffected:
+      `KeysWithConvertersTestBase` configures every one with an explicit
+      `Property(e => e.Id).HasConversion(...)`, so it never depends on this source to be classified
+      as a property. `failed` 122 -> 72, **`total` unchanged at 27021**. FIXED 50 — the 45 #69
+      failures and the 5 sibling `PropertyValues` failures on the current/original-values path (two
+      `complex property 'Building.Culture#Culture.License' could not be found`, three
+      `Collections differ`) that the same divergence caused. BROKEN none. REASONS: three whole
+      classes removed (`45× EF.Property`, `3× Collections differ`, `2× complex property not found`),
+      nothing added. Trim ratchet `ours` 89 <= 89, `total` 855, unchanged.
+      **Measurement note.** The dev box (8 GB, swap exhausted, an unrelated `ubuntu-desktop-installer`
+      snap resident) OOM-killed the test host on every full-suite run, so the suite was run in
+      memory-sized `--filter` chunks — a clean partition of the `.csproj`, every chunk completing —
+      and the `[FAIL]` names aggregated and diffed against `groupd-entitysplitting`. The count is
+      cross-checked two ways (122 baseline minus the 50 fixed; observed fails minus the two
+      environment casualties) and both give the same 72 names. The two casualties are
+      `NorthwindMiscellaneousQueryInfoCarrierTest.Handle_materialization_properly_when_more_than_two_query_sources_are_involved`
+      (sync and async), which throw `System.OutOfMemoryException` serialising this suite's
+      known-largest result on a starved box; they pass under normal memory and are not in the
+      baseline or the new names file.
