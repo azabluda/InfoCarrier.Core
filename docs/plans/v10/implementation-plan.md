@@ -346,8 +346,8 @@ only a fraction of what it hid.
       the trailing digits. The `(decimal)` cast over an `int`/`float` `Average`/`Sum` picks a
       different translation on each side of the wire — EF's expected is the `double` computation,
       the server's is SQLite's decimal accumulator, and `AssertEqual` compares exactly. B4 family;
-      left failing per ADR-004, recorded in `test/known-failures.txt`, needs a GitHub issue (PR #74
-      notes the session could not file one). `failed` 72 → 78, `total` unchanged 27021.
+      left failing per ADR-004, recorded in `test/known-failures.txt`, tracked as issue #75.
+      `failed` 72 → 78, `total` unchanged 27021.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
