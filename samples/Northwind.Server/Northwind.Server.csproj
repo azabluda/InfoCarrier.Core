@@ -31,6 +31,15 @@
 
     <!-- UseBlazorFrameworkFiles(), which maps _framework/* out of the referenced WASM project. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+
+    <!--
+      SQLitePCLRaw is unpinned repo-wide and resolves to 2.1.11 / SQLite 3.49.1, kept off the
+      2.1.13 fix so four Northwind aggregate spec tests stay green on the pre-3.50
+      CAST(real AS TEXT) formatting (full rationale in InfoCarrier.Core.FunctionalTests.csproj).
+      2.1.11 carries GHSA-2m69-gcr7-jv3q; suppressed here because this is a sample, not a shipped
+      or packaged artifact.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
   </ItemGroup>
 
 </Project>

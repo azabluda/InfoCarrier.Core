@@ -1150,5 +1150,30 @@
 #
 # BROKEN 6 (the three above, sync+async), FIXED none. Figures read off the CI Spec ratchet's TRX:
 # 27021 / 26708 / 78 / 235.
-failed=78
+#
+# 2026-08-30, #77 (closes #75). `failed` 78 -> 72, `total` UNCHANGED at 27021. The 6 above are
+# fixed, and the R20 block's mechanism for them was WRONG: it is NOT "a type mapping computed
+# twice", and the client/server split contributes nothing -- the server SQL is byte-identical to
+# EF Core's own SQLite baseline and plain EF Core SQLite (no InfoCarrier at all) fails the same
+# tests the same way. Two unrelated real causes:
+#
+#   * Average_over_max_subquery / Average_over_nested_subquery (4). SQLite >= 3.50.2 renders
+#     CAST(real AS TEXT) at full precision where <= 3.49 rendered 15 significant digits. EF's
+#     expected is (decimal)(double), which itself snaps to 15 digits; the SQLite side is
+#     ef_avg(CAST(realAvg AS TEXT)) and now keeps ~17, so the two disagree in the last place.
+#     This repo was on SQLite 3.53.3 via SQLitePCLRaw 2.1.13, floored there to close
+#     CVE-2025-6965 / GHSA-2m69-gcr7-jv3q. No SQLitePCLRaw release has the CVE fix AND the old
+#     formatting. Fix: unpin SQLitePCLRaw so it falls to EF Core's own 2.1.11 floor (SQLite
+#     3.49.1), and suppress the advisory with NuGetAuditSuppress in the only three projects that
+#     pull it -- FunctionalTests, TransportTests, samples/Northwind.Server -- none of which ship
+#     or are packaged. The shipped packages never reference SQLite.
+#
+#   * Type_casting_inside_sum (2). OrderDetail.Discount is a float; NorthwindData's 0.15f widens
+#     in SQLite's 8-byte REAL column to 0.150000005960464..., where EF's own SQLite suite reads a
+#     clean 0.15 from its prebuilt northwind.db. This tier builds its store from the model, so
+#     NorthwindQueryInfoCarrierSqliteFixture.SeedAsync now runs
+#     `UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)` after seeding.
+#
+# FIXED 6, BROKEN none. Figures read off the CI Spec ratchet's TRX: 27021 / 26714 / 72 / 235.
+failed=72
 total=27021
