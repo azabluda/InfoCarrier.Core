@@ -1219,5 +1219,30 @@
 # .FailedByOrdinal. Covered on the HTTP wire by a new TransportTests case (separate project, not
 # in this baseline). BROKEN none. Names copied from CI's failures.txt on merge; the two removed
 # lines were the tail of the file. CI Spec ratchet confirms 27023 / ~26716 / 70 / 235.
-failed=70
-total=27023
+#
+# 2026-08-31, #56 (R23). `failed` UNCHANGED at 70, `total` 27023 -> 27024 for one new test.
+# OptimisticConcurrencyInfoCarrierTest is re-parented from the core OptimisticConcurrencyTestBase
+# onto OptimisticConcurrencyRelationalTestBase, which adds Property_entry_original_value_is_set.
+# It passes: the concurrency check is the server's and RelationalStrings.UpdateConcurrencyException
+# is the message it raises, so the assertion holds across the wire unchanged. The class goes
+# 45 -> 46 tests, 34 passed / 12 skipped / 0 failed, measured with a local --filter run.
+# FIXED none, BROKEN none. known-failures.names.txt is unchanged (no failure added or removed).
+#
+# 2026-08-31, #56 (R24). `failed` 70 -> 71, `total` 27024 -> 27026. DataAnnotation moves from
+# Tier A to Tier B and picks up its relational base, which adds two tests. The class goes 95/0/95
+# to 97 tests, 96 passed and 1 failed, measured with a local --filter run.
+#
+# Three of the six InMemory overrides the Tier A class carried are now really executed and pass:
+# ConcurrencyCheckAttribute_throws_if_value_in_database_changed and the two RequiredAttribute
+# ones. The other three are replaced by EF's own DataAnnotationSqliteTest overrides, same bodies
+# and same reasons on a different store: SQLite enforces no column length (MaxLengthAttribute,
+# StringLengthAttribute) and has no rowversion (TimestampAttribute, EF issue #2195).
+#
+# BROKEN 1, and it is the relational base's own Table_can_configure_TPT_with_Owned. It asserts
+# over context.Model.GetTableMappings(), which needs the relational model, and the model under
+# assertion is the CLIENT's -- which this provider does not build relationally (M9). The same
+# assumption disqualified JsonTypesRelationalTestBase wholesale in R23; here it costs one test,
+# which is the distinction ADR-013's amendment draws, so the base is adopted and the test is left
+# failing per ADR-004. FIXED none.
+failed=71
+total=27026
