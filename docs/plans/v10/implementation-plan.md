@@ -1167,6 +1167,45 @@ re-parents of families already running, because R25–R30 showed that is where t
       `UseTransaction` override is not needed and none is written.
       `test/` only.
 
+- [x] **R47. `AdHocAdvancedMappings` moved to Tier B — seven tests added, all green, and two of
+      them are worth more than their green.** Missing 37 → 36.
+      `Passed: 38, Failed: 1, Total: 39` on Tier A becomes `Passed: 45, Failed: 1, Total: 46` here.
+      The one failure is the same pre-existing `Casts_are_removed_from_expression_tree_when_redundant`
+      on both tiers — **it is in the baseline and only its namespace changed**, so
+      `known-failures.names.txt` is edited in this commit and `failed` does not move.
+      EF's own `AdHocAdvancedMappingsQuerySqliteTest` is twelve lines with no overrides, so the
+      store asks for nothing.
+
+      **Four of the seven are the only TPT and TPC coverage anywhere in this repository.**
+      `CLAUDE.md` names TPT/TPC as the one real gap left by M7's dropped SQL Server tier — *"it
+      changes the model, and this provider builds a model on the client too, and no TPT or TPC test
+      class exists here at any tier"*. One now does. **What that establishes is bounded and the
+      bound is the point**: EF's `Context28196` pair are regression tests for a crash (#28196), so
+      they run `Animals.OfType<Pet>().Where(a => a.Species.StartsWith("F"))` against a
+      `UseTpcMappingStrategy` and a `UseTptMappingStrategy` model and **assert nothing about the
+      result**. So the client builds such a model and the server answers the query without
+      throwing. **It does not say TPT or TPC is correct, and no user-facing document may say it
+      does** — CLAUDE.md's standing rule about the four withdrawn features applies unchanged.
+
+      **Two more use `AsSplitQuery()`, and this is the finding for #60.** They pass — but they pass
+      because the marker is **silently ignored**, not because splitting works. Established rather
+      than assumed, as CLAUDE.md requires: `INFOCARRIER_SERVER_SQL=1` on
+      `Two_similar_complex_properties_projected_with_split_query1` shows the server executing
+      **one** `SELECT` with a `LEFT JOIN`, where a split query is two. A single query gives the
+      same answers, so the assertion holds.
+
+      **This narrows #60 rather than obeying it.** The standing instruction is not to adopt a base
+      that needs a relational client API, and it was written for `FromSql`, which *throws*.
+      `AsSplitQuery` does not throw and does not produce a red — so the four bases withheld only
+      for `AsSplitQuery` (`OwnedQuery`'s 8, `OwnedEntityQuery`'s 2, `AdHocNavigations`' 2, and this
+      one's 2) are withheld for a cost that has now been measured at **zero red tests**.
+      **What it does cost is a silent wrong-shaped answer**: a consumer calling `AsSplitQuery` here
+      gets correct results from an unsplit query and no diagnostic at all. That is an owner's
+      decision on two counts — whether to adopt those bases, and whether
+      [`website/docs/limitations.md`](../../../website/docs/limitations.md) should name the silent
+      ignore — and **neither is taken here**.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
