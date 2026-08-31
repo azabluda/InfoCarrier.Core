@@ -1898,6 +1898,106 @@ re-parents of families already running, because R25–R30 showed that is where t
       Measured `r70-jsonquery` against `r69-ownedquery`: FIXED none, BROKEN exactly the fourteen,
       one reason moved (`InvalidCastException` 11 -> 25).
 
+- [x] **R71. The remaining 19 measured rather than estimated - and `FromSqlRaw` is SILENTLY
+      IGNORED, which no estimate had seen.** No code; every probe adopted bare on Tier B, run with
+      `--filter`, and reverted. `failed` and `total` unmoved at 118 / 29028. **This step adopts
+      nothing: every base below raises `failed`, and that is the owner's call, not this step's.**
+
+      **The finding that outranks the table.** `FromSqlRaw` on a client `DbSet` does not throw,
+      does not translate, and does not refuse - **the `FromSqlQueryRootExpression` is discarded and
+      the query runs as if `FromSqlRaw` had never been called.** Read out of the server's own log
+      (`INFOCARRIER_SERVER_SQL=1`) for
+      `FromSqlQueryTestBase.FromSqlRaw_queryable_with_parameters`, whose raw SQL is
+      `SELECT * FROM "Customers" WHERE "City" = {0}`:
+
+      ```text
+      SELECT "c"."CustomerID", "c"."Address", ... FROM "Customers" AS "c"
+      WHERE "c"."ContactTitle" = @Value
+      ```
+
+      The raw text and its `London` parameter are **gone**; only the composed LINQ `Where`
+      survives. The test expects 3 rows and gets **91** - the whole table. **82 of the 148 tests in
+      that base fail as a wrong answer of exactly this shape**, and 40 more "pass" only because
+      their raw SQL happened to be equivalent to an unfiltered `SELECT *`.
+
+      **This is `AsSplitQuery` before R59, with the stakes of a `WHERE` clause.** A user who writes
+      `FromSqlRaw` with a filter gets every row of the table and no diagnostic. It is
+      consumer-visible, it is undocumented, and **it is not reached by the suite today** - no
+      adopted base calls `FromSqlRaw` - which is why 22472 green never saw it. It belongs in
+      [`limitations.md`](../../../website/docs/limitations.md), and it is the sharpest single input
+      to #60.
+
+      **The `RelationalTestStore` cast was hiding the question, and lifting it is what answered
+      it.** 277 of the reds below were `InvalidCastException: InfoCarrierTestStore ->
+      RelationalTestStore`, raised by the spec bases' own `NormalizeDelimitersInRawString` helper -
+      **test infrastructure, ADR-013, not #60**, and it stops the test before the provider is ever
+      asked anything. A probe store deriving from `RelationalTestStore` (the base needs a
+      `DbConnection` only for `ConnectionString`; the normalizer is pure string work) lifted it and
+      turned the wall into the two clean numbers below. **Counting those 277 as #60 evidence, which
+      is what R62's table did, was wrong.**
+
+      **The table. Every number is read out of the run's own summary; the delta columns subtract
+      what the core base already runs.**
+
+      | Base | Class run P/F/S/T | New tests | New green | New red | Dominant cause |
+      |---|---|---|---|---|---|
+      | `ConcurrencyDetectorEnabledRelationalTestBase` | 18/0/0/18 | +2 | **+2** | 0 | none - the `FromSql` theory passes |
+      | `ConcurrencyDetectorDisabledRelationalTestBase` | 18/0/0/18 | +2 | **+2** | 0 | none |
+      | `Query.ToSqlQueryTestBase` | 2/0/0/2 | +2 | **+2** | 0 | none |
+      | `Query.AdHocMiscellaneousQueryRelationalTestBase` | 65/6/1/72 | +13 | **+7** | 6 | cache-entry and dbcontext-leak asserts |
+      | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | 44/7/1/52 | +26 | **+20** | 6 (+1 override) | `ParameterTranslationMode` not honoured |
+      | `Query.UdfDbFunctionTestBase` | 25/80/1/106 | +106 | **+25** | 80 | SQLite has no `CREATE FUNCTION` |
+      | `Query.SharedTypeQueryRelationalTestBase` | 2/4/0/6 | +4 | 0 | 4 | `SqlQueryRaw` plus the cast |
+      | `Query.GearsOfWarFromSqlQueryTestBase` | 0/1/0/1 | +1 | 0 | 1 | the cast (**one** test, not two) |
+      | `Query.NorthwindSqlQueryTestBase` | 0/8/0/8 | +8 | 0 | 8 | `Database.SqlQuery*` relational-only |
+      | `Query.SqlQueryTestBase` | 0/119/0/119 | +119 | 0 | 119 | `Database.SqlQueryRaw` relational-only |
+      | `Query.FromSqlQueryTestBase` | 0/148/0/148 | +148 | 0 | 148 | the cast; **40 green once lifted** |
+      | `Query.SqlExecutorTestBase` | 0/28/0/28 | +28 | 0 | 28 | `Database.ExecuteSql*` relational-only |
+      | `Query.FromSqlSprocQueryTestBase` | 0/48/0/48 | +48 | 0 | 48 | sproc result types absent from Northwind |
+      | `Update.JsonUpdateTestBase` | 0/142/0/142 | +142 | 0 | 142 | `UseTransaction` reaching `GetDbTransaction()` |
+      | `Update.StoreValueGenerationTestBase` | 0/38/0/38 | +38 | 0 | 38 | `ISqlGenerationHelper` unresolvable |
+      | `Update.StoredProcedureUpdateTestBase` | 0/56/0/56 | +56 | 0 | 56 | *"SQLite does not support stored procedures"* |
+      | `Query.AdHocQuerySplittingQueryTestBase` (R62) | 7 green / 6 red / 13 | +13 | **+7** | 6 | unchanged |
+      | `Query.NorthwindDbFunctionsQueryRelationalTestBase` (R55) | 0 green / 20 red | +20 | 0 | 20 | unchanged |
+      | `Query.MappingQueryTestBase` | see R72 | | | | the store name, not any API |
+
+      **How much green #60 is withholding: none. The withheld green is 65 tests, and R62's
+      estimates are what withheld it.** Adopting the six rows above with a bold figure adds
+      **65 new green** and 18 new red, and not one of those greens needs a line of #60 work. What
+      #60 and its neighbours withhold is **red**: 623 tests that cannot go green whatever is
+      written here.
+
+      **The two blockers are different problems and the table now separates them.**
+      `Database.SqlQueryRaw` and `Database.ExecuteSql*` raise *"Relational-specific methods can only
+      be used when the context is using a relational database provider"* - **249 tests, a hard
+      guard no test-side work reaches**, and the cleanest #60 evidence in the phase. Against that,
+      `IQueryable.FromSqlRaw` raises nothing at all, which is the defect above.
+
+      **R62's estimates were wrong in seven rows, and this time the direction is mixed.**
+
+      | Base | R62 said | Measured |
+      |---|---|---|
+      | both `ConcurrencyDetector*Relational` | *"2 tests, both red, zero new green"* | 2 tests, **both green** |
+      | `Query.ToSqlQueryTestBase` | *"blocked twice over"* - client `ToSqlQuery` **and** a non-virtual `UseTransaction` | **2 tests, both green.** Neither blocker fires |
+      | `Query.AdHocMiscellaneousQueryRelationalTestBase` | *"#60, abstract `SetParameterizedCollectionMode`"* | a **no-op** implementation is enough; 7 new green |
+      | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | same member, same verdict | same; **20 new green**, and the re-parent deletes the hand-mirrored `Array_of_byte` |
+      | `Query.UdfDbFunctionTestBase` | *"`HasDbFunction` ... refused before the wire"* | the model builds; **25 green**. The 80 reds are SQLite's missing functions |
+      | `Query.GearsOfWarFromSqlQueryTestBase` | *"2 tests"* | **1** - a `ConditionalFact`, not a theory |
+      | `Update.JsonUpdateTestBase` | *"136 tests"* | **142**, one cause, and the cause is the `UseTransaction` R62 named |
+
+      **The `CreateDbParameter` hypothesis the handoff asked to test is CONFIRMED, and that member
+      was never the blocker.** `protected abstract DbParameter CreateDbParameter(string, object)`
+      compiles and runs as `new SqliteParameter { ParameterName = name, Value = value }` - the test
+      project already has Microsoft.Data.Sqlite through the Tier B backend. R62 called it a hard
+      blocker on four bases on the ground that *"this client has no ADO.NET provider, so there is
+      nothing to return"*; the client does not need one, because the **test** project has one. Not
+      one of the four bases is blocked by that member.
+
+      **One adoption cost worth recording.** `StoredProcedureUpdateTestBase` declares
+      `public abstract Task X(bool)` beside `protected Task X(bool, string)`, and overriding the
+      first trips **xUnit1024** in this repository, which EF's own suite does not enforce. Adopting
+      it would need a file-scoped `#pragma warning disable xUnit1024`.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
