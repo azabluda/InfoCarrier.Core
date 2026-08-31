@@ -941,6 +941,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       rather than mostly open. **A name is not a classification, and the cost of finding out is
       about twenty minutes a base.**
 
+- [x] **R39. `WarningsTestBase` adopted — R38's one candidate, and it landed green.** 11 tests,
+      `Passed: 11, Failed: 0, Total: 11`. `failed` unchanged, `total` +11, compliance missing bases
+      47 → 46.
+      **The obstacle was the fixture, not the base, and ADR-013's amendment is what decided it.**
+      `WarningsTestBase` constrains `TFixture` to `NorthwindQueryRelationalFixture`, which declares
+      `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`, and
+      `InfoCarrierTestStore` is a `TestStore` rather than a `RelationalTestStore`. The amendment
+      says such a cast blocks a base only when *every route* runs through it. No test in this class
+      reads `Fixture.TestStore`.
+      **So `NorthwindQueryInfoCarrierSqliteFixture` is re-parented onto
+      `NorthwindQueryRelationalFixture`, and that was measured before the new class was written
+      rather than assumed**: `Passed: 2460, Failed: 2, Total: 2470` for the whole
+      `Sqlite.Query.Northwind` filter before and after, with a **byte-identical failure set**. The
+      `new` property is never read, and the base's `AddOptions` — which adds `ConfigureWarnings`
+      and `EnableDetailedErrors` — changed nothing. Two of our own members are deleted as
+      redundant: the fixture's `TestSqlLoggerFactory` implementation and its `ShouldLogCategory`
+      override, both of which the relational base supplies.
+      **What the base covers is worth naming**: the diagnostics a query raises rather than its
+      answer. Those warnings come from the query pipeline, which on this provider runs on the
+      *server*, so this is a direct check that a server-side diagnostic still reaches a client with
+      no database.
+      **And it re-opens the R34 verdicts as a question.** Two of the four bases R34 set aside —
+      `NorthwindBulkUpdatesRelationalTestBase` and `OwnedQueryRelationalTestBase` — were set aside
+      partly for this same cast. #60 still gates them on their `FromSql`/`AsSplitQuery` tests, so
+      the verdict stands, but the *cast* is no longer part of the reason.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

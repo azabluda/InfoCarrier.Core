@@ -1394,5 +1394,25 @@
 # The fourth, ComplexType.Complex_properties_can_be_configured_by_type, FAILS BECAUSE IT PASSES:
 # "Assert.Throws() Failure: No exception was thrown". Same category as R29's and R31's.
 # FIXED none. Compliance missing bases 56 -> 47, fixtures unchanged at 18.
+#
+# 2026-08-31, #56 (R39). `failed` UNCHANGED at 83, `total` 27356 -> 27367 for the 11 tests
+# WarningsTestBase brings, all of them green. Compliance missing bases 47 -> 46.
+#
+# The obstacle was the fixture, not the base. WarningsTestBase constrains TFixture to
+# NorthwindQueryRelationalFixture, which declares
+# `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`, and
+# InfoCarrierTestStore is a TestStore rather than a RelationalTestStore. ADR-013's 2026-08-30
+# amendment is the rule that decides it: such a cast blocks a base only when every route runs
+# through it.
+#
+# NorthwindQueryInfoCarrierSqliteFixture is therefore re-parented onto
+# NorthwindQueryRelationalFixture, and that was MEASURED BEFORE the new class was written rather
+# than assumed: Passed: 2460, Failed: 2, Total: 2470 for the whole Sqlite.Query.Northwind filter
+# before and after, with a byte-identical failure set. The `new` property is never read, and the
+# base's AddOptions (ConfigureWarnings + EnableDetailedErrors) and ShouldLogCategory changed
+# nothing. Two of our own members are deleted as redundant: the fixture's TestSqlLoggerFactory
+# implementation and its ShouldLogCategory override, both of which the relational base supplies.
+#
+# FIXED none, BROKEN none, names file unchanged.
 failed=83
-total=27356
+total=27367
