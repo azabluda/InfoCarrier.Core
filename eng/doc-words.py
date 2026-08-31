@@ -26,10 +26,8 @@ BUDGET = {
     # the package readmes came from.
     "website/docs/api-surface.md": 400,
 
-    # The four pages that each cover a whole subject rather than one task: every failing scenario
-    # in the spec suite, a generation of API change, three browser constraints plus a wiring
-    # recipe, and the release itself.
-    "website/docs/limitations.md": 700,
+    # The pages that each cover a whole subject rather than one task: a generation of API change,
+    # three browser constraints plus a wiring recipe, and the release itself.
     "website/docs/getting-started/upgrading-from-3-1.md": 700,
     "website/docs/release-notes/10.0.md": 700,
     "website/docs/platforms/blazor-webassembly.md": 700,
@@ -44,6 +42,16 @@ BUDGET = {
     # that is restructured, not before. See docs/plans/v10/cold-read-findings.md.
     "website/docs/security.md": 750,
     "website/docs/guide/errors.md": 750,
+
+    # PROVISIONAL, 2026-08-31. Raised from 700 for the reason the tier exists: the page names
+    # every scenario in the spec suite that does not behave as a normal provider does, so its
+    # length is a function of what the suite covers rather than of how it is written. Phase R
+    # adopted the Query.Associations relational bases and the PrimitiveCollections relational
+    # base, and two more scenarios came with them -- comparing an owned JSON entity against a
+    # null parameter, and comparing or combining parameter collections. Both are cases this
+    # provider answers and other providers do not, so leaving them out would break the
+    # completeness claim the page opens with. Revisit if the suite stops adding to it.
+    "website/docs/limitations.md": 750,
 
     # Added to the 700 tier 2026-08-24. Same tier rule as the four above: it covers a whole
     # subject rather than one task (reads, writes, resolving the tenant on the server, and what

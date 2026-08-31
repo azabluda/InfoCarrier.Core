@@ -141,11 +141,11 @@ orders.Cast<IArchivable>().FirstOrDefault();
 Both throw. Catch the exception type and do not match on message text, which is unsupported on any
 EF Core provider.
 
-### Queries this provider answers that other providers reject
+### Queries this provider answers that other providers do not
 
-Three other scenarios in EF's suite assert that a provider rejects the query. This provider answers
-them. A test suite you port from another provider will expect an exception, and LINQ that relies on
-this will not run unchanged there.
+Five other scenarios in EF's suite assert that a provider either rejects the query or returns the
+wrong rows. This provider answers all five correctly. A test suite you port from another provider
+will expect an exception, and LINQ that relies on this will not run unchanged there.
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -190,6 +190,27 @@ context.RootEntities
         .Where(a => a.Id > associates[0].Id)
         .Contains(associates[1]))
     .ToList();
+// EF Core providers: throws.   This provider: returns the matching rows.
+```
+
+Comparing an owned JSON entity against a null parameter:
+
+```csharp
+modelBuilder.Entity<RootEntity>().OwnsOne(e => e.Associate, b => b.ToJson());
+
+Associate? absent = null;
+context.RootEntities.Where(e => e.Associate == absent).ToList();
+// EF Core providers: return the wrong rows.   This provider: returns the right ones.
+```
+
+Comparing a column collection against an inline collection of parameters, which relational
+providers leave without a type mapping:
+
+```csharp
+var low = 1;
+var high = 9;
+
+context.Entities.Where(e => e.Ints == new[] { low, high }).ToList();
 // EF Core providers: throws.   This provider: returns the matching rows.
 ```
 

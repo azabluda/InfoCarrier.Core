@@ -901,6 +901,27 @@ re-parents of families already running, because R25–R30 showed that is where t
       candidates out of the cheap group into #60 (R34), and nine out of the blocked group into
       adopted (this step).
 
+- [x] **R37. `limitations.md` gains the two scenarios this phase found.** The page's promise is
+      that it names *every* scenario in the suite that does not behave as a normal provider does,
+      so a phase that adopts new spec bases can oblige it to grow. Two did:
+      **comparing an owned JSON entity against a null parameter** (R29, EF issue #36401 — EF
+      returns the wrong rows, this provider the right ones) and **comparing a column collection
+      against an inline collection of parameters** (R31, which EF's relational providers leave
+      without a type mapping). The section goes from three scenarios to five.
+      **Its heading changed with it**, and that is not cosmetic: it said "that other providers
+      reject", and one of the two new cases is a provider answering *wrongly* rather than
+      refusing. It now reads "that other providers do not".
+      **The page's word budget is raised 700 → 750**, in `docs/doc-style.md` and in
+      `eng/doc-words.py`, which the script's own header says to keep in step. The page reads 730.
+      This follows the precedent set for `security` and `guide/errors` on 2026-08-24: a dated
+      entry with the reason, not a silent bump. **The reason is specific to this page** — its
+      length is a function of what the suite covers rather than of how it is written.
+      **Left alone deliberately: the `Total tests: … Failed: 9` block**, which is measured against
+      the released `10.0.0` and is not this branch's to move. The behaviours described are 10.0.0's
+      behaviours; what changed is only that adopted bases now cover them.
+      Humanizer pass run on the result, per the standing rule for `website/`. `eng/doc-links.py`
+      and `eng/doc-words.py` both pass.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
