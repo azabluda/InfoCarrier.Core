@@ -1229,6 +1229,37 @@ re-parents of families already running, because R25–R30 showed that is where t
       sibling two.**
       `test/` only.
 
+- [x] **R49. `Types.RelationalTypeTestBase` adopted — 16 tests become 112, and the reason it had
+      been passed over was stale on both halves.** Missing 34 of 45. `Passed: 16, Failed: 0,
+      Total: 16` becomes `Passed: 112, Failed: 0, Total: 112`: **+96, every one green.** The
+      largest single gain in the phase, and it cost a fixture re-parent and nine overrides.
+
+      **The stale reason is the finding.** `TypeInfoCarrierTest`'s own remarks said the core base
+      was used because `RelationalTypeTestBase` *"lives in `EFCore.Relational.Specification.Tests`,
+      which this project does not reference … and its extra tests assert JSON columns and
+      `ExecuteUpdate` — neither of which a client with no database has."* **R1 made the project
+      reference that assembly**, and **both features shipped**: `ExecuteUpdate` runs on Tier B in
+      `NorthwindBulkUpdates` and JSON columns in `JsonQuerySqliteInfoCarrierTest`. This is
+      `CLAUDE.md`'s "before pricing a gap, check whether a sibling of it already works" again, and
+      the sibling had been green for milestones.
+
+      **Two things were needed and one of them is D6.** The fixture re-parents onto
+      `RelationalTypeFixtureBase<T>`, whose `UseTransaction` is
+      `facade.UseTransaction(transaction.GetDbTransaction())`; five of the base's six tests route
+      through `ExecuteWithStrategyInTransactionAsync`, and without the override all of them answer
+      *"Relational-specific methods can only be used when the context is using a relational
+      database provider"* — **82 red of 112, measured before the override and 9 after**. It is
+      `public virtual`, which is exactly what ADR-013's 2026-08-30 amendment says still adopts.
+
+      **The nine remaining are convergence, name for name.** Seven
+      `ExecuteUpdate_within_json_to_nonjson_column` (EF #36688: SQLite cannot do it for a type
+      other than string, numeric or bool) and two `Query_property_within_json` (EF #36749: a
+      string-representation discrepancy between EF's JSON and `Microsoft.Data.Sqlite`'s). **The
+      nine this provider failed and the nine EF's own `SqliteMiscellaneousTypeTest` /
+      `SqliteTemporalTypeTest` override are the same nine**, checked one by one rather than
+      inferred from the family. EF's overrides are adopted verbatim.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
