@@ -803,6 +803,22 @@ re-parents of families already running, because R25–R30 showed that is where t
       a `website/docs/limitations.md` entry**, which is tracked as its own step because that file
       needs the humanizer pass.
 
+- [x] **R32. `ComplexTypeQuery` re-parented — free, and it retires the same wrong remark a third
+      time.** The class moves onto `ComplexTypeQueryRelationalTestBase` and the fixture onto
+      `ComplexTypeQueryRelationalFixtureBase`. **The remark that stood on this file said the
+      relational base "asserts SQL, which a client with no database has none of". It does not**:
+      its six overrides each assert an *exception message* and then call an empty `AssertSql()`
+      meaning "nothing was executed". That is the identical C0-era misreading R30 corrected for the
+      `ComplexJson` bases, and here it had cost six hand-written copies of overrides this file
+      could have inherited — the two `Subquery_over_*` and the four
+      `Concat_`/`Union_two_different_*`. All six deleted.
+      `Passed: 150, Failed: 0, Total: 151`, identical before and after, so `failed` and `total`
+      both stand. **Two compliance entries close for one commit**: missing bases 59 → 58 and
+      missing fixtures 20 → 19, the second because the relational fixture base supplies
+      `ITestSqlLoggerFactory`.
+      What stays is EF's `ComplexTypeQuerySqliteTest` pair, the two `ApplyNotSupported` ones the
+      relational base does not carry.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
