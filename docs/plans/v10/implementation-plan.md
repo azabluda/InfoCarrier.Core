@@ -477,6 +477,47 @@ only a fraction of what it hid.
       That is exactly the distinction ADR-013's 2026-08-30 amendment draws.
       95 / 0 / 95 → 97 / 96 / 1. `failed` 70 → 71, `total` +2. `test/` only.
 
+### R25–R30 — the `Query.Associations` relational family (35 bases)
+
+The 35 `Query.Associations.*RelationalTestBase` classes are a third of the 95 the compliance
+test still lists. EF ships a complete SQLite counterpart for every one of them, fixtures
+included, and **none of them carries `FromSql`, `ToQueryString`, or a `RelationalTestStore`
+cast** — the four things that blocked bases earlier in Phase R. **Nor is there any golden SQL:
+across all 35 there are zero `AssertSql("…")` calls with an argument. Every use is either the
+`protected void AssertSql(params string[] expected)` declaration or an empty `AssertSql()`
+meaning "nothing was executed".** That corrects a C0-era remark in
+`ComplexPropertiesQueryInfoCarrierTests.cs` which said these bases "assert SQL and stay
+unadopted"; they do not.
+
+**What an empty `AssertSql()` is worth here, stated honestly.** It reads the *client's*
+`TestSqlLoggerFactory`, and this client has no database and emits no SQL, so the assertion
+passes trivially. Weaker than it is on SQLite, not false. `ServerSqlLog` is where the server's
+statements can be read.
+
+**The `UseTransaction` trap is on the FIXTURE here, not the base.** Grepping these test bases
+for `ExecuteWithStrategyInTransactionAsync` finds nothing, and that is not clearance: every
+`*RelationalFixtureBase` in the family declares
+`UseTransaction(facade, t) => facade.UseTransaction(t.GetDbTransaction())`, which ADR-013 makes
+unreachable on a client with no database. Each of our fixtures overrides it with
+`facade.UseInfoCarrierTransaction(transaction)`, in the same commit as the fixture.
+
+- [x] **R25. The seven `Navigations` bases — a pure re-parent, and it cost nothing.** The
+      fixture moves from the core `NavigationsFixtureBase` to `NavigationsRelationalFixtureBase`
+      and the seven classes from `Navigations*TestBase` to `Navigations*RelationalTestBase`.
+      **Six hand-written overrides are deleted, because the re-parent now inherits them
+      verbatim**: the two `Distinct_over_projected_*` (C2 copied them out of
+      `NavigationsCollectionRelationalTestBase`), `Select_nested_collection_on_optional_associate`,
+      `Over_associate_collection_projected`, and the three `Nested_collection_*`. The fixture's
+      hand-mirrored six `AutoInclude()` calls go the same way — they were
+      `NavigationsRelationalFixtureBase.OnModelCreating`, mirrored in C0 because the test project
+      did not then reference `EFCore.Relational.Specification.Tests`. What stays is EF's own
+      `Navigations*SqliteTest` overrides, three `SqliteStrings.ApplyNotSupported` assertions the
+      relational bases do not carry.
+      The relational bases add no test of their own, so this is measurable in one figure:
+      `Passed: 336, Failed: 0, Total: 336` across all three Associations families before and
+      after, and `Passed: 109, Failed: 0, Total: 109` for `Navigations` alone. `failed` and
+      `total` both unchanged; compliance missing 95 → 88, fixtures 23 → 22. `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
