@@ -1472,5 +1472,40 @@
 # has it. Measured, not assumed.
 #
 # Gates: trim ratchet OK (89 <= 89, unchanged); CI=true Release build 0 errors.
+#
+# ---------------------------------------------------------------------------------------------
+# R44-R51 (2026-08-31): total 27375 -> 27483, failed UNCHANGED at 82, and the 82 names are
+# byte-identical -- FIXED none, BROKEN none, diffed with eng/trx-failures.py against
+# known-failures.names.txt.
+#
+# The +108 is six adoptions and one pin, and every figure below is read out of a run's own
+# summary rather than derived:
+#
+#   R44  +1    SqliteSmokeTest.A_deleted_row_releases_its_alternate_key_before_a_new_row_takes_it,
+#              the originals-audit scenario pin. (CI measured 27376 at this point.)
+#   R46  +0    AdHocManyToMany and AdHocQueryFilters re-parented onto their relational bases and
+#              moved to Tier B. 26 tests before, 26 after; the bases add none of their own.
+#   R47  +7    AdHocAdvancedMappings moved to Tier B. 39 -> 46 tests, all seven new ones green.
+#   R48  +4    AdHocNavigations moved to Tier B. 21 -> 25 tests; two core tests turn red on
+#              SqliteStrings.ApplyNotSupported and EF's own overrides are adopted, so 0 failed.
+#   R49  +96   Types re-parented onto RelationalTypeTestBase. 16 -> 112 tests, all green after
+#              D6's UseTransaction override and nine EF SQLite overrides (#36688 x7, #36749 x2).
+#   R50  +0    SpatialQueryRelationalTestBase adopted. 168 tests before and after; the base adds
+#              none. Also the first fixture to gain ITestSqlLoggerFactory.
+#
+# ONE NAME IN known-failures.names.txt CHANGED without the count changing, and it is a move
+# rather than a fix: R47 took Casts_are_removed_from_expression_tree_when_redundant from
+# InMemory.Query.AdHocAdvancedMappingsQueryInfoCarrierTest to
+# Sqlite.Query.AdHocAdvancedMappingsQuerySqliteInfoCarrierTest. It fails identically on both
+# tiers, measured on each before the move was committed.
+#
+# Compliance counts, both read from the test's own output: missing bases 45 -> 33 (R45 ignored
+# six, R46-R50 adopted six), and All_query_test_fixtures_must_implement_ITestSqlLoggerFactory
+# 18 -> 17. Both tests stay red, so neither number is in this file.
+#
+# Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet; CI=true Release build
+# 0 errors (it was 4 first -- two EF1001 for SqliteStrings and two IDE0005 -- and Debug reported
+# none of them, which is exactly what CLAUDE.md warns Debug hides).
+# ---------------------------------------------------------------------------------------------
 failed=82
-total=27375
+total=27483
