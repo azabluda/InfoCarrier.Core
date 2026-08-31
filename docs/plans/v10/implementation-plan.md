@@ -1358,6 +1358,46 @@ re-parents of families already running, because R25–R30 showed that is where t
       behaviours, and a decision on #60 should name which of them it is fixing.
       No code; `test/` only while probing.
 
+- [x] **R56. `NullSemanticsQuery` ADOPTED — 322 tests, 304 green, and `failed` rises 81 → 99 on
+      purpose.** Missing bases 33 → 32; `total` 27483 → 27805.
+      **The baseline rise is deliberate and authorised**, which `known-failures.txt` records at
+      length. R41 called this the base *"where the ratio is worth the owner's attention"* and
+      estimated about 21 permanent reds; measuring gives **18**. FIXED none, BROKEN 18, and the
+      BROKEN list is exactly those 18 — nothing else in the suite moved.
+
+      **The abstract member R41 tripped on is implemented by dropping the flag.**
+      `protected abstract NullSemanticsContext CreateContext(bool useRelationalNulls = false)`;
+      EF's SQLite class writes `new SqliteDbContextOptionsBuilder(o).UseRelationalNulls()`, a
+      relational option on the *client's* builder. Ours takes the flag and ignores it, so a test
+      that asks for the store's null semantics gets C#'s. **That is the cost, and counting it was
+      the point of the step.**
+
+      **The 18 split into two causes and neither is a defect this repository can fix alone.**
+
+      - **12 are #60.** Ten say so in their own names (`..._for_relational_null_semantics`); the
+        other two are `Switching_null_semantics_produces_different_cache_entry` and
+        `From_sql_composed_with_relational_null_comparison`, the latter also #60's `FromSql` half.
+      - **6 are the projection-split boundary working exactly as `CLAUDE.md` says it must**, and
+        this was checked rather than assumed. The fixture registers two user-defined functions
+        with a **relational** translation —
+        `modelBuilder.HasDbFunction(… Cases …).HasTranslation(args => new CaseExpression(…))`, and
+        the same for `BoolSwitch`. The client has no relational query pipeline, cannot apply that
+        translation, and `QuerySplitter.RejectClientEvaluation` refuses the query rather than
+        fetching the table. **The tell that this is the boundary and not a translation bug**: the
+        `select`/`projection` siblings all **pass**, because a projection is reassembled
+        client-side; only the `filter`/`predicate` ones are refused.
+
+      **Not convergence, and EF's own suite was read before that was ruled out.** EF *does*
+      override all six `Case*` tests in `NullSemanticsQuerySqliteTest` — but every override is
+      `await base.X(async)` followed by `AssertSql(…)`, so the base assertion **passes** on SQLite
+      and the override only adds a golden-SQL check. EF's overrides therefore say these should
+      pass. **None is adopted and all six stay red**, which is what `CLAUDE.md` requires of a red
+      that is information.
+
+      **This makes #60 the largest single item left in the inventory by test count.** Twelve of
+      these 18, plus R55's 20, plus the bases still standing aside for it.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

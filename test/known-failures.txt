@@ -1532,5 +1532,49 @@
 #
 # Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
 # ---------------------------------------------------------------------------------------------
-failed=81
-total=27483
+#
+# ---------------------------------------------------------------------------------------------
+# R56 (2026-08-31): failed 81 -> 99, total 27483 -> 27805. FIXED none, BROKEN 18, ALL INTENDED.
+#
+# THIS IS A DELIBERATE RISE and the owner authorised it. NullSemanticsQueryTestBase is adopted:
+# 322 tests arrive, 304 of them green, 18 permanently red. R41 identified it as the base where
+# the ratio was worth the owner's attention and estimated "about 21 permanent reds"; measuring
+# gives 18. Every one of the 18 is classified below, and the BROKEN list is exactly those 18 --
+# nothing else in the suite moved.
+#
+# THE 18 SPLIT INTO TWO CAUSES, and neither is a defect this repository can fix on its own.
+#
+#   12 are #60, the relational client API. The base declares
+#   `protected abstract NullSemanticsContext CreateContext(bool useRelationalNulls = false)`, and
+#   EF's SQLite class implements it as `new SqliteDbContextOptionsBuilder(o).UseRelationalNulls()`
+#   -- a relational option on the CLIENT's builder, which UseInfoCarrier has none of. Our override
+#   accepts the flag and drops it, so a test asking for the store's null semantics gets C#'s.
+#   Ten of the twelve say so in their own names (`..._for_relational_null_semantics`,
+#   `..._with_relational_null_semantics`); the other two are
+#   `Switching_null_semantics_produces_different_cache_entry` and
+#   `From_sql_composed_with_relational_null_comparison`, which is also #60's FromSql half.
+#
+#   6 are the projection-split boundary working as designed, and this was checked rather than
+#   assumed. The fixture registers two user-defined functions on the model with a RELATIONAL
+#   translation -- `modelBuilder.HasDbFunction(... Cases ...).HasTranslation(args => new
+#   CaseExpression(...))` and the same for `BoolSwitch`. The client has no relational query
+#   pipeline, so it cannot apply that translation, and QuerySplitter.RejectClientEvaluation
+#   refuses the query rather than fetching the table -- exactly what CLAUDE.md says must happen.
+#   The tell that this is the boundary and not a translation bug: the SELECT-side siblings
+#   (`CaseWhen_equal_to_second_select`, `CaseWhen_equal_to_first_or_third_select`,
+#   `CaseOpWhen_projection`) all PASS, because a projection is reassembled client-side; only the
+#   WHERE-side ones (`CaseWhen_equal_to_second_filter`,
+#   `CaseWhen_equal_to_first_or_third_filter`, `CaseOpWhen_predicate`) are refused.
+#
+# NOT CONVERGENCE, and EF's own suite was read before that was ruled out. EF overrides all six of
+# those Case* tests in NullSemanticsQuerySqliteTest -- but every override is `await base.X(async)`
+# followed by AssertSql(...), i.e. the base assertion PASSES on SQLite and the override only adds
+# a golden-SQL check. So EF's overrides say these tests should pass, which is why none of them is
+# adopted here and all six are left red.
+#
+# Compliance missing bases 33 -> 32. Skipped 235 -> 236 (one theory in the new class).
+#
+# Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
+# ---------------------------------------------------------------------------------------------
+failed=99
+total=27805
