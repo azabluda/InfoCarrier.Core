@@ -1790,5 +1790,49 @@
 # `test/` only. Measured `r68-noclienteval` against `r67-base`: FIXED none, BROKEN exactly the
 # three above, and the reasons diff adds exactly one line per new red.
 # ---------------------------------------------------------------------------------------------
-failed=102
-total=28964
+# 2026-08-31 (R69) - 102 -> 104, and `total` 28964 -> 28982. `Query.OwnedQueryRelationalTestBase`
+# ADOPTED on Tier B, and this is a TIER MOVE: `OwnedQueryTestBase` ran on Tier A (194 tests, all
+# green) and that class is deleted, so the total moves by 212 - 194 = +18 rather than by 212.
+#
+# 210 of 212 pass. BOTH REDS ARE ONE THEORY AND IT IS #60:
+# `Using_from_sql_on_owner_generates_join_with_table_for_owned_shared_dependents`, which dies on
+# `RelationalOwnedQueryFixture`'s `public new RelationalTestStore TestStore` cast, reached through
+# `NormalizeDelimitersInRawString`. That cast is on NO OTHER ROUTE in this base, so ADR-013's
+# 2026-08-30 amendment says the base still adopts.
+#
+# THE SIX ROW-LIMITING REDS THE PROBE FOUND ARE GONE, AND NOT BY AN OVERRIDE. R62 measured 10 red;
+# R64 fixed two (`Left_join_on_entity_with_owned_navigations`); six were
+# `ElementAt`/`ElementAtOrDefault`/`Skip_Take_over_owned_collection`, which the relational base
+# overrides to expect an `InvalidOperationException` for a row-limiting operator without an
+# `OrderBy`. Here nothing threw: that diagnostic is `RowLimitingOperationWithoutOrderByWarning`,
+# raised by the BACKING STORE's `RelationalQueryableMethodTranslatingExpressionVisitor`, and the
+# server does not inherit the fixture's `ConfigureWarnings`.
+#
+# THE FIX IS C69's MECHANISM REUSED, NOT A NEW ONE. `AssociationsWarnings.ThrowOnUnorderedRowLimiting`
+# already existed and already forwards exactly this event, per fixture, for four `Associations`
+# fixtures. This fixture is the fifth caller. NO OVERRIDE ASSERTING "no throw" WAS WRITTEN -- that
+# would have hidden a real difference between this provider and every relational one.
+#
+# AND THE GLOBAL ALTERNATIVE WAS NOT RE-MEASURED, BECAUSE C55 ALREADY DID: forwarding the
+# fixture's whole `ConfigureWarnings(Default(Throw))` to the server is 8 FIXED and 626 BROKEN,
+# most of them model warnings about a model `TestModelSource` built for the backing store rather
+# than one the caller wrote. `InfoCarrierBackendTestStore.AddProviderOptions`'s remark declining to
+# copy it therefore STANDS, and the per-fixture knob is the answer.
+#
+# THE RE-PARENT DELETES MORE THAN IT ADDS, R1 paying out for the second time this phase. The Tier A
+# class carried five overrides copied from EF's `OwnedQueryInMemoryTest` -- `Contains_`,
+# `ElementAt_`, `ElementAtOrDefault_`, `FirstOrDefault_` and `OrderBy_ElementAt_over_owned_collection`
+# -- every one an InMemory limitation. On a store that composes, all five simply answer. The fixture
+# also loses a duplicated `TestSqlLoggerFactory` property and its `ITestSqlLoggerFactory`
+# declaration, because `RelationalOwnedQueryFixture` already supplies both.
+#
+# D6 DOES NOT APPLY AND WAS CHECKED RATHER THAN ASSUMED: neither `OwnedQueryTestBase` nor
+# `OwnedQueryRelationalTestBase` uses `ExecuteWithStrategyInTransactionAsync`, and
+# `RelationalOwnedQueryFixture` declares no `UseTransaction`. It is a read-only query base.
+#
+# `test/` only. Measured `r69-ownedquery` against `r68-noclienteval`: FIXED none, BROKEN exactly
+# the two `FromSql` parameterizations, and the only reason that moved is the `InvalidCastException`
+# tally, 9 -> 11.
+# ---------------------------------------------------------------------------------------------
+failed=104
+total=28982

@@ -1815,6 +1815,49 @@ re-parents of families already running, because R25–R30 showed that is where t
       else's tests — so the ten greens are the point of adopting it. Measured `r68-noclienteval`
       against `r67-base`: FIXED none, BROKEN exactly the three, reasons diff one new line per red.
 
+- [x] **R69. `OwnedQueryRelationalTestBase` ADOPTED as a TIER MOVE — 212 tests, 210 green, and the
+      six row-limiting reds closed with a knob that already existed.** `failed` 102 -> 104,
+      `total` 28964 -> 28982 (212 on Tier B less the 194 Tier A tests the move deletes).
+
+      **The harness question the handoff posed is answered, and the answer is "the existing
+      decision stands".** `InfoCarrierBackendTestStore.AddProviderOptions` deliberately does not
+      copy the fixture's `ConfigureWarnings(Default(Throw))` to the server, on the grounds that it
+      is a statement about what the test author wrote while the server runs a tree this provider
+      generated. **That remark is correct and the global change was not re-measured, because C55
+      already measured it: 8 fixed, 626 broken.** Most of the 626 are model warnings about a model
+      `TestModelSource` built for the backing store.
+
+      **What closed the six is C69's per-fixture mechanism, reused rather than rebuilt.**
+      `AssociationsWarnings.ThrowOnUnorderedRowLimiting` forwards exactly
+      `RowLimitingOperationWithoutOrderByWarning` — the event
+      `RelationalQueryableMethodTranslatingExpressionVisitor` raises on the *server* — and four
+      `Associations` fixtures already call it. This fixture is the fifth. The base names the event
+      itself, in a comment on each of the three overrides, which is the same justification C69
+      recorded. **No override asserting "no throw" was written**: that would have hidden a real
+      difference between this provider and every relational one.
+
+      | Outcome | Count |
+      |---|---|
+      | Green | 210 |
+      | Red — `Using_from_sql_on_owner_generates_join_with_table_for_owned_shared_dependents`, two parameterizations | 2 |
+
+      Both reds are #60, dying on `RelationalOwnedQueryFixture`'s
+      `public new RelationalTestStore TestStore` cast inside `NormalizeDelimitersInRawString`. That
+      cast is on no other route in the base, so ADR-013's 2026-08-30 amendment adopts it.
+
+      **The re-parent deletes more than it adds — R1 paying out for the second time this phase.**
+      The Tier A class's five overrides were all InMemory limitations copied from EF's
+      `OwnedQueryInMemoryTest`; on a store that composes, all five simply answer. The fixture also
+      loses a duplicated `TestSqlLoggerFactory` and its `ITestSqlLoggerFactory` declaration, both
+      supplied by `RelationalOwnedQueryFixture`. What is left of the old Tier A file is
+      `SharedTypeQueryInfoCarrierTest`, and the file is renamed to match.
+
+      **D6 checked rather than assumed**: neither owned-query base uses
+      `ExecuteWithStrategyInTransactionAsync` and the relational fixture declares no
+      `UseTransaction`. It is a read-only query base. Measured `r69-ownedquery` against
+      `r68-noclienteval`: FIXED none, BROKEN exactly the two, one reason moved (`InvalidCastException`
+      9 -> 11).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
