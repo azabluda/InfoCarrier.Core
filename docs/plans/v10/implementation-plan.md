@@ -967,6 +967,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       partly for this same cast. #60 still gates them on their `FromSql`/`AsSplitQuery` tests, so
       the verdict stands, but the *cast* is no longer part of the reason.
 
+- [x] **R40. The defect R35 found, fixed — and it is one line.** `Can_delete_with_many_to_many`
+      passes; the class is `Passed: 201, Failed: 0, Total: 201`. Full local run
+      `Passed: 27050, Failed: 82, Total: 27367`, **FIXED 1, BROKEN 0**, diffed by name against
+      `known-failures.names.txt` rather than read off the count.
+      **The cause was a comment that was right about every case it had been tested on.**
+      `ChangeEntryMapper.ToChangeEntry` sent original foreign-key values for `Modified` entries
+      only, on the stated ground that *"a `Deleted` entry needs no ordering hint, because the row
+      it releases is the one being deleted"*. **That is true while a deleted row is only ever a
+      dependent, and false the moment one deleted row is a dependent of another.** The test deletes
+      an `EntityOne` and an `EntityTwo` in one call and `EntityTwo.CollectionInverseId` points at
+      that `EntityOne`; EF's own `ClientSetNull` fixup nulls the FK on the client *before* the
+      entry is sent, so the current value carried no edge either, and
+      `CommandBatchPreparer` on the server had nothing to order by. It emitted
+      `DELETE FROM "EntityOnes"` first and SQLite refused it.
+      **Traced rather than guessed, in four steps**: the server SQL log named the failing statement
+      once `RelationalEventId.CommandError` was added to it; replaying the server's exact
+      statements against a copy of the store reproduced the error and showed `EntityTwos.Id=1` as
+      the only row still referencing `EntityOne 1`; a probe on the server's change tracker showed
+      `CollectionInverseId` current `null` **and** original `null`, where a single-context EF holds
+      `1`; and the one-line widening of the condition fixed it.
+      **This is J11's mechanism one case wider.** J11 measured **165** `FOREIGN KEY constraint
+      failed` for the same missing original on `Modified` entries, when `ProxyGraphUpdates` first
+      reached a store that enforces them. Neither case can appear on Tier A, because InMemory
+      enforces no foreign key — which is the argument for the tier moves, stated as a measurement
+      rather than a preference.
+      **`src/`, so both gates ran**: trim ratchet OK (89 ≤ 89, unchanged) and
+      `CI=true … --configuration Release` clean.
+      `failed` 83 → 82, `total` unchanged.
+      **A second, smaller thing came out of the trace and is kept**: `ServerSqlLog` now subscribes
+      to `RelationalEventId.CommandError` as well as `CommandExecuted`. A statement that *failed*
+      is the one a diagnostic most needs and the one `CommandExecuted` never carries, so the log
+      used to stop at the last statement that worked and stay silent about the one that did not.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

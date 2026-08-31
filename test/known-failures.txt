@@ -1414,5 +1414,33 @@
 # implementation and its ShouldLogCategory override, both of which the relational base supplies.
 #
 # FIXED none, BROKEN none, names file unchanged.
-failed=83
+#
+# 2026-08-31, #56 (R40). `failed` 83 -> 82, `total` UNCHANGED at 27367. FIXED 1, BROKEN 0, and
+# both figures come from a full local run diffed against this file by name:
+# `Passed: 27050, Failed: 82, Total: 27367`.
+#
+# The fix is one line in ChangeEntryMapper.ToChangeEntry: original foreign-key values are now sent
+# for a `Deleted` entry as well as a `Modified` one. R35 found the failure; this is its cause.
+#
+# The comment that used to stand there said "a `Deleted` entry needs no ordering hint, because the
+# row it releases is the one being deleted". That is true while a deleted row is only ever a
+# dependent, and false the moment ONE DELETED ROW IS A DEPENDENT OF ANOTHER.
+# Can_delete_with_many_to_many deletes an EntityOne and an EntityTwo in one call and
+# EntityTwo.CollectionInverseId points at that EntityOne. EF's own ClientSetNull fixup nulls the
+# FK on the client before the entry is sent, so the current value carried no edge either; the
+# server rebuilt the row with a null FK, snapshotted originals from it, and CommandBatchPreparer
+# had nothing to order by. It emitted DELETE FROM "EntityOnes" first and SQLite refused it.
+#
+# Traced rather than guessed: the server SQL log gave the failing statement, replaying the
+# server's exact statements against a copy of the store reproduced the error and showed
+# EntityTwos.Id=1 as the only row still referencing EntityOne 1, and a probe on the server's
+# change tracker showed CollectionInverseId current=null original=null where a single-context EF
+# would hold 1.
+#
+# This is the J11 mechanism one case wider: J11 measured 165 FOREIGN KEY constraint failed for
+# the same missing original on `Modified` entries when ProxyGraphUpdates reached a real store.
+# Tier A cannot show either -- InMemory enforces no foreign key.
+#
+# Gates: trim ratchet OK (89 <= 89, unchanged); CI=true Release build 0 errors.
+failed=82
 total=27367
