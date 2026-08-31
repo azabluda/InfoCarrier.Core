@@ -518,6 +518,23 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       after, and `Passed: 109, Failed: 0, Total: 109` for `Navigations` alone. `failed` and
       `total` both unchanged; compliance missing 95 → 88, fixtures 23 → 22. `test/` only.
 
+- [x] **R26. The six `OwnedNavigations` bases, adopted bare — 8 red of 91, and all 8 are one
+      reason.** The fixture re-parents onto `OwnedNavigationsRelationalFixtureBase` and the six
+      classes onto `OwnedNavigations*RelationalTestBase`, with **every override removed** so that
+      the failures are measured before anything is written to answer them.
+      **The hand copy C0 left behind was not complete, which is the argument for the re-parent
+      rather than for maintaining it.** C0 mirrored `OwnedTableSplittingRelationalFixtureBase`'s
+      and `OwnedNavigationsRelationalFixtureBase`'s `ToTable` calls and `AreCollectionsOrdered`;
+      it did not mirror the base's `ValueGeneratedNever()` on every owned key, nor its
+      `Navigation(…).IsRequired()` statements. The re-parent brings both in.
+      `Passed: 83, Failed: 8, Total: 91`, measured locally with a `--filter` run. **The eight are
+      four tests times two `QueryTrackingBehavior` arms, and the reason is the same in all eight:
+      SQLite has no `APPLY`.** Two shapes, which is the reasons diff and not the count:
+      `NoTracking` raises `SqliteStrings.ApplyNotSupported` bare, while `TrackAll` reaches an
+      assertion expecting a different message — *"A tracking query is attempting to project"* for
+      the `Projection` and `Collection` ones, *"Unable to translate a collection subquery"* for
+      `SetOperations`. R26a is the override subset.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
