@@ -1398,6 +1398,36 @@ re-parents of families already running, because R25–R30 showed that is where t
       these 18, plus R55's 20, plus the bases still standing aside for it.
       `test/` only.
 
+- [x] **R57. `Translations` moved to Tier B — the last tier move, and R43's price was off by a
+      factor of three.** Missing bases 32 → 30, `total` 27805 → 27809, `failed` **unchanged at
+      99**, FIXED none, BROKEN none. 333 tests become 337, **green on both sides of the move**.
+
+      **R43 priced this at 217 overrides and left it for the owner. The measured cost is 65.**
+      The 217 is the size of EF's *SQLite* `Translations` suite, and most of those overrides exist
+      only to assert golden SQL over a base call that already passes. What a provider actually has
+      to write is one override per test that **fails**, and on this store that is 65. **The gap
+      between 217 and 65 is the whole argument for measuring a price instead of counting the
+      reference implementation's lines** — and it is the same mistake in the same shape as R50,
+      where a base was priced as needing a native library on the strength of its name.
+
+      **All 65 are the store and not this provider, established twice over rather than assumed.**
+      Every one failed with `The LINQ expression … could not be translated`, naming a member SQLite
+      has no function for — `TimeOnly.FromDateTime`, `Math.Round` on `decimal`, `Convert.To*`,
+      `Guid.NewGuid`, `DateTimeOffset.ToUnixTimeSeconds`. EF's own SQLite classes override each
+      with `AssertTranslationFailed`, **sampled across five classes before any were adopted**. The
+      adoption is the second proof: all 65 overrides assert a translation failure and all 65 pass,
+      which they could not do if any test had been failing for another reason.
+
+      **Nine overrides were deleted by the move, and that is the tier rule paying out.** Three were
+      EF's `StringTranslationsInMemoryTest` — the base asserts `StringComparison.CurrentCulture`
+      and `InvariantCulture` are unsupported, which is true of real providers and false of the
+      InMemory store that used to sit behind this wire, so the assertion had to be neutered. SQLite
+      does not support them, so the base's own expectation is now the right one. The other six are
+      A27's hand-transcribed copy of `MiscellaneousTranslationsRelationalTestBase`'s `Random.Next`
+      expectations, written because that base was out of reach; the move puts it in reach and the
+      base supplies them.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
