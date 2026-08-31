@@ -1507,6 +1507,44 @@ re-parents of families already running, because R25–R30 showed that is where t
       stops it — see R61.
       `test/` only.
 
+- [x] **R61. `NorthwindMiscellaneousQuery` and `OwnedEntityQuery` adopted — and between them they
+      need zero overrides that are not EF's own.** Missing bases 25 → 23, `total` 28919 → 28945,
+      `failed` **unchanged at 95**, FIXED none, BROKEN none.
+      `Passed: 28614, Failed: 95, Total: 28945`.
+
+      **Both are R41 entries, and R41's reason for both was `AsSplitQuery`.** R59 removes it.
+
+      **`NorthwindMiscellaneousQueryRelationalTestBase`, moved to Tier B: `Passed: 935, Failed: 0,
+      Total: 936`.** The largest query base in the suite and the last big one on Tier A. The
+      relational base adds exactly two tests, both `AsSplitQuery`, and both pass.
+
+      **Ten overrides were deleted by the move and nine arrived**, which is the tier rule paying
+      out twice in one class. Seven of the ten asserted *"Sequence contains no elements"* — true of
+      the InMemory store that used to sit behind this wire, which throws where a relational store
+      returns an empty sequence, so the base's own expectation could not hold and had to be
+      neutered. The other three were EF's own InMemory suppressions of
+      `Collection_navigation_equal_to_null_for_subquery_using_ElementAtOrDefault_*`, which InMemory
+      cannot compose and SQLite can; all three now run and all three pass.
+      The nine that arrive are all EF's own `NorthwindMiscellaneousQuerySqliteTest` — five `APPLY`,
+      two date-arithmetic, one untranslatable date component, one client-evaluation message whose
+      only difference is the fixture named in it. **EF overrides 36 tests and this class overrides
+      nine, because the other 27 pass.** An override is written where a test fails, not where the
+      reference provider happens to have one.
+      **One of the nine is deliberately not EF's**: EF disables
+      `SelectMany_correlated_subquery_hard` outright by returning a null `Task`. It fails here for
+      the same reason its four siblings do, and `AssertApplyNotSupported` says that where a skip
+      would say nothing.
+
+      **`OwnedEntityQueryRelationalTestBase`, moved to Tier B: 37 tests, 37 green, and no overrides
+      at all.** R41 withheld it for two `AsSplitQuery` tests and there is nothing left to withhold
+      it for. It declares no `UseTransaction` and calls the transaction helper zero times, both
+      checked rather than assumed.
+
+      **The Release build caught three errors Debug did not**, which is #90's lesson holding on a
+      `test/`-only change for the second time: two `CS8603` on an element sorter returning a
+      `DateTime?` and one `IDE0005`.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

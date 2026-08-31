@@ -1675,5 +1675,29 @@
 #
 # `test/` only, so eng/measure.sh's axis and not the trim ratchet.
 # ---------------------------------------------------------------------------------------------
+# 2026-08-31 (R61) -- `failed` UNCHANGED at 95, `total` 28919 -> 28945. FIXED none, BROKEN none.
+# Two more bases R41 withheld for `AsSplitQuery`, and both adopt with ZERO overrides between them.
+# Compliance missing bases 25 -> 23.
+#
+# `NorthwindMiscellaneousQueryRelationalTestBase` -- the largest query base in the suite and the
+# last big one on Tier A. The relational base adds exactly two tests, both `AsSplitQuery`, and both
+# pass. `Passed: 935, Failed: 0, Total: 936`.
+#
+# TEN OVERRIDES WERE DELETED BY THE MOVE and nine arrived, which is the tier rule paying out twice
+# in one class. Seven of the ten asserted "Sequence contains no elements" -- true of the InMemory
+# store that used to sit behind this wire, which throws where a relational store returns an empty
+# sequence; the other three were EF's own InMemory suppressions of
+# `Collection_navigation_equal_to_null_for_subquery_using_ElementAtOrDefault_*`, which SQLite can
+# compose. The nine that arrive are all EF's own `NorthwindMiscellaneousQuerySqliteTest`: five
+# `APPLY`, two date-arithmetic, one untranslatable date component, one client-evaluation message.
+# EF OVERRIDES 36 AND THIS CLASS OVERRIDES NINE, because the other 27 pass -- an override is
+# written where a test fails, not where the reference provider happens to have one.
+#
+# `OwnedEntityQueryRelationalTestBase` -- 37 tests, 37 green, NO overrides at all. R41 withheld it
+# for two `AsSplitQuery` tests and there is now nothing to withhold it for.
+#
+# `test/` only. The Release build was checked because a `test/`-only change produced Release-only
+# errors in #90, and it did again here: two CS8603 and one IDE0005, none of them visible in Debug.
+# ---------------------------------------------------------------------------------------------
 failed=95
-total=28919
+total=28945
