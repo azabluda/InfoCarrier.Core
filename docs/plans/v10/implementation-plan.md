@@ -1598,7 +1598,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       running** — and they point opposite ways depending on whether the count is of the reference
       provider's overrides or of the base's own new tests.
 
-- [ ] **R63. J22's `ComplexTypesTracking` pair re-checked — the price still stands, but the
+- [x] **R63. J22's `ComplexTypesTracking` pair re-checked — the price still stands, but the
       mechanism it was priced against no longer matches EF's source.** No code. **Left open**,
       because what is needed next is one diagnostic rather than a decision.
 
@@ -1633,9 +1633,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       age**, which is the rule that produced six corrections in M9's closing session.
 
       **The next step is one diagnostic, not an investigation.** The server's own stack is what
-      settles it, and `ServerSaveChangesExecutor` already rethrows with the request appended (C38);
-      what the client surfaces is only the rehydrated top frame, so the server frames need to reach
-      the test output before the site can be named. **Do that before re-pricing anything.**
+      settles it. **Done in R65, and the diagnostic turned out to already exist** — see there.
 
 - [x] **R64. `LeftJoin` was missing from `ProjectionShape`, and it cost a silent wrong answer.**
       `failed` **unchanged at 95**, `total` 28945 → 28946 for the one new test. FIXED none, BROKEN
@@ -1681,6 +1679,54 @@ re-parents of families already running, because R25–R30 showed that is where t
       covers half a defect should say which half.
       Gates: trim ratchet OK (89 ≤ 89), Release build `0 Warning(s), 0 Error(s)`, which caught one
       `CS8602` Debug did not — the third time on this branch.
+
+- [x] **R65. J22's pair settled from the server's own stack — J22 was right, R63's doubt was
+      right about the source and wrong about the conclusion, and the diagnostic already
+      existed.** No code kept; the probe was reverted. Docs only, no gate.
+
+      **Nothing had to be built.** R63 said the server frames "need to reach the test output before
+      the site can be named". They already do: `InfoCarrierFaultMapper` has carried the server
+      stack since C48 and `Rehydrate` puts it on `exception.Data["InfoCarrier.ServerStackTrace"]`,
+      deliberately not spliced into the message — `InfoCarrierFault`'s own remarks say why, and
+      say it would break every message assertion. A four-line `catch` in the test class printed it.
+      **The lesson is R50's and R43's in a third shape: the thing was priced without being looked
+      at.**
+
+      **The stack, and it names the frame J22 named:**
+
+      ```
+      Expression.Property(Expression, PropertyInfo)
+        StructuralTypeMaterializerSource.<AddInitializeExpression>g__CreateMemberAssignment|10_0
+        StructuralTypeMaterializerSource.AddInitializeExpression        <- the complex type's property
+        StructuralTypeMaterializerSource.CreateMaterializeExpression    <- the complex type
+        StructuralTypeMaterializerSource.AddInitializeExpression        <- the entity's complex property
+        StructuralTypeMaterializerSource.CreateMaterializeExpression    <- the entity
+        RuntimeEntityType.GetOrCreateMaterializer
+        InfoCarrier.Core.ServerSaveChangesExecutor.Materialize
+      ```
+
+      **And the branch is the one R63 guessed.** `CreateMemberAssignment` guards its final
+      `return` with `property.IsIndexerProperty()` and builds a `MakeIndex`. Its **primitive
+      collection** branch, taken earlier, does not: it calls
+      `MakeMemberAccess(parameter, property.GetMemberInfo(…))`, and `MakeMemberAccess` on a
+      `PropertyInfo` is `Expression.Property` — which is the throwing frame. So R63's "two other
+      `MakeMemberAccess` calls in the same method are still unguarded" was the right suspicion and
+      this is the confirmation.
+
+      **The model shows exactly why that branch is reached**, and the value is one line of EF's
+      own seed: `["Members"] = new List<string> { "Boris", "David", "Theresa" }` — a **primitive
+      collection**, non-array, inside a **property-bag** complex type whose properties are indexer
+      properties. `IsPrimitiveCollection: true, ClrType.IsArray: false` selects the unguarded
+      branch; the indexer then reaches `Expression.Property` with no index argument.
+
+      **So J22's verdict stands, its site name stands, and its price stands.** It is EF's defect,
+      on a path only this provider takes — EF's own suites construct the object and track it, and
+      never materialize it from a value buffer. The route around it still has to avoid
+      `GetOrCreateMaterializer` and reproduce constructor binding, for two tests. **Not taken, and
+      now priced against a mechanism that has been read rather than inferred.**
+
+      **What is newly actionable is the upstream report**: the fix is one branch of one method
+      applying the guard the same method already applies eight lines later.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
