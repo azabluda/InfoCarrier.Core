@@ -1767,5 +1767,28 @@
 # `test/` only. The Release build was run anyway and caught one IDE0005 that Debug did not, which
 # is the fourth time on this branch.
 # ---------------------------------------------------------------------------------------------
-failed=99
-total=28950
+# 2026-08-31 (R68) - 99 -> 102, and `total` 28950 -> 28964 for the fourteen tests
+# `Query.QueryNoClientEvalTestBase` brings with it. ADOPTED on Tier B, bare, exactly as EF's own
+# `QueryNoClientEvalSqliteTest` is -- nineteen lines over the shared Northwind fixture, overriding
+# nothing. Ten pass, one is skipped by EF itself (`Throws_when_group_by`, EF issue #18923), three
+# are red.
+#
+# NONE OF THE THREE IS A DEFECT OF THIS PROVIDER, and that is why the rise is taken.
+# `Doesnt_throw_when_from_sql_not_composed` and `Throws_when_from_sql_composed` are #60: the first
+# does not even reach `FromSql`, dying on `NorthwindQueryRelationalFixture`'s
+# `(RelationalTestStore)TestStore` cast inside `NormalizeDelimitersInRawString`. Both are permanent
+# until #60 is decided.
+#
+# `Throws_when_orderby_multiple` is a MESSAGE-TEXT DIFFERENCE, settled in R67 by printing the
+# thrown message rather than reading xUnit's truncated assertion. The query has two untranslatable
+# operators -- `OrderBy(c => c.IsLondon).ThenBy(c => ClientMethod(c))`. EF translates bottom-up and
+# names the inner one; this provider refuses at the client boundary and names the outer one. Both
+# messages carry the details clause the base asserts on, and both reasons are true. It is not
+# fixable in EF's direction: `IsLondon` is not client code by this provider's test, so only the
+# server could name it, and the server never sees a query the client has already refused.
+#
+# `test/` only. Measured `r68-noclienteval` against `r67-base`: FIXED none, BROKEN exactly the
+# three above, and the reasons diff adds exactly one line per new red.
+# ---------------------------------------------------------------------------------------------
+failed=102
+total=28964

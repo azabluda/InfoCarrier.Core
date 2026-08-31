@@ -1793,6 +1793,28 @@ re-parents of families already running, because R25–R30 showed that is where t
       none of the three is a defect of this provider** — two are #60's `FromSql` and one is this.
       That is a better trade than R62 recorded, and it is the owner's call, not taken here.
 
+- [x] **R68. `QueryNoClientEvalTestBase` ADOPTED on Tier B — 14 tests, and all three reds were
+      already classified.** `failed` 99 -> 102, `total` 28950 -> 28964. The class is nineteen lines
+      over `NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>`, which already satisfies
+      the base's `NorthwindQueryRelationalFixture<NoopModelCustomizer>, new()` constraint. **EF's
+      own `QueryNoClientEvalSqliteTest` is the same shape and overrides nothing**, so no red here is
+      the store's.
+
+      **Ten pass, one is skipped by EF itself** (`Throws_when_group_by`, EF issue #18923), **three
+      are red and none is a defect of this provider** — which is the whole reason the rise is taken
+      rather than the base left unadopted:
+
+      | Test | Cause |
+      |---|---|
+      | `Doesnt_throw_when_from_sql_not_composed` | #60. Dies on `(RelationalTestStore)TestStore` inside `NormalizeDelimitersInRawString` before `FromSql` is reached. |
+      | `Throws_when_from_sql_composed` | #60. `FromSqlRaw`. |
+      | `Throws_when_orderby_multiple` | **A message-text difference (R67), not a gap.** Both messages carry the details clause; they name different operators, and both reasons are true. |
+
+      The base asserts that an untranslatable operator is *refused* rather than run on the client,
+      which is this provider's own rule (`QuerySplitter.RejectClientEvaluation`) stated by someone
+      else's tests — so the ten greens are the point of adopting it. Measured `r68-noclienteval`
+      against `r67-base`: FIXED none, BROKEN exactly the three, reasons diff one new line per red.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
