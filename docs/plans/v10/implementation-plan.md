@@ -563,6 +563,31 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       SQLite classes, never in the 35 relational bases** (verified: every `AssertSql` in those 35
       is the declaration or an empty call).
 
+- [x] **R27. `OwnedTableSplitting` — the first genuinely new family, and it lands at 4 red of 70.**
+      A new fixture on `OwnedTableSplittingRelationalFixtureBase` and four classes adopted bare.
+      **Four and not seven: EF ships no `BulkUpdate`, `Collection` or `SetOperations` class for
+      this family.** The mapping is the one `OwnedNavigations` switches *off* — an owned reference
+      lives in its owner's table and only an owned collection gets a table of its own — which is
+      why `OwnedNavigationsRelationalFixtureBase` derives from this one and overrides precisely
+      that. Nothing is mirrored by hand, `AreCollectionsOrdered` included.
+      `Passed: 66, Failed: 4, Total: 70`. **All four are two tests times two arms, and the reason
+      is the one R26 already priced: SQLite has no `APPLY`.**
+      `Projection.Select_subquery_required_related_FirstOrDefault` and
+      `…_optional_related_FirstOrDefault`, `NoTracking` raising the APPLY message bare and
+      `TrackAll` reaching `AssertOwnedTrackingQuery` expecting *"A tracking query is attempting to
+      project"*.
+      **EF's `OwnedTableSplittingProjectionSqliteTest` is commented out in full** — the same EF
+      issue #26708 that disables `OwnedNavigationsProjectionSqliteTest` — so once again there is
+      no upstream override to adopt and `OwnedJsonProjectionSqliteTest` is the nearest statement of
+      the same limit. Two families now, same gap, same substitute.
+      **One thing of EF's is deliberately not adopted and it is worth naming: their SQLite fixture
+      adds `ConfigureWarnings(b => b.Ignore(SqliteEventId.CompositeKeyWithValueGeneration))`.**
+      Not needed here and measured rather than assumed — 66 of 70 pass with no such failure, and
+      an unnecessary warning-ignore in a fixture is the kind of thing that later hides a real one.
+      `OwnedTableSplittingStructuralEqualitySqliteTest` is not adopted either: its overrides are
+      golden SQL only, those tests pass here on the relational base's own assertion, and the SQL is
+      the backing store's text, which this client never emits.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
