@@ -1131,6 +1131,27 @@ re-parents of families already running, because R25–R30 showed that is where t
       `test/` only, so `eng/measure.sh` and not the trim ratchet. Measured together with R45;
       figures there.
 
+- [x] **R45. Six provably-inapplicable bases into `IgnoredTestBases` — missing 45 → 39.**
+      `InfoCarrierComplianceTest`'s own remarks state the bar: the list is for bases *conceptually
+      inapplicable to a remoting provider*, and **"a base that is merely not built yet must stay
+      out of the list."** R41 read all six; this records the reading where the gate can use it.
+      Each entry carries its reason beside it, in the style of R2's twelve.
+
+      | Base | Why it can never be adopted here |
+      |---|---|
+      | `TransactionTestBase<>` | `GetDbConnection()`, `GetDbTransaction()`, `UseTransaction(DbTransaction)` and a `(RelationalTestStore)Fixture.TestStore` cast run through all 44 tests. Same reason as the already-listed `TransactionInterceptionTestBase`. |
+      | `TwoDatabasesTestBase` | Declares `protected abstract string DummyConnectionString` and `CreateBackingContext(string databaseName)`; its three tests swap one connection string for another inside a `DbConnection` interceptor. |
+      | `LoggingRelationalTestBase<,>` | **Cannot be closed at all**: `TExtension` is constrained to `RelationalOptionsExtension` and `TBuilder` to `RelationalDbContextOptionsBuilder<,>`. This provider's options extension is neither, and all nine tests configure `MaxBatchSize` / `CommandTimeout` / `UseRelationalNulls` / `MigrationsAssembly` / `MigrationsHistoryTable` through them. |
+      | `ModelBuilding101RelationalTestBase` | Its whole contribution over the core base is `GetModelMetadata`, overridden as `new RelationalModelMetadata(context.Model, context.Database.GenerateCreateScript())`. Every test routes through it. |
+      | `Scaffolding.CompiledModelRelationalTestBase` | Asserts `GetTableName()` on the compiled model, which here is the **client's**. M9 removed the relational model. |
+      | `JsonTypesRelationalTestBase` | Same boundary: `AssertElementFacets` asserts `FindRelationalTypeMapping()`, `IsFixedLength()` and `GetStoreType()` on the client's model. R23 measured 104 red of 576 on that assumption and reverted. |
+
+      **Nothing moves in `failed` or `total`, and that flat count is the expected result rather
+      than a null one.** `All_test_bases_must_be_implemented` is red before and red after — the
+      other 39 keep it red — so it is the same one failing test either way and neither baseline
+      file changes. What moves is the number the test prints, measured: **45 → 39**.
+      `test/` only. Measured together with R44; figures below.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
