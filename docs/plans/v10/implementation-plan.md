@@ -626,6 +626,36 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       `known-failures.names.txt` untouched. Compliance missing bases 78 → 73, fixtures unchanged
       at 21.
 
+- [x] **R29. `OwnedJson` — 16 red of 87, and for the first time in this block they are not all one
+      reason.** A new fixture on `OwnedJsonRelationalFixtureBase` and six classes adopted bare.
+      **Six and not seven, and the missing one is not ours:**
+      `OwnedJsonSetOperationsRelationalTestBase` is commented out upstream in full, EF's note being
+      that every set operation over an owned JSON collection throws `KeyNotFoundException` on the
+      synthesized ordinal key. The compliance test asks for six for that reason.
+      `Passed: 71, Failed: 16, Total: 87`. **Three groups, and the reasons diff is the whole point
+      of reading them separately:**
+      • **Group A, twelve of the sixteen: SQLite has no `APPLY`.** Six tests times two arms —
+      `Collection.Distinct_projected`, the two `Projection.Select_subquery_*_related_FirstOrDefault`
+      and the three `Projection.SelectMany_*`. EF has an override for every one, in
+      `OwnedJsonCollectionSqliteTest` and `OwnedJsonProjectionSqliteTest`. R29a adopts all six.
+      • **Group B, three: an exception-type difference on a path that is unsupported either way.**
+      `Contains_with_parameter`, `Contains_with_operators_composed_on_the_collection` and
+      `Contains_with_nested_and_composed_operators` — the relational base asserts
+      `KeyNotFoundException`, this provider raises `InvalidOperationException` *"No backing field
+      could be found for property … and the property does not have a getter"*. Both are the owned
+      JSON collection's synthetic key machinery failing to be read; the difference is which point
+      it fails at first. **EF's SQLite class has no override for these — it just calls `base` — so
+      there is nothing to adopt, and writing one of our own would be overriding a spec test to make
+      the suite green.** Left failing per ADR-004. Note that `Contains_with_inline`, which the base
+      asserts as `InvalidOperationException`, passes.
+      • **Group C, one, and it is the good kind: `Associate_with_parameter_null` fails because it
+      passes.** The relational base wraps it in `Assert.ThrowsAsync<EqualException>` for EF issue
+      #36401 — EF expects a *wrong answer* here — and this provider returns the right one, so no
+      `EqualException` is thrown and the wrapper fails. This is R21's and R22's category again:
+      **a query this provider answers that other EF providers get wrong.** Not overridden, left
+      failing, and a candidate for `website/docs/limitations.md`'s section on exactly that (that
+      file is governed by `doc-style.md` and needs a humanizer pass, so it is not touched here).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
