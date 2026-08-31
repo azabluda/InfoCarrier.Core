@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.ComplexTableSplitting;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -65,10 +66,13 @@ public class ComplexTableSplittingQueryInfoCarrierFixture : ComplexTableSplittin
         => facade.UseInfoCarrierTransaction(transaction);
 }
 
-// The five ComplexTableSplitting facets (ADR-004), adopted bare: no override at all, so that
-// every failure is measured and classified before anything is written to answer it. Five and not
-// seven: EF ships no Collection or SetOperations class for this family, which follows from the
-// model -- there are no collections in it to run them against.
+// The five ComplexTableSplitting facets (ADR-004). Five and not seven: EF ships no Collection or
+// SetOperations class for this family, which follows from the model rather than from EF's
+// convenience -- there are no collections in it to run them against.
+//
+// R28 adopted them bare and measured 4 red of 115; R28a is the single override below. Nothing
+// else of EF's is left unadopted: the rest of its SQLite suite for this family is bare, with no
+// golden SQL anywhere in it -- the first family in this block of which that is true.
 
 public class ComplexTableSplittingBulkUpdateQueryInfoCarrierTest(
     ComplexTableSplittingQueryInfoCarrierFixture fixture,
@@ -88,7 +92,32 @@ public class ComplexTableSplittingPrimitiveCollectionQueryInfoCarrierTest(
 public class ComplexTableSplittingProjectionQueryInfoCarrierTest(
     ComplexTableSplittingQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : ComplexTableSplittingProjectionRelationalTestBase<ComplexTableSplittingQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : ComplexTableSplittingProjectionRelationalTestBase<ComplexTableSplittingQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    /// <summary>
+    ///     <c>ComplexTableSplittingProjectionSqliteTest</c>'s two, verbatim, and the whole of
+    ///     R28's red: SQLite has no <c>APPLY</c>.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Unlike R26a and R27a, this override comes from the family's own SQLite class rather
+    ///     than a sibling's</b> — EF issue #26708 disables the projection class for the two
+    ///     <em>owned</em> families but not for this one.
+    ///     <b>And there is no <c>TrackAll</c> arm to special-case.</b> R26 and R27 each had to
+    ///     short-circuit tracking, because an owned dependent projected under <c>TrackAll</c>
+    ///     reaches <c>AssertOwnedTrackingQuery</c> and the APPLY message arrives where a tracking
+    ///     message was expected. A complex type is not tracked as an entity, so no such assertion
+    ///     stands in the way and both arms raise <c>ApplyNotSupported</c> directly — measured in
+    ///     R28, not assumed from the shape.
+    /// </remarks>
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+}
 
 public class ComplexTableSplittingStructuralEqualityQueryInfoCarrierTest(
     ComplexTableSplittingQueryInfoCarrierFixture fixture,

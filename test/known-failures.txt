@@ -1260,5 +1260,13 @@
 #
 # The +70 is the delta measured by a local --filter run, to be confirmed by CI's Spec ratchet,
 # which is the only thing that produces the absolute figures.
+#
+# 2026-08-31, #56 (R28/R28a). `failed` UNCHANGED at 71, `total` 27096 -> 27211 for the 115 tests
+# the new ComplexTableSplitting family brings, all of them green:
+# `Passed: 521, Failed: 0, Total: 521` for the whole Query.Associations tree afterwards, which is
+# R27a's 406 plus this family's 115. FIXED none, BROKEN none, names file unchanged.
+#
+# Compliance missing bases 78 -> 73, fixtures unchanged at 21. Both InfoCarrierComplianceTest
+# entries stay red by design.
 failed=71
-total=27096
+total=27211

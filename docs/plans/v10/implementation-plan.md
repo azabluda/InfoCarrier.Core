@@ -619,6 +619,13 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       Nothing of EF's is left unadopted here: the rest of its SQLite suite for this family is bare,
       with **no golden SQL anywhere in it**.
 
+- [x] **R28a. The `ComplexTableSplitting` override subset — one override, 4 of 4 answered.**
+      `ComplexTableSplittingProjectionSqliteTest`'s two methods, verbatim.
+      `Passed: 521, Failed: 0, Total: 521` for the whole `Query.Associations` tree, which is
+      R27a's 406 plus this family's 115. `failed` unchanged at 71, `total` 27096 → 27211,
+      `known-failures.names.txt` untouched. Compliance missing bases 78 → 73, fixtures unchanged
+      at 21.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
