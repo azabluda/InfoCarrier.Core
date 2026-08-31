@@ -1598,6 +1598,45 @@ re-parents of families already running, because R25–R30 showed that is where t
       running** — and they point opposite ways depending on whether the count is of the reference
       provider's overrides or of the base's own new tests.
 
+- [ ] **R63. J22's `ComplexTypesTracking` pair re-checked — the price still stands, but the
+      mechanism it was priced against no longer matches EF's source.** No code. **Left open**,
+      because what is needed next is one diagnostic rather than a decision.
+
+      **The symptom is unchanged.** Both parameterizations of
+      `Can_track_entity_with_complex_property_bag_collections` on `Added` still fail with
+      `System.ArgumentException : Incorrect number of arguments supplied for call to method
+      'System.Object get_Item(System.String)'`, raised on the server during `SaveChanges`.
+
+      **What has changed is EF's code.** J22 named the site exactly: *"`CreateMemberAssignment`
+      calls `Expression.Property(instance, member)` where `member` is the `Item[string]` indexer …
+      supplying no index argument"*. `StructuralTypeMaterializerSource.AddInitializeExpression`'s
+      local `CreateMemberAssignment` now ends:
+
+      ```csharp
+      return property.IsIndexerProperty()
+          ? Assign(MakeIndex(parameter, (PropertyInfo)memberInfo, [Constant(property.Name)]), value)
+          : MakeMemberAccess(parameter, memberInfo).Assign(value);
+      ```
+
+      **The guard J22 said was missing is there.** Either the reference clone moved since J22 or
+      J22 read the wrong one of the method's several assignment sites — and **two of them are still
+      unguarded**: both `MakeMemberAccess` calls inside the `IsPrimitiveCollection` branch, which
+      `IsIndexerProperty()` does not cover. A third candidate is the complex-*collection* path,
+      which this method does not write at all (`IComplexProperty { IsCollection: true } =>
+      Default(clrType)`, *"populated separately"*), and the failing model's property is exactly a
+      complex collection of bags.
+
+      **So the standing classification is not safe to repeat.** J22's conclusion — upstream, on a
+      path only this provider takes, priced at reproducing constructor binding — may still be
+      right, and its *price* is unaffected either way, but the sentence naming the defect is now
+      false about the source it names. **A classification is not evidence, and neither is its
+      age**, which is the rule that produced six corrections in M9's closing session.
+
+      **The next step is one diagnostic, not an investigation.** The server's own stack is what
+      settles it, and `ServerSaveChangesExecutor` already rethrows with the request appended (C38);
+      what the client surfaces is only the rehydrated top frame, so the server frames need to reach
+      the test output before the site can be named. **Do that before re-pricing anything.**
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
