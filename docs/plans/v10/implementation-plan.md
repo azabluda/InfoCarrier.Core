@@ -1568,7 +1568,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       | `ConcurrencyDetectorEnabledRelationalTestBase` | **#60, and there is nothing else in it.** 22 lines; the whole contribution is one `FromSql` theory. **Adopting adds two tests and both are red — zero new green.** R41 said "1"; a theory is two. |
       | `ConcurrencyDetectorDisabledRelationalTestBase` | **Identical, line for line.** Two tests, both red, no new green. |
       | `Query.MappingQueryTestBase` | **Blocked on the store, not on any API, and deliberately NOT probed.** Its nested `MappingQueryFixtureBase` supplies a *model* — a cut-down Northwind remapped with `SetTableName`/`SetColumnName`/`SetSchema` — and **no seed at all**, because it expects a prebuilt `Northwind` database. `StoreName` is `"Northwind"`, the same name `NorthwindQueryFixtureBase` uses, and this tier's store is **built from whichever model reaches it first** (`NorthwindInfoCarrierSqliteServerContext`) rather than being a curated file as EF's `SqliteNorthwindTestStoreFactory` is. Probing it could initialize the shared `Northwind.db` from a three-table model and break every Northwind class in the suite — a store-lifetime coupling `CLAUDE.md` explicitly forbids reintroducing. **Adopting it needs a second, separately named Northwind store seeded outside the model**, and that is the price. |
-      | `Query.QueryNoClientEvalTestBase` *(probed)* | **11 green of 14, 3 red, and not adopted.** R41 said 2. Two are #60 — one `FromSqlRaw` and one `Doesnt_throw_when_from_sql_not_composed` that dies on `(RelationalTestStore)` first. **The third is this provider's own**: `Throws_when_orderby_multiple` gets `TranslationFailed` where the base expects `TranslationFailedWithDetails`, so the *details* clause is missing on that shape. That one is a real, small gap and is worth a step of its own. |
+      | `Query.QueryNoClientEvalTestBase` *(probed)* | **11 green of 14, 3 red, and not adopted.** R41 said 2. Two are #60 — one `FromSqlRaw` and one `Doesnt_throw_when_from_sql_not_composed` that dies on `(RelationalTestStore)` first. **The third looked like this provider's own and is not** — see R67, which read the message instead of the assertion failure. |
       | `Query.OwnedQueryRelationalTestBase` *(probed)* | **202 green of 212, 10 red, and NOT adopted — and R41's estimate was wrong in the opposite direction to R43's and R50's.** R41 priced it at "8 `AsSplitQuery` + 1 `FromSql`". **All eight split tests pass** (R59), the `FromSql` theory is two reds, **and there are eight more R41 never saw because it never ran the base**: six `ElementAt`/`ElementAtOrDefault`/`Skip_Take_over_owned_collection` where the relational base expects a row-limiting throw, and **two `Left_join_on_entity_with_owned_navigations` that return the wrong answer**. **EF's own `OwnedQuerySqliteTest` is nineteen lines and overrides nothing**, so not one of the eight is the store. This is the most informative "not yet" in the phase: there is a defect behind it, and it should be diagnosed before the base is adopted. |
       | `Query.JsonQueryRelationalTestBase` *(probed)* | **Not adopted, and the probe does not even compile.** The 7 `FromSql_on_entity_with_json_*` theories are 14 #60 reds as R41 said. What R41 could not see is that `JsonQueryRelationalFixture` declares `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`, which **shadows** the property: `JsonQuerySqliteInfoCarrierTest`'s own model-agreement test reads the backend through `Fixture.TestStore` and stops compiling, and no cast recovers it, because every read of the shadowed property throws on a store that is not relational. **This is a new ADR-013 shape** — the amendment asks whether a route runs through the cast, and here it fails at *compile* time in a derived fixture. Adopting needs 14 reds accepted **and** that test rewired. |
       | `BulkUpdates.NorthwindBulkUpdatesRelationalTestBase` | **#60, and R41's "2" is 4 parameterizations.** Two new theories, `Delete_FromSql_converted_to_subquery` and `Update_FromSql_set_constant`, both `FromSqlRaw`. It also needs `NorthwindBulkUpdatesRelationalFixture` and, per **D6**, a `UseTransaction` override in the same commit: both new theories call `TestHelpers.ExecuteWithStrategyInTransactionAsync(…, Fixture.UseTransaction, …)`. |
@@ -1761,6 +1761,37 @@ re-parents of families already running, because R25–R30 showed that is where t
       adopting the base did not close them — so C20's reading of them stands unchanged.
       `test/` only; the Release build was run anyway and caught one `IDE0005` Debug did not, the
       fourth on this branch.
+
+- [x] **R67. R62's one "real gap" in `QueryNoClientEval` is not a gap — the details clause was
+      never missing.** No code kept; the probe was reverted. Docs only, no gate.
+
+      **R62 said `Throws_when_orderby_multiple` gets `TranslationFailed` where the base expects
+      `TranslationFailedWithDetails`, so "the details clause is missing on that shape". That was
+      read off an assertion failure, and xUnit had truncated both strings.** Printing the thrown
+      message instead says something different:
+
+      | Query | Who refuses it, and with what details |
+      |---|---|
+      | `OrderBy(c => c.IsLondon)` | **The server.** `Translation of member 'IsLondon' on entity type 'Customer' failed`. The test passes. |
+      | `OrderBy(c => c.IsLondon).ThenBy(c => ClientMethod(c))` | **The client**, first. `Translation of method '…ClientMethod' failed`. |
+      | `OrderBy(c => ClientMethod(c))` | The client, same message. |
+      | `Where(c => c.IsLondon)` | The server, member message. The test passes. |
+
+      **The details are there. They name a different reason, and both reasons are true.** The query
+      has two untranslatable operators; EF translates bottom-up and reports the inner one, and this
+      provider refuses at the boundary and reports the outer one.
+
+      **It is also not fixable in the direction EF goes, and that is the useful part.** Reporting
+      `IsLondon` would mean shipping a query the client has already established it cannot ship —
+      the member is not client code by this provider's test (`Customer` is allowlisted and
+      `IsLondon` is an ordinary member read), so only the server can name it, and the server never
+      sees this query. Visiting children before parents in `ClientEvaluationFinder` would not help
+      for the same reason: there is nothing in the inner operator for it to find.
+
+      **So this is a message-text difference, the category `limitations.md` already names two of,
+      and not a defect.** `QueryNoClientEvalTestBase`'s price is therefore **11 green, 3 red, and
+      none of the three is a defect of this provider** — two are #60's `FromSql` and one is this.
+      That is a better trade than R62 recorded, and it is the owner's call, not taken here.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
