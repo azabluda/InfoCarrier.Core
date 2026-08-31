@@ -1281,6 +1281,25 @@ re-parents of families already running, because R25–R30 showed that is where t
       one was written because the base required it rather than to lower a count.
       `test/` only.
 
+- [x] **R51. The five of the eleven that do not adopt, classified — and none is classified on its
+      name.** No code. This finishes the unread list the phase opened with: **six adopted (R46–R50),
+      five blocked, none left unread.**
+
+      | Base | Verdict, and the member that decides it |
+      |---|---|
+      | `Update.StoredProcedureUpdateTestBase` | **Blocked wholesale.** It declares **28 `public abstract Task`** members — one per test — and each provider implements them by mapping a real stored procedure (`InsertUsingStoredProcedure` and friends). Stored-procedure mapping is not supported here. **This is also the one hole R44's audit named**: a sproc parameter with `ForOriginalValue: true` takes *any* property's original, which is the single place `ToChangeEntry`'s condition would not hold — and it is unreachable for exactly this reason. |
+      | `Update.JsonUpdateTestBase<>` | **Blocked by ADR-013, and re-confirmed against EF 10 rather than taken from the record.** `public void UseTransaction(DatabaseFacade, IDbContextTransaction) => facade.UseTransaction(transaction.GetDbTransaction())` at line 3674 — **non-virtual**, and **every one of its 136 tests** routes through `ExecuteWithStrategyInTransactionAsync(CreateContext, UseTransaction, …)`. C81 measured it at 142 of 142 failing and `JsonOwnedCollectionUpdateInfoCarrierTest` is the hand-written substitute that exists because of it. Contrast R49: `RelationalTypeFixtureBase`'s is `public virtual`, and that one adopts. |
+      | `Update.StoreValueGenerationTestBase<>` | **Blocked three ways, independently.** (1) The fixture's `OnModelCreating` calls `context.GetService<ISqlGenerationHelper>()` — a relational service this client has not registered since M9. (2) It configures `HasComputedColumnSql` on the client's model. (3) **Every test asserts the backing store's command shape through the client's logger**: `Assert.Equal(ShouldExecuteInNumberOfCommands(…), Fixture.ListLoggerFactory.Log.Count(l => l.Id == RelationalEventId.CommandExecuted))`, plus `TransactionStarted`/`TransactionCommitted`. The client executes no `DbCommand` and starts no store transaction; both happen on the server, on its own context and its own logger. **What this base tests is the relational update pipeline's batching, which is EF's concern on the server and never crosses this wire.** |
+      | `Query.AdHocMiscellaneousQueryRelationalTestBase` | **#60, and the blocker is an abstract member rather than a test body** — `NullSemanticsQueryTestBase`'s shape exactly (R41). It declares `protected abstract DbContextOptionsBuilder SetParameterizedCollectionMode(DbContextOptionsBuilder, ParameterTranslationMode)`, which EF's SQLite class implements as `new SqliteDbContextOptionsBuilder(optionsBuilder).UseParameterizedCollectionMode(…)` — a relational option on the **client's** builder. A second abstract member, `Seed2951`, is `context.Database.ExecuteSqlRawAsync(...)` on the client. **Stays visible, not ignored**: #60 is undecided, and R2's rule is that an undecided base must keep being reported. |
+      | `Query.NorthwindDbFunctionsQueryRelationalTestBase<>` | **Not blocked — gated on a step of its own, and worth stating as such.** Its only real requirement is `where TFixture : NorthwindQueryRelationalFixture<NoopModelCustomizer>`, and that fixture declares `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`. Under ADR-013's 2026-08-30 amendment a cast like that blocks a base **only if a route runs through it**, which is not established here — but adopting means re-parenting `NorthwindQueryInfoCarrierFixture` onto a relational fixture base, and **every Northwind class in the suite hangs off it**. That is a change to price on its own, not a substep. Its two abstract members are trivial (`CaseInsensitiveCollation` / `CaseSensitiveCollation`, `"NOCASE"` and `"BINARY"` on SQLite). |
+
+      **Two of the five look to me like `IgnoredTestBases` candidates and neither is added here.**
+      `JsonUpdateTestBase` is the same ADR-013 shape as the already-listed `TransactionTestBase`,
+      and `StoreValueGenerationTestBase` asserts a store's command batching through a client that
+      issues no commands. Both would meet the "conceptually inapplicable" bar. **Adding to that
+      list is a permanent change to what the gate reports**, the owner named exactly six for R45,
+      and neither of these was among them — so they are classified and left visible.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
