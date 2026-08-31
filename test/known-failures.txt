@@ -1442,5 +1442,35 @@
 # Tier A cannot show either -- InMemory enforces no foreign key.
 #
 # Gates: trim ratchet OK (89 <= 89, unchanged); CI=true Release build 0 errors.
+#
+# 2026-08-31, #56 (R42). `failed` UNCHANGED at 82, `total` 27367 -> 27375. Updates moves from
+# Tier A to Tier B and onto UpdatesRelationalTestBase; the class goes 28 tests to 36, ALL GREEN.
+# Full local run Passed: 27058, Failed: 82, Total: 27375, FIXED none BROKEN none by name.
+# Compliance missing bases 46 -> 45.
+#
+# The move found a second defect of the same family as R40 and it is fixed in the same commit.
+# Swap_filtered_unique_index_values and Swap_computed_unique_index_values swap the values of a
+# unique index between two rows, and the store answered
+# SQLite Error 19: 'UNIQUE constraint failed: Products.Name, Products.Price'.
+# CommandBatchPreparer orders by VALUE dependencies as well as row ones -- one row must release a
+# unique value before another may take it -- and the only thing that says which row is releasing
+# what is the ORIGINAL value. ChangeEntryMapper sent originals for concurrency tokens and foreign
+# keys; neither Name nor Price is either, so nothing carried them. The condition now also admits
+# a property contained in a unique index.
+#
+# NOT convergence, checked: UpdatesSqliteTest overrides only Save_with_shared_foreign_key and
+# Identifiers_are_generated_correctly, so EF's own SQLite run passes both swap tests.
+#
+# Three Tier A overrides are deleted because the move makes them false: both concurrency messages
+# (they were InMemoryStrings' and the relational base states them itself), the reseed override
+# whose remark said the InMemory store "has no transaction to roll back", and EF issue #29875's,
+# which was InMemory's alone.
+#
+# Identifiers_are_generated_correctly PASSES, which was not the expectation: it asserts
+# GetTableName() on the CLIENT's model and that was predicted to hit the M9 boundary. EF Core
+# keeps the table name as a core annotation, so a client that builds no relational model still
+# has it. Measured, not assumed.
+#
+# Gates: trim ratchet OK (89 <= 89, unchanged); CI=true Release build 0 errors.
 failed=82
-total=27367
+total=27375

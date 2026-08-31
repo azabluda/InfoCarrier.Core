@@ -1031,6 +1031,50 @@ re-parents of families already running, because R25–R30 showed that is where t
       trade in every case is a handful of permanently red tests against a much larger body of
       green, and `NullSemanticsQuery` is the one where the ratio is worth the owner's attention.
 
+- [x] **R42. `Updates` moved to Tier B — 28 tests become 36, all green, and the move found a second
+      defect of R40's family.** The class re-parents onto `UpdatesRelationalTestBase` and the
+      fixture onto its nested `UpdatesRelationalFixture`. `Passed: 36, Failed: 0, Total: 36`; full
+      run `Passed: 27058, Failed: 82, Total: 27375`, FIXED none BROKEN none by name. Compliance
+      missing bases 46 → 45.
+      **Three Tier A overrides are deleted because the move makes them false** — both concurrency
+      messages (they were `InMemoryStrings`', and the relational base states them itself), the
+      reseed override whose remark said the InMemory store *"has no transaction to roll back"*, and
+      EF issue #29875's, which was InMemory's alone. `UseTransaction` is written in the same commit,
+      per D6.
+      **The defect, and it is R40's mechanism one case wider again.**
+      `Swap_filtered_unique_index_values` and `Swap_computed_unique_index_values` swap the values of
+      a unique index between two rows, and the store answered
+      `SQLite Error 19: 'UNIQUE constraint failed: Products.Name, Products.Price'`.
+      **`CommandBatchPreparer` orders by *value* dependencies as well as row ones**: one row must
+      release a unique value before another may take it, and the only thing that says which row is
+      releasing what is the **original**. `ChangeEntryMapper` sent originals for concurrency tokens
+      and foreign keys; neither `Name` nor `Price` is either. The condition now also admits a
+      property contained in a unique index, and both tests pass.
+      **Not convergence, checked rather than assumed**: `UpdatesSqliteTest` overrides only
+      `Save_with_shared_foreign_key` and `Identifiers_are_generated_correctly`, so EF's own SQLite
+      run passes both swap tests.
+      **One expectation was wrong and the measurement corrected it.**
+      `Identifiers_are_generated_correctly` asserts `GetTableName()` on the *client's* model and was
+      predicted to hit the M9 boundary. It passes: EF keeps the table name as a core annotation, so
+      a client that builds no relational model still has it.
+      `src/`, so both gates ran: trim ratchet OK (89 ≤ 89) and Release build clean.
+
+- [ ] **R43. `Translations` priced and NOT moved — 217 overrides, and the reason to hand it over.**
+      The last of the tier moves, and the one that should not be taken on a whim. EF's SQLite
+      `Translations` suite carries **217 `public override`s across six classes** —
+      `StringTranslations` 104, `MathTranslations` 66, `EnumTranslations` 18,
+      `MiscellaneousTranslations` 18, `ByteArray` 7, `Guid` 4 — plus `Operators/` and `Temporal/`
+      subdirectories. Nearly all of them are SQLite lacking a function, which says something about
+      **the store** and nothing about this provider.
+      Against that, the Tier A family is 333 tests green today, and what it exercises *is* this
+      provider's concern: every scalar type crossing the wire as a constant, a parameter or a
+      projected column, which is what `PrimitiveCoercion` and the type allowlist decide.
+      **Both relational bases constrain `TFixture` to the *core* `BasicTypesQueryFixtureBase`**, so
+      nothing technical blocks it; the cost is the 217 overrides and the judgement is whose green
+      means more. A81 says the translating tier — but A81 is about a base that could go either way,
+      and this is the one case in the phase where the answer turns on how much store-limitation
+      bookkeeping the suite should carry. **Left for the owner, priced rather than argued.**
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

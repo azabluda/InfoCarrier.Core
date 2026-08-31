@@ -146,7 +146,18 @@ public static class ChangeEntryMapper
             // A single-context EF never loses this: the original is the value the row was loaded
             // with. Only a wire does, which is why Tier A could not show it — InMemory enforces no
             // foreign key — and why R35's move to Tier B is what surfaced it.
-            if (carriesOriginals && (property.IsConcurrencyToken || property.IsForeignKey()))
+            // **A unique index counts as well as a foreign key, for the same reason.**
+            // `CommandBatchPreparer` orders by *value* dependencies, not only by row ones: when two
+            // rows swap the values of a unique index, one has to release its value before the other
+            // may take it, and the only thing that says which is releasing what is the original.
+            // `UpdatesTestBase.Swap_filtered_unique_index_values` and
+            // `Swap_computed_unique_index_values` do exactly that, and without this the store
+            // answered `SQLite Error 19: 'UNIQUE constraint failed: Products.Name, Products.Price'`.
+            // Neither property is a foreign key, so the clause above never carried them.
+            if (carriesOriginals
+                && (property.IsConcurrencyToken
+                    || property.IsForeignKey()
+                    || property.GetContainingIndexes().Any(index => index.IsUnique)))
             {
                 // The value the check is made against. Only the token's original matters: the
                 // server rebuilds the entity from the *current* values, attaches it and sets
