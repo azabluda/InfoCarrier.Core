@@ -95,7 +95,7 @@ only a fraction of what it hid.
       | Group | Count | What is known now |
       |---|---|---|
       | Needs a relational **client** API (#60) | ~18 | The five `FromSql`/`SqlQuery`/`SqlExecutor`/`ToSqlQuery` bases and the six `*SplitQuery*`/`*SplitInclude*` ones, plus `UdfDbFunction`. **Out of scope by the owner's decision**; do not design around it. |
-      | Asserts the **client's relational model** | ~12 | The nine `RelationalModelBuilderTest+*` nested bases, `ModelBuilding101RelationalTestBase`, `Scaffolding.CompiledModelRelationalTestBase`, and `JsonTypesRelationalTestBase` — the last measured in R23 at 104 red of 576 and reverted. This provider does not build a relational model on the client (M9), so these are the ADR-013 "blocked wholesale" shape rather than the "costs one test" shape. |
+      | Asserts the **client's relational model** | ~3 | The nine `RelationalModelBuilderTest+*` nested bases, `ModelBuilding101RelationalTestBase`, `Scaffolding.CompiledModelRelationalTestBase`, and `JsonTypesRelationalTestBase` — the last measured in R23 at 104 red of 576 and reverted. This provider does not build a relational model on the client (M9), so these are the ADR-013 "blocked wholesale" shape rather than the "costs one test" shape. |
       | **Re-parents of families already running** | ~11 | `Query.Translations.String*`/`Miscellaneous*`, `Update.UpdatesRelational`, `Query.ComplexTypeQueryRelational`, `Query.JsonQueryRelational`, `Query.PrimitiveCollectionsQueryRelational`, `Query.OwnedQueryRelational`, `Query.SpatialQueryRelational`, `Query.NorthwindMiscellaneousQueryRelational`, the two `BulkUpdates.*Relational`, `ManyToManyTrackingRelational` (R16 examined and deferred). **This is the R25/R26/R30 shape and is where the cheap wins are.** Several also close a `ITestSqlLoggerFactory` fixture entry as a side effect, as R25 and R30 each did. |
       | Plausibly new families or standalone | ~19 | The five `Query.AdHoc*QueryRelational`, `TransactionTestBase`, `TwoDatabasesTestBase`, `LoggingRelational`, the two `ConcurrencyDetector*Relational`, `Query.WarningsTestBase`, `Query.QueryNoClientEvalTestBase`, `Query.NullSemanticsQueryTestBase`, `Query.SharedTypeQueryRelational`, `Query.OwnedEntityQueryRelational`, `Query.NonSharedPrimitiveCollectionsQueryRelational`, `Types.RelationalTypeTestBase`, `Update.JsonUpdateTestBase`, `Update.StoreValueGenerationTestBase`. `Update.StoredProcedureUpdateTestBase` needs stored procedures and is the one here most likely to be a genuine ignore entry. |
 
@@ -873,6 +873,33 @@ re-parents of families already running, because R25–R30 showed that is where t
       **Worth an issue of its own** — same class of find as Phase U, which R19 turned up the same
       way.
       `failed` 78 → 79, `total` +1. Compliance missing bases 57 → 56, fixtures 19 → 18.
+
+- [x] **R36. All nine `RelationalModelBuilderTest` bases adopted — and the R30b inventory was
+      wrong about them.** It put these in the "asserts the client's relational model, therefore
+      blocked wholesale" group, on the strength of their names. **Reading them is what corrected
+      that**, and the correction is large: nine compliance entries close in one commit, missing
+      bases 56 → 47.
+      **Three of the nine are declared with an empty body** — `RelationalOneToManyTestBase`,
+      `RelationalManyToOneTestBase`, `RelationalOneToOneTestBase` add no test at all — and
+      `RelationalModelBuilderFixture` is `: ModelBuilderFixtureBase;` and nothing else, so the
+      fixture move is free too.
+      637/0/703 → 678/4/748: **+45 tests, 41 of them green.**
+      **The four reds are two kinds.** Three are the M9 boundary proper, where this provider does
+      not build a relational model on the client and an assertion about table splitting,
+      owned-type identity under it, or stored-procedure mapping has nothing to read:
+      `OwnedTypes.Can_use_table_splitting_with_owned_reference`,
+      `OwnedTypes.Can_configure_owned_type` and
+      `OwnedTypes.Can_use_sproc_mapping_with_owned_reference`. **That is the "costs a few tests"
+      side of ADR-013's amendment rather than the "blocked wholesale" side** — the same
+      distinction R24 drew for one test and R23 drew against `JsonTypesRelationalTestBase`'s 104.
+      The fourth, `ComplexType.Complex_properties_can_be_configured_by_type`, **fails because it
+      passes**: *"Assert.Throws() Failure: No exception was thrown"*. That is now the fourth place
+      in this phase where a spec base asserts a failure this provider does not have.
+      `failed` 79 → 83, `total` +45.
+      **The lesson, and it is R4's lesson restated: a group classified from its name is not
+      classified.** Two of the four groups in the R30b inventory have now moved when read — four
+      candidates out of the cheap group into #60 (R34), and nine out of the blocked group into
+      adopted (this step).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

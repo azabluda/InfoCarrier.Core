@@ -1365,5 +1365,34 @@
 # overrides, so EF's own SQLite run passes this test. Left failing per ADR-004 and worth an issue
 # of its own -- same class of find as Phase U, which R19 turned up the same way.
 # FIXED none. Compliance missing bases 57 -> 56, fixtures 19 -> 18.
-failed=79
-total=27311
+#
+# 2026-08-31, #56 (R36). `failed` 79 -> 83, `total` 27311 -> 27356. NINE compliance entries close
+# in one commit: all nine RelationalModelBuilderTest+Relational*TestBase nested bases.
+# ModelBuilderInfoCarrierTest re-parents onto RelationalModelBuilderTest, its fixture onto
+# RelationalModelBuilderFixture (which is `: ModelBuilderFixtureBase;` and nothing else), and the
+# nine abstract classes onto the Relational* bases. 637/0/703 -> 678/4/748: +45 tests, 41 green.
+#
+# THIS CONTRADICTS THE R30b INVENTORY, which put these nine in the "asserts the client's
+# relational model, therefore blocked wholesale" group. They are not blocked. Three of the nine --
+# RelationalOneToMany, RelationalManyToOne, RelationalOneToOne -- are declared with an empty body
+# and add no test at all, and of the six that do add tests, only two produce a failure. The group
+# was classified from its name; reading it was what corrected that.
+#
+# BROKEN 4, in two kinds.
+#
+# Three are the M9 boundary proper -- this provider does not build a relational model on the
+# client, so an assertion about table splitting, owned-type identity under table splitting, or
+# stored-procedure mapping has nothing to read:
+#   OwnedTypes.Can_use_table_splitting_with_owned_reference  (Assert.True() Failure)
+#   OwnedTypes.Can_configure_owned_type                      (Assert.Same(); got a keyless shared
+#                                                             entity type where the owned
+#                                                             navigation's was expected)
+#   OwnedTypes.Can_use_sproc_mapping_with_owned_reference    (same shape)
+# That is the "costs a few tests" side of ADR-013's amendment rather than the "blocked wholesale"
+# side, so the bases are adopted and the tests are left failing per ADR-004.
+#
+# The fourth, ComplexType.Complex_properties_can_be_configured_by_type, FAILS BECAUSE IT PASSES:
+# "Assert.Throws() Failure: No exception was thrown". Same category as R29's and R31's.
+# FIXED none. Compliance missing bases 56 -> 47, fixtures unchanged at 18.
+failed=83
+total=27356

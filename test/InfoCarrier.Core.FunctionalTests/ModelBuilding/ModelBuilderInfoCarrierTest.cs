@@ -29,43 +29,43 @@ namespace InfoCarrier.Core.FunctionalTests.ModelBuilding;
 ///         InMemory's tests, not spec base members, and are deliberately not carried.
 ///     </para>
 /// </remarks>
-public class ModelBuilderInfoCarrierTest : ModelBuilderTest
+public class ModelBuilderInfoCarrierTest : RelationalModelBuilderTest
 {
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierNonRelationship(InfoCarrierModelBuilderFixture fixture)
-        : NonRelationshipTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalNonRelationshipTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierComplexType(InfoCarrierModelBuilderFixture fixture)
-        : ComplexTypeTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalComplexTypeTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierComplexCollection(InfoCarrierModelBuilderFixture fixture)
-        : ComplexCollectionTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalComplexCollectionTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierInheritance(InfoCarrierModelBuilderFixture fixture)
-        : InheritanceTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalInheritanceTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierOneToMany(InfoCarrierModelBuilderFixture fixture)
-        : OneToManyTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalOneToManyTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierManyToMany(InfoCarrierModelBuilderFixture fixture)
-        : ManyToManyTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalManyToManyTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierManyToOne(InfoCarrierModelBuilderFixture fixture)
-        : ManyToOneTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalManyToOneTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierOneToOne(InfoCarrierModelBuilderFixture fixture)
-        : OneToOneTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalOneToOneTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
     public abstract class InfoCarrierOwnedTypes(InfoCarrierModelBuilderFixture fixture)
-        : OwnedTypesTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
+        : RelationalOwnedTypesTestBase(fixture), IClassFixture<InfoCarrierModelBuilderFixture>;
 
     /// <summary>
     ///     The model-building fixture.
@@ -78,7 +78,7 @@ public class ModelBuilderInfoCarrierTest : ModelBuilderTest
     ///     it costs nothing and travels nowhere; whether to drop the convention anyway is a
     ///     provider question, not a test one.
     /// </remarks>
-    public class InfoCarrierModelBuilderFixture : ModelBuilderFixtureBase
+    public class InfoCarrierModelBuilderFixture : RelationalModelBuilderFixture
     {
         /// <inheritdoc />
         public override TestHelpers TestHelpers
