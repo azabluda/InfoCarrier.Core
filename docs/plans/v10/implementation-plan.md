@@ -535,6 +535,34 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       the `Projection` and `Collection` ones, *"Unable to translate a collection subquery"* for
       `SetOperations`. R26a is the override subset.
 
+- [x] **R26a. The `OwnedNavigations` override subset — 8 of 8 answered, all from EF's own SQLite
+      suite.** `Passed: 336, Failed: 0, Total: 336` across all three Associations families,
+      identical to the figure before R25 and after it, so `failed` and `total` are both unchanged
+      and the baseline files do not move. Compliance missing 88 → 82, fixtures 22 → 21.
+      Adopted, and why each matched by reason first (A63):
+      • `OwnedNavigationsCollectionSqliteTest.Distinct_projected`, whole, including the
+      `TrackAll` arm EF short-circuits with *"Base test expects 'can't track owned entities'
+      exception, but with SQLite we get 'no CROSS APPLY'"* — which is exactly what R26 measured.
+      • `OwnedNavigationsSetOperationsSqliteTest.Over_associate_collection_projected`, **verbatim,
+      and this is the clearest single thing the re-parent bought.** EF writes it as
+      `Assert.ThrowsAsync<EqualException>` because the relational base asserts
+      `InsufficientInformationToIdentifyElementOfCollectionJoin` and SQLite raises APPLY instead,
+      so the nested assertion failure *is* the statement. C57 could not write it that way — the
+      class then sat on the core base, which makes no assertion to fail — and asserted the APPLY
+      message directly with a paragraph explaining the divergence. That paragraph is now deleted.
+      • The two `Projection.Select_subquery_*_related_FirstOrDefault` from
+      `OwnedJsonProjectionSqliteTest`, character for character. **EF ships no
+      `OwnedNavigationsProjectionSqliteTest` at all** — the whole class is commented out upstream
+      for EF issue #26708 — so there is nothing to adopt there and `OwnedJson`'s is the nearest
+      statement of the same limit, as C20 and C57 already found.
+      **Deliberately not adopted:** `OwnedNavigationsStructuralEqualitySqliteTest` overrides
+      several tests purely to assert golden SQL. Those pass here on the relational base's own
+      assertion, and the golden SQL is the *backing store's* statement text, which this client
+      never emits — taking them would assert nothing and would couple the file to SQLite's
+      formatting. **This is the one place the family does carry golden SQL, and it is in EF's
+      SQLite classes, never in the 35 relational bases** (verified: every `AssertSql` in those 35
+      is the declaration or an empty call).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

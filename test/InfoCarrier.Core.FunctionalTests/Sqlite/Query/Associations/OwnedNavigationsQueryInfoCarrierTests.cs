@@ -2,10 +2,13 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 using Xunit.Abstractions;
+using Xunit.Sdk;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 
@@ -55,13 +58,43 @@ public class OwnedNavigationsQueryInfoCarrierFixture : OwnedNavigationsRelationa
         => facade.UseInfoCarrierTransaction(transaction);
 }
 
-// The six OwnedNavigations facets (ADR-004), adopted bare on their relational bases: no override
-// at all, so that every failure is measured before anything is written to answer it.
+// The six OwnedNavigations facets (ADR-004). R26 adopted them bare and measured 8 red of 91;
+// R26a is the override subset, and every one of the eight was the same reason -- SQLite has no
+// APPLY -- so every override below comes from EF's own SQLite suite.
+//
+// The four `Contains_*` assertions, the two `Distinct_over_projected_*` and the two rewrites in
+// `Projection` that this file used to restate by hand are all gone: they were
+// `OwnedNavigations*RelationalTestBase`'s, and the re-parent inherits them verbatim.
+//
+// What is deliberately NOT adopted from EF's SQLite suite:
+// `OwnedNavigationsStructuralEqualitySqliteTest` overrides several tests purely to assert golden
+// SQL. Those pass here on the relational base's own assertion, and the golden SQL is the
+// *backing store's* statement text, which this client never emits -- taking them would assert
+// nothing and would couple this file to SQLite's formatting.
 
 public class OwnedNavigationsCollectionQueryInfoCarrierTest(
     OwnedNavigationsQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : OwnedNavigationsCollectionRelationalTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : OwnedNavigationsCollectionRelationalTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    /// <summary>
+    ///     <c>OwnedNavigationsCollectionSqliteTest</c>'s, adopted whole including its
+    ///     <c>TrackAll</c> arm and EF's reason for it.
+    /// </summary>
+    /// <remarks>
+    ///     Both arms measured as APPLY in R26: <c>NoTracking</c> raised
+    ///     <c>SqliteStrings.ApplyNotSupported</c> bare, and <c>TrackAll</c> reached
+    ///     <c>AssertOwnedTrackingQuery</c> expecting <i>"A tracking query is attempting to
+    ///     project"</i> and got the APPLY message instead. That is EF's comment word for word:
+    ///     <i>"Base test expects 'can't track owned entities' exception, but with SQLite we get
+    ///     'no CROSS APPLY'"</i>. Reason matched before the override was taken (A63).
+    /// </remarks>
+    public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Distinct_projected(queryTrackingBehavior));
+}
 
 public class OwnedNavigationsMiscellaneousQueryInfoCarrierTest(
     OwnedNavigationsQueryInfoCarrierFixture fixture,
@@ -76,12 +109,62 @@ public class OwnedNavigationsPrimitiveCollectionQueryInfoCarrierTest(
 public class OwnedNavigationsProjectionQueryInfoCarrierTest(
     OwnedNavigationsQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : OwnedNavigationsProjectionRelationalTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : OwnedNavigationsProjectionRelationalTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    /// <summary>
+    ///     The same APPLY limit in the same two arms, but <b>EF ships no
+    ///     <c>OwnedNavigationsProjectionSqliteTest</c> to take it from.</b> That whole class is
+    ///     commented out upstream, for EF issue #26708 (<i>"Stop generating composite keys for
+    ///     owned collections on SQLite"</i>), so there is no override there to adopt.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>OwnedJsonProjectionSqliteTest</c> is the nearest statement of the same limit and
+    ///         is where these two bodies come from, character for character including the
+    ///         <c>TrackAll</c> arm. C20 and C57 already borrowed from there for the same reason.
+    ///     </para>
+    ///     <para>
+    ///         <b>Worth recording rather than quietly enjoying: the rest of this class passes
+    ///         here.</b> R26 measured it with no override at all and only these two tests failed,
+    ///         in both arms. That is an observation about a class EF does not run, not a claim
+    ///         that #26708 is fixed, and nothing here depends on which it is.
+    ///     </para>
+    /// </remarks>
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+}
 
 public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(
     OwnedNavigationsQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : OwnedNavigationsSetOperationsRelationalTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : OwnedNavigationsSetOperationsRelationalTestBase<OwnedNavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    /// <summary>
+    ///     <c>OwnedNavigationsSetOperationsSqliteTest</c>'s, now adoptable <em>verbatim</em>, and
+    ///     that is the clearest single thing the re-parent bought.
+    /// </summary>
+    /// <remarks>
+    ///     EF writes this as <c>Assert.ThrowsAsync&lt;EqualException&gt;</c>: the relational base
+    ///     asserts <c>InsufficientInformationToIdentifyElementOfCollectionJoin</c>, SQLite raises
+    ///     the APPLY message instead, and the nested assertion failure <em>is</em> the statement.
+    ///     C57 could not write it that way, because this class then sat on the <em>core</em> base,
+    ///     which makes no assertion to fail; it asserted the APPLY message directly and explained
+    ///     the divergence in a paragraph. On the relational base EF's one line means here exactly
+    ///     what it means upstream, and the paragraph is no longer needed.
+    /// </remarks>
+    public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => Assert.ThrowsAsync<EqualException>(() => base.Over_associate_collection_projected(queryTrackingBehavior));
+}
 
 public class OwnedNavigationsStructuralEqualityQueryInfoCarrierTest(
     OwnedNavigationsQueryInfoCarrierFixture fixture,
