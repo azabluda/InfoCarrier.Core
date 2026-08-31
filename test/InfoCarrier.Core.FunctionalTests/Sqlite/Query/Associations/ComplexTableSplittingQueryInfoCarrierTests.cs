@@ -25,13 +25,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 ///         assertions that a collection query fails.
 ///     </para>
 ///     <para>
-///         <b>This is the same model that C0 called the one bend in "we adopt the core family, not
-///         the mapping-strategy variants".</b>
-///         <see cref="ComplexPropertiesQueryInfoCarrierFixture" /> mirrors
-///         <c>ComplexJsonRelationalFixtureBase</c>'s <c>ToJson()</c> by hand because a relational
-///         store has no other way to hold a complex collection. This family is the other answer to
-///         the same question: do not hold collections at all. Both are now adopted as EF states
-///         them.
+///         <b>This is one of the two answers to a question C0 could only answer once.</b> A
+///         complex collection cannot live in ordinary columns, so a relational store either puts
+///         the whole graph in a JSON column — <see cref="ComplexJsonQueryInfoCarrierFixture" />,
+///         which R30 adopted — or does not hold collections at all, which is this family. C0 had
+///         to mirror the JSON mapping by hand and had no way to state this one; both are now
+///         adopted as EF writes them, one family each.
 ///     </para>
 ///     <para>
 ///         Nothing is mirrored by hand. Its own <c>StoreName</c>, per CLAUDE.md: the Tier B store
@@ -60,7 +59,7 @@ public class ComplexTableSplittingQueryInfoCarrierFixture : ComplexTableSplittin
     ///     <c>transaction.GetDbTransaction()</c> (ADR-013), and the <c>BulkUpdate</c> class really
     ///     does run each test inside a transaction that a second context has to observe. That is
     ///     the 31-failure lesson recorded on
-    ///     <see cref="ComplexPropertiesQueryInfoCarrierFixture.UseTransaction" />.
+    ///     <see cref="ComplexJsonQueryInfoCarrierFixture.UseTransaction" />.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
         => facade.UseInfoCarrierTransaction(transaction);

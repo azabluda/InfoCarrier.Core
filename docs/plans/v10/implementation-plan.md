@@ -673,6 +673,38 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       reds, and both the exception-type difference and the "fails because it passes" case stand as
       measured.
 
+- [x] **R30. `ComplexJson` — the last family, a re-parent, and the hand copy is cashed in.** 10 red
+      of 136, all one reason. `ComplexPropertiesQueryInfoCarrierFixture` becomes
+      `ComplexJsonQueryInfoCarrierFixture` on `ComplexJsonRelationalFixtureBase`, and the seven
+      classes move from `ComplexProperties*TestBase` to `ComplexJson*RelationalTestBase`.
+      **The ~20 lines of `ToJson()` C0 mirrored by hand are deleted, and the copy was diffed
+      against the original before it went: byte-identical apart from the wording of one comment.**
+      **This is a re-parent and not an addition, and running both would be duplication rather than
+      coverage** (CLAUDE.md). The `ComplexJson*RelationalTestBase` classes derive from the
+      `ComplexProperties*TestBase` ones, so compliance resolves both transitively, and the
+      *non*-JSON complex mapping is not lost: R28 adopted it as `ComplexTableSplitting`. **Two
+      complex mappings, one family each, and no model mirrored by hand anywhere in the block any
+      more.**
+      `Passed: 126, Failed: 10, Total: 136` — and 136 is exactly the count the family had before
+      the re-parent, so no test is gained or lost. All ten are five
+      `ComplexJsonProjection` tests times two arms, all raising `SqliteStrings.ApplyNotSupported`
+      **bare in both arms** (a complex type is not tracked as an entity, so no owned-tracking
+      assertion intervenes — the same distinction R28 measured).
+      `ComplexJsonProjectionSqliteTest` has exactly those five and R30a adopts them. **No other
+      class in EF's SQLite suite for this family carries a single override**, golden SQL included.
+      **It also corrects a C0-era remark that stood on this file**, which said the `ComplexJson*`
+      bases "assert SQL and stay unadopted". They do not, and the whole block is the evidence.
+      **And it settles the #62 note the old file carried.** That note deleted an override of
+      `Contains_with_nested_and_composed_operators` — borrowed from
+      `ComplexTableSplittingStructuralEqualityRelationalTestBase` and applied to a JSON-mapped
+      model — once the query started translating, and called the result "a query this provider
+      answers that other EF providers refuse". The sharper reading now available: EF's *JSON*
+      structural-equality base asserts nothing at all, so passing there is agreement rather than
+      divergence, and R28 runs the table-splitting base where EF *does* assert the throw and this
+      provider throws. **The difference was the mapping, not the provider**, and the borrowed
+      override never should have applied to a JSON model. Deleting it was right for a reason
+      better than the one recorded.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
