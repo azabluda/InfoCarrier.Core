@@ -1468,6 +1468,45 @@ re-parents of families already running, because R25–R30 showed that is where t
       [`limitations.md`](../../../website/docs/limitations.md) still does not say so.
       Gates: trim ratchet OK (89 ≤ 89), Release build `5 Warning(s), 0 Error(s)`.
 
+- [x] **R60. Five of the six Split bases ADOPTED — 1110 tests, every one green.** Missing bases
+      30 → 25, `total` 27809 → 28919, `failed` **unchanged at 95**, FIXED none, BROKEN none. The
+      largest all-green addition in the phase, and it cost R59 plus 47 overrides.
+
+      `NorthwindSplitIncludeQueryTestBase`, `NorthwindSplitIncludeNoTrackingQueryTestBase`,
+      `ComplexNavigationsCollectionsSplitQueryRelationalTestBase`,
+      `ComplexNavigationsCollectionsSplitSharedTypeQueryRelationalTestBase`,
+      `CompositeKeysSplitQueryRelationalTestBase`. All five were withheld by R41's #60 rule.
+
+      **The family splits in two, and the probe is what showed it.** The two Northwind bases append
+      `AsSplitQuery` **once, at the top of the chain**; the other three insert it **at every query
+      root**, through a `SplitQueryRewritingExpressionVisitor` over `EntityQueryRootExpression`.
+      Bare, the first pair measured `Passed: 452, Failed: 20, Total: 472` — eight `ApplyNotSupported`
+      that EF's own SQLite classes override and four that were the ignore itself. The second group
+      measured **456 red of 638**, with 106 of this provider's own *"reads navigation X, but no
+      query sent to the server returned it"* and the rest **wrong answers**. Two orders of magnitude
+      apart on the same hint, which is what said the top-of-chain reading was incomplete and sent
+      this to R59.
+
+      **With R59 in, all five adopt green.** The remaining 86 reds were every one
+      `SqliteStrings.ApplyNotSupported`, and 47 overrides close them.
+
+      **Where not splitting shows is the override count, not the failure count, and that is the
+      honest price.** EF's `ComplexNavigationsCollectionsSplitQuerySqliteTest` overrides 20 and ours
+      overrides 23. The four extra —
+      `Filtered_include_after_different_filtered_include_different_level`, both
+      `Filtered_include_complex_three_level_with_middle_having_filter*`, and
+      `Skip_Take_on_grouping_element_with_collection_include` — are tests a real split query answers
+      in a second statement and a single statement cannot, because SQLite has no `APPLY`. **Each of
+      the four is already overridden identically in the unsplit sibling class**, taken from EF's own
+      unsplit SQLite class, so the assertion is EF's own about the same query and the same store.
+      The shared-type class shows the same four, 17 of EF's becoming 20.
+      **One of EF's is deliberately absent from both**, as in the unsplit siblings:
+      `Projecting_collection_after_optional_reference_correlated_with_parent` passes here.
+
+      **The sixth, `AdHocQuerySplittingQueryTestBase`, does not adopt** and it is not the hint that
+      stops it — see R61.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

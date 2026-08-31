@@ -1643,5 +1643,37 @@
 # `src/`, so both gates ran: trim ratchet OK (89 <= 89), and `CI=true dotnet build --configuration
 # Release` reports 5 Warning(s), 0 Error(s) -- the documented Razor baseline.
 # ---------------------------------------------------------------------------------------------
+# 2026-08-31 (R60) -- `failed` UNCHANGED at 95, `total` 27809 -> 28919. FIXED none, BROKEN none.
+# **1110 new tests and every one green**, which is the largest single addition in the phase and the
+# largest all-green one in the file.
+#
+# Five spec bases, all of them ones R41 stood aside from because they need `AsSplitQuery`:
+# `NorthwindSplitIncludeQueryTestBase`, `NorthwindSplitIncludeNoTrackingQueryTestBase`,
+# `ComplexNavigationsCollectionsSplitQueryRelationalTestBase`,
+# `ComplexNavigationsCollectionsSplitSharedTypeQueryRelationalTestBase` and
+# `CompositeKeysSplitQueryRelationalTestBase`. Compliance missing bases 30 -> 25.
+#
+# THE PROBE IS WHAT FOUND R59, and the order matters. Bare, the three that insert the hint at every
+# query root measured **456 red of 638** -- 106 of them this provider's own "reads navigation X, but
+# no query sent to the server returned it" and the rest wrong answers. That is not what a silently
+# ignored hint looks like, and reading why produced R59. With R59 in, the same three measure 86 red
+# of 638 and every one of the 86 is `SqliteStrings.ApplyNotSupported`.
+#
+# THE OVERRIDE COUNT IS WHERE NOT SPLITTING SHOWS, and it is worth reading as a price. EF's own
+# `ComplexNavigationsCollectionsSplitQuerySqliteTest` overrides 20; ours overrides 23. The four
+# extra -- `Filtered_include_after_different_filtered_include_different_level`, the two
+# `Filtered_include_complex_three_level_with_middle_having_filter*` and
+# `Skip_Take_on_grouping_element_with_collection_include` -- are tests a real split query answers in
+# a second statement and a single statement cannot, because SQLite has no `APPLY`. Each of the four
+# is already overridden the same way in the UNSPLIT sibling class, from EF's own unsplit SQLite
+# class, so the assertion is EF's about the same query. The same four appear in the shared-type
+# class, 17 of EF's becoming 20. One of EF's is deliberately absent in both:
+# `Projecting_collection_after_optional_reference_correlated_with_parent` passes here.
+#
+# `CompositeKeysSplitQueryInfoCarrierTest` needs no override at all, and neither Northwind class
+# needs one beyond the four `ApplyNotSupported` its unsplit sibling already has.
+#
+# `test/` only, so eng/measure.sh's axis and not the trim ratchet.
+# ---------------------------------------------------------------------------------------------
 failed=95
-total=27809
+total=28919

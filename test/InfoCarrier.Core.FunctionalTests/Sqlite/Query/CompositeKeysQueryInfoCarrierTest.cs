@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
@@ -27,6 +27,18 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 /// </remarks>
 public class CompositeKeysQueryInfoCarrierTest(CompositeKeysQueryInfoCarrierFixture fixture)
     : CompositeKeysQueryRelationalTestBase<CompositeKeysQueryInfoCarrierFixture>(fixture);
+
+/// <summary>
+///     <c>CompositeKeysSplitQueryRelationalTestBase</c> on Tier B — the composite-key corpus with
+///     <c>AsSplitQuery</c> applied at every query root.
+/// </summary>
+/// <remarks>
+///     No overrides, and none is needed: the hint is removed before the boundary analysis, so this
+///     class asks the server exactly what the class above asks it, and every test answers the
+///     same. EF's own <c>CompositeKeysSplitQuerySqliteTest</c> is a one-liner too.
+/// </remarks>
+public class CompositeKeysSplitQueryInfoCarrierTest(CompositeKeysQueryInfoCarrierFixture fixture)
+    : CompositeKeysSplitQueryRelationalTestBase<CompositeKeysQueryInfoCarrierFixture>(fixture);
 
 /// <summary>
 ///     The composite-keys query fixture, wired to a SQLite backend behind the wire.
