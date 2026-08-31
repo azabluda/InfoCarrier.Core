@@ -846,6 +846,34 @@ re-parents of families already running, because R25–R30 showed that is where t
       **The correction to make in the R4 notes: the "re-parents of families already running" group
       is ~11, not ~15, and the #60 group is ~18, not ~14.**
 
+- [x] **R35. `ManyToManyTracking` moved to Tier B — and it found a real defect.** R16 examined this
+      move and deferred it. What makes it worth taking is R13a's lesson: **the move is what makes
+      the tests real.** 200/0/200 → 200/1/201.
+      **The `UseTransaction` override is written in the same commit as the store switch**, and this
+      is the case CLAUDE.md D6 is about rather than a formality: the core base routes **47** call
+      sites through `ExecuteWithStrategyInTransactionAsync`, each opening one transaction every
+      other context must enlist in. On Tier A it was ignored; here it is real, and the run
+      completes in six seconds instead of producing D6's lock-timeout shape.
+      **Two things the Tier A class asserted about itself are deleted, because the move makes them
+      false.** The `ExecuteWithStrategyInTransactionAsync` reseed override said *"without a real
+      transaction there is no rollback to undo the test's mutations"* — true of InMemory, false
+      here. And `SupportsDatabaseDefaults => false` said *"the backend is the InMemory store, which
+      has no database default values"*; the fixture now declares the six `HasDefaultValue` /
+      `HasDefaultValueSql` statements EF's own SQLite fixture declares.
+      The relational base's one added test, `Many_to_many_delete_behaviors_are_set`, **passes**.
+      **`Can_delete_with_many_to_many` breaks, and it is a real defect of this provider.** It
+      deletes an `EntityOne` and an `EntityTwo` whose `JoinOneToTwo` rows are cascade-deleted, and
+      the server reports `SQLite Error 19: 'FOREIGN KEY constraint failed'`. The join rows must be
+      deleted before their principals — a relational provider's `CommandBatchPreparer`
+      topologically sorts for exactly this — and something in the wire round trip does not preserve
+      that order. **InMemory enforces no foreign key, so on Tier A this passed while saying
+      nothing.**
+      **Not convergence, and that was checked rather than assumed**: `ManyToManyTrackingSqliteTest`
+      declares zero test overrides, so EF's own SQLite run passes it. Left failing per ADR-004.
+      **Worth an issue of its own** — same class of find as Phase U, which R19 turned up the same
+      way.
+      `failed` 78 → 79, `total` +1. Compliance missing bases 57 → 56, fixtures 19 → 18.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

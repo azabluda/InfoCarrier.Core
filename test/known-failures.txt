@@ -1340,5 +1340,30 @@
 #
 # FIXED none, BROKEN none, known-failures.names.txt unchanged.
 # Compliance missing bases 59 -> 57, fixtures 20 -> 19.
-failed=78
-total=27310
+#
+# 2026-08-31, #56 (R35). `failed` 78 -> 79, `total` 27310 -> 27311. ManyToManyTracking moves from
+# Tier A to Tier B and onto ManyToManyTrackingRelationalTestBase, which R16 examined and deferred.
+# The class goes 200 passed / 0 failed / 200 total to 200 passed / 1 failed / 201 total.
+#
+# The relational base's one added test, Many_to_many_delete_behaviors_are_set, PASSES. Two things
+# the Tier A class asserted about itself are deleted because the move makes them false, which is
+# R13a's lesson again: the ExecuteWithStrategyInTransactionAsync reseed override (its remark said
+# "without a real transaction there is no rollback", true of InMemory and false here -- the base
+# routes 47 call sites through that helper and each now really rolls back) and
+# SupportsDatabaseDefaults => false. The UseTransaction override is written in the same commit as
+# the store switch, per CLAUDE.md D6; without it those 47 transactions would have produced the
+# lock-timeout shape D6 records, and the run instead completes in 6 seconds.
+#
+# BROKEN 1: Can_delete_with_many_to_many, and it is a REAL DEFECT OF THIS PROVIDER that only a
+# real store could expose. It deletes an EntityOne and an EntityTwo whose JoinOneToTwo rows are
+# cascade-deleted, and the server reports SQLite Error 19: 'FOREIGN KEY constraint failed'. The
+# join rows must be deleted before their principals; a relational provider's CommandBatchPreparer
+# topologically sorts for exactly this, and something in the wire round trip does not preserve it.
+# InMemory enforces no foreign key, so on Tier A this passed while saying nothing.
+#
+# NOT convergence, checked rather than assumed: ManyToManyTrackingSqliteTest declares zero test
+# overrides, so EF's own SQLite run passes this test. Left failing per ADR-004 and worth an issue
+# of its own -- same class of find as Phase U, which R19 turned up the same way.
+# FIXED none. Compliance missing bases 57 -> 56, fixtures 19 -> 18.
+failed=79
+total=27311
