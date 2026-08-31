@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -14,9 +14,19 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     context remotes through the InfoCarrier backend store (InMemory first).
 /// </summary>
 /// <typeparam name="TModelCustomizer">The model customizer.</typeparam>
-public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
+public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>, ITestSqlLoggerFactory
     where TModelCustomizer : ITestModelCustomizer, new()
 {
+    /// <summary>
+    ///     The compliance gate's second assertion (R54). The property is real —
+    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
+    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
+    ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
+    ///     server's statements can actually be read.
+    /// </summary>
+    public TestSqlLoggerFactory TestSqlLoggerFactory
+        => (TestSqlLoggerFactory)ListLoggerFactory;
+
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
     /// <inheritdoc />

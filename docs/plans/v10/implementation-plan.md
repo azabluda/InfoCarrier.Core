@@ -1300,6 +1300,27 @@ re-parents of families already running, because R25–R30 showed that is where t
       list is a permanent change to what the gate reports**, the owner named exactly six for R45,
       and neither of these was among them — so they are classified and left visible.
 
+- [x] **R54. The fixture gate closed — 17 → 0, and `failed` 82 → 81.**
+      `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` is **green**, which is the
+      first of the two compliance tests to go green at all. Full run
+      `Passed: 27167, Failed: 81, Total: 27483`; **FIXED 1** (that test), **BROKEN none**, `total`
+      unchanged. R50 found the change is one member and did it for one fixture because a base
+      required it; this does the other seventeen. Fifteen declarations edited, two inherit it.
+
+      **The member is real, not a suppression, and that was checked rather than assumed.**
+      `InfoCarrierTestStoreFactory.CreateListLoggerFactory` returns `new TestSqlLoggerFactory(...)`,
+      so the cast holds for every fixture using an InfoCarrier store factory — which all 17 do —
+      and **the same cast is already exercised at runtime** by R50's Spatial fixture and by the
+      `Associations` families, whose relational bases read it through `RelationalQueryAsserter`.
+
+      **What it is worth is smaller than green suggests, and each fixture says so in its own
+      remarks.** The property observes the **client's** log, and this client has no database and
+      emits no SQL; `ServerSqlLog` is where the server's statements can be read. That is the same
+      honesty `NavigationsQueryInfoCarrierTests` already carries about `AssertSql`. The gate asks
+      whether a fixture can produce a `TestSqlLoggerFactory`, and the answer here is truthfully
+      yes.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

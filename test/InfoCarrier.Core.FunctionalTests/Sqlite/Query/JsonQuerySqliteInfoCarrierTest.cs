@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -244,8 +244,18 @@ public class JsonQuerySqliteInfoCarrierTest(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
 
-    public class JsonQuerySqliteInfoCarrierFixture : JsonQueryFixtureBase
+    public class JsonQuerySqliteInfoCarrierFixture : JsonQueryFixtureBase, ITestSqlLoggerFactory
     {
+        /// <summary>
+        ///     The compliance gate's second assertion (R54). The property is real —
+        ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
+        ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
+        ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
+        ///     server's statements can actually be read.
+        /// </summary>
+        public TestSqlLoggerFactory TestSqlLoggerFactory
+            => (TestSqlLoggerFactory)ListLoggerFactory;
+
         private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName

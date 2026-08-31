@@ -1507,5 +1507,30 @@
 # 0 errors (it was 4 first -- two EF1001 for SqliteStrings and two IDE0005 -- and Debug reported
 # none of them, which is exactly what CLAUDE.md warns Debug hides).
 # ---------------------------------------------------------------------------------------------
-failed=82
+#
+# ---------------------------------------------------------------------------------------------
+# R54 (2026-08-31): failed 82 -> 81, total UNCHANGED at 27483. FIXED 1, BROKEN none.
+#
+# The one fixed test is InfoCarrierComplianceTest
+# .All_query_test_fixtures_must_implement_ITestSqlLoggerFactory, and it is now GREEN: the 17
+# remaining query fixtures each gained the one member the gate asks for,
+# `public TestSqlLoggerFactory TestSqlLoggerFactory => (TestSqlLoggerFactory)ListLoggerFactory`.
+# 15 declarations were edited; two more inherit it.
+#
+# THE MEMBER IS REAL, NOT A SUPPRESSION. InfoCarrierTestStoreFactory.CreateListLoggerFactory
+# returns `new TestSqlLoggerFactory(...)`, so the cast holds for every fixture that uses an
+# InfoCarrier store factory -- which all 17 do -- and the same cast is already exercised at
+# runtime by R50's Spatial fixture and by the Associations families, whose relational bases read
+# it through RelationalQueryAsserter.
+#
+# WHAT IT IS WORTH IS SMALLER THAN GREEN SUGGESTS, and the fixtures say so in their own remarks:
+# the property observes the CLIENT's log, and this client has no database and emits no SQL.
+# `ServerSqlLog` is where the server's statements can be read. The gate asked whether a fixture
+# can produce a TestSqlLoggerFactory; the answer is honestly yes.
+#
+# The other compliance test stays red at 33 missing bases, so that number is still not in here.
+#
+# Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
+# ---------------------------------------------------------------------------------------------
+failed=81
 total=27483
