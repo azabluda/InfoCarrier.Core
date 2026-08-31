@@ -598,6 +598,27 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       what falls is what their assertion prints (95 → 82 bases, 23 → 21 fixtures), not their
       status.
 
+- [x] **R28. `ComplexTableSplitting` — 4 red of 115, same reason again, and EF has the override
+      this time.** A new fixture on `ComplexTableSplittingRelationalFixtureBase` and five classes
+      adopted bare. **Five and not seven: EF ships no `Collection` or `SetOperations` class, and
+      that follows from the model rather than from EF's convenience — a complex collection cannot
+      be table-split at all**, so the fixture both `Ignore`s every collection and nulls it out of
+      the seed data, and there is nothing for those two facets to run against.
+      `Passed: 111, Failed: 4, Total: 115`. The four are the same two
+      `Projection.Select_subquery_*_related_FirstOrDefault` tests in both arms, all four raising
+      `SqliteStrings.ApplyNotSupported` bare — **no `TrackAll` wrapper this time**, because a
+      complex type is not tracked as an entity and there is no owned-tracking assertion in the way.
+      **`ComplexTableSplittingProjectionSqliteTest` exists and carries exactly those two
+      overrides**, so unlike R26a and R27a this one is adopted from the family's own SQLite class
+      rather than a sibling's. R28a takes them verbatim.
+      **This family is the other half of a question C0 answered once.**
+      `ComplexPropertiesQueryInfoCarrierFixture` mirrors `ComplexJsonRelationalFixtureBase`'s
+      `ToJson()` because a relational store has no other way to hold a complex collection; this
+      family is the other answer to the same question — do not hold collections at all. Both are
+      now adopted as EF states them.
+      Nothing of EF's is left unadopted here: the rest of its SQLite suite for this family is bare,
+      with **no golden SQL anywhere in it**.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
