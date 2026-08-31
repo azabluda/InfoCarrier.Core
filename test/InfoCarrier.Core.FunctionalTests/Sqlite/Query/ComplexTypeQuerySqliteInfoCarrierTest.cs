@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
@@ -23,65 +22,35 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///     translate a complex property access at all, and ships no complex-type query test of any
 ///     kind. The SQLite one does, so this is the tier the base belongs on.
 ///     <para>
-///         The core base rather than <c>ComplexTypeQueryRelationalTestBase</c>: the relational one
-///         asserts SQL, which a client with no database has none of.
+///         <b>R32 re-parented this onto <c>ComplexTypeQueryRelationalTestBase</c>, and the remark
+///         that stood here was wrong.</b> It said the relational base "asserts SQL, which a client
+///         with no database has none of". It does not: its six overrides each assert an
+///         <em>exception message</em> and then call an empty <c>AssertSql()</c> meaning "nothing
+///         was executed". That is the same C0-era misreading R30 corrected for the
+///         <c>ComplexJson</c> bases, and it had cost this file six hand-written copies of
+///         overrides it could have inherited.
+///     </para>
+///     <para>
+///         What the empty <c>AssertSql()</c> is worth here, stated plainly: it reads the
+///         <em>client's</em> <c>TestSqlLoggerFactory</c>, and this client emits no SQL, so it
+///         passes trivially. Weaker than on SQLite, not false.
 ///     </para>
 /// </remarks>
 public class ComplexTypeQuerySqliteInfoCarrierTest(
     ComplexTypeQuerySqliteInfoCarrierTest.ComplexTypeQuerySqliteInfoCarrierFixture fixture)
-    : ComplexTypeQueryTestBase<ComplexTypeQuerySqliteInfoCarrierTest.ComplexTypeQuerySqliteInfoCarrierFixture>(fixture)
+    : ComplexTypeQueryRelationalTestBase<ComplexTypeQuerySqliteInfoCarrierTest.ComplexTypeQuerySqliteInfoCarrierFixture>(
+        fixture)
 {
-    /// <inheritdoc />
-    /// <remarks>
-    ///     The six overrides below and the two after them are EF's own, and they are here because
-    ///     the *backing store* is relational: `ComplexTypeQueryRelationalTestBase` carries the
-    ///     first six (a subquery over a complex type, and a set operation between two different
-    ///     ones, are limits every relational provider has) and `ComplexTypeQuerySqliteTest` the
-    ///     last two (`ApplyNotSupported`). CLAUDE.md's rule — grep the relational base as well as
-    ///     SQLite's own suite — is what finds the first group.
-    /// </remarks>
-    public override async Task Subquery_over_complex_type(bool async)
-        => Assert.Equal(
-            RelationalStrings.SubqueryOverComplexTypesNotSupported("Customer.ShippingAddress#Address"),
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Subquery_over_complex_type(async))).Message);
+    // R32 deleted six overrides here -- the two `Subquery_over_*` and the four
+    // `Concat_`/`Union_two_different_*`. Every one was `ComplexTypeQueryRelationalTestBase`'s,
+    // copied in by hand because that base was believed to assert SQL, and the re-parent now
+    // inherits them verbatim. What is left below is EF's `ComplexTypeQuerySqliteTest` pair, which
+    // the relational base does not carry.
 
-    /// <inheritdoc cref="Subquery_over_complex_type" />
-    public override async Task Subquery_over_struct_complex_type(bool async)
-        => Assert.Equal(
-            RelationalStrings.SubqueryOverComplexTypesNotSupported("ValuedCustomer.ShippingAddress#AddressStruct"),
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Subquery_over_struct_complex_type(async))).Message);
-
-    /// <inheritdoc cref="Subquery_over_complex_type" />
-    public override async Task Concat_two_different_complex_type(bool async)
-        => Assert.Equal(
-            RelationalStrings.SetOperationOverDifferentStructuralTypes(
-                "Customer.ShippingAddress#Address", "Customer.BillingAddress#Address"),
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Concat_two_different_complex_type(async))).Message);
-
-    /// <inheritdoc cref="Subquery_over_complex_type" />
-    public override async Task Union_two_different_complex_type(bool async)
-        => Assert.Equal(
-            RelationalStrings.SetOperationOverDifferentStructuralTypes(
-                "Customer.ShippingAddress#Address", "Customer.BillingAddress#Address"),
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Union_two_different_complex_type(async))).Message);
-
-    /// <inheritdoc cref="Subquery_over_complex_type" />
-    public override async Task Concat_two_different_struct_complex_type(bool async)
-        => Assert.Equal(
-            RelationalStrings.SetOperationOverDifferentStructuralTypes(
-                "ValuedCustomer.ShippingAddress#AddressStruct", "ValuedCustomer.BillingAddress#AddressStruct"),
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Concat_two_different_struct_complex_type(async))).Message);
-
-    /// <inheritdoc cref="Subquery_over_complex_type" />
-    public override async Task Union_two_different_struct_complex_type(bool async)
-        => Assert.Equal(
-            RelationalStrings.SetOperationOverDifferentStructuralTypes(
-                "ValuedCustomer.ShippingAddress#AddressStruct", "ValuedCustomer.BillingAddress#AddressStruct"),
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Union_two_different_struct_complex_type(async))).Message);
-
-    /// <inheritdoc cref="Subquery_over_complex_type" />
+    /// <summary>
+    ///     <c>ComplexTypeQuerySqliteTest</c>'s two: the query reaches SQL and asks SQLite for
+    ///     <c>APPLY</c>, which it does not have.
+    /// </summary>
     public override async Task Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -89,7 +58,7 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
                 () => base.Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(async)))
             .Message);
 
-    /// <inheritdoc cref="Subquery_over_complex_type" />
+    /// <inheritdoc cref="Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection" />
     public override async Task Same_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -97,7 +66,13 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
                 () => base.Same_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(async)))
             .Message);
 
-    public class ComplexTypeQuerySqliteInfoCarrierFixture : ComplexTypeQueryFixtureBase
+    /// <remarks>
+    ///     Moved onto <c>ComplexTypeQueryRelationalFixtureBase</c> in R32, which the relational
+    ///     base's <c>TFixture</c> constraint requires. That base adds one member and no model: the
+    ///     <c>ITestSqlLoggerFactory</c> implementation, which also drops this fixture from the
+    ///     compliance test's second list.
+    /// </remarks>
+    public class ComplexTypeQuerySqliteInfoCarrierFixture : ComplexTypeQueryRelationalFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
 

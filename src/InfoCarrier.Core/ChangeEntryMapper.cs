@@ -124,14 +124,40 @@ public static class ChangeEntryMapper
             // `ProxyGraphUpdates` reached a store that enforces them (J3); Tier A cannot show it,
             // and a single-context EF never loses the originals in the first place.
             //
-            // `Modified` only, and foreign keys only. C42 measured the symmetric temptation —
-            // sending every propagated foreign key *back* — at **1 fixed, 2 broken**, and the rule
-            // it established holds in this direction too: send what the other side cannot derive,
-            // and nothing else. A `Deleted` entry needs no ordering hint, because the row it
-            // releases is the one being deleted.
+            // Foreign keys only. C42 measured the symmetric temptation — sending every propagated
+            // foreign key *back* — at **1 fixed, 2 broken**, and the rule it established is what
+            // this satisfies: send what the other side cannot derive, and nothing else.
+            //
+            // **`Deleted` as well as `Modified`, and the sentence that used to stand here was
+            // wrong.** It read: *"a `Deleted` entry needs no ordering hint, because the row it
+            // releases is the one being deleted"*. That holds while the deleted row is only ever
+            // a dependent. It is false the moment **one deleted row is a dependent of another**,
+            // and then the missing original is exactly what misorders the batch:
+            //
+            //   `ManyToManyTrackingTestBase.Can_delete_with_many_to_many` deletes an `EntityOne`
+            //   and an `EntityTwo` in one call, and `EntityTwo.CollectionInverseId` points at that
+            //   very `EntityOne`. EF's own `ClientSetNull` fixup nulls the FK on the client before
+            //   the entry is sent, so the *current* value carries no edge either; the server then
+            //   rebuilds the row with a null FK, snapshots originals from it, and
+            //   `CommandBatchPreparer` sees nothing to order. It emitted
+            //   `DELETE FROM "EntityOnes"` first and the store answered
+            //   `SQLite Error 19: 'FOREIGN KEY constraint failed'`.
+            //
+            // A single-context EF never loses this: the original is the value the row was loaded
+            // with. Only a wire does, which is why Tier A could not show it — InMemory enforces no
+            // foreign key — and why R35's move to Tier B is what surfaced it.
+            // **A unique index counts as well as a foreign key, for the same reason.**
+            // `CommandBatchPreparer` orders by *value* dependencies, not only by row ones: when two
+            // rows swap the values of a unique index, one has to release its value before the other
+            // may take it, and the only thing that says which is releasing what is the original.
+            // `UpdatesTestBase.Swap_filtered_unique_index_values` and
+            // `Swap_computed_unique_index_values` do exactly that, and without this the store
+            // answered `SQLite Error 19: 'UNIQUE constraint failed: Products.Name, Products.Price'`.
+            // Neither property is a foreign key, so the clause above never carried them.
             if (carriesOriginals
                 && (property.IsConcurrencyToken
-                    || (entry.EntityState == EntityState.Modified && property.IsForeignKey())))
+                    || property.IsForeignKey()
+                    || property.GetContainingIndexes().Any(index => index.IsUnique)))
             {
                 // The value the check is made against. Only the token's original matters: the
                 // server rebuilds the entity from the *current* values, attaches it and sets

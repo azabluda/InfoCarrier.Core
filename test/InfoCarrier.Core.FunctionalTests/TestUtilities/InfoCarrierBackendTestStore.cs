@@ -212,9 +212,17 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // file rather than output attached to a failing test.
         if (ServerSqlLog.IsEnabled)
         {
+            // CommandError as well as CommandExecuted. A statement that *failed* is the one a
+            // diagnostic most needs and the one CommandExecuted never carries, because it is
+            // logged only on success -- so the log used to stop at the last statement that
+            // worked and stay silent about the one that did not. Found while tracing the
+            // ManyToManyTracking foreign-key failure R35 uncovered.
             builder = builder.LogTo(
                 ServerSqlLog.Write,
-                [Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted]);
+                [
+                    Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted,
+                    Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandError,
+                ]);
         }
 
         return _testStoreProperties.OnAddOptions?.Invoke(builder) ?? builder;

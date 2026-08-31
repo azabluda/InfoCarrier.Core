@@ -1244,5 +1244,233 @@
 # assumption disqualified JsonTypesRelationalTestBase wholesale in R23; here it costs one test,
 # which is the distinction ADR-013's amendment draws, so the base is adopted and the test is left
 # failing per ADR-004. FIXED none.
-failed=71
-total=27026
+#
+# 2026-08-31, #56 (R25-R27a). `failed` UNCHANGED at 71, `total` 27026 -> 27096 for the 70 tests
+# the new OwnedTableSplitting family brings. The Query.Associations relational block adopts the
+# 35 `*RelationalTestBase` classes; R25 (Navigations, 7) and R26/R26a (OwnedNavigations, 6) are
+# pure re-parents of families already running and add no test at all -- measured as
+# `Passed: 336, Failed: 0, Total: 336` before and after each. R27/R27a adds the four
+# OwnedTableSplitting classes, a family this repository has never run: `Passed: 406, Failed: 0,
+# Total: 406` for the whole Associations tree afterwards, so all 70 are green.
+#
+# FIXED none, BROKEN none, and known-failures.names.txt is unchanged: no failure is added or
+# removed. The two InfoCarrierComplianceTest entries stay in it and stay red by design -- the
+# missing-base list falls 95 -> 82 and the missing-fixture list 23 -> 21, which lowers what the
+# assertion prints without making it pass.
+#
+# The +70 is the delta measured by a local --filter run, to be confirmed by CI's Spec ratchet,
+# which is the only thing that produces the absolute figures.
+#
+# 2026-08-31, #56 (R28/R28a). `failed` UNCHANGED at 71, `total` 27096 -> 27211 for the 115 tests
+# the new ComplexTableSplitting family brings, all of them green:
+# `Passed: 521, Failed: 0, Total: 521` for the whole Query.Associations tree afterwards, which is
+# R27a's 406 plus this family's 115. FIXED none, BROKEN none, names file unchanged.
+#
+# Compliance missing bases 78 -> 73, fixtures unchanged at 21. Both InfoCarrierComplianceTest
+# entries stay red by design.
+#
+# 2026-08-31, #56 (R29/R29a). `failed` 71 -> 75, `total` 27211 -> 27298. The new OwnedJson family
+# brings 87 tests, of which 83 pass: `Passed: 604, Failed: 4, Total: 608` for the whole
+# Query.Associations tree afterwards, which is R28a's 521 plus this family's 87. FIXED none,
+# BROKEN none -- the 4 are new tests that arrive red, not regressions, and known-failures.names.txt
+# gains exactly those 4 names.
+#
+# All 4 are in OwnedJsonStructuralEqualityQueryInfoCarrierTest and they are TWO different things.
+#
+# Three are an exception-type difference on a path that is unsupported either way:
+# Contains_with_parameter, Contains_with_operators_composed_on_the_collection and
+# Contains_with_nested_and_composed_operators. The relational base asserts KeyNotFoundException;
+# this provider raises InvalidOperationException, "No backing field could be found for property
+# '...NestedCollection#NestedAssociateType.AssociateTypeRootEntityId' and the property does not
+# have a getter". Both are the owned JSON collection's synthetic key machinery failing to be read,
+# differing in which point of it fails first. EF's own OwnedJsonStructuralEqualitySqliteTest has
+# no override to adopt -- it overrides these only to assert golden SQL and calls base for the
+# behaviour -- and writing one of ours would be overriding a spec test to make the suite green.
+# Left failing per ADR-004. Contains_with_inline, which the base asserts as
+# InvalidOperationException, passes.
+#
+# The fourth, Associate_with_parameter_null, FAILS BECAUSE IT PASSES. The relational base wraps
+# it in Assert.ThrowsAsync<EqualException> citing EF issue #36401 -- EF expects a wrong answer
+# here -- and this provider returns the right one, so no EqualException is thrown and the wrapper
+# is what fails. That is the R21/R22 category: a query this provider answers that other EF
+# providers get wrong. Left failing rather than papered over, because the red is the evidence.
+# Candidate for website/docs/limitations.md, which is governed by doc-style.md and not touched
+# here.
+#
+# Compliance missing bases 73 -> 67, fixtures unchanged at 21.
+#
+# 2026-08-31, #56 (R31). `failed` 75 -> 78, `total` UNCHANGED at 27298.
+# PrimitiveCollectionsQuerySqliteInfoCarrierTest is re-parented from the core
+# PrimitiveCollectionsQueryTestBase onto PrimitiveCollectionsQueryRelationalTestBase, closing one
+# compliance entry. The relational base adds no test, so the class stays at 165 total; it goes
+# 162 passed / 0 failed to 159 passed / 3 failed. The fixture does NOT move: that base constrains
+# TFixture to the core PrimitiveCollectionsQueryFixtureBase and calls no AssertSql.
+#
+# Four hand-mirrored overrides are deleted -- they were that base's, copied in when the test
+# project did not reference the relational specification assembly (pre-ADR-013).
+#
+# BROKEN 3, AND ALL THREE FAIL BECAUSE THEY PASS:
+#   Parameter_collection_in_subquery_and_Convert_as_compiled_query
+#   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query
+#   Column_collection_equality_inline_collection_with_parameters
+# Each is one of the base's three remaining overrides, asserting that translation must fail, and
+# each reports "Assert.Throws() Failure: No exception was thrown". They are one defect on EF's
+# side and EF's own TODO states it: array indexing becomes a subquery with a CAST over it, the
+# type-mapping inference does not propagate inside, and the parameter is left without a mapping.
+# This provider does not reach that state and the base tests' own result assertions hold, so the
+# answers are right rather than merely un-thrown. Not overridden -- there is no grandparent to
+# call, and asserting the correct behaviour to turn the red green would be overriding a spec test
+# to make the suite green. FIXED none.
+#
+# With R29's OwnedJson.Associate_with_parameter_null this makes FOUR standing failures of the
+# "a query this provider answers that other EF providers refuse" kind. That is now enough to be
+# worth a website/docs/limitations.md entry.
+#
+# 2026-08-31, #56 (R32, R33). `failed` UNCHANGED at 78, `total` 27298 -> 27310.
+#
+# R32 re-parents ComplexTypeQuerySqliteInfoCarrierTest onto ComplexTypeQueryRelationalTestBase and
+# its fixture onto ComplexTypeQueryRelationalFixtureBase. The relational base adds no test and six
+# hand-mirrored overrides are deleted, so the class stands at 150 passed / 0 failed / 151 total,
+# identical before and after. It closes TWO compliance entries: one base and one fixture, the
+# latter because the relational fixture base supplies ITestSqlLoggerFactory.
+#
+# R33 re-parents NonSharedModelBulkUpdatesInfoCarrierTest onto
+# NonSharedModelBulkUpdatesRelationalTestBase, which takes the same NonSharedFixture and adds six
+# tests of its own. The class goes 22 -> 34 tests, ALL 34 GREEN, hence total +12 with failed flat.
+#
+# FIXED none, BROKEN none, known-failures.names.txt unchanged.
+# Compliance missing bases 59 -> 57, fixtures 20 -> 19.
+#
+# 2026-08-31, #56 (R35). `failed` 78 -> 79, `total` 27310 -> 27311. ManyToManyTracking moves from
+# Tier A to Tier B and onto ManyToManyTrackingRelationalTestBase, which R16 examined and deferred.
+# The class goes 200 passed / 0 failed / 200 total to 200 passed / 1 failed / 201 total.
+#
+# The relational base's one added test, Many_to_many_delete_behaviors_are_set, PASSES. Two things
+# the Tier A class asserted about itself are deleted because the move makes them false, which is
+# R13a's lesson again: the ExecuteWithStrategyInTransactionAsync reseed override (its remark said
+# "without a real transaction there is no rollback", true of InMemory and false here -- the base
+# routes 47 call sites through that helper and each now really rolls back) and
+# SupportsDatabaseDefaults => false. The UseTransaction override is written in the same commit as
+# the store switch, per CLAUDE.md D6; without it those 47 transactions would have produced the
+# lock-timeout shape D6 records, and the run instead completes in 6 seconds.
+#
+# BROKEN 1: Can_delete_with_many_to_many, and it is a REAL DEFECT OF THIS PROVIDER that only a
+# real store could expose. It deletes an EntityOne and an EntityTwo whose JoinOneToTwo rows are
+# cascade-deleted, and the server reports SQLite Error 19: 'FOREIGN KEY constraint failed'. The
+# join rows must be deleted before their principals; a relational provider's CommandBatchPreparer
+# topologically sorts for exactly this, and something in the wire round trip does not preserve it.
+# InMemory enforces no foreign key, so on Tier A this passed while saying nothing.
+#
+# NOT convergence, checked rather than assumed: ManyToManyTrackingSqliteTest declares zero test
+# overrides, so EF's own SQLite run passes this test. Left failing per ADR-004 and worth an issue
+# of its own -- same class of find as Phase U, which R19 turned up the same way.
+# FIXED none. Compliance missing bases 57 -> 56, fixtures 19 -> 18.
+#
+# 2026-08-31, #56 (R36). `failed` 79 -> 83, `total` 27311 -> 27356. NINE compliance entries close
+# in one commit: all nine RelationalModelBuilderTest+Relational*TestBase nested bases.
+# ModelBuilderInfoCarrierTest re-parents onto RelationalModelBuilderTest, its fixture onto
+# RelationalModelBuilderFixture (which is `: ModelBuilderFixtureBase;` and nothing else), and the
+# nine abstract classes onto the Relational* bases. 637/0/703 -> 678/4/748: +45 tests, 41 green.
+#
+# THIS CONTRADICTS THE R30b INVENTORY, which put these nine in the "asserts the client's
+# relational model, therefore blocked wholesale" group. They are not blocked. Three of the nine --
+# RelationalOneToMany, RelationalManyToOne, RelationalOneToOne -- are declared with an empty body
+# and add no test at all, and of the six that do add tests, only two produce a failure. The group
+# was classified from its name; reading it was what corrected that.
+#
+# BROKEN 4, in two kinds.
+#
+# Three are the M9 boundary proper -- this provider does not build a relational model on the
+# client, so an assertion about table splitting, owned-type identity under table splitting, or
+# stored-procedure mapping has nothing to read:
+#   OwnedTypes.Can_use_table_splitting_with_owned_reference  (Assert.True() Failure)
+#   OwnedTypes.Can_configure_owned_type                      (Assert.Same(); got a keyless shared
+#                                                             entity type where the owned
+#                                                             navigation's was expected)
+#   OwnedTypes.Can_use_sproc_mapping_with_owned_reference    (same shape)
+# That is the "costs a few tests" side of ADR-013's amendment rather than the "blocked wholesale"
+# side, so the bases are adopted and the tests are left failing per ADR-004.
+#
+# The fourth, ComplexType.Complex_properties_can_be_configured_by_type, FAILS BECAUSE IT PASSES:
+# "Assert.Throws() Failure: No exception was thrown". Same category as R29's and R31's.
+# FIXED none. Compliance missing bases 56 -> 47, fixtures unchanged at 18.
+#
+# 2026-08-31, #56 (R39). `failed` UNCHANGED at 83, `total` 27356 -> 27367 for the 11 tests
+# WarningsTestBase brings, all of them green. Compliance missing bases 47 -> 46.
+#
+# The obstacle was the fixture, not the base. WarningsTestBase constrains TFixture to
+# NorthwindQueryRelationalFixture, which declares
+# `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`, and
+# InfoCarrierTestStore is a TestStore rather than a RelationalTestStore. ADR-013's 2026-08-30
+# amendment is the rule that decides it: such a cast blocks a base only when every route runs
+# through it.
+#
+# NorthwindQueryInfoCarrierSqliteFixture is therefore re-parented onto
+# NorthwindQueryRelationalFixture, and that was MEASURED BEFORE the new class was written rather
+# than assumed: Passed: 2460, Failed: 2, Total: 2470 for the whole Sqlite.Query.Northwind filter
+# before and after, with a byte-identical failure set. The `new` property is never read, and the
+# base's AddOptions (ConfigureWarnings + EnableDetailedErrors) and ShouldLogCategory changed
+# nothing. Two of our own members are deleted as redundant: the fixture's TestSqlLoggerFactory
+# implementation and its ShouldLogCategory override, both of which the relational base supplies.
+#
+# FIXED none, BROKEN none, names file unchanged.
+#
+# 2026-08-31, #56 (R40). `failed` 83 -> 82, `total` UNCHANGED at 27367. FIXED 1, BROKEN 0, and
+# both figures come from a full local run diffed against this file by name:
+# `Passed: 27050, Failed: 82, Total: 27367`.
+#
+# The fix is one line in ChangeEntryMapper.ToChangeEntry: original foreign-key values are now sent
+# for a `Deleted` entry as well as a `Modified` one. R35 found the failure; this is its cause.
+#
+# The comment that used to stand there said "a `Deleted` entry needs no ordering hint, because the
+# row it releases is the one being deleted". That is true while a deleted row is only ever a
+# dependent, and false the moment ONE DELETED ROW IS A DEPENDENT OF ANOTHER.
+# Can_delete_with_many_to_many deletes an EntityOne and an EntityTwo in one call and
+# EntityTwo.CollectionInverseId points at that EntityOne. EF's own ClientSetNull fixup nulls the
+# FK on the client before the entry is sent, so the current value carried no edge either; the
+# server rebuilt the row with a null FK, snapshotted originals from it, and CommandBatchPreparer
+# had nothing to order by. It emitted DELETE FROM "EntityOnes" first and SQLite refused it.
+#
+# Traced rather than guessed: the server SQL log gave the failing statement, replaying the
+# server's exact statements against a copy of the store reproduced the error and showed
+# EntityTwos.Id=1 as the only row still referencing EntityOne 1, and a probe on the server's
+# change tracker showed CollectionInverseId current=null original=null where a single-context EF
+# would hold 1.
+#
+# This is the J11 mechanism one case wider: J11 measured 165 FOREIGN KEY constraint failed for
+# the same missing original on `Modified` entries when ProxyGraphUpdates reached a real store.
+# Tier A cannot show either -- InMemory enforces no foreign key.
+#
+# Gates: trim ratchet OK (89 <= 89, unchanged); CI=true Release build 0 errors.
+#
+# 2026-08-31, #56 (R42). `failed` UNCHANGED at 82, `total` 27367 -> 27375. Updates moves from
+# Tier A to Tier B and onto UpdatesRelationalTestBase; the class goes 28 tests to 36, ALL GREEN.
+# Full local run Passed: 27058, Failed: 82, Total: 27375, FIXED none BROKEN none by name.
+# Compliance missing bases 46 -> 45.
+#
+# The move found a second defect of the same family as R40 and it is fixed in the same commit.
+# Swap_filtered_unique_index_values and Swap_computed_unique_index_values swap the values of a
+# unique index between two rows, and the store answered
+# SQLite Error 19: 'UNIQUE constraint failed: Products.Name, Products.Price'.
+# CommandBatchPreparer orders by VALUE dependencies as well as row ones -- one row must release a
+# unique value before another may take it -- and the only thing that says which row is releasing
+# what is the ORIGINAL value. ChangeEntryMapper sent originals for concurrency tokens and foreign
+# keys; neither Name nor Price is either, so nothing carried them. The condition now also admits
+# a property contained in a unique index.
+#
+# NOT convergence, checked: UpdatesSqliteTest overrides only Save_with_shared_foreign_key and
+# Identifiers_are_generated_correctly, so EF's own SQLite run passes both swap tests.
+#
+# Three Tier A overrides are deleted because the move makes them false: both concurrency messages
+# (they were InMemoryStrings' and the relational base states them itself), the reseed override
+# whose remark said the InMemory store "has no transaction to roll back", and EF issue #29875's,
+# which was InMemory's alone.
+#
+# Identifiers_are_generated_correctly PASSES, which was not the expectation: it asserts
+# GetTableName() on the CLIENT's model and that was predicted to hit the M9 boundary. EF Core
+# keeps the table name as a core annotation, so a client that builds no relational model still
+# has it. Measured, not assumed.
+#
+# Gates: trim ratchet OK (89 <= 89, unchanged); CI=true Release build 0 errors.
+failed=82
+total=27375

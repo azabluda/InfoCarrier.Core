@@ -251,8 +251,15 @@ public class FiltersInheritanceBulkUpdatesInfoCarrierTest(FiltersInheritanceBulk
 ///     The non-shared-model variant, through the same harness
 ///     <c>NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest</c> uses.
 /// </summary>
+/// <remarks>
+///     <b>R33 re-parented this onto <c>NonSharedModelBulkUpdatesRelationalTestBase</c>.</b> That
+///     base takes the same <c>NonSharedFixture</c> and adds six tests of its own; it carries no
+///     <c>FromSql</c>, no <c>AsSplitQuery</c> and no <c>RelationalTestStore</c> cast, which is what
+///     separates it from <c>NorthwindBulkUpdatesRelationalTestBase</c> — that one adds two
+///     <c>FromSqlRaw</c> tests and is gated on #60.
+/// </remarks>
 public class NonSharedModelBulkUpdatesInfoCarrierTest(NonSharedFixture fixture)
-    : NonSharedModelBulkUpdatesTestBase(fixture)
+    : NonSharedModelBulkUpdatesRelationalTestBase(fixture)
 {
     private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
 

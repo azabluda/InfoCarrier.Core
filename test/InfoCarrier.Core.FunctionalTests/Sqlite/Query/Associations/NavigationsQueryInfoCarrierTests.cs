@@ -2,13 +2,13 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Query.Associations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.Navigations;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
-using Xunit.Sdk;
+using Xunit.Abstractions;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -17,8 +17,8 @@ using Xunit.Sdk;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 
 /// <summary>
-///     The shared fixture for the seven <c>Navigations*TestBase</c> classes below, on ADR-009
-///     <b>Tier B</b>.
+///     The shared fixture for the seven <c>Navigations*RelationalTestBase</c> classes below, on
+///     ADR-009 <b>Tier B</b>.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -27,20 +27,20 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 ///         "could go either way" here for A81's rule to adjudicate.
 ///     </para>
 ///     <para>
-///         The <em>core</em> fixture, which is where the model and the data live —
-///         <c>AssociationsQueryFixtureBase</c>, <c>AssociationsData</c>, <c>AssociationsModel</c>
-///         and <c>NavigationsFixtureBase</c> are all in <c>EFCore.Specification.Tests</c>. The
-///         relational assembly adds only <em>mapping-strategy</em> variants — <c>ComplexJson</c>,
-///         <c>OwnedJson</c>, <c>ComplexTableSplitting</c>, <c>OwnedTableSplitting</c> — which the
-///         compliance test does not ask for and each of which would need a hand-mirrored model, the
-///         cost B3d priced at ~630 lines. Adopting the core family and not those is deliberate.
+///         <b>R25 re-parented this onto <c>NavigationsRelationalFixtureBase</c>.</b> C0 adopted the
+///         core fixture and mirrored the relational one's six <c>AutoInclude()</c> calls by hand,
+///         because the test project did not then reference
+///         <c>EFCore.Relational.Specification.Tests</c>. ADR-013 made that reference available and
+///         the hand copy is now the real thing: the base supplies the auto-includes, the
+///         <c>ITestSqlLoggerFactory</c> the relational test bases need, and a <c>StoreName</c> this
+///         class still overrides.
 ///     </para>
 ///     <para>
 ///         Its own <c>StoreName</c>, per CLAUDE.md: the Tier B store is file-backed and two
 ///         fixtures sharing a name share a database.
 ///     </para>
 /// </remarks>
-public class NavigationsQueryInfoCarrierFixture : NavigationsFixtureBase
+public class NavigationsQueryInfoCarrierFixture : NavigationsRelationalFixtureBase
 {
     private ITestStoreFactory? _testStoreFactory;
 
@@ -59,79 +59,42 @@ public class NavigationsQueryInfoCarrierFixture : NavigationsFixtureBase
 
     /// <inheritdoc />
     /// <remarks>
-    ///     <para>
-    ///         The six <c>AutoInclude()</c> calls are <c>NavigationsRelationalFixtureBase</c>'s,
-    ///         mirrored by hand because this project references only the core specification
-    ///         assembly. <b>They are not decoration — they are what the facet is about.</b> Every
-    ///         query in these seven classes returns bare <c>RootEntity</c> rows and no test writes
-    ///         an <c>Include</c>, yet <c>AssociationsQueryFixtureBase.AssertRootEntity</c> walks the
-    ///         whole association graph and compares it against the fully-populated
-    ///         <c>AssociationsData</c>. Without the auto-includes the associates are simply not
-    ///         loaded, and <b>63 of the first run's 79 failures were one <c>Values differ</c></b> —
-    ///         <c>Expected: Root5_RequiredAssociate, Actual: null</c>, out of that asserter.
-    ///     </para>
-    ///     <para>
-    ///         Safe to mirror, and the reason is worth stating: <c>AutoInclude</c> is a
-    ///         <em>core</em> modelling API, so it is a statement both models make for themselves
-    ///         from the same <c>OnModelCreating</c> — not something one side computes and the other
-    ///         has to agree with (the B4/B6/B12 hazard).
-    ///     </para>
+    ///     <b>The <c>UseTransaction</c> that CLAUDE.md says to write in the same commit as the
+    ///     store switch — except that here it is the fixture, not the base, that carries it.</b>
+    ///     Grepping these bases for <c>ExecuteWithStrategyInTransactionAsync</c> finds nothing;
+    ///     what needs the override is <c>NavigationsRelationalFixtureBase.UseTransaction</c>
+    ///     itself, which calls <c>transaction.GetDbTransaction()</c> and is unreachable on a client
+    ///     with no database (ADR-013). The provider has its own enlistment (Phase T / M4).
     /// </remarks>
-    protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
-    {
-        base.OnModelCreating(modelBuilder, context);
-
-        modelBuilder.Entity<RootEntity>(b =>
-        {
-            b.Navigation(e => e.RequiredAssociate).AutoInclude();
-            b.Navigation(e => e.OptionalAssociate).AutoInclude();
-            b.Navigation(e => e.AssociateCollection).AutoInclude();
-        });
-
-        modelBuilder.Entity<AssociateType>(b =>
-        {
-            b.Navigation(e => e.RequiredNestedAssociate).AutoInclude();
-            b.Navigation(e => e.OptionalNestedAssociate).AutoInclude();
-            b.Navigation(e => e.NestedCollection).AutoInclude();
-        });
-    }
+    public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        => facade.UseInfoCarrierTransaction(transaction);
 }
 
-// The seven Navigations facets (ADR-004). Adopting these also satisfies the seven shared
-// `Associations*TestBase` bases, which they derive from and which ComplianceTestBase resolves
+// The seven Navigations facets (ADR-004), on their relational bases since R25. Adopting these
+// also satisfies the seven core `Navigations*TestBase` classes and the seven shared
+// `Associations*TestBase` ones, which they derive from and which ComplianceTestBase resolves
 // transitively.
 //
-// The overrides below are all EF's own, from `Navigations*RelationalTestBase` and
-// `Navigations*SqliteTest`, and each was matched by *reason* before being taken (A63): every one
-// of them is a limit of the backing store or of relational translation generally, raised here from
-// the same place with the same message. Nothing else is overridden, and nothing here is red:
-// the four `Index_*` (and four more on `OwnedNavigations`) were closed by C69, which forwards the
-// one warning `AssertOrderedCollectionQuery` contracts for to the server that raises it — see
-// `AssociationsWarnings`. C55 had diagnosed them and left them red on the belief that the event
-// could only be forwarded globally, at 26 broken; all 26 turned out to be in Northwind and
-// BulkUpdates classes, none in these families.
+// R25 deleted six overrides that this file used to restate by hand -- the two
+// `Distinct_over_projected_*`, `Select_nested_collection_on_optional_associate`,
+// `Over_associate_collection_projected` and the three `Nested_collection_*` ones. Every one was
+// copied out of a `Navigations*RelationalTestBase`, and the re-parent inherits them verbatim.
+// What is left below is EF's `Navigations*SqliteTest` overrides, which the relational bases do
+// not carry: each is a limit of the backing store, raised here from the same place with the same
+// message.
+//
+// The relational bases add no test of their own. What they add is `AssertSql`, and it is worth
+// being honest about what that is worth here: it reads the *client's* TestSqlLoggerFactory, and
+// this client has no database and emits no SQL. No base in this family calls it with an argument
+// -- every call is the empty `AssertSql()` meaning "nothing was executed" -- so the assertion is
+// true here but trivially so, weaker than it is on SQLite rather than false. `ServerSqlLog` is
+// where the server's statements can actually be read.
 
-public class NavigationsCollectionQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsCollectionTestBase<NavigationsQueryInfoCarrierFixture>(fixture)
+public class NavigationsCollectionQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsCollectionRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper)
 {
-    /// <summary>
-    ///     <c>NavigationsCollectionRelationalTestBase</c>'s two: <c>Distinct</c> over a projected
-    ///     collection is something no relational provider can express, and EF states it on the
-    ///     relational base rather than in SQLite's suite.
-    /// </summary>
-    public override async Task Distinct_over_projected_nested_collection()
-        => Assert.Equal(
-            RelationalStrings.DistinctOnCollectionNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.Distinct_over_projected_nested_collection)).Message);
-
-    /// <inheritdoc cref="Distinct_over_projected_nested_collection" />
-    public override async Task Distinct_over_projected_filtered_nested_collection()
-        => Assert.Equal(
-            RelationalStrings.DistinctOnCollectionNotSupported,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.Distinct_over_projected_filtered_nested_collection)).Message);
-
     /// <summary>
     ///     <c>NavigationsCollectionSqliteTest</c>'s: the query reaches SQL and asks SQLite for
     ///     <c>APPLY</c>, which it does not have.
@@ -145,32 +108,26 @@ public class NavigationsCollectionQueryInfoCarrierTest(NavigationsQueryInfoCarri
             (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
 }
 
-public class NavigationsIncludeQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsIncludeTestBase<NavigationsQueryInfoCarrierFixture>(fixture);
+public class NavigationsIncludeQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsIncludeRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
 
-public class NavigationsMiscellaneousQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsMiscellaneousTestBase<NavigationsQueryInfoCarrierFixture>(fixture);
+public class NavigationsMiscellaneousQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsMiscellaneousRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
 
-public class NavigationsPrimitiveCollectionQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsPrimitiveCollectionTestBase<NavigationsQueryInfoCarrierFixture>(fixture);
+public class NavigationsPrimitiveCollectionQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsPrimitiveCollectionRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
 
-public class NavigationsProjectionQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsProjectionTestBase<NavigationsQueryInfoCarrierFixture>(fixture)
+public class NavigationsProjectionQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsProjectionRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper)
 {
-    /// <summary>
-    ///     <c>NavigationsProjectionRelationalTestBase</c>'s. A relational store returns an
-    ///     <em>empty</em> collection where the owner is null, not a null collection, so EF rewrites
-    ///     the expected side rather than the query.
-    /// </summary>
-    public override Task Select_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
-        => AssertQuery(
-            ss => ss.Set<RootEntity>().OrderBy(e => e.Id).Select(x => x.OptionalAssociate!.NestedCollection),
-            ss => ss.Set<RootEntity>().OrderBy(e => e.Id)
-                .Select(x => x.OptionalAssociate!.NestedCollection ?? new List<NestedAssociateType>()),
-            assertOrder: true,
-            elementAsserter: (e, a) => AssertCollection(e, a, elementSorter: r => r.Id),
-            queryTrackingBehavior: queryTrackingBehavior);
-
     /// <summary>
     ///     <c>NavigationsProjectionSqliteTest</c>'s two, both <c>APPLY</c>.
     /// </summary>
@@ -184,35 +141,12 @@ public class NavigationsProjectionQueryInfoCarrierTest(NavigationsQueryInfoCarri
             () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
 }
 
-public class NavigationsSetOperationsQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsSetOperationsTestBase<NavigationsQueryInfoCarrierFixture>(fixture)
-{
-    /// <summary>
-    ///     <c>NavigationsSetOperationsRelationalTestBase</c>'s, for EF issues #33485 and #34849.
-    /// </summary>
-    public override async Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
-        => Assert.Equal(
-            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Over_associate_collection_projected(queryTrackingBehavior))).Message);
-}
+public class NavigationsSetOperationsQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsSetOperationsRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
 
-public class NavigationsStructuralEqualityQueryInfoCarrierTest(NavigationsQueryInfoCarrierFixture fixture)
-    : NavigationsStructuralEqualityTestBase<NavigationsQueryInfoCarrierFixture>(fixture)
-{
-    /// <summary>
-    ///     <c>NavigationsStructuralEqualityRelationalTestBase</c>'s three, with EF's reason: a
-    ///     traditional relational collection navigation cannot be compared reliably — a collection
-    ///     on a null instance comes back empty rather than null, and element order is not preserved.
-    /// </summary>
-    public override Task Two_nested_collections()
-        => Assert.ThrowsAsync<EqualException>(() => base.Two_nested_collections());
-
-    /// <inheritdoc cref="Two_nested_collections" />
-    public override Task Nested_collection_with_inline()
-        => Assert.ThrowsAsync<InvalidOperationException>(() => base.Nested_collection_with_inline());
-
-    /// <inheritdoc cref="Two_nested_collections" />
-    public override Task Nested_collection_with_parameter()
-        => Assert.ThrowsAsync<InvalidOperationException>(() => base.Nested_collection_with_parameter());
-}
+public class NavigationsStructuralEqualityQueryInfoCarrierTest(
+    NavigationsQueryInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : NavigationsStructuralEqualityRelationalTestBase<NavigationsQueryInfoCarrierFixture>(fixture, testOutputHelper);
