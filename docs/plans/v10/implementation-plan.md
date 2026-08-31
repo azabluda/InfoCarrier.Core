@@ -768,6 +768,41 @@ What the block cost and what it bought, in the order it is worth remembering:
   three exception-type differences on an already-unsupported path, and one test that fails
   *because it passes*. Both are recorded in `known-failures.txt` and in the file.
 
+### R31 onward — the rest of the relational spec bases
+
+The R4 inventory above splits the remaining 60 four ways. This section works the third group, the
+re-parents of families already running, because R25–R30 showed that is where the cheap wins are.
+
+- [x] **R31. `PrimitiveCollectionsQuery` re-parented — and it broke three tests by answering
+      them.** The class moves from the core `PrimitiveCollectionsQueryTestBase` onto
+      `PrimitiveCollectionsQueryRelationalTestBase`. **The fixture does not move**, which is the
+      cheapest shape this project has seen: that base constrains `TFixture` to the *core*
+      `PrimitiveCollectionsQueryFixtureBase` and calls no `AssertSql`, so there is nothing for a
+      relational fixture to supply.
+      **Four hand-mirrored overrides are deleted, and the remark on them was the tell**: it said
+      they were mirrored "because this project does not reference" the relational specification
+      assembly — which stopped being true at ADR-013. Same stale-by-a-milestone shape as R25's
+      `AutoInclude` copies and R30's `ToJson` one.
+      165 total before and after; `Passed: 159, Failed: 3` against `Passed: 162, Failed: 0`.
+      **All three broke because they pass.** They are the base's three overrides this file never
+      carried, each asserting that translation *must* fail, and each now reporting
+      *"Assert.Throws() Failure: No exception was thrown"*:
+      `Parameter_collection_in_subquery_and_Convert_as_compiled_query`,
+      `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query`,
+      `Column_collection_equality_inline_collection_with_parameters`.
+      **They are one defect on EF's side, and EF's own TODO states it**: indexing an array becomes
+      a subquery with a `CAST` over it, the type-mapping inference from the other side does not
+      propagate inside, and the parameter is left without a mapping. This provider does not reach
+      that state, and the base tests' own result assertions hold — so the answers are right rather
+      than merely un-thrown, measured rather than inferred.
+      Not overridden: there is no grandparent to call, and asserting the correct behaviour to turn
+      the red green would be overriding a spec test to make the suite green.
+      `failed` 75 → 78, `total` unchanged. Compliance missing bases 60 → 59.
+      **With R29's `OwnedJson.Associate_with_parameter_null` this makes four standing failures of
+      the "a query this provider answers that other EF providers refuse" kind — enough to be worth
+      a `website/docs/limitations.md` entry**, which is tracked as its own step because that file
+      needs the humanizer pass.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

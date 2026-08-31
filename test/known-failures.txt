@@ -1298,5 +1298,32 @@
 # here.
 #
 # Compliance missing bases 73 -> 67, fixtures unchanged at 21.
-failed=75
+#
+# 2026-08-31, #56 (R31). `failed` 75 -> 78, `total` UNCHANGED at 27298.
+# PrimitiveCollectionsQuerySqliteInfoCarrierTest is re-parented from the core
+# PrimitiveCollectionsQueryTestBase onto PrimitiveCollectionsQueryRelationalTestBase, closing one
+# compliance entry. The relational base adds no test, so the class stays at 165 total; it goes
+# 162 passed / 0 failed to 159 passed / 3 failed. The fixture does NOT move: that base constrains
+# TFixture to the core PrimitiveCollectionsQueryFixtureBase and calls no AssertSql.
+#
+# Four hand-mirrored overrides are deleted -- they were that base's, copied in when the test
+# project did not reference the relational specification assembly (pre-ADR-013).
+#
+# BROKEN 3, AND ALL THREE FAIL BECAUSE THEY PASS:
+#   Parameter_collection_in_subquery_and_Convert_as_compiled_query
+#   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query
+#   Column_collection_equality_inline_collection_with_parameters
+# Each is one of the base's three remaining overrides, asserting that translation must fail, and
+# each reports "Assert.Throws() Failure: No exception was thrown". They are one defect on EF's
+# side and EF's own TODO states it: array indexing becomes a subquery with a CAST over it, the
+# type-mapping inference does not propagate inside, and the parameter is left without a mapping.
+# This provider does not reach that state and the base tests' own result assertions hold, so the
+# answers are right rather than merely un-thrown. Not overridden -- there is no grandparent to
+# call, and asserting the correct behaviour to turn the red green would be overriding a spec test
+# to make the suite green. FIXED none.
+#
+# With R29's OwnedJson.Associate_with_parameter_null this makes FOUR standing failures of the
+# "a query this provider answers that other EF providers refuse" kind. That is now enough to be
+# worth a website/docs/limitations.md entry.
+failed=78
 total=27298

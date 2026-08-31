@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -25,10 +24,19 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///     <see cref="NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest" /> — EF ships
 ///     <c>PrimitiveCollectionsQuerySqliteTest</c> and no InMemory counterpart, because a primitive
 ///     collection is a thing a store either maps or does not.
+///     <para>
+///         <b>R31 re-parented this onto <c>PrimitiveCollectionsQueryRelationalTestBase</c></b>, and
+///         four hand-mirrored overrides went with it. The remark they carried — "which this
+///         project does not reference and so must mirror by hand" — stopped being true when
+///         ADR-013 admitted <c>EFCore.Relational.Specification.Tests</c>. <b>The fixture does not
+///         move</b>: that base constrains <c>TFixture</c> to the <em>core</em>
+///         <c>PrimitiveCollectionsQueryFixtureBase</c> and calls no <c>AssertSql</c>, so there is
+///         nothing for a relational fixture to supply.
+///     </para>
 /// </remarks>
 public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     PrimitiveCollectionsQuerySqliteInfoCarrierTest.PrimitiveCollectionsQuerySqliteInfoCarrierFixture fixture)
-    : PrimitiveCollectionsQueryTestBase<
+    : PrimitiveCollectionsQueryRelationalTestBase<
         PrimitiveCollectionsQuerySqliteInfoCarrierTest.PrimitiveCollectionsQuerySqliteInfoCarrierFixture>(fixture)
 {
     /// <summary>
@@ -164,40 +172,31 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     public override async Task Parameter_collection_Concat_column_collection()
         => await Assert.ThrowsAsync<EqualException>(() => base.Parameter_collection_Concat_column_collection());
 
-    /// <summary>
-    ///     Four from <c>PrimitiveCollectionsQueryRelationalTestBase</c>, which this project does not
-    ///     reference and so must mirror by hand.
-    /// </summary>
-    /// <remarks>
-    ///     Each is a limit <em>every</em> relational provider has, which is why EF states it on the
-    ///     relational base rather than in SQLite's own suite — and why reading only the latter left
-    ///     all four classified as failures of this provider. The reason has to match, not just the
-    ///     name (A63): an empty inline collection and a <c>Concat</c> in a projection each raise the
-    ///     exact <c>RelationalStrings</c> message EF asserts, and the two inline-collection equality
-    ///     comparisons fail translation for the reason EF's TODO gives — comparing a relational
-    ///     rowset against a primitive collection, EF issue #33792.
-    /// </remarks>
-    public override async Task Inline_collection_Count_with_zero_values()
-        => Assert.Equal(
-            RelationalStrings.EmptyCollectionNotSupportedAsInlineQueryRoot,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Inline_collection_Count_with_zero_values())).Message);
-
-    /// <inheritdoc cref="Inline_collection_Count_with_zero_values" />
-    public override async Task Project_inline_collection_with_Concat()
-        => Assert.Equal(
-            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
-            (await Assert.ThrowsAsync<InvalidOperationException>(
-                () => base.Project_inline_collection_with_Concat())).Message);
-
-    /// <inheritdoc cref="Inline_collection_Count_with_zero_values" />
-    public override async Task Column_collection_Concat_parameter_collection_equality_inline_collection()
-        => await AssertTranslationFailed(
-            () => base.Column_collection_Concat_parameter_collection_equality_inline_collection());
-
-    /// <inheritdoc cref="Inline_collection_Count_with_zero_values" />
-    public override async Task Column_collection_Where_equality_inline_collection()
-        => await AssertTranslationFailed(() => base.Column_collection_Where_equality_inline_collection());
+    // R31 deleted four overrides here. They were `PrimitiveCollectionsQueryRelationalTestBase`'s,
+    // mirrored by hand because the test project did not then reference the relational
+    // specification assembly, and the re-parent now inherits them verbatim -- along with three
+    // more of that base's that this file never carried.
+    //
+    // THOSE THREE ARE LEFT FAILING, AND THEY FAIL BECAUSE THEY PASS. Each asserts that translation
+    // must fail, and here it does not: "Assert.Throws() Failure: No exception was thrown".
+    //
+    //   Parameter_collection_in_subquery_and_Convert_as_compiled_query
+    //   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query
+    //   Column_collection_equality_inline_collection_with_parameters
+    //
+    // All three are the same defect on EF's side and EF says so in its own TODO on the first:
+    // indexing an array becomes a subquery with a CAST over it, the type-mapping inference from
+    // the other side does not propagate inside, and the parameter is left without a mapping --
+    // "in the SQL tree does not have a type mapping assigned",
+    // SetOperationsRequireAtLeastOneSideWithValidTypeMapping, or a plain translation failure. This
+    // provider does not reach that state, and the base tests' own result assertions hold, so the
+    // answers are right rather than merely un-thrown (measured in R31, not inferred).
+    //
+    // Not overridden. There is no grandparent to call -- an override here could only re-state the
+    // core test's body -- and asserting the correct behaviour to turn the red green would be
+    // overriding a spec test to make the suite green, which CLAUDE.md forbids. This is the R29
+    // category (`OwnedJson.Associate_with_parameter_null`) three more times: a query this provider
+    // answers that other EF providers refuse, which is `website/docs/limitations.md`'s territory.
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(
