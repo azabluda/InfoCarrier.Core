@@ -1000,6 +1000,37 @@ re-parents of families already running, because R25–R30 showed that is where t
       is the one a diagnostic most needs and the one `CommandExecuted` never carries, so the log
       used to stop at the last statement that worked and stay silent about the one that did not.
 
+- [x] **R41. The last seven bases read one by one — and every one is blocked, for a reason worth
+      writing down.** No code. This finishes R38's open list and the two R30b left over, and it is
+      the point at which the *unblocked* part of the remaining inventory is exhausted.
+
+      | Base | Verdict |
+      |---|---|
+      | `Query.NullSemanticsQueryTestBase` | **Probed properly and backed out**, and it is the one that nearly landed: 168 test methods, a *core* fixture constraint, and only one `FromSqlRaw` in 2,325 lines. **The blocker is not in its body.** It declares `protected abstract NullSemanticsContext CreateContext(bool useRelationalNulls = false)`, EF's SQLite class implements it with `new SqliteDbContextOptionsBuilder(options).UseRelationalNulls()`, and **20 of the base's 23 `CreateContext` call sites pass `useRelationalNulls: true`**. That is a relational option on the *client's* builder, which `UseInfoCarrier` has none of. A class was written, failed to compile on the abstract member, and was deleted. |
+      | `TransactionTestBase` | **Blocked wholesale**, and this is the shape ADR-013 calls that: `GetDbConnection()`, `GetDbTransaction()`, `UseTransaction(DbTransaction)` and `protected RelationalTestStore TestStore => (RelationalTestStore)Fixture.TestStore` run through the whole of its 44 tests. The client has no database and no connection. |
+      | `Query.QueryNoClientEvalTestBase` | #60: two `FromSqlRaw` tests. Its fixture constraint is now satisfied by R39's re-parent, so #60 is the only thing left. |
+      | `Query.SharedTypeQueryRelationalTestBase` | #60: one `FromSqlRaw` test, plus one `(RelationalTestStore)TestStore` cast in the same area. |
+      | `Query.OwnedEntityQueryRelationalTestBase` | #60: two `AsSplitQuery` tests out of twelve. |
+      | `ModelBuilding101RelationalTestBase` | **Blocked wholesale.** Its whole contribution is `GetModelMetadata`, overridden as `new RelationalModelMetadata(context.Model, context.Database.GenerateCreateScript())`. `GenerateCreateScript` is relational-only and *every* test routes through it. |
+      | `Scaffolding.CompiledModelRelationalTestBase` | **Blocked, and it is the M9 boundary rather than #60.** Its eleven tests build models with `ToTable`, `SplitToTable`, sprocs, sequences and check constraints, then assert `GetTableName()` on the compiled model. The compiled model here is the *client's*, and this provider does not build a relational one. |
+
+      **The contrast with R36 is the useful part.** Those nine `RelationalModelBuilderTest` bases
+      had relational names and turned out adoptable, because most of their content is not
+      relational-model assertion. These two have the same kind of name and are genuinely blocked,
+      because theirs is. **Neither the name nor the namespace decides it; only reading the base
+      does** — and the cost of reading one is minutes.
+
+      **What the #60 rule is now withholding, stated so it can be overruled with numbers rather
+      than argued.** Ten bases stand aside for it, and most are cheap in reds:
+      `JsonQuery` (7 `FromSql` tests), `OwnedQuery` (8 `AsSplitQuery` + 1 `FromSql`),
+      `NorthwindBulkUpdates` (2), `NorthwindMiscellaneousQuery` (2),
+      `ConcurrencyDetectorEnabled`/`Disabled` (1 each), `QueryNoClientEval` (2),
+      `SharedTypeQuery` (1), `OwnedEntityQuery` (2), and `NullSemanticsQuery` (21, and 168 test
+      methods behind them). **The standing instruction is not to adopt a base that needs a
+      relational client API, and that is what R34, R38 and this step have all applied** — but the
+      trade in every case is a handful of permanently red tests against a much larger body of
+      green, and `NullSemanticsQuery` is the one where the ratio is worth the owner's attention.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
