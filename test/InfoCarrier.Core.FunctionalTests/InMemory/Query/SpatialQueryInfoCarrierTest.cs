@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
@@ -8,15 +8,26 @@ using Xunit;
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
 
 /// <summary>
-///     <c>Query.SpatialQueryTestBase</c> on ADR-009 Tier A. See
+///     <c>Query.SpatialQueryRelationalTestBase</c> on ADR-009 Tier A. See
 ///     <see cref="SpatialInfoCarrierTest" /> for why Tier A and what had to exist first.
 /// </summary>
 /// <remarks>
-///     EF's <c>SpatialQueryInMemoryTest</c> carries four overrides. Each was checked against ours
-///     by reason before being borrowed (A63) — see the comment on each.
+///     <para>
+///         EF's <c>SpatialQueryInMemoryTest</c> carries four overrides. Each was checked against
+///         ours by reason before being borrowed (A63) — see the comment on each.
+///     </para>
+///     <para>
+///         <b>The relational base, since R50 — and it needs no SpatiaLite and no store change.</b>
+///         <c>SpatialQueryRelationalTestBase</c> is fourteen lines and adds no tests: its whole
+///         contribution is a <c>RelationalQueryAsserter</c>, which differs from the core one by
+///         calling <c>TestSqlLoggerFactory.OutputSql()</c> when an assertion fails. So the cost
+///         is the <see cref="ITestSqlLoggerFactory" /> member below, the count is unchanged at
+///         <c>Passed: 168, Failed: 0, Total: 168</c>, and this base was priced as needing a
+///         native library on its name rather than its body.
+///     </para>
 /// </remarks>
 public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrierFixture fixture)
-    : SpatialQueryTestBase<SpatialQueryInfoCarrierTest.InfoCarrierFixture>(fixture)
+    : SpatialQueryRelationalTestBase<SpatialQueryInfoCarrierTest.InfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
     /// <remarks>
@@ -50,12 +61,16 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     public override Task GetGeometryN_with_null_argument(bool async)
         => Task.CompletedTask;
 
-    public class InfoCarrierFixture : SpatialQueryFixtureBase
+    public class InfoCarrierFixture : SpatialQueryFixtureBase, ITestSqlLoggerFactory
     {
         private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "SpatialQueryInfoCarrierTest";
+
+        /// <inheritdoc />
+        public TestSqlLoggerFactory TestSqlLoggerFactory
+            => (TestSqlLoggerFactory)ListLoggerFactory;
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(

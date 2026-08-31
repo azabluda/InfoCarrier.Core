@@ -1260,6 +1260,27 @@ re-parents of families already running, because R25–R30 showed that is where t
       inferred from the family. EF's overrides are adopted verbatim.
       `test/` only.
 
+- [x] **R50. `SpatialQueryRelationalTestBase` adopted — no SpatiaLite, no store change, and the
+      fixture gate moves for the first time.** Missing bases 34 → 33, **and
+      `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` 18 → 17.**
+      `Passed: 168, Failed: 0, Total: 168`, unchanged, because the base adds no tests.
+
+      **It was priced on its name.** The handoff had this last and time-boxed, on the assumption it
+      needs a package reference and a native library. **Reading it costs less than that assumption
+      did**: `SpatialQueryRelationalTestBase<TFixture>` is **fourteen lines**, constrained on the
+      *core* `SpatialQueryFixtureBase`, and its only member is
+      `CreateQueryAsserter => new RelationalQueryAsserter(...)`. `RelationalQueryAsserter` differs
+      from the core one by calling `TestSqlLoggerFactory.OutputSql()` when an assertion fails — a
+      diagnostic. Nothing spatial, nothing relational about the store.
+      The whole cost is `ITestSqlLoggerFactory` on the fixture, which
+      `InfoCarrierTestStoreFactory.CreateListLoggerFactory` has satisfied since R3.
+
+      **Which is why the second compliance gate moved.** That test lists 18 query fixtures with no
+      `ITestSqlLoggerFactory`; this is the first one to gain it, and the same one-property change
+      is available to the other 17. **Not done here**: 17 fixtures is a step of its own, and this
+      one was written because the base required it rather than to lower a count.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
