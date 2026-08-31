@@ -1152,6 +1152,21 @@ re-parents of families already running, because R25–R30 showed that is where t
       file changes. What moves is the number the test prints, measured: **45 → 39**.
       `test/` only. Measured together with R44; figures below.
 
+- [x] **R46. `AdHocManyToManyQuery` and `AdHocQueryFilters` re-parented onto their relational bases
+      and moved to Tier B — missing 39 → 37, and not one test moves.**
+      Both relational bases are **eighteen lines with no tests of their own**: their whole
+      contribution over the core base is a `TestSqlLoggerFactory`, a `ClearLog` and an `AssertSql`.
+      So this is a re-parent and a store switch and nothing else, and EF's own
+      `AdHocManyToManyQuerySqliteTest` and `AdHocQueryFiltersQuerySqliteTest` are twelve lines each
+      with **no overrides at all**, so the store asks for nothing either.
+      **Moved, not added** — a base belongs to exactly one tier — so the two classes leave
+      `InMemory/Query/AdHocQueryInfoCarrierTest.cs` for a new
+      `Sqlite/Query/AdHocRelationalQuerySqliteInfoCarrierTest.cs`.
+      Tier A before: `Passed: 26, Failed: 0, Total: 26`. Tier B after: `Passed: 26, Failed: 0,
+      Total: 26`. Neither core base uses `ExecuteWithStrategyInTransactionAsync`, so D6's
+      `UseTransaction` override is not needed and none is written.
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
