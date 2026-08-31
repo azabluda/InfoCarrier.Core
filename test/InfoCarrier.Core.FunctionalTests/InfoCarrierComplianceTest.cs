@@ -1,9 +1,10 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Scaffolding;
 using Microsoft.EntityFrameworkCore.Update;
 
 namespace InfoCarrier.Core.FunctionalTests;
@@ -35,7 +36,7 @@ public class InfoCarrierComplianceTest : RelationalComplianceTestBase
 
     /// <summary>
     ///     Bases that are conceptually inapplicable to InfoCarrier — each with the reason.
-    ///     Seeded in M1-I3; the relational entries were added for #56.
+    ///     Seeded in M1-I3; the relational entries were added for #56 in R2 and R45.
     /// </summary>
     /// <remarks>
     ///     A base that is merely unadopted must NOT be listed here. Everything below needs a
@@ -74,5 +75,39 @@ public class InfoCarrierComplianceTest : RelationalComplianceTestBase
         typeof(PrecompiledQueryRelationalTestBase),
         typeof(PrecompiledSqlPregenerationQueryRelationalTestBase),
         typeof(AdHocPrecompiledQueryRelationalTestBase),
+
+        // ---- Added in R45, each read in R41 before it was listed. ----
+
+        // GetDbConnection(), GetDbTransaction(), UseTransaction(DbTransaction) and a
+        // (RelationalTestStore)Fixture.TestStore cast run through all 44 of its tests. The client
+        // has no database and no connection. Same reason as TransactionInterceptionTestBase above.
+        typeof(TransactionTestBase<>),
+
+        // Declares `protected abstract string DummyConnectionString` and
+        // CreateBackingContext(string databaseName), and its three tests swap one connection
+        // string for another inside a DbConnection interceptor. A connection string names a
+        // database; the client has neither.
+        typeof(TwoDatabasesTestBase),
+
+        // Cannot even be closed here: TExtension is constrained to RelationalOptionsExtension and
+        // TBuilder to RelationalDbContextOptionsBuilder<,>. This provider's options extension is
+        // neither, and every one of its nine tests configures MaxBatchSize, CommandTimeout,
+        // UseRelationalNulls, MigrationsAssembly or MigrationsHistoryTable through them.
+        typeof(LoggingRelationalTestBase<,>),
+
+        // Its whole contribution over the core base is GetModelMetadata, overridden as
+        // new RelationalModelMetadata(context.Model, context.Database.GenerateCreateScript()).
+        // GenerateCreateScript is relational-only, and every test routes through it.
+        typeof(ModelBuilding101RelationalTestBase),
+
+        // Asserts GetTableName() on the compiled model, which here is the *client's*. Its eleven
+        // tests build models with ToTable, SplitToTable, sprocs, sequences and check constraints.
+        // M9 removed the relational model from the client; this is that boundary, not a gap.
+        typeof(CompiledModelRelationalTestBase),
+
+        // Same boundary. AssertElementFacets asserts FindRelationalTypeMapping(), IsFixedLength()
+        // and GetStoreType() on the client's model, and the store types it expects are the backing
+        // provider's. R23 measured 104 red of 576 on exactly that assumption and reverted.
+        typeof(JsonTypesRelationalTestBase),
     ];
 }

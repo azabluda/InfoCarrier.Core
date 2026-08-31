@@ -1,53 +1,30 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
 
 /// <summary>
-///     <c>AdHocManyToManyQueryTestBase</c> on ADR-009 Tier A.
+///     <c>AdHocMiscellaneousQueryTestBase</c> on ADR-009 Tier A.
 /// </summary>
 /// <remarks>
-///     The <c>AdHoc*</c> bases are EF's regression corpus: each test is a model built for one
-///     reported bug. They build that model <em>per test</em> rather than sharing a fixture, which
-///     is why they need <see cref="NonSharedModelInfoCarrierHarness" /> (A49) and why none of them
-///     was adoptable before it. The two overrides below are the whole of the wiring, and are the
-///     same in every class of this kind.
+///     <para>
+///         The <c>AdHoc*</c> bases are EF's regression corpus: each test is a model built for one
+///         reported bug. They build that model <em>per test</em> rather than sharing a fixture,
+///         which is why they need <see cref="NonSharedModelInfoCarrierHarness" /> (A49) and why
+///         none of them was adoptable before it. The two overrides below are the whole of the
+///         wiring, and are the same in every class of this kind.
+///     </para>
+///     <para>
+///         This one stays on Tier A because its relational base is blocked: R51 read
+///         <c>AdHocMiscellaneousQueryRelationalTestBase</c> and found it declares
+///         <c>protected abstract DbContextOptionsBuilder SetParameterizedCollectionMode(…)</c>,
+///         which EF's SQLite class implements on the <em>client's</em> options builder.
+///     </para>
 /// </remarks>
-public class AdHocManyToManyQueryInfoCarrierTest(NonSharedFixture fixture)
-    : AdHocManyToManyQueryTestBase(fixture)
-{
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
-
-    /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
-        => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
-        Action<ModelBuilder>? onModelCreating = null,
-        Action<DbContextOptionsBuilder>? onConfiguring = null,
-        Func<IServiceCollection, IServiceCollection>? addServices = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null,
-        Func<string, bool>? shouldLogCategory = null,
-        Func<TestStore>? createTestStore = null,
-        bool usePooling = true,
-        bool useServiceProvider = true)
-    {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
-
-        return base.CreateContextFactory<TContext>(
-            onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
-    }
-}
-
-/// <inheritdoc cref="AdHocManyToManyQueryInfoCarrierTest" />
 public class AdHocMiscellaneousQueryInfoCarrierTest(NonSharedFixture fixture)
     : AdHocMiscellaneousQueryTestBase(fixture)
 {
@@ -96,94 +73,4 @@ public class AdHocMiscellaneousQueryInfoCarrierTest(NonSharedFixture fixture)
     /// <inheritdoc />
     public override Task Variable_from_closure_is_parametrized()
         => Task.CompletedTask;
-}
-
-/// <inheritdoc cref="AdHocManyToManyQueryInfoCarrierTest" />
-public class AdHocAdvancedMappingsQueryInfoCarrierTest(NonSharedFixture fixture)
-    : AdHocAdvancedMappingsQueryTestBase(fixture)
-{
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
-
-    /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
-        => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
-        Action<ModelBuilder>? onModelCreating = null,
-        Action<DbContextOptionsBuilder>? onConfiguring = null,
-        Func<IServiceCollection, IServiceCollection>? addServices = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null,
-        Func<string, bool>? shouldLogCategory = null,
-        Func<TestStore>? createTestStore = null,
-        bool usePooling = true,
-        bool useServiceProvider = true)
-    {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
-
-        return base.CreateContextFactory<TContext>(
-            onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
-    }
-}
-
-/// <inheritdoc cref="AdHocManyToManyQueryInfoCarrierTest" />
-public class AdHocNavigationsQueryInfoCarrierTest(NonSharedFixture fixture)
-    : AdHocNavigationsQueryTestBase(fixture)
-{
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
-
-    /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
-        => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
-        Action<ModelBuilder>? onModelCreating = null,
-        Action<DbContextOptionsBuilder>? onConfiguring = null,
-        Func<IServiceCollection, IServiceCollection>? addServices = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null,
-        Func<string, bool>? shouldLogCategory = null,
-        Func<TestStore>? createTestStore = null,
-        bool usePooling = true,
-        bool useServiceProvider = true)
-    {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
-
-        return base.CreateContextFactory<TContext>(
-            onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
-    }
-}
-
-/// <inheritdoc cref="AdHocManyToManyQueryInfoCarrierTest" />
-public class AdHocQueryFiltersQueryInfoCarrierTest(NonSharedFixture fixture)
-    : AdHocQueryFiltersQueryTestBase(fixture)
-{
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
-
-    /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
-        => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
-        Action<ModelBuilder>? onModelCreating = null,
-        Action<DbContextOptionsBuilder>? onConfiguring = null,
-        Func<IServiceCollection, IServiceCollection>? addServices = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null,
-        Func<string, bool>? shouldLogCategory = null,
-        Func<TestStore>? createTestStore = null,
-        bool usePooling = true,
-        bool useServiceProvider = true)
-    {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
-
-        return base.CreateContextFactory<TContext>(
-            onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
-    }
 }

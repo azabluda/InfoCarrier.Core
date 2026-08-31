@@ -1,4 +1,4 @@
-# Implementation plan — post-10.0 work, no milestone open
+﻿# Implementation plan — post-10.0 work, no milestone open
 
 Milestone-level scope lives in [`roadmap.md`](roadmap.md). Do not put scope here.
 
@@ -1074,6 +1074,231 @@ re-parents of families already running, because R25–R30 showed that is where t
       means more. A81 says the translating tier — but A81 is about a base that could go either way,
       and this is the one case in the phase where the answer turns on how much store-limitation
       bookkeeping the suite should carry. **Left for the owner, priced rather than argued.**
+
+- [x] **R44. The originals audit — done from the other end, and it comes back NEGATIVE.**
+      R40 and R42 each found the same defect shape by accident, three hours apart: EF's
+      `CommandBatchPreparer` orders a write batch by values the wire had dropped, and the store
+      answered with a constraint failure. **Rather than wait for a third**, this enumerates every
+      value the preparer reads from *originals* and diffs that list against what
+      `ChangeEntryMapper.ToChangeEntry` sends. The answer is that the list is now complete.
+
+      | What `CommandBatchPreparer` reads from originals | For which state | Sent today? |
+      |---|---|---|
+      | Dependent foreign-key columns (`AddForeignKeyEdges`, `CreateDependent…`) | Modified, Deleted | **yes** — `IsForeignKey()`, since J11 and R40 |
+      | Unique **index** columns (`AddUniqueValueEdges`, first loop) | Modified, Deleted | **yes** — `GetContainingIndexes().Any(IsUnique)`, since R42 |
+      | Concurrency tokens (the `UPDATE`/`DELETE` `WHERE` clause, `ModificationCommand.HandleColumn`) | Modified, Deleted | **yes** — `IsConcurrencyToken`, since M4 |
+      | **Principal key** columns (`CreatePrincipalEquatableKeyValue/Key`) | Modified, Deleted | no — and it does not matter, below |
+      | **Unique constraint** columns, i.e. primary key + alternate keys (`AddUniqueValueEdges`, second loop) | Deleted | no — and it does not matter, below |
+      | Whether a column changed (`IsModified`) | Modified | **yes** — `ModifiedProperties` is the primary answer; the original-vs-current compare is only its fallback |
+
+      **The two rows that are not sent are exactly the key properties, and a key property's
+      original can never differ from its current.** `Property.GetAfterSaveBehavior()` returns
+      `PropertySaveBehavior.Throw` for any property where `IsKey()` — primary *and* alternate —
+      and `Property.CheckAfterSaveBehavior` **refuses to configure any other value**, answering
+      `KeyPropertyMustBeReadOnly`: *"Key properties are always read-only once an entity has been
+      saved for the first time."* `ChangeDetector.ThrowIfKeyChanged` and
+      `InternalEntryBase.SetPropertyModified` both raise `KeyReadOnly` on the attempt. So on every
+      `Modified` or `Deleted` entry the client could send, original **is** current for every key
+      property, and there is nothing for the wire to lose. **Alternate keys were the named suspect
+      and they are clear.**
+
+      **A second, independent reason closes the unique-constraint row.** `AddSameTableEdges` already
+      orders every `Deleted` command on a table before every `Added` one, reading no value at all.
+      `AddUniqueValueEdges`' contribution there is only that its edge is *non-breakable* in a cycle.
+
+      **Two things outside the ordering graph were checked in the same sweep and are recorded
+      rather than fixed:**
+
+      - **`ColumnValuePropagator`** (shared-table column maps: table splitting, and a `Deleted` +
+        `Added` pair sharing one row identity) compares a `Modified` or `Deleted` entry's
+        *original* provider value against a later `Added` entry's current one to decide whether to
+        write the column. The wire's original equals the current there, so the two could disagree —
+        but only for an entity whose non-key properties were **changed and then deleted in the same
+        `SaveChanges`**, which discards the change on every other path. No spec test does it, and
+        the effect would be a column written or skipped, not a constraint failure. **Left open and
+        named**, not fixed: the fix is "send every original", and C42 already measured the cost of
+        widening this condition speculatively at 1 fixed, 2 broken.
+      - **Stored-procedure parameters with `ForOriginalValue: true`** take *any* property's
+        original, not just a key's or a token's. That is the one place the enumeration above would
+        not hold — and it is unreachable, because stored-procedure mapping is not supported here.
+        See R47, which classifies `StoredProcedureUpdateTestBase`.
+
+      **The pin.** `SqliteSmokeTest.A_deleted_row_releases_its_alternate_key_before_a_new_row_takes_it`
+      and a `Coded` entity with `HasAlternateKey` on the SQLite smoke model. It is the first thing
+      on Tier B to send a delete and a colliding insert in one request. **Its own comment says what
+      it does not prove** — `AddSameTableEdges` makes it pass either way — because a pin that
+      overstates itself is worse than none.
+      `test/` only, so `eng/measure.sh` and not the trim ratchet. Measured together with R45;
+      figures there.
+
+- [x] **R45. Six provably-inapplicable bases into `IgnoredTestBases` — missing 45 → 39.**
+      `InfoCarrierComplianceTest`'s own remarks state the bar: the list is for bases *conceptually
+      inapplicable to a remoting provider*, and **"a base that is merely not built yet must stay
+      out of the list."** R41 read all six; this records the reading where the gate can use it.
+      Each entry carries its reason beside it, in the style of R2's twelve.
+
+      | Base | Why it can never be adopted here |
+      |---|---|
+      | `TransactionTestBase<>` | `GetDbConnection()`, `GetDbTransaction()`, `UseTransaction(DbTransaction)` and a `(RelationalTestStore)Fixture.TestStore` cast run through all 44 tests. Same reason as the already-listed `TransactionInterceptionTestBase`. |
+      | `TwoDatabasesTestBase` | Declares `protected abstract string DummyConnectionString` and `CreateBackingContext(string databaseName)`; its three tests swap one connection string for another inside a `DbConnection` interceptor. |
+      | `LoggingRelationalTestBase<,>` | **Cannot be closed at all**: `TExtension` is constrained to `RelationalOptionsExtension` and `TBuilder` to `RelationalDbContextOptionsBuilder<,>`. This provider's options extension is neither, and all nine tests configure `MaxBatchSize` / `CommandTimeout` / `UseRelationalNulls` / `MigrationsAssembly` / `MigrationsHistoryTable` through them. |
+      | `ModelBuilding101RelationalTestBase` | Its whole contribution over the core base is `GetModelMetadata`, overridden as `new RelationalModelMetadata(context.Model, context.Database.GenerateCreateScript())`. Every test routes through it. |
+      | `Scaffolding.CompiledModelRelationalTestBase` | Asserts `GetTableName()` on the compiled model, which here is the **client's**. M9 removed the relational model. |
+      | `JsonTypesRelationalTestBase` | Same boundary: `AssertElementFacets` asserts `FindRelationalTypeMapping()`, `IsFixedLength()` and `GetStoreType()` on the client's model. R23 measured 104 red of 576 on that assumption and reverted. |
+
+      **Nothing moves in `failed` or `total`, and that flat count is the expected result rather
+      than a null one.** `All_test_bases_must_be_implemented` is red before and red after — the
+      other 39 keep it red — so it is the same one failing test either way and neither baseline
+      file changes. What moves is the number the test prints, measured: **45 → 39**.
+      `test/` only. Measured together with R44; figures below.
+
+- [x] **R46. `AdHocManyToManyQuery` and `AdHocQueryFilters` re-parented onto their relational bases
+      and moved to Tier B — missing 39 → 37, and not one test moves.**
+      Both relational bases are **eighteen lines with no tests of their own**: their whole
+      contribution over the core base is a `TestSqlLoggerFactory`, a `ClearLog` and an `AssertSql`.
+      So this is a re-parent and a store switch and nothing else, and EF's own
+      `AdHocManyToManyQuerySqliteTest` and `AdHocQueryFiltersQuerySqliteTest` are twelve lines each
+      with **no overrides at all**, so the store asks for nothing either.
+      **Moved, not added** — a base belongs to exactly one tier — so the two classes leave
+      `InMemory/Query/AdHocQueryInfoCarrierTest.cs` for a new
+      `Sqlite/Query/AdHocRelationalQuerySqliteInfoCarrierTest.cs`.
+      Tier A before: `Passed: 26, Failed: 0, Total: 26`. Tier B after: `Passed: 26, Failed: 0,
+      Total: 26`. Neither core base uses `ExecuteWithStrategyInTransactionAsync`, so D6's
+      `UseTransaction` override is not needed and none is written.
+      `test/` only.
+
+- [x] **R47. `AdHocAdvancedMappings` moved to Tier B — seven tests added, all green, and two of
+      them are worth more than their green.** Missing 37 → 36.
+      `Passed: 38, Failed: 1, Total: 39` on Tier A becomes `Passed: 45, Failed: 1, Total: 46` here.
+      The one failure is the same pre-existing `Casts_are_removed_from_expression_tree_when_redundant`
+      on both tiers — **it is in the baseline and only its namespace changed**, so
+      `known-failures.names.txt` is edited in this commit and `failed` does not move.
+      EF's own `AdHocAdvancedMappingsQuerySqliteTest` is twelve lines with no overrides, so the
+      store asks for nothing.
+
+      **Four of the seven are the only TPT and TPC coverage anywhere in this repository.**
+      `CLAUDE.md` names TPT/TPC as the one real gap left by M7's dropped SQL Server tier — *"it
+      changes the model, and this provider builds a model on the client too, and no TPT or TPC test
+      class exists here at any tier"*. One now does. **What that establishes is bounded and the
+      bound is the point**: EF's `Context28196` pair are regression tests for a crash (#28196), so
+      they run `Animals.OfType<Pet>().Where(a => a.Species.StartsWith("F"))` against a
+      `UseTpcMappingStrategy` and a `UseTptMappingStrategy` model and **assert nothing about the
+      result**. So the client builds such a model and the server answers the query without
+      throwing. **It does not say TPT or TPC is correct, and no user-facing document may say it
+      does** — CLAUDE.md's standing rule about the four withdrawn features applies unchanged.
+
+      **Two more use `AsSplitQuery()`, and this is the finding for #60.** They pass — but they pass
+      because the marker is **silently ignored**, not because splitting works. Established rather
+      than assumed, as CLAUDE.md requires: `INFOCARRIER_SERVER_SQL=1` on
+      `Two_similar_complex_properties_projected_with_split_query1` shows the server executing
+      **one** `SELECT` with a `LEFT JOIN`, where a split query is two. A single query gives the
+      same answers, so the assertion holds.
+
+      **This narrows #60 rather than obeying it.** The standing instruction is not to adopt a base
+      that needs a relational client API, and it was written for `FromSql`, which *throws*.
+      `AsSplitQuery` does not throw and does not produce a red — so the four bases withheld only
+      for `AsSplitQuery` (`OwnedQuery`'s 8, `OwnedEntityQuery`'s 2, `AdHocNavigations`' 2, and this
+      one's 2) are withheld for a cost that has now been measured at **zero red tests**.
+      **What it does cost is a silent wrong-shaped answer**: a consumer calling `AsSplitQuery` here
+      gets correct results from an unsplit query and no diagnostic at all. That is an owner's
+      decision on two counts — whether to adopt those bases, and whether
+      [`website/docs/limitations.md`](../../../website/docs/limitations.md) should name the silent
+      ignore — and **neither is taken here**.
+      `test/` only.
+
+- [x] **R48. `AdHocNavigations` moved to Tier B — four tests added, and the two it breaks are
+      convergence.** Missing 36 → 35. `Passed: 21, Failed: 0, Total: 21` on Tier A becomes
+      `Passed: 25, Failed: 0, Total: 25` here, after two overrides.
+      **R47 is what made this adoptable.** The relational base's one theory has four
+      parameterizations and two of them call `AsSplitQuery()`, which is why R41's rule would have
+      withheld it. R47 measured that cost at zero red tests, and all four pass.
+
+      **The two newly-red tests are the store, and EF's own SQLite class is the check that says
+      so.** `Projection_with_multiple_includes_and_subquery_with_set_operation` and
+      `Let_multiple_references_with_reference_to_outer` fail with
+      `Translating this query requires the SQL APPLY operation, which is not supported on SQLite`
+      — `SqliteStrings.ApplyNotSupported` character for character, which is exactly what
+      `AdHocNavigationsQuerySqliteTest` overrides them with. On Tier A the query never reached SQL.
+      EF's overrides are adopted, as CLAUDE.md requires.
+
+      **EF overrides a third and this does not, deliberately.**
+      `SelectMany_and_collection_in_projection_in_FirstOrDefault` is `ApplyNotSupported` in EF's
+      SQLite suite and **passes here**, so adopting that override would turn a green test red. It
+      joins the set of queries this provider answers that other EF providers reject — the same
+      shape `limitations.md` already names two of. **Checked by running it, not assumed from the
+      sibling two.**
+      `test/` only.
+
+- [x] **R49. `Types.RelationalTypeTestBase` adopted — 16 tests become 112, and the reason it had
+      been passed over was stale on both halves.** Missing 34 of 45. `Passed: 16, Failed: 0,
+      Total: 16` becomes `Passed: 112, Failed: 0, Total: 112`: **+96, every one green.** The
+      largest single gain in the phase, and it cost a fixture re-parent and nine overrides.
+
+      **The stale reason is the finding.** `TypeInfoCarrierTest`'s own remarks said the core base
+      was used because `RelationalTypeTestBase` *"lives in `EFCore.Relational.Specification.Tests`,
+      which this project does not reference … and its extra tests assert JSON columns and
+      `ExecuteUpdate` — neither of which a client with no database has."* **R1 made the project
+      reference that assembly**, and **both features shipped**: `ExecuteUpdate` runs on Tier B in
+      `NorthwindBulkUpdates` and JSON columns in `JsonQuerySqliteInfoCarrierTest`. This is
+      `CLAUDE.md`'s "before pricing a gap, check whether a sibling of it already works" again, and
+      the sibling had been green for milestones.
+
+      **Two things were needed and one of them is D6.** The fixture re-parents onto
+      `RelationalTypeFixtureBase<T>`, whose `UseTransaction` is
+      `facade.UseTransaction(transaction.GetDbTransaction())`; five of the base's six tests route
+      through `ExecuteWithStrategyInTransactionAsync`, and without the override all of them answer
+      *"Relational-specific methods can only be used when the context is using a relational
+      database provider"* — **82 red of 112, measured before the override and 9 after**. It is
+      `public virtual`, which is exactly what ADR-013's 2026-08-30 amendment says still adopts.
+
+      **The nine remaining are convergence, name for name.** Seven
+      `ExecuteUpdate_within_json_to_nonjson_column` (EF #36688: SQLite cannot do it for a type
+      other than string, numeric or bool) and two `Query_property_within_json` (EF #36749: a
+      string-representation discrepancy between EF's JSON and `Microsoft.Data.Sqlite`'s). **The
+      nine this provider failed and the nine EF's own `SqliteMiscellaneousTypeTest` /
+      `SqliteTemporalTypeTest` override are the same nine**, checked one by one rather than
+      inferred from the family. EF's overrides are adopted verbatim.
+      `test/` only.
+
+- [x] **R50. `SpatialQueryRelationalTestBase` adopted — no SpatiaLite, no store change, and the
+      fixture gate moves for the first time.** Missing bases 34 → 33, **and
+      `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` 18 → 17.**
+      `Passed: 168, Failed: 0, Total: 168`, unchanged, because the base adds no tests.
+
+      **It was priced on its name.** The handoff had this last and time-boxed, on the assumption it
+      needs a package reference and a native library. **Reading it costs less than that assumption
+      did**: `SpatialQueryRelationalTestBase<TFixture>` is **fourteen lines**, constrained on the
+      *core* `SpatialQueryFixtureBase`, and its only member is
+      `CreateQueryAsserter => new RelationalQueryAsserter(...)`. `RelationalQueryAsserter` differs
+      from the core one by calling `TestSqlLoggerFactory.OutputSql()` when an assertion fails — a
+      diagnostic. Nothing spatial, nothing relational about the store.
+      The whole cost is `ITestSqlLoggerFactory` on the fixture, which
+      `InfoCarrierTestStoreFactory.CreateListLoggerFactory` has satisfied since R3.
+
+      **Which is why the second compliance gate moved.** That test lists 18 query fixtures with no
+      `ITestSqlLoggerFactory`; this is the first one to gain it, and the same one-property change
+      is available to the other 17. **Not done here**: 17 fixtures is a step of its own, and this
+      one was written because the base required it rather than to lower a count.
+      `test/` only.
+
+- [x] **R51. The five of the eleven that do not adopt, classified — and none is classified on its
+      name.** No code. This finishes the unread list the phase opened with: **six adopted (R46–R50),
+      five blocked, none left unread.**
+
+      | Base | Verdict, and the member that decides it |
+      |---|---|
+      | `Update.StoredProcedureUpdateTestBase` | **Blocked wholesale.** It declares **28 `public abstract Task`** members — one per test — and each provider implements them by mapping a real stored procedure (`InsertUsingStoredProcedure` and friends). Stored-procedure mapping is not supported here. **This is also the one hole R44's audit named**: a sproc parameter with `ForOriginalValue: true` takes *any* property's original, which is the single place `ToChangeEntry`'s condition would not hold — and it is unreachable for exactly this reason. |
+      | `Update.JsonUpdateTestBase<>` | **Blocked by ADR-013, and re-confirmed against EF 10 rather than taken from the record.** `public void UseTransaction(DatabaseFacade, IDbContextTransaction) => facade.UseTransaction(transaction.GetDbTransaction())` at line 3674 — **non-virtual**, and **every one of its 136 tests** routes through `ExecuteWithStrategyInTransactionAsync(CreateContext, UseTransaction, …)`. C81 measured it at 142 of 142 failing and `JsonOwnedCollectionUpdateInfoCarrierTest` is the hand-written substitute that exists because of it. Contrast R49: `RelationalTypeFixtureBase`'s is `public virtual`, and that one adopts. |
+      | `Update.StoreValueGenerationTestBase<>` | **Blocked three ways, independently.** (1) The fixture's `OnModelCreating` calls `context.GetService<ISqlGenerationHelper>()` — a relational service this client has not registered since M9. (2) It configures `HasComputedColumnSql` on the client's model. (3) **Every test asserts the backing store's command shape through the client's logger**: `Assert.Equal(ShouldExecuteInNumberOfCommands(…), Fixture.ListLoggerFactory.Log.Count(l => l.Id == RelationalEventId.CommandExecuted))`, plus `TransactionStarted`/`TransactionCommitted`. The client executes no `DbCommand` and starts no store transaction; both happen on the server, on its own context and its own logger. **What this base tests is the relational update pipeline's batching, which is EF's concern on the server and never crosses this wire.** |
+      | `Query.AdHocMiscellaneousQueryRelationalTestBase` | **#60, and the blocker is an abstract member rather than a test body** — `NullSemanticsQueryTestBase`'s shape exactly (R41). It declares `protected abstract DbContextOptionsBuilder SetParameterizedCollectionMode(DbContextOptionsBuilder, ParameterTranslationMode)`, which EF's SQLite class implements as `new SqliteDbContextOptionsBuilder(optionsBuilder).UseParameterizedCollectionMode(…)` — a relational option on the **client's** builder. A second abstract member, `Seed2951`, is `context.Database.ExecuteSqlRawAsync(...)` on the client. **Stays visible, not ignored**: #60 is undecided, and R2's rule is that an undecided base must keep being reported. |
+      | `Query.NorthwindDbFunctionsQueryRelationalTestBase<>` | **Not blocked — gated on a step of its own, and worth stating as such.** Its only real requirement is `where TFixture : NorthwindQueryRelationalFixture<NoopModelCustomizer>`, and that fixture declares `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`. Under ADR-013's 2026-08-30 amendment a cast like that blocks a base **only if a route runs through it**, which is not established here — but adopting means re-parenting `NorthwindQueryInfoCarrierFixture` onto a relational fixture base, and **every Northwind class in the suite hangs off it**. That is a change to price on its own, not a substep. Its two abstract members are trivial (`CaseInsensitiveCollation` / `CaseSensitiveCollation`, `"NOCASE"` and `"BINARY"` on SQLite). |
+
+      **Two of the five look to me like `IgnoredTestBases` candidates and neither is added here.**
+      `JsonUpdateTestBase` is the same ADR-013 shape as the already-listed `TransactionTestBase`,
+      and `StoreValueGenerationTestBase` asserts a store's command batching through a client that
+      issues no commands. Both would meet the "conceptually inapplicable" bar. **Adding to that
+      list is a permanent change to what the gate reports**, the owner named exactly six for R45,
+      and neither of these was among them — so they are classified and left visible.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

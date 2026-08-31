@@ -83,6 +83,8 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
 
     public DbSet<Addressed> Addressed => Set<Addressed>();
 
+    public DbSet<Coded> Coded => Set<Coded>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,7 +95,44 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
             .HasConversion(k => k.Value, v => new IntStructKey(v));
 
         modelBuilder.Entity<Addressed>().ComplexProperty(e => e.Address);
+
+        // An alternate key, which SQLite renders as a UNIQUE table constraint. It is the only
+        // thing in this model that reaches CommandBatchPreparer.AddUniqueValueEdges' unique-
+        // constraint branch, and R44 exists to measure that branch over the wire.
+        modelBuilder.Entity<Coded>(b =>
+        {
+            b.Property(e => e.Code).IsRequired();
+            b.HasAlternateKey(e => e.Code);
+        });
     }
+}
+
+/// <summary>
+///     An entity with an alternate key, for the R44 originals audit.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <c>CommandBatchPreparer.AddUniqueValueEdges</c> orders a <c>Deleted</c> command before
+///         an <c>Added</c> one that reuses the same <em>unique constraint</em> value, and it reads
+///         the deleted row's value <c>fromOriginalValues: true</c>. A table's unique constraints
+///         are its primary key and its alternate keys, and nothing else in this model has an
+///         alternate key.
+///     </para>
+///     <para>
+///         The audit's answer is that the wire cannot lose that original, because <c>Code</c> is a
+///         key property and EF fixes every key property's <c>AfterSaveBehavior</c> at
+///         <c>Throw</c> — <c>Property.CheckAfterSaveBehavior</c> refuses to configure any other
+///         value, so a saved key can never be changed and its original can never differ from its
+///         current. This entity is what lets the scenario be run at all.
+///     </para>
+/// </remarks>
+public class Coded
+{
+    public int Id { get; set; }
+
+    public string Code { get; set; } = string.Empty;
+
+    public string? Label { get; set; }
 }
 
 /// <summary>

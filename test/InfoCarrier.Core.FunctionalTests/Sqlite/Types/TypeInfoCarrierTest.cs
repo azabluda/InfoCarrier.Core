@@ -1,8 +1,12 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Types;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Types;
 
@@ -24,10 +28,24 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Types;
 ///         cannot test one. The sixteen types below are exactly the ones EF's SQLite suite covers.
 ///     </para>
 ///     <para>
-///         The <em>core</em> base, not <c>RelationalTypeTestBase</c>: that one lives in
-///         <c>EFCore.Relational.Specification.Tests</c>, which this project does not reference
-///         (A79 mirrors its overrides by hand for the same reason), and its extra tests assert
-///         JSON columns and <c>ExecuteUpdate</c> — neither of which a client with no database has.
+///         <b><c>RelationalTypeTestBase</c>, since R49 — and the reason this used to be the core
+///         base was stale on both of its halves.</b> It read: <em>"that one lives in
+///         <c>EFCore.Relational.Specification.Tests</c>, which this project does not reference,
+///         and its extra tests assert JSON columns and <c>ExecuteUpdate</c> — neither of which a
+///         client with no database has."</em> R1 made the project reference that assembly, and
+///         both features shipped: <c>ExecuteUpdate</c> runs on Tier B in <c>NorthwindBulkUpdates</c>
+///         and JSON columns in <c>JsonQuerySqliteInfoCarrierTest</c>. The re-parent takes
+///         <c>Passed: 16, Total: 16</c> to <c>Passed: 112, Total: 112</c> — six more tests per
+///         type, ninety-six in all, every one green.
+///     </para>
+///     <para>
+///         <b>Nine of those ninety-six needed EF's own SQLite overrides</b>, and they are
+///         convergence rather than anything of this provider's: seven
+///         <c>ExecuteUpdate_within_json_to_nonjson_column</c> (EF #36688 — SQLite cannot do it for
+///         a type other than string, numeric or bool) and two <c>Query_property_within_json</c>
+///         (EF #36749 — a string-representation discrepancy between EF's JSON and
+///         <c>Microsoft.Data.Sqlite</c>'s). The nine this provider failed and the nine EF's SQLite
+///         suite overrides are the same nine, checked name by name.
 ///     </para>
 ///     <para>
 ///         <b>A store name per type.</b> EF's fixture names them all <c>TypeTest</c> and relies on
@@ -36,7 +54,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Types;
 ///         coupling that produced a 698-test phantom failure once already.
 ///     </para>
 /// </remarks>
-public abstract class TypeInfoCarrierFixture<T> : TypeFixtureBase<T>
+public abstract class TypeInfoCarrierFixture<T> : RelationalTypeFixtureBase<T>
     where T : notnull
 {
     private ITestStoreFactory? _testStoreFactory;
@@ -52,10 +70,25 @@ public abstract class TypeInfoCarrierFixture<T> : TypeFixtureBase<T>
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);
+
+    /// <summary>
+    ///     Enlist in the ambient transaction the InfoCarrier way (architecture.md §6a <b>D6</b>).
+    /// </summary>
+    /// <remarks>
+    ///     Required the moment the class re-parents onto <c>RelationalTypeTestBase</c>: five of
+    ///     its six tests run through <c>ExecuteWithStrategyInTransactionAsync</c>, and the base
+    ///     fixture's <c>UseTransaction</c> is <c>facade.UseTransaction(transaction.GetDbTransaction())</c>
+    ///     — <em>"Relational-specific methods can only be used when the context is using a
+    ///     relational database provider"</em> on a client that has no database. It is
+    ///     <c>public virtual</c>, which is what makes the base adoptable at all under ADR-013's
+    ///     2026-08-30 amendment; <c>JsonUpdateTestBase</c>'s is not, and that base stays out.
+    /// </remarks>
+    public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        => facade.UseInfoCarrierTransaction(transaction);
 }
 
 public class BoolTypeInfoCarrierTest(BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture fixture)
-    : TypeTestBase<bool, BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<bool, BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture>(fixture)
 {
     public class BoolTypeInfoCarrierFixture : TypeInfoCarrierFixture<bool>
     {
@@ -66,7 +99,7 @@ public class BoolTypeInfoCarrierTest(BoolTypeInfoCarrierTest.BoolTypeInfoCarrier
 }
 
 public class StringTypeInfoCarrierTest(StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture fixture)
-    : TypeTestBase<string, StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<string, StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture>(fixture)
 {
     public class StringTypeInfoCarrierFixture : TypeInfoCarrierFixture<string>
     {
@@ -77,8 +110,18 @@ public class StringTypeInfoCarrierTest(StringTypeInfoCarrierTest.StringTypeInfoC
 }
 
 public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture fixture)
-    : TypeTestBase<Guid, GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<Guid, GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class GuidTypeInfoCarrierFixture : TypeInfoCarrierFixture<Guid>
     {
         public override Guid Value { get; } = new("8f7331d6-cde9-44fb-8611-81fff686f280");
@@ -88,8 +131,25 @@ public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrier
 }
 
 public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture fixture)
-    : TypeTestBase<byte[], ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<byte[], ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: a string-representation discrepancy between EF's JSON and
+    ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
+    /// </summary>
+    public override Task Query_property_within_json()
+        => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
+
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class ByteArrayTypeInfoCarrierFixture : TypeInfoCarrierFixture<byte[]>
     {
         public override byte[] Value { get; } = [1, 2, 3];
@@ -101,7 +161,7 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
 }
 
 public class ByteTypeInfoCarrierTest(ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture fixture)
-    : TypeTestBase<byte, ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<byte, ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture>(fixture)
 {
     public class ByteTypeInfoCarrierFixture : TypeInfoCarrierFixture<byte>
     {
@@ -112,7 +172,7 @@ public class ByteTypeInfoCarrierTest(ByteTypeInfoCarrierTest.ByteTypeInfoCarrier
 }
 
 public class ShortTypeInfoCarrierTest(ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture fixture)
-    : TypeTestBase<short, ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<short, ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture>(fixture)
 {
     public class ShortTypeInfoCarrierFixture : TypeInfoCarrierFixture<short>
     {
@@ -123,7 +183,7 @@ public class ShortTypeInfoCarrierTest(ShortTypeInfoCarrierTest.ShortTypeInfoCarr
 }
 
 public class IntTypeInfoCarrierTest(IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture fixture)
-    : TypeTestBase<int, IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<int, IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture>(fixture)
 {
     public class IntTypeInfoCarrierFixture : TypeInfoCarrierFixture<int>
     {
@@ -134,7 +194,7 @@ public class IntTypeInfoCarrierTest(IntTypeInfoCarrierTest.IntTypeInfoCarrierFix
 }
 
 public class LongTypeInfoCarrierTest(LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture fixture)
-    : TypeTestBase<long, LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<long, LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture>(fixture)
 {
     public class LongTypeInfoCarrierFixture : TypeInfoCarrierFixture<long>
     {
@@ -145,7 +205,7 @@ public class LongTypeInfoCarrierTest(LongTypeInfoCarrierTest.LongTypeInfoCarrier
 }
 
 public class DecimalTypeInfoCarrierTest(DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture fixture)
-    : TypeTestBase<decimal, DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<decimal, DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture>(fixture)
 {
     public class DecimalTypeInfoCarrierFixture : TypeInfoCarrierFixture<decimal>
     {
@@ -156,7 +216,7 @@ public class DecimalTypeInfoCarrierTest(DecimalTypeInfoCarrierTest.DecimalTypeIn
 }
 
 public class DoubleTypeInfoCarrierTest(DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture fixture)
-    : TypeTestBase<double, DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<double, DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture>(fixture)
 {
     public class DoubleTypeInfoCarrierFixture : TypeInfoCarrierFixture<double>
     {
@@ -167,7 +227,7 @@ public class DoubleTypeInfoCarrierTest(DoubleTypeInfoCarrierTest.DoubleTypeInfoC
 }
 
 public class FloatTypeInfoCarrierTest(FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture fixture)
-    : TypeTestBase<float, FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<float, FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture>(fixture)
 {
     public class FloatTypeInfoCarrierFixture : TypeInfoCarrierFixture<float>
     {
@@ -178,8 +238,18 @@ public class FloatTypeInfoCarrierTest(FloatTypeInfoCarrierTest.FloatTypeInfoCarr
 }
 
 public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture fixture)
-    : TypeTestBase<DateTime, DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<DateTime, DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class DateTimeTypeInfoCarrierFixture : TypeInfoCarrierFixture<DateTime>
     {
         public override DateTime Value { get; } = new(2020, 1, 5, 12, 30, 45, DateTimeKind.Unspecified);
@@ -190,8 +260,18 @@ public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTyp
 
 public class DateTimeOffsetTypeInfoCarrierTest(
     DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture fixture)
-    : TypeTestBase<DateTimeOffset, DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<DateTimeOffset, DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class DateTimeOffsetTypeInfoCarrierFixture : TypeInfoCarrierFixture<DateTimeOffset>
     {
         public override DateTimeOffset Value { get; } = new(2020, 1, 5, 12, 30, 45, TimeSpan.FromHours(2));
@@ -201,8 +281,18 @@ public class DateTimeOffsetTypeInfoCarrierTest(
 }
 
 public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture fixture)
-    : TypeTestBase<DateOnly, DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<DateOnly, DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class DateOnlyTypeInfoCarrierFixture : TypeInfoCarrierFixture<DateOnly>
     {
         public override DateOnly Value { get; } = new(2020, 1, 5);
@@ -212,8 +302,25 @@ public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTyp
 }
 
 public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture fixture)
-    : TypeTestBase<TimeOnly, TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<TimeOnly, TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: a string-representation discrepancy between EF's JSON and
+    ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
+    /// </summary>
+    public override Task Query_property_within_json()
+        => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
+
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class TimeOnlyTypeInfoCarrierFixture : TypeInfoCarrierFixture<TimeOnly>
     {
         public override TimeOnly Value { get; } = new(12, 30, 45);
@@ -223,8 +330,18 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
 }
 
 public class TimeSpanTypeInfoCarrierTest(TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture fixture)
-    : TypeTestBase<TimeSpan, TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture>(fixture)
+    : RelationalTypeTestBase<TimeSpan, TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture>(fixture)
 {
+    /// <summary>
+    ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
+    ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
+    /// </summary>
+    public override async Task ExecuteUpdate_within_json_to_nonjson_column()
+        => Assert.Equal(
+            RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+
     public class TimeSpanTypeInfoCarrierFixture : TypeInfoCarrierFixture<TimeSpan>
     {
         public override TimeSpan Value { get; } = new(12, 30, 45);
