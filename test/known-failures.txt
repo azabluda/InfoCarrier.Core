@@ -1733,5 +1733,39 @@
 # `src/`, so both gates ran: trim ratchet OK (89 <= 89), Release build 0 Warning(s), 0 Error(s).
 # The Release build caught one CS8602 that Debug did not -- the third time in this branch.
 # ---------------------------------------------------------------------------------------------
-failed=95
-total=28946
+# 2026-08-31 (R66) -- `failed` 95 -> 99, `total` 28946 -> 28950. FIXED none, BROKEN four.
+# THE RISE IS DELIBERATE AND AUTHORISED: the owner asked for this base knowing the price, which
+# R62 had measured at four permanent reds. The four broken are exactly those four and nothing else
+# moved. Compliance missing bases 23 -> 22.
+#
+# `NorthwindBulkUpdatesRelationalTestBase` adds two theories, `Delete_FromSql_converted_to_subquery`
+# and `Update_FromSql_set_constant`, both `FromSqlRaw`. They fail on the `(RelationalTestStore)`
+# cast in `NormalizeDelimitersInRawString` before `FromSql` is reached, so the message names the
+# cast; the reason is #60 either way and both are permanent until #60 is decided.
+#
+# THE RE-PARENT DELETES MORE THAN IT ADDS, and that is R1 paying out again. This class carried SIX
+# overrides hand-mirrored from `NorthwindBulkUpdatesRelationalTestBase` -- three
+# `Delete_non_entity_projection`, `Update_without_property_to_set_throws`,
+# `Update_multiple_tables_throws`, `Update_unmapped_property_throws` -- plus a hand-mirrored
+# `AssertTranslationFailed` helper, all written because that assembly was not referenced. Its own
+# remark said so: "mirrored by hand, each matched by reason against a measured failure first
+# (A63)". R1 referenced the assembly and the base supplies every one of them. The fixture loses a
+# duplicated `TestSqlLoggerFactory` property and its `ITestSqlLoggerFactory` declaration for the
+# same reason.
+#
+# D6 IS SATISFIED AND WAS CHECKED RATHER THAN ASSUMED. `NorthwindBulkUpdatesRelationalFixture`
+# declares `public override void UseTransaction(...) => facade.UseTransaction(transaction.GetDbTransaction())`
+# -- virtual, so it adopts (ADR-013's 2026-08-30 amendment) -- and this fixture already overrode it
+# with `UseInfoCarrierTransaction`. Nothing new was needed, which is why no `database is locked`
+# run appears here.
+#
+# C20's PAIR IS UNCHANGED AND THAT IS INFORMATION. The relational base overrides
+# `Update_with_invalid_lambda_in_set_property_throws` itself, and both parameterizations still
+# fail exactly as before -- they were already in this baseline and are not part of the four. So
+# adopting the base did not close them and C20's reading of them still stands.
+#
+# `test/` only. The Release build was run anyway and caught one IDE0005 that Debug did not, which
+# is the fourth time on this branch.
+# ---------------------------------------------------------------------------------------------
+failed=99
+total=28950

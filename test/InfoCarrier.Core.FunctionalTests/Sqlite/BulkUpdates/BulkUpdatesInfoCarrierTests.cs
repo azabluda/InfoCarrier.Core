@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.BulkUpdates;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.Northwind;
@@ -11,6 +10,7 @@ using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Xunit.Abstractions;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -46,19 +46,9 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.BulkUpdates;
 ///     </para>
 /// </remarks>
 public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
-    : NorthwindBulkUpdatesFixture<TModelCustomizer>, ITestSqlLoggerFactory
+    : NorthwindBulkUpdatesRelationalFixture<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
-    /// <summary>
-    ///     The compliance gate's second assertion (R54). The property is real —
-    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
-    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
-    ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
-    ///     server's statements can actually be read.
-    /// </summary>
-    public TestSqlLoggerFactory TestSqlLoggerFactory
-        => (TestSqlLoggerFactory)ListLoggerFactory;
-
     private ITestStoreFactory? _testStoreFactory;
 
     /// <inheritdoc />
@@ -147,44 +137,13 @@ public class FiltersInheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUp
 ///         <c>Update_with_invalid_lambda_in_set_property_throws</c>; see C20.
 ///     </para>
 /// </remarks>
-public class NorthwindBulkUpdatesInfoCarrierTest(NorthwindBulkUpdatesInfoCarrierFixture<NoopModelCustomizer> fixture)
-    : NorthwindBulkUpdatesTestBase<NorthwindBulkUpdatesInfoCarrierFixture<NoopModelCustomizer>>(fixture)
+public class NorthwindBulkUpdatesInfoCarrierTest(
+    NorthwindBulkUpdatesInfoCarrierFixture<NoopModelCustomizer> fixture,
+    ITestOutputHelper testOutputHelper)
+    : NorthwindBulkUpdatesRelationalTestBase<NorthwindBulkUpdatesInfoCarrierFixture<NoopModelCustomizer>>(
+        fixture,
+        testOutputHelper)
 {
-    // --- Relational limits, stated on `NorthwindBulkUpdatesRelationalTestBase`. The server
-    // raises each message verbatim; only the assertion was missing.
-
-    /// <inheritdoc />
-    public override Task Delete_non_entity_projection(bool async)
-        => AssertTranslationFailed(
-            RelationalStrings.ExecuteDeleteOnNonEntityType, () => base.Delete_non_entity_projection(async));
-
-    /// <inheritdoc />
-    public override Task Delete_non_entity_projection_2(bool async)
-        => AssertTranslationFailed(
-            RelationalStrings.ExecuteDeleteOnNonEntityType, () => base.Delete_non_entity_projection_2(async));
-
-    /// <inheritdoc />
-    public override Task Delete_non_entity_projection_3(bool async)
-        => AssertTranslationFailed(
-            RelationalStrings.ExecuteDeleteOnNonEntityType, () => base.Delete_non_entity_projection_3(async));
-
-    /// <inheritdoc />
-    public override Task Update_without_property_to_set_throws(bool async)
-        => AssertTranslationFailed(
-            RelationalStrings.NoSetPropertyInvocation, () => base.Update_without_property_to_set_throws(async));
-
-    /// <inheritdoc />
-    public override Task Update_multiple_tables_throws(bool async)
-        => AssertTranslationFailed(
-            RelationalStrings.MultipleTablesInExecuteUpdate("o => o.Outer.OrderDate", "o => o.Inner.ContactName"),
-            () => base.Update_multiple_tables_throws(async));
-
-    /// <inheritdoc />
-    public override Task Update_unmapped_property_throws(bool async)
-        => AssertTranslationFailed(
-            RelationalStrings.InvalidPropertyInSetProperty("c => c.IsLondon"),
-            () => base.Update_unmapped_property_throws(async));
-
     // --- SQLite has no APPLY. Stated in EF's own SQLite suite, and the message this provider
     // surfaces is `SqliteStrings.ApplyNotSupported` character for character.
 
@@ -249,16 +208,6 @@ public class NorthwindBulkUpdatesInfoCarrierTest(NorthwindBulkUpdatesInfoCarrier
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_two_inner_joins(bool async)
         => base.Update_with_two_inner_joins(async);
-
-    /// <summary>
-    ///     EF's helper, mirrored: a non-query translation failure wraps the provider's detail in
-    ///     <c>CoreStrings.NonQueryTranslationFailedWithDetails</c>, whose first 21 characters are
-    ///     the query text the caller wrote and therefore not comparable.
-    /// </summary>
-    private static async Task AssertTranslationFailed(string details, Func<Task> query)
-        => Assert.Contains(
-            CoreStrings.NonQueryTranslationFailedWithDetails(string.Empty, details)[21..],
-            (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
 }
 
 public class InheritanceBulkUpdatesInfoCarrierTest(InheritanceBulkUpdatesInfoCarrierFixture fixture)

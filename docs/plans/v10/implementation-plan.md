@@ -1728,6 +1728,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       **What is newly actionable is the upstream report**: the fix is one branch of one method
       applying the guard the same method already applies eight lines later.
 
+- [x] **R66. `NorthwindBulkUpdates` re-parented onto its relational base — and the re-parent
+      deletes seven things and adds two.** Missing bases 23 → 22, `total` 28946 → 28950,
+      `failed` **95 → 99 on the owner's instruction**. FIXED none, BROKEN four.
+      `Passed: 28615, Failed: 99, Total: 28950`.
+
+      **The rise is the price R62 measured and the owner accepted.** The base adds two theories,
+      `Delete_FromSql_converted_to_subquery` and `Update_FromSql_set_constant`, both `FromSqlRaw`;
+      four parameterizations, all permanent until #60 is decided. **The four broken are exactly
+      those four**, and nothing else in the suite moved. They fail on the `(RelationalTestStore)`
+      cast inside `NormalizeDelimitersInRawString` before `FromSql` is reached, so the message
+      names the cast rather than the SQL — the reason is #60 either way.
+
+      **Seven things go away, and that is R1 paying out a second time.** This class carried **six
+      overrides hand-mirrored** from the relational base — the three `Delete_non_entity_projection`,
+      `Update_without_property_to_set_throws`, `Update_multiple_tables_throws` and
+      `Update_unmapped_property_throws` — plus a hand-mirrored `AssertTranslationFailed` helper.
+      Its own remark explained why: *"`EFCore.Relational.Specification.Tests` is not referenced here
+      — so they are mirrored by hand, each matched by reason against a measured failure first
+      (A63)"*. R1 referenced it. The fixture also loses a duplicated `TestSqlLoggerFactory` property
+      and its `ITestSqlLoggerFactory` declaration, both of which the relational fixture supplies.
+
+      **D6 is satisfied and was checked rather than assumed.**
+      `NorthwindBulkUpdatesRelationalFixture.UseTransaction` is `public override` calling
+      `GetDbTransaction()` — virtual, so it adopts under ADR-013's amendment — and this fixture
+      already overrode it with `UseInfoCarrierTransaction`. Nothing new was needed, which is why
+      this step has no `database is locked` run behind it.
+
+      **C20's pair did not move, and that is worth recording.** The relational base overrides
+      `Update_with_invalid_lambda_in_set_property_throws` itself, and both parameterizations fail
+      exactly as before. They were already in the baseline, they are not among the four, and
+      adopting the base did not close them — so C20's reading of them stands unchanged.
+      `test/` only; the Release build was run anyway and caught one `IDE0005` Debug did not, the
+      fourth on this branch.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
