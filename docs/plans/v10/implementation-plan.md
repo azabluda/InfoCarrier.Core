@@ -1428,6 +1428,46 @@ re-parents of families already running, because R25–R30 showed that is where t
       base supplies them.
       `test/` only.
 
+- [x] **R59. `AsSplitQuery` is now actually ignored — and the "silent ignore" was never what was
+      happening.** `failed` 99 → 95, `total` **unchanged** at 27809. FIXED 4, BROKEN none.
+      `Passed: 27478, Failed: 95, Total: 27809`. A `src/` change; both gates ran.
+
+      **The defect is one clause, and it had never executed.** `QuerySplitter.QueryMarkers` has
+      listed `"AsSplitQuery"` and `"AsSingleQuery"` since the set was written. The only thing that
+      reads that set is `MarkerStrippingVisitor`, whose first test is
+      `DeclaringType == typeof(EntityFrameworkQueryableExtensions)` — and both hints are declared
+      on `RelationalQueryableExtensions`. **Neither entry could ever match.** The strings look like
+      a decision and are a dead branch.
+
+      **What actually happened is not "the marker vanishes", and that mattered.** The marker stayed
+      in the tree; `ServerBoundaryAnalyzer` met a call it did not know and cut **below** it. The
+      server ran what was under the hint, and the client applied `AsSplitQuery` to a materialized
+      `EnumerableQuery` — where EF's own method returns its source untouched, because the provider
+      is not an `EntityQueryProvider`. **At the top of a chain that is invisible**: the whole query
+      is under the hint and the answer is right, which is exactly what R47 measured and read as a
+      silent ignore. **At a nested query root it is not**: the cut is forced below that root, so an
+      `Include` or a navigation above it has no server query to read from.
+
+      **Four baseline failures were this, and both places that classified them said something
+      else.** `Include_on_derived_type_with_queryable_Cast_split` on TPT and TPC is recorded in
+      `known-failures.txt` as returning an **over-included graph**, cited as *"evidence for #60's
+      option 3, a marker the server must recognise so an unknown one fails loudly"*. It was not
+      evidence for that; it was this. All four are green with the hint removed, and the entry is
+      corrected in place. **That also takes the repository's wrong-answer count back to 2** —
+      `CLAUDE.md` has said 2 for two milestones while these four were quietly a third case.
+
+      **The other eight of that twelve stay red and stay correctly classified**: they throw
+      `ApplyNotSupported`, which a single query genuinely needs and a split query genuinely avoids.
+      That half is #60 and this does not touch it.
+
+      **This is not #60 work and adds no relational client API.** The hint is an EF extension
+      method that already compiled and already reached this provider; the change is that the
+      provider now does what its own `QueryMarkers` list says it does. **What it does not change is
+      the consumer-facing question** the owner reserved: a caller who writes `AsSplitQuery` still
+      gets correct results from one statement and no diagnostic, and
+      [`limitations.md`](../../../website/docs/limitations.md) still does not say so.
+      Gates: trim ratchet OK (89 ≤ 89), Release build `5 Warning(s), 0 Error(s)`.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

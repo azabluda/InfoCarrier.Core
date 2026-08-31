@@ -1611,5 +1611,37 @@
 #
 # Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
 # ---------------------------------------------------------------------------------------------
-failed=99
+# 2026-08-31 (R59) -- `failed` 99 -> 95, `total` UNCHANGED at 27809. FIXED four, BROKEN none.
+# A `src/` change, and the four it fixes were all classified wrong in this file.
+#
+# `QuerySplitter` now strips `AsSplitQuery` and `AsSingleQuery` from the captured query before the
+# boundary analysis reads it. Both were already listed in `QueryMarkers` -- and neither entry could
+# ever match, because the only thing that reads that set is `MarkerStrippingVisitor`, whose first
+# test is `DeclaringType == typeof(EntityFrameworkQueryableExtensions)`, and both hints are
+# declared on `RelationalQueryableExtensions`. The intent was written down five milestones ago and
+# has never once executed.
+#
+# WHAT HAPPENED INSTEAD IS NOT "THE MARKER VANISHES", which is what the 2026-08-29 entry above
+# says. The marker stayed in the tree; the boundary analyzer met a call it did not know and cut
+# BELOW it. The server then ran whatever was under the hint and the client applied `AsSplitQuery`
+# to a materialized `EnumerableQuery`, where EF's own method returns its source untouched because
+# the provider is not an `EntityQueryProvider`. On a hint at the TOP of the chain that is invisible
+# -- the whole query is under it, the answer is right -- which is how R47 read it as "silently
+# ignored". On a hint at a NESTED query root it is not: the cut is forced below that root, so an
+# `Include` or a navigation above it has no server query to read from.
+#
+# THE FOUR FIXED ARE THE PROOF, and they were the entry above's own second shape:
+# `Include_on_derived_type_with_queryable_Cast_split` on TPT and TPC, recorded there as returning
+# an OVER-INCLUDED graph and cited as "evidence for #60's option 3, a marker the server must
+# recognise so an unknown one fails loudly". It was not evidence for that. It was this defect, and
+# the graph was over-included because the cut landed under the marker. All four are green.
+#
+# THE OTHER EIGHT OF THAT TWELVE STAY RED and stay correctly classified: they throw
+# `ApplyNotSupported`, which a single query genuinely does need and a split query genuinely avoids.
+# That half is #60 and is unaffected.
+#
+# `src/`, so both gates ran: trim ratchet OK (89 <= 89), and `CI=true dotnet build --configuration
+# Release` reports 5 Warning(s), 0 Error(s) -- the documented Razor baseline.
+# ---------------------------------------------------------------------------------------------
+failed=95
 total=27809

@@ -29,9 +29,15 @@ public sealed class QuerySplitter
         nameof(EntityFrameworkQueryableExtensions.AsNoTrackingWithIdentityResolution),
         nameof(EntityFrameworkQueryableExtensions.IgnoreQueryFilters),
         nameof(EntityFrameworkQueryableExtensions.IgnoreAutoIncludes),
-        "AsSplitQuery",
-        "AsSingleQuery",
     ];
+
+    // The two relational query hints, which this provider cannot honour and strips outright --
+    // see `SplitHintStrippingVisitor` below. Named as strings because `InfoCarrier.Core` does not
+    // reference `EFCore.Relational` (M9), so `RelationalQueryableExtensions` is not a type here.
+    private const string RelationalQueryableExtensionsFullName
+        = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions";
+
+    private static readonly HashSet<string> SplitHints = ["AsSplitQuery", "AsSingleQuery"];
 
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
@@ -103,6 +109,27 @@ public sealed class QuerySplitter
         // it. Left alone, `IgnoreQueryFilters(["ActiveFilter", "NameFilter"])` was unshippable
         // whole, so only the query root travelled and the marker stayed on the client where it
         // does nothing at all — the server applied the filters the caller had just excluded.
+        // `AsSplitQuery` and `AsSingleQuery` are relational hints about how many statements the
+        // store issues. This provider issues none, so there is nothing here for them to mean, and
+        // they are removed before anything else reads the tree.
+        //
+        // THEY USED TO BE LISTED IN `QueryMarkers` AND STRIPPED NOWHERE. That set is only ever
+        // consulted by `MarkerStrippingVisitor`, whose first test is
+        // `DeclaringType == typeof(EntityFrameworkQueryableExtensions)` -- and both hints are
+        // declared on `RelationalQueryableExtensions`, so neither entry could ever match. What
+        // happened instead is that the boundary analyzer met a call it did not know and cut
+        // *below* it: the server ran whatever was under the hint, and the client applied
+        // `AsSplitQuery` to a materialized `EnumerableQuery`, where EF's own method returns its
+        // source untouched because the provider is not an `EntityQueryProvider`. On a hint at the
+        // top of the chain that is invisible -- the whole query is under it and the answer is
+        // right, which is how it read as "silently ignored" (plan step R47). On a hint at a
+        // *nested* query root it is not: the cut is forced below that root, so an `Include` or a
+        // navigation above it has no server query to read from. Measured on EF's three
+        // `*SplitQueryRelationalTestBase` classes, which insert the hint at every root: 456 of 638
+        // failing, 106 of them this provider's own "reads navigation X, but no query sent to the
+        // server returned it", and the rest wrong answers.
+        query = new SplitHintStrippingVisitor().Visit(query)!;
+
         query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
 
         // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
@@ -910,6 +937,17 @@ public sealed class QuerySplitter
 
             return Expression.Constant(array, declared);
         }
+    }
+
+    private sealed class SplitHintStrippingVisitor : ExpressionVisitor
+    {
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+            => node.Method.IsStatic
+                && node.Arguments.Count == 1
+                && SplitHints.Contains(node.Method.Name)
+                && node.Method.DeclaringType?.FullName == RelationalQueryableExtensionsFullName
+                    ? Visit(node.Arguments[0])
+                    : base.VisitMethodCall(node);
     }
 
     private sealed class MarkerStrippingVisitor : ExpressionVisitor
