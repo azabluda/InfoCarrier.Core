@@ -1545,6 +1545,59 @@ re-parents of families already running, because R25–R30 showed that is where t
       `DateTime?` and one `IDE0005`.
       `test/` only.
 
+- [x] **R62. The remaining 23 classified, four of them measured and reverted — and the inventory is
+      now read end to end.** No code. Every base the compliance gate lists has a verdict and the
+      member or the number that decides it, and **not one is classified on its name**.
+
+      **Four were probed and backed out.** Each left no code and each replaced an estimate with a
+      measurement, which is R55's model. They are marked *(probed)* below.
+
+      | Base | Verdict, and what decides it |
+      |---|---|
+      | `Query.FromSqlQueryTestBase` | **#60, and the blocker is an abstract member as much as the bodies.** It declares `protected abstract DbParameter CreateDbParameter(string, object)` — an **ADO.NET** parameter object. This client has no ADO.NET provider, so there is nothing to return. 1,346 lines, every test `FromSqlRaw` or `SqlQueryRaw`. |
+      | `Query.SqlQueryTestBase` | **#60, same abstract member.** 1,301 lines of `context.Database.SqlQueryRaw`. |
+      | `Query.NorthwindSqlQueryTestBase` | **#60, same abstract member.** Every one of its tests is `Database.SqlQueryRaw` or `Database.SqlQuery`. |
+      | `Query.SqlExecutorTestBase` | **#60, same abstract member, plus three more**: `TenMostExpensiveProductsSproc`, `CustomerOrderHistorySproc` and `CustomerOrderHistoryWithGeneratedParameterSproc`, each a real stored procedure the store must define. |
+      | `Query.FromSqlSprocQueryTestBase` | **#60 and stored procedures.** Two abstract sproc names, and every test `FromSqlRaw(TenMostExpensiveProductsSproc, …)`. |
+      | `Query.GearsOfWarFromSqlQueryTestBase` | **#60 in its purest form: 45 lines, two tests, no abstract member at all.** The only blocker is `FromSqlRaw` — and `NormalizeDelimitersInRawString` reaching `Fixture.TestStore` as a `RelationalTestStore` on both routes. Two tests, both permanently red; nothing else in the base. |
+      | `Query.ToSqlQueryTestBase` | **Blocked twice over, and neither is #60.** Its model calls `builder.ToSqlQuery("SELECT * FROM PostStats")` on the **client's** model — a relational mapping this provider does not build (M9) — and it declares `public void UseTransaction(DatabaseFacade, IDbContextTransaction) => facade.UseTransaction(transaction.GetDbTransaction())`, **non-virtual**, which is ADR-013's blocking shape exactly. |
+      | `Query.UdfDbFunctionTestBase` | **Blocked twice, and the second is the stronger reason.** Its model registers about thirty `HasDbFunction`, several with `HasTranslation(args => new SqlFragmentExpression(…))`, `new InExpression(…)` and `new SqlFunctionExpression(…)` — relational `SqlExpression` types on the **client's** model, which `QuerySplitter.RejectClientEvaluation` refuses before the wire. That is R55's and R56's mechanism for the third time. **And EF ships no `UdfDbFunctionSqliteTest` and no InMemory one either**, which is `CLAUDE.md`'s stated bar for leaving a base unadopted rather than moving its tier: the functions have to exist in the store, and SQLite has no `CREATE FUNCTION`. |
+      | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | **#60, and it is the same abstract member as `AdHocMiscellaneous` (R51)**: `protected abstract DbContextOptionsBuilder SetParameterizedCollectionMode(DbContextOptionsBuilder, ParameterTranslationMode)`, which EF's SQLite writes as `new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(…)` — a relational option on the **client's** builder. |
+      | `Query.AdHocQuerySplittingQueryTestBase` *(probed)* | **7 green of 13, 6 red, and not adopted.** Its abstract pair is `SetQuerySplittingBehavior` / `ClearQuerySplittingBehavior`, the same client-builder shape again; implementing them as no-ops (R56's route) leaves **six reds in three causes**: three `InvalidCastException` to `RelationalTestStore`, one `Unconfigured_query_splitting_behavior_throws_a_warning` that never throws, and two `NoTracking_split_query_creates_only_required_instances` measuring **1 instance where 2 are created** — the first place a test asserts the *consequence* of splitting rather than the hint. |
+      | `Query.SharedTypeQueryRelationalTestBase` | **#60, and R41's "1" is really 4.** 72 lines, three test methods, four parameterizations, all four blocked: a query filter built on `FromSqlRaw`, a `Database.SqlQueryRaw` with a hard `(RelationalTestStore)TestStore` cast, and a third expecting `ClashingSharedType` from `SqlQueryRaw`. |
+      | `ConcurrencyDetectorEnabledRelationalTestBase` | **#60, and there is nothing else in it.** 22 lines; the whole contribution is one `FromSql` theory. **Adopting adds two tests and both are red — zero new green.** R41 said "1"; a theory is two. |
+      | `ConcurrencyDetectorDisabledRelationalTestBase` | **Identical, line for line.** Two tests, both red, no new green. |
+      | `Query.MappingQueryTestBase` | **Blocked on the store, not on any API, and deliberately NOT probed.** Its nested `MappingQueryFixtureBase` supplies a *model* — a cut-down Northwind remapped with `SetTableName`/`SetColumnName`/`SetSchema` — and **no seed at all**, because it expects a prebuilt `Northwind` database. `StoreName` is `"Northwind"`, the same name `NorthwindQueryFixtureBase` uses, and this tier's store is **built from whichever model reaches it first** (`NorthwindInfoCarrierSqliteServerContext`) rather than being a curated file as EF's `SqliteNorthwindTestStoreFactory` is. Probing it could initialize the shared `Northwind.db` from a three-table model and break every Northwind class in the suite — a store-lifetime coupling `CLAUDE.md` explicitly forbids reintroducing. **Adopting it needs a second, separately named Northwind store seeded outside the model**, and that is the price. |
+      | `Query.QueryNoClientEvalTestBase` *(probed)* | **11 green of 14, 3 red, and not adopted.** R41 said 2. Two are #60 — one `FromSqlRaw` and one `Doesnt_throw_when_from_sql_not_composed` that dies on `(RelationalTestStore)` first. **The third is this provider's own**: `Throws_when_orderby_multiple` gets `TranslationFailed` where the base expects `TranslationFailedWithDetails`, so the *details* clause is missing on that shape. That one is a real, small gap and is worth a step of its own. |
+      | `Query.OwnedQueryRelationalTestBase` *(probed)* | **202 green of 212, 10 red, and NOT adopted — and R41's estimate was wrong in the opposite direction to R43's and R50's.** R41 priced it at "8 `AsSplitQuery` + 1 `FromSql`". **All eight split tests pass** (R59), the `FromSql` theory is two reds, **and there are eight more R41 never saw because it never ran the base**: six `ElementAt`/`ElementAtOrDefault`/`Skip_Take_over_owned_collection` where the relational base expects a row-limiting throw, and **two `Left_join_on_entity_with_owned_navigations` that return the wrong answer**. **EF's own `OwnedQuerySqliteTest` is nineteen lines and overrides nothing**, so not one of the eight is the store. This is the most informative "not yet" in the phase: there is a defect behind it, and it should be diagnosed before the base is adopted. |
+      | `Query.JsonQueryRelationalTestBase` *(probed)* | **Not adopted, and the probe does not even compile.** The 7 `FromSql_on_entity_with_json_*` theories are 14 #60 reds as R41 said. What R41 could not see is that `JsonQueryRelationalFixture` declares `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`, which **shadows** the property: `JsonQuerySqliteInfoCarrierTest`'s own model-agreement test reads the backend through `Fixture.TestStore` and stops compiling, and no cast recovers it, because every read of the shadowed property throws on a store that is not relational. **This is a new ADR-013 shape** — the amendment asks whether a route runs through the cast, and here it fails at *compile* time in a derived fixture. Adopting needs 14 reds accepted **and** that test rewired. |
+      | `BulkUpdates.NorthwindBulkUpdatesRelationalTestBase` | **#60, and R41's "2" is 4 parameterizations.** Two new theories, `Delete_FromSql_converted_to_subquery` and `Update_FromSql_set_constant`, both `FromSqlRaw`. It also needs `NorthwindBulkUpdatesRelationalFixture` and, per **D6**, a `UseTransaction` override in the same commit: both new theories call `TestHelpers.ExecuteWithStrategyInTransactionAsync(…, Fixture.UseTransaction, …)`. |
+      | `Query.AdHocMiscellaneousQueryRelationalTestBase` | R51: #60, abstract `SetParameterizedCollectionMode`. Unchanged. |
+      | `Query.NorthwindDbFunctionsQueryRelationalTestBase` | R55: #60, measured at 20 reds for 0 new green. Unchanged. |
+      | `Update.JsonUpdateTestBase` | R51: ADR-013, non-virtual `UseTransaction` on every one of 136 tests. Unchanged. |
+      | `Update.StoreValueGenerationTestBase` | R51: blocked three ways. Unchanged. |
+      | `Update.StoredProcedureUpdateTestBase` | R51: 28 abstract members, one per test, each a real stored procedure. Unchanged. |
+
+      **#60 now has a fourth measured behaviour, and it is an abstract member rather than a call.**
+      R55 named three — `FromSql` throws, `AsSplitQuery` is ignored, `RelationalDbFunctions` is
+      refused at the client boundary. The fourth is **a relational option on the client's
+      `DbContextOptionsBuilder`**, and it is not a stray: `NullSemanticsQueryTestBase`
+      (`useRelationalNulls`, R56), `AdHocMiscellaneousQueryRelationalTestBase` and
+      `NonSharedPrimitiveCollectionsQueryRelationalTestBase` (`SetParameterizedCollectionMode`) and
+      `AdHocQuerySplittingQueryTestBase` (`SetQuerySplittingBehavior`) are **four bases blocked by
+      one member shape**. A fifth, `DbParameter CreateDbParameter`, blocks four of the `Sql`-named
+      bases and is ADO.NET rather than EF. **A decision on #60 should say which of the five it
+      addresses**, because they are not the same problem and only the first two are about queries.
+
+      **On the direction of a mis-priced estimate.** R50 and R43 were both over-priced by about
+      three, and the handoff asked whether the direction repeats. **It does not.** R41's per-base
+      counts are **under**-priced, because they were read off the bases' new test methods and never
+      run: `SharedTypeQuery` 1 → 4, both `ConcurrencyDetector`s 1 → 2, `NorthwindBulkUpdates` 2 → 4,
+      `QueryNoClientEval` 2 → 3, `OwnedQuery` 9 → 10 with a different *composition* and two wrong
+      answers inside it. The two failure modes are the same mistake — **counting instead of
+      running** — and they point opposite ways depending on whether the count is of the reference
+      provider's overrides or of the base's own new tests.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
