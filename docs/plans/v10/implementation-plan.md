@@ -86,6 +86,29 @@ only a fraction of what it hid.
       `AssertSql` pin the backend's dialect, and #56's "SQL plumbing only" group has to be answered
       rather than skipped. **R4 does not wait on it.**
 - [ ] **R4. Classify the remaining 148.** Each is adopt-on-Tier-B, or an ignore entry with a reason.
+
+      **By-product of R25–R30, 2026-08-31: the list is 60, and here is how it splits.** This is an
+      inventory, not the classification R4 asks for — each group still needs the 20-minute probe
+      that R25–R30 used (adopt bare, measure, read the reasons diff). Recorded so the next session
+      does not re-derive it.
+
+      | Group | Count | What is known now |
+      |---|---|---|
+      | Needs a relational **client** API (#60) | ~14 | The five `FromSql`/`SqlQuery`/`SqlExecutor`/`ToSqlQuery` bases and the six `*SplitQuery*`/`*SplitInclude*` ones, plus `UdfDbFunction`. **Out of scope by the owner's decision**; do not design around it. |
+      | Asserts the **client's relational model** | ~12 | The nine `RelationalModelBuilderTest+*` nested bases, `ModelBuilding101RelationalTestBase`, `Scaffolding.CompiledModelRelationalTestBase`, and `JsonTypesRelationalTestBase` — the last measured in R23 at 104 red of 576 and reverted. This provider does not build a relational model on the client (M9), so these are the ADR-013 "blocked wholesale" shape rather than the "costs one test" shape. |
+      | **Re-parents of families already running** | ~15 | `Query.Translations.String*`/`Miscellaneous*`, `Update.UpdatesRelational`, `Query.ComplexTypeQueryRelational`, `Query.JsonQueryRelational`, `Query.PrimitiveCollectionsQueryRelational`, `Query.OwnedQueryRelational`, `Query.SpatialQueryRelational`, `Query.NorthwindMiscellaneousQueryRelational`, the two `BulkUpdates.*Relational`, `ManyToManyTrackingRelational` (R16 examined and deferred). **This is the R25/R26/R30 shape and is where the cheap wins are.** Several also close a `ITestSqlLoggerFactory` fixture entry as a side effect, as R25 and R30 each did. |
+      | Plausibly new families or standalone | ~19 | The five `Query.AdHoc*QueryRelational`, `TransactionTestBase`, `TwoDatabasesTestBase`, `LoggingRelational`, the two `ConcurrencyDetector*Relational`, `Query.WarningsTestBase`, `Query.QueryNoClientEvalTestBase`, `Query.NullSemanticsQueryTestBase`, `Query.SharedTypeQueryRelational`, `Query.OwnedEntityQueryRelational`, `Query.NonSharedPrimitiveCollectionsQueryRelational`, `Types.RelationalTypeTestBase`, `Update.JsonUpdateTestBase`, `Update.StoreValueGenerationTestBase`. `Update.StoredProcedureUpdateTestBase` needs stored procedures and is the one here most likely to be a genuine ignore entry. |
+
+      **The three checks R25–R30 showed are worth running on every candidate, in this order**, because
+      each is cheap and each caught something:
+      1. `grep` the **relational fixture base** (not the test bases) for `UseTransaction` —
+         in all six families of that block the trap was there and nowhere else.
+      2. Count `AssertSql` calls **with an argument** in the relational bases. In the whole
+         `Associations` block there were none; in EF's *SQLite* classes there were many, and those
+         must not be adopted.
+      3. Check whether EF's SQLite class for the facet exists at all before concluding there is no
+         override to adopt — #26708 has two of them commented out, and the fix was to borrow the
+         sibling family's.
       #56 carries the hand classification; this step replaces it with an enforced one. The TPT and
       TPC bases that prompted the issue are the first ones worth taking.
 - [x] **R5. `TPTInheritanceQueryTestBase` on Tier B, and the client validator it needed.** The first
