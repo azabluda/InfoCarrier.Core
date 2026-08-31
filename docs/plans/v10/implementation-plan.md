@@ -1858,6 +1858,46 @@ re-parents of families already running, because R25–R30 showed that is where t
       `r68-noclienteval`: FIXED none, BROKEN exactly the two, one reason moved (`InvalidCastException`
       9 -> 11).
 
+- [x] **R70. `JsonQueryRelationalTestBase` ADOPTED — the compile blocker is solved, and the probe's
+      price was under by eight.** `failed` 104 -> 118, `total` 28982 -> 29028. 425 of 446 pass,
+      7 skipped, 14 red — **all fourteen the `FromSql_on_entity_with_json_*` theories, which is
+      #60 and exactly what R62 priced.**
+
+      **The handoff's open question is answered yes, with the compiler rather than a guess.**
+      `JsonQueryRelationalFixture` declares `public new RelationalTestStore TestStore`, which
+      *shadows*; our `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`
+      stopped **compiling**, not failing. The `OwnedQueryFixtureBase` workaround transfers, with a
+      different type argument — `JsonQueryFixtureBase : SharedStoreFixtureBase<JsonQueryContext>`,
+      not `SharedStoreFixtureBase<PoolableDbContext>`:
+
+      ```csharp
+      public InfoCarrierTestStore InfoCarrierTestStore
+          => (InfoCarrierTestStore)((SharedStoreFixtureBase<JsonQueryContext>)this).TestStore;
+      ```
+
+      **R41's failure mode repeated, and this time on our side of the ledger.** R62 priced 14 by
+      counting the base's `FromSql` methods. The base also adds ~16
+      `*AsNoTrackingWithIdentityResolution` theories nobody had counted; twelve pass and **four
+      fail identically**, SQLite raising `ApplyNotSupported` before the query reaches the check the
+      base is testing. **EF's own `JsonQuerySqliteTest` overrides all four** — *"Sqlit throws APPLY
+      error, but base expects different exception"* — so they are convergence with the reference
+      provider and EF's overrides are adopted.
+
+      **A63's shape was reproduced, by measuring rather than reasoning about it.** The eighteen
+      APPLY overrides already in this file wrap `base` in `AssertApplyNotSupported`, which asserts
+      the refusal rather than swallowing it, and that was tried first. It cannot work here: **these
+      four base methods catch the `InvalidOperationException` themselves** and compare its message,
+      so what escapes `base` is an `Xunit.Sdk.EqualException` and the wrapper fails with *"Exception
+      type was not an exact match"* — the exact words this file's own remarks warn about. EF's
+      `=> Task.CompletedTask` is taken instead, with the reason recorded on it.
+
+      **R1 pays out a third time.** Deleted: ~40 lines of hand-copied `ToJson()` mapping, three
+      hand-mirrored `Project_json_*_tracking_query_fails` overrides, the `AssertOwnedWithoutOwner`
+      helper, a duplicated `TestSqlLoggerFactory` and an `ITestSqlLoggerFactory` declaration. Kept:
+      `JsonQuerySqliteFixture`'s ignores, which are the *store's* statement rather than the base's.
+      Measured `r70-jsonquery` against `r69-ownedquery`: FIXED none, BROKEN exactly the fourteen,
+      one reason moved (`InvalidCastException` 11 -> 25).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

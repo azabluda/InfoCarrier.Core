@@ -1834,5 +1834,53 @@
 # the two `FromSql` parameterizations, and the only reason that moved is the `InvalidCastException`
 # tally, 9 -> 11.
 # ---------------------------------------------------------------------------------------------
-failed=104
-total=28982
+# 2026-09-01 (R70) - 104 -> 118, and `total` 28982 -> 29028. `Query.JsonQueryRelationalTestBase`
+# ADOPTED: `JsonQuerySqliteInfoCarrierTest` re-parented from the CORE `JsonQueryTestBase` onto the
+# relational one. 425 of 446 pass, 7 skipped, 14 red.
+#
+# ALL FOURTEEN REDS ARE ONE CAUSE AND IT IS #60: the seven `FromSql_on_entity_with_json_*`
+# theories, priced at exactly this by R62. Nothing else in the base is red.
+#
+# THE COMPILE BLOCKER IS SOLVED, AND THE HANDOFF'S OPEN QUESTION IS ANSWERED YES.
+# `JsonQueryRelationalFixture` declares `public new RelationalTestStore TestStore`, which SHADOWS
+# rather than overrides, so `Fixture.TestStore` in our own
+# `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection` stopped COMPILING -- not
+# failing at run time. The workaround verified for `OwnedQueryFixtureBase` does transfer, with a
+# different type argument: `JsonQueryFixtureBase` derives from
+# `SharedStoreFixtureBase<JsonQueryContext>`, NOT `SharedStoreFixtureBase<PoolableDbContext>`. The
+# fixture exposes `InfoCarrierTestStore => (InfoCarrierTestStore)((SharedStoreFixtureBase<JsonQueryContext>)this).TestStore`
+# and the test reads that. Checked with the compiler, not guessed.
+#
+# THE PROBE'S PRICE OF 14 WAS UNDER-PRICED BY 8, and this is R41's failure mode again -- counting
+# the base's new test methods instead of running them. The relational base adds ~16
+# `*AsNoTrackingWithIdentityResolution` theories nobody had counted. Twelve pass. FOUR do not, and
+# all four fail identically: SQLite raises `ApplyNotSupported` before the query can reach the check
+# the base is testing, so the base's expected `JsonProjectingQueryableOperationNoTracking...`
+# message never gets raised.
+#
+# EF'S OWN `JsonQuerySqliteTest` OVERRIDES ALL FOUR, and says why on the first: "Sqlit throws APPLY
+# error, but base expects different exception". That is CLAUDE.md's standing test for a newly-red
+# SQLite test, so they are convergence with the reference provider and EF's overrides are adopted.
+#
+# EF'S FORM IS `=> Task.CompletedTask` AND THE STRONGER FORM WAS TRIED FIRST AND CANNOT WORK.
+# The eighteen APPLY overrides already in this file wrap `base` in `AssertApplyNotSupported`, which
+# asserts the refusal instead of swallowing it. That idiom does NOT transfer to these four, because
+# THESE BASE METHODS CATCH THE `InvalidOperationException` THEMSELVES and compare its message -- so
+# what escapes `base` is an `Xunit.Sdk.EqualException` and the wrapper fails with "Exception type
+# was not an exact match". THAT IS A63's SHAPE, reproduced here by measuring rather than reasoning,
+# and it is written down in this very file's remarks. Asserting the refusal would mean re-writing
+# all four queries outside the base, pinning this file to EF's query text.
+#
+# THE RE-PARENT DELETES MORE THAN IT ADDS, R1 paying out for the third time this phase. Gone: about
+# forty lines of `JsonQueryRelationalFixture`'s `ToJson()` mapping copied in by hand, three
+# hand-mirrored `Project_json_*_tracking_query_fails` overrides (the relational base declares all
+# three, with the same assertion), the `AssertOwnedWithoutOwner` helper, a duplicated
+# `TestSqlLoggerFactory` property and an `ITestSqlLoggerFactory` declaration. What is still copied
+# is `JsonQuerySqliteFixture`'s ignores, which are the STORE's statement, not the base's.
+#
+# `test/` only. Measured `r70-jsonquery` against `r69-ownedquery`: FIXED none, BROKEN exactly the
+# fourteen `FromSql` parameterizations, and the only reason that moved is the `InvalidCastException`
+# tally, 11 -> 25.
+# ---------------------------------------------------------------------------------------------
+failed=118
+total=29028
