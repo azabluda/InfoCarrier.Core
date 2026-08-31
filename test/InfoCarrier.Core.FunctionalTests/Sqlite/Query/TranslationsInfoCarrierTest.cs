@@ -9,30 +9,40 @@ using Microsoft.EntityFrameworkCore.TestUtilities;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
 /// <summary>
-///     EF Core 10's per-type translation suites on ADR-009 Tier A — all sixteen of them.
+///     EF Core 10's per-type translation suites on ADR-009 <b>Tier B</b> — all sixteen of them.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         These replaced the single sprawling <c>*FunctionsQuery</c> base with one class per CLR
 ///         type or operator family, over one shared model (<c>BasicTypesQueryFixtureBase</c>). They
-///         are the densest scalar coverage EF has, and this provider has had none of it: every
-///         value here crosses the wire as a constant, a parameter or a projected column, which is
-///         exactly what <c>PrimitiveCoercion</c> and the allowlist decide (A19, A34).
+///         are the densest scalar coverage EF has: every value here crosses the wire as a constant,
+///         a parameter or a projected column, which is exactly what <c>PrimitiveCoercion</c> and
+///         the allowlist decide (A19, A34).
 ///     </para>
 ///     <para>
-///         Adopted as EF's own <c>*InMemoryTest</c> pieces are: one shared fixture, one class per
-///         base, and the three <c>StringComparison</c> overrides EF's InMemory suite carries — the
-///         culture-sensitive comparisons no real provider supports and the InMemory one does, so
-///         the base asserts a throw that this backing store will not produce.
+///         <b>Tier B since R57</b>, and A81's rule is why: when a base could run on either tier,
+///         the tier that <em>translates</em> is the one whose green means more. R43 had priced the
+///         move at 217 overrides — the size of EF's SQLite <c>Translations</c> suite — and left it
+///         for the owner. The measured cost is <b>65</b>, because most of EF's 217 exist only to
+///         assert golden SQL over a base call that already passes, and a provider only writes an
+///         override for a test that actually fails.
+///     </para>
+///     <para>
+///         Every one of those 65 is the store rather than this provider: each failed with
+///         <c>The LINQ expression … could not be translated</c>, naming a member SQLite has no
+///         function for, and EF's own SQLite class answers each with the same
+///         <c>AssertTranslationFailed</c>. The move also <em>deleted</em> nine overrides — see the
+///         remarks on <see cref="StringTranslationsInfoCarrierTest" /> and
+///         <see cref="MiscellaneousTranslationsInfoCarrierTest" />.
 ///     </para>
 /// </remarks>
 public class ByteArrayTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : ByteArrayTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own ByteArrayTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own ByteArrayTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task First()
@@ -51,10 +61,10 @@ public class EnumTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
 public class GuidTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : GuidTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own GuidTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own GuidTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task NewGuid()
@@ -65,10 +75,10 @@ public class GuidTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
 public class MathTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : MathTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own MathTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own MathTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task Abs_decimal()
@@ -104,10 +114,10 @@ public class MathTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
 public class MiscellaneousTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : MiscellaneousTranslationsRelationalTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own MiscellaneousTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own MiscellaneousTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task Convert_ToBoolean()
@@ -154,10 +164,10 @@ public class MiscellaneousTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrier
 public class StringTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : StringTranslationsRelationalTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own StringTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own StringTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task Join_non_aggregate()
@@ -172,10 +182,10 @@ public class ArithmeticOperatorTranslationsInfoCarrierTest(BasicTypesQueryInfoCa
 public class BitwiseOperatorTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : BitwiseOperatorTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own BitwiseOperatorTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own BitwiseOperatorTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task Left_shift()
@@ -210,10 +220,10 @@ public class MiscellaneousOperatorTranslationsInfoCarrierTest(BasicTypesQueryInf
 public class DateOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : DateOnlyTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own DateOnlyTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own DateOnlyTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task ToDateTime_constant_DateTime_with_property_TimeOnly()
@@ -240,10 +250,10 @@ public class DateOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
 public class DateTimeTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : DateTimeTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own DateTimeTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own DateTimeTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task subtract_and_TotalDays()
@@ -254,10 +264,10 @@ public class DateTimeTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
 public class DateTimeOffsetTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : DateTimeOffsetTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own DateTimeOffsetTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own DateTimeOffsetTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task Date()
@@ -324,10 +334,10 @@ public class DateTimeOffsetTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrie
 public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : TimeOnlyTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own TimeOnlyTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own TimeOnlyTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task AddHours()
@@ -402,10 +412,10 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
 public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : TimeSpanTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
-    // --- SQLite cannot translate these, and EF's own TimeSpanTranslationsSqliteTest says so with the same
-    // `AssertTranslationFailed`. Adopted one by one from the tests that actually failed, not
-    // copied wholesale: EF overrides every test in this class, most of them only to assert
-    // golden SQL over a passing base.
+    // --- SQLite cannot translate these, and EF's own TimeSpanTranslationsSqliteTest says so
+    // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
+    // actually failed rather than copied wholesale: EF overrides every test in this
+    // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
     public override Task Hours()
