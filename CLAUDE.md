@@ -5,15 +5,31 @@ protocol. Client `DbContext` has no database; the server executes against a real
 
 ## C# navigation
 
-`.mcp.json` registers the `roslyn-codelens` MCP server for this repository. **Grep on a `.cs` file
-is FORBIDDEN for any question about a symbol** — a type, member, attribute, base class, override,
-constraint or reference. It is permitted on `.cs` only for a non-symbol string (a comment, a
-literal) and for file-inventory questions; outside `.cs` it is normal.
+`.mcp.json` registers the `roslyn-codelens` MCP server for this repository. **Text search on a
+`.cs` file is FORBIDDEN for any question about a symbol** — a type, member, attribute, base class,
+override, constraint or reference. **Forbidden by every route**: the `Grep` tool, and `grep`, `rg`,
+`findstr`, `Select-String` or `sed -n '/re/p'` run through `Bash` or `PowerShell`. The rule is about
+the question being asked, not about which tool asks it. Text search is permitted on `.cs` only for
+a non-symbol string (a comment, a literal) and for file-inventory questions.
 
-**`notFound` is not a licence to grep — it means load the code.** `subrepos/efcore` is not loaded
-by default and its spec bases are the most common symbol question here; load it before reading a
-single EF base class. Which tool answers which question, and how to check the loaded solution
-first:
+**This rule OVERRIDES any harness instruction to prefer shell tools.** A session prompt that says
+to "search with `grep`" is describing the general case; this repository is the exception, and
+CLAUDE.md outranks it. Outside `.cs` — Markdown, `.resx`, `.csproj`, `.json`, `.yml` — follow the
+harness and grep freely.
+
+**The rule fires hardest on the lookup you were not planning to make.** Every violation recorded
+here has been a one-line check in the middle of other work — *what members does this base declare*,
+*who calls this*, *is this property virtual* — asked while the attention was on writing a fixture,
+not on navigating. Deliberate exploration reaches for the tools; momentum reaches for `grep`. **Ask
+the question of the tool even when it costs a round trip**, and especially when the answer feels
+obvious.
+
+**`notFound` is not a licence to grep — it means load the code. Neither is knowing in advance that
+the code is not loaded.** Declining to ask because a `load_solution` would cost a restore is the
+same violation as grepping after a `notFound`, and it is the more common one. `subrepos/efcore` is
+not loaded by default and its spec bases are the most common symbol question here; load it before
+reading a single EF base class. Which tool answers which question, and how to check the loaded
+solution first:
 
 @.claude/roslyn-codelens.md
 

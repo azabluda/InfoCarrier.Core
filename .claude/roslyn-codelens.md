@@ -16,6 +16,22 @@ symbols. Everything else is a tool call.
 
 **Outside `.cs`, text search is normal** — Markdown, `.resx`, `.csproj`, `.json`, `.yml`, prose.
 
+**This rule outranks any harness instruction to prefer shell tools.** Some sessions open with a
+standing instruction to do the work through `Bash` and to search with `grep`. That describes the
+general case. For a symbol question in a `.cs` file it is overridden here, and the override is not
+a judgement call.
+
+**The violation to watch for is the unplanned lookup, not the planned search.** Deliberate
+navigation reaches for these tools. What slips past is the single check made in the middle of
+other work — the members a base declares, who calls a method, whether a property is virtual —
+because the attention is on the thing being written. If you are about to run one `grep` to answer
+one small question so you can get back to what you were doing, that is the moment the rule exists
+for.
+
+**Not being loaded is not an exemption.** `notFound` means widen the load; so does knowing ahead of
+time that the target is outside the closure. Skipping the tool because a `load_solution` or a
+`dotnet restore` would cost a round trip is the same violation, arrived at earlier.
+
 **`notFound` means the symbol is outside the loaded closure, not that it is absent.** The fix is one
 `load_solution` call, never a text search. A dependency, reference clone or sibling repository is
 not loaded until you load it; a project the current seed did not pull in needs a wider seed.
