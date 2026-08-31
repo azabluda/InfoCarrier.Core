@@ -407,6 +407,22 @@ public sealed class TypeAllowlist
                 || Array.TrueForAll(type.GetGenericArguments(), IsAllowed);
         }
 
+        // An enum is data, not behaviour, and travels as its underlying value, so allowing it
+        // cannot construct anything. Asked HERE rather than only at the end of this method,
+        // because a type NESTED IN A GENERIC TYPE is itself a constructed generic type even when
+        // it declares no type parameter of its own: `MappingQueryTestBase<TFixture>+ShipVia` has
+        // `IsConstructedGenericType` true, so the branch below decomposed it, asked whether the
+        // open definition was listed — which no enum ever is — and denied it. The rule this file
+        // states ("every enum is already admitted") was therefore false for exactly the shape EF's
+        // specification suites use, and `MappingQueryTestBase.Project_nullable_enum` is what
+        // found it. The enclosing type's generic arguments say nothing about an enum's value, so
+        // there is nothing here to decompose. This is the same statement as the exact-match branch
+        // above, for a type admitted by rule rather than by the set.
+        if (type.IsEnum)
+        {
+            return true;
+        }
+
         if (type.IsConstructedGenericType)
         {
             return IsAllowed(type.GetGenericTypeDefinition())
@@ -430,8 +446,8 @@ public sealed class TypeAllowlist
             return true;
         }
 
-        // An enum is data, not behaviour, and travels as its underlying value anyway; allowing
-        // it cannot construct anything.
-        return type.IsEnum;
+        // Every enum has already been admitted above, before the generic decomposition that used
+        // to hide the nested ones.
+        return false;
     }
 }

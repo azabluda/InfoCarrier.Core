@@ -1882,5 +1882,20 @@
 # fourteen `FromSql` parameterizations, and the only reason that moved is the `InvalidCastException`
 # tally, 11 -> 25.
 # ---------------------------------------------------------------------------------------------
-failed=118
-total=29028
+# 2026-09-01 (R72) -- 118 -> 117, and `total` 29028 -> 29032 for the four `MappingQueryTestBase`
+# tests, all four green. The lowering is ONE test, `CustomConvertersInfoCarrierTest
+# .Collection_enum_as_string_Contains`, and it was fixed by a defect fix rather than by adopting
+# anything: `TypeAllowlist.Evaluate` asked `IsEnum` only after its constructed-generic branch, and
+# a type NESTED IN A GENERIC TYPE is a constructed generic type, so every enum declared inside a
+# generic test base was denied. That denial made the boundary analyzer refuse an enum `Contains`,
+# and the projection split then answered on the client a query SQLite cannot translate.
+#
+# ONE TEST MOVED THE OTHER WAY IN THE SAME RUN AND IS NOT A REGRESSION. `Value_conversion_on_enum
+# _collection_contains` had been passing for that same wrong reason; with the allowlist fixed the
+# query reaches SQL and SQLite refuses it. EF's own `CustomConvertersSqliteTest` OVERRIDES that
+# test to assert exactly that refusal, which is CLAUDE.md's standing test for a newly-red SQLite
+# test, so EF's override is adopted and the test is green. Measured `r72-mappingquery` against
+# `r70-jsonquery`: FIXED 1, BROKEN none, one reason moved (41 -> 40 "No exception was thrown").
+
+failed=117
+total=29032

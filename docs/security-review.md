@@ -37,7 +37,15 @@ Stages 1, 4, 5, 7 and 8 were closed during M5 (C36, C37, C30, and the type allow
   `Type.GetType("System.Diagnostics.Process")` — a *public* method on an *admitted* type — and
   obtain, **at run time on the server, after every deserialization-time check has passed**, a type
   the allowlist never saw.
-- **Every enum**, by the closing `return type.IsEnum`. So `BindingFlags` is admissible.
+- **Every enum**, by the `type.IsEnum` clause of `Evaluate`. So `BindingFlags` is admissible.
+  **That clause used to be the closing line, and it was reached less often than this sentence
+  claimed** (R72, 2026-09-01): a type *nested in a generic type* is itself a constructed generic
+  type, so the generic decomposition above it denied every such enum before the rule ran. The
+  clause now sits before that decomposition, which makes the statement in this bullet true rather
+  than aspirational. **It widens nothing the conjunction below depends on** — the surface that
+  bullet is measured against is `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+  `PropertyInfo`, `Activator`, `Assembly` and `AppDomain`, and an enum is none of them and derives
+  from none of them.
 
 Neither is a hole, and the reason is precise and load-bearing:
 

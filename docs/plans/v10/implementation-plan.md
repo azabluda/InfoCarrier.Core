@@ -1998,6 +1998,57 @@ re-parents of families already running, because R25–R30 showed that is where t
       first trips **xUnit1024** in this repository, which EF's own suite does not enforce. Adopting
       it would need a file-scoped `#pragma warning disable xUnit1024`.
 
+- [x] **R72. `MappingQueryTestBase` ADOPTED — the store-name blocker cost a seed, and the one red
+      it uncovered was a defect in the type allowlist.** `failed` 118 -> 117, `total`
+      29028 -> 29032. **Four tests, four green.**
+
+      **R62 was right not to probe it, and right about why.** The base's fixture supplies a model
+      and no seed, because EF's providers hand it a prebuilt `northwind.db` through
+      `SqliteNorthwindTestStoreFactory`. Its inherited `StoreName` is `"Northwind"` — on this tier
+      the same file the Northwind query fixtures share — and this tier builds each store from
+      whichever model reaches it first. Probing it as-is would have initialized the shared
+      `Northwind.db` from a three-table model and broken every Northwind class in the suite.
+
+      **The price, and it is the whole price.** `StoreName` is `protected override`, so the store
+      is renamed to `"MappingQuery"` and seeded here from `NorthwindData`'s own `Create*` arrays —
+      the real 91 customers, 9 employees and 830 orders the base asserts. Only the three properties
+      this model keeps are written, because the base `Ignore`s everything else and there is no
+      column to write to. **Renaming alone is necessary and not sufficient**, exactly as the
+      handoff said: it yields the right table shape and no rows.
+
+      **EF's four `MappingQuerySqliteTest` overrides are NOT adopted.** Each asserts a SQL string
+      against `Fixture.TestSqlLoggerFactory.Sql`, which observes the *client's* log — a client with
+      no database, which emits no SQL (R54). #56's "SQL plumbing only" group. The core base's four
+      tests assert results, and those are the adoptable part.
+
+      **The probe's one red was ours, and it was a general defect rather than this base's.**
+      `Project_nullable_enum` was refused by `TypeAllowlist` with *"Type
+      'MappingQueryTestBase`1+ShipVia[...]' is not on the deserialization allowlist"* — which
+      contradicts the rule that file states and `security-review.md` §2 repeats, that **every enum
+      is admitted**. The cause: **a type nested in a generic type is itself a constructed generic
+      type**, even when it declares no type parameter of its own. `Evaluate` therefore reached its
+      `IsConstructedGenericType` branch first, asked whether the open definition
+      `MappingQueryTestBase<>+ShipVia` was listed — which no enum ever is — and denied it. The
+      closing `return type.IsEnum` was unreachable for the whole family.
+
+      **This is the exact shape the same method already warns about one branch higher**, where the
+      exact-match check carries a comment that "an entity type can perfectly well *be* a
+      constructed generic — the EF specification suites nest their models inside generic test
+      bases". Entity types were rescued by being in the set verbatim; enums are admitted **by rule**
+      rather than by the set, and nothing rescued them.
+
+      **The fix is to ask `IsEnum` before the decomposition, and it widens nothing.** An enclosing
+      type's generic arguments say nothing about an enum's value, so there is nothing to decompose;
+      and `security-review.md` §2's conjunction is measured over `Binder`, `MethodBase`,
+      `MethodInfo`, `ConstructorInfo`, `PropertyInfo`, `Activator`, `Assembly` and `AppDomain`, of
+      which an enum is none. Every non-nested enum was already admitted by the closing line, so no
+      new *kind* of thing crosses. §2 is amended to say so; `DeserializationHardeningTest` (27) and
+      `TypeAllowlistBoundaryTest` (2) both stay green.
+
+      `src/` changed, so **both** gates: `CI=true dotnet build --configuration Release` reports
+      `0 Error(s), 5 Warning(s)` (the documented five), and `eng/trim-ratchet.sh` holds.
+      Measured `r72-mappingquery` against `r70-jsonquery`: **FIXED 1, BROKEN none**, one reason moved (41 -> 40 "No exception was thrown"). The one fixed test is `CustomConvertersInfoCarrierTest.Collection_enum_as_string_Contains`, which asserts the refusal this provider now raises; its sibling `Value_conversion_on_enum_collection_contains` had been **passing for the same wrong reason** and takes EF's own SQLite override, recorded in `test/known-failures.txt` and in the class itself.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
