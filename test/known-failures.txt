@@ -1244,5 +1244,21 @@
 # assumption disqualified JsonTypesRelationalTestBase wholesale in R23; here it costs one test,
 # which is the distinction ADR-013's amendment draws, so the base is adopted and the test is left
 # failing per ADR-004. FIXED none.
+#
+# 2026-08-31, #56 (R25-R27a). `failed` UNCHANGED at 71, `total` 27026 -> 27096 for the 70 tests
+# the new OwnedTableSplitting family brings. The Query.Associations relational block adopts the
+# 35 `*RelationalTestBase` classes; R25 (Navigations, 7) and R26/R26a (OwnedNavigations, 6) are
+# pure re-parents of families already running and add no test at all -- measured as
+# `Passed: 336, Failed: 0, Total: 336` before and after each. R27/R27a adds the four
+# OwnedTableSplitting classes, a family this repository has never run: `Passed: 406, Failed: 0,
+# Total: 406` for the whole Associations tree afterwards, so all 70 are green.
+#
+# FIXED none, BROKEN none, and known-failures.names.txt is unchanged: no failure is added or
+# removed. The two InfoCarrierComplianceTest entries stay in it and stay red by design -- the
+# missing-base list falls 95 -> 82 and the missing-fixture list 23 -> 21, which lowers what the
+# assertion prints without making it pass.
+#
+# The +70 is the delta measured by a local --filter run, to be confirmed by CI's Spec ratchet,
+# which is the only thing that produces the absolute figures.
 failed=71
-total=27026
+total=27096

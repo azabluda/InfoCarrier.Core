@@ -588,6 +588,16 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       golden SQL only, those tests pass here on the relational base's own assertion, and the SQL is
       the backing store's text, which this client never emits.
 
+- [x] **R27a. The `OwnedTableSplitting` override subset — 4 of 4 answered, and the family is
+      green.** `Passed: 406, Failed: 0, Total: 406` for the whole `Query.Associations` tree, which
+      is R26a's 336 plus this family's 70. Both overrides are `OwnedJsonProjectionSqliteTest`'s,
+      character for character, because #26708 leaves EF with no `OwnedTableSplitting` projection
+      class to take them from. **Baseline moves for the first time this block: `failed` unchanged
+      at 71, `total` 27026 → 27096**, and `known-failures.names.txt` is untouched because no
+      failure is added or removed. The two `InfoCarrierComplianceTest` entries stay red by design;
+      what falls is what their assertion prints (95 → 82 bases, 23 → 21 fixtures), not their
+      status.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

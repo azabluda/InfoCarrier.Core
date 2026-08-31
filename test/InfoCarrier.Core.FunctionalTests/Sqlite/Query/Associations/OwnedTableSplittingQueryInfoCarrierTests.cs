@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedTableSplitting;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -60,10 +61,21 @@ public class OwnedTableSplittingQueryInfoCarrierFixture : OwnedTableSplittingRel
         => facade.UseInfoCarrierTransaction(transaction);
 }
 
-// The four OwnedTableSplitting facets (ADR-004), adopted bare: no override at all, so that every
-// failure is measured and classified before anything is written to answer it. EF ships no
-// BulkUpdate, Collection or SetOperations class for this family, which is why it is four and not
-// seven.
+// The four OwnedTableSplitting facets (ADR-004). EF ships no BulkUpdate, Collection or
+// SetOperations class for this family, which is why it is four and not seven.
+//
+// R27 adopted them bare and measured 4 red of 70; R27a is the override subset below, and all four
+// were one reason -- SQLite has no APPLY.
+//
+// Two things of EF's are deliberately NOT adopted:
+//
+//  - `OwnedTableSplittingStructuralEqualitySqliteTest` overrides several tests purely to assert
+//    golden SQL. They pass here on the relational base's own assertion, and the SQL is the
+//    *backing store's* statement text, which this client never emits.
+//  - EF's `OwnedTableSplittingSqliteFixture` adds
+//    `ConfigureWarnings(b => b.Ignore(SqliteEventId.CompositeKeyWithValueGeneration))`. Not needed
+//    here, and measured rather than assumed: R27's bare run passed 66 of 70 with no such failure.
+//    An unnecessary warning-ignore in a fixture is the kind of thing that later hides a real one.
 
 public class OwnedTableSplittingMiscellaneousQueryInfoCarrierTest(
     OwnedTableSplittingQueryInfoCarrierFixture fixture,
@@ -78,7 +90,36 @@ public class OwnedTableSplittingPrimitiveCollectionQueryInfoCarrierTest(
 public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
     OwnedTableSplittingQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : OwnedTableSplittingProjectionRelationalTestBase<OwnedTableSplittingQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : OwnedTableSplittingProjectionRelationalTestBase<OwnedTableSplittingQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    /// <summary>
+    ///     The whole of R27's red: SQLite has no <c>APPLY</c>, in both
+    ///     <c>QueryTrackingBehavior</c> arms. <b>EF ships no
+    ///     <c>OwnedTableSplittingProjectionSqliteTest</c> to take the override from</b> — that
+    ///     class is commented out upstream in full, for the same EF issue #26708 that disables
+    ///     <c>OwnedNavigationsProjectionSqliteTest</c>.
+    /// </summary>
+    /// <remarks>
+    ///     So these two bodies come from <c>OwnedJsonProjectionSqliteTest</c>, character for
+    ///     character, exactly as
+    ///     <see cref="OwnedNavigationsProjectionQueryInfoCarrierTest.Select_subquery_required_related_FirstOrDefault" />
+    ///     does. <b>Two families now with the same upstream gap and the same substitute</b>, which
+    ///     is worth stating once: #26708 costs EF two SQLite classes, and this provider runs both
+    ///     of them with two tests red in each.
+    /// </remarks>
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+}
 
 public class OwnedTableSplittingStructuralEqualityQueryInfoCarrierTest(
     OwnedTableSplittingQueryInfoCarrierFixture fixture,
