@@ -1,4 +1,4 @@
-# Implementation plan — post-10.0 work, no milestone open
+﻿# Implementation plan — post-10.0 work, no milestone open
 
 Milestone-level scope lives in [`roadmap.md`](roadmap.md). Do not put scope here.
 
@@ -1074,6 +1074,62 @@ re-parents of families already running, because R25–R30 showed that is where t
       means more. A81 says the translating tier — but A81 is about a base that could go either way,
       and this is the one case in the phase where the answer turns on how much store-limitation
       bookkeeping the suite should carry. **Left for the owner, priced rather than argued.**
+
+- [x] **R44. The originals audit — done from the other end, and it comes back NEGATIVE.**
+      R40 and R42 each found the same defect shape by accident, three hours apart: EF's
+      `CommandBatchPreparer` orders a write batch by values the wire had dropped, and the store
+      answered with a constraint failure. **Rather than wait for a third**, this enumerates every
+      value the preparer reads from *originals* and diffs that list against what
+      `ChangeEntryMapper.ToChangeEntry` sends. The answer is that the list is now complete.
+
+      | What `CommandBatchPreparer` reads from originals | For which state | Sent today? |
+      |---|---|---|
+      | Dependent foreign-key columns (`AddForeignKeyEdges`, `CreateDependent…`) | Modified, Deleted | **yes** — `IsForeignKey()`, since J11 and R40 |
+      | Unique **index** columns (`AddUniqueValueEdges`, first loop) | Modified, Deleted | **yes** — `GetContainingIndexes().Any(IsUnique)`, since R42 |
+      | Concurrency tokens (the `UPDATE`/`DELETE` `WHERE` clause, `ModificationCommand.HandleColumn`) | Modified, Deleted | **yes** — `IsConcurrencyToken`, since M4 |
+      | **Principal key** columns (`CreatePrincipalEquatableKeyValue/Key`) | Modified, Deleted | no — and it does not matter, below |
+      | **Unique constraint** columns, i.e. primary key + alternate keys (`AddUniqueValueEdges`, second loop) | Deleted | no — and it does not matter, below |
+      | Whether a column changed (`IsModified`) | Modified | **yes** — `ModifiedProperties` is the primary answer; the original-vs-current compare is only its fallback |
+
+      **The two rows that are not sent are exactly the key properties, and a key property's
+      original can never differ from its current.** `Property.GetAfterSaveBehavior()` returns
+      `PropertySaveBehavior.Throw` for any property where `IsKey()` — primary *and* alternate —
+      and `Property.CheckAfterSaveBehavior` **refuses to configure any other value**, answering
+      `KeyPropertyMustBeReadOnly`: *"Key properties are always read-only once an entity has been
+      saved for the first time."* `ChangeDetector.ThrowIfKeyChanged` and
+      `InternalEntryBase.SetPropertyModified` both raise `KeyReadOnly` on the attempt. So on every
+      `Modified` or `Deleted` entry the client could send, original **is** current for every key
+      property, and there is nothing for the wire to lose. **Alternate keys were the named suspect
+      and they are clear.**
+
+      **A second, independent reason closes the unique-constraint row.** `AddSameTableEdges` already
+      orders every `Deleted` command on a table before every `Added` one, reading no value at all.
+      `AddUniqueValueEdges`' contribution there is only that its edge is *non-breakable* in a cycle.
+
+      **Two things outside the ordering graph were checked in the same sweep and are recorded
+      rather than fixed:**
+
+      - **`ColumnValuePropagator`** (shared-table column maps: table splitting, and a `Deleted` +
+        `Added` pair sharing one row identity) compares a `Modified` or `Deleted` entry's
+        *original* provider value against a later `Added` entry's current one to decide whether to
+        write the column. The wire's original equals the current there, so the two could disagree —
+        but only for an entity whose non-key properties were **changed and then deleted in the same
+        `SaveChanges`**, which discards the change on every other path. No spec test does it, and
+        the effect would be a column written or skipped, not a constraint failure. **Left open and
+        named**, not fixed: the fix is "send every original", and C42 already measured the cost of
+        widening this condition speculatively at 1 fixed, 2 broken.
+      - **Stored-procedure parameters with `ForOriginalValue: true`** take *any* property's
+        original, not just a key's or a token's. That is the one place the enumeration above would
+        not hold — and it is unreachable, because stored-procedure mapping is not supported here.
+        See R47, which classifies `StoredProcedureUpdateTestBase`.
+
+      **The pin.** `SqliteSmokeTest.A_deleted_row_releases_its_alternate_key_before_a_new_row_takes_it`
+      and a `Coded` entity with `HasAlternateKey` on the SQLite smoke model. It is the first thing
+      on Tier B to send a delete and a colliding insert in one request. **Its own comment says what
+      it does not prove** — `AddSameTableEdges` makes it pass either way — because a pin that
+      overstates itself is worse than none.
+      `test/` only, so `eng/measure.sh` and not the trim ratchet. Measured together with R45;
+      figures there.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

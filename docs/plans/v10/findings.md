@@ -1,4 +1,4 @@
-# Findings, v10
+﻿# Findings, v10
 
 How each part of the provider was made to work, and what it cost to learn. This is the long form
 of what `CLAUDE.md` states as rules. Nothing here is an instruction; the instructions are in
@@ -508,6 +508,57 @@ it already works.**
 A relational suite normally enlists with `transaction.GetDbTransaction()`, which ADR-013 does put
 permanently out of this client's reach — that part was always true, and it is why the override is
 needed rather than why the move is impossible.
+
+### What the wire drops is invisible until a store enforces it
+
+Three defects, one mechanism, and it took an audit from the other end to close the class.
+
+EF's `CommandBatchPreparer` orders a write batch from **original** values: a dependent's original
+foreign key says which principal it is releasing, and a unique value's original says which row is
+giving it up. A single-context EF never loses an original — it is the value the row was loaded
+with. **A wire loses every one of them by construction**: the server rebuilds an entity from the
+*current* values it was sent, attaches it and sets its state, and EF then snapshots originals from
+the entity it was just handed. So on the server every original equals its current unless the client
+explicitly sent otherwise, the dependency graph has no edges to build, and the batch goes out in an
+order the store refuses.
+
+**Tier A cannot show any of it, because InMemory enforces no constraint.** Each of the three
+surfaced when a base moved to a store that does.
+
+| | What was missing | What the store said | Found by |
+|---|---|---|---|
+| J11 | foreign-key originals, at all | `FOREIGN KEY constraint failed`, **165 of them** | `ProxyGraphUpdates` reaching Tier B |
+| R40 | foreign-key originals on `Deleted` entries | `FOREIGN KEY constraint failed` | `ManyToManyTracking` reaching Tier B |
+| R42 | originals for unique-index properties | `UNIQUE constraint failed: Products.Name, Products.Price` | `Updates` reaching Tier B |
+
+**R40 is the one with a rule in it.** The condition had carried a comment asserting that *"a
+`Deleted` entry needs no ordering hint, because the row it releases is the one being deleted"* —
+which is true for every deleted row that is only ever a dependent, and false the moment **one
+deleted row is a dependent of another**. `Can_delete_with_many_to_many` deletes an `EntityOne` and
+an `EntityTwo` whose `CollectionInverseId` points at it; EF's own `ClientSetNull` fixup nulls that
+foreign key on the client before the entry is sent, so the *current* value carries no edge either,
+and the server had nothing at all to order by.
+
+> **A design comment that says a case "needs no X" is a claim about every instance of that case.**
+> Read it as a quantifier, and look for the instance that breaks it.
+
+**R42 widened the mechanism rather than repeating it.** `CommandBatchPreparer` orders by *value*
+dependencies as well as row ones: two rows swapping a unique index value have to be sequenced, and
+neither property is a foreign key or a concurrency token, so the condition R40 had just corrected
+still did not carry them.
+
+**R44 is what should have happened after R40, and it is the transferable half.** Two defects of one
+shape found by accident three hours apart is a signal to stop finding them one at a time. The audit
+enumerated every value `CommandBatchPreparer` reads from originals and diffed that list against
+what `ChangeEntryMapper.ToChangeEntry` sends, and came back **negative**: the two remaining rows are
+principal keys and unique constraints, both of which are *key* properties, and a key property's
+original can never differ from its current because EF fixes its `AfterSaveBehavior` at `Throw` and
+refuses to let a model configure anything else. A documented negative closes the class; a third
+accident would only have moved it.
+
+> **Anything the wire drops that a single-context EF never loses is invisible until a store
+> enforces it.** Original values are the standing example, and the way to close such a class is to
+> enumerate what the far end reads, not to wait for the next store to complain.
 
 ### A base belongs to exactly one tier
 

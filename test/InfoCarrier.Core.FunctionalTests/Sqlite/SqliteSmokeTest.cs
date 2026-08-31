@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -323,6 +323,52 @@ public class SqliteSmokeTest
         using DbContext server = store.CreateDbContext();
         Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync();
         Assert.Equal("ef", Assert.Single(saved.Tags).Label);
+    }
+
+    [ConditionalFact]
+    public async Task A_deleted_row_releases_its_alternate_key_before_a_new_row_takes_it()
+    {
+        // The R44 originals audit's scenario pin: a `Deleted` and an `Added` row colliding on a
+        // *unique constraint* — a table's primary key and its alternate keys — in one call, over
+        // the wire, on a store that enforces it. R40 and R42 each found the wire dropping an
+        // original that EF's command ordering needed, and this is the third place EF reads one.
+        //
+        // **What it does not do is prove the edge that reads it.** `AddUniqueValueEdges` builds
+        // that edge from the deleted row's value `fromOriginalValues: true`, but `AddSameTableEdges`
+        // already orders every `Deleted` command on a table before every `Added` one, with no value
+        // read at all — so this passes either way. The audit's finding is that the path is closed
+        // twice over: redundantly ordered here, and reading a value the wire cannot lose anyway,
+        // because `Coded.Code` is a key property and EF fixes every key property's
+        // `AfterSaveBehavior` at `Throw` (`Property.CheckAfterSaveBehavior` refuses any other
+        // value), so a saved key's original always equals its current.
+        //
+        // Kept as a scenario pin rather than deleted with the audit: nothing else on Tier B sends
+        // a delete and a colliding insert in one request.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new Coded { Id = 1, Code = "X", Label = "before" });
+                await context.SaveChangesAsync();
+            });
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            Coded existing = await client.Coded.SingleAsync();
+            client.Remove(existing);
+
+            // Same `Code`, in the same call. Without the DELETE first the store answers
+            // `SQLite Error 19: 'UNIQUE constraint failed: Coded.Code'`.
+            client.Add(new Coded { Id = 2, Code = "X", Label = "after" });
+
+            Assert.Equal(2, await client.SaveChangesAsync());
+        }
+
+        using DbContext server = store.CreateDbContext();
+        Coded saved = await server.Set<Coded>().SingleAsync();
+        Assert.Equal((2, "X", "after"), (saved.Id, saved.Code, saved.Label));
     }
 
     [ConditionalFact]
