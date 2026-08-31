@@ -1,9 +1,39 @@
 # C# navigation: the `roslyn-codelens` MCP server
 
-**For C# work these tools are the default and grep is the exception.** Before reaching for grep on
-a `.cs` file, ask whether the question is about a **symbol**; if it is, a tool here answers it
-better. It also resolves into NuGet metadata assemblies that have no source on disk, which grep
-cannot do at all.
+## The rule
+
+**Grep on a `.cs` file is FORBIDDEN for any question about a symbol.** Not discouraged — forbidden.
+A symbol question is anything about a type, member, attribute, base class, interface, override,
+constraint or reference: *what does this class declare*, *is this member virtual*, *what are its
+abstract members*, *how many tests does it have*, *where is this class declared*, *what does EF's
+own provider override*. Every one of those has a tool below, and the tool gives the compiler's
+answer where grep gives a line of text that resembles one.
+
+**Grep is permitted on `.cs` files for exactly two things**: a string that is not a symbol
+(a comment, a resource value, a literal), and an inventory question about *files* rather than
+symbols. Everything else is a tool call.
+
+**Outside `.cs`, grep is normal** — Markdown, `.resx`, `.csproj`, `.json`, `.yml`, plain prose.
+
+### If the tool cannot answer, the fix is to load the code, not to grep
+
+**The failure mode this rule exists to stop is not forgetting the tools — it is meeting a
+`notFound` and treating grep as the fallback.** `notFound` almost always means the symbol is
+outside the loaded closure, and the fix is one `load_solution` call:
+
+- `subrepos/efcore` is **not loaded by default**, and its spec bases are the most common symbol
+  questions in this repository. Load it (see *Several solutions at once* below) before reading a
+  single EF base class. A session that greps `subrepos/efcore/test/**/*.cs` for `protected abstract`
+  or `UseTransaction` has skipped this step.
+- A project in *this* solution that the active seed did not pull in: re-load with a wider seed.
+
+**If the server is down, say so and stop** — see *Setup* below. Do not silently fall back.
+
+## Why it matters here
+
+Before reaching for grep on a `.cs` file, ask whether the question is about a **symbol**; if it is,
+a tool here answers it better. It also resolves into NuGet metadata assemblies that have no source
+on disk, which grep cannot do at all.
 
 There are **sixty-odd tools**, and the reflex is to use the same six. The ones below are the ones
 that most often replace a worse method. Read the server's own catalogue when a question does not fit
@@ -22,6 +52,22 @@ one of these — there is probably a tool for it.
 | Does a symbol with this name exist? | `search_symbols` |
 | What is in this file? | `get_file_overview` |
 | What extension methods apply here? | `get_extension_methods` |
+
+**Adopting an EF spec base asks the same five symbol questions every time, and every one of them is
+a tool call.** These are written out because they were got wrong by grep in the session that added
+this section:
+
+| Question about a spec base | Tool, not grep |
+|---|---|
+| What does it declare — abstract members, constraints, base? | `get_type_overview` |
+| Is `UseTransaction` virtual, and what does it call? | `get_method_source` (**batch the names**) |
+| How many tests does it have? | `get_test_summary`, or `find_attribute_usages` for `ConditionalFact`/`ConditionalTheory` |
+| What does EF's own SQLite class override? | `get_type_overview` on that class, then `get_method_source` |
+| Which of our classes derive from it? | `get_type_hierarchy`, `find_implementations` |
+
+**`grep -c 'ConditionalFact\|ConditionalTheory'` is the tell.** It counts attribute *text*,
+including inside comments and `#if` blocks, and it cannot see inherited or generic-expanded tests —
+which is the number that actually lands in the suite total. `get_test_summary` can.
 
 And these are the ones that get forgotten entirely, each replacing something slower:
 

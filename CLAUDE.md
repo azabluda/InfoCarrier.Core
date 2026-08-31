@@ -5,9 +5,15 @@ protocol. Client `DbContext` has no database; the server executes against a real
 
 ## C# navigation
 
-`.mcp.json` registers the `roslyn-codelens` MCP server for this repository. **For C# work its
-tools are the default and grep is the exception.** Which tool answers which question, and how to
-check the loaded solution first:
+`.mcp.json` registers the `roslyn-codelens` MCP server for this repository. **Grep on a `.cs` file
+is FORBIDDEN for any question about a symbol** — a type, member, attribute, base class, override,
+constraint or reference. It is permitted on `.cs` only for a non-symbol string (a comment, a
+literal) and for file-inventory questions; outside `.cs` it is normal.
+
+**`notFound` is not a licence to grep — it means load the code.** `subrepos/efcore` is not loaded
+by default and its spec bases are the most common symbol question here; load it before reading a
+single EF base class. Which tool answers which question, and how to check the loaded solution
+first:
 
 @.claude/roslyn-codelens.md
 
