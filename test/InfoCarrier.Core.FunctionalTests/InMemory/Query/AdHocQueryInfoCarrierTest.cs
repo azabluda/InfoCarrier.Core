@@ -19,7 +19,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
 ///         wiring, and are the same in every class of this kind.
 ///     </para>
 ///     <para>
-///         This one stays on Tier A because its relational base is blocked: R47 read
+///         This one stays on Tier A because its relational base is blocked: R51 read
 ///         <c>AdHocMiscellaneousQueryRelationalTestBase</c> and found it declares
 ///         <c>protected abstract DbContextOptionsBuilder SetParameterizedCollectionMode(…)</c>,
 ///         which EF's SQLite class implements on the <em>client's</em> options builder.
