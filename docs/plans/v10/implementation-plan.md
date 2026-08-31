@@ -705,6 +705,46 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       override never should have applied to a JSON model. Deleting it was right for a reason
       better than the one recorded.
 
+- [x] **R30a. The `ComplexJson` override subset — one class, and the block is finished.**
+      `ComplexJsonProjectionSqliteTest`'s five, adopted whole. The re-parent also deleted nine
+      overrides this file used to restate by hand — five in `BulkUpdate`, two in `Collection`, two
+      in `SetOperations` — every one copied out of a `ComplexJson*RelationalTestBase` in C20 and
+      now inherited verbatim.
+      `Passed: 604, Failed: 4, Total: 608` for the whole `Query.Associations` tree, **unchanged
+      from R29a, as a re-parent should be**. `failed` stays 75 and `total` stays 27298, so neither
+      baseline file moves.
+
+### R25–R30 closed: all 35 `Query.Associations` relational bases are adopted
+
+**The compliance test's missing list holds no `Query.Associations` entry at all**: 95 → **60**
+bases, 23 → **20** fixtures. `Passed: 604, Failed: 4, Total: 608` across the six families, with
+`failed` 71 → 75 and `total` 27026 → 27298 for the whole suite.
+
+What the block cost and what it bought, in the order it is worth remembering:
+
+- **Two of the six families were re-parents of code already running** (`Navigations`,
+  `ComplexJson`) and added no test at all; two more (`OwnedNavigations`, and `ComplexJson` again)
+  deleted hand-mirrored model code. **Four new families brought 272 tests, 268 of them green.**
+- **The handoff's "no golden SQL" claim was verified rather than trusted, and it is true of the
+  35 relational bases and false of EF's SQLite classes.** Every `AssertSql` in the 35 is either
+  the helper declaration or an empty call; several `*StructuralEqualitySqliteTest` classes are
+  nothing but golden SQL. None of those was adopted, and the file in each family says why: the SQL
+  is the *backing store's* text, which this client never emits.
+- **The `UseTransaction` trap was on the fixture, not the base, in all six families.** Grepping
+  the test bases for `ExecuteWithStrategyInTransactionAsync` finds nothing; what needs the
+  override is each `*RelationalFixtureBase.UseTransaction` calling `GetDbTransaction()`. Written
+  in the same commit as the fixture every time, per CLAUDE.md.
+- **EF issue #26708 costs EF two whole SQLite projection classes** (`OwnedNavigations`,
+  `OwnedTableSplitting`), and this provider runs both with two tests red in each — answered from
+  `OwnedJsonProjectionSqliteTest`, the nearest statement of the same limit.
+- **`SqliteStrings.ApplyNotSupported` is 38 of the 42 failures across the whole block.** The one
+  distinction worth keeping: the *owned* families need a `TrackAll` short-circuit because
+  `AssertOwnedTrackingQuery` intervenes, and the *complex* families do not, because a complex type
+  is not tracked as an entity. Measured in each family rather than inferred from the shape.
+- **Four are left failing on purpose, all in `OwnedJson`**, and they are two different things —
+  three exception-type differences on an already-unsupported path, and one test that fails
+  *because it passes*. Both are recorded in `known-failures.txt` and in the file.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

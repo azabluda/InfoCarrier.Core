@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.ComplexJson;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -73,10 +74,17 @@ public class ComplexJsonQueryInfoCarrierFixture : ComplexJsonRelationalFixtureBa
         => facade.UseInfoCarrierTransaction(transaction);
 }
 
-// The seven ComplexJson facets (ADR-004), adopted bare: no override at all, so that every failure
-// is measured before anything is written to answer it. Adopting these also satisfies the seven
-// core `ComplexProperties*TestBase` classes, which they derive from and which ComplianceTestBase
+// The seven ComplexJson facets (ADR-004). Adopting these also satisfies the seven core
+// `ComplexProperties*TestBase` classes, which they derive from and which ComplianceTestBase
 // resolves transitively.
+//
+// R30 adopted them bare and measured 10 red of 136, all one reason; R30a is the single override
+// class below. The re-parent deleted nine overrides this file used to restate by hand -- five in
+// BulkUpdate, two in Collection and two in SetOperations -- every one of which was copied out of
+// a `ComplexJson*RelationalTestBase` in C20 and is now inherited verbatim.
+//
+// Nothing of EF's SQLite suite is left unadopted: outside ComplexJsonProjectionSqliteTest, not
+// one class in it carries a single override, golden SQL included.
 
 public class ComplexJsonBulkUpdateQueryInfoCarrierTest(
     ComplexJsonQueryInfoCarrierFixture fixture,
@@ -101,13 +109,68 @@ public class ComplexJsonPrimitiveCollectionQueryInfoCarrierTest(
 public class ComplexJsonProjectionQueryInfoCarrierTest(
     ComplexJsonQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : ComplexJsonProjectionRelationalTestBase<ComplexJsonQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : ComplexJsonProjectionRelationalTestBase<ComplexJsonQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    /// <summary>
+    ///     <c>ComplexJsonProjectionSqliteTest</c>'s five, adopted whole and the whole of R30's
+    ///     red: SQLite has no <c>APPLY</c>.
+    /// </summary>
+    /// <remarks>
+    ///     <b>No <c>TrackAll</c> arm to short-circuit</b>, unlike the three owned families' five
+    ///     identically-named tests. A complex type is not tracked as an entity, so
+    ///     <c>AssertOwnedTrackingQuery</c> never intervenes and both arms raise
+    ///     <c>ApplyNotSupported</c> directly. EF's class is written the same way, and R30 measured
+    ///     all ten arms that way rather than inferring it from the shape.
+    /// </remarks>
+    public override Task SelectMany_associate_collection(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.SelectMany_associate_collection(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task SelectMany_nested_collection_on_required_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task SelectMany_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+}
 
 public class ComplexJsonSetOperationsQueryInfoCarrierTest(
     ComplexJsonQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
     : ComplexJsonSetOperationsRelationalTestBase<ComplexJsonQueryInfoCarrierFixture>(fixture, testOutputHelper);
 
+/// <remarks>
+///     <para>
+///         <b>Green with no override, and that settles the #62 note this file used to carry.</b>
+///         The old note deleted an override of <c>Contains_with_nested_and_composed_operators</c>
+///         that asserted <c>InvalidOperationException</c>, quoting
+///         <c>ComplexTableSplittingStructuralEqualityRelationalTestBase</c>, once the query
+///         started translating — and called the result "a query this provider answers that other
+///         EF providers refuse".
+///     </para>
+///     <para>
+///         <b>The sharper reading, now that both mappings are adopted as EF states them:</b>
+///         <c>ComplexJsonStructuralEqualityRelationalTestBase</c> declares no override at all, so
+///         passing here is <em>agreement</em> with EF rather than divergence from it; and R28 runs
+///         the table-splitting base, where EF does assert the throw and this provider throws.
+///         <b>The difference was the mapping, not the provider</b> — the borrowed override never
+///         should have been applied to a JSON-mapped model. Deleting it was right for a better
+///         reason than the one recorded.
+///     </para>
+/// </remarks>
 public class ComplexJsonStructuralEqualityQueryInfoCarrierTest(
     ComplexJsonQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
