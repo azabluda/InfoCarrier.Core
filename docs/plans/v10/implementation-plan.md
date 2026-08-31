@@ -922,6 +922,25 @@ re-parents of families already running, because R25–R30 showed that is where t
       Humanizer pass run on the result, per the standing rule for `website/`. `eng/doc-links.py`
       and `eng/doc-words.py` both pass.
 
+- [ ] **R38. The "plausibly new or standalone" group probed — and most of it is blocked for
+      reasons that only reading it shows.** No code in this step; it is the classification R4 asks
+      for, on the group R30b sized at ~19. Each was read for the three checks R25–R30 produced.
+
+      | Base | Verdict |
+      |---|---|
+      | `Query.WarningsTestBase` | **The one worth trying.** 11 tests, and the base itself carries no blocker. What stands in the way is its `TFixture : NorthwindQueryRelationalFixture<NoopModelCustomizer>` constraint, and that fixture declares `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore`. **ADR-013's amendment says such a cast blocks only when every route runs through it, and `WarningsTestBase` never touches `Fixture.TestStore`** — so this is an experiment with a real chance, not a closed door. |
+      | `ConcurrencyDetectorEnabledRelationalTestBase`, `…DisabledRelationalTestBase` | **#60.** Each adds exactly one test and that test is `FromSqlRaw`. Everything else about them is clean: 22 lines, the constraint is the *core* fixture, and the `RelationalTestStore` use is a safe `as` cast with a fallback rather than a hard one. |
+      | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | **Blocked, and it is the #60 shape rather than a new one.** It declares `protected abstract DbContextOptionsBuilder SetParameterizedCollectionMode(…)` and uses it **ten** times; SQLite implements it as `new SqliteDbContextOptionsBuilder(optionsBuilder).UseParameterizedCollectionMode(…)`, a relational option on the *client's* builder. `UseInfoCarrier` has none. Routing it to the backend harness instead is design work, not an adoption. |
+      | `TwoDatabasesTestBase` | **Blocked by the client having no database**, which is the honest category rather than a defect: it declares `protected abstract string DummyConnectionString` and `CreateBackingContext(string databaseName)`. |
+      | `LoggingRelationalTestBase<TBuilder, TExtension>` | **Blocked by design.** Every test configures `MaxBatchSize`, `CommandTimeout`, `UseRelationalNulls`, `MigrationsAssembly` or `MigrationsHistoryTable`, and `TExtension` is a `RelationalOptionsExtension`. This provider's options extension is not one, and M9 is why. |
+      | `TransactionTestBase`, `NullSemanticsQueryTestBase`, `OwnedEntityQueryRelationalTestBase`, `QueryNoClientEvalTestBase`, `SharedTypeQueryRelationalTestBase` | Not read line by line. Each has between one and seven hits for `FromSql`/`AsSplitQuery`/`RelationalTestStore`/`GetDbTransaction`, so each needs the same per-base read rather than a group verdict — which is the whole lesson of R34 and R36. |
+
+      **What the three probes together say about the R30b inventory.** It has now been corrected
+      twice by reading and once more here: four candidates left the cheap group for #60 (R34), nine
+      left the blocked group for adopted (R36), and this group turns out to be mostly blocked
+      rather than mostly open. **A name is not a classification, and the cost of finding out is
+      about twenty minutes a base.**
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
