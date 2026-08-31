@@ -1637,6 +1637,51 @@ re-parents of families already running, because R25–R30 showed that is where t
       what the client surfaces is only the rehydrated top frame, so the server frames need to reach
       the test output before the site can be named. **Do that before re-pricing anything.**
 
+- [x] **R64. `LeftJoin` was missing from `ProjectionShape`, and it cost a silent wrong answer.**
+      `failed` **unchanged at 95**, `total` 28945 → 28946 for the one new test. FIXED none, BROKEN
+      none. `Passed: 28615, Failed: 95, Total: 28946`. A `src/` change; both gates ran.
+
+      **This is R62's `OwnedQuery` finding run to ground.** That step measured
+      `OwnedQueryRelationalTestBase` at 202 green of 212 and said two of the ten were wrong answers
+      with a defect behind them. This is the defect.
+
+      **`ProjectionShape.Operator` listed `Select`, `SelectMany` and `Join`, and not `LeftJoin`.**
+      A left join's result selector was therefore never entered, and every owned entity type it
+      projected came back unresolved. Nothing else can resolve those, and the class's own remarks
+      say why: the CLR type cannot, because four of `OwnedQueryTestBase`'s owned types are the same
+      `OwnedAddress`; the change tracker cannot, because the server tracks only when asked.
+      `Companion` named `Join` alone for the same reason. `RightJoin` is added to both — the three
+      have identical argument shapes.
+
+      **Two consequences, and the quiet one is worse.**
+      1. The mapper falls back to round-tripping the value by its **public CLR members**, so
+         `PlaceType` and `Country` came back and `AddressLine` and `ZipCode` — private fields
+         behind an indexer — did not. **A wrong answer, and silent.**
+      2. The tracking downgrade `ServerQueryExecutor.TrackingBehaviorFor` makes for an ownerless
+         owned type never fires, so the server refuses the query instead.
+
+      **Ten probes, and the discriminator is the operator and nothing else.** Correct: an inner
+      `Join`; `SelectMany` + `Where` + `DefaultIfEmpty`, which is the same left join written
+      differently; a plain `Select(p => p.PersonAddress)`; and every one of those with
+      `AsNoTracking`. Wrong: `GroupJoin` + `DefaultIfEmpty`, and a hand-written
+      `Queryable.LeftJoin`. **The same `LeftJoin` run directly on the server context is correct**,
+      which is what rules out EF, the shaper and the SQL — and the SQL was replayed against a copy
+      of the `.db` file and returns the address.
+      **`GroupJoinFlattener` was the first suspect and is exonerated**: it emits
+      `Queryable.LeftJoin`, and a caller who writes `LeftJoin` by hand fails identically.
+      **One hypothesis was evidenced and wrong**: that the loss was "no entry, so no shadow state".
+      `AsNoTracking` on the working shapes does not reproduce it.
+
+      **The suite measures none of this**, so
+      `SqliteSmokeTest.A_left_join_keeps_an_owned_value_that_has_no_public_member` is added, with a
+      `Located` entity whose owned address holds one value behind an indexer. Measured **red before
+      the fix and green after**. It pins consequence (2): a model with one owned type per CLR type
+      cannot reproduce (1), and the base that does — `OwnedQueryRelationalTestBase` — is not
+      adopted (R62). **That is stated in the test rather than left implied**, because a pin that
+      covers half a defect should say which half.
+      Gates: trim ratchet OK (89 ≤ 89), Release build `0 Warning(s), 0 Error(s)`, which caught one
+      `CS8602` Debug did not — the third time on this branch.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

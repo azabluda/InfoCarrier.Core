@@ -440,4 +440,47 @@ public class SqliteSmokeTest
         await using SqliteSmokeContext after = CreateClient(store);
         Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
     }
+
+    [ConditionalFact]
+    public async Task A_left_join_keeps_an_owned_value_that_has_no_public_member()
+    {
+        // R64. `LeftJoin` was missing from `ProjectionShape`'s operator list, so a left join's
+        // result selector was never entered and every owned type it projected came back with no
+        // entity type. That has two consequences and this test pins the loud one: the tracking
+        // downgrade `ServerQueryExecutor.TrackingBehaviorFor` makes for an ownerless owned type
+        // never fires, and the server refuses the query outright -- "a tracking query is
+        // attempting to project an owned entity without a corresponding owner". Measured red
+        // before the fix and green after.
+        //
+        // The quiet consequence is the worse one and this model does not reproduce it: with four
+        // owned types sharing one CLR type, as `OwnedQueryTestBase` has, the mapper falls back to
+        // the public CLR members and the value comes back with `City` set and `Line` -- which
+        // lives in a private field behind an indexer -- silently missing.
+        // `OwnedQueryRelationalTestBase.Left_join_on_entity_with_owned_navigations` is what covers
+        // that half, and this repository does not run it yet (R62).
+        //
+        // `Line` is asserted beside `City` because the defect took one and left the other.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new Blog { Id = 1, Title = "alpha" });
+                context.Add(
+                    new Located { Id = 1, Address = new LocatedAddress { City = "Zurich", ["Line"] = "Bahnhofstrasse 1" } });
+                await context.SaveChangesAsync();
+            });
+
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        var rows = await client.Blogs
+            .LeftJoin(client.Located, b => b.Id, l => l.Id, (b, l) => new { b.Title, Address = l!.Address })
+            .ToListAsync();
+
+        var row = Assert.Single(rows);
+        LocatedAddress address = Assert.IsType<LocatedAddress>(row.Address);
+        Assert.Equal("Zurich", address.City);
+        Assert.Equal("Bahnhofstrasse 1", address["Line"]);
+    }
 }

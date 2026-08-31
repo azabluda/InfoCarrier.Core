@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using System.Reflection;
@@ -30,6 +30,15 @@ namespace InfoCarrier.Core.Query;
 ///         <see langword="null" />, which leaves the mapper exactly where it was. It is consulted
 ///         last and only applies when the value really is an instance of the named type, so a wrong
 ///         answer degrades to the previous behaviour rather than mislabelling a row.
+///     </para>
+///     <para>
+///         <b>Partial is not free, and <c>LeftJoin</c> is what showed the cost.</b> The operator
+///         list in <c>Operator</c> named <c>Join</c> and not <c>LeftJoin</c>, so a left join's
+///         result selector was never entered and every owned type it projected came back
+///         unresolved. The mapper then round-tripped the value by its public CLR members -- which
+///         is why <c>OwnedAddress.PlaceType</c> and <c>Country</c> survived and <c>AddressLine</c>
+///         and <c>ZipCode</c>, which live in private fields behind an indexer, did not. A degraded
+///         answer for an entity type is still a wrong answer, and this one was silent.
 ///     </para>
 /// </remarks>
 internal sealed class ProjectionShape
@@ -157,7 +166,7 @@ internal sealed class ProjectionShape
 
         if (Lambda(call.Arguments[^1]) is { } selector
             && call.Method.Name is nameof(Queryable.Select) or nameof(Queryable.SelectMany)
-                or nameof(Queryable.Join))
+                or nameof(Queryable.Join) or nameof(Queryable.LeftJoin) or nameof(Queryable.RightJoin))
         {
             var inner = new Dictionary<ParameterExpression, ProjectionShape>(bindings);
 
@@ -203,7 +212,10 @@ internal sealed class ProjectionShape
         ProjectionShape source,
         Dictionary<ParameterExpression, ProjectionShape> bindings)
     {
-        if (call.Method.Name == nameof(Queryable.Join))
+        // `Join`, `LeftJoin` and `RightJoin` all take (outer, inner, outerKey, innerKey, result),
+        // so the second parameter ranges over argument 1 in all three. Only the nullability of the
+        // two sides differs, and a shape says nothing about nullability.
+        if (call.Method.Name is nameof(Queryable.Join) or nameof(Queryable.LeftJoin) or nameof(Queryable.RightJoin))
         {
             return call.Arguments.Count >= 2 ? Resolve(call.Arguments[1], bindings) : null;
         }

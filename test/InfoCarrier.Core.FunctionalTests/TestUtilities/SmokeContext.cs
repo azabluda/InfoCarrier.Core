@@ -85,6 +85,8 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
 
     public DbSet<Coded> Coded => Set<Coded>();
 
+    public DbSet<Located> Located => Set<Located>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,6 +97,12 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
             .HasConversion(k => k.Value, v => new IntStructKey(v));
 
         modelBuilder.Entity<Addressed>().ComplexProperty(e => e.Address);
+
+        // An OWNED type one of whose values has no public CLR member -- it lives in a private
+        // field reached through an indexer. That is the shape R64 turns on: a value the wire can
+        // carry only if it knows the entity type, so a projection whose shape went unresolved
+        // dropped it silently while the public members beside it survived.
+        modelBuilder.Entity<Located>().OwnsOne(e => e.Address, b => b.IndexerProperty<string>("Line"));
 
         // An alternate key, which SQLite renders as a UNIQUE table constraint. It is the only
         // thing in this model that reaches CommandBatchPreparer.AddUniqueValueEdges' unique-
@@ -197,4 +205,47 @@ public class GuidKeyed
     public Guid Id { get; set; }
 
     public string? Label { get; set; }
+}
+
+/// <summary>
+///     An entity with an owned address, for R64's <c>LeftJoin</c> pin.
+/// </summary>
+/// <remarks>
+///     Modelled on <c>OwnedQueryTestBase.OwnedAddress</c>, which is where the defect was found:
+///     one value behind an indexer and one an ordinary property, so a wire that falls back to
+///     public CLR members loses exactly half of it and the loss is visible in one assertion.
+/// </remarks>
+public class Located
+{
+    public int Id { get; set; }
+
+    public LocatedAddress Address { get; set; } = new();
+}
+
+/// <summary>
+///     An owned address whose <c>Line</c> has no public CLR member.
+/// </summary>
+public class LocatedAddress
+{
+    private string? _line;
+
+    public string? City { get; set; }
+
+    public object? this[string name]
+    {
+        get => name == "Line"
+            ? _line
+            : throw new InvalidOperationException($"Indexer property with key {name} is not defined on {nameof(LocatedAddress)}.");
+
+        set
+        {
+            if (name != "Line")
+            {
+                throw new InvalidOperationException(
+                    $"Indexer property with key {name} is not defined on {nameof(LocatedAddress)}.");
+            }
+
+            _line = (string?)value;
+        }
+    }
 }

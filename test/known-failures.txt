@@ -1699,5 +1699,39 @@
 # `test/` only. The Release build was checked because a `test/`-only change produced Release-only
 # errors in #90, and it did again here: two CS8603 and one IDE0005, none of them visible in Debug.
 # ---------------------------------------------------------------------------------------------
+# 2026-08-31 (R64) -- `failed` UNCHANGED at 95, `total` 28945 -> 28946 for the one new test.
+# FIXED none, BROKEN none. A `src/` change that the suite cannot see, and the test is why it is
+# still known to work.
+#
+# `ProjectionShape.Operator` listed `Select`, `SelectMany` and `Join`, and not `LeftJoin`. A left
+# join's result selector was therefore never entered, so every owned entity type it projected came
+# back with no entity type at all. `ProjectionShape` is the ONLY thing that can resolve those: the
+# CLR type cannot (four of `OwnedQueryTestBase`'s owned types are the same `OwnedAddress`) and the
+# change tracker cannot (the server tracks only when asked). Its own remarks say so. `Companion`
+# named `Join` alone for the same reason and is fixed with it; `RightJoin` is added to both,
+# because the three operators have identical argument shapes.
+#
+# TWO CONSEQUENCES, AND THE QUIET ONE IS WORSE. (1) The mapper falls back to round-tripping the
+# value by its public CLR members, so `OwnedAddress.PlaceType` and `Country` came back and
+# `AddressLine` and `ZipCode` -- private fields behind an indexer -- did not. A wrong answer, and
+# silent. (2) The tracking downgrade `ServerQueryExecutor.TrackingBehaviorFor` makes for an
+# ownerless owned type never fires, so the server refuses the query instead.
+#
+# ESTABLISHED BY MEASUREMENT AND NOT BY READING, in ten probes over the OwnedQuery model. The
+# discriminator is the operator and nothing else: an inner `Join`, a `SelectMany` + `DefaultIfEmpty`
+# (the same left-join semantics written differently), a plain `Select(p => p.PersonAddress)` and
+# all of those with `AsNoTracking` are correct; `GroupJoin` + `DefaultIfEmpty` and a hand-written
+# `Queryable.LeftJoin` are not. THE SAME `LeftJoin` RUN DIRECTLY ON THE SERVER IS CORRECT, which is
+# what rules out EF and the SQL. `GroupJoinFlattener` was the first suspect and is exonerated: it
+# emits `Queryable.LeftJoin`, and the caller writing `LeftJoin` by hand fails identically.
+#
+# THE SUITE MEASURES NONE OF THIS, so `SqliteSmokeTest.A_left_join_keeps_an_owned_value_that_has_no_public_member`
+# is added and was measured red before the fix and green after. It pins consequence (2), because
+# the model this repository owns has one owned type per CLR type and so cannot reproduce (1); the
+# base that covers (1) is `OwnedQueryRelationalTestBase`, which is not adopted (R62).
+#
+# `src/`, so both gates ran: trim ratchet OK (89 <= 89), Release build 0 Warning(s), 0 Error(s).
+# The Release build caught one CS8602 that Debug did not -- the third time in this branch.
+# ---------------------------------------------------------------------------------------------
 failed=95
-total=28945
+total=28946
