@@ -1321,6 +1321,43 @@ re-parents of families already running, because R25–R30 showed that is where t
       yes.
       `test/` only.
 
+- [x] **R55. `NorthwindDbFunctions` probed and NOT adopted — and R51's reason for withholding it
+      was wrong twice over.** No code kept. `Passed: 10, Failed: 0, Total: 10` on Tier A before,
+      and unchanged after the revert.
+
+      **R51 said it was "not blocked, gated on a step of its own": re-parenting
+      `NorthwindQueryInfoCarrierFixture`, which every Northwind class hangs off. Both halves were
+      wrong.**
+
+      1. **The fixture was never the blocker.** R20 had already built a second, relational Northwind
+         fixture — `NorthwindQueryInfoCarrierSqliteFixture` — and the Tier B Northwind classes have
+         been using it since. The cost was one file, not a suite-wide re-parent. *(A Tier A
+         re-parent was probed first, on R51's reading, and measured clean at
+         `Passed: 4398, Failed: 4, Total: 4416` with all four failures pre-existing — so the
+         `(RelationalTestStore)base.TestStore` cast in `NorthwindQueryRelationalFixture` is
+         confirmed not to be on any Northwind route. That probe was reverted as unnecessary.)*
+      2. **And it IS blocked, by something R51 never looked at.** With the class moved to Tier B on
+         the relational base: **`Passed: 10, Failed: 20, Total: 30`.** The relational base declares
+         **exactly ten test methods** — `Collate` ×4, `Greatest` ×3, `Least` ×3 — and **every one
+         of the twenty parameterizations fails.** The ten that pass are the core base's, untouched.
+
+      **The mechanism, and it is the useful part.** The thrower is
+      `QuerySplitter.RejectClientEvaluation` — **the client, before the wire**:
+      `Translation of method 'Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions.Collate'
+      failed`. The client's model registers no translation for `RelationalDbFunctionsExtensions`,
+      so the query is rejected at the boundary and the server never sees it. The two collations the
+      base declares abstract (`"NOCASE"`, `"BINARY"`) are beside the point — nothing gets far
+      enough to use them.
+
+      **So this is #60, in its purest form yet.** Not one or two `FromSql` tests inside a useful
+      base — a base whose *entire* contribution is relational `EF.Functions`. Twenty permanent reds
+      for nothing. **The standing rule applies unchanged and the class is not kept.**
+      **What is new is that #60 now has a measured third member**: `FromSql` throws,
+      `AsSplitQuery` is silently ignored (R47), and `RelationalDbFunctionsExtensions` is rejected
+      at the client boundary with EF's own translation-failure message. Those are three different
+      behaviours, and a decision on #60 should name which of them it is fixing.
+      No code; `test/` only while probing.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
