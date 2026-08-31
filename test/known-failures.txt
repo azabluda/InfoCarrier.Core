@@ -1268,5 +1268,35 @@
 #
 # Compliance missing bases 78 -> 73, fixtures unchanged at 21. Both InfoCarrierComplianceTest
 # entries stay red by design.
-failed=71
-total=27211
+#
+# 2026-08-31, #56 (R29/R29a). `failed` 71 -> 75, `total` 27211 -> 27298. The new OwnedJson family
+# brings 87 tests, of which 83 pass: `Passed: 604, Failed: 4, Total: 608` for the whole
+# Query.Associations tree afterwards, which is R28a's 521 plus this family's 87. FIXED none,
+# BROKEN none -- the 4 are new tests that arrive red, not regressions, and known-failures.names.txt
+# gains exactly those 4 names.
+#
+# All 4 are in OwnedJsonStructuralEqualityQueryInfoCarrierTest and they are TWO different things.
+#
+# Three are an exception-type difference on a path that is unsupported either way:
+# Contains_with_parameter, Contains_with_operators_composed_on_the_collection and
+# Contains_with_nested_and_composed_operators. The relational base asserts KeyNotFoundException;
+# this provider raises InvalidOperationException, "No backing field could be found for property
+# '...NestedCollection#NestedAssociateType.AssociateTypeRootEntityId' and the property does not
+# have a getter". Both are the owned JSON collection's synthetic key machinery failing to be read,
+# differing in which point of it fails first. EF's own OwnedJsonStructuralEqualitySqliteTest has
+# no override to adopt -- it overrides these only to assert golden SQL and calls base for the
+# behaviour -- and writing one of ours would be overriding a spec test to make the suite green.
+# Left failing per ADR-004. Contains_with_inline, which the base asserts as
+# InvalidOperationException, passes.
+#
+# The fourth, Associate_with_parameter_null, FAILS BECAUSE IT PASSES. The relational base wraps
+# it in Assert.ThrowsAsync<EqualException> citing EF issue #36401 -- EF expects a wrong answer
+# here -- and this provider returns the right one, so no EqualException is thrown and the wrapper
+# is what fails. That is the R21/R22 category: a query this provider answers that other EF
+# providers get wrong. Left failing rather than papered over, because the red is the evidence.
+# Candidate for website/docs/limitations.md, which is governed by doc-style.md and not touched
+# here.
+#
+# Compliance missing bases 73 -> 67, fixtures unchanged at 21.
+failed=75
+total=27298

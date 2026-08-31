@@ -656,6 +656,23 @@ unreachable on a client with no database. Each of our fixtures overrides it with
       failing, and a candidate for `website/docs/limitations.md`'s section on exactly that (that
       file is governed by `doc-style.md` and needs a humanizer pass, so it is not touched here).
 
+- [x] **R29a. The `OwnedJson` override subset — 12 of 16 answered, 4 left failing on purpose, and
+      this is the first commit in the block that raises `failed`.** Six methods adopted whole:
+      `OwnedJsonCollectionSqliteTest.Distinct_projected` and all five of
+      `OwnedJsonProjectionSqliteTest`. **That second class is the one R26a and R27a have been
+      borrowing from**, because #26708 leaves the two other owned families without a projection
+      class; here it is finally used where it was written.
+      `Passed: 604, Failed: 4, Total: 608` for the whole `Query.Associations` tree, which is
+      R28a's 521 plus this family's 87 — 83 of the 87 green.
+      **`failed` 71 → 75, `total` 27211 → 27298, and `known-failures.names.txt` gains exactly the
+      four names.** They are new tests arriving red, not a regression: FIXED none, BROKEN none.
+      Compliance missing bases 73 → 67, fixtures unchanged at 21.
+      Nothing of EF's SQLite suite is left unadopted that states a *reason*:
+      `OwnedJsonStructuralEqualitySqliteTest` overrides every test in the class, but only ever to
+      assert golden SQL, calling `base` for the behaviour — so there is nothing there for the four
+      reds, and both the exception-type difference and the "fails because it passes" case stand as
+      measured.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
