@@ -94,9 +94,9 @@ only a fraction of what it hid.
 
       | Group | Count | What is known now |
       |---|---|---|
-      | Needs a relational **client** API (#60) | ~14 | The five `FromSql`/`SqlQuery`/`SqlExecutor`/`ToSqlQuery` bases and the six `*SplitQuery*`/`*SplitInclude*` ones, plus `UdfDbFunction`. **Out of scope by the owner's decision**; do not design around it. |
+      | Needs a relational **client** API (#60) | ~18 | The five `FromSql`/`SqlQuery`/`SqlExecutor`/`ToSqlQuery` bases and the six `*SplitQuery*`/`*SplitInclude*` ones, plus `UdfDbFunction`. **Out of scope by the owner's decision**; do not design around it. |
       | Asserts the **client's relational model** | ~12 | The nine `RelationalModelBuilderTest+*` nested bases, `ModelBuilding101RelationalTestBase`, `Scaffolding.CompiledModelRelationalTestBase`, and `JsonTypesRelationalTestBase` — the last measured in R23 at 104 red of 576 and reverted. This provider does not build a relational model on the client (M9), so these are the ADR-013 "blocked wholesale" shape rather than the "costs one test" shape. |
-      | **Re-parents of families already running** | ~15 | `Query.Translations.String*`/`Miscellaneous*`, `Update.UpdatesRelational`, `Query.ComplexTypeQueryRelational`, `Query.JsonQueryRelational`, `Query.PrimitiveCollectionsQueryRelational`, `Query.OwnedQueryRelational`, `Query.SpatialQueryRelational`, `Query.NorthwindMiscellaneousQueryRelational`, the two `BulkUpdates.*Relational`, `ManyToManyTrackingRelational` (R16 examined and deferred). **This is the R25/R26/R30 shape and is where the cheap wins are.** Several also close a `ITestSqlLoggerFactory` fixture entry as a side effect, as R25 and R30 each did. |
+      | **Re-parents of families already running** | ~11 | `Query.Translations.String*`/`Miscellaneous*`, `Update.UpdatesRelational`, `Query.ComplexTypeQueryRelational`, `Query.JsonQueryRelational`, `Query.PrimitiveCollectionsQueryRelational`, `Query.OwnedQueryRelational`, `Query.SpatialQueryRelational`, `Query.NorthwindMiscellaneousQueryRelational`, the two `BulkUpdates.*Relational`, `ManyToManyTrackingRelational` (R16 examined and deferred). **This is the R25/R26/R30 shape and is where the cheap wins are.** Several also close a `ITestSqlLoggerFactory` fixture entry as a side effect, as R25 and R30 each did. |
       | Plausibly new families or standalone | ~19 | The five `Query.AdHoc*QueryRelational`, `TransactionTestBase`, `TwoDatabasesTestBase`, `LoggingRelational`, the two `ConcurrencyDetector*Relational`, `Query.WarningsTestBase`, `Query.QueryNoClientEvalTestBase`, `Query.NullSemanticsQueryTestBase`, `Query.SharedTypeQueryRelational`, `Query.OwnedEntityQueryRelational`, `Query.NonSharedPrimitiveCollectionsQueryRelational`, `Types.RelationalTypeTestBase`, `Update.JsonUpdateTestBase`, `Update.StoreValueGenerationTestBase`. `Update.StoredProcedureUpdateTestBase` needs stored procedures and is the one here most likely to be a genuine ignore entry. |
 
       **The three checks R25–R30 showed are worth running on every candidate, in this order**, because
@@ -818,6 +818,33 @@ re-parents of families already running, because R25–R30 showed that is where t
       `ITestSqlLoggerFactory`.
       What stays is EF's `ComplexTypeQuerySqliteTest` pair, the two `ApplyNotSupported` ones the
       relational base does not carry.
+
+- [x] **R33. `NonSharedModelBulkUpdates` re-parented — twelve new tests and all of them green.**
+      `NonSharedModelBulkUpdatesRelationalTestBase` takes the same `NonSharedFixture` this class
+      already used and adds six tests, which is twelve with the async arm. 22 → 34 tests,
+      `Passed: 34, Failed: 0, Total: 34`. `failed` unchanged, `total` +12. Compliance missing bases
+      58 → 57.
+      **What separates it from its Northwind sibling is worth stating**, because the two sit next
+      to each other in the same file: this base carries no `FromSql`, no `AsSplitQuery` and no
+      `RelationalTestStore` cast, and `NorthwindBulkUpdatesRelationalTestBase` carries all three.
+
+- [ ] **R34. Four of R30b's "cheap re-parent" candidates are actually #60-gated, and the probe is
+      what found it.** The inventory put them in the group where the cheap wins are; reading the
+      bases moved them:
+
+      | Base | What gates it |
+      |---|---|
+      | `Query.JsonQueryRelationalTestBase` | adds **seven** `FromSqlRaw` tests |
+      | `Query.OwnedQueryRelationalTestBase` | adds eight `AsSplitQuery` tests, one `FromSqlRaw`, **and** its fixture declares `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore` |
+      | `Query.NorthwindMiscellaneousQueryRelationalTestBase` | adds two `AsSplitQuery` tests |
+      | `BulkUpdates.NorthwindBulkUpdatesRelationalTestBase` | adds two `FromSqlRaw` tests, and its fixture carries the same `RelationalTestStore` cast |
+
+      **Not adopted**, per the standing instruction not to adopt a base that needs a relational
+      client API. `InfoCarrierTestStore` derives from `TestStore` and not from
+      `RelationalTestStore`, so that cast is an `InvalidCastException` rather than a missing
+      feature — the shape ADR-013's amendment calls blocked when every route runs through it.
+      **The correction to make in the R4 notes: the "re-parents of families already running" group
+      is ~11, not ~15, and the #60 group is ~18, not ~14.**
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

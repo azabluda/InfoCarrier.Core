@@ -1325,5 +1325,20 @@
 # With R29's OwnedJson.Associate_with_parameter_null this makes FOUR standing failures of the
 # "a query this provider answers that other EF providers refuse" kind. That is now enough to be
 # worth a website/docs/limitations.md entry.
+#
+# 2026-08-31, #56 (R32, R33). `failed` UNCHANGED at 78, `total` 27298 -> 27310.
+#
+# R32 re-parents ComplexTypeQuerySqliteInfoCarrierTest onto ComplexTypeQueryRelationalTestBase and
+# its fixture onto ComplexTypeQueryRelationalFixtureBase. The relational base adds no test and six
+# hand-mirrored overrides are deleted, so the class stands at 150 passed / 0 failed / 151 total,
+# identical before and after. It closes TWO compliance entries: one base and one fixture, the
+# latter because the relational fixture base supplies ITestSqlLoggerFactory.
+#
+# R33 re-parents NonSharedModelBulkUpdatesInfoCarrierTest onto
+# NonSharedModelBulkUpdatesRelationalTestBase, which takes the same NonSharedFixture and adds six
+# tests of its own. The class goes 22 -> 34 tests, ALL 34 GREEN, hence total +12 with failed flat.
+#
+# FIXED none, BROKEN none, known-failures.names.txt unchanged.
+# Compliance missing bases 59 -> 57, fixtures 20 -> 19.
 failed=78
-total=27298
+total=27310
