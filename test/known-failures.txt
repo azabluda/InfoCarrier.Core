@@ -1507,5 +1507,109 @@
 # 0 errors (it was 4 first -- two EF1001 for SqliteStrings and two IDE0005 -- and Debug reported
 # none of them, which is exactly what CLAUDE.md warns Debug hides).
 # ---------------------------------------------------------------------------------------------
-failed=82
-total=27483
+#
+# ---------------------------------------------------------------------------------------------
+# R54 (2026-08-31): failed 82 -> 81, total UNCHANGED at 27483. FIXED 1, BROKEN none.
+#
+# The one fixed test is InfoCarrierComplianceTest
+# .All_query_test_fixtures_must_implement_ITestSqlLoggerFactory, and it is now GREEN: the 17
+# remaining query fixtures each gained the one member the gate asks for,
+# `public TestSqlLoggerFactory TestSqlLoggerFactory => (TestSqlLoggerFactory)ListLoggerFactory`.
+# 15 declarations were edited; two more inherit it.
+#
+# THE MEMBER IS REAL, NOT A SUPPRESSION. InfoCarrierTestStoreFactory.CreateListLoggerFactory
+# returns `new TestSqlLoggerFactory(...)`, so the cast holds for every fixture that uses an
+# InfoCarrier store factory -- which all 17 do -- and the same cast is already exercised at
+# runtime by R50's Spatial fixture and by the Associations families, whose relational bases read
+# it through RelationalQueryAsserter.
+#
+# WHAT IT IS WORTH IS SMALLER THAN GREEN SUGGESTS, and the fixtures say so in their own remarks:
+# the property observes the CLIENT's log, and this client has no database and emits no SQL.
+# `ServerSqlLog` is where the server's statements can be read. The gate asked whether a fixture
+# can produce a TestSqlLoggerFactory; the answer is honestly yes.
+#
+# The other compliance test stays red at 33 missing bases, so that number is still not in here.
+#
+# Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
+# ---------------------------------------------------------------------------------------------
+#
+# ---------------------------------------------------------------------------------------------
+# R56 (2026-08-31): failed 81 -> 99, total 27483 -> 27805. FIXED none, BROKEN 18, ALL INTENDED.
+#
+# THIS IS A DELIBERATE RISE and the owner authorised it. NullSemanticsQueryTestBase is adopted:
+# 322 tests arrive, 304 of them green, 18 permanently red. R41 identified it as the base where
+# the ratio was worth the owner's attention and estimated "about 21 permanent reds"; measuring
+# gives 18. Every one of the 18 is classified below, and the BROKEN list is exactly those 18 --
+# nothing else in the suite moved.
+#
+# THE 18 SPLIT INTO TWO CAUSES, and neither is a defect this repository can fix on its own.
+#
+#   12 are #60, the relational client API. The base declares
+#   `protected abstract NullSemanticsContext CreateContext(bool useRelationalNulls = false)`, and
+#   EF's SQLite class implements it as `new SqliteDbContextOptionsBuilder(o).UseRelationalNulls()`
+#   -- a relational option on the CLIENT's builder, which UseInfoCarrier has none of. Our override
+#   accepts the flag and drops it, so a test asking for the store's null semantics gets C#'s.
+#   Ten of the twelve say so in their own names (`..._for_relational_null_semantics`,
+#   `..._with_relational_null_semantics`); the other two are
+#   `Switching_null_semantics_produces_different_cache_entry` and
+#   `From_sql_composed_with_relational_null_comparison`, which is also #60's FromSql half.
+#
+#   6 are the projection-split boundary working as designed, and this was checked rather than
+#   assumed. The fixture registers two user-defined functions on the model with a RELATIONAL
+#   translation -- `modelBuilder.HasDbFunction(... Cases ...).HasTranslation(args => new
+#   CaseExpression(...))` and the same for `BoolSwitch`. The client has no relational query
+#   pipeline, so it cannot apply that translation, and QuerySplitter.RejectClientEvaluation
+#   refuses the query rather than fetching the table -- exactly what CLAUDE.md says must happen.
+#   The tell that this is the boundary and not a translation bug: the SELECT-side siblings
+#   (`CaseWhen_equal_to_second_select`, `CaseWhen_equal_to_first_or_third_select`,
+#   `CaseOpWhen_projection`) all PASS, because a projection is reassembled client-side; only the
+#   WHERE-side ones (`CaseWhen_equal_to_second_filter`,
+#   `CaseWhen_equal_to_first_or_third_filter`, `CaseOpWhen_predicate`) are refused.
+#
+# NOT CONVERGENCE, and EF's own suite was read before that was ruled out. EF overrides all six of
+# those Case* tests in NullSemanticsQuerySqliteTest -- but every override is `await base.X(async)`
+# followed by AssertSql(...), i.e. the base assertion PASSES on SQLite and the override only adds
+# a golden-SQL check. So EF's overrides say these tests should pass, which is why none of them is
+# adopted here and all six are left red.
+#
+# Compliance missing bases 33 -> 32. Skipped 235 -> 236 (one theory in the new class).
+#
+# Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
+# ---------------------------------------------------------------------------------------------
+#
+# ---------------------------------------------------------------------------------------------
+# R57 (2026-08-31): total 27805 -> 27809, failed UNCHANGED at 99. FIXED none, BROKEN none.
+#
+# `Translations` moved from Tier A to Tier B -- the last of the tier moves, and the one R43
+# priced and left for the owner. 333 tests become 337, all green on both sides of the move.
+#
+# R43 PRICED IT AT 217 OVERRIDES. THE MEASURED COST IS 65. The 217 is the size of EF's SQLite
+# Translations suite, and most of those overrides exist only to assert golden SQL over a base
+# call that passes. What a provider actually has to write is one override per test that FAILS,
+# and on this store that is 65. The gap between 217 and 65 is the whole reason to measure a price
+# rather than count the reference implementation's lines.
+#
+# ALL 65 ARE THE STORE, NOT THIS PROVIDER, and that is established rather than assumed twice
+# over. Every one of the 65 failed with `The LINQ expression ... could not be translated`, naming
+# a member SQLite has no function for -- System.TimeOnly.FromDateTime, System.Math.Round (decimal),
+# System.Convert.To*, System.Guid.NewGuid, DateTimeOffset.ToUnixTimeSeconds and so on. EF's own
+# SQLite classes override each with `AssertTranslationFailed`, sampled across five classes before
+# any were adopted. And the adoption itself is the second proof: all 65 overrides assert a
+# translation failure, and all 65 pass -- which they could not do if any test had been failing
+# for some other reason.
+#
+# THREE OVERRIDES WERE DELETED BY THE MOVE, which is the tier rule paying out. EF's own
+# StringTranslationsInMemoryTest overrides said StringComparison.CurrentCulture/InvariantCulture
+# are unsupported -- true of real providers, false of the InMemory store that used to sit behind
+# this wire, so the base's assertion could not hold and had to be neutered. SQLite does not
+# support them, so the base is right and the workaround is gone. Six more went the same way:
+# A27 had transcribed MiscellaneousTranslationsRelationalTestBase's Random.Next expectations by
+# hand because that base was out of reach, and the move puts it in reach.
+#
+# Compliance missing bases 32 -> 30: MiscellaneousTranslationsRelationalTestBase and
+# StringTranslationsRelationalTestBase are both adopted by the move.
+#
+# Gates: test/ only, so eng/measure.sh's axis and not the trim ratchet.
+# ---------------------------------------------------------------------------------------------
+failed=99
+total=27809

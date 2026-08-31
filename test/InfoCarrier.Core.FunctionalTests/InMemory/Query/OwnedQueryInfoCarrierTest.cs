@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -26,8 +26,18 @@ public class OwnedQueryInfoCarrierTest(OwnedQueryInfoCarrierTest.OwnedQueryInfoC
     ///     <c>OwnedQueryFixtureBase</c> is nested in the base it belongs to — EF's own InMemory
     ///     class nests its fixture for the same reason.
     /// </summary>
-    public class OwnedQueryInfoCarrierFixture : OwnedQueryFixtureBase
+    public class OwnedQueryInfoCarrierFixture : OwnedQueryFixtureBase, ITestSqlLoggerFactory
     {
+        /// <summary>
+        ///     The compliance gate's second assertion (R54). The property is real —
+        ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
+        ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
+        ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
+        ///     server's statements can actually be read.
+        /// </summary>
+        public TestSqlLoggerFactory TestSqlLoggerFactory
+            => (TestSqlLoggerFactory)ListLoggerFactory;
+
         private ITestStoreFactory? _testStoreFactory;
 
         /// <inheritdoc />

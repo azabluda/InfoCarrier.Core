@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -46,9 +46,19 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.BulkUpdates;
 ///     </para>
 /// </remarks>
 public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
-    : NorthwindBulkUpdatesFixture<TModelCustomizer>
+    : NorthwindBulkUpdatesFixture<TModelCustomizer>, ITestSqlLoggerFactory
     where TModelCustomizer : ITestModelCustomizer, new()
 {
+    /// <summary>
+    ///     The compliance gate's second assertion (R54). The property is real —
+    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
+    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
+    ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
+    ///     server's statements can actually be read.
+    /// </summary>
+    public TestSqlLoggerFactory TestSqlLoggerFactory
+        => (TestSqlLoggerFactory)ListLoggerFactory;
+
     private ITestStoreFactory? _testStoreFactory;
 
     /// <inheritdoc />
@@ -75,8 +85,18 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
 ///     The inheritance fixture for the two inheritance bulk-update classes, TPH — the default
 ///     strategy, and the one EF's own <c>TPHInheritanceBulkUpdatesSqliteFixture</c> uses.
 /// </summary>
-public class InheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesFixtureBase
+public class InheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesFixtureBase, ITestSqlLoggerFactory
 {
+    /// <summary>
+    ///     The compliance gate's second assertion (R54). The property is real —
+    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
+    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
+    ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
+    ///     server's statements can actually be read.
+    /// </summary>
+    public TestSqlLoggerFactory TestSqlLoggerFactory
+        => (TestSqlLoggerFactory)ListLoggerFactory;
+
     private ITestStoreFactory? _testStoreFactory;
 
     /// <inheritdoc />
