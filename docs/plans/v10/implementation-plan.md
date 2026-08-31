@@ -1206,6 +1206,29 @@ re-parents of families already running, because R25–R30 showed that is where t
       ignore — and **neither is taken here**.
       `test/` only.
 
+- [x] **R48. `AdHocNavigations` moved to Tier B — four tests added, and the two it breaks are
+      convergence.** Missing 36 → 35. `Passed: 21, Failed: 0, Total: 21` on Tier A becomes
+      `Passed: 25, Failed: 0, Total: 25` here, after two overrides.
+      **R47 is what made this adoptable.** The relational base's one theory has four
+      parameterizations and two of them call `AsSplitQuery()`, which is why R41's rule would have
+      withheld it. R47 measured that cost at zero red tests, and all four pass.
+
+      **The two newly-red tests are the store, and EF's own SQLite class is the check that says
+      so.** `Projection_with_multiple_includes_and_subquery_with_set_operation` and
+      `Let_multiple_references_with_reference_to_outer` fail with
+      `Translating this query requires the SQL APPLY operation, which is not supported on SQLite`
+      — `SqliteStrings.ApplyNotSupported` character for character, which is exactly what
+      `AdHocNavigationsQuerySqliteTest` overrides them with. On Tier A the query never reached SQL.
+      EF's overrides are adopted, as CLAUDE.md requires.
+
+      **EF overrides a third and this does not, deliberately.**
+      `SelectMany_and_collection_in_projection_in_FirstOrDefault` is `ApplyNotSupported` in EF's
+      SQLite suite and **passes here**, so adopting that override would turn a green test red. It
+      joins the set of queries this provider answers that other EF providers reject — the same
+      shape `limitations.md` already names two of. **Checked by running it, not assumed from the
+      sibling two.**
+      `test/` only.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

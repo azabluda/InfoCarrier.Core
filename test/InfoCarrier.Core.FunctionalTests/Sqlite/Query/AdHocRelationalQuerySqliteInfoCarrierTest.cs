@@ -3,8 +3,10 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -144,4 +146,81 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
             onModelCreating, onConfiguring, addServices, configureConventions,
             shouldLogCategory, createTestStore, usePooling, useServiceProvider);
     }
+}
+
+/// <summary>
+///     <c>AdHocNavigationsQueryRelationalTestBase</c> on ADR-009 <b>Tier B</b>.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Moved here from Tier A by R48. The relational base adds one theory with four
+///         parameterizations, and <c>Passed: 21, Failed: 0, Total: 21</c> becomes
+///         <c>Passed: 23, Failed: 2, Total: 25</c> before the two overrides below, which is
+///         <c>+4</c> new tests all green and <c>2</c> newly-red <em>core</em> tests.
+///     </para>
+///     <para>
+///         Two of the four use <c>AsSplitQuery()</c>. As R47 established with
+///         <c>INFOCARRIER_SERVER_SQL=1</c>, that marker is silently ignored here — the server
+///         issues one query — so these pass on correct answers from an unsplit query.
+///     </para>
+///     <para>
+///         <b>The two newly-red tests are convergence, not regression, and the check that says so
+///         is EF's own SQLite class.</b> <c>AdHocNavigationsQuerySqliteTest</c> overrides exactly
+///         these with <c>SqliteStrings.ApplyNotSupported</c>: on Tier A the query never reached
+///         SQL, and here it does and SQLite has no <c>APPLY</c>. The message this provider
+///         surfaces is that string character for character.
+///     </para>
+///     <para>
+///         <b>EF overrides a third that is left alone deliberately.</b>
+///         <c>SelectMany_and_collection_in_projection_in_FirstOrDefault</c> is
+///         <c>ApplyNotSupported</c> in EF's SQLite suite and <em>passes</em> here, so adopting
+///         that override would turn a green test red. It joins the small set of queries this
+///         provider answers that other EF providers reject.
+///     </para>
+/// </remarks>
+public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
+    : AdHocNavigationsQueryRelationalTestBase(fixture)
+{
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+
+    /// <inheritdoc />
+    protected override ITestStoreFactory TestStoreFactory
+        => _harness.TestStoreFactory;
+
+    /// <inheritdoc />
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<IServiceCollection, IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true)
+    {
+        Fixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+    }
+
+    // --- SQLite has no APPLY. Both overrides are EF's own AdHocNavigationsQuerySqliteTest, and
+    // the message this provider surfaces is `SqliteStrings.ApplyNotSupported` character for
+    // character. EF's third such override is not adopted: see the class remarks.
+
+    /// <inheritdoc />
+    public override async Task Projection_with_multiple_includes_and_subquery_with_set_operation()
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.Projection_with_multiple_includes_and_subquery_with_set_operation)).Message);
+
+    /// <inheritdoc />
+    public override async Task Let_multiple_references_with_reference_to_outer()
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.Let_multiple_references_with_reference_to_outer)).Message);
 }
