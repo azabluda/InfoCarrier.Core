@@ -2119,6 +2119,65 @@ re-parents of families already running, because R25–R30 showed that is where t
       silent-wrong-answer family after R71's `FromSqlRaw`, and the owner's instruction is to
       diagnose those 11 before the base is adopted (R74).
 
+- [x] **R74. `UdfDbFunctionTestBase` ADOPTED — and diagnosing it first is what stopped a whole
+      wrong classification from being committed.** `failed` 125 -> 200, `total`
+      29077 -> 29183. 106 tests: **30 green, 75 red, 1 skipped by EF itself.** The compliance
+      gate's missing list falls **13 -> 12**.
+
+      **The owner's instruction was to adopt but to diagnose R73's "11 wrong answers" first. There
+      are none.** The 11 were an artefact of the R71 probe's own fixture, and the root cause is a
+      deliberate hole in EF's base: **`UdfFixtureBase.SeedAsync` only STAGES its entities.** Its
+      last four statements are `AddRange` calls and it never persists them — verified with the
+      compiler over the whole body, lines 371-528. Every provider fixture is expected to override
+      it, create its own SQL functions and call `SaveChanges`, which is exactly what EF's
+      `UdfDbFunctionSqlServerTests.SqlServer` fixture does. The probe did neither, so the store was
+      **empty**, and eleven tests reported "wrong answer" and "sequence contains no elements"
+      while reading zero rows.
+
+      **The evidence that settled it, in order.** A `Probe_seed_state` test writing to a file (xUnit
+      swallows stdout) read `Customers = 0, Products = 0, Orders = 0`. The store file on disk had
+      every table created and every table empty, so `EnsureCreated` had run and the seed had not
+      taken. Instrumenting `SeedAsync` showed it **was** called and **did** return without
+      throwing — which is what pointed at the base's body rather than at the wiring.
+
+      **With the seed corrected: 30 green, 75 red, and NOT ONE wrong answer.**
+
+      | Count | Cause |
+      |---|---|
+      | 36 | the client refuses the `HasDbFunction` call before the wire |
+      | 22 | the funcletizer tries to **evaluate** the UDF call locally |
+      | 7 | a different exception or message than the base asserts |
+      | 4 | `NotImplementedException` — EF's UDF stub bodies, reached because the call was evaluated client-side |
+      | 3 | EF's own translator marker exception, likewise client-side |
+      | **2** | **the store** — SQLite has no such user-defined function |
+      | 1 | the client-side part of the query |
+
+      **One mechanism, and it is the safe failure mode.** This provider does not support
+      `HasDbFunction`: it refuses at the client boundary or tries to evaluate the call, and either
+      way the caller gets an exception rather than a plausible result. That is **#60's third
+      shape** (R55, R56). **Unlike `FromSqlRaw` (R71) it needs no consumer warning about silent
+      data loss**, and the contrast between the two is the most useful thing this base contributes.
+
+      **Two corrections land here.** R71 recorded the 80 reds as "SQLite's missing functions" —
+      only 2 are, and R73 corrected that by reading the reasons rather than the base's name. Then
+      R73 recorded 11 of them as a second silent-wrong-answer family — they do not exist, and this
+      step corrects that by fixing the fixture rather than trusting the summary. **Both errors were
+      the same mistake: classifying from a label instead of from evidence**, which is the failure
+      mode `CLAUDE.md` names twice over.
+
+      **On the bar for leaving a base unadopted.** EF ships no SQLite and no InMemory class for
+      this base, which is `CLAUDE.md`'s stated bar. The bar's *reason*, though, is that such a base
+      reports on the backing store instead of on the provider — and **73 of 75 reds here report on
+      this provider**. Adopted on the owner's decision for that reason, with the letter of the rule
+      noted as not fitting its purpose in this one case.
+
+      **The functions are not created, and that is priced rather than overlooked.** SQLite has no
+      `CREATE FUNCTION`; `Microsoft.Data.Sqlite` registers one per *connection* through
+      `SqliteConnection.CreateFunction`, which is not a schema object and would need a connection
+      interceptor on the server. It would buy the two store-side reds and none of the other 73.
+
+      `test/` only, so `eng/measure.sh` alone. Measured `r74-udf` against `r73-five-bases`: **FIXED none, BROKEN exactly the 75**, all inside the new class, and the reasons diff shows the seven causes above and nothing else.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

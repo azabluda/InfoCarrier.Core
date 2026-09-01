@@ -1921,5 +1921,25 @@
 #
 # Measured `r73-five-bases` against `r72-mappingquery`: FIXED none, BROKEN exactly those eight.
 
-failed=125
-total=29077
+# 2026-09-01 (R74) -- 125 -> 200, `total` 29077 -> 29183. A DELIBERATE RISE on the owner's
+# decision, adopting `UdfDbFunctionTestBase`: 106 tests, 30 green, 75 red, 1 skipped by EF itself.
+# FIXED none, BROKEN exactly the 75, every one inside the new class.
+#
+# ALL 75 ARE ONE MECHANISM -- this provider does not support `HasDbFunction` -- and NOT ONE IS A
+# WRONG ANSWER. 36 are refused at the client boundary, 22 have the funcletizer try to EVALUATE the
+# UDF call, 7 raise a different message, 4 surface EF's own stub `NotImplementedException` because
+# the call was evaluated client-side, 3 EF's translator marker exception, 1 the client-side part of
+# the query. ONLY 2 ARE THE STORE (`no such table: GetTopTwoSellingProducts`). That is #60's third
+# shape (R55, R56), and unlike R71's `FromSqlRaw` it FAILS SAFE: the caller gets an exception, never
+# a plausible wrong result. No consumer warning is needed for it.
+#
+# TWO EARLIER READINGS OF THIS BASE WERE WRONG AND BOTH ARE CORRECTED HERE. R71 recorded the reds
+# as "SQLite's missing functions" -- only 2 are. R73 then recorded 11 of them as wrong answers and
+# empty results -- THEY DO NOT EXIST. `UdfFixtureBase.SeedAsync` ends with four `AddRange` calls
+# and NEVER SAVES (verified over the whole body, lines 371-528); every provider fixture is expected
+# to override it, create its functions and call `SaveChanges`, as EF's SqlServer fixture does. The
+# probe did neither, so the store was EMPTY and eleven tests reported wrong answers while reading
+# zero rows. The adopted fixture carries the save and says why.
+
+failed=200
+total=29183
