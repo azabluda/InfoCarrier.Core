@@ -1,6 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Globalization;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -14,31 +16,6 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>106 tests: 30 pass, 75 red, 1 skipped by EF itself. Every red is one mechanism —
-///         this provider does not support <c>HasDbFunction</c> — and NOT ONE is a wrong answer.</b>
-///         The provider refuses the call at the client boundary or the funcletizer tries to
-///         evaluate it locally; either way the caller gets an exception rather than a plausible
-///         result. That is <b>#60's third shape</b> (R55, R56: <c>RelationalDbFunctions</c> refused
-///         before the wire), and it is the safe failure mode.
-///     </para>
-///     <list type="table">
-///         <item><description>36 — the client refuses the mapped call before the wire.</description></item>
-///         <item><description>22 — the funcletizer tries to <em>evaluate</em> the UDF locally.</description></item>
-///         <item><description>7 — a different exception or message than the base asserts.</description></item>
-///         <item><description>4 — <c>NotImplementedException</c>: EF's UDF stub bodies, reached because the call was evaluated client-side. The same mechanism, seen from inside.</description></item>
-///         <item><description>3 — EF's own translator marker exception, likewise client-side.</description></item>
-///         <item><description>2 — <b>the store</b>: SQLite has no such user-defined function.</description></item>
-///         <item><description>1 — the client-side part of the query.</description></item>
-///     </list>
-///     <para>
-///         <b>Only 2 of 75 are SQLite's.</b> R71 recorded that the reds were "SQLite's missing
-///         functions" and that was wrong; R73 corrected it by reading the reasons instead of the
-///         base's name. EF ships no SQLite and no InMemory class for this base, which is
-///         <c>CLAUDE.md</c>'s stated bar for leaving a base unadopted — but the bar's <em>reason</em>
-///         is that such a base reports on the backing store rather than on the provider, and here
-///         73 of 75 report on this provider. Adopted on the owner's decision for that reason.
-///     </para>
-///     <para>
 ///         <b>The fixture must save, and EF's base deliberately does not.</b>
 ///         <c>UdfFixtureBase.SeedAsync</c> ends with four <c>AddRange</c> calls and never persists
 ///         them; every provider fixture is expected to override it, add its own SQL functions and
@@ -48,11 +25,29 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         results" that were nothing but a store with no rows in it.
 ///     </para>
 ///     <para>
-///         <b>No functions are created here, unlike EF's SqlServer fixture.</b> SQLite has no
-///         <c>CREATE FUNCTION</c>; <c>Microsoft.Data.Sqlite</c> can register one per
-///         <em>connection</em> through <c>SqliteConnection.CreateFunction</c>, which is not a
-///         schema object and would need a connection interceptor on the server. It would buy the
-///         two store-side reds and none of the other 73, so it is priced and not taken.
+///         <b>The scalar functions are defined per connection, because SQLite has no
+///         <c>create function</c>.</b> EF's SqlServer fixture writes its definitions into the
+///         database in <c>SeedAsync</c>; <c>Microsoft.Data.Sqlite</c> attaches a delegate to one
+///         open <see cref="SqliteConnection" /> instead, and nothing is written to the file. So
+///         they are declared here and installed by <see cref="SqliteFunctionInterceptor" /> on
+///         every connection the <em>server</em> opens.
+///     </para>
+///     <para>
+///         <b>R74 priced this at "two store-side reds and none of the other 73" and declined it;
+///         that pricing was stale by R85.</b> What changed in between is R84, which made
+///         <c>HasDbFunction</c> work: the reds that used to read "the client refuses the mapped
+///         call" now reach the store and read <c>no such function</c>. Fourteen of the 185 named a
+///         missing scalar function in <c>artifacts/measure/r85.log</c>, which is what this step
+///         was priced against.
+///     </para>
+///     <para>
+///         <b>Two things here are still the store's and are not worked around.</b> The
+///         table-valued functions cannot be expressed at all — <c>Microsoft.Data.Sqlite</c>
+///         registers scalar functions and SQLite has no table-valued equivalent to
+///         <c>GetTopTwoSellingProducts</c>. And <c>IdentityString</c> is mapped
+///         <c>[DbFunction(Schema = "dbo")]</c>, so the server emits a schema-qualified call that
+///         SQLite answers with <c>near "(": syntax error</c>; a schema is not something a
+///         connection-scoped function can carry.
 ///     </para>
 /// </remarks>
 public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunctionInfoCarrierFixture fixture)
@@ -72,6 +67,7 @@ public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunc
                 InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+                onAddOptions: builder => builder.AddInterceptors(new SqliteFunctionInterceptor(DefineFunctions)),
                 configureConventions: ConfigureConventions);
 
         /// <inheritdoc />
@@ -79,14 +75,127 @@ public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunc
         ///     <c>UdfFixtureBase.SeedAsync</c> only <em>stages</em> its entities — its last four
         ///     statements are <c>AddRange</c> calls and it never saves. EF's SqlServer fixture
         ///     finishes the job with its <c>create function</c> statements and a
-        ///     <c>SaveChanges</c>; this one has no functions to create, so the save is the whole
-        ///     of it. Without this the store is empty and all 106 tests read zero rows.
+        ///     <c>SaveChanges</c>; here the functions are the interceptor's, so the save is the
+        ///     whole of it. Without this the store is empty and all 106 tests read zero rows.
         /// </remarks>
         protected override async Task SeedAsync(DbContext context)
         {
             await base.SeedAsync(context);
 
             await context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        ///     Defines this fixture's scalar functions on one open connection, with the semantics
+        ///     of the <c>create function</c> statements EF's SqlServer fixture runs.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>Only the functions this suite's failures named, and not the rest of EF's
+        ///         SqlServer list.</b> Five more were written and measured first —
+        ///         <c>StringLength</c>, the three <c>IdentityString</c> variants and
+        ///         <c>AddValues</c> — and every one of them bought nothing, because no red here
+        ///         reaches them. <c>DollarValue</c> is the one kept without a red of its own: it
+        ///         is <c>StarValue</c>'s twin and shares its implementation.
+        ///     </para>
+        ///     <para>
+        ///         The two that read the database do so on the <em>same</em> connection the
+        ///         function was called on. SQLite permits a function callback to read through its
+        ///         own connection — what it forbids is writing to it, or redefining functions on
+        ///         it — and a second connection would be a second transaction, so a UDF called
+        ///         inside one would answer from the wrong snapshot.
+        ///     </para>
+        ///     <para>
+        ///         Dates are taken and returned as <c>string</c> rather than
+        ///         <see cref="DateTime" />. SQLite has no date type: both this suite's stored
+        ///         values and any parameter <c>Microsoft.Data.Sqlite</c> binds are TEXT in one
+        ///         format, so comparing the text is what the store itself does, and the
+        ///         alternative is to parse and reformat the same value twice for no gain.
+        ///     </para>
+        /// </remarks>
+        private static void DefineFunctions(SqliteConnection connection)
+        {
+            connection.CreateFunction<int, long?>(
+                "CustomerOrderCount",
+                customerId => Scalar<long>(
+                    connection,
+                    @"SELECT count(""Id"") FROM ""Orders"" WHERE ""CustomerId"" = $customerId",
+                    ("$customerId", customerId)));
+
+            connection.CreateFunction<string?, long?>(
+                "GetCustomerWithMostOrdersAfterDate",
+                startDate => Scalar<long>(
+                    connection,
+                    @"SELECT ""CustomerId"" FROM ""Orders"" WHERE ""OrderDate"" > $startDate
+                      GROUP BY ""CustomerId"" ORDER BY count(""Id"") DESC LIMIT 1",
+                    ("$startDate", startDate)));
+
+            // The period is ignored, as it is in EF's SqlServer fixture.
+            connection.CreateFunction<int, string>(
+                "GetReportingPeriodStartDate",
+                _ => "1998-01-01 00:00:00",
+                isDeterministic: true);
+
+            connection.CreateFunction<int, long>(
+                "IsTopCustomer",
+                customerId => customerId == 1 ? 1 : 0,
+                isDeterministic: true);
+
+            // `IsDate` and `len` are mapped `IsBuiltIn()`, so the server emits them unqualified
+            // and SQLite — which has neither — resolves them to these.
+            connection.CreateFunction<string?, long>(
+                "IsDate",
+                value => DateTime.TryParse(value, CultureInfo.InvariantCulture, out _) ? 1 : 0,
+                isDeterministic: true);
+
+            connection.CreateFunction<string?, long?>(
+                "len",
+                value => value?.Length,
+                isDeterministic: true);
+
+            // Variadic, because the second argument is an `int` for `StarValue` and a `string`
+            // for `DollarValue` and the mapped overloads differ only in that.
+            connection.CreateFunction<string?>(
+                "StarValue",
+                arguments => Prefixed('*', arguments),
+                isDeterministic: true);
+
+            connection.CreateFunction<string?>(
+                "DollarValue",
+                arguments => Prefixed('$', arguments),
+                isDeterministic: true);
+        }
+
+        /// <summary>
+        ///     <c>replicate(@marker, @count) + @value</c>, which is how EF's SqlServer fixture
+        ///     defines both <c>StarValue</c> and <c>DollarValue</c>.
+        /// </summary>
+        private static string? Prefixed(char marker, object?[] arguments)
+            => arguments[0] is long count
+                ? new string(marker, (int)count) + Convert.ToString(arguments[1], CultureInfo.InvariantCulture)
+                : null;
+
+        /// <summary>
+        ///     The first column of the first row, or <see langword="null" /> when there is none.
+        /// </summary>
+        private static T? Scalar<T>(
+            SqliteConnection connection,
+            string sql,
+            params (string Name, object? Value)[] parameters)
+            where T : struct
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = sql;
+            foreach ((string name, object? value) in parameters)
+            {
+                command.Parameters.AddWithValue(name, value ?? (object)DBNull.Value);
+            }
+
+            object? result = command.ExecuteScalar();
+
+            return result is null or DBNull
+                ? null
+                : (T)Convert.ChangeType(result, typeof(T), CultureInfo.InvariantCulture);
         }
     }
 }

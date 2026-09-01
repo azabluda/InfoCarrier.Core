@@ -2156,5 +2156,39 @@
 # both halves; and registering on the CLIENT ALONE still fails on the server. Without the third the
 # two registrations look like duplication.
 
-failed=185
+# 2026-09-02 (R86) -- `failed` 185 -> 171, `total` unchanged at 29223. FIXED 14, BROKEN none.
+# The REASONS diff is removals only: all seven `no such function` classes are gone and nothing
+# was added.
+#
+# THE R74 PRICING WAS STALE AND R85 SAID SO. `Microsoft.Data.Sqlite` registers a scalar function
+# per CONNECTION, through `SqliteConnection.CreateFunction`, which is not a schema object -- so
+# SQLite cannot do what EF SqlServer fixture does with `create function` in `SeedAsync`. R74
+# priced a connection interceptor at "two store-side reds and none of the other 73" and declined
+# it. R84 made `HasDbFunction` work, which moved 60 reds from "the client refuses" to "the store
+# has no such function", and the price became fourteen. IT WAS COUNTED, NOT ESTIMATED: 14 of the
+# 185 named a missing scalar function in `artifacts/measure/r85.log`, and exactly those 14 are
+# the FIXED list.
+#
+# THE SEAM ALREADY EXISTED. `SharedTestStoreProperties.OnAddOptions` is read by
+# `InfoCarrierBackendTestStore.AddProviderOptions` and nothing else, so it configures the SERVER
+# context and only the server context. No product code changed and no new plumbing was added --
+# `SqliteFunctionInterceptor` is a `DbConnectionInterceptor` in the test utilities, and the
+# fixture passes its own function definitions to it.
+#
+# THE TWO FUNCTIONS THAT READ THE DATABASE DO SO ON THE SAME CONNECTION they were called on.
+# SQLite permits a function callback to read through its own connection; a second connection
+# would be a second transaction, and a UDF called inside one would answer from the wrong
+# snapshot. `CustomerOrderCount` alone is 7 of the 14, so this was the half that had to work.
+#
+# WHAT IS STILL THE STORE'S, AND IS NOT WORKED AROUND. Two reds are the table-valued functions,
+# which `Microsoft.Data.Sqlite` cannot express at all -- it registers scalar functions and SQLite
+# has no table-valued equivalent. Two more are `IdentityString`, mapped `[DbFunction(Schema =
+# "dbo")]`, so the server emits a schema-qualified call and SQLite answers `near "(": syntax
+# error`; a schema is not something a connection-scoped function can carry.
+#
+# FIVE MORE FUNCTIONS WERE WRITTEN, MEASURED AND DELETED. `StringLength`, the three
+# `IdentityString` variants and `AddValues` are in EF SqlServer fixture and each bought nothing
+# here, because no red reaches them: the class went 81 -> 67 with them and 81 -> 67 without.
+
+failed=171
 total=29223

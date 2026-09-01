@@ -2621,6 +2621,48 @@ re-parents of families already running, because R25–R30 showed that is where t
       types: admitted on one side only is worse than admitted on neither.
 
 
+- [x] **R86. The harness server defines its own SQLite functions, and R74's price for that was
+      stale by fourteen.**
+      `failed` **185 -> 171**, `total` unchanged at 29223. FIXED 14, BROKEN none. The REASONS diff
+      is **removals only** — all seven `no such function` classes gone, nothing added.
+      `test/` only, so `eng/measure.sh` is the gate and the trim ratchet is not.
+
+      **The price was counted, not estimated.** `UdfDbFunctionInfoCarrierTest` is 81 of the 185, and
+      **14** of them named a missing scalar function in `artifacts/measure/r85.log`. Exactly those
+      14 are the FIXED list. R74 priced this at *"two store-side reds and none of the other 73"* and
+      declined it; what invalidated that was **R84**, which made `HasDbFunction` work and so moved
+      60 reds from *"the client refuses the mapped call"* to *"the store has no such function"*.
+      R85 flagged the pricing as stale and it was.
+
+      **SQLite has no `create function`, which is the whole difficulty.** EF's SqlServer fixture
+      writes its definitions into the database in `SeedAsync`; `Microsoft.Data.Sqlite` attaches a
+      delegate to **one open connection** through `SqliteConnection.CreateFunction` and writes
+      nothing to the file. So the definitions have to be reapplied on every connection, which is
+      what `SqliteFunctionInterceptor` (a `DbConnectionInterceptor`, in the test utilities) does.
+
+      **No product code changed and no new plumbing was added.**
+      `SharedTestStoreProperties.OnAddOptions` already existed and
+      `InfoCarrierBackendTestStore.AddProviderOptions` is its only reader, so it configures the
+      **server** context and only the server context — the client has no database and no
+      connection to intercept. The fixture passes its own function definitions through it.
+
+      **The two functions that read the database do so on the connection they were called on.**
+      SQLite permits a function callback to read through its own connection; a second connection
+      would be a second transaction, and a UDF called inside one would answer from the wrong
+      snapshot. `CustomerOrderCount` alone is 7 of the 14, so that half had to work.
+
+      **Five more functions were written, measured, and deleted.** `StringLength`, the three
+      `IdentityString` variants and `AddValues` are all in EF's SqlServer fixture and every one
+      bought nothing here: the class ran 81 -> 67 with them and 81 -> 67 without. `DollarValue` is
+      the one kept without a red of its own, because it is `StarValue`'s twin and shares its
+      implementation.
+
+      **Four reds in that class are still the store's and are not worked around.** Two are the
+      table-valued functions, which `Microsoft.Data.Sqlite` cannot express at all. Two are
+      `IdentityString`, mapped `[DbFunction(Schema = "dbo")]`, so the server emits a
+      schema-qualified call and SQLite answers `near "(": syntax error` — a schema is not
+      something a connection-scoped function can carry.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
