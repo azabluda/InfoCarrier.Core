@@ -39,6 +39,13 @@ public class InfoCarrierConventionSetBuilder(
         // keeps a discriminator the server's model has dropped.
         conventionSet.ModelFinalizingConventions.Add(new InfoCarrierHierarchyMappingConvention());
 
+        // And once more for query filters. Core EF's rewriter turns the `DbSet` a `FromSql*` call
+        // reads into an `IQueryable`, which is not what that call's first parameter is, so a filter
+        // written over raw SQL fails while the CLIENT's model is built. Only a relational
+        // convention knows about `FromSql`, and this provider does not run one.
+        conventionSet.Replace<QueryFilterRewritingConvention>(
+            new InfoCarrierQueryFilterRewritingConvention(Dependencies));
+
         return conventionSet;
     }
 }

@@ -135,6 +135,37 @@ public class DocumentMappingPinTest
         Assert.Empty(ModelDbFunctions.ForModel(plain.Model));
     }
 
+    // `InfoCarrierQueryFilterRewritingConvention`'s two. The second is derived from EF rather than
+    // written down: the methods the convention must leave alone are exactly those on this class
+    // whose FIRST parameter is a `DbSet<>`, because that is the parameter core EF's rewriter fills
+    // with an `IQueryable`. A new overload group EF adds would fail this test rather than fail a
+    // caller's model build with `ArgumentException`.
+    [ConditionalFact]
+    public void The_FromSql_host_name_is_still_EFs()
+        => Assert.Equal(
+            InfoCarrierQueryFilterRewritingConvention.FromSqlDeclaringTypeName,
+            typeof(RelationalQueryableExtensions).FullName);
+
+    [ConditionalFact]
+    public void Every_DbSet_taking_method_EF_declares_there_is_one_the_convention_leaves_alone()
+    {
+        string[] takingADbSet = typeof(RelationalQueryableExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(m => m.GetParameters() is [{ ParameterType: { IsGenericType: true } first }, ..]
+                && first.GetGenericTypeDefinition() == typeof(DbSet<>))
+            .Select(m => m.Name)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        // Asserted rather than hoped for, as above: an empty set would satisfy the equality below
+        // while proving nothing.
+        Assert.NotEmpty(takingADbSet);
+        Assert.Equal(
+            InfoCarrierQueryFilterRewritingConvention.FromSqlMethodNames.Order().ToArray(),
+            takingADbSet);
+    }
+
     [ConditionalFact]
     public void The_walk_agrees_with_EF_for_every_type_including_nested_ones()
     {

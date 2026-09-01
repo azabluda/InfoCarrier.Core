@@ -2694,6 +2694,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       the class name does not say which it is. The question is whether it runs before
       `IDatabase.CompileQuery`.
 
+- [x] **R88. A `FromSql` query filter broke the client's model build, and the missing piece was the
+      convention replacement R87 had just named.** `src/` change, so both gates: `eng/measure.sh`
+      and `eng/trim-ratchet.sh` (`ours` 89 ≤ 89, `total` 855, unchanged).
+      `failed` **171 -> 169**, `total` 29223 -> **29225** — two new `DocumentMappingPinTest` pins,
+      both green. FIXED 2, BROKEN none.
+
+      **It fires while the model is finalized, before any query runs**, which is why R83 read the
+      base as *"3 tests, all reaching `SqlQueryRaw`/`FromSqlRaw`"* and was right about the API and
+      wrong about where it failed. Core EF's `QueryFilterRewritingConvention` rewrites a `DbSet`
+      access inside a filter into an `EntityQueryRootExpression`, typed `IQueryable<T>`; the first
+      parameter of `FromSqlRaw` is `DbSet<T>`, so the rewritten call cannot be constructed:
+      *"Expression of type `IQueryable<Dictionary<string, object>>` cannot be used for parameter of
+      type `DbSet<Dictionary<string, object>>`"*. EF Core Relational does not have the problem
+      because it **replaces** the convention, and D7 had just recorded that this client makes two of
+      that builder's four replacements and not this one.
+
+      **Leaving the `FromSql*` call alone is R82's rule, not the cheap way out.** The server applies
+      its own model's filter with its own provider, where `FromSql` means something; the filter in
+      the *client's* model only has to be representable. The alternative was to build a
+      `FromSqlQueryRootExpression` by reflection — a relational query root, on a client with no
+      store.
+
+      **The third test with that exception converged rather than passed.**
+      `Ad_hoc_query_for_default_shared_type_entity_type_throws` now builds its model, reaches
+      `FromSqlRaw` on a non-relational client, and gets *"Relational-specific methods can only be
+      used when the context is using a relational database provider"* — ADR-013's shape, and #60.
+      Its reason moved from `ArgumentException` to `Assert.Equal Strings differ`, which is the whole
+      of that line in the reasons diff going 8 -> 9.
+
+      **The second pin is derived from EF rather than written down.** The methods the convention
+      must leave alone are exactly those on `RelationalQueryableExtensions` whose *first* parameter
+      is a `DbSet<>` — the parameter core EF's rewriter fills with an `IQueryable` — so a new
+      overload group EF adds fails this test instead of failing a caller's model build.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

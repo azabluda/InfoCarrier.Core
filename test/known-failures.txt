@@ -2190,5 +2190,28 @@
 # `IdentityString` variants and `AddValues` are in EF SqlServer fixture and each bought nothing
 # here, because no red reaches them: the class went 81 -> 67 with them and 81 -> 67 without.
 
-failed=171
-total=29223
+# 2026-09-02 (R88) -- `failed` 171 -> 169, `total` 29223 -> 29225. FIXED 2, BROKEN none. The two
+# new tests are `DocumentMappingPinTest` pins and both are green.
+#
+# A `FromSql` QUERY FILTER FAILED WHILE THE CLIENT MODEL WAS BUILT, before any query ran. Core EF
+# `QueryFilterRewritingConvention` rewrites the `DbSet` a filter reads into an
+# `EntityQueryRootExpression`, which is typed `IQueryable<T>`; the first parameter of `FromSqlRaw`
+# is `DbSet<T>`, so the rewritten call cannot be constructed. EF Core Relational does not have the
+# problem because it REPLACES the convention -- and this client, per D7, replaces two of that
+# builder four replacements and had never made this one.
+#
+# THE FIX LEAVES THE CALL ALONE, which is R82 rule and not the cheap way out. The server applies
+# its own model filter with its own provider, where `FromSql` means something; the filter in the
+# client model only has to be REPRESENTABLE. Building a `FromSqlQueryRootExpression` by reflection
+# was the alternative and would have meant constructing a relational query root on a client that
+# has no store.
+#
+# THE THIRD TEST WITH THAT EXCEPTION CONVERGED RATHER THAN PASSED.
+# `Ad_hoc_query_for_default_shared_type_entity_type_throws` now builds its model, reaches
+# `FromSqlRaw` on a non-relational client and says so: "Relational-specific methods can only be
+# used when the context is using a relational database provider". That is ADR-013 shape and #60,
+# and it moved from `ArgumentException` to `Assert.Equal Strings differ`, which is why the reasons
+# diff shows that class going 8 -> 9.
+
+failed=169
+total=29225

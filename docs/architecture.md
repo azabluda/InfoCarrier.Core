@@ -689,6 +689,12 @@ of type `DbSet<Dictionary<string, object>>` of method `FromSqlRaw`"*, raised **w
 model is built, before any query runs**. Three of `SharedTypeQueryInfoCarrierTest`'s four reds are
 this.
 
+**CLOSED 2026-09-02 (R88).** `InfoCarrierQueryFilterRewritingConvention` leaves a
+`FromSql*` call exactly as the caller wrote it, which is R82's rule — the server applies its
+own model's filter, so the client's only has to be *representable*. Two of the three pass;
+the third converged onto #60, reaching `FromSqlRaw` on a non-relational client and saying
+so. **The other four rows above are still open and unverified.**
+
 **The pattern all three defects share, and it is the part that transfers.** Every one is a service
 EF replaces *for a reason that has nothing to do with SQL* — the filter protects a call from being
 evaluated, the convention teaches a rewriter about a method — and this client needs the same
