@@ -2013,5 +2013,24 @@
 # 20 reds were all one mechanism. The six fixed here were already failing for that mechanism and
 # nobody had connected them, because no test named `EF.Functions` existed.
 
-failed=192
-total=29183
+# 2026-09-01 (R79) -- 192 -> 198, `total` 29183 -> 29213. A DELIBERATE RISE, adopting
+# `NorthwindDbFunctionsQueryRelationalTestBase`: 30 tests, 24 green, 6 red. FIXED none, BROKEN
+# exactly the 6, every one inside the new class. Ratio 24:6, against the 30:75 accepted for
+# `UdfDbFunctionTestBase` in R74.
+#
+# THE 6, and four of them are one shape. `Least_with_parameter_array_is_not_supported` and
+# `Greatest_with_parameter_array_is_not_supported` (sync + async) expect a translation failure and
+# get a differently worded one, because the refusal happens on the server and arrives wrapped --
+# A63's shape, recorded for the third and fourth time here after R70 and R75.
+# `Collate_case_sensitive_constant` (sync + async) is genuine and NOT yet triaged: the other three
+# `Collate_*` tests pass, so it is one expression shape rather than the feature.
+#
+# R77 IS NOT NEEDED FOR THIS, AND THE WRONG BELIEF THAT IT WAS COST A WHOLE MECHANISM. The base
+# constrains its fixture to `NorthwindQueryRelationalFixture`, which declares
+# `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore;` -- and the
+# inference that a constraint therefore forces the cast is wrong. A property is evaluated when
+# something READS it, and no test here reads it. Measured both ways, byte-identical: 24 green,
+# 6 red. A TYPE CONSTRAINT NAMES WHAT A FIXTURE MUST BE, NOT WHAT A TEST WILL TOUCH.
+
+failed=198
+total=29213

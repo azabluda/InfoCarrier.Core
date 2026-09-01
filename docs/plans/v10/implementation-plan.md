@@ -2328,9 +2328,47 @@ re-parents of families already running, because R25–R30 showed that is where t
       `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` and nobody had connected them.
       **A gap with no test naming it is a gap nobody is looking at.**
 
-      That base is parked with R77 on `park/r77-relational-client-store` and is **not** part of this
-      step: it needs a relational client test store to be adoptable at all, and that mechanism has
-      to earn its place on its own evidence. This step depends on none of it.
+      That base is not part of this step; it is adopted in R79. **The claim made here when this
+      entry was written — that it needs a relational client test store to be adoptable — is wrong,
+      and R79 records the measurement that disproves it.** This step depended on none of it either
+      way.
+
+- [x] **R79. `NorthwindDbFunctionsQueryRelationalTestBase` ADOPTED — the first `EF.Functions`
+      coverage this repository has ever had, and it needs no relational client store.**
+      `failed` 192 -> 198, `total` 29183 -> 29213. **A deliberate rise**: 30 tests, **24 green**,
+      6 red, FIXED none, BROKEN exactly the 6 and every one inside the new class. Ratio **24:6**,
+      against the 30:75 accepted for `UdfDbFunctionTestBase` in R74.
+
+      **R77 was not needed, and believing it was cost a whole mechanism.** The base constrains its
+      fixture to `NorthwindQueryRelationalFixture`, which declares
+      `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore;`. The
+      inference — constraint therefore forces the cast, therefore the client must be relational —
+      is simply wrong. **A property is evaluated when something reads it, and no test in this base
+      reads it.** Measured both ways and byte-identical: 30 tests, 24 green, 6 red, with the
+      relational shell and without it.
+
+      **The rule that generalises: a type constraint names what a fixture must BE, not what a test
+      will TOUCH.** R77 was built, measured, committed, parked and reverted on the strength of the
+      opposite assumption, and one filtered run against the plain client store would have settled
+      it at any point. The cost was not the mechanism, which broke nothing — it was that the
+      question was never asked.
+
+      **What R77 did leave behind is real and is already banked in R78.** Adopting this base put
+      the words `EF.Functions` into the suite for the first time, its reds turned out to be one
+      allowlist gap, and six *existing* reds elsewhere were failing for that same gap with nobody
+      connecting them. **A gap with no test naming it is a gap nobody is looking at** — that is the
+      finding, and it belongs to the base, not to the mechanism.
+
+      **The 6 reds, four of which are one shape.** `Least_with_parameter_array_is_not_supported` and
+      `Greatest_with_parameter_array_is_not_supported` (sync + async) assert a translation failure
+      and get a differently worded one, because the refusal happens on the *server* and arrives
+      wrapped — A63's shape, now recorded for the third and fourth time after R70 and R75.
+      `Collate_case_sensitive_constant` (sync + async) is **genuine and not yet triaged**: the other
+      three `Collate_*` tests pass, so it is one expression shape rather than the feature.
+
+      No golden strings: EF's own `NorthwindDbFunctionsQuerySqliteTest` overrides most of these to
+      assert SQL and adds `Glob`; that is the provider's dialect, and this client emits none.
+      `test/` only, so `eng/measure.sh` and not the trim ratchet.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
