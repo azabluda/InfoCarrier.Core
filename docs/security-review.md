@@ -196,6 +196,37 @@ The library cannot do it: the timeout belongs to the call the *caller* wrote, an
 static overload the caller named into a different one server-side would be this provider silently
 changing the semantics of a query — the class of thing ADR-006 exists to prevent.
 
+## 4b. Amendment — the relational operation hosts admitted (R78), and why the conjunction survives
+
+`TypeAllowlist` admitted `EF`, `DbFunctions` and the *core* `DbFunctionsExtensions`, but not the two
+classes that actually declare the markers a caller writes:
+`Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions` (`EF.Functions.Collate`, `Least`,
+`Greatest`) and `Microsoft.EntityFrameworkCore.EFExtensions` (`EF.Constant`, `EF.Parameter`,
+`EF.MultipleParameters`). Both live in `EFCore.Relational`, which `InfoCarrier.Core` does not
+reference (M9), so neither can be written as `typeof`. They are matched by **full name and assembly
+name** instead, the same by-name route `ServerBoundaryAnalyzer` takes for
+`FromSqlQueryRootExpression`.
+
+**Why the refusal was wrong.** The server is an ordinary relational provider and translates all six
+markers. Refusing them at the client boundary made this provider disagree with every reference
+implementation, which is precisely the reasoning that admitted `Regex` in §4a — and it cost six reds
+in `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` before anyone noticed, because this
+repository had no `EF.Functions` coverage at all.
+
+**Why §2's conjunction survives.** That bound is over the reflection *invocation* surface —
+`Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`, `Activator`, `Assembly`,
+`AppDomain`. Neither class is on it, derives from anything on it, or constructs anything on it.
+Their parameters are `DbFunctions`, scalars, `string` and arrays. The generic markers
+(`EF.Constant<T>` and friends) are bounded **by §2's own mechanism rather than by luck**:
+`ResolveMethod` resolves every parameter type through this same allowlist, so a `T` bound to an
+unadmitted type fails the signature lookup before the method is found — exactly how `Binder` blocks
+`Type.InvokeMember`. Naming a host permits the type to be *named*; a method still has to resolve by
+signature.
+
+**What is accepted.** Nothing new. These are query-shaping markers with no side effect on the
+server beyond the SQL they contribute, and unlike raw SQL they cannot reach a table the model does
+not map — the distinction R75 turned on.
+
 ## 5. Not in scope, and stated so
 
 - **Authentication and authorization.** No identity travels in `InfoCarrierEnvelope`. A deployment

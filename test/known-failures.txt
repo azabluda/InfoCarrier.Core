@@ -1989,5 +1989,29 @@
 # not survive. That turned the search into an experiment -- delete exactly that file and compare
 # the signature. Full account in docs/plans/v10/findings.md.
 
-failed=198
+# 2026-09-01 (R78) -- 198 -> 192, `total` unchanged at 29183. `TypeAllowlist` admitted `EF`,
+# `DbFunctions` and the CORE `DbFunctionsExtensions`, but not the two classes that actually declare
+# the markers a caller writes: `RelationalDbFunctionsExtensions` (`EF.Functions.Collate`, `Least`,
+# `Greatest`) and `EFExtensions` (`EF.Constant`, `EF.Parameter`, `EF.MultipleParameters`). Both live
+# in `EFCore.Relational`, which the product does not reference (M9), so neither could be written as
+# `typeof`; they are matched by full name AND assembly name, the by-name route
+# `ServerBoundaryAnalyzer` already takes for `FromSqlQueryRootExpression`.
+#
+# The server is an ordinary relational provider and translates all six markers. Refusing them at the
+# client boundary made this provider disagree with every reference implementation -- the reasoning
+# that admitted `Regex` in M9 J20. FIXED exactly 6, all in
+# `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest`; BROKEN none; the reasons diff moves one
+# family from 44 to 38 and nothing else.
+#
+# `security-review.md` §4b records why §2's conjunction survives: neither class is on the reflection
+# invocation surface, and the generic markers are bounded by §2's OWN mechanism, since
+# `ResolveMethod` resolves parameter types through this same allowlist.
+#
+# HOW IT WAS FOUND, because the route matters: adopting
+# `NorthwindDbFunctionsQueryRelationalTestBase` (parked with R77 on
+# `park/r77-relational-client-store`) gave this repository its first `EF.Functions` coverage and its
+# 20 reds were all one mechanism. The six fixed here were already failing for that mechanism and
+# nobody had connected them, because no test named `EF.Functions` existed.
+
+failed=192
 total=29183

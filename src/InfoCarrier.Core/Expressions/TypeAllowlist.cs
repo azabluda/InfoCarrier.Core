@@ -83,6 +83,42 @@ public sealed class TypeAllowlist
         typeof(System.Text.RegularExpressions.Regex),
     ];
 
+    // Operation hosts that live in `EFCore.Relational`, which this assembly does not reference
+    // (M9), so they cannot be named with `typeof`. Matched by full name AND assembly instead --
+    // the same by-name route `ServerBoundaryAnalyzer` takes for `FromSqlQueryRootExpression`.
+    //
+    //   RelationalDbFunctionsExtensions -> EF.Functions.Collate / Least / Greatest
+    //   EFExtensions                    -> EF.Constant / EF.Parameter / EF.MultipleParameters
+    //
+    // WHY THEY WERE MISSING, and it was not deliberate. `EF` and `DbFunctions` are both admitted
+    // above, and so is the *core* `DbFunctionsExtensions` -- but the markers a caller actually
+    // writes are declared on these two relational classes, so every `EF.Functions.Collate` and
+    // every `EF.MultipleParameters` was refused at the client boundary and raised EF's own
+    // `TranslationFailed`. The server could translate all of them: it is an ordinary relational
+    // provider. This is the shape M9 J20 reversed for `Regex` -- a refusal that made this provider
+    // disagree with every reference implementation -- and it cost six reds in
+    // `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` alone.
+    //
+    // WHY THIS DOES NOT BREAK `security-review.md` §2's CONJUNCTION. That bound is over the
+    // reflection *invocation* surface -- `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+    // `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. Neither class is on it, neither
+    // derives from anything on it, and neither constructs anything on it. Their parameters are
+    // `DbFunctions`, scalars, `string` and arrays. The generic ones (`EF.Constant<T>` and
+    // friends) are bounded by §2's own mechanism rather than by luck: `ResolveMethod` resolves
+    // every parameter type through this same allowlist, so a `T` bound to an unadmitted type
+    // fails the signature lookup before the method is found. Naming a host permits the type to be
+    // named; a method still has to resolve by signature.
+    private static readonly HashSet<string> RelationalOperationHostNames =
+    [
+        "Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions",
+        "Microsoft.EntityFrameworkCore.EFExtensions",
+    ];
+
+    private static bool IsRelationalOperationHost(Type type)
+        => type.FullName is { } name
+            && RelationalOperationHostNames.Contains(name)
+            && type.Assembly.GetName().Name == "Microsoft.EntityFrameworkCore.Relational";
+
     private static readonly HashSet<Type> BuiltInGenericDefinitions =
     [
         typeof(ParameterBox<>),
@@ -441,7 +477,8 @@ public sealed class TypeAllowlist
             return true;
         }
 
-        if (BuiltInTypes.Contains(type) || BuiltInOperationHosts.Contains(type) || _allowed.Contains(type))
+        if (BuiltInTypes.Contains(type) || BuiltInOperationHosts.Contains(type)
+            || IsRelationalOperationHost(type) || _allowed.Contains(type))
         {
             return true;
         }

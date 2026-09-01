@@ -2292,6 +2292,46 @@ re-parents of families already running, because R25–R30 showed that is where t
       in [`findings.md`](findings.md); `CLAUDE.md`'s "no known intermittent" paragraph is updated
       rather than restored.
 
+- [x] **R78. `EF.Functions` and the `EF.Constant`/`Parameter`/`MultipleParameters` markers cross the
+      wire — `TypeAllowlist` was missing the classes that declare them.** `failed` **198 -> 192**,
+      `total` unchanged at 29183. FIXED 6, BROKEN none. `src/` change, so **both** gates:
+      `eng/trim-ratchet.sh` holds at `ours 89 <= 89` and the Release build reports the documented
+      `5 Warning(s), 0 Error(s)`.
+
+      **The defect.** The allowlist admitted `EF`, `DbFunctions` and the *core*
+      `DbFunctionsExtensions` — but the markers a caller actually writes are declared on
+      `RelationalDbFunctionsExtensions` (`Collate`, `Least`, `Greatest`) and `EFExtensions`
+      (`EF.Constant`, `EF.Parameter`, `EF.MultipleParameters`). Neither was admitted, so every one
+      was refused at the client boundary by `QuerySplitter.RejectClientEvaluation` — **while the
+      server, an ordinary relational provider, could translate all six.** That is the shape M9 J20
+      reversed for `Regex`: a refusal that made this provider disagree with every reference
+      implementation.
+
+      **Why they could not simply be added.** Both live in `EFCore.Relational`, which
+      `InfoCarrier.Core` does not reference (M9), so neither can be written as `typeof`. They are
+      matched by **full name and assembly name** instead — the by-name route
+      `ServerBoundaryAnalyzer` already takes for `FromSqlQueryRootExpression`, and the assembly
+      check makes it tighter than a name alone.
+
+      **`security-review.md` §4b** records why §2's conjunction survives: neither class is on the
+      reflection *invocation* surface (`Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+      `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`), and the generic markers are bounded
+      **by §2's own mechanism rather than by luck** — `ResolveMethod` resolves every parameter type
+      through this same allowlist, so a `T` bound to an unadmitted type fails the signature lookup
+      before the method is found. Naming a host permits the type to be *named*; a method still has
+      to resolve by signature.
+
+      **How it was found, because the route is the lesson.** Nothing named `EF.Functions` existed in
+      this suite, so a whole family of refusals was invisible. Adopting
+      `NorthwindDbFunctionsQueryRelationalTestBase` gave the first such coverage and its reds were
+      all one mechanism; the six fixed here were already failing for that same mechanism in
+      `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` and nobody had connected them.
+      **A gap with no test naming it is a gap nobody is looking at.**
+
+      That base is parked with R77 on `park/r77-relational-client-store` and is **not** part of this
+      step: it needs a relational client test store to be adoptable at all, and that mechanism has
+      to earn its place on its own evidence. This step depends on none of it.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
