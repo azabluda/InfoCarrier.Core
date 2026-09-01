@@ -49,6 +49,39 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         SQLite answers with <c>near "(": syntax error</c>; a schema is not something a
 ///         connection-scoped function can carry.
 ///     </para>
+///     <para>
+///         <b>All 55 remaining reds, classified — 2026-09-02, out of
+///         <c>artifacts/measure/r89b.log</c>.</b> 50 pass, 1 is skipped by EF itself. <b>Not one
+///         is a wrong answer.</b>
+///     </para>
+///     <list type="table">
+///         <item><description><b>29 — EF's own <c>TranslationFailed</c>.</b> The safe answer, and the one every other provider gives. Two families: a <em>queryable</em> function (<c>QF_*</c>, the table-valued ones) and a scalar function mapped as an <em>instance</em> method, whose call carries the client's own <c>DbContext</c> (R89).</description></item>
+///         <item><description><b>10 — the client evaluated the mapped function</b> inside an anonymous-type projection, reaching EF's stub body. See below; this is the one family that is not simply "the store cannot".</description></item>
+///         <item><description><b>6 — a <c>QF_*</c> message assertion</b>: the right refusal, different words.</description></item>
+///         <item><description><b>4 — "no part of the query can be executed on the server"</b>, all <c>QF_*</c>. A refusal too, spelled in this provider's words rather than EF's.</description></item>
+///         <item><description><b>2 — the store's:</b> <c>no such table: GetTopTwoSellingProducts</c>.</description></item>
+///         <item><description><b>2 — the store's:</b> the schema-qualified <c>IdentityString</c> above.</description></item>
+///         <item><description>1 client-side navigation read, 1 differing exception.</description></item>
+///     </list>
+///     <para>
+///         <b>The <c>QF_*</c> family is not a lever and that was measured, not assumed.</b> Every
+///         one of them is a <em>table-valued</em> function, and SQLite has none — there is no
+///         <c>Microsoft.Data.Sqlite</c> registration for one, as there is for a scalar. Moving the
+///         boundary so these ship would only move the failure: the two that already reach the store
+///         are the proof, and they say <c>no such table</c>. Nothing here is this provider's to fix
+///         and nothing here is work.
+///     </para>
+///     <para>
+///         <b>The 10 are a real semantic gap, and a small one.</b> A mapped function in a
+///         <em>final projection</em> is answered by the client's own method rather than by the
+///         store, because the projection split reassembles client-typed projections here — and a
+///         final projection is exactly where EF permits client evaluation, so this provider is
+///         inside EF's contract rather than outside it. What differs is <em>whose</em>
+///         implementation runs, which matters only for a function whose CLR body and store
+///         definition disagree. In this base every stub throws, so the gap surfaces as
+///         <c>NotImplementedException</c> and never as a wrong value. Closing it would mean
+///         hoisting a mapped call out of the residual and into the server's tuple; not priced.
+///     </para>
 /// </remarks>
 public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunctionInfoCarrierFixture fixture)
     : UdfDbFunctionTestBase<UdfDbFunctionInfoCarrierTest.UdfDbFunctionInfoCarrierFixture>(fixture)

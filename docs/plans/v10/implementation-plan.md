@@ -2773,6 +2773,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       type on the allowlist, which is the condition — and the method throws, so a regression arrives
       named in the assertion message rather than as a green count.
 
+- [x] **R90. `UdfDbFunctionInfoCarrierTest`'s 55 remaining reds, every one classified.** Comments
+      only — the class's own XML doc. No gate runs; nothing executable changed.
+
+      The class began this session at **81 red of 106** and stands at **55**, with 50 passing and
+      one skipped by EF itself. **Not one is a wrong answer.** The classification is read out of
+      `artifacts/measure/r89b.log`, not carried over: 29 are EF's own `TranslationFailed`, 10 are a
+      mapped function evaluated by the client inside an anonymous-type projection, 6 are a `QF_*`
+      message assertion, 4 are this provider's own refusal wording, 4 are the store's, and 2 are
+      one-offs.
+
+      **The `QF_*` family is not a lever, and that is measured rather than assumed.** Every one is a
+      *table-valued* function; SQLite has none, and `Microsoft.Data.Sqlite` offers no registration
+      for one the way it does for a scalar (which is what R86 used). Moving the boundary so they
+      ship would only move the failure — **the two that already reach the store are the proof, and
+      they say `no such table`.** Nothing in that family is this provider's and nothing in it is
+      work.
+
+      **The 10 are a real semantic gap and a small one.** A mapped function in a *final projection*
+      is answered by the client's own method rather than the store's, because the projection split
+      reassembles client-typed projections here — and a final projection is exactly where EF permits
+      client evaluation, so this is inside EF's contract, not outside it. What differs is *whose*
+      implementation runs, which matters only where a function's CLR body and its store definition
+      disagree. Every stub in this base throws, so it surfaces as `NotImplementedException` and
+      never as a wrong value. Closing it means hoisting a mapped call out of the residual into the
+      server's tuple; **not priced, and not started.**
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
