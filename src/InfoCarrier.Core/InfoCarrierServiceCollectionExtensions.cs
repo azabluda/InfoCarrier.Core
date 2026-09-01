@@ -100,6 +100,50 @@ public static class InfoCarrierServiceCollectionExtensions
     }
 
     /// <summary>
+    ///     Permits a wire payload to name these CLR types on <em>this server</em>, beyond the ones
+    ///     its model implies (ADR-008 constraint 2).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The server half of the seam whose client half is
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" />. <b>Register the same
+    ///         types on both.</b> The usual reason to need it is the <c>EF.Functions</c> host of
+    ///         this server's own provider, such as <c>SqliteDbFunctionsExtensions</c> or
+    ///         <c>SqlServerDbFunctionsExtensions</c>, which a server can name with <c>typeof</c>
+    ///         because it references the provider and <c>InfoCarrier.Core</c> cannot.
+    ///     </para>
+    ///     <para>
+    ///         <b>This is a security decision and is deliberately explicit.</b> Nothing here is
+    ///         inferred. <c>docs/security-review.md</c> section 2 records that the deserializer's
+    ///         safety is a conjunction, broken by admitting any of <c>Binder</c>,
+    ///         <c>MethodBase</c>, <c>MethodInfo</c>, <c>ConstructorInfo</c>, <c>PropertyInfo</c>,
+    ///         <c>Activator</c>, <c>Assembly</c> or <c>AppDomain</c>, none of which looks dangerous
+    ///         alone. Read it before adding a type.
+    ///     </para>
+    ///     <para>
+    ///         Each call adds one registration and the server reads them all, so several calls
+    ///         compose and none replaces another.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <param name="types">The types to admit.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierAllowedTypes(this IServiceCollection services, params Type[] types)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(types);
+
+        services.AddSingleton<Expressions.IInfoCarrierAllowedTypes>(new AllowedTypes(types));
+
+        return services;
+    }
+
+    private sealed class AllowedTypes(IEnumerable<Type> types) : Expressions.IInfoCarrierAllowedTypes
+    {
+        public IEnumerable<Type> Types { get; } = [.. types];
+    }
+
+    /// <summary>
     ///     Registers the value mappers this provider ships for BCL types the wire cannot walk
     ///     (ADR-012, amended 2026-08-11).
     /// </summary>

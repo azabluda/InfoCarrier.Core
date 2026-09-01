@@ -2580,6 +2580,47 @@ re-parents of families already running, because R25–R30 showed that is where t
       have passed.**
 
 
+- [x] **R85. A caller could not use their own store's `EF.Functions`. The fix is a registration the
+      application makes on both sides, not a list inside this package.**
+      `failed` unchanged at 185, `total` 29220 -> 29223 — three new `SqliteSmokeTest` cases, all
+      three green. FIXED none, BROKEN none, REASONS unchanged. `src/` changed, so both gates:
+      `eng/trim-ratchet.sh` holds at `ours 89 <= 89` and a **clean** Release build reports the
+      documented `5 Warning(s), 0 Error(s)`.
+
+      **The gap, measured rather than reasoned about.** `EF.Functions.Like` works everywhere because
+      it is declared on EF Core's *core* `DbFunctionsExtensions`. `Glob` is declared on
+      `SqliteDbFunctionsExtensions`, `DateDiffDay` on `SqlServerDbFunctionsExtensions`, and
+      `InfoCarrier.Core` references no provider, so it can name neither. A probe run against the
+      SQLite tier was refused by `QuerySplitter.RejectClientEvaluation` while the server translated
+      the identical call to `GLOB`. **One green `Like` test is what hid this**, which is R78's lesson
+      again: a gap with no test naming it is a gap nobody is looking at.
+
+      **Why not a list of names in this package.** It cannot enumerate providers it does not
+      reference, so it would be wrong for every third-party store; and a *pattern* — "any class
+      called `*DbFunctionsExtensions`" — cannot be reviewed at all, because `security-review.md`
+      §2's argument is a per-class conjunction and a pattern admits classes nobody has seen.
+
+      **The shape, and the two halves do different jobs.** `UseInfoCarrier(client, o =>
+      o.AllowTypes(…))` on the client; `services.AddInfoCarrierAllowedTypes(…)` on the server. The
+      client's list decides what this application's own code may **send** and is not a security
+      boundary. The server's decides what a **payload** may name and is. §2 already ended with the
+      sentence this implements — *"only ever by an application registering one explicitly, which is
+      its own decision"* — and it had no API behind it until now. §4c records the reading.
+
+      **EF's nested-options-builder idiom**, not a `params Type[]` overload of `UseInfoCarrier`:
+      `InfoCarrierDbContextOptionsBuilder` is the shape every EF provider uses
+      (`UseSqlite(conn, o => o.CommandTimeout(30))`), so the next option needs no new overload.
+      `WithAllowedTypes` is **additive rather than replacing**, unlike every other `With…` on an EF
+      options extension, because it names a set and a caller configuring options in two places would
+      otherwise silently lose the first list.
+
+      **Three tests, and the third is the one that earns the two registrations.** The call is refused
+      with nothing registered; it works with both halves; and **registering on the client alone still
+      fails on the server**, with the deserializer's own rejection message. Without that third case
+      the two registrations read as duplication. It is ADR-012's value-mapper rule restated for
+      types: admitted on one side only is worse than admitted on neither.
+
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

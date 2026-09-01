@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -18,7 +19,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 /// </remarks>
 public class SqliteSmokeTest
 {
-    private static SqliteInfoCarrierBackendTestStore CreateStore()
+    private static SqliteInfoCarrierBackendTestStore CreateStore(
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -29,10 +31,93 @@ public class SqliteSmokeTest
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
+                OnAddServices = onAddServices,
             });
 
-    private static SqliteSmokeContext CreateClient(SqliteInfoCarrierBackendTestStore store)
-        => new(new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options);
+    private static SqliteSmokeContext CreateClient(
+        SqliteInfoCarrierBackendTestStore store,
+        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptions = null)
+        => new(new DbContextOptionsBuilder<SqliteSmokeContext>()
+            .UseInfoCarrier(store, infoCarrierOptions)
+            .Options);
+
+    private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
+    {
+        SqliteInfoCarrierBackendTestStore store = CreateStore(onAddServices);
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" });
+                await context.SaveChangesAsync();
+            });
+
+        return store;
+    }
+
+    // R85. The two halves of the allowed-types seam, and the closed default that makes it a seam
+    // rather than a hole.
+    //
+    // `EF.Functions.Glob` is SQLite's, declared on `SqliteDbFunctionsExtensions` in the provider
+    // assembly. `InfoCarrier.Core` references no provider and cannot name it, so before this the
+    // call was refused at the client boundary while the server -- an ordinary SQLite provider --
+    // translated it to `GLOB` without difficulty. `EF.Functions.Like` hid the gap for a whole
+    // milestone, because `Like` is declared on EF's CORE `DbFunctionsExtensions` and always worked.
+    //
+    // The same story is every store's: `DateDiffDay` and `FreeText` are SQL Server's, and a
+    // third-party provider has its own. The answer is not a list in this package -- it cannot
+    // enumerate providers it does not reference -- but a registration the application makes, on
+    // both sides, exactly as ADR-012 requires of a value mapper.
+    [ConditionalFact]
+    public async Task A_provider_specific_EF_Functions_call_is_refused_when_nothing_is_registered()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        // EF's own `TranslationFailed`, raised by `QuerySplitter.RejectClientEvaluation`. The
+        // closed default of ADR-008 constraint 2: a type the model does not imply is not named.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+
+        Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
+    }
+
+    [ConditionalFact]
+    public async Task A_provider_specific_EF_Functions_call_crosses_once_both_sides_admit_its_host()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
+
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => o.AllowTypes(typeof(SqliteDbFunctionsExtensions)));
+
+        // Two of the three titles do not start with "al"; the answer proves the server ran GLOB
+        // rather than the client running something equivalent, because the client cannot run it
+        // at all -- `SqliteDbFunctionsExtensions.Glob` throws when invoked.
+        Assert.Equal(1, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+        Assert.Equal(2, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "*a*")));
+    }
+
+    [ConditionalFact]
+    public async Task Registering_the_host_on_the_client_alone_still_fails_on_the_server()
+    {
+        // ADR-012's rule restated for types, and the reason the server half is a separate call:
+        // a type admitted on one side only is worse than one admitted on neither. The client now
+        // ships the query and the SERVER refuses to read it, which is the half that is a security
+        // boundary. Without this test the two registrations look like duplication.
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => o.AllowTypes(typeof(SqliteDbFunctionsExtensions)));
+
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+
+        Assert.Contains("deserialization allowlist", refused.Message, StringComparison.Ordinal);
+    }
 
     [ConditionalFact]
     public async Task Client_query_round_trips_through_a_relational_server()

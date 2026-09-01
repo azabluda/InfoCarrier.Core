@@ -2137,5 +2137,24 @@
 # connection interceptor on the harness server; that was priced at "two store-side reds" when the
 # client refused everything, and it is now worth about fourteen. Re-price it before dismissing it.
 
+# 2026-09-01 (R85) -- `failed` unchanged at 185, `total` 29220 -> 29223. The three are new
+# `SqliteSmokeTest` cases and all three are green. FIXED none, BROKEN none, REASONS unchanged.
+#
+# A CALLER COULD NOT USE THEIR OWN STORE `EF.Functions`. `Like` works because it is declared on EF
+# CORE `DbFunctionsExtensions`; `Glob` is SQLite, `DateDiffDay` is SQL Server, and this package
+# references no provider so it can name neither. Measured with a probe: `Glob` was refused by
+# `QuerySplitter.RejectClientEvaluation` while the server translated the same call to GLOB.
+#
+# THE FIX IS A REGISTRATION, NOT A LIST. A list of provider names inside this package cannot
+# enumerate providers it does not reference, and a pattern cannot be reviewed, because
+# `security-review.md` section 2 argues per class. The application registers instead, on both sides:
+# `UseInfoCarrier(client, o => o.AllowTypes(...))` on the client and `AddInfoCarrierAllowedTypes` on
+# the server. Only the server half is a security boundary; the client half decides what the
+# application own code may send. Section 4c records the whole reading.
+#
+# THREE TESTS, AND THE THIRD IS THE ONE THAT MATTERS. Refused with nothing registered; works with
+# both halves; and registering on the CLIENT ALONE still fails on the server. Without the third the
+# two registrations look like duplication.
+
 failed=185
-total=29220
+total=29223

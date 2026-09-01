@@ -227,6 +227,50 @@ signature.
 server beyond the SQL they contribute, and unlike raw SQL they cannot reach a table the model does
 not map — the distinction R75 turned on.
 
+## 4c. Amendment — the application may register types explicitly (R85), and why that is the safe shape
+
+Reviewed **2026-09-01**. §2 ends with a sentence that had no API behind it until now:
+
+> *Never admitted by inference — only ever by an application registering one explicitly, which is
+> its own decision.*
+
+**What forced the question.** A caller cannot use their own store's `EF.Functions`. `Like` works
+because it is declared on EF Core's **core** `DbFunctionsExtensions`; `Glob` is
+`SqliteDbFunctionsExtensions`, `DateDiffDay` is `SqlServerDbFunctionsExtensions`, and
+`InfoCarrier.Core` references no provider, so it can name neither. Measured, not assumed: a `Glob`
+probe was refused by `QuerySplitter.RejectClientEvaluation` while the server translated the same
+call to `GLOB` without difficulty. **A list of provider names inside this package was rejected as
+the fix** — it cannot enumerate providers it does not reference, and a *pattern* (*"any class named
+`*DbFunctionsExtensions`"*) cannot be reviewed, because §2's argument is a per-class conjunction and
+a pattern admits classes nobody has seen.
+
+**The shape, and it is two halves that do different jobs.**
+
+| Half | API | What it decides | Security boundary? |
+|---|---|---|---|
+| client | `UseInfoCarrier(client, o => o.AllowTypes(…))` | what this application's own code may **send** | **no** |
+| server | `services.AddInfoCarrierAllowedTypes(…)` | what a **payload** may name | **yes** |
+
+Only the second one is this document's subject. The client's list governs code the application
+already controls; widening it can produce a query the server refuses, never a payload the server
+accepts. **The server's list is the one to review**, and it is the one `TypeNodeResolver` reads.
+
+**Why this does not weaken §2.** It cannot be reached by inference — there is no rule that guesses,
+and every entry is a line an application wrote. The conjunction is unchanged and is still broken by
+admitting any of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`,
+`Activator`, `Assembly` or `AppDomain`; that hazard now has a place to be stated, and both API
+members state it. **This is strictly better than the alternative that was actually in front of us**,
+which was to widen the *static* list inside this package on behalf of every deployment at once.
+
+**`SqliteDbFunctionsExtensions` itself clears §2's bar**, for the record and as the worked example:
+a static class on no reflection surface, deriving from nothing on it, constructing nothing, whose
+parameters are `DbFunctions`, `string` and `byte[]`. That is R78's reading applied to a third class.
+
+**Pinned by three tests in `SqliteSmokeTest`**, not by this prose: the call is refused with nothing
+registered, it works with both halves registered, and — the one that makes the two registrations
+look like something other than duplication — **registering on the client alone still fails on the
+server**, with this document's own rejection message.
+
 ## 5. Not in scope, and stated so
 
 - **Authentication and authorization.** No identity travels in `InfoCarrierEnvelope`. A deployment
