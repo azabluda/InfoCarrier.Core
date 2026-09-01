@@ -2519,6 +2519,67 @@ re-parents of families already running, because R25–R30 showed that is where t
       fails.**
 
 
+- [x] **R84. `HasDbFunction` works. It was never unsupported — two boundaries refused it, and they
+      pulled in opposite directions.**
+      `failed` **unchanged at 185**, `total` 29218 -> 29220 (two new pin tests). **FIXED 12,
+      BROKEN 12.** This is precisely the case `eng/measure.sh` exists for and the count cannot see,
+      so the verdict below is read out of the reasons diff. `src/` changed, so both gates:
+      `eng/trim-ratchet.sh` holds at `ours 89 <= 89`, and `CI=true dotnet build --configuration
+      Release` reports the documented `5 Warning(s), 0 Error(s)` — **from a clean sample build**,
+      because a second Release build in one session reports `0 Warning(s)` by incremental skip.
+
+      **The two boundaries.** `TypeAllowlist` would not let a mapped function be *named*: the class
+      declaring it is a `DbContext` subclass or a static helper, never an entity type, so
+      `QuerySplitter` raised EF's `TranslationFailed`. And EF's parameter extraction *evaluated* the
+      call whenever its arguments were all constants, which runs a body that exists only to throw.
+      Fixing one without the other only moves a test from the first failure to the second.
+      `Metadata.ModelDbFunctions` reads the model's own `Relational:DbFunctions` annotation by
+      string (M9 J5's route), `TypeAllowlist.ForModel` admits each declaring type, and
+      `InfoCarrierEvaluatableExpressionFilter` ports the `model.FindDbFunction` clause **R80
+      deliberately left out on the belief that it could never fire**. It fires for 22 tests.
+
+      **Model-derived, so `security-review.md` §2's conjunction is untouched.** Nothing static is
+      widened. The methods come from the application's own `OnModelCreating`, exactly as the entity
+      and property types the allowlist already admits do, and §2a's C53 argument applies word for
+      word — including its guard, so a declaring type on the reflection invocation surface is
+      refused rather than trusted.
+
+      **The 12 fixed are the functions that need no store function**: six `BoolSwitch` and `Cases`
+      tests in `NullSemanticsQueryInfoCarrierTest`, six in `UdfDbFunctionInfoCarrierTest`, every one
+      mapped with `HasTranslation` so the server builds SQL from the tree and asks the store for
+      nothing.
+
+      **The 12 broken are all `Scalar_Nested_Function_*_Instance` and all say "No exception was
+      thrown".** The base asserts that a relational provider must *refuse* a query mixing client and
+      server calls; this provider answers it, because the projection split reassembles on the
+      client. That is `website/docs/limitations.md`'s "queries this provider answers where other
+      providers refuse", the same family as the 32 TPC/TPT GearsOfWar reds. **Not one is a wrong
+      answer** — the assertion is over the exception, not over a value.
+
+      **The rest of that class converged with the reference provider, which is why a flat count is
+      progress.** Its reds used to read *"the client refuses"* (38) and *"the client evaluated it"*
+      (22). They now read `SQLite Error 1: no such function: CustomerOrderCount` and eight siblings.
+      The query reaches SQL, and SQLite has no `CREATE FUNCTION`. CLAUDE.md names exactly this as
+      convergence rather than regression.
+
+      **What this suite structurally cannot show, and it is the point of the change.** On a store
+      that *has* the function — SQL Server, which EF ships the only provider class for — a mapped
+      function now reaches the store and works, where before it could not leave the client. ADR-009
+      Tier B is SQLite and M7's SQL Server tier is dropped, so no test here can demonstrate it.
+      **`Microsoft.Data.Sqlite` can register a function per connection**, which needs a connection
+      interceptor on the harness server. R74 priced that at "two store-side reds and none of the
+      other 73" and declined it; after this step it is worth about **fourteen**, and the pricing
+      should be redone rather than inherited.
+
+      **How the reader was found wrong, and the pin test is what found it.** The first
+      implementation read a public `MethodInfo` property off the concrete class. A finalized model
+      holds `RuntimeDbFunction`, which implements `IReadOnlyDbFunction.MethodInfo` **explicitly**,
+      so the lookup answered "this model maps no functions" — on every model this provider ever
+      sees. `DocumentMappingPinTest` caught it because it compares against EF's own
+      `GetDbFunctions()` rather than asserting a count. **A pin test that asserted a number would
+      have passed.**
+
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

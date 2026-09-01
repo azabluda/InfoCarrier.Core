@@ -36,12 +36,15 @@ namespace InfoCarrier.Core;
 ///         serialized, and this filter is what leaves a call there to serialize.
 ///     </para>
 ///     <para>
-///         <b>EF's other clause is deliberately not ported.</b> <c>RelationalEvaluatableExpressionFilter</c>
-///         also refuses to evaluate anything <c>model.FindDbFunction</c> answers for — user
-///         functions declared with <c>HasDbFunction</c>. That is a relational model extension, and
-///         this provider does not support <c>HasDbFunction</c> at all
-///         (<c>UdfDbFunctionInfoCarrierTest</c>, one mechanism, still red). Porting it would add a
-///         clause that can never fire.
+///         <b>EF's other clause is ported too (R84), and R80's reason for leaving it out was
+///         wrong.</b> <c>RelationalEvaluatableExpressionFilter</c> also refuses to evaluate
+///         anything <c>model.FindDbFunction</c> answers for — a user function declared with
+///         <c>HasDbFunction</c>. R80 skipped it on the belief that this provider does not support
+///         <c>HasDbFunction</c> at all, so the clause could never fire. It fires for <b>22</b>
+///         tests in <c>UdfDbFunctionInfoCarrierTest</c> alone: a mapped function whose arguments
+///         are all constants is an evaluatable subtree, EF runs it, and the body of a mapped
+///         function is a <c>throw</c>. <see cref="Metadata.ModelDbFunctions" /> answers the
+///         question without a reference to <c>EFCore.Relational</c>.
 ///     </para>
 /// </remarks>
 /// <param name="dependencies">The dependencies to use.</param>
@@ -64,7 +67,8 @@ public class InfoCarrierEvaluatableExpressionFilter(EvaluatableExpressionFilterD
         ArgumentNullException.ThrowIfNull(expression);
 
         if (expression is MethodCallExpression methodCall
-            && IsRelationalDbFunctionsExtensions(methodCall.Method.DeclaringType))
+            && (IsRelationalDbFunctionsExtensions(methodCall.Method.DeclaringType)
+                || Metadata.ModelDbFunctions.ForModel(model).Contains(methodCall.Method)))
         {
             return false;
         }

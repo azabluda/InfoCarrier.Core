@@ -2102,5 +2102,40 @@
 # `RelationalTestStore` and then calls `SqlQueryRaw`. R77 WOULD REMOVE THE CAST AND NOT THE RED,
 # because the call behind it still needs raw SQL on a client that has no database. R77 stays parked.
 
+# 2026-09-01 (R84) -- `failed` UNCHANGED at 185, `total` 29218 -> 29220 (two new pin tests).
+# FIXED 12, BROKEN 12. THIS IS THE CASE THE COUNT CANNOT SEE, so read the reasons.
+#
+# `HasDbFunction` IS NOT UNSUPPORTED. R74 recorded "this provider does not support HasDbFunction"
+# and that named a symptom. Two things refused a mapped function and they pulled in opposite
+# directions. `TypeAllowlist` would not let the call be NAMED, because the class declaring it is a
+# `DbContext` subclass or a static helper rather than an entity type. And EF parameter extraction
+# EVALUATED the call whenever its arguments were all constants, which runs a body that is a `throw`.
+# `ModelDbFunctions` reads the model own `Relational:DbFunctions` annotation by string, the
+# allowlist admits each declaring type, and the filter ports EF `model.FindDbFunction` clause that
+# R80 left out.
+#
+# THE 12 FIXED ARE THE FUNCTIONS THAT NEED NO STORE FUNCTION. Six `BoolSwitch`/`Cases` tests in
+# `NullSemanticsQueryInfoCarrierTest`, and six in `UdfDbFunctionInfoCarrierTest` -- every one mapped
+# with `HasTranslation`, so the server builds SQL from the tree and asks the store for nothing.
+#
+# THE 12 BROKEN ARE ALL `Scalar_Nested_Function_*_Instance` AND ALL SAY "No exception was thrown".
+# The base asserts that a relational provider must REFUSE a query mixing client and server calls.
+# This provider answers it, because the projection split reassembles on the client. That is the
+# "queries this provider answers where other providers refuse" family in
+# `website/docs/limitations.md`, the same family as the 32 TPC/TPT GearsOfWar reds. NOT ONE IS A
+# WRONG ANSWER: the assertion is over the exception, not over a value.
+#
+# THE REST OF THAT CLASS CONVERGED WITH THE REFERENCE PROVIDER, WHICH IS WHY A FLAT COUNT IS
+# PROGRESS. Its reds used to say "the client refuses" (38) and "the client evaluated it" (22). They
+# now say SQLite Error 1: no such function: CustomerOrderCount, and eight siblings. The query
+# reaches SQL, and SQLite has no `CREATE FUNCTION`. CLAUDE.md calls exactly this convergence.
+#
+# WHAT THE SUITE STRUCTURALLY CANNOT SHOW. On a store that HAS the function -- SQL Server, which EF
+# ships the only provider class for -- a mapped function now works where before it could never
+# reach the store. ADR-009 Tier B is SQLite and M7 SQL Server tier is dropped, so no test here can
+# demonstrate it. `Microsoft.Data.Sqlite` can register a function per CONNECTION, which would need a
+# connection interceptor on the harness server; that was priced at "two store-side reds" when the
+# client refused everything, and it is now worth about fourteen. Re-price it before dismissing it.
+
 failed=185
-total=29218
+total=29220

@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -212,6 +213,30 @@ public sealed class TypeAllowlist
                         AddDeclaredType(member.ClrType, allowed);
                     }
                 }
+            }
+        }
+
+        // The classes declaring the model's own `HasDbFunction` methods (R84).
+        //
+        // A user-defined function is an ordinary method on a class the model names, and that class
+        // is almost never an entity type -- it is a `DbContext` subclass or a static helper. So
+        // every mapped function was refused at the client boundary and `QuerySplitter` raised EF's
+        // `TranslationFailed`, while the server -- an ordinary relational provider with the same
+        // model -- translated it without difficulty. 81 red tests, and R74 recorded the symptom as
+        // "this provider does not support `HasDbFunction`".
+        //
+        // WHY THIS IS NOT A WIDENING `security-review.md` §2 HAS TO RE-EXAMINE. It is model-derived,
+        // like every entity type and property type above: the application named these methods in
+        // its own `OnModelCreating`, and a payload that names one reaches a method the model maps
+        // and nothing else. §2a's argument for C53 applies word for word, and the same guard is
+        // applied for the same reason -- a declaring type on the reflection invocation surface is
+        // refused rather than trusted, so the conjunction does not depend on nobody ever mapping
+        // a function onto one.
+        foreach (MethodInfo function in Metadata.ModelDbFunctions.ForModel(model))
+        {
+            if (function.DeclaringType is { } declaring && !IsReflectionInvocationSurface(declaring))
+            {
+                allowed.Add(declaring);
             }
         }
 
