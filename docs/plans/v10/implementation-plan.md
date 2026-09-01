@@ -2663,6 +2663,37 @@ re-parents of families already running, because R25–R30 showed that is where t
       schema-qualified call and SQLite answers `near "(": syntax error` — a schema is not
       something a connection-scoped function can carry.
 
+- [x] **R87. What the client loses by not being relational, listed once instead of a defect at a
+      time.** Documents only — `docs/architecture.md` **§6a D7**. No gate runs; nothing executable
+      changed.
+
+      **Three defects in one session were one shape**, and none was found by looking: R80
+      (`EF.Functions.Collate` over a constant, executed on the client), R84 (a `HasDbFunction` call
+      over constant arguments, the same), and the `FromSql` query filter that still fails while the
+      **client's** model is built. EF registers a different set of services and conventions when a
+      provider is relational; this client gets the core set; the difference had never been written
+      down.
+
+      **The cut is ADR-006 and it does most of the work.** `EntityFrameworkRelationalServicesBuilder
+      .TryAddCoreServices` makes **61** `TryAdd` calls; **50** of them are downstream of
+      `IDatabase.CompileQuery` and belong to the server's provider — not missing here, not wanted.
+      D7 names the eleven that are not, with a verdict on each, and four of the eleven are verdicts
+      of *"nothing to lose"* reached by reading EF's class rather than by guessing from its name
+      (`RelationalModelCustomizer` is an empty subclass; the two execution-strategy factories return
+      the same strategy).
+
+      **The live defect the audit names is `QueryFilterRewritingConvention`**, which is the one of
+      `RelationalConventionSetBuilder`'s four replacements this client does not make. R88 fixes it.
+      Three more rows are **open and unverified** and no failure is attributed to any of them:
+      `IStructuralTypeMaterializerSource` (JSON-mapped complex types), `IAdHocMapper` (bound up with
+      #60), `TableSharingConcurrencyTokenConvention` (a shadow property that would change what
+      `SaveChanges` sends) and `RelationalDbFunctionAttributeConvention` (a function declared by
+      **attribute** is not in this client's model at all, which R84's reader cannot see).
+
+      **The rule that transfers:** a relational service is not automatically a store service, and
+      the class name does not say which it is. The question is whether it runs before
+      `IDatabase.CompileQuery`.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

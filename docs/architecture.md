@@ -618,6 +618,84 @@ application's configuration; this asks it about the provider's own.
 `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`. B12's own symptom was
 **wrong data with no exception**, so a green build is not evidence here — the measurement is.
 
+### D7 — the client gets EF's core services, and nobody had listed what the relational set adds
+
+**Raised 2026-09-01, after three defects turned out to be one shape.** `EF.Functions.Collate` over a
+constant was executed on the client instead of translated (R80); a `HasDbFunction` call whose
+arguments were all constants was evaluated the same way (R84); and a `FromSql` query filter still
+fails while the **client's** model is built (open, below). All three are one sentence: **EF
+registers a different set of services and conventions when a provider is relational, this client
+gets the core set, and the difference had never been written down.** Each was found by a failing
+test, which is the expensive way to find any of them.
+
+**The inventory.** `EntityFrameworkRelationalServicesBuilder.TryAddCoreServices` makes **61**
+`TryAdd` calls and registers **36** dependency objects.
+`RelationalConventionSetBuilder.CreateConventionSet` **adds 20** conventions and **replaces 4**.
+
+**The cut that makes the list short, and it is ADR-006.** This client captures the raw expression
+tree at `IDatabase.CompileQuery` and never compiles past it. Everything EF registers in order to
+turn a query tree into SQL, batch a `SaveChanges`, open a connection, run a migration or read a
+`DbDataReader` is **downstream of the capture point and belongs to the server's provider** — not
+missing here, not wanted here. That is **50 of the 61** in one stroke: the SQL generator and the
+whole translating-visitor stack, the update pipeline and its row-value factories, migrations, the
+connection and its transaction factory, the command and connection loggers, the three
+`IInterceptorAggregator`s, and the liftable-constant machinery. Two of them the client already
+replaces with services that **throw** and say why (`InfoCarrierQueryPipelineFactories`), and four
+more it replaces with its own (`IDatabase`, `IDatabaseCreator`, `IDbContextTransactionManager`,
+and `IQueryContextFactory` below).
+
+**The eleven that run before the capture point, or outside a query altogether.** These are the
+client's own business, and this is the list that did not exist.
+
+| EF's relational service | What the relational one adds | Standing here |
+|---|---|---|
+| `IEvaluatableExpressionFilter` | Two clauses: `EF.Functions` hosts, and `model.FindDbFunction` | **Was the gap.** `InfoCarrierEvaluatableExpressionFilter` ports both (R80, R84). |
+| `IModelCustomizer` | Nothing — `RelationalModelCustomizer` is an empty subclass | Nothing to lose. Verified by reading it. |
+| `IExecutionStrategyFactory` | Nothing by default — both return `NonRetryingExecutionStrategy`; the relational one only adds the hook for `RelationalOptionsExtension.ExecutionStrategyFactory` | Nothing to lose; the client has no relational options. Verified by reading both. |
+| `ICompiledQueryCacheKeyGenerator` | `UseRelationalNulls`, `QuerySplittingBehavior` and a buffering flag, all read off `RelationalOptionsExtension` | **Cannot apply**, and R82's rule says why: those three are the *server's* configuration. |
+| `ITypeMappingSource` | The store's type mappings | Deliberate. `InfoCarrierTypeMappingSource` answers from the CLR type alone, which is CLAUDE.md's "computed twice by two providers" rule. |
+| `IValueGeneratorSelector` | Store-generated key defaults | Deliberate; `InfoCarrierValueGeneratorSelector`, found neutral by D3's audit. |
+| `IQueryContextFactory` | The connection on the query context | Deliberate; `InfoCarrierQueryContextFactory`. |
+| `IModelValidator` | Store-mapping validation — shared tables, column clashes, TPT | Not wanted. The client replaces core's for the opposite reason: to *relax* a rule (a hierarchy needs no discriminator here). |
+| `IModelRuntimeInitializer` | Builds the relational model — tables, columns, foreign keys | Not wanted; store layout, and the server builds its own. |
+| `IStructuralTypeMaterializerSource` | One override: `ReadComplexTypeDirectly` is false for a JSON-mapped complex type, so the shaper handles it rather than the materializer | **Open, unverified.** It is D3's question again — *is this mapped to a document?* — and `IInfoCarrierDocumentMapping` is the seam that would answer it. No failure is attributed to it today. |
+| `IAdHocMapper` | Builds an entity type for a CLR type a query names and the model does not map | **Open, unverified**, and bound up with `FromSql` (#60), which is out of scope without the owner. |
+
+**The conventions, which are where the live defect is.** Of the 18 `RelationalConventionSetBuilder`
+*adds*, fifteen decide **store layout** — table and column names and comments, check constraints,
+sequences, stored procedures, table sharing and splitting, property overrides, discriminator
+length, the JSON property-name attributes. None of them can change what this client puts on the
+wire, because the wire carries an expression tree and a change-tracking graph, not a table. Three
+are worth naming:
+
+| Convention | Reading |
+|---|---|
+| `RelationalMapToJsonConvention` | Sets the container annotation `AnnotationDocumentMapping` reads. The client does not run it, and D3's pins are green — `JsonQuery` 393/0, `JsonOwnedCollectionUpdate` 5/5 — because a caller's own `ToJson()` sets the annotation directly. The *implicit* cases are what the convention adds, and none is covered. |
+| `TableSharingConcurrencyTokenConvention` | Adds a **shadow concurrency-token property** where two entity types share a table. That changes the property set, and the property set is what `SaveChanges` sends. **Open, unverified**; no failure names it. |
+| `RelationalDbFunctionAttributeConvention` | Puts a `[DbFunction]`-attributed method into the model. R84's `ModelDbFunctions` reads the model's own `Relational:DbFunctions` annotation, so on this client a function declared by **attribute** rather than by `HasDbFunction` is not in the model at all. **Open, unverified.** |
+
+Of the 4 *replacements*: `KeyDiscoveryConvention` and `ValueGenerationConvention` the client already
+makes (`InfoCarrierKeyDiscoveryConvention`, `InfoCarrierValueGenerationConvention`), and
+`EntityTypeHierarchyMappingConvention` — an addition rather than a replacement — is mirrored by
+`InfoCarrierHierarchyMappingConvention`. `RuntimeModelConvention` is **open and unverified**; it is
+the compiled model, and `Scaffolding.CompiledModel` is green. The fourth is the defect:
+
+**`QueryFilterRewritingConvention` is not replaced, and three tests fail because of it.**
+`RelationalQueryFilterRewritingConvention` teaches the rewriter that a `FromSql*` call is a query
+root and turns it into a `FromSqlQueryRootExpression`. The core one does not know `FromSql`, so it
+rewrites the inner `Set<T>()` into an `IQueryable` and leaves it where a `DbSet<T>` parameter is
+expected: *"Expression of type `IQueryable<Dictionary<string, object>>` cannot be used for parameter
+of type `DbSet<Dictionary<string, object>>` of method `FromSqlRaw`"*, raised **while the client's
+model is built, before any query runs**. Three of `SharedTypeQueryInfoCarrierTest`'s four reds are
+this.
+
+**The pattern all three defects share, and it is the part that transfers.** Every one is a service
+EF replaces *for a reason that has nothing to do with SQL* — the filter protects a call from being
+evaluated, the convention teaches a rewriter about a method — and this client needs the same
+behaviour for the same reason while wanting none of the SQL. **A relational service is not
+automatically a store service**, and reading the class name is not how to tell them apart: the
+question is whether it runs before `IDatabase.CompileQuery`.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
