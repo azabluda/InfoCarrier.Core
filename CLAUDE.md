@@ -364,10 +364,14 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**There is no known intermittent.** The last one closed in C38: `ServerSaveChangesExecutor` rethrows
-an identity conflict with the whole request appended, which turned a one-run-in-four failure into
-two dumps that arrived already diagnosed. Both accounts are in
-[`docs/plans/v10/findings.md`](docs/plans/v10/findings.md).
+**There is no known intermittent.** Two have been closed, and they were closed by opposite routes.
+C38's was **instrumented into the open**: `ServerSaveChangesExecutor` rethrows an identity conflict
+with the whole request appended, which turned a one-run-in-four failure into two dumps that arrived
+already diagnosed. R76's **never reproduced under instrumentation at all** — five clean full runs —
+and was closed by *reproducing its signature* instead: delete the shared `.db` in the window between
+the two classes that share it and the same 18 failures come back to the reason. Its rule is worth
+carrying: **a guard that records that work *started* is not evidence its result still exists.** Both
+accounts are in [`docs/plans/v10/findings.md`](docs/plans/v10/findings.md).
 
 **The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
