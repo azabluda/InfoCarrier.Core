@@ -2833,6 +2833,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       **Still open in D7:** `IStructuralTypeMaterializerSource`, `IAdHocMapper` and
       `RuntimeModelConvention`. None has a failure attributed to it and none was probed here.
 
+- [x] **R92. `NorthwindBulkUpdates` priced, and #60 scoped rather than started.** Documents only —
+      `architecture.md` §6a **D8**. No gate runs; nothing executable changed.
+
+      **`NorthwindBulkUpdates`' 6 reds: none is cheap and none is clearly this provider's.** Four
+      are `Update_FromSql_*` / `Delete_FromSql_*` — #60, and blocked twice over, since they also
+      carry R77's `InvalidCastException`. The other two are
+      `Update_with_invalid_lambda_in_set_property_throws`, and they are **the right refusal with the
+      wrong message**: the base asserts `CoreStrings.NonQueryTranslationFailedWithDetails` whose
+      details clause is `RelationalStrings.InvalidPropertyInSetProperty(…)` — **a localized
+      relational resource this package cannot name**, because it does not reference
+      `EFCore.Relational` (D3). Reading it by string, as `AnnotationDocumentMapping` reads an
+      annotation, is a much worse trade for a user-facing message than for a metadata key. **Priced
+      and not taken.**
+
+      **#60 priced: 21 of the 157 failures and 6 of the 10 missing bases**, counted out of
+      `artifacts/measure/r91.log`. The standing note that *seven* of ten wait on it is wrong; it is
+      six, and the other four are unrelated.
+
+      **The finding that decides the sequencing is not a count.** `FromSql` would be the first
+      construct where the client hands the server **a string to execute**, and every argument in
+      `security-review.md` is about what a payload may *name* — a payload that names nothing
+      dangerous can still carry `DROP TABLE`. That is a change of posture rather than an extension
+      of the allowlist, and §2's per-class conjunction cannot be stretched over it. **D8 recommends
+      the security section first and on its own**, before either piece of code; the shape of both
+      code pieces is already known and neither is the hard part.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

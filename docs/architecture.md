@@ -725,6 +725,46 @@ behaviour for the same reason while wanting none of the SQL. **A relational serv
 automatically a store service**, and reading the class name is not how to tell them apart: the
 question is whether it runs before `IDatabase.CompileQuery`.
 
+### D8 — `FromSql` (#60) is a milestone with a security precondition, priced 2026-09-02
+
+**Raised by R92, which priced it rather than starting it.** The owner cleared #60 for work; this
+entry is what that work would be, so the decision to start it is taken against a number rather than
+an impression.
+
+**What it is worth, counted out of `artifacts/measure/r91.log` rather than estimated.**
+
+| | |
+|---|---|
+| **21 of the 157** current failures name `FromSql`, `SqlQuery` or an ad-hoc raw query | 14 `JsonQuerySqlite`, 4 `NorthwindBulkUpdates`, 2 `TPHInheritanceQuery`, 1 `SharedTypeQuery` |
+| **6 of the 10** unimplemented spec bases are raw-SQL bases | `FromSqlQueryTestBase`, `FromSqlSprocQueryTestBase`, `GearsOfWarFromSqlQueryTestBase`, `NorthwindSqlQueryTestBase`, `SqlQueryTestBase`, `SqlExecutorTestBase` |
+
+The other four missing bases are unrelated: `JsonUpdateTestBase` (ADR-013 — the client is never
+relational), `StoredProcedureUpdateTestBase`, `StoreValueGenerationTestBase`,
+`AdHocQuerySplittingQueryTestBase`. **An earlier note said seven of ten wait on #60; the count is
+six.**
+
+**Three pieces of work, and the third is not code.**
+
+1. **A wire node for `FromSqlQueryRootExpression`.** `ServerBoundaryAnalyzer.IsSerializableKind`
+   refuses it today *by exact type match*, with a comment recording what happened when it did not:
+   a `FromSqlRaw` with a `WHERE` came back as the whole table, silently. The type lives in
+   `Microsoft.EntityFrameworkCore.Relational`, which this package deliberately does not reference
+   (D3, M9 J5) — so the node has to carry `Sql` + `Argument` and be rebuilt on the server, the way
+   `QueryRootStubNode` is rebuilt against the server's model.
+2. **`SqlQuery<T>` and `Database.ExecuteSql` are separate entry points**, not query roots, and
+   `SqlExecutorTestBase` does not go through the query pipeline at all.
+3. **A `security-review.md` section, before either.** Every argument in that document is about what
+   a payload may *name* — ADR-008's allowlist, the per-class conjunction of §2. **Raw SQL is a
+   different axis: a payload that names nothing dangerous can still carry `DROP TABLE`.** Today the
+   server executes only trees it rebuilt from a vocabulary it controls, and `FromSql` would be the
+   first construct where the client hands the server a string to run. That is a change of posture,
+   not an extension of the allowlist, and §2 cannot be stretched to cover it.
+
+**Recommendation: item 3 first, and on its own.** The two code pieces are ordinary work whose shape
+is already known; the security section decides whether they should exist, and in what form — an
+opt-in server registration in the shape of R85's `AddInfoCarrierAllowedTypes` is the obvious
+candidate, but that is the owner's call and a review's, not a step's.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
