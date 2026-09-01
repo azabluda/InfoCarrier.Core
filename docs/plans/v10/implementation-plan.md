@@ -1946,7 +1946,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       | `Query.ToSqlQueryTestBase` | 2/0/0/2 | +2 | **+2** | 0 | none |
       | `Query.AdHocMiscellaneousQueryRelationalTestBase` | 65/6/1/72 | +13 | **+7** | 6 | cache-entry and dbcontext-leak asserts |
       | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | 44/7/1/52 | +26 | **+20** | 6 (+1 override) | `ParameterTranslationMode` not honoured |
-      | `Query.UdfDbFunctionTestBase` | 25/80/1/106 | +106 | **+25** | 80 | SQLite has no `CREATE FUNCTION` |
+      | `Query.UdfDbFunctionTestBase` | 25/80/1/106 | +106 | **+25** | 80 | ~~SQLite has no `CREATE FUNCTION`~~ **wrong; R73 measured only 2 of 80 as the store** |
       | `Query.SharedTypeQueryRelationalTestBase` | 2/4/0/6 | +4 | 0 | 4 | `SqlQueryRaw` plus the cast |
       | `Query.GearsOfWarFromSqlQueryTestBase` | 0/1/0/1 | +1 | 0 | 1 | the cast (**one** test, not two) |
       | `Query.NorthwindSqlQueryTestBase` | 0/8/0/8 | +8 | 0 | 8 | `Database.SqlQuery*` relational-only |
@@ -1981,7 +1981,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       | `Query.ToSqlQueryTestBase` | *"blocked twice over"* - client `ToSqlQuery` **and** a non-virtual `UseTransaction` | **2 tests, both green.** Neither blocker fires |
       | `Query.AdHocMiscellaneousQueryRelationalTestBase` | *"#60, abstract `SetParameterizedCollectionMode`"* | a **no-op** implementation is enough; 7 new green |
       | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | same member, same verdict | same; **20 new green**, and the re-parent deletes the hand-mirrored `Array_of_byte` |
-      | `Query.UdfDbFunctionTestBase` | *"`HasDbFunction` ... refused before the wire"* | the model builds; **25 green**. The 80 reds are SQLite's missing functions |
+      | `Query.UdfDbFunctionTestBase` | *"`HasDbFunction` ... refused before the wire"* | the model builds; **25 green**. ~~The 80 reds are SQLite's missing functions~~ — **R62 was RIGHT and this cell was wrong.** R73 read the reasons instead of the base's name: 56 of 80 are exactly that refusal, 11 are wrong answers, 2 are the store |
       | `Query.GearsOfWarFromSqlQueryTestBase` | *"2 tests"* | **1** - a `ConditionalFact`, not a theory |
       | `Update.JsonUpdateTestBase` | *"136 tests"* | **142**, one cause, and the cause is the `UseTransaction` R62 named |
 
@@ -2048,6 +2048,76 @@ re-parents of families already running, because R25–R30 showed that is where t
       `src/` changed, so **both** gates: `CI=true dotnet build --configuration Release` reports
       `0 Error(s), 5 Warning(s)` (the documented five), and `eng/trim-ratchet.sh` holds.
       Measured `r72-mappingquery` against `r70-jsonquery`: **FIXED 1, BROKEN none**, one reason moved (41 -> 40 "No exception was thrown"). The one fixed test is `CustomConvertersInfoCarrierTest.Collection_enum_as_string_Contains`, which asserts the refusal this provider now raises; its sibling `Value_conversion_on_enum_collection_contains` had been **passing for the same wrong reason** and takes EF's own SQLite override, recorded in `test/known-failures.txt` and in the class itself.
+
+- [x] **R73. Five of R71's six adoptable bases TAKEN, on the owner's instruction — +37 green for
+      +8 red, and every red was named before the run.** `failed` 117 -> 125, `total`
+      29032 -> 29077. The compliance gate's missing list falls **18 -> 13**.
+
+      | Base | Was | Now | New | Green | Red |
+      |---|---|---|---|---|---|
+      | `ConcurrencyDetectorEnabledRelationalTestBase` | Tier A, core base, 16 | 18/0/0/18 | +2 | +2 | 0 |
+      | `ConcurrencyDetectorDisabledRelationalTestBase` | Tier A, core base, 16 | 18/0/0/18 | +2 | +2 | 0 |
+      | `Query.ToSqlQueryTestBase` | not adopted | 2/0/0/2 | +2 | +2 | 0 |
+      | `Query.AdHocMiscellaneousQueryRelationalTestBase` | Tier A, core base, 59 | 69/2/1/72 | +13 | +11 | 2 |
+      | `Query.NonSharedPrimitiveCollectionsQueryRelationalTestBase` | Tier B, core base, 26 | 44/6/2/52 | +26 | +20 | 6 |
+
+      **Three of the five are tier MOVES, not additions** — a base belongs to exactly one tier, so
+      each class was re-parented onto the relational base rather than run alongside the core one.
+      `NonSharedPrimitiveCollections` was already Tier B and is a pure re-parent.
+
+      **R1 pays out again.** The re-parent deletes `NonSharedPrimitiveCollections`'
+      hand-mirrored `Array_of_byte` override, which existed only because this project did not
+      reference the relational base that declares it. EF's own skip of `Array_of_TimeOnly` stays:
+      that one is the store's statement, not the base's.
+
+      **The trap on the `AdHocMiscellaneous` move, and it would have read as a regression.** Four
+      of the six reds R71 measured are on the **core** base and pass today at Tier A —
+      `Explicitly_compiled_query_does_not_add_cache_entry`, `Inlined_dbcontext_is_not_leaking`,
+      `Variable_from_closure_is_parametrized` and
+      `Relational_command_cache_creates_new_entry_when_parameter_nullability_changes`. The Tier A
+      class carried EF's own `AdHocMiscellaneousQueryInMemoryTest` overrides for all four, and
+      **those overrides had to move with it**: they assert the size of EF's relational command
+      cache, and it is the *client's* cache they read. This client is not a relational provider on
+      **either** tier, so the reason is untouched by the backing store; EF's SQLite class omits
+      them only because a real relational client has that cache. Carrying them turns R71's
+      "+7 green / 6 red" into the true **+11 green / 2 red**.
+
+      **The eight reds, both families pre-classified.** Two are R71's `FromSqlRaw` defect
+      (`Multiple_different_entity_type_from_different_namespaces`, whose `FromSqlRaw` is discarded
+      so the exception it exists to provoke never arrives) — left red on purpose as the cheapest
+      standing witness to that defect in the suite. Six are **#60's fourth shape**, a relational
+      option on the *client's* `DbContextOptionsBuilder`: `SetParameterizedCollectionMode` is a
+      no-op here, so `ParameterTranslationMode` is never applied. The query is right; the knob to
+      request it is missing.
+
+      **R62's blocker on both `SetParameterizedCollectionMode` bases does not exist.** A no-op
+      implementation is enough, because only tests that ask for a *non-default* mode consult it —
+      none in `AdHocMiscellaneous`, six in `NonSharedPrimitiveCollections`. R51 read the member and
+      called both bases blocked; R71 ran them.
+
+      **`ToSqlQuery` was priced as blocked twice over and is blocked by neither.** `ToSqlQuery` is
+      model *metadata* — the client records it, the server builds the same model and turns it into
+      SQL — so nothing relational need exist on the client. And no test in the base routes through
+      its non-virtual `UseTransaction`, which is exactly the distinction ADR-013's 2026-08-30
+      amendment draws.
+
+      **EF's SQLite overrides not taken, in every case for the same reason**: `ToSqlQuerySqliteTest`'s
+      `AssertSql` and `Check_all_tests_overridden`, and `AdHocMiscellaneousQuerySqliteTest`'s
+      `Average_with_cast` and `Check_inlined_constants_redacting`. The first two pin generated SQL,
+      which a client emitting none cannot observe (R54); the last two **passed unmodified when
+      measured**, and an override adopted ahead of a measurement is a workaround for a limitation
+      this arrangement may not have.
+
+      `test/` only, so `eng/measure.sh` alone. Measured `r73-five-bases` against
+      `r72-mappingquery`: FIXED none, BROKEN exactly the eight named above.
+
+      **`Query.UdfDbFunctionTestBase` is the sixth and is NOT here.** R71 classified its 80 reds as
+      SQLite's missing functions; **that was wrong, and reading the reasons rather than the base's
+      name is what showed it.** Only **2 of 80** are the store. 56 are this provider refusing or
+      trying to *evaluate* a `HasDbFunction` call before the wire, and **11 run and get it wrong**
+      — 6 wrong answers and 5 empty results where rows are expected. That is a second
+      silent-wrong-answer family after R71's `FromSqlRaw`, and the owner's instruction is to
+      diagnose those 11 before the base is adopted (R74).
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

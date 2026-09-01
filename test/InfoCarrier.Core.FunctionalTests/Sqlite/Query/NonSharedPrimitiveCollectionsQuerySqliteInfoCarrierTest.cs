@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +24,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///     </para>
 /// </remarks>
 public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
-    : NonSharedPrimitiveCollectionsQueryTestBase(fixture)
+    : NonSharedPrimitiveCollectionsQueryRelationalTestBase(fixture)
 {
     private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
 
@@ -32,19 +32,19 @@ public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFi
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
 
-    /// <summary>
-    ///     EF's own, from <c>NonSharedPrimitiveCollectionsQueryRelationalTestBase</c>, which this
-    ///     project does not reference and so must mirror by hand.
-    /// </summary>
+    /// <inheritdoc />
     /// <remarks>
-    ///     EF's reason, verbatim: "On relational databases, <c>byte[]</c> gets mapped to a special
-    ///     binary data type, which isn't queryable as a regular primitive collection." The backing
-    ///     store is relational, so the limit is the store's — and it is stated on the relational
-    ///     base rather than in SQLite's own suite, which is why reading only the latter left this
-    ///     classified as a failure of this provider.
+    ///     A no-op. EF's SQLite writes
+    ///     <c>new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(...)</c>, a
+    ///     relational option on the <em>client's</em> builder that this provider does not have.
+    ///     The six <c>*_with_default_mode_EF_MultipleParameters</c> tests that ask for a
+    ///     non-default mode are red because of it, and they are #60's fourth shape rather than a
+    ///     translation gap: the query is right and the knob to request it is missing.
     /// </remarks>
-    public override Task Array_of_byte()
-        => AssertTranslationFailed(() => TestArray((byte)1, (byte)2));
+    protected override DbContextOptionsBuilder SetParameterizedCollectionMode(
+        DbContextOptionsBuilder optionsBuilder,
+        ParameterTranslationMode parameterizedCollectionMode)
+        => optionsBuilder;
 
     /// <summary>
     ///     EF's own skip, adopted verbatim (C94). <c>NonSharedPrimitiveCollectionsQuerySqliteTest</c>

@@ -1897,5 +1897,29 @@
 # test, so EF's override is adopted and the test is green. Measured `r72-mappingquery` against
 # `r70-jsonquery`: FIXED 1, BROKEN none, one reason moved (41 -> 40 "No exception was thrown").
 
-failed=117
-total=29032
+# 2026-09-01 (R73) -- 117 -> 125, `total` 29032 -> 29077. A DELIBERATE RISE, on the owner's
+# instruction, adopting five bases R71 measured and R62 had priced as blocked. +45 tests, +37
+# green, +8 red, and every one of the eight was named before the run:
+#
+#   2  AdHocMiscellaneousQuerySqliteInfoCarrierTest.Multiple_different_entity_type_from_different
+#      _namespaces -- R71's `FromSqlRaw` defect. The query root is DISCARDED rather than run or
+#      refused, so the exception the test exists to provoke never arrives. The cheapest standing
+#      witness to that defect anywhere in the suite, and it is left red on purpose.
+#   6  NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest.Parameter_collection_{Contains,
+#      Count_with_column_predicate}_with_default_mode_EF_MultipleParameters -- #60's FOURTH shape,
+#      a relational option on the CLIENT's `DbContextOptionsBuilder`. EF's SQLite writes
+#      `new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(...)`; this provider
+#      has no such option, so `SetParameterizedCollectionMode` is a no-op and the mode is never
+#      applied. The query is right; the knob to request it is missing.
+#
+# THE FOUR `Task.CompletedTask` OVERRIDES ON `AdHocMiscellaneous` MOVED TIER WITH THE CLASS, and
+# dropping them would have turned four passing tests red and looked like a regression of the move.
+# They are EF's own InMemory class's, for tests asserting the size of EF's relational command cache
+# -- and it is the CLIENT's cache they read. This client is not relational on either tier, so the
+# reason is untouched by the backing store. EF's SQLite class does not carry them because a real
+# relational client has that cache.
+#
+# Measured `r73-five-bases` against `r72-mappingquery`: FIXED none, BROKEN exactly those eight.
+
+failed=125
+total=29077
