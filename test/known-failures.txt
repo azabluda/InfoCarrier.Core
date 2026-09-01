@@ -2032,5 +2032,28 @@
 # something READS it, and no test here reads it. Measured both ways, byte-identical: 24 green,
 # 6 red. A TYPE CONSTRAINT NAMES WHAT A FIXTURE MUST BE, NOT WHAT A TEST WILL TOUCH.
 
-failed=198
-total=29213
+# 2026-09-01 (R80) -- 198 -> 192, `total` 29213 -> 29214. FIXED 6, BROKEN none. The +1 total is one
+# new pin test, not a test that moved.
+#
+# `NorthwindDbFunctionsQueryInfoCarrierTest` IS NOW 30 OF 30, and R79's six reds were ONE mechanism
+# rather than the two families they were read as. The client had no relational
+# `IEvaluatableExpressionFilter`, because M9 removed the reference to `EFCore.Relational` and EF then
+# registers the plain core filter -- which knows the CORE `DbFunctionsExtensions` and not the
+# relational host that declares `Collate`, `Least` and `Greatest`. EF's parameter extraction
+# therefore EVALUATED those calls on the client, and their bodies exist only to throw.
+#
+# THE TRIAGE THAT WAS HANDED OVER SPLIT THEM 2 + 4 AND BOTH HALVES WERE THE SAME DEFECT.
+# `Collate_case_sensitive_constant` was called "genuine, one expression shape"; the four
+# `Least`/`Greatest_with_parameter_array_is_not_supported` were filed under A63, "the refusal
+# happens on the server and arrives wrapped". Neither reading was right. In both the call was
+# evaluated on the CLIENT and never reached the wire, and the tell was the same in both: the
+# operand is a constant or a captured array, so the whole call is evaluatable, where the passing
+# siblings all take a column. A63 was assumed rather than read out of the message.
+#
+# `InfoCarrierEvaluatableExpressionFilter` ports the one clause of
+# `RelationalEvaluatableExpressionFilter` that applies, naming the host by string as M9 J5 decided
+# and pinning it in `DocumentMappingPinTest`. It is the other half of R78: the allowlist lets the
+# call be serialized, and the filter is what leaves a call there to serialize.
+
+failed=192
+total=29214

@@ -36,6 +36,11 @@ public static class InfoCarrierServiceCollectionExtensions
             .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
             .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
 
+            // `EF.Functions.Collate` and friends must survive parameter extraction rather than be
+            // evaluated on the client, and EF's core filter does not know the relational host that
+            // declares them -- see `InfoCarrierEvaluatableExpressionFilter`.
+            .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
+
             // The client's model has to agree with the backing store's, and one key shape is
             // decided by the caller's own `ToJson()` rather than by the store — see
             // `InfoCarrierKeyDiscoveryConvention`.

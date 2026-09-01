@@ -85,6 +85,17 @@ public class DocumentMappingPinTest
             InfoCarrierHierarchyMappingConvention.TpcMappingStrategy);
     }
 
+    // `InfoCarrierEvaluatableExpressionFilter`'s one, and it is a TYPE name rather than an
+    // annotation name -- but it is named by string for exactly the same reason and fails the same
+    // silent way. A rename would stop the filter matching, `EF.Functions.Collate` over a constant
+    // operand would go back to being evaluated on the client, and the only symptom is EF's own
+    // "switched to client-evaluation" from a query that used to work.
+    [ConditionalFact]
+    public void The_relational_DbFunctions_host_name_is_still_EFs()
+        => Assert.Equal(
+            InfoCarrierEvaluatableExpressionFilter.RelationalDbFunctionsExtensionsName,
+            typeof(RelationalDbFunctionsExtensions).FullName);
+
     [ConditionalFact]
     public void The_walk_agrees_with_EF_for_every_type_including_nested_ones()
     {

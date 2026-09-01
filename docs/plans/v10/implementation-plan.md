@@ -2370,6 +2370,65 @@ re-parents of families already running, because R25–R30 showed that is where t
       assert SQL and adds `Glob`; that is the provider's dialect, and this client emits none.
       `test/` only, so `eng/measure.sh` and not the trim ratchet.
 
+- [x] **R80. The client had no relational `IEvaluatableExpressionFilter`, so `EF.Functions.Collate`
+      over a constant was executed instead of translated — and R79's six reds were ONE mechanism,
+      not the two families they were triaged as.**
+      `failed` 198 -> 192, `total` 29213 -> 29214, FIXED 6, BROKEN none. The +1 total is the new pin
+      test. **`NorthwindDbFunctionsQueryInfoCarrierTest` is now 30 of 30.**
+
+      **The defect.** EF's parameter extraction evaluates every maximal subtree that does not touch
+      the query root, and `RelationalDbFunctionsExtensions.Collate` — like every `EF.Functions`
+      marker — has a body that exists only to throw. Relational providers are protected by
+      `RelationalEvaluatableExpressionFilter`, which refuses to evaluate anything that class
+      declares. **This client is not a relational provider**: M9 removed the reference to
+      `Microsoft.EntityFrameworkCore.Relational`, so EF registers the plain core
+      `EvaluatableExpressionFilter`, which knows the *core* `DbFunctionsExtensions` and nothing
+      about the relational host. `InfoCarrierEvaluatableExpressionFilter` ports the one clause that
+      applies, naming the type by string as M9 J5 decided and pinning it in `DocumentMappingPinTest`
+      beside the annotation names. EF's other clause — `model.FindDbFunction` — is deliberately not
+      ported: it is a relational model extension for `HasDbFunction`, which this provider does not
+      support at all, so the clause could never fire.
+
+      **This is the other half of R78, and neither half works alone.** The allowlist lets the call
+      be *serialized*; the filter is what leaves a call there to serialize. R78 landed first and
+      fixed six reds elsewhere, which is why the remaining six looked like a separate problem.
+
+      **BOTH HANDED-OVER TRIAGES WERE WRONG, AND THEY WERE WRONG THE SAME WAY.**
+      `Collate_case_sensitive_constant` was called "genuine and not yet triaged — one expression
+      shape rather than the feature", which was right about the symptom and wrong about the cause.
+      The four `Least_with_parameter_array_is_not_supported` /
+      `Greatest_with_parameter_array_is_not_supported` were filed under **A63** — "the refusal
+      happens on the server and arrives wrapped" — and that was never read out of the message.
+      The log said `String: "An exception was thrown while attempting "···`, which is EF's
+      *client-evaluation* wrapper: the call never reached the wire, so there was no server refusal
+      to be wrapped. **A63 was assumed from the shape of the assertion, not from the string the
+      assertion printed.**
+
+      **The rule that generalises, and it is the cheap half of an existing one.** CLAUDE.md already
+      says a classification is not evidence and age is not evidence. R80 adds the narrower case:
+      **when a family is filed under a known class, check that the recorded symptom is the observed
+      one.** Six reds sat in two buckets for a day because nobody compared "arrives wrapped from the
+      server" against a message that names client evaluation in its first eight words. The
+      distinguishing tell was in the *passing* siblings all along — every green `Collate_*`,
+      `Least` and `Greatest` takes a **column**, and all six reds take a constant or a captured
+      array, which is exactly what makes a subtree evaluatable.
+
+      `src/` changed, so both gates: `eng/trim-ratchet.sh` holds at `ours 89 <= 89` (`total` 855),
+      and `CI=true dotnet build --configuration Release` reports the documented
+      `5 Warning(s), 0 Error(s)`. Both halves of the baseline moved together.
+
+      **Triage banked on the way past, at the cost of one tally: `TPCGearsOfWarQueryInfoCarrierTest`
+      and `TPTGearsOfWarQueryInfoCarrierTest`'s 36 reds are not 36 things and were not untriaged.**
+      They are **nine test names, each in both classes, sync and async**. 32 fail with
+      `Assert.Throws() Failure: No exception was thrown` from `AssertTranslationFailed` — the base
+      asserts a relational translator must refuse a correlated collection with `Distinct`, and this
+      provider answers it, which is `website/docs/limitations.md`'s "queries this provider answers
+      where other providers refuse". The other 4 are C64's
+      `Correlated_collection_with_distinct_3_levels`, whose assertion no correct answer can satisfy.
+      **Both classes' own doc comments already said exactly this**; the tally only confirmed it.
+      **Nothing here is a defect and nothing here is work.**
+
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
