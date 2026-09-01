@@ -73,6 +73,19 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
         => optionsBuilder;
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     <b>EF issue #23981 is about entity types in different namespaces; the
+    ///     <c>FromSqlRaw</c> is only how the base reaches them.</b> This provider refuses
+    ///     <c>FromSql</c> (R75), so the scenario cannot be reached here at all, and the refusal is
+    ///     what is pinned. Until R75 this failed with a <c>NullReferenceException</c> out of this
+    ///     provider's own materializer — the discarded query root surfacing three layers from its
+    ///     cause, which is why it read as an unrelated defect.
+    /// </remarks>
+    public override Task Multiple_different_entity_type_from_different_namespaces(bool async)
+        => FromSqlAssertions.NotSupportedAsync(
+            () => base.Multiple_different_entity_type_from_different_namespaces(async));
+
+    /// <inheritdoc />
     /// <remarks>EF's own <c>AdHocMiscellaneousQuerySqliteTest</c>'s, verbatim.</remarks>
     protected override Task Seed2951(Context2951 context)
         => context.Database.ExecuteSqlRawAsync(

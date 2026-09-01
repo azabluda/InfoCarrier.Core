@@ -52,7 +52,19 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     internal static bool IsSerializableKind(Expression node)
         => node switch
         {
-            Microsoft.EntityFrameworkCore.Query.QueryRootExpression => true,
+            // The EXACT type, not the base. A query root carrying state beyond its entity type is
+            // a subclass, and `QueryRootStubNode` has no field for that state — so matching the
+            // base here shipped the subclass as a plain root and DROPPED what made it different.
+            // `FromSqlQueryRootExpression` (relational, `Sql` + `Argument`) is the case that found
+            // it: a `FromSqlRaw` with a `WHERE` came back as the whole table, silently. Refusing
+            // the subclass instead sends it down `QuerySplitter.RejectClientEvaluation`, which
+            // raises EF's own `TranslationFailed` — the answer every other provider gives for a
+            // construct it cannot translate. Named by shape rather than by type because
+            // `FromSqlQueryRootExpression` lives in `EFCore.Relational`, which this assembly does
+            // not reference (M9).
+            { } root when root.GetType() == typeof(Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression)
+                => true,
+            Microsoft.EntityFrameworkCore.Query.QueryRootExpression => false,
             // Any other extension node — QueryParameterExpression included, though those are
             // substituted away before the split — has no translation.
             { NodeType: ExpressionType.Extension } => false,

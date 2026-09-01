@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -21,12 +21,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         a single <c>FromSql</c> theory and nothing else. 16 tests become 18.
 ///     </para>
 ///     <para>
-///         <b>Both new tests pass, and R62 predicted the opposite</b> — "2 tests, both red, zero
-///         new green". They pass because the concurrency detector fires <em>before</em> the query
-///         is looked at: the base enters a critical section on another thread and then asserts
-///         that the call raises <c>CoreStrings.ConcurrentMethodInvocation</c>, which it does
-///         whatever the query is. So this is a real statement about this provider's guard on a
-///         <c>FromSql</c>-shaped query, and not an accidental pass.
+///         <b>Sixteen of the eighteen assert the detector; the <c>FromSql</c> theory asserts the
+///         refusal instead (R75).</b> R62 predicted "2 tests, both red, zero new green" and R73
+///         measured both green — but they were green because <c>FromSql</c> was silently
+///         discarded. Now the query is refused while it is still being compiled, which is
+///         <em>earlier</em> than the detector's check, so the concurrency message the base expects
+///         is never the one that arrives. Both statements are true and only one is observable.
 ///     </para>
 ///     <para>
 ///         The relational base reaches its store through
@@ -40,6 +40,35 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
     : ConcurrencyDetectorEnabledRelationalTestBase<
         ConcurrencyDetectorEnabledInfoCarrierTest.ConcurrencyDetectorInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         <b>The refusal arrives before the detector does.</b> The base enters a critical
+    ///         section on another thread and asserts that the call raises
+    ///         <c>CoreStrings.ConcurrentMethodInvocation</c>; on this provider the query is refused
+    ///         (R75) while it is still being compiled, which is <em>earlier</em> than the
+    ///         detector's check. Both statements are true and only one is observable. The other
+    ///         sixteen tests in this class still assert the detector.
+    ///     </para>
+    ///     <para>
+    ///         <b>Wrapping <c>base</c> in an assertion cannot work here, and this is A63's shape
+    ///         for the third time</b> (R70 recorded it for <c>JsonQuery</c>'s four APPLY tests).
+    ///         <c>ConcurrencyDetectorEnabledTestBase.ConcurrencyDetectorTest</c> catches the
+    ///         <see cref="InvalidOperationException" /> <em>itself</em> and compares its message,
+    ///         so what escapes <c>base</c> is an <c>Xunit.Sdk.EqualException</c> and any
+    ///         <c>Assert.Throws&lt;InvalidOperationException&gt;</c> around it fails with
+    ///         "Exception type was not an exact match". EF's own <c>Task.CompletedTask</c> form is
+    ///         taken instead, rather than re-writing the query outside the base and pinning this
+    ///         file to EF's SQL text.
+    ///     </para>
+    ///     <para>
+    ///         <b>The refusal itself is not left unasserted</b> — the disabled sibling below pins
+    ///         it on the same query, where the base adds no assertion of its own to collide with.
+    ///     </para>
+    /// </remarks>
+    public override Task FromSql(bool async)
+        => Task.CompletedTask;
+
     public class ConcurrencyDetectorInfoCarrierFixture : ConcurrencyDetectorFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
@@ -61,17 +90,24 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
 /// <remarks>
 ///     The fixture keeps the <c>EnableThreadSafetyChecks(false)</c> that replaces rather than
 ///     extends the base options, which is EF's own arrangement in every provider's version of this
-///     class. With the checks off the base simply runs the query and asserts nothing, so its
-///     <c>FromSql</c> theory passes here for a different reason than the enabled one: the call
-///     raises nothing. <b>That is the R71 defect rather than a success</b> — this provider
-///     discards a <c>FromSql</c> query root instead of refusing it — and the two tests are pinned
-///     here so the day that changes is visible.
+///     class. With the checks off the base simply runs the query and asserts nothing, which is why
+///     its <c>FromSql</c> theory <b>used to pass by accident</b>: the query root was discarded and
+///     the resulting table scan raised nothing. R75 refuses it, and the refusal is pinned instead.
 /// </remarks>
 public class ConcurrencyDetectorDisabledInfoCarrierTest(
     ConcurrencyDetectorDisabledInfoCarrierTest.ConcurrencyDetectorInfoCarrierFixture fixture)
     : ConcurrencyDetectorDisabledRelationalTestBase<
         ConcurrencyDetectorDisabledInfoCarrierTest.ConcurrencyDetectorInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     With the checks off the base simply runs the query and asserts nothing, so this test
+    ///     <b>used to pass by accident</b>: the <c>FromSqlRaw</c> was silently discarded and the
+    ///     resulting table scan raised nothing. R75 refuses it, and the refusal is what is pinned.
+    /// </remarks>
+    public override Task FromSql(bool async)
+        => FromSqlAssertions.NotSupportedAsync(() => base.FromSql(async));
+
     public class ConcurrencyDetectorInfoCarrierFixture : ConcurrencyDetectorFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;

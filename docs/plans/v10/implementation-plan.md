@@ -2178,6 +2178,71 @@ re-parents of families already running, because R25–R30 showed that is where t
 
       `test/` only, so `eng/measure.sh` alone. Measured `r74-udf` against `r73-five-bases`: **FIXED none, BROKEN exactly the 75**, all inside the new class, and the reasons diff shows the seven causes above and nothing else.
 
+- [x] **R75. `FromSql` is REFUSED instead of silently discarded, and the mechanism was a subclass
+      falling into a base-class branch.** `failed` 200 -> 198, `total` unchanged at 29183. The silent
+      wrong answer R71 found is closed.
+
+      **The defect, exactly.** `FromSqlQueryRootExpression` derives from
+      `EntityQueryRootExpression` and adds two members, `string Sql` and `Expression Argument`.
+      `ServerBoundaryAnalyzer.IsSerializableKind` matched the **base** (`QueryRootExpression =>
+      true`), and `QueryRootStubNode` has fields for an element type and nothing else, so the SQL
+      and its parameters were read by nobody. The server rebuilt a plain `DbSet<T>`, and a
+      `FromSqlRaw` carrying a `WHERE` returned the whole table.
+
+      **The shape that generalises, and it is worth naming.** An *unknown* extension node already
+      threw — `ExpressionToNodeTranslator.VisitExtension` ends in
+      `throw new NotSupportedException($"Unsupported extension expression: {node.GetType()}.")`.
+      What degraded silently was a **known base class with an unrepresented subclass**. A type test
+      written as `is SomeBase` accepts subclasses carrying state the branch cannot see, and there
+      is no compiler help for it. The fix matches the **exact** type instead, so any future EF
+      subclass of a query root is refused rather than quietly flattened.
+
+      **Refused through the existing path, not a new throw site.** With the node no longer
+      serializable the subtree is not shippable and `QuerySplitter.RejectClientEvaluation` fires,
+      which is where every other refusal in this provider is raised. The message names the
+      construct: *"No part of the query can be executed on the server:
+      '[…FromSqlQueryRootExpression]'"*. Named by shape rather than by type because the class lives
+      in `EFCore.Relational`, which `InfoCarrier.Core` does not reference (M9).
+
+      **Three overrides, and one of them could not assert.** `ConcurrencyDetectorDisabled.FromSql`
+      and `AdHocMiscellaneous.Multiple_different_entity_type_from_different_namespaces` now assert
+      the refusal through `FromSqlAssertions`, which is the tripwire: **if `FromSql` is ever
+      supported, both fail** and the decision has to be taken again. The first of those *used to
+      pass by accident* — the base asserts nothing, so a discarded query root and a table scan
+      looked like success. The second used to fail with a `NullReferenceException` out of this
+      provider's materializer, three layers from its cause.
+
+      **`ConcurrencyDetectorEnabled.FromSql` takes EF's `Task.CompletedTask` form, and this is
+      A63's shape for the third time** (R70 recorded it for `JsonQuery`'s four APPLY tests).
+      `ConcurrencyDetectorTest` catches the `InvalidOperationException` *itself* and compares its
+      message, so what escapes `base` is an `Xunit.Sdk.EqualException` and any
+      `Assert.Throws<InvalidOperationException>` around it fails on "Exception type was not an
+      exact match". The refusal is not left unasserted: the disabled sibling pins it on the same
+      query, where the base adds no assertion to collide with. **The refusal also arrives *before*
+      the concurrency detector**, because it happens while the query is still being compiled.
+
+      **Two user-facing corrections, both found by reading the page against the suite.**
+      `website/docs/limitations.md` already carried a row saying relational-only APIs "are not part
+      of this provider's surface"; the row was true and the code disagreed with it, and it now says
+      what calling one does. And the page's "queries this provider answers that other providers do
+      not" listed **five** scenarios, one of which was `Contains` over a collection of enums stored
+      as a string. **R72's allowlist fix made this provider refuse that query**, so the claim had
+      become false; the entry is removed and the count is four. 737 words against a 750 budget, no
+      budget change needed.
+
+      `src/` changed, so **both** gates: `CI=true dotnet build --configuration Release` reports
+      `0 Error(s), 5 Warning(s)` (the documented five) and `eng/trim-ratchet.sh` holds at
+      `ours 89 <= 89`. Measured `r75-repro` against `r74-udf`: **FIXED 2, BROKEN none.** The first run of this change reported 216, with 18 extra reds in `TPTFiltersInheritanceBulkUpdates` (`no such table`); a second run with identical code reported 198 and none of them. **That is a flake, it is not this change, and it is now the top priority** -- `test/known-failures.txt` carries the evidence and the standing hypothesis.
+
+      **What is NOT done, deliberately.** Supporting `FromSql` is a security decision rather than
+      an engineering one, and it is the owner's. The wire would carry client-authored SQL for the
+      server to execute, which escapes the containment every other node has: a LINQ tree is
+      translated *through the server's model*, and raw SQL is not, so it reaches tables the model
+      never maps. That is a larger grant than `IgnoreQueryFilters`, which only bypasses a filter
+      *inside* the model, and this repository ships a browser client. If it is ever wanted it
+      belongs behind a server-side opt-in that is off by default, documented the way
+      `IgnoreQueryFilters` is.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

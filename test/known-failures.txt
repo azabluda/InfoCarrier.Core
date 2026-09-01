@@ -1941,5 +1941,28 @@
 # probe did neither, so the store was EMPTY and eleven tests reported wrong answers while reading
 # zero rows. The adopted fixture carries the save and says why.
 
-failed=200
+# 2026-09-01 (R75) -- 200 -> 198, `total` unchanged at 29183. `FromSql` is now REFUSED instead of
+# silently discarded. The two tests that move are `AdHocMiscellaneousQuerySqliteInfoCarrierTest
+# .Multiple_different_entity_type_from_different_namespaces`, which used to fail with a
+# `NullReferenceException` out of this provider's materializer and now assert the refusal.
+#
+# A FLAKE WAS OBSERVED WHILE MEASURING THIS, AND IT IS NOT THIS CHANGE. The first full run reported
+# 216, with 18 extra failures in `TPTFiltersInheritanceBulkUpdatesInfoCarrierTest`, every one
+# `SQLite Error 1: 'no such table: Countries'` or `'Animals'`. The class passes in isolation (30 of
+# 33), the whole `Sqlite.BulkUpdates` namespace together shows only the 6 expected
+# `NorthwindBulkUpdates` reds, and a SECOND FULL RUN WITH IDENTICAL CODE reported 198 with BROKEN
+# none. Two runs, no code change between them, different results: that is a flake by this
+# repository's own definition and it is the next thing to fix.
+#
+# THE STANDING HYPOTHESIS, recorded so the next session does not re-derive it:
+# `TPTFiltersInheritanceBulkUpdatesInfoCarrierFixture` and `TPCFiltersInheritanceBulkUpdatesInfoCarrierFixture`
+# inherit `StoreName` from their non-filtered parents, so each pair shares one `.db` file --
+# while the non-TPT `FiltersInheritanceBulkUpdatesInfoCarrierFixture` DOES override `StoreName`.
+# That asymmetry suggests the TP* variants were simply missed. `SqliteInfoCarrierBackendTestStore`
+# takes its per-path gate before `Created.TryAdd`, so the documented race is closed; the hypothesis
+# is therefore not proven and the mechanism is still open.
+#
+# Measured `r75-repro` against `r74-udf`: FIXED 2, BROKEN none.
+
+failed=198
 total=29183
