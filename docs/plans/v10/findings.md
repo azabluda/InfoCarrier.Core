@@ -351,7 +351,7 @@ after. **What the attribute buys is a consumer being told at their own call site
 thing that was missing: before it, a consumer publishing trimmed learned about this provider's
 reflection from EF Core's generic warning or from nothing at all.
 
-## Two closed investigations
+## Three closed investigations
 
 **The runtime culture is pinned to invariant, and that was a ratchet fix rather than a test fix
 (C50).** The machine is `en-SE`, whose decimal separator is a comma, and it cost **nine**
@@ -388,6 +388,63 @@ about the mechanism.** "The ranges coincide" was correct and load-bearing. "Ther
 is being mistaken for a borrowed placeholder" was one step too far, and the dump that confirmed the
 first half refuted the second in the same four lines. Read what the instrument prints, not what it
 was expected to print.
+
+**The second intermittent is CLOSED (R76, 2026-09-01), and what closed it was reproducing the
+signature rather than catching the flake.** `TPTFiltersInheritanceBulkUpdatesInfoCarrierTest` failed
+18 of the 27 tests it runs in one full run and passed in the next eight, every failure
+`SQLite Error 1: 'no such table: Countries'` or `'Animals'`. The class passes in isolation and its
+whole namespace passes together, so the interaction was with full-suite scheduling.
+
+**Five instrumented full runs never reproduced it, and that is the part worth generalising.** The
+store was made to log every initialization -- the resolved path, whether it won the creation guard,
+the table count it saw, the outcome of every `EnsureDeleted`/`EnsureCreated`/seed -- plus every
+`.db` create and delete in the directory through a `FileSystemWatcher`. All five runs came back
+byte-identical and clean. Sampling a one-in-nine event at eight minutes a sample was not going to
+close it, and it is worth noticing that early rather than after the tenth run.
+
+**Two facts pinned the mechanism without catching it.** First, the six tests that *passed* in the
+failing run are exactly the ones refused before they reach the store, so every test that touched
+the database failed: the database was empty for the whole class, not part of it. Second, EF's
+`SqliteDatabaseCreator.Create` runs `PRAGMA journal_mode = 'wal'`, so every store here is a WAL
+database whose content can live entirely in `<name>.db-wal` while the `.db` is a 4 KB shell -- and
+a killed process's database recovers *completely* on reopen as long as that `.db` survives. An
+empty database therefore means the `.db` itself did not survive. **Deleting exactly that one file
+in the window between the two classes reproduced the failure to the reason**: 18 failures, 8
+`Countries`, 4 `Animals`, 4 downstream `Assert.Contains`, 2 `Assert.Throws` -- the original tally.
+
+**The mechanism, as a chain.** Six classes share three files, because the three `...Filters...`
+fixtures override `EnableFilters` and nothing else and so inherit their parent's `StoreName` --
+exactly as EF's own suite does. EF is safe there only because its `SqliteTestStore` uses the
+*global* `TestStoreIndex`; each backend store here builds its own service provider and therefore
+its own, which is why `Created` exists at all. The first class's store wins `Created.TryAdd`,
+creates and seeds the file, runs, and is disposed; the second class's store is constructed **two
+minutes later** and returns from the guard without looking. In between, the file stops being
+protected: EF's `SqliteDatabaseCreator.Delete` calls `SqliteConnection.ClearAllPools()`
+**process-globally** on every store's initialization -- some 646 times in a full run -- and about
+fifteen seconds after the first class ends, one of those drops the last handle. Anything that then
+deletes the file is noticed by nobody, because `Created` records that initialization was
+*started*, not that its result still exists.
+
+**The deleter in the original run was never identified, and the fix deliberately does not depend on
+it.** All five instrumented runs show exactly one sweep and no deletion of any shared `.db`; both
+in-process deleters are logged and neither fired. So it came from outside the process -- and
+`SweepStaleFiles` is precisely that shape, deleting every `*.db` it finds and swallowing the
+`IOException` on the ones a live handle protects, which is "delete every idle database" run by any
+concurrent `dotnet test` in the same output directory. CI, which runs one thing at a time, has
+never seen it.
+
+**Two fixes, and the second is the one that matters.** The sweep now takes `-wal` and `-shm` as
+well as `.db`, because a database here is three files and not one: **14,971 `-wal` and 14,946
+`-shm` orphans had accumulated against 76 `.db`**, collected by nothing, and a fresh `.db` opened
+beside a stale pair answers `no such table` -- the flake's own error text, reproducible in five
+lines of Python. That leak is real but it self-heals at initialization, so it is *not* the flake's
+mechanism and was not allowed to be reported as one. The fix that closes the flake is that the
+creation guard is now **verified rather than trusted**: a store that did not create the database
+asks whether it is still there and rebuilds it when it is not, at the cost of one `sqlite_master`
+count per skip -- 71 in a full run. It cannot destroy anyone's data, because it fires only on a
+database with no tables at all, which no store here legitimately has once seeded.
+
+**The rule: a guard that records that work *started* is not evidence its result still exists.**
 
 ## How the rules were learned
 
