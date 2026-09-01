@@ -2243,6 +2243,55 @@ re-parents of families already running, because R25–R30 showed that is where t
       belongs behind a server-side opt-in that is off by default, documented the way
       `IgnoreQueryFilters` is.
 
+- [x] **R76. The shared test store loses its database and nothing notices — this repository's only
+      known intermittent, CLOSED.** `failed` unchanged at 198, `total` unchanged at 29183.
+      **Not #56 work**, and committed straight to `main` as `299a1dd` because it is independent of
+      this branch: the flake was found while measuring R75 and `CLAUDE.md` makes it outrank
+      whatever else is in hand.
+
+      **R75's standing hypothesis was wrong, and the correction is the useful part.** The shared
+      `StoreName` is real — `TPTFilters…`, `TPHFilters…` and `TPCFilters…` override `EnableFilters`
+      only, so each inherits its parent's — but **that is EF's own design and EF's own suite shares
+      the store the same way.** EF is safe because its `SqliteTestStore` uses the *global*
+      `TestStoreIndex`; each backend store here builds its own service provider and therefore its
+      own, which is why `Created` exists. Renaming the three pairs would have papered over them and
+      left `Northwind` (14 skips a run) and `BasicTypesTest` (15) exactly as exposed.
+
+      **The mechanism.** `Created` records that initialization was *started*, and every later store
+      for the same file trusted it forever without looking — 71 such skips in a full run, across 19
+      store names. The first class creates and seeds the file, runs, and is disposed; the second is
+      constructed **two minutes later** and returns from the guard blind. In between the file stops
+      being protected: EF's `SqliteDatabaseCreator.Delete` calls `SqliteConnection.ClearAllPools()`
+      **process-globally** on every store's initialization, ~646 times in a full run, and ~15s
+      after the first class ends one of those drops the last handle.
+
+      **How it was closed, since five instrumented full runs never caught it.** Two facts pinned it
+      without a sighting. The six tests that *passed* in the failing run are exactly the ones
+      refused before they reach the store, so the database was empty for the whole class. And a WAL
+      database recovers completely on reopen **as long as its `.db` survives** — so an empty one
+      means the file did not. That turned the hunt into an experiment: delete exactly that file in
+      the window and compare signatures. **Matched pair, same trigger.** Pre-fix, deleted 15s after
+      disposal: 18 failures, 8 `Countries`, 4 `Animals`, 4 `Assert.Contains`, 2 `Assert.Throws` —
+      R75's tally to the reason. Post-fix, deleted 11s after disposal: the rebuild branch fires and
+      the run is clean.
+
+      **Two changes.** `SweepStaleFiles` now matches `*.db*`, because EF's `Create` sets
+      `journal_mode = wal` and a database here is three files — **14,971 `-wal` and 14,946 `-shm`
+      orphans against 76 `.db`**, collected by nothing. That leak self-heals at initialization, so
+      it is **not** the flake's mechanism and was not allowed to be reported as one. The fix that
+      closes the flake is that the guard is **verified rather than trusted**: a store that did not
+      create the database checks it is still there and rebuilds it when it is not.
+
+      **The deleter in the original run was never identified, and the fix does not depend on it.**
+      Both in-process deleters are logged and neither fired in five runs, so it came from outside
+      the process — and `SweepStaleFiles` is exactly that shape, deleting every `*.db` it finds and
+      swallowing the `IOException` on the ones a live handle protects. CI, which runs one thing at a
+      time, has never seen it.
+
+      Three-run bar: **198 / 198 / 198**, FIXED none, BROKEN none, reasons unchanged. Full account
+      in [`findings.md`](findings.md); `CLAUDE.md`'s "no known intermittent" paragraph is updated
+      rather than restored.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

@@ -1964,5 +1964,30 @@
 #
 # Measured `r75-repro` against `r74-udf`: FIXED 2, BROKEN none.
 
+# 2026-09-01 (R76) -- THE FLAKE ABOVE IS CLOSED, and neither number moves: it was never a test's
+# answer, it was the test store losing its database.
+#
+# THE STANDING HYPOTHESIS ABOVE IS WRONG, and is left in place so the correction is legible. The
+# shared `StoreName` is real -- the three `...Filters...` fixtures override `EnableFilters` only, so
+# each inherits its parent's -- but that is EF's OWN design and EF's own suite shares the store the
+# same way. Renaming the three pairs would have papered over them and left `Northwind` (14 skips a
+# run) and `BasicTypesTest` (15) exactly as exposed.
+#
+# THE MECHANISM, reproduced on demand. `Created` records that initialization was *started*, and
+# every later store for the same file trusted it forever without looking. The first class creates
+# and seeds the file, runs, and is disposed; the second is constructed two minutes later and
+# returns from the guard blind. In between the file stops being protected: EF's
+# `SqliteDatabaseCreator.Delete` calls `SqliteConnection.ClearAllPools()` PROCESS-GLOBALLY on every
+# store's initialization, ~646 times in a full run, and ~15 seconds after the first class ends one
+# of those drops the last handle. Delete the file in that window and the second class answers
+# `no such table` to every test that reaches the store while the ones refused before reaching it
+# still pass -- 8 `Countries`, 4 `Animals`, 4 `Assert.Contains`, 2 `Assert.Throws`, which is the 18
+# above to the reason.
+#
+# HOW IT WAS CLOSED, since five instrumented full runs never caught it in the wild: a WAL database
+# recovers completely on reopen as long as its `.db` survives, so an EMPTY one means the file did
+# not survive. That turned the search into an experiment -- delete exactly that file and compare
+# the signature. Full account in docs/plans/v10/findings.md.
+
 failed=198
 total=29183
