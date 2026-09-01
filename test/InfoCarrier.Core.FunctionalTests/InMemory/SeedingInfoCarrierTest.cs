@@ -43,7 +43,7 @@ public class SeedingInfoCarrierTest : SeedingTestBase
 
     /// <inheritdoc />
     protected override SeedingContext CreateContextWithEmptyDatabase(string testId)
-        => new SeedingInfoCarrierContext(testId, ((InfoCarrierTestStore)TestStore).Backend);
+        => new SeedingInfoCarrierContext(testId, ((IInfoCarrierClientTestStore)TestStore).Backend);
 
     private class SeedingInfoCarrierContext(string testId, IInfoCarrierClient client) : SeedingContext(testId)
     {

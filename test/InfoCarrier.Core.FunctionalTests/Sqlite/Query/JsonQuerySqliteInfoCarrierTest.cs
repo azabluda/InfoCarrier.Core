@@ -282,14 +282,14 @@ public class JsonQuerySqliteInfoCarrierTest(
         ///     That hides the inherited property rather than overriding it, so from outside the
         ///     fixture the name resolves to the relational one and the cast throws for a store that
         ///     is not relational — <b>a compile error here, not a run-time one</b>, because the
-        ///     shadowing type is unrelated to <see cref="TestUtilities.InfoCarrierTestStore" />.
+        ///     shadowing type is unrelated to <see cref="TestUtilities.IInfoCarrierClientTestStore" />.
         ///     Casting <c>this</c> to the base that declares the original property reaches past the
         ///     shadow, and the type argument is the one
         ///     <c>JsonQueryFixtureBase</c> supplies — <c>JsonQueryContext</c>, not the
         ///     <c>PoolableDbContext</c> that the same trick needs for the owned-query fixtures.
         /// </remarks>
-        public InfoCarrierTestStore InfoCarrierTestStore
-            => (InfoCarrierTestStore)((SharedStoreFixtureBase<JsonQueryContext>)this).TestStore;
+        public IInfoCarrierClientTestStore InfoCarrierTestStore
+            => (IInfoCarrierClientTestStore)((SharedStoreFixtureBase<JsonQueryContext>)this).TestStore;
 
         private ITestStoreFactory? _testStoreFactory;
 
@@ -301,7 +301,8 @@ public class JsonQuerySqliteInfoCarrierTest(
                 InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-                configureConventions: ConfigureConventions);
+                configureConventions: ConfigureConventions,
+                relationalClientStore: true);
 
         /// <inheritdoc />
         /// <remarks>

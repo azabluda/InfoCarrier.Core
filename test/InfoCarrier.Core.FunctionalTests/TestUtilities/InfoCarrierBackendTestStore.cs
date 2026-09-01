@@ -1,6 +1,8 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Data.Common;
 using InfoCarrier.Core.Common;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -172,6 +174,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     The server URL/name this store stands in for.
     /// </summary>
     public string ServerUrl => Name;
+
+    /// <summary>
+    ///     An <b>unopened</b> connection carrying the backing store's connection string, for
+    ///     <c>RelationalTestStore</c> to read <c>ConnectionString</c> from. EXPERIMENT (decision 1).
+    /// </summary>
+    public virtual DbConnection CreateStoreConnection() => new SqliteConnection();
 
     /// <summary>
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.

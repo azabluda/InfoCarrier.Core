@@ -15,7 +15,8 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="InfoCarrierTestStore" /> class.
 /// </remarks>
-public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend) : TestStore(backend.Name, shared: false)
+public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
+    : TestStore(backend.Name, shared: false), IInfoCarrierClientTestStore
 {
     private readonly InfoCarrierBackendTestStore _backend = backend;
 

@@ -73,7 +73,7 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
         /// <inheritdoc />
         public override async Task ReseedAsync()
         {
-            InfoCarrierBackendTestStore backend = ((InfoCarrierTestStore)TestStore).Backend;
+            InfoCarrierBackendTestStore backend = ((IInfoCarrierClientTestStore)TestStore).Backend;
             using DbContext context = backend.CreateDbContext();
             await backend.CleanAsync(context);
             await CleanAsync(context);

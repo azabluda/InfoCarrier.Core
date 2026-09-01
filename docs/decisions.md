@@ -510,3 +510,42 @@ R14 states the principle: *"it is not that a non-virtual `UseTransaction` disqua
 that a base failing wholesale yields nothing. One use costs a test; 136 costs the base."* The
 `JsonUpdateTestBase` decision (not adopted) and the `ComplexCollectionJsonUpdateTestBase` decision
 (adopted, 18 of 18) are unchanged.
+
+**Amended 2026-09-01 (R77) — a fixture may opt into a relational client test store.** The gate above
+asks whether a base assumes the *client* is relational, and until now the only answer was no. A
+second answer exists for one narrow case: several relational fixtures declare
+`public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore;`, and any test
+touching that property threw `InvalidCastException` — **25 of them, inside six bases already
+adopted**.
+
+`RelationalTestStore` splits in two. The **string half** — `ConnectionString`,
+`NormalizeDelimitersInRawString`, and delimiters that already default to SQLite's — is harmless, and
+it is the half those tests actually want. The **connection half** — `ConnectionState`,
+`CloseConnection`, `BeginTransaction` — would reach the database directly, past the wire, and a
+green from that says nothing about this provider. All three are non-virtual and all three read
+`Connection`, which is `protected virtual`, so **overriding that one member governs every one of
+them**.
+
+So `RelationalInfoCarrierTestStore` exists beside `InfoCarrierTestStore`, identical in behaviour and
+different only in shape, with `Connection` throwing. A fixture opts in with
+`relationalClientStore: true`; everything else keeps the plain shell. Two classes rather than one
+because `RelationalTestStore` derives from `TestStore`, and **per fixture rather than globally**
+because a global answer would claim every fixture in the suite has a relational client, which is not
+true — the opt-in list is the record of which bases needed it. Per fixture is also the finest grain
+available: xUnit builds one fixture per test class.
+
+**Measured both ways, and they agree.** Making the whole suite relational and opting in for the six
+give byte-identical results: 25 `InvalidCastException` to zero, `failed` 198 and `total` 29183
+unchanged, FIXED none, BROKEN none. `Connection` was never reached in either run, so nothing in this
+suite wants a live connection and refusing one costs nothing. What the 25 become is 24 of R75's own
+`FromSql` refusals — accurate where the cast was noise — and **one real defect the cast had been
+hiding**, `TPHInheritanceQueryInfoCarrierTest.Casting_to_base_type_joining_with_query_type_works`.
+
+**This buys no green test, and that is the point of recording it.** Everything behind the cast was
+`FromSql`, which is refused (R75). The change converts harness noise into accurate information and
+removes the structural blocker on the raw-SQL bases should `FromSql` ever be supported; it is not
+worth doing for the count.
+
+**One base it must not be pointed at.** `AdHocQuerySplittingQueryTestBase` calls `CloseConnection()`
+on the cast store, so it needs a live connection. What it tests — a connection dropping mid
+split-query — has no meaning across this wire, and a green there would be manufactured.

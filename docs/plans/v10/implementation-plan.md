@@ -2292,6 +2292,49 @@ re-parents of families already running, because R25–R30 showed that is where t
       in [`findings.md`](findings.md); `CLAUDE.md`'s "no known intermittent" paragraph is updated
       rather than restored.
 
+- [x] **R77. A fixture may opt into a relational client test store, and the 25 `InvalidCastException`
+      harness failures become accurate information.** `failed` unchanged at 198, `total` unchanged
+      at 29183, FIXED none, BROKEN none. ADR-013 amended (2026-09-01).
+
+      **What was blocked.** Several relational fixtures declare
+      `public new RelationalTestStore TestStore => (RelationalTestStore)base.TestStore;`. Shadowing
+      cannot be intercepted from a derived fixture — `new` binds at compile time and EF's bases were
+      compiled against EF's own types — and `SharedStoreFixtureBase.TestStore` is non-virtual with a
+      private backing field, so there is no override point. The runtime object has to *be* a
+      `RelationalTestStore`.
+
+      **The design, and why two classes.** `RelationalTestStore` derives from `TestStore`, so one
+      type cannot have both shapes. `RelationalInfoCarrierTestStore` sits beside
+      `InfoCarrierTestStore`, identical in behaviour, and `IInfoCarrierClientTestStore` carries the
+      one member (`Backend`) the ten call sites needed — so no test class names a concrete shell.
+      `Connection` is overridden to throw, and that single `protected virtual` governs
+      `ConnectionState`, `CloseConnection` and `BeginTransaction`, all three of which are
+      non-virtual and all three of which read it. `InitializeAsync` and `DisposeAsync` skip `base`,
+      which would open and dispose that connection.
+
+      **Per fixture, not globally, and both were measured.** A global switch and the six-fixture
+      opt-in give byte-identical results, so containment costs nothing: 25 `InvalidCastException` to
+      zero, no test changing status. Global was rejected anyway — it would claim every fixture in
+      the suite has a relational client, which is untrue, and the opt-in list is the record of which
+      bases needed it. Per fixture is also the floor: xUnit builds one fixture per test class, so
+      there is no per-test choice.
+
+      **Activated for the six bases that were eating the cast**: `JsonQuerySqlite` (14),
+      `NorthwindBulkUpdates` (4), `TPHInheritanceQuery` (3), `OwnedQuery` (2), `NullSemantics` (2),
+      and `NorthwindQueryInfoCarrierSqliteFixture` for `QueryNoClientEval` (2). Tier A is untouched.
+
+      **NOT activated for `AdHocQuerySplittingQueryTestBase`**, which calls `CloseConnection()` and
+      so needs a live connection to the server database. What it tests — a connection dropping mid
+      split-query — has no meaning across this wire, so a green there would be manufactured.
+
+      **What it buys, stated honestly: no green test.** Everything behind the cast was `FromSql`,
+      refused since R75, so 24 of the 25 now fail with this provider's own refusal instead of a
+      harness cast. That is accurate where the old message was noise, and it removes the structural
+      blocker on the raw-SQL bases should `FromSql` ever be supported. It also uncovered **one real
+      defect the cast had been hiding** —
+      `TPHInheritanceQueryInfoCarrierTest.Casting_to_base_type_joining_with_query_type_works`,
+      `ArgumentException : must be reducible node` — which is ours and is not yet triaged.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

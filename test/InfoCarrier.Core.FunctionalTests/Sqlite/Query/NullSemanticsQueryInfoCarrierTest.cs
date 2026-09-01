@@ -58,6 +58,7 @@ public class NullSemanticsQueryInfoCarrierTest(NullSemanticsQueryInfoCarrierTest
                 InfoCarrierTestStoreFactory.Sqlite,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-                configureConventions: ConfigureConventions);
+                configureConventions: ConfigureConventions,
+                relationalClientStore: true);
     }
 }

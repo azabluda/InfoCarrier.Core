@@ -75,7 +75,7 @@ public class AdHocJsonQueryInfoCarrierTest(NonSharedFixture fixture)
     /// </remarks>
     private async Task ExecuteOnBackendAsync(FormattableString sql)
     {
-        using DbContext backend = ((InfoCarrierTestStore)TestStore).Backend.CreateDbContext();
+        using DbContext backend = ((IInfoCarrierClientTestStore)TestStore).Backend.CreateDbContext();
         await backend.Database.ExecuteSqlAsync(sql);
     }
 

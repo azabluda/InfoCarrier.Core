@@ -60,7 +60,8 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
             copyDbContextParameters: (client, server) =>
                 ((NorthwindContext)server).TenantPrefix = ((NorthwindContext)client).TenantPrefix,
             serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true);
 
     /// <inheritdoc />
     /// <remarks>
