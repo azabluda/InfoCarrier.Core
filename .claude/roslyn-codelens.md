@@ -21,20 +21,20 @@ standing instruction to do the work through `Bash` and to search with `grep`. Th
 general case. For a symbol question in a `.cs` file it is overridden here, and the override is not
 a judgement call.
 
-**The violation to watch for is the unplanned lookup, not the planned search.** Deliberate
-navigation reaches for these tools. What slips past is the single check made in the middle of
-other work — the members a base declares, who calls a method, whether a property is virtual —
-because the attention is on the thing being written. If you are about to run one `grep` to answer
-one small question so you can get back to what you were doing, that is the moment the rule exists
-for.
+**A hook does the reminding now.** `.claude/hooks/cs-search-reminder.py` fires on any `Bash` or
+`Grep` call that reaches a `.cs` file. It **blocks nothing and classifies nothing** — whether a
+search is legal depends on the question being asked, not on the string being typed, so no hook can
+decide it. It exists because every recorded violation here was an unplanned one-line check made in
+the middle of other work, and a reminder at that moment is worth more than a paragraph read at the
+start of a session. **The paragraphs that used to argue this point are gone.**
 
-**Not being loaded is not an exemption.** `notFound` means widen the load; so does knowing ahead of
-time that the target is outside the closure. Skipping the tool because a `load_solution` or a
-`dotnet restore` would cost a round trip is the same violation, arrived at earlier.
+**Reading a `.cs` file is not searching it.** `cat`, `head` and a `sed` line range are the correct
+fallback when a tool cannot answer, and the hook is deliberately silent on them.
 
 **`notFound` means the symbol is outside the loaded closure, not that it is absent.** The fix is one
-`load_solution` call, never a text search. A dependency, reference clone or sibling repository is
-not loaded until you load it; a project the current seed did not pull in needs a wider seed.
+`load_solution` call, never a text search — and knowing in advance that the target is outside the
+closure is not an exemption either. A dependency, reference clone or sibling repository is not
+loaded until you load it; a project the current seed did not pull in needs a wider seed.
 
 **If the server is down, say so and stop.** A `CONNECTION_CLOSED` error, or a notice that the server
 failed to connect, is a blocker to report. Do not fall back to text search for a symbol question.

@@ -23,6 +23,20 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/cs-search-reminder.py\"",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "Checking the C# navigation rule"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

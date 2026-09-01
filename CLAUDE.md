@@ -17,19 +17,21 @@ to "search with `grep`" is describing the general case; this repository is the e
 CLAUDE.md outranks it. Outside `.cs` — Markdown, `.resx`, `.csproj`, `.json`, `.yml` — follow the
 harness and grep freely.
 
-**The rule fires hardest on the lookup you were not planning to make.** Every violation recorded
-here has been a one-line check in the middle of other work — *what members does this base declare*,
-*who calls this*, *is this property virtual* — asked while the attention was on writing a fixture,
-not on navigating. Deliberate exploration reaches for the tools; momentum reaches for `grep`. **Ask
-the question of the tool even when it costs a round trip**, and especially when the answer feels
-obvious.
+**READING a `.cs` file is not searching it, and that distinction was missing here until
+2026-09-01.** `cat`, `head`, and a `sed` line range (`sed -n '1,80p'`) are the correct fallback when
+the MCP server cannot answer, and none of them is forbidden. What is forbidden is asking a *pattern*
+where a symbol question was meant.
 
-**`notFound` is not a licence to grep — it means load the code. Neither is knowing in advance that
-the code is not loaded.** Declining to ask because a `load_solution` would cost a restore is the
-same violation as grepping after a `notFound`, and it is the more common one. `subrepos/efcore` is
-not loaded by default and its spec bases are the most common symbol question here; load it before
-reading a single EF base class. Which tool answers which question, and how to check the loaded
-solution first:
+**`notFound` means load the code.** `subrepos/efcore` is not loaded by default and its spec bases
+are the most common symbol question here; load it before reading a single EF base class.
+
+**A hook now says all of this at the moment it matters**, so the paragraphs of exhortation that used
+to sit here are gone. `.claude/hooks/cs-search-reminder.py` fires on any `Bash` or `Grep` call that
+reaches a `.cs` file and prints a reminder. **It blocks nothing and judges nothing**, because
+whether a search is legal turns on the question being asked and not on the string being typed —
+`grep "TODO" x.cs` is permitted and `grep "Collate" x.cs` is not, and no hook can tell them apart.
+The decision is still yours; the hook only makes sure you are asked. Which tool answers which
+question, and how to check the loaded solution first:
 
 @.claude/roslyn-codelens.md
 
