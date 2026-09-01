@@ -82,15 +82,31 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     ///     Removes the database files a <em>previous</em> run left behind, once per process.
     /// </summary>
     /// <remarks>
-    ///     Nothing is deleted when a store is disposed. Doing that made disposal order
-    ///     load-bearing again — the very thing making the store file-backed was meant to end —
-    ///     and the test that ran next got "no such table". Sweeping at startup instead is safe by
-    ///     construction: no store of this run has been created yet, so every file present is
-    ///     stale, and each store deletes and recreates its own file at initialization anyway.
+    ///     <para>
+    ///         Nothing is deleted when a store is disposed. Doing that made disposal order
+    ///         load-bearing again — the very thing making the store file-backed was meant to end —
+    ///         and the test that ran next got "no such table". Sweeping at startup instead is safe
+    ///         by construction: no store of this run has been created yet, so every file present is
+    ///         stale, and each store deletes and recreates its own file at initialization anyway.
+    ///     </para>
+    ///     <para>
+    ///         <b>A database here is three files, not one, and the sweep has to take all three.</b>
+    ///         EF's <c>SqliteDatabaseCreator.Create</c> runs <c>PRAGMA journal_mode = 'wal'</c>, so
+    ///         every store in this suite is a WAL database: the committed content lives in
+    ///         <c>&lt;name&gt;.db-wal</c> until a checkpoint folds it back, and the <c>.db</c>
+    ///         itself can be a 4 KB shell. Matching only <c>*.db</c> therefore swept a third of
+    ///         each database and left the rest. <b>14,971 <c>-wal</c> and 14,946 <c>-shm</c> files
+    ///         had accumulated against 76 <c>.db</c></b> when this was found, none of them ever
+    ///         collected by anything. And a fresh <c>.db</c> opened beside a stale <c>-wal</c> and
+    ///         <c>-shm</c> answers <c>SQLite Error 1: 'no such table'</c> — reproducible in
+    ///         isolation: delete only the <c>.db</c>, reopen the path, and the WAL is silently
+    ///         discarded.
+    ///     </para>
     /// </remarks>
     private static void SweepStaleFiles()
     {
-        foreach (string stale in Directory.EnumerateFiles(Directory.GetCurrentDirectory(), "*.db"))
+        // "*.db*", not "*.db": the -wal and -shm siblings are part of the database. See above.
+        foreach (string stale in Directory.EnumerateFiles(Directory.GetCurrentDirectory(), "*.db*"))
         {
             try
             {
@@ -120,13 +136,67 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => base.AddProviderOptions(builder).UseSqlite(_connectionString);
 
+    /// <summary>
+    ///     Whether the database at <see cref="_path" /> currently holds any table.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately not <c>File.Exists</c>. Opening a SQLite path that has no file creates an
+    ///     empty database rather than failing, so "the file is there" and "the database is there"
+    ///     are different questions, and the second is the one that matters — an emptied database
+    ///     and a missing one reach a test as the same <c>no such table</c>. Its own connection,
+    ///     because the caller has none yet.
+    /// </remarks>
+    private bool HasTables()
+    {
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT count(*) FROM sqlite_master WHERE type = 'table'";
+            return Convert.ToInt64(command.ExecuteScalar()) > 0;
+        }
+        catch (SqliteException)
+        {
+            // Unreadable is not usable, and the caller's answer to both is to build it again.
+            return false;
+        }
+    }
+
     /// <inheritdoc />
     /// <remarks>
-    ///     Guarded per file, and the guard is still needed even though the database now outlives
-    ///     every connection: each backend store builds its <em>own</em> service provider, so the
-    ///     <see cref="TestStoreIndex" /> that normally makes shared initialization run once is not
-    ///     actually shared between them, and a second store re-seeding the same file mid-run
-    ///     would destroy the first one's data.
+    ///     <para>
+    ///         Guarded per file, and the guard is still needed even though the database now
+    ///         outlives every connection: each backend store builds its <em>own</em> service
+    ///         provider, so the <see cref="TestStoreIndex" /> that normally makes shared
+    ///         initialization run once is not actually shared between them, and a second store
+    ///         re-seeding the same file mid-run would destroy the first one's data.
+    ///     </para>
+    ///     <para>
+    ///         <b>But the guard records that initialization was <em>started</em>, not that the
+    ///         database is still there, and every later store trusted it forever.</b> That is what
+    ///         produced this repository's only known intermittent (R76). Six classes share three
+    ///         files here — <c>TPTFiltersInheritanceBulkUpdatesInfoCarrierFixture</c> and the two
+    ///         other <c>…Filters…</c> fixtures override <c>EnableFilters</c> only, so each inherits
+    ///         its parent's <c>StoreName</c>, exactly as EF's own suite does. The first class
+    ///         creates and seeds the file, runs, and is disposed; the second is constructed
+    ///         <em>two minutes later</em> and takes the branch below without looking. In between,
+    ///         the file stops being protected: EF's <c>SqliteDatabaseCreator.Delete</c> calls
+    ///         <c>SqliteConnection.ClearAllPools()</c> <em>process-globally</em> on every store's
+    ///         initialization — some 646 times in a full run — and about fifteen seconds after the
+    ///         first class ends, one of those drops the last handle and the file becomes deletable
+    ///         by anything. Delete it in that window and the second class answers
+    ///         <c>no such table</c> to every test that reaches the store, while the ones refused
+    ///         before reaching it still pass: 18 failures of 27, which is the signature that was
+    ///         seen once and then reproduced on demand.
+    ///     </para>
+    ///     <para>
+    ///         So the branch verifies instead of trusting. A store that did not create the database
+    ///         asks whether it is still there, and re-creates it when it is not. This costs one
+    ///         <c>sqlite_master</c> count per skip (71 in a full run) and cannot destroy anyone's
+    ///         data, because it only fires when the database has no tables at all — which no store
+    ///         in this suite legitimately has once seeded.
+    ///     </para>
     /// </remarks>
     protected override async Task InitializeAsync(
         Func<DbContext> createContext,
@@ -137,7 +207,7 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         await gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!Created.TryAdd(_path, true))
+            if (!Created.TryAdd(_path, true) && HasTables())
             {
                 return;
             }
