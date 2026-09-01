@@ -2847,9 +2847,13 @@ re-parents of families already running, because R25–R30 showed that is where t
       annotation, is a much worse trade for a user-facing message than for a metadata key. **Priced
       and not taken.**
 
-      **#60 priced: 21 of the 157 failures and 6 of the 10 missing bases**, counted out of
+      **#60 priced: 27 of the 157 failures and 6 of the 10 missing bases**, counted out of
       `artifacts/measure/r91.log`. The standing note that *seven* of ten wait on it is wrong; it is
-      six, and the other four are unrelated.
+      six, and the other four are unrelated. **The first pass at this said 21 and was low** — it
+      matched on the test name and missed the ones that fail earlier, on R77's
+      `InvalidCastException`. That cast is not a separate item but this one's first blocker, and
+      **reviving R77 alone would buy no green test at all**: all 26 tests carrying it are raw-SQL
+      tests that would then fail one step later.
 
       **The finding that decides the sequencing is not a count.** `FromSql` would be the first
       construct where the client hands the server **a string to execute**, and every argument in

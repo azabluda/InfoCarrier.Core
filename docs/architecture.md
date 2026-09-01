@@ -735,8 +735,16 @@ an impression.
 
 | | |
 |---|---|
-| **21 of the 157** current failures name `FromSql`, `SqlQuery` or an ad-hoc raw query | 14 `JsonQuerySqlite`, 4 `NorthwindBulkUpdates`, 2 `TPHInheritanceQuery`, 1 `SharedTypeQuery` |
+| **27 of the 157** current failures are raw-SQL shaped | 14 `JsonQuerySqlite`, 4 `NorthwindBulkUpdates`, 3 `TPHInheritanceQuery`, 2 `OwnedQuery`, 2 `QueryNoClientEval`, 1 `SharedTypeQuery`, 1 `NullSemanticsQuery` |
 | **6 of the 10** unimplemented spec bases are raw-SQL bases | `FromSqlQueryTestBase`, `FromSqlSprocQueryTestBase`, `GearsOfWarFromSqlQueryTestBase`, `NorthwindSqlQueryTestBase`, `SqlQueryTestBase`, `SqlExecutorTestBase` |
+
+**Corrected 2026-09-02, same day: the first count of this was 21 and it was low.** It matched on
+the test *name* and so missed the ones that fail earlier, on a cast. **`R77`'s
+`InvalidCastException` — `InfoCarrierTestStore` cannot be cast to `RelationalTestStore` — is not a
+separate item; it is this one's first blocker**, and all 26 tests carrying it are raw-SQL tests.
+**Reviving R77 on its own would therefore turn 26 failures from a cast into a translation failure
+and buy no green test at all**, which settles the standing "do not revive it without a base that
+demonstrably needs it": a base that needs it exists, and it needs #60 more.
 
 The other four missing bases are unrelated: `JsonUpdateTestBase` (ADR-013 — the client is never
 relational), `StoredProcedureUpdateTestBase`, `StoreValueGenerationTestBase`,
