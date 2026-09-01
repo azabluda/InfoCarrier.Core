@@ -695,6 +695,21 @@ own model's filter, so the client's only has to be *representable*. Two of the t
 the third converged onto #60, reaching `FromSqlRaw` on a non-relational client and saying
 so. **The other four rows above are still open and unverified.**
 
+**A fourth defect, found 2026-09-02 (R89), and it is the same sentence turned inside out.**
+`RelationalEvaluatableExpressionFilter`'s second clause is what R84 ported so a mapped function
+survives parameter extraction; admitting the mapping's declaring type to the allowlist is what let
+the call be *named*. For a function mapped as an **instance** method that declaring type is the
+caller's own `DbContext`, and admitting it silently removed the refusal that had been standing in
+for the missing capability: **38 `TranslationFailed` refusals vanished at R84** and became client
+evaluations. R89 restores the refusal by making a constant holding a `DbContext` never server-ok.
+
+**OPEN, and it is a security question rather than a rewrite.** Making an instance-mapped function
+actually *cross* needs a wire node that resolves to the **server's** context, the way
+`QueryRootStubNode` resolves to the server's model. That is a new capability handed to a payload,
+so `security-review.md` §2's per-class conjunction has to be re-argued for it before any code is
+written. Worth roughly ten of the residual `UdfDbFunction` reds; not started, and not to be started
+without the owner.
+
 **The pattern all three defects share, and it is the part that transfers.** Every one is a service
 EF replaces *for a reason that has nothing to do with SQL* — the filter protects a call from being
 evaluated, the convention teaches a rewriter about a method — and this client needs the same

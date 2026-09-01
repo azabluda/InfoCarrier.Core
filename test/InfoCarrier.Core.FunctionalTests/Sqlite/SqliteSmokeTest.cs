@@ -119,6 +119,36 @@ public class SqliteSmokeTest
         Assert.Contains("deserialization allowlist", refused.Message, StringComparison.Ordinal);
     }
 
+    // R89. Being NAMEABLE on the wire is not being SHIPPABLE, and conflating the two removed a
+    // refusal. `QuerySplitter.ClientCodeFinder` refuses a method whose declaring type the
+    // allowlist does not admit; R84 admitted the declaring type of every `HasDbFunction` mapping
+    // so the call could be named, and for a function mapped as an INSTANCE method that type is
+    // the caller's own `DbContext`. The clause then stopped firing while the call stayed
+    // unshippable for a different reason -- its `Object` is a constant holding the live client
+    // context, which no wire carries.
+    //
+    // What that cost was measured, not reasoned about: a boundary probe on
+    // `UdfDbFunctionInfoCarrierTest.Scalar_Function_Where_Correlated_Instance` reported
+    // `shippable=1` -- the bare query root -- and the client filtered the whole table. Across R84
+    // the reasons diff shows 38 `TranslationFailed` refusals disappearing into 18 client
+    // evaluations and 15 "no part of the query can be executed".
+    //
+    // `SqliteSmokeContext.TitleIsLong` is mapped with `HasDbFunction`, which is what puts this
+    // context type on the allowlist -- the exact condition, reproduced without depending on the
+    // inherited UDF class. `TitleIsLong` throws, so a regression arrives named in the assertion
+    // message rather than as a green count.
+    [ConditionalFact]
+    public async Task A_predicate_calling_a_mapped_function_on_the_client_context_is_refused()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.CountAsync(b => client.TitleIsLong(b.Title)));
+
+        Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
+    }
+
     [ConditionalFact]
     public async Task Client_query_round_trips_through_a_relational_server()
     {

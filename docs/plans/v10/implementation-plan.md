@@ -2728,6 +2728,51 @@ re-parents of families already running, because R25–R30 showed that is where t
       is a `DbSet<>` — the parameter core EF's rewriter fills with an `IQueryable` — so a new
       overload group EF adds fails this test instead of failing a caller's model build.
 
+- [x] **R89. A predicate calling a function mapped on the client's own context was neither shipped
+      nor refused, and R84 is what removed the refusal.** `src/` change, so both gates:
+      `eng/trim-ratchet.sh` (`ours` 89 ≤ 89, `total` 855, unchanged) and `eng/measure.sh`.
+      `failed` **169 -> 157**, `total` 29225 -> **29226** (one new pin, green). FIXED 12, BROKEN
+      none — and the 12 are the *same* `Scalar_Nested_Function_*_Instance` tests R84 broke.
+
+      **The reasons diff across R84 is where this was visible, and the count hid it.** r83 -> r84:
+      **38 `TranslationFailed` refusals disappear** and become 18 client evaluations and 15 "no part
+      of the query can be executed", while `failed` went 181 -> 185. CLAUDE.md's three levels exist
+      for exactly this, and even the names were not enough — only the reasons showed it.
+
+      **Being nameable on the wire is not being shippable.** R84 admits the declaring type of every
+      `HasDbFunction` mapping so the *call* can be named. For a function mapped as an **instance**
+      method that type is the caller's own `DbContext`, so `QuerySplitter.ClientCodeFinder` — which
+      refuses a method whose declaring type is not admitted — stopped firing, while the call stayed
+      unshippable for a different reason: its `Object` is a constant holding the live client
+      context.
+
+      **Both outcomes were wrong, and which one a caller got depended on nothing that matters.**
+      Measured with a boundary probe on two contexts rather than reasoned about:
+
+      | The allowlist happened to… | What happened |
+      |---|---|
+      | refuse the context type | `shippable=1` — the bare query root. Neither shipped nor refused: **the client fetched the whole table and ran the predicate.** |
+      | admit it | the whole query shipped and the **server** tried to rebuild a `DbContext` from the payload: *"Cannot dynamically create an instance … no parameterless constructor"*. |
+
+      **The fix is two clauses and the first is the one that matters.**
+      `ServerBoundaryAnalyzer.CarriesTheClientsContext` makes a constant holding a `DbContext` never
+      server-ok, which collapses both cases into "not shipped"; `ClientCodeFinder` then turns "not
+      shipped" into EF's own `TranslationFailed` instead of silent client evaluation. **The type
+      allowlist cannot be asked to do this job**, because R84 needs that same type admitted for the
+      name.
+
+      **What this does not do is make the call work.** An instance-mapped function would need a wire
+      node resolving to the *server's* context — a new capability handed to a payload, so a
+      `security-review.md` question rather than a rewrite. Refusing is what every other EF provider
+      does with a call it cannot translate. Recorded as an open question in `architecture.md` §6a
+      **D7**.
+
+      **The pin throws on purpose.**
+      `SqliteSmokeTest.A_predicate_calling_a_mapped_function_on_the_client_context_is_refused` maps
+      `SqliteSmokeContext.TitleIsLong` with `HasDbFunction` — that mapping is what puts the context
+      type on the allowlist, which is the condition — and the method throws, so a regression arrives
+      named in the assertion message rather than as a green count.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

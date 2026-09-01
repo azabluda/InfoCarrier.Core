@@ -2213,5 +2213,43 @@
 # and it moved from `ArgumentException` to `Assert.Equal Strings differ`, which is why the reasons
 # diff shows that class going 8 -> 9.
 
-failed=169
-total=29225
+# 2026-09-02 (R89) -- `failed` 169 -> 157, `total` 29225 -> 29226 (one new pin, green).
+# FIXED 12, BROKEN none. All 12 are `Scalar_Nested_Function_*_Instance`, which are the SAME 12
+# R84 broke.
+#
+# R84 REMOVED A REFUSAL, AND THE REASONS DIFF ACROSS IT SAYS SO. r83 -> r84: 38
+# `TranslationFailed` refusals disappear and become 18 client evaluations and 15 "no part of the
+# query can be executed". The count moved 181 -> 185 and hid it. THIS IS WHAT THE THREE LEVELS
+# ARE FOR, and it took a third run to see because the names alone did not show it either.
+#
+# BEING NAMEABLE ON THE WIRE IS NOT BEING SHIPPABLE. R84 admits the declaring type of every
+# `HasDbFunction` mapping so the CALL can be named. For a function mapped as an INSTANCE method
+# that type is the caller own `DbContext`, so `ClientCodeFinder` -- which refuses a method whose
+# declaring type is not admitted -- stopped firing, while the call stayed unshippable for a
+# different reason: its `Object` is a constant holding the live client context.
+#
+# BOTH OUTCOMES WERE WRONG AND WHICH ONE YOU GOT DEPENDED ON NOTHING THAT MATTERS. Measured with
+# a boundary probe on two contexts. Where the allowlist happened to refuse the context type, the
+# query was neither shipped nor refused: `shippable=1` (the bare query root) and the CLIENT
+# fetched the whole table and ran the predicate. Where it happened to admit it, the whole query
+# shipped and the SERVER tried to rebuild a `DbContext` from the payload -- "Cannot dynamically
+# create an instance ... no parameterless constructor".
+#
+# THE FIX IS TWO CLAUSES AND THE FIRST IS THE ONE THAT MATTERS.
+# `ServerBoundaryAnalyzer.CarriesTheClientsContext` makes a constant holding a `DbContext` never
+# server-ok, which collapses both cases into "not shipped"; `ClientCodeFinder` then turns "not
+# shipped" into EF own `TranslationFailed` rather than silent client evaluation. The type
+# allowlist cannot be asked to do this: R84 needs the type admitted for the NAME.
+#
+# WHAT THIS DOES NOT DO IS MAKE THE CALL WORK. An instance-mapped function would need a wire node
+# resolving to the SERVER context, which is a new capability handed to a payload and therefore a
+# `security-review.md` question rather than a rewrite. Refusing is what every other EF provider
+# does with a call it cannot translate.
+#
+# THE PIN IS `SqliteSmokeTest.A_predicate_calling_a_mapped_function_on_the_client_context_is_refused`.
+# `SqliteSmokeContext.TitleIsLong` is mapped with `HasDbFunction` -- that mapping is what puts the
+# context type on the allowlist, which is the condition -- and it THROWS, so a regression arrives
+# named in the assertion message instead of as a green count.
+
+failed=157
+total=29226

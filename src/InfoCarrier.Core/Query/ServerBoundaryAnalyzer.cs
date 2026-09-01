@@ -80,6 +80,46 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
             or ConstantExpression { Value: IQueryable };
 
     /// <summary>
+    ///     Whether a node is the caller's live <see cref="DbContext" />, which nothing can ship.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A query filter or projection that calls a method <em>on the context</em> — a
+    ///         function mapped by <c>HasDbFunction</c> as an instance method is the ordinary way
+    ///         to get one — funcletizes to a <see cref="ConstantExpression" /> holding the client's
+    ///         own context object. It is not data, it is a live object graph with a connection, a
+    ///         change tracker and a service provider hanging off it, and the server has one of its
+    ///         own.
+    ///     </para>
+    ///     <para>
+    ///         <b>The type allowlist does not catch it, and cannot be asked to.</b> R84 admits the
+    ///         declaring type of every <c>HasDbFunction</c> mapping so the call can be
+    ///         <em>named</em> on the wire, and for an instance mapping that type is the context.
+    ///         Both outcomes were then wrong, and which one you got depended on nothing that
+    ///         matters — measured with a boundary probe on two contexts:
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             admitted: the whole query was judged shippable and the <b>server</b> tried to
+    ///             rebuild a <c>DbContext</c> from the payload —
+    ///             <c>"Cannot dynamically create an instance … no parameterless constructor"</c>.
+    ///         </item>
+    ///         <item>
+    ///             not admitted: the query was not shippable and not refused either, so the client
+    ///             fetched the whole table and ran the predicate locally.
+    ///         </item>
+    ///     </list>
+    ///     <para>
+    ///         Refusing it here makes both cases the same one: not server-ok, therefore not
+    ///         shipped, therefore examined by <c>QuerySplitter.RejectClientEvaluation</c>, which
+    ///         raises EF's own <c>TranslationFailed</c> — what every other provider answers for a
+    ///         call it cannot translate.
+    ///     </para>
+    /// </remarks>
+    internal static bool CarriesTheClientsContext(Expression node)
+        => node is ConstantExpression { Value: DbContext };
+
+    /// <summary>
     ///     The element type of a queryable type, or the type itself when it is not one.
     /// </summary>
     internal static Type ElementTypeOf(Type type)
@@ -205,6 +245,11 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
             {
                 // The lambda binds its own parameters; anything left is bound further out.
                 free.ExceptWith(lambda.Parameters);
+            }
+
+            if (serverOk && CarriesTheClientsContext(node))
+            {
+                serverOk = false;
             }
 
             if (serverOk)

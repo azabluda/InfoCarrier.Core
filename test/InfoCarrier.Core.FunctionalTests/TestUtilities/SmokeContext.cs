@@ -87,10 +87,36 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
 
     public DbSet<Located> Located => Set<Located>();
 
+    /// <summary>
+    ///     A store function mapped as an <em>instance</em> method on the context, for R89's pin.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Instance, and mapped, are both load-bearing.</b> R84 admits the declaring type
+    ///         of every <c>HasDbFunction</c> mapping to the allowlist so that the call can be
+    ///         <em>named</em> on the wire; for an instance mapping that type is this context. The
+    ///         pin is that being nameable did not make the call shippable — its <c>Object</c> is
+    ///         the live client context — and that it is therefore still refused.
+    ///     </para>
+    ///     <para>
+    ///         <b>It throws on purpose.</b> The failure guarded against is the client fetching the
+    ///         whole table and running this locally. A body returning a plausible answer would let
+    ///         that regression pass as a green count; a body that throws makes it arrive named, in
+    ///         the assertion message.
+    ///     </para>
+    /// </remarks>
+    public bool TitleIsLong(string? title)
+        => throw new NotSupportedException($"{nameof(TitleIsLong)} must never run on the client.");
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        // R89's pin. Mapping it is what puts this context type on the allowlist, which is the
+        // condition the pin is about; no test ever runs the function, so the store needs no
+        // definition for it.
+        modelBuilder.HasDbFunction(typeof(SqliteSmokeContext).GetMethod(nameof(TitleIsLong))!);
 
         modelBuilder.Entity<StructKeyed>()
             .Property(e => e.Id)

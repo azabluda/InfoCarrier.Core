@@ -151,6 +151,7 @@ public sealed class QuerySplitter
 
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
 
+
         if (analysis.IsWhollyServerExecutable)
         {
             // Nothing to do on the client. Keep the residual an identity so callers have one
@@ -1407,6 +1408,64 @@ public sealed class QuerySplitter
                 && !allowlist.IsAllowed(type)
                 && type.GetMethod(nameof(Equals), [typeof(object)])?.DeclaringType == typeof(object);
 
+        /// <summary>
+        ///     A method invoked on the caller's own <see cref="DbContext" /> instance.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>Being nameable on the wire is not the same as being shippable, and the two
+        ///         were conflated.</b> The clause above refuses a method whose declaring type the
+        ///         allowlist does not admit. R84 admitted the declaring type of every
+        ///         <c>HasDbFunction</c> mapping so that the call could be <em>named</em> — and for
+        ///         a function mapped as an <em>instance</em> method that type is the caller's
+        ///         <c>DbContext</c>, so this clause stopped firing while the call remained
+        ///         unshippable for a different reason: its <c>Object</c> is a
+        ///         <c>ConstantExpression</c> holding the live client context, which no wire can
+        ///         carry.
+        ///     </para>
+        ///     <para>
+        ///         <b>The result was the exact failure this class exists to prevent.</b> Measured
+        ///         with a boundary probe on
+        ///         <c>Scalar_Function_Where_Correlated_Instance</c>: the analysis returned
+        ///         <c>shippable=1</c> — the bare query root — and the client filtered the whole
+        ///         table locally. Nothing refused it, because the only refusal that would have
+        ///         read the declaring type now finds it allowed. The reasons diff across R84 shows
+        ///         the same thing at scale: <b>38 <c>TranslationFailed</c> refusals disappeared</b>
+        ///         and became 18 client evaluations and 15 "no part of the query can be executed".
+        ///     </para>
+        ///     <para>
+        ///         <b><see cref="DbContext" />'s own API is exempt</b>, and the test is where the
+        ///         method is <em>declared</em>. <c>Set&lt;T&gt;()</c> is declared on
+        ///         <see cref="DbContext" /> and names a query root the server rebinds against its
+        ///         own model (<c>QueryRootStubNode</c>); a function mapped by
+        ///         <c>HasDbFunction</c> is declared on the caller's derived context and has no
+        ///         such rebinding. That difference is the whole rule.
+        ///     </para>
+        ///     <para>
+        ///         <b>This refuses; it does not make the call work.</b> Making an instance-mapped
+        ///         function cross would need a wire node that resolves to the <em>server's</em>
+        ///         context, which is a new capability handed to a payload and therefore a
+        ///         <c>security-review.md</c> question rather than a rewrite. Refusing is what
+        ///         every other EF provider does with a call it cannot translate.
+        ///     </para>
+        /// </remarks>
+        private static bool IsCallOnTheClientsContext(
+            MethodCallExpression node,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Type? contextType)
+        {
+            if (node.Object is ConstantExpression { Value: DbContext } instance
+                && node.Method.DeclaringType is { } declaring
+                && typeof(DbContext).IsAssignableFrom(declaring)
+                && declaring != typeof(DbContext))
+            {
+                contextType = instance.Type;
+                return true;
+            }
+
+            contextType = null;
+            return false;
+        }
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (_found is not null)
@@ -1419,6 +1478,14 @@ public sealed class QuerySplitter
                 _found = new ClientCodeReason(
                     Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
                         DisplayName(declaring), node.Method.Name));
+                return node;
+            }
+
+            if (IsCallOnTheClientsContext(node, out Type? contextType))
+            {
+                _found = new ClientCodeReason(
+                    Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
+                        DisplayName(contextType), node.Method.Name));
                 return node;
             }
 
