@@ -2482,6 +2482,43 @@ re-parents of families already running, because R25–R30 showed that is where t
       `EFCore.Relational` needs an M9 J5 style seam, and that is a step of its own.
 
 
+- [x] **R83. `SharedTypeQueryRelationalTestBase` ADOPTED, by moving its non-relational base off
+      Tier A rather than running it on both.**
+      `failed` 181 -> 185, `total` 29214 -> 29218. **A deliberate rise**: 6 tests, **2 green**,
+      4 red, FIXED none, BROKEN exactly the 4 and every one inside the new class. Compliance missing
+      list **11 -> 10**. `test/` only, so `eng/measure.sh` and not the trim ratchet.
+
+      **Moved, not added, and that was the whole design decision.**
+      `SharedTypeQueryRelationalTestBase` derives from `SharedTypeQueryTestBase`, which this
+      repository already ran on Tier A. Adopting the relational base beside it would have run the
+      shared base's tests on both tiers, which CLAUDE.md calls duplication rather than coverage. So
+      the class moved to Tier B whole. **Its two inherited tests still pass there, so the move
+      itself cost nothing** — all four new reds are the relational base's own.
+
+      **The four reds are two mechanisms, and one of them was not known.** Three of them —
+      `Can_use_shared_type_entity_type_in_query_filter_with_from_sql` (sync + async) and
+      `Ad_hoc_query_for_default_shared_type_entity_type_throws` — fail with the *same*
+      `System.ArgumentException` raised inside EF's own `QueryFilterRewritingConvention`, **while
+      building the client's model, before any query runs**: *"Expression of type
+      `IQueryable<Dictionary<string, object>>` cannot be used for parameter of type
+      `DbSet<Dictionary<string, object>>` of method `FromSqlRaw`"*. A `HasQueryFilter` whose body
+      calls `FromSqlRaw` cannot be rewritten for this client. **That is not #60's runtime `FromSql`
+      gap — it is a model-build failure**, it happens on the client alone, and no test in this suite
+      named it before. Whether #60 closes it is unproven and should not be assumed.
+
+      **The fourth is R77's cast, and R77 still buys nothing.**
+      `Ad_hoc_query_for_shared_type_entity_type_works` casts the test store to `RelationalTestStore`
+      and then calls `SqlQueryRaw`. Making the client store relational would remove the cast and not
+      the red, because the call behind it needs raw SQL on a client that has no database. **This is
+      the second base measured against R77's premise and the second to refuse it.**
+
+      **What the handoff predicted and what the run showed.** The handoff read this base as
+      "3 tests, all reaching `SqlQueryRaw`/`FromSqlRaw`". The count was right and the conclusion was
+      half right: all four reds do involve raw SQL in the source, but three of them never reach it,
+      failing in model building instead. **Reading which API a test calls does not tell you where it
+      fails.**
+
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

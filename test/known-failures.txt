@@ -2081,5 +2081,26 @@
 # connected the two. The seventh is `From_sql_composed_with_relational_null_comparison`, which is
 # `FromSql` and is issue #60.
 
-failed=181
-total=29214
+# 2026-09-01 (R83) -- 181 -> 185, `total` 29214 -> 29218. A DELIBERATE RISE, adopting
+# `SharedTypeQueryRelationalTestBase`: 6 tests, 2 green, 4 red. FIXED none, BROKEN exactly the 4,
+# every one inside the new class. Compliance missing list 11 -> 10.
+#
+# MOVED, NOT ADDED. `SharedTypeQueryRelationalTestBase` derives from `SharedTypeQueryTestBase`,
+# which this repository ran on Tier A. Adopting the relational base as a second class would have
+# run the shared base on both tiers, and CLAUDE.md says a base belongs to exactly one. So the class
+# moved to Tier B whole, and its 2 inherited tests still pass there -- the move itself cost nothing.
+#
+# THE 4 REDS ARE TWO MECHANISMS AND ONE OF THEM WAS NOT KNOWN. Three of them --
+# `Can_use_shared_type_entity_type_in_query_filter_with_from_sql` (sync + async) and
+# `Ad_hoc_query_for_default_shared_type_entity_type_throws` -- fail with the SAME
+# `System.ArgumentException` raised inside EF's own `QueryFilterRewritingConvention`, while building
+# THE CLIENT'S MODEL, before any query runs. A `HasQueryFilter` whose body calls `FromSqlRaw` cannot
+# be rewritten for this client. That is not the `FromSql` runtime gap of #60; it is a model-build
+# failure, and no test in this suite named it before.
+#
+# The fourth, `Ad_hoc_query_for_shared_type_entity_type_works`, casts the test store to
+# `RelationalTestStore` and then calls `SqlQueryRaw`. R77 WOULD REMOVE THE CAST AND NOT THE RED,
+# because the call behind it still needs raw SQL on a client that has no database. R77 stays parked.
+
+failed=185
+total=29218
