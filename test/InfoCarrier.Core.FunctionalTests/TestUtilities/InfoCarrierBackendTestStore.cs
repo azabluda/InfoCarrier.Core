@@ -73,7 +73,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
                 ServerContextType,
                 (s, b) => AddProviderOptions(b),
                 ServiceLifetime.Transient,
-                ServiceLifetime.Singleton);
+                _testStoreProperties.ServerOptionsLifetime ?? ServiceLifetime.Singleton);
 
         // Only when the fixture's context is a *subclass*. A spec fixture may be
         // `SharedStoreFixtureBase<DbContext>` — `LazyLoadProxyTestBase`'s is — and then this

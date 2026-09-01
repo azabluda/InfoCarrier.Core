@@ -2055,5 +2055,31 @@
 # and pinning it in `DocumentMappingPinTest`. It is the other half of R78: the allowlist lets the
 # call be serialized, and the filter is what leaves a call there to serialize.
 
-failed=192
+# 2026-09-01 (R82) -- 192 -> 181, `total` unchanged at 29214. FIXED 11, BROKEN none. All 11 are
+# `NullSemanticsQueryInfoCarrierTest`, and the class goes 18 red to 7.
+#
+# `UseRelationalNulls` IS SERVER-SIDE CONFIGURATION AND THE HARNESS HAD NO WAY TO SEND IT. R56
+# adopted the base and dropped the flag, because `NullSemanticsQueryTestBase` declares
+# `CreateContext(bool useRelationalNulls)` and EF's SQLite class implements it on the CLIENT'S
+# options builder, which `UseInfoCarrier` has none of. The owner's rule already said where the flag
+# belongs: ambient provider configuration is the server's, and per-query hints may cross. Nothing
+# about the product had to change.
+#
+# WHAT WAS ACTUALLY MISSING WAS A LIFETIME. The server's `DbContextOptions` were registered
+# `Singleton`, so one server served every test in the class and no request could configure it. Some
+# tests in this class ask for relational nulls and others ask for C# nulls, so a single options
+# instance cannot answer both. `SharedTestStoreProperties.ServerOptionsLifetime` is the seam; this
+# fixture is the only one that asks for `Transient`, and it reads an `AsyncLocal` the test sets in
+# `CreateContext`. Every other fixture keeps `Singleton` and pays nothing.
+#
+# THE READING THAT WAS WRONG WAS "THE FLAG CANNOT CROSS". It never had to cross. The flag names a
+# server configuration, and the harness owns the server.
+#
+# THE REMAINING 7 IN THAT CLASS ARE NOT NULL SEMANTICS. Six are `BoolSwitch` and `Cases`, which the
+# fixture declares with `HasDbFunction` -- the same mechanism as the 75 in
+# `UdfDbFunctionInfoCarrierTest`, which makes that mechanism 81 tests rather than 75, and nobody had
+# connected the two. The seventh is `From_sql_composed_with_relational_null_comparison`, which is
+# `FromSql` and is issue #60.
+
+failed=181
 total=29214

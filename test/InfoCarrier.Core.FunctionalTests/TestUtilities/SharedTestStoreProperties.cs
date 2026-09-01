@@ -60,6 +60,32 @@ public struct SharedTestStoreProperties
     public Action<DbContext, DbContext>? CopyDbContextParameters;
 
     /// <summary>
+    ///     The lifetime of the server context's <see cref="DbContextOptions" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <see cref="ServiceLifetime.Singleton" /> for every fixture but one, because the
+    ///         options never change: the connection string and the model are fixed for the store's
+    ///         lifetime, and building them once is what the whole suite wants.
+    ///     </para>
+    ///     <para>
+    ///         <b><see cref="ServiceLifetime.Transient" /> is for a fixture whose server options
+    ///         differ per REQUEST.</b> Only <c>NullSemanticsQueryInfoCarrierTest</c> needs it. Its
+    ///         base calls <c>CreateContext(useRelationalNulls: true)</c> in some tests and
+    ///         <c>false</c> in others, and <c>UseRelationalNulls</c> is a provider option that
+    ///         belongs to the server. Singleton options cannot express "this request wants
+    ///         relational nulls", so that fixture asks for transient ones and reads an ambient flag
+    ///         in its <see cref="OnAddOptions" />.
+    ///     </para>
+    ///     <para>
+    ///         Opt-in rather than the default, because transient options are rebuilt on every
+    ///         server context resolution — about 29,000 times in a full run — and no other fixture
+    ///         gets anything for the cost.
+    ///     </para>
+    /// </remarks>
+    public ServiceLifetime? ServerOptionsLifetime;
+
+    /// <summary>
     ///     Extra services the <em>server</em> provider needs.
     /// </summary>
     /// <remarks>

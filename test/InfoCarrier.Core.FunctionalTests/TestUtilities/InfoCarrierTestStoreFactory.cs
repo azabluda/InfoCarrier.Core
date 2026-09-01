@@ -56,7 +56,8 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Action<DbContext, DbContext>? copyDbContextParameters = null,
         Type? serverContextType = null,
         Func<IServiceCollection, IServiceCollection>? onAddServices = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null)
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        ServiceLifetime? serverOptionsLifetime = null)
     {
         var props = new SharedTestStoreProperties
         {
@@ -67,6 +68,7 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             OnAddOptions = onAddOptions,
             CopyDbContextParameters = copyDbContextParameters,
             OnAddServices = onAddServices,
+            ServerOptionsLifetime = serverOptionsLifetime,
         };
 
         return new InfoCarrierTestStoreFactory(() => props, backendFactory);

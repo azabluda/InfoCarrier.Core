@@ -2429,6 +2429,59 @@ re-parents of families already running, because R25–R30 showed that is where t
       **Nothing here is a defect and nothing here is work.**
 
 
+- [x] **R82. `UseRelationalNulls` reaches the server, and what was missing was a service lifetime
+      rather than a client option.**
+      `failed` 192 -> 181, `total` unchanged at 29214, FIXED 11, BROKEN none.
+      `NullSemanticsQueryInfoCarrierTest` goes from 18 red to 7. `test/` only, so `eng/measure.sh`
+      and not the trim ratchet.
+
+      **The flag never had to cross the wire.** `NullSemanticsQueryTestBase` declares
+      `CreateContext(bool useRelationalNulls)`, and EF's SQLite class implements it on the
+      *client's* options builder, which `UseInfoCarrier` has none of. R56 therefore accepted the
+      flag and dropped it, and every test that passed `true` got C# null semantics where it asked
+      for the store's. But the owner's rule already settled where the flag belongs: **ambient
+      provider configuration is the server's, and only per-query hints in the expression tree may
+      cross.** `UseRelationalNulls` decides SQL, and the SQL is the server's.
+
+      **What was actually missing was a lifetime.** The server's `DbContextOptions` were registered
+      `Singleton`, so one server served every test in the class and no individual request could
+      configure it — and this class asks for relational nulls in some tests and C# nulls in others,
+      which one options instance cannot answer. `SharedTestStoreProperties.ServerOptionsLifetime`
+      is the new seam. This fixture is the only one that asks for `Transient`; every other fixture
+      keeps `Singleton` and pays nothing, because transient options are rebuilt on every server
+      context resolution. The request carries the value in an `AsyncLocal` that `CreateContext`
+      writes — a synchronous method, so the write is visible to the test that called it — and the
+      fixture's `onAddOptions` reads. **`CopyDbContextParameters` is the other per-request seam and
+      could not be used**: it runs after the server context exists, and an options extension has to
+      be in place before one is built.
+
+      **The reading that was wrong was "the flag cannot cross".** Nothing about the product had to
+      change, and no product code did. **The rule that generalises: when a test asks for
+      configuration this client cannot express, ask whether the SERVER can express it before
+      recording the test as a limitation.** The harness owns the server.
+
+      **The remaining 7 in that class are not null semantics, and one of them re-prices a whole
+      family.** Six are `BoolSwitch` and `Cases`, which `NullSemanticsQueryFixtureBase` declares
+      with `HasDbFunction`. That is the same mechanism as the 75 in `UdfDbFunctionInfoCarrierTest`,
+      so **the `HasDbFunction` mechanism is 81 tests, not 75**, and nobody had connected the two
+      because the six sat inside a class named for null semantics. The seventh is
+      `From_sql_composed_with_relational_null_comparison`, which is `FromSql` and is #60.
+
+      **`HasDbFunction` was also measured, and it is not "unsupported".** A probe admitted
+      `NullSemanticsQueryFixtureBase` to `TypeAllowlist` by name and **all six went green**. The
+      refusal is at the client type boundary: the class declaring the mapped method is not on the
+      allowlist, so `QuerySplitter.RejectClientEvaluation` raises EF's `TranslationFailed` while the
+      server — an ordinary relational provider with the same model — translates it. R74's
+      "this provider does not support `HasDbFunction`" describes a symptom, not a cause. The 75 in
+      `UdfDbFunctionInfoCarrierTest` split 32 of that shape and 22 of R80's shape (a function call
+      with only constant arguments, client-evaluated because
+      `RelationalEvaluatableExpressionFilter`'s `model.FindDbFunction` clause is not ported). **The
+      fix is model-derived and therefore not a trust-boundary change** — admit the declaring type of
+      every `DbFunction` the model itself declares, exactly as `ForModel` already admits every
+      entity and property type — but reading that annotation without a reference to
+      `EFCore.Relational` needs an M9 J5 style seam, and that is a step of its own.
+
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
