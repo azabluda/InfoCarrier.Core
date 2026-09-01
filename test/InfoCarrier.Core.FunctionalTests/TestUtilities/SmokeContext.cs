@@ -108,6 +108,18 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     public bool TitleIsLong(string? title)
         => throw new NotSupportedException($"{nameof(TitleIsLong)} must never run on the client.");
 
+    /// <summary>
+    ///     The same thing declared by <b>attribute</b> rather than by <c>HasDbFunction</c>, for
+    ///     R91's probe of D7's <c>RelationalDbFunctionAttributeConvention</c> row.
+    /// </summary>
+    /// <remarks>
+    ///     That convention is relational, so only the server runs it. The probe asks whether the
+    ///     two models therefore disagree about which methods this model maps.
+    /// </remarks>
+    [DbFunction]
+    public static bool TitleIsShort(string? title)
+        => throw new NotSupportedException($"{nameof(TitleIsShort)} must never run on the client.");
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -273,5 +285,82 @@ public class LocatedAddress
 
             _line = (string?)value;
         }
+    }
+}
+
+/// <summary>
+///     The principal half of a table-split pair, carrying the concurrency token.
+/// </summary>
+public class SharedRoot
+{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
+
+    /// <summary>
+    ///     An application-managed concurrency token — the shape SQLite supports, since it has no
+    ///     native <c>rowversion</c>.
+    /// </summary>
+    public string? Version { get; set; }
+
+    public SharedDetail? Detail { get; set; }
+}
+
+/// <summary>
+///     The dependent half, which shares <see cref="SharedRoot" />'s table and has no token of
+///     its own. That is the shape <c>TableSharingConcurrencyTokenConvention</c> exists for.
+/// </summary>
+public class SharedDetail
+{
+    public int Id { get; set; }
+
+    public string? Note { get; set; }
+
+    public SharedRoot? Root { get; set; }
+}
+
+/// <summary>
+///     Two entity types split across one table, one of them carrying a concurrency token.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>A probe for D7's <c>TableSharingConcurrencyTokenConvention</c> row, and a context of
+///         its own so the model change reaches nothing else.</b> That convention is relational:
+///         where entity types share a table and only some carry a concurrency token, it gives the
+///         others a <em>shadow</em> token property named
+///         <c>_TableSharingConcurrencyTokenConvention_&lt;name&gt;</c> mapped to the same column.
+///         This client does not run it, so the server's model has a property the client's does
+///         not — and the property set is what <c>SaveChanges</c> sends.
+///     </para>
+///     <para>
+///         <b>EF ships no store-agnostic test for it.</b> Its only functional coverage is
+///         <c>OptimisticConcurrencySqlServerTest</c>, which is SQL Server's own class rather than
+///         a specification base and uses <c>rowversion</c>; the rest is a unit test in
+///         <c>EFCore.Relational.Tests</c>. So nothing this repository inherits can reach it, and
+///         a probe is the only way to know.
+///     </para>
+/// </remarks>
+public class TableSplitSmokeContext(DbContextOptions<TableSplitSmokeContext> options) : DbContext(options)
+{
+    public DbSet<SharedRoot> Roots => Set<SharedRoot>();
+
+    public DbSet<SharedDetail> Details => Set<SharedDetail>();
+
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.Entity<SharedRoot>(b =>
+        {
+            b.ToTable("Shared");
+            // BOTH clauses are required and only one is obvious. `FindConcurrencyColumns` skips
+            // a token that is not also `ValueGenerated.OnUpdate`, so an application-managed token
+            // -- the only kind SQLite has -- never reaches the convention at all.
+            b.Property(e => e.Version).IsConcurrencyToken().ValueGeneratedOnAddOrUpdate();
+            b.HasOne(e => e.Detail).WithOne(e => e.Root).HasForeignKey<SharedDetail>(e => e.Id);
+        });
+
+        modelBuilder.Entity<SharedDetail>().ToTable("Shared");
     }
 }

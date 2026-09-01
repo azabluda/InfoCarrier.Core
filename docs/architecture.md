@@ -671,8 +671,8 @@ are worth naming:
 | Convention | Reading |
 |---|---|
 | `RelationalMapToJsonConvention` | Sets the container annotation `AnnotationDocumentMapping` reads. The client does not run it, and D3's pins are green — `JsonQuery` 393/0, `JsonOwnedCollectionUpdate` 5/5 — because a caller's own `ToJson()` sets the annotation directly. The *implicit* cases are what the convention adds, and none is covered. |
-| `TableSharingConcurrencyTokenConvention` | Adds a **shadow concurrency-token property** where two entity types share a table. That changes the property set, and the property set is what `SaveChanges` sends. **Open, unverified**; no failure names it. |
-| `RelationalDbFunctionAttributeConvention` | Puts a `[DbFunction]`-attributed method into the model. R84's `ModelDbFunctions` reads the model's own `Relational:DbFunctions` annotation, so on this client a function declared by **attribute** rather than by `HasDbFunction` is not in the model at all. **Open, unverified.** |
+| `TableSharingConcurrencyTokenConvention` | Adds a **shadow concurrency-token property** where two entity types share a table. **CLOSED 2026-09-02 (R91), by running it.** It cannot fire on any store this suite has: `GetConcurrencyTokensMap` skips a token that is not also `ValueGenerated.OnUpdate`, which on a token means `rowversion`. Forced to fire, the divergence is real and costs nothing — the server applies its own model to entries the client sent by property *name*, and both halves of a split still save. |
+| `RelationalDbFunctionAttributeConvention` | Puts a `[DbFunction]`-attributed method into the model, so the server's model maps it and the client's does not — asserted both ways. **CLOSED 2026-09-02 (R91), and the answer was not the prediction:** the call still crosses and the server translates it, because what decides that is the **allowlist**, and the context type was on it for an unrelated reason. Had the context declared no mapped function at all, the same call would have been refused. |
 
 Of the 4 *replacements*: `KeyDiscoveryConvention` and `ValueGenerationConvention` the client already
 makes (`InfoCarrierKeyDiscoveryConvention`, `InfoCarrierValueGenerationConvention`), and
@@ -709,6 +709,14 @@ actually *cross* needs a wire node that resolves to the **server's** context, th
 so `security-review.md` §2's per-class conjunction has to be re-argued for it before any code is
 written. Worth roughly ten of the residual `UdfDbFunction` reds; not started, and not to be started
 without the owner.
+
+**What three of these rows turned out to have in common, and it is not the convention set.**
+R84, R89 and R91 were each decided by whether the **type allowlist** happened to admit a type — for
+R84 the host of a mapped function, for R89 the caller's own `DbContext`, for R91 a context that was
+on the list because of a *different* function. The allowlist is documented as a deserialization
+control (ADR-008, `security-review.md` §2) and it is also, undocumented, the thing that decides
+where the query boundary falls and whether an untranslatable call is refused or quietly run on the
+client. **Nothing says so where it is declared**, and each of the three cost a measurement to find.
 
 **The pattern all three defects share, and it is the part that transfers.** Every one is a service
 EF replaces *for a reason that has nothing to do with SQL* — the filter protects a call from being

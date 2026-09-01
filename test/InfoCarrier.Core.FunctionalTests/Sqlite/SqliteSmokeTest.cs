@@ -149,6 +149,145 @@ public class SqliteSmokeTest
         Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
     }
 
+    // R91. D7's `RelationalDbFunctionAttributeConvention` row, settled by reading both models.
+    //
+    // `HasDbFunction` is a call the caller's own `OnModelCreating` makes, so both models get it.
+    // `[DbFunction]` is picked up by a RELATIONAL convention, which only the server runs -- so the
+    // server's model maps the method and the client's does not. R84's `ModelDbFunctions` reads the
+    // client's model, so the allowlist never admits the declaring type and the call is refused
+    // rather than translated.
+    //
+    // THE CALL STILL CROSSES, AND THAT WAS NOT THE PREDICTION. The models disagree, but what
+    // decides the outcome is the ALLOWLIST, and `SqliteSmokeContext` is on it for an unrelated
+    // reason -- `TitleIsLong`'s `HasDbFunction` mapping put it there. So the static call ships,
+    // the server translates it against ITS model, and the only thing that fails is the store
+    // lacking the function. That is the correct end-to-end behaviour; had this context declared
+    // no mapped function at all, the same call would have been refused instead.
+    //
+    // Which is the third time in this session that "the allowlist admitted the type for an
+    // unrelated reason" decided the behaviour -- R84, R89 and here. The type allowlist is load
+    // bearing for far more than deserialization safety, and nothing says so where it is declared.
+    [ConditionalFact]
+    public async Task A_DbFunction_declared_by_attribute_reaches_the_servers_model_and_not_the_clients()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+        using DbContext server = store.CreateDbContext();
+
+        string[] onTheServer = [.. InfoCarrier.Core.Metadata.ModelDbFunctions.ForModel(server.Model)
+            .Select(m => m.Name).Order()];
+        string[] onTheClient = [.. InfoCarrier.Core.Metadata.ModelDbFunctions.ForModel(client.Model)
+            .Select(m => m.Name).Order()];
+
+        // The divergence, established before anything is concluded from it.
+        Assert.Equal([nameof(SqliteSmokeContext.TitleIsLong), nameof(SqliteSmokeContext.TitleIsShort)], onTheServer);
+        Assert.Equal([nameof(SqliteSmokeContext.TitleIsLong)], onTheClient);
+
+        // And what it costs: nothing here. The call reaches the store as a function call, which is
+        // what a server that maps it should produce. `TitleIsShort` throws when invoked, so this
+        // could not be a client-side answer wearing a store-side message.
+        InfoCarrierServerException reached = await Assert.ThrowsAsync<InfoCarrierServerException>(
+            () => client.Blogs.CountAsync(b => SqliteSmokeContext.TitleIsShort(b.Title)));
+
+        Assert.Contains("no such function: TitleIsShort", reached.Message, StringComparison.Ordinal);
+    }
+
+    // R91. D7's `TableSharingConcurrencyTokenConvention` row, settled by running it.
+    //
+    // Where entity types share a table and only some carry a concurrency token, that relational
+    // convention gives the others a SHADOW token property mapped to the same column. This client
+    // does not run it, so the server's model has a property the client's does not -- and the
+    // property set is what `SaveChanges` sends. Nothing this repository inherits can reach the
+    // shape: EF's only functional coverage is `OptimisticConcurrencySqlServerTest`, SQL Server's
+    // own class rather than a specification base, over `rowversion`.
+    //
+    // TWO MEASURED ANSWERS, AND THE FIRST IS WHY THE SECOND WAS SO NEARLY MISSED.
+    //
+    // ONE: the convention needs BOTH `IsConcurrencyToken` AND `ValueGenerated.OnUpdate` --
+    // `GetConcurrencyTokensMap.FindConcurrencyColumns` skips anything else. `ValueGenerated.OnUpdate`
+    // on a token means `rowversion`, which SQLite does not have; an application-managed token, the
+    // only kind this tier can express, never reaches the convention at all. So on every store this
+    // repository tests, the convention CANNOT FIRE, and the client not running it is unobservable
+    // by construction rather than by luck. The first version of this probe used a plain
+    // `IsConcurrencyToken()` and passed while proving nothing -- the model assertions below are
+    // what caught that.
+    //
+    // TWO: forced to fire, the divergence is real and costs nothing. The server's model gains the
+    // synthesized property and the client's does not, and both halves of the split still round-trip
+    // and save. The server applies its own model to entries the client sent by property NAME; a
+    // property the client never mentions is simply not among them.
+    //
+    // `_TableSharingConcurrencyTokenConvention_` is a literal here on purpose: the constant is
+    // private to EF, and this is a probe rather than a contract.
+    [ConditionalFact]
+    public async Task A_table_split_pair_whose_server_model_has_a_synthesized_concurrency_token_round_trips()
+    {
+        await using var store = new SqliteInfoCarrierBackendTestStore(
+            Guid.NewGuid().ToString(),
+            shared: false,
+            new SharedTestStoreProperties
+            {
+                ContextType = typeof(TableSplitSmokeContext),
+                OnModelCreating = (_, _) => { },
+            });
+
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(
+                    new SharedRoot
+                    {
+                        Id = 1,
+                        Name = "root",
+                        Version = "v1",
+                        Detail = new SharedDetail { Note = "first" },
+                    });
+                await context.SaveChangesAsync();
+            });
+
+        await using (var client = new TableSplitSmokeContext(
+            new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            // ESTABLISH THAT THE DIVERGENCE IS REAL BEFORE CONCLUDING ANYTHING FROM A GREEN ROUND
+            // TRIP. A convention that never fired and a divergence that costs nothing look
+            // identical from outside, and CLAUDE.md names that mistake. The server's model must
+            // have the synthesized token on `SharedDetail` and the client's must not; if EF ever
+            // stops synthesizing it, this fails here rather than silently making the rest vacuous.
+            const string synthesized = "_TableSharingConcurrencyTokenConvention_Version";
+
+            using DbContext server = store.CreateDbContext();
+            Assert.NotNull(server.Model.FindEntityType(typeof(SharedDetail))!.FindProperty(synthesized));
+            Assert.Null(client.Model.FindEntityType(typeof(SharedDetail))!.FindProperty(synthesized));
+
+            SharedDetail detail = await client.Details.SingleAsync();
+            detail.Note = "second";
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        await using (var client = new TableSplitSmokeContext(
+            new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            SharedRoot root = await client.Roots.SingleAsync();
+            root.Name = "renamed";
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        await using (var client = new TableSplitSmokeContext(
+            new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            Assert.Equal("second", (await client.Details.SingleAsync()).Note);
+            Assert.Equal("renamed", (await client.Roots.SingleAsync()).Name);
+
+            // `Version` is deliberately not asserted. `ValueGeneratedOnAddOrUpdate` makes EF omit
+            // the property from the INSERT and expect the store to supply it, and SQLite supplies
+            // nothing -- so it reads back null, on this wire and on a direct SQLite context alike.
+            // That is the store's behaviour, not this provider's, and asserting it would pin the
+            // wrong thing.
+        }
+    }
+
     [ConditionalFact]
     public async Task Client_query_round_trips_through_a_relational_server()
     {

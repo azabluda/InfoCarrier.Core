@@ -2799,6 +2799,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       never as a wrong value. Closing it means hoisting a mapped call out of the residual into the
       server's tuple; **not priced, and not started.**
 
+- [x] **R91. Two of D7's open rows settled by running them, and both answers differed from the
+      prediction.** `test/` only, so `eng/measure.sh` is the gate.
+      `failed` **unchanged at 157**, `total` 29226 -> **29228** — two new `SqliteSmokeTest` probes,
+      both green. FIXED none, BROKEN none, REASONS unchanged.
+
+      **`TableSharingConcurrencyTokenConvention` cannot fire on any store this suite has.**
+      `GetConcurrencyTokensMap` skips a token that is not *also* `ValueGenerated.OnUpdate`, and on a
+      token that means `rowversion`, which SQLite has not. So the client not running the convention
+      is unobservable here **by construction rather than by luck** — which is a much stronger
+      statement than the "open, unverified" it replaces. **The first version of the probe used a
+      plain `IsConcurrencyToken()`, passed, and proved nothing**; the two model assertions are what
+      caught that, and they are CLAUDE.md's "establish that the code ran" in its exact shape. Forced
+      to fire with `ValueGeneratedOnAddOrUpdate`, the divergence is real — the server's model gains
+      the synthesized property, the client's does not — and both halves of a table-split pair still
+      round-trip and save, because the server applies its own model to entries the client sent by
+      property *name*.
+
+      **A `[DbFunction]`-attributed function still crosses, which was not the prediction.** The
+      attribute is read by a relational convention, so the server's model maps the method and the
+      client's does not — asserted both ways. But what decides the outcome is the **allowlist**, and
+      the context type was on it for an unrelated reason (another function's `HasDbFunction`
+      mapping). The static call ships, the server translates it against its own model, and the only
+      thing that fails is the store lacking the function. Had the context declared no mapped
+      function at all, the same call would have been refused.
+
+      **The pattern the two probes exposed is the part worth keeping.** R84, R89 and R91 were each
+      decided by whether the type allowlist happened to admit a type. It is documented as a
+      deserialization control and is also, undocumented, what decides where the query boundary falls
+      and whether an untranslatable call is refused or quietly run on the client. `architecture.md`
+      §6a **D7** now says so.
+
+      **Still open in D7:** `IStructuralTypeMaterializerSource`, `IAdHocMapper` and
+      `RuntimeModelConvention`. None has a failure attributed to it and none was probed here.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

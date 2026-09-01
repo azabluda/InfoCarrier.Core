@@ -2251,5 +2251,33 @@
 # context type on the allowlist, which is the condition -- and it THROWS, so a regression arrives
 # named in the assertion message instead of as a green count.
 
+# 2026-09-02 (R91) -- `failed` unchanged at 157, `total` 29226 -> 29228. The two new tests are
+# D7 probes in `SqliteSmokeTest` and both are green. FIXED none, BROKEN none, REASONS unchanged.
+#
+# TWO OF D7's OPEN ROWS SETTLED BY RUNNING THEM RATHER THAN READING THEM, and both answers
+# differed from the prediction written a few hours earlier.
+#
+# `TableSharingConcurrencyTokenConvention` CANNOT FIRE ON ANY STORE THIS SUITE HAS.
+# `GetConcurrencyTokensMap` skips a token that is not also `ValueGenerated.OnUpdate` -- which on a
+# token means `rowversion`, which SQLite has not. So the client not running the convention is
+# unobservable here BY CONSTRUCTION, not by luck. The first version of the probe used a plain
+# `IsConcurrencyToken()`, passed, and proved nothing; the model assertions are what caught it,
+# which is CLAUDE.md's "establish that the code ran" in its exact shape. Forced to fire with
+# `ValueGeneratedOnAddOrUpdate`, the divergence is real -- the server model gains the synthesized
+# property and the client model does not -- and BOTH halves of a table-split pair still round-trip
+# and save, because the server applies its own model to entries the client sent by property NAME.
+#
+# A `[DbFunction]`-ATTRIBUTED FUNCTION STILL CROSSES, WHICH WAS NOT THE PREDICTION. The attribute
+# is read by a relational convention, so the server model maps the method and the client model does
+# not -- asserted both ways. But what decides the outcome is the ALLOWLIST, and the context type
+# was on it for an unrelated reason (another function's `HasDbFunction` mapping). So the static
+# call ships, the server translates it against its own model, and the only thing that fails is the
+# store lacking the function. Had the context declared no mapped function at all, the same call
+# would have been refused.
+#
+# WHICH IS THE THIRD TIME THIS SESSION THAT "THE ALLOWLIST ADMITTED THE TYPE FOR AN UNRELATED
+# REASON" DECIDED THE BEHAVIOUR -- R84, R89 and this. The type allowlist is load-bearing for far
+# more than deserialization safety and nothing says so where it is declared.
+
 failed=157
-total=29226
+total=29228
