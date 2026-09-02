@@ -3784,6 +3784,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       binary-compatibility overloads, were corrected after `measure.sh` had already built. They are
       doc comments: no IL changes, and the trim publish and the pack both ran after them.
 
+- [x] **R121. The three measurement tools take several test projects, against one baseline.**
+      `eng/` only: `measure.sh`, `ratchet.sh`, `trx-failures.py`, plus the table rows in
+      `CLAUDE.md`. **No product or test code, and the behaviour of every existing call is
+      unchanged.** Written before the split it exists for, so the split can be measured the day it
+      lands rather than after.
+
+      **What changed.** `ratchet.sh` now reads `<results.trx> [more.trx ...] <baseline-file>` — the
+      LAST argument is the baseline — and sums the `<Counters>` of each TRX while unioning the
+      failing names into one sorted list. `trx-failures.py` takes any number of TRX. `measure.sh`
+      holds a `projects` array, runs `dotnet test` once per entry, adds the figures read out of
+      each run's own summary block, and concatenates the per-project logs for the name and reason
+      extraction. Today that array holds one project, so every number is identical.
+
+      **ONE BASELINE, and that is the decision rather than a detail.** `test/known-failures.txt`
+      and `known-failures.names.txt` stay one pair covering the whole suite. With a pair per
+      project, a test that MOVES between projects reads as a fix in one and a break in the other,
+      and the name diff that makes "fixed 4, broke 4" fail the gate stops working across the
+      boundary — which is exactly the boundary the split is about to create.
+
+      **Summing is the one arithmetic allowed on these counts, and the scripts say so.** Every
+      figure is still read out of a run's own summary or `<Counters>` element; what is added is the
+      same figure from a second run. `passed` is still never derived from `total` and `failed`.
+
+      **Verified directly, because these scripts ARE the gates and a broken one is invisible.**
+      `ratchet.sh` against a real TRX and a baseline matching it: `Passed: 27474, Failed: 99,
+      Total: 27809`, FIXED none, BROKEN none, exit 0 — the single-TRX path unchanged. The same TRX
+      named twice: `Passed: 54948, Failed: 198, Total: 55618`, both counters exactly doubled, the
+      name list unioned to the same 99 names, and the failure gate fires. `trx-failures.py` on one
+      TRX and on the same TRX twice both print 99 names. `measure.sh` was pointed at a fast project
+      listed twice and reported two per-project lines and `TOTAL: 38` for a 19-test project.
+
+      `build.yml` is untouched: its call is two arguments, the last of which is the baseline, which
+      is what the new parser reads.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
