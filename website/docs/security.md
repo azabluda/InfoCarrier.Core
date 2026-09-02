@@ -24,7 +24,8 @@ depth limit alone does not cap the memory a parse costs. See
 
 A client also cannot name a type the server's model does not have. The query runs against the
 server's `DbContext`, so the entity types in your shared model are the whole of what a client can
-compose over. That surface is a real boundary. A query filter is not one, for the reason below.
+compose over. That surface is a boundary until a server grants `FromSql`, because raw SQL names its
+own tables. A query filter is not one either, for the reason below.
 
 ## What is yours
 
