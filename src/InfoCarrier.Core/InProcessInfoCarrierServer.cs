@@ -56,6 +56,18 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private IEnumerable<Type> AllowedTypes
         => _serviceProvider.GetServices<Expressions.IInfoCarrierAllowedTypes>().SelectMany(a => a.Types);
 
+    /// <summary>
+    ///     Whether this server permits a payload to carry SQL it will execute
+    ///     (<see cref="IInfoCarrierArbitrarySqlExecution" />, #60).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider, like the two above, and absent unless the application
+    ///     registered it. <b>This is the security boundary for raw SQL</b> - see
+    ///     <c>docs/security-review.md</c> section 5a.
+    /// </remarks>
+    private bool ArbitrarySqlAllowed
+        => _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
+
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
@@ -65,7 +77,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         try
         {
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
-            var executor = new ServerQueryExecutor(lease.Context, serializer);
+            var executor = new ServerQueryExecutor(lease.Context, serializer, ArbitrarySqlAllowed);
             return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         }
         finally

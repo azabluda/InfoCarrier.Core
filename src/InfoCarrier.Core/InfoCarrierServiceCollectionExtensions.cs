@@ -144,6 +144,52 @@ public static class InfoCarrierServiceCollectionExtensions
     }
 
     /// <summary>
+    ///     Permits a wire payload to carry SQL <em>this server</em> will execute (#60).
+    ///     <b>This grants arbitrary SQL execution on the server's connection.</b>
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Read the name literally.</b> It is not "enable <c>FromSql</c>", because
+    ///         <c>Sqlite/RawSqlExecutionProbeTest</c> (R94) measured what enabling it grants and
+    ///         the answer is larger than a query feature. One <c>CommandText</c> executes every
+    ///         statement it contains - <c>SELECT 1; DROP TABLE X</c> drops the table, on the
+    ///         reader path EF itself takes - and an uncomposed <c>FromSqlRaw</c> reaches the store
+    ///         unwrapped, so the subquery wrap that would have confined a caller to reading is an
+    ///         artefact of composition and the caller decides whether to compose. A client that
+    ///         can reach this server can therefore run any statement the store's grammar allows,
+    ///         under whatever rights the server's connection holds.
+    ///     </para>
+    ///     <para>
+    ///         <b>The controls that still work are outside the model.</b> A raw-SQL query does not
+    ///         go through the server's <c>OnModelCreating</c>, so the server's query filters are
+    ///         not in the statement: a deployment relying on them for row-level authorization must
+    ///         not register this. What remains is a database account limited to the rights the
+    ///         caller should have, a server-side query interceptor, and an authenticated
+    ///         transport. <c>docs/security-review.md</c> section 5a is the reading.
+    ///     </para>
+    ///     <para>
+    ///         The server half of the seam whose client half is
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    ///         <b>Only this half is a security boundary</b>, and it is default-deny: a server that
+    ///         does not call this refuses a raw-SQL payload however the client is configured.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierArbitrarySqlExecution(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IInfoCarrierArbitrarySqlExecution, ArbitrarySqlExecution>();
+
+        return services;
+    }
+
+    private sealed class ArbitrarySqlExecution : IInfoCarrierArbitrarySqlExecution
+    {
+    }
+
+    /// <summary>
     ///     Registers the value mappers this provider ships for BCL types the wire cannot walk
     ///     (ADR-012, amended 2026-08-11).
     /// </summary>

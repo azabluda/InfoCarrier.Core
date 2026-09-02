@@ -119,6 +119,94 @@ public class SqliteSmokeTest
         Assert.Contains("deserialization allowlist", refused.Message, StringComparison.Ordinal);
     }
 
+    // R95. The raw-SQL gate (#60), in the same three shapes R85's allowed-types seam is pinned in,
+    // plus one for the arguments.
+    //
+    // WHAT IS GRANTED IS ARBITRARY SQL EXECUTION, NOT A QUERY FEATURE, and the API names it that
+    // way because `Sqlite/RawSqlExecutionProbeTest` (R94) measured what it means: one
+    // `CommandText` runs every statement it contains, and an uncomposed `FromSqlRaw` reaches the
+    // store unwrapped. There is no read-only subset to offer, so there is none in the API.
+    //
+    // These four also REPLACE the tripwire `FromSqlAssertions` describes -- "if `FromSql` is ever
+    // supported, every one of them fails". It is supported now, on an opt-in a server has to make,
+    // and the refusal that class asserts is still the default and is still asserted, here.
+    [ConditionalFact]
+    public async Task A_FromSql_query_is_refused_when_neither_side_grants_it()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        // The refusal names the node, which is exactly what `FromSqlAssertions` pins across the
+        // inherited suites -- so this is the same refusal those tests assert, restated where the
+        // gate lives. Default-deny, and the behaviour every caller had before the gate existed.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+
+        Assert.Contains("FromSqlQueryRootExpression", refused.Message, StringComparison.Ordinal);
+    }
+
+    [ConditionalFact]
+    public async Task A_FromSql_query_crosses_once_both_sides_grant_it()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierArbitrarySqlExecution());
+
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+
+        // The store holds two blogs. THE `WHERE` IS THE POINT: before R75 a `FromSqlRaw` carrying
+        // one came back as the whole table, because the wire's query-root node had no field for
+        // the SQL and the subclass was shipped as its base. An answer of 2 here is that regression
+        // returning, and it would otherwise look like an ordinary passing query.
+        Assert.Equal(1, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = 'alpha'").CountAsync());
+        Assert.Equal(2, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+
+        // And composed over, which is the shape EF wraps in a subquery.
+        Blog[] composed = [.. await client.Blogs
+            .FromSqlRaw(@"SELECT * FROM ""Blogs""")
+            .Where(b => b.Title == "beta")
+            .ToArrayAsync()];
+
+        Assert.Equal("beta", Assert.Single(composed).Title);
+    }
+
+    [ConditionalFact]
+    public async Task Granting_it_on_the_client_alone_is_refused_by_the_server()
+    {
+        // The half that makes the two registrations something other than duplication, and the one
+        // that is the security boundary. The client now ships the query and the SERVER refuses to
+        // run the string, which is what `docs/security-review.md` section 5a is about.
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+
+        // Raised on the SERVER and rehydrated here by `InfoCarrierFaultMapper`, which round-trips
+        // an `InvalidOperationException` as itself -- so the exception TYPE says nothing about
+        // which side refused, and the message is what does.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+
+        Assert.Contains("does not permit a payload to carry SQL", refused.Message, StringComparison.Ordinal);
+    }
+
+    [ConditionalFact]
+    public async Task FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierArbitrarySqlExecution());
+
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+
+        // `{0}` becomes a `DbParameter` on the server, which is the only shape in which an
+        // argument keeps its type across the wire. A quote in the value is the assertion that it
+        // was bound and not spliced: interpolated into the text it would be a syntax error, and
+        // matching zero rows through a parameter is the correct answer.
+        Assert.Equal(
+            1,
+            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "alpha").CountAsync());
+        Assert.Equal(
+            0,
+            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "al'pha").CountAsync());
+    }
+
     // R89. Being NAMEABLE on the wire is not being SHIPPABLE, and conflating the two removed a
     // refusal. `QuerySplitter.ClientCodeFinder` refuses a method whose declaring type the
     // allowlist does not admit; R84 admitted the declaring type of every `HasDbFunction` mapping

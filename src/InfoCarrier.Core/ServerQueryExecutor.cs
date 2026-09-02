@@ -28,10 +28,23 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="ServerQueryExecutor" /> class.
 /// </remarks>
-public class ServerQueryExecutor(DbContext context, IExpressionSerializer expressionSerializer)
+/// <param name="context">The server's context.</param>
+/// <param name="expressionSerializer">The serializer built for the server's model.</param>
+/// <param name="arbitrarySqlAllowed">
+///     Whether this server permits a payload to carry SQL it will execute (#60) - true when the
+///     application registered
+///     <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />.
+///     <b>This is the security boundary</b>; the client's matching option only decides what it
+///     sends. Default <c>false</c>, so a server that says nothing refuses.
+/// </param>
+public class ServerQueryExecutor(
+    DbContext context,
+    IExpressionSerializer expressionSerializer,
+    bool arbitrarySqlAllowed = false)
 {
     private readonly DbContext _context = context;
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
+    private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
 
     /// <summary>
     ///     Executes the query described by <paramref name="request" /> and returns the wire result.
@@ -147,6 +160,33 @@ public class ServerQueryExecutor(DbContext context, IExpressionSerializer expres
         entityType ??= _context.Model.FindEntityType(elementType)
             ?? throw new InvalidOperationException(
                 $"Entity type '{stub.ElementType}' not found in the server model.");
+
+        // The raw-SQL root (#60). Refused unless this server registered the grant, and the check
+        // is here rather than at the parse: the node is well-formed either way, and what a server
+        // withholds is permission to EXECUTE a string it did not write. `docs/security-review.md`
+        // section 5a is why the message names arbitrary SQL execution rather than `FromSql`.
+        if (stub is FromSqlQueryRootStubNode fromSql)
+        {
+            if (!_arbitrarySqlAllowed)
+            {
+                throw new InvalidOperationException(
+                    "This server does not permit a payload to carry SQL it will execute. A "
+                    + "raw-SQL query (FromSql/FromSqlRaw/FromSqlInterpolated) reached it and was "
+                    + "refused. Register it with "
+                    + "services.AddInfoCarrierArbitrarySqlExecution() only after reading "
+                    + "docs/security-review.md section 5a: it grants arbitrary SQL execution on "
+                    + "this server's connection, and the server's own query filters are not "
+                    + "applied to such a query.");
+            }
+
+            // The arguments are rebuilt as an expression and handed to EF, which binds them as
+            // DbParameters. They are never spliced into the text: a value in a string has lost
+            // its type, and the round trip is the only reason this node carries a tree at all.
+            return RelationalQueryRootShape.CreateFromSqlRoot(
+                entityType,
+                fromSql.Sql,
+                ((ExpressionSerializer)_expressionSerializer).ToExpression(fromSql.Arguments));
+        }
 
         return new Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression(entityType);
     }

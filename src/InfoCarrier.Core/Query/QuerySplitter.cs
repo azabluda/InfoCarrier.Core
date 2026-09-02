@@ -41,6 +41,7 @@ public sealed class QuerySplitter
 
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
+    private readonly bool _arbitrarySqlAllowed;
     private readonly ServerBoundaryAnalyzer _analyzer;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Query>? _queryLogger;
 
@@ -58,14 +59,21 @@ public sealed class QuerySplitter
     ///     instead. Optional because the splitter is also constructed in tests that have no
     ///     context; a null one simply skips those checks.
     /// </param>
+    /// <param name="arbitrarySqlAllowed">
+    ///     Whether this client may send a query carrying raw SQL (#60), from
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />. Default
+    ///     <c>false</c>, which is the refusal every caller had before it existed.
+    /// </param>
     public QuerySplitter(
         IModel model,
         TypeAllowlist? allowlist = null,
-        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null)
+        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null,
+        bool arbitrarySqlAllowed = false)
     {
         _model = model;
         _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
-        _analyzer = new ServerBoundaryAnalyzer(_allowlist);
+        _arbitrarySqlAllowed = arbitrarySqlAllowed;
+        _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed);
         _queryLogger = queryLogger;
     }
 
@@ -232,7 +240,7 @@ public sealed class QuerySplitter
 
         foreach (Expression node in nodes)
         {
-            if (!ServerBoundaryAnalyzer.IsSerializableKind(node))
+            if (!ServerBoundaryAnalyzer.IsSerializableKind(node, _arbitrarySqlAllowed))
             {
                 return $"'{Abbreviate(node)}' ({node.NodeType}) has no wire representation.";
             }

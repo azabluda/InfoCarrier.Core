@@ -20,7 +20,7 @@ Every arrow is a place a hostile payload gets a say.
 | 2 | envelope → operation | `InfoCarrierEnvelopeServer`: protocol version checked, operation matched by name |
 | 3 | payload → request DTO | source-generated `JsonSerializerContext`, no reflection fallback |
 | 4 | `SerializedQuery` → `ExpressionNode` | payload bound again; `ExpressionJsonContext` `MaxDepth = 256` |
-| 5 | `$kind` → node type | closed set of 15 `[JsonDerivedType]`s; unregistered discriminator fails the parse |
+| 5 | `$kind` → node type | closed set of 16 `[JsonDerivedType]`s; unregistered discriminator fails the parse |
 | 6 | `TypeNode` → CLR type | `TypeAllowlist` |
 | 7 | `MethodNode` → `MethodInfo` | `ResolveMethod` + `Admit`: public, or two named markers |
 | 8 | `Operator` → `ExpressionType` | per-node-kind allowlist of the pure subset |
@@ -276,10 +276,62 @@ server**, with this document's own rejection message.
 - **Authentication and authorization.** No identity travels in `InfoCarrierEnvelope`. A deployment
   must authenticate the transport and decide what a caller may see. Row-level authorization is an
   application concern — EF query filters on the *server's* model are the natural mechanism, and
-  they are applied by the server's own `OnModelCreating`, which the client cannot influence.
+  they are applied by the server's own `OnModelCreating`. **A client cannot influence those
+  filters — but it can write a query they are not part of, and §5a is the reading of that.**
 - **Transport confidentiality and integrity.** TLS is the transport's business.
 - **Denial of service beyond payload size.** A well-formed query that is merely expensive is not
   distinguishable here from a legitimate one. Timeouts and quotas belong in the host.
+
+## 5a. Amendment — raw SQL (#60, R95), and why it is a change of posture rather than a wider list
+
+Written **2026-09-02**, from R94's measurements rather than from an expectation.
+
+**Every other control in this document is about what a payload may *name*.** §2's conjunction,
+ADR-008's allowlist, §4a's `Regex`, §4b's operation hosts, §4c's application registration — each
+one asks whether some CLR type or method may appear in a tree the server rebuilds, and the server
+then executes only trees built from a vocabulary it controls. **`FromSql` is the first construct
+where the client hands the server a string to run.** A payload that names nothing dangerous can
+still carry `DROP TABLE`, so §2 is not the precedent here and cannot be stretched to be one:
+there is no set to enumerate and no per-class conjunction to check, because SQL text is not a
+naming question. **§4c rhymes with the API shape and gives no support to the argument.**
+
+**What was measured, and it decides the name of the gate.**
+`Sqlite/RawSqlExecutionProbeTest` (R94) answers the two questions this section rests on, and both
+answers are in the direction that removes options:
+
+| Question | Answer |
+|---|---|
+| Does one `CommandText` run more than one statement? | **Yes.** `SELECT 1; DROP TABLE Probe;` drops the table — on `ExecuteNonQuery` and on the `ExecuteReader` path EF itself takes, where the trailing statements run as the reader is advanced or disposed. |
+| Does EF pass an uncomposed `FromSqlRaw` through unwrapped? | **Yes.** The caller's string *is* the command, character for character. The `FROM (…)` wrap appears only when something is composed on top, and the caller decides whether to compose. |
+
+**Therefore there is no read-only version of this feature to grant.** The wrap that would have
+produced one is optional from the caller's side, and the store executes every statement regardless.
+Enabling raw SQL on a server enables **arbitrary SQL execution** on that server's connection, under
+whatever rights it holds — `INSERT`, `DROP`, `ATTACH`, anything the store's own grammar allows.
+
+**The shape, and it is R85's two halves doing the same two jobs.**
+
+| Half | API | What it decides | Security boundary? |
+|---|---|---|---|
+| client | `UseInfoCarrier(client, o => o.AllowArbitrarySqlExecution())` | whether this application's own code may **send** raw SQL | **no** |
+| server | `services.AddInfoCarrierArbitrarySqlExecution()` | whether a **payload** may carry SQL this server runs | **yes** |
+
+**Default-deny, and the default is what ships.** A server that does not register refuses a raw-SQL
+payload; a client that does not register refuses to send one, with EF's own `TranslationFailed` —
+the answer every other provider gives for a construct it cannot translate. **The name says what is
+granted rather than which API is unblocked**, because "enable `FromSql`" reads as a query feature
+and this is not one.
+
+**What a deployment loses by registering, stated once.** The server's query filters are applied by
+EF when it builds a query from the server's model. A raw-SQL query does not go through that: the
+client writes its own `FROM`, so no filter is in the statement. Combined with the standing note
+that `IgnoreQueryFilters` is not refused (`roadmap.md`, `cold-read-findings.md` §1), **a server
+that registers this has no query-filter-shaped tenancy control left at all** — not for reads and
+not for `ExecuteUpdate`/`ExecuteDelete`. The controls that still work are the ones outside the
+model: a database account with the rights the caller should have, a server-side query interceptor,
+and authenticating the transport. **A deployment that relies on query filters for row-level
+authorization must not register this.**
+
 
 ## 6. Cancellation (W6) — half landed, and the half that touches this path is the open one
 

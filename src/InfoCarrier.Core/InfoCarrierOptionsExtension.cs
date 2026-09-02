@@ -55,6 +55,34 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     }
 
     /// <summary>
+    ///     Whether this client may send a query carrying raw SQL (#60). <c>false</c> unless the
+    ///     application called
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    /// </summary>
+    public virtual bool ArbitrarySqlExecutionAllowed { get; private set; }
+
+    /// <summary>
+    ///     Sets <see cref="ArbitrarySqlExecutionAllowed" /> for this options instance.
+    /// </summary>
+    public virtual InfoCarrierOptionsExtension WithArbitrarySqlExecution()
+    {
+        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
+        clone.ArbitrarySqlExecutionAllowed = true;
+        return clone;
+    }
+
+    /// <summary>
+    ///     Whether the context's own options permit sending raw SQL, read <em>per execution</em>
+    ///     for the reason <see cref="AllowedTypesFor" /> records.
+    /// </summary>
+    internal static bool ArbitrarySqlExecutionAllowedFor(Microsoft.EntityFrameworkCore.DbContext context)
+        => Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<IDbContextOptions>(context)
+            .Extensions
+            .OfType<InfoCarrierOptionsExtension>()
+            .FirstOrDefault()
+            ?.ArbitrarySqlExecutionAllowed ?? false;
+
+    /// <summary>
     ///     The types the context's own options admit, read <em>per execution</em>.
     /// </summary>
     /// <remarks>

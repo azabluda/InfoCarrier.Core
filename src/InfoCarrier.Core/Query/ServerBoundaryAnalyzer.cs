@@ -28,9 +28,19 @@ namespace InfoCarrier.Core.Query;
 ///     Initializes a new instance of the <see cref="ServerBoundaryAnalyzer" /> class.
 /// </remarks>
 /// <param name="allowlist">The types the server will accept. Must match the server's.</param>
-public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
+/// <param name="arbitrarySqlAllowed">
+///     Whether this client may send a query carrying raw SQL (#60) - set from
+///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />, and
+///     <c>false</c> by default. It changes exactly one verdict, in
+///     <see cref="IsSerializableKind" />: whether EF's relational raw-SQL query root has a wire
+///     representation. <b>It is not a security boundary</b> - the server's own
+///     <see cref="IInfoCarrierArbitrarySqlExecution" /> registration is, and it refuses a
+///     raw-SQL payload however this client is configured.
+/// </param>
+public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitrarySqlAllowed = false)
 {
     private readonly TypeAllowlist _allowlist = allowlist;
+    private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
 
     /// <summary>
     ///     Analyzes a captured query tree.
@@ -39,7 +49,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var walker = new Walker(_allowlist);
+        var walker = new Walker(_allowlist, _arbitrarySqlAllowed);
         walker.Visit(root);
         return new BoundaryAnalysis(root, walker.Results);
     }
@@ -49,7 +59,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     ///     minimal set of research-findings §5 (block, loop, try, goto, switch, label) have no
     ///     wire representation, so a subtree containing one can never be shipped.
     /// </summary>
-    internal static bool IsSerializableKind(Expression node)
+    internal static bool IsSerializableKind(Expression node, bool arbitrarySqlAllowed = false)
         => node switch
         {
             // The EXACT type, not the base. A query root carrying state beyond its entity type is
@@ -64,6 +74,15 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
             // not reference (M9).
             { } root when root.GetType() == typeof(Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression)
                 => true,
+
+            // The one subclass this wire does know, and only where the application asked for it
+            // (#60). `FromSqlQueryRootStubNode` carries the `Sql` and the arguments that the
+            // paragraph above records as having been dropped, and `RelationalQueryRootShape`
+            // names the type by shape for the same reason the comment above gives. Without the
+            // option this stays `false`, so the refusal below is unchanged and every existing
+            // caller sees EF's own `TranslationFailed`.
+            { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsFromSqlRoot(root) => true,
+
             Microsoft.EntityFrameworkCore.Query.QueryRootExpression => false,
             // Any other extension node — QueryParameterExpression included, though those are
             // substituted away before the split — has no translation.
@@ -201,7 +220,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     /// <summary>
     ///     Folds each node's verdict from its direct children, post-order.
     /// </summary>
-    private sealed class Walker(TypeAllowlist allowlist) : ExpressionVisitor
+    private sealed class Walker(TypeAllowlist allowlist, bool arbitrarySqlAllowed) : ExpressionVisitor
     {
         // One entry per direct child, popped when the parent folds them.
         private readonly List<NodeFacts> _pending = [];
@@ -218,7 +237,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
             int mark = _pending.Count;
             base.Visit(node);
 
-            bool serverOk = IsSerializableKind(node);
+            bool serverOk = IsSerializableKind(node, arbitrarySqlAllowed);
             bool hasRoot = IsQueryRoot(node);
             HashSet<ParameterExpression>? free = null;
 

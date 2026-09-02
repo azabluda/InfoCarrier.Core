@@ -65,4 +65,41 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
 
         return this;
     }
+
+    /// <summary>
+    ///     Permits this client to send a query carrying raw SQL - <c>FromSql</c>,
+    ///     <c>FromSqlRaw</c>, <c>FromSqlInterpolated</c> (#60).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The server decides whether it runs, and it refuses by default.</b> This half
+    ///         governs what this application's own code may <em>send</em>; the grant is
+    ///         <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />
+    ///         on the server, and it is the security boundary. Registering here alone produces a
+    ///         query the server refuses, exactly as <c>AllowTypes</c> does.
+    ///     </para>
+    ///     <para>
+    ///         <b>Named for what it grants rather than for the API it unblocks.</b>
+    ///         <c>Sqlite/RawSqlExecutionProbeTest</c> (R94) measured both halves: one
+    ///         <c>CommandText</c> executes every statement it contains, and an uncomposed
+    ///         <c>FromSqlRaw</c> reaches the store unwrapped. There is no read-only subset of this
+    ///         to ask for. Read <c>docs/security-review.md</c> section 5a.
+    ///     </para>
+    ///     <para>
+    ///         Without it, a <c>FromSql</c> query is refused with EF's own
+    ///         <c>TranslationFailed</c> - the answer every other provider gives for a construct it
+    ///         cannot translate.
+    ///     </para>
+    /// </remarks>
+    /// <returns>The same builder, so calls chain.</returns>
+    public virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
+    {
+        InfoCarrierOptionsExtension extension =
+            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
+                .WithArbitrarySqlExecution();
+
+        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
+
+        return this;
+    }
 }

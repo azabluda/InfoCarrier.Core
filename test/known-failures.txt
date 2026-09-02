@@ -2290,5 +2290,14 @@
 # the caller chooses. So there is no read-only subset of `FromSql` to grant, and the opt-in has to
 # be named for arbitrary SQL execution.
 
+# 2026-09-02 (R95) -- `failed` unchanged at 157, `total` 29231 -> 29235. Four new tests in
+# `SqliteSmokeTest`, all green: the raw-SQL gate (#60) in R85's three shapes plus one for the
+# arguments. FIXED none, BROKEN none.
+#
+# THE GATE TURNS NOTHING GREEN AND THAT IS EXPECTED. The 27 raw-SQL reds counted in D8 need the
+# harness work too -- R77's `RelationalTestStore` cast blocks 26 of them before a query is built,
+# and no inherited fixture grants the gate. What landed here is the capability and its default-deny
+# boundary; pointing the spec bases at it is the next step.
+
 failed=157
-total=29231
+total=29235

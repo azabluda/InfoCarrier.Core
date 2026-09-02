@@ -106,13 +106,26 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
         // query-root stubs (research-findings §2).
         if (node.Value is IQueryable queryable)
         {
-            _result = new QueryRootStubNode
-            {
-                ElementType = RootElementType(
-                    queryable.ElementType,
-                    queryable.Expression as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression),
-                Type = type,
-            };
+            TypeNode rootElement = RootElementType(
+                queryable.ElementType,
+                queryable.Expression as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression);
+
+            // A raw-SQL queryable captured as a constant - the same root as the extension branch
+            // below, reached when the caller closed over the `FromSql` query rather than writing
+            // it inline. Its state is carried, not dropped (#60).
+            _result = RelationalQueryRootShape.TryRead(queryable.Expression, out string? capturedSql, out Expression? capturedArgument)
+                ? new FromSqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = type,
+                    Sql = capturedSql,
+                    Arguments = Translate(capturedArgument),
+                }
+                : new QueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = type,
+                };
             return node;
         }
 
@@ -151,12 +164,31 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
         // EF Core's EntityQueryRootExpression (NodeType Extension) becomes a query-root stub.
         if (node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root)
         {
+            TypeNode rootElement = RootElementType(
+                root.ElementType,
+                root as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression);
+            TypeNode rootType = _typeMapper.ToTypeNode(node.Type);
+
+            // EF's relational raw-SQL root carries a SQL string and an argument expression that a
+            // plain stub has no field for, and dropping them is what silently returned the whole
+            // table before R75. `Translate` runs FIRST because it assigns `_result` itself (#60).
+            if (RelationalQueryRootShape.TryRead(root, out string? sql, out Expression? argument))
+            {
+                ExpressionNode arguments = Translate(argument);
+                _result = new FromSqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = rootType,
+                    Sql = sql,
+                    Arguments = arguments,
+                };
+                return node;
+            }
+
             _result = new QueryRootStubNode
             {
-                ElementType = RootElementType(
-                    root.ElementType,
-                    root as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression),
-                Type = _typeMapper.ToTypeNode(node.Type),
+                ElementType = rootElement,
+                Type = rootType,
             };
             return node;
         }

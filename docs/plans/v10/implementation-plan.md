@@ -2896,6 +2896,59 @@ re-parents of families already running, because R25–R30 showed that is where t
       R95 does. The answers live in the test file's own remarks rather than in prose here, because
       a fact in prose goes stale and this one is what a review will rest on.
 
+- [x] **R95. The raw-SQL gate, and the wire node that makes it mean something (#60).** `src/`
+      change, so both gates plus the CI Release build. `failed` unchanged at 157, `total` 29231 ->
+      29235; FIXED none, BROKEN none. Trim ratchet `ours` 89 <= 89, `total` 855. `CI=true
+      dotnet build --configuration Release` reports the documented `5 Warning(s), 0 Error(s)`.
+
+      **The name is the finding, and R94 is where it comes from.** `AddInfoCarrierArbitrarySqlExecution`
+      on the server, `AllowArbitrarySqlExecution` on the client. Not "enable `FromSql`": one
+      `CommandText` executes every statement it contains and an uncomposed `FromSqlRaw` reaches the
+      store unwrapped, so what is granted is arbitrary SQL execution on the server's connection and
+      there is no read-only subset of it to offer. `security-review.md` **section 5a** is the
+      written form, and it also corrects section 5's first bullet: a client cannot influence the
+      server's query filters, but it can now write a query they are not part of.
+
+      **R85's two halves, doing the same two jobs.** The server's registration is the security
+      boundary and is default-deny; the client's option governs only what this application's own
+      code may send. Four tests in `SqliteSmokeTest` pin it in R85's three shapes plus one: refused
+      when neither side grants it, works when both do, **refused by the server when only the client
+      grants it**, and the arguments cross as values. The third is the one that makes the two
+      registrations something other than duplication.
+
+      **The registration and the wire node landed together on purpose, against the sprint's stated
+      order.** A gate that admits a node the wire cannot carry is a switch that turns on a broken
+      path, and the one-commit window between them would have been exactly that. `D8`'s own
+      recommendation - the security section first and on its own - is honoured by R94, which is the
+      half of that section that is a fact.
+
+      **`FromSqlQueryRootStubNode`**, a subclass of `QueryRootStubNode` carrying `Sql` and the
+      arguments node. `QueryRootStubNode` is unsealed for it and for nothing else; the wire mirrors
+      EF's own hierarchy, where a root with extra state is a subclass too.
+      `ServerBoundaryAnalyzer.IsSerializableKind` still matches EF's plain root by EXACT type and
+      still refuses every other subclass - the new clause is one more exact shape, and only when
+      the client option is set, so the refusal path is byte-identical for everyone else.
+
+      **`RelationalQueryRootShape` names EF's type by shape**, because `InfoCarrier.Core` does not
+      reference `EFCore.Relational` (D3) and R75's comment already named it that way. Two
+      `GetProperty` reads on the client, one `Activator.CreateInstance` on the server, each with a
+      narrow `[UnconditionalSuppressMessage]` saying why the members survive trimming. **The trim
+      count still rose to 90 on the first run, and the cause is worth carrying**: an
+      `[UnconditionalSuppressMessage]` covers the annotated member's own body, and a lambda
+      compiles to a member of its own - `.Select(a => a.GetType(...))` reported its IL2026 against
+      `<>c.<ResolveFromSqlRootType>b__5_0`, outside the suppression. Rewritten as a `foreach` it is
+      89 again.
+
+      **The arguments are bound, never interpolated.** They cross as an ordinary constant node and
+      are handed back to EF, which makes `DbParameter`s of them. Not because injection is the
+      threat - a client that can send this node already writes whatever SQL it likes - but because
+      a value put into text has lost its type. Pinned with a value containing a quote.
+
+      **The 27 blocked spec tests are untouched by this and stay red.** They need the harness work
+      as well: R77's `RelationalTestStore` cast blocks 26 of them before the query is ever built,
+      and no fixture grants the gate. That is the next step, and the gate is what unblocks it
+      rather than the other way round.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

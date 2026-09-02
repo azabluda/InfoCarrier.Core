@@ -773,6 +773,29 @@ is already known; the security section decides whether they should exist, and in
 opt-in server registration in the shape of R85's `AddInfoCarrierAllowedTypes` is the obvious
 candidate, but that is the owner's call and a review's, not a step's.
 
+#### D8 amendment 2026-09-02 — built, and the ordering was changed once for a measured reason
+
+**The gate is `AddInfoCarrierArbitrarySqlExecution` (server) and `AllowArbitrarySqlExecution`
+(client), and the name is the finding.** R94 put the two questions the security section rests on to
+a test rather than to a reading, and both answers removed an option: **one `CommandText` executes
+every statement it contains**, and **an uncomposed `FromSqlRaw` reaches the store unwrapped**. The
+`FROM (…)` subquery that would have confined a caller to reading is an artefact of *composing* on
+the query, and the caller decides whether to compose. So there is no read-only version of
+`FromSql` to grant, the API cannot honestly be called "enable raw queries", and §2's per-class
+conjunction gives no support — SQL text is not a naming question and there is no set to enumerate.
+`security-review.md` §5a is the written form.
+
+**Item 3 still came first in substance, and item 1 was built in the same step rather than the
+next.** A registration that admits a node the wire cannot yet carry is a switch that turns on a
+broken path, so R95 lands the gate and the `FromSqlQueryRootStubNode` together. The reflection that
+buys — two `GetProperty` reads on the client and one `Activator.CreateInstance` on the server, all
+in `RelationalQueryRootShape` — is the premise `eng/trim-baseline.txt` already describes, and every
+call site carries a narrow `[UnconditionalSuppressMessage]` naming why the members survive.
+
+**Item 2 is untouched and stays priced.** `SqlQuery<T>` and `Database.ExecuteSql` are separate
+entry points, not query roots, and `SqlExecutorTestBase` passes `DbParameter` objects that the
+client cannot construct. It accounts for **0 of the 27** raw-SQL reds and one missing base.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query

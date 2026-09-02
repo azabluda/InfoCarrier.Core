@@ -63,7 +63,8 @@ internal sealed class QueryExecutor<TElement>
             queryContext.Context.Model,
             Expressions.TypeAllowlist.ForModel(
                 queryContext.Context.Model, InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context)),
-            queryContext.QueryLogger).Split(substituted);
+            queryContext.QueryLogger,
+            InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context)).Split(substituted);
 
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
