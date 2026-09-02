@@ -2299,5 +2299,26 @@
 # and no inherited fixture grants the gate. What landed here is the capability and its default-deny
 # boundary; pointing the spec bases at it is the next step.
 
-failed=157
+# 2026-09-02 (R96) -- `failed` 157 -> 133, `total` unchanged at 29235. FIXED 24, BROKEN none.
+# The names file moves with it.
+#
+# THE RAW-SQL SPEC BASES POINTED AT R95'S GATE, WITH R77 REVIVED TO UNBLOCK THEM. Neither half buys
+# anything alone: R77 was parked having measured zero green tests, because everything behind the
+# `RelationalTestStore` cast was `FromSql` and `FromSql` was refused. The cast is the FIRST blocker
+# on 26 of the 27 raw-SQL reds and the gate is the second.
+#
+# THE GRANT IS PER FIXTURE, NOT SUITE-WIDE. Seven fixtures set `arbitrarySqlExecution: true`; every
+# other one still exercises the default refusal, and two assert it through `FromSqlAssertions`.
+#
+# READ THE REASONS, NOT THE COUNT, FOR THE THREE THAT DID NOT GO GREEN.
+# `Delete_FromSql_converted_to_subquery` (2) moved from the cast to `no such table: Order Details`:
+# the base names the table `NorthwindRelationalContext` maps with `ToTable("Order Details")`, and
+# this tier builds its store from `NorthwindContext`'s core model, where it is `OrderDetails`. A
+# harness mismatch of the same shape as the `ProductView` and `Product.CategoryID` notes already in
+# `NorthwindInfoCarrierSqliteServerContext`, and NOT a wire defect.
+# `SharedTypeQuery`'s remaining 2 moved to "Relational-specific methods can only be used when the
+# context is using a relational database provider", out of `SqlQueryRaw` -- D8 item 2, a separate
+# entry point that is not a query root and was never in this step's scope.
+
+failed=133
 total=29235

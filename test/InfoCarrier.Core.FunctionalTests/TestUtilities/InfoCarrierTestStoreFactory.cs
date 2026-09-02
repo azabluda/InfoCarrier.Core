@@ -35,14 +35,29 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
 
     private readonly Func<SharedTestStoreProperties> _props;
     private readonly InfoCarrierBackendTestStoreFactory _backendFactory;
+    private readonly bool _relationalClientStore;
 
     private InfoCarrierTestStoreFactory(
         Func<SharedTestStoreProperties> props,
-        InfoCarrierBackendTestStoreFactory backendFactory)
+        InfoCarrierBackendTestStoreFactory backendFactory,
+        bool relationalClientStore = false)
     {
         _props = props;
         _backendFactory = backendFactory;
+        _relationalClientStore = relationalClientStore;
     }
+
+    /// <summary>
+    ///     The client shell this factory hands out.
+    /// </summary>
+    /// <remarks>
+    ///     A <see cref="RelationalInfoCarrierTestStore" /> only where a fixture asked for one. See
+    ///     that class for why the choice is per fixture rather than global.
+    /// </remarks>
+    private TestStore CreateClientStore(InfoCarrierBackendTestStore backend)
+        => _relationalClientStore
+            ? new RelationalInfoCarrierTestStore(backend)
+            : new InfoCarrierTestStore(backend);
 
     /// <summary>
     ///     Creates a factory for the given backend + fixture properties. Fixtures typically cache
@@ -57,7 +72,9 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Type? serverContextType = null,
         Func<IServiceCollection, IServiceCollection>? onAddServices = null,
         Action<ModelConfigurationBuilder>? configureConventions = null,
-        ServiceLifetime? serverOptionsLifetime = null)
+        ServiceLifetime? serverOptionsLifetime = null,
+        bool relationalClientStore = false,
+        bool arbitrarySqlExecution = false)
     {
         var props = new SharedTestStoreProperties
         {
@@ -69,9 +86,10 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             CopyDbContextParameters = copyDbContextParameters,
             OnAddServices = onAddServices,
             ServerOptionsLifetime = serverOptionsLifetime,
+            ArbitrarySqlExecution = arbitrarySqlExecution,
         };
 
-        return new InfoCarrierTestStoreFactory(() => props, backendFactory);
+        return new InfoCarrierTestStoreFactory(() => props, backendFactory, relationalClientStore);
     }
 
     /// <summary>
@@ -86,16 +104,17 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     /// </remarks>
     public static ITestStoreFactory CreateDeferred(
         InfoCarrierBackendTestStoreFactory backendFactory,
-        Func<SharedTestStoreProperties> properties)
-        => new InfoCarrierTestStoreFactory(properties, backendFactory);
+        Func<SharedTestStoreProperties> properties,
+        bool relationalClientStore = false)
+        => new InfoCarrierTestStoreFactory(properties, backendFactory, relationalClientStore);
 
     /// <inheritdoc />
     public virtual TestStore Create(string storeName)
-        => new InfoCarrierTestStore(_backendFactory(storeName, shared: false, _props()));
+        => CreateClientStore(_backendFactory(storeName, shared: false, _props()));
 
     /// <inheritdoc />
     public virtual TestStore GetOrCreate(string storeName)
-        => new InfoCarrierTestStore(_backendFactory(storeName, shared: true, _props()));
+        => CreateClientStore(_backendFactory(storeName, shared: true, _props()));
 
     /// <inheritdoc />
     /// <remarks>

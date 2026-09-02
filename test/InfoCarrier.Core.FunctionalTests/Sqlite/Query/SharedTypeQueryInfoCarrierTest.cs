@@ -32,7 +32,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class SharedTypeQueryInfoCarrierTest(NonSharedFixture fixture)
     : SharedTypeQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    // Both opt-ins, for the two reds this class carries. `SharedTypeQueryRelationalTestBase` casts
+    // the store to `RelationalTestStore` in `Ad_hoc_query_for_shared_type_entity_type_works`, and
+    // the query it then builds is a `FromSql` (#60).
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(
+        InfoCarrierTestStoreFactory.Sqlite,
+        relationalClientStore: true,
+        arbitrarySqlExecution: true);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

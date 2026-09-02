@@ -80,6 +80,8 @@ public class OwnedQueryInfoCarrierTest(OwnedQueryInfoCarrierTest.OwnedQueryInfoC
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 onAddOptions: AssociationsWarnings.ThrowOnUnorderedRowLimiting,
-                configureConventions: ConfigureConventions);
+                configureConventions: ConfigureConventions,
+                relationalClientStore: true,
+                arbitrarySqlExecution: true);
     }
 }

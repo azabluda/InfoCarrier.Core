@@ -1,6 +1,8 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Data.Common;
 using InfoCarrier.Core.Common;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +43,15 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         if (testStoreProperties.OnAddServices is { } onAddServices)
         {
             services = onAddServices(services);
+        }
+
+        // The SERVER half of the raw-SQL seam (#60), and the half that is the security boundary.
+        // Absent unless the fixture asked, which is what makes the default a refusal rather than a
+        // hole -- `SqliteSmokeTest` builds its stores without going through a fixture and pins
+        // both directions.
+        if (testStoreProperties.ArbitrarySqlExecution)
+        {
+            services = services.AddInfoCarrierArbitrarySqlExecution();
         }
 
         services = services
@@ -172,6 +183,18 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     The server URL/name this store stands in for.
     /// </summary>
     public string ServerUrl => Name;
+
+    /// <summary>
+    ///     Whether this store's fixture granted raw SQL execution (#60). Read by the client shells,
+    ///     which have to set the matching client-side option.
+    /// </summary>
+    public bool ArbitrarySqlExecution => _testStoreProperties.ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     An <b>unopened</b> connection carrying the backing store's connection string, for
+    ///     <c>RelationalTestStore</c> to read <c>ConnectionString</c> from. EXPERIMENT (decision 1).
+    /// </summary>
+    public virtual DbConnection CreateStoreConnection() => new SqliteConnection();
 
     /// <summary>
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.

@@ -95,4 +95,26 @@ public struct SharedTestStoreProperties
     ///     asserts in <c>SeedAsync</c> that it ran, and the seed executes against the server.
     /// </remarks>
     public Func<IServiceCollection, IServiceCollection>? OnAddServices;
+
+    /// <summary>
+    ///     Whether this fixture's client and server both grant raw SQL execution (#60).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Per fixture, and default off, for the same reason
+    ///         <c>relationalClientStore</c> is</b> - the opt-in list is the record of which bases
+    ///         need it. A fixture that sets this gets
+    ///         <c>services.AddInfoCarrierArbitrarySqlExecution()</c> on the server and
+    ///         <c>o.AllowArbitrarySqlExecution()</c> on the client, which are the two halves of the
+    ///         seam and only the first of which is a security boundary.
+    ///     </para>
+    ///     <para>
+    ///         <b>Not granted suite-wide</b>, deliberately. The default refusal is what every other
+    ///         fixture exercises, and two of them assert it directly through
+    ///         <see cref="FromSqlAssertions" />. Granting globally would delete that coverage and
+    ///         claim, of every fixture in the suite, that its deployment had made a security
+    ///         decision it has not.
+    ///     </para>
+    /// </remarks>
+    public bool ArbitrarySqlExecution;
 }

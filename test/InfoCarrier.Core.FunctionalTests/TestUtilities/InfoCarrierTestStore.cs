@@ -15,7 +15,8 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="InfoCarrierTestStore" /> class.
 /// </remarks>
-public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend) : TestStore(backend.Name, shared: false)
+public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
+    : TestStore(backend.Name, shared: false), IInfoCarrierClientTestStore
 {
     private readonly InfoCarrierBackendTestStore _backend = backend;
 
@@ -39,8 +40,22 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend) : TestSto
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The CLIENT half of the raw-SQL seam (#60) when the fixture asked for it. Not a security
+    ///     boundary - it decides only what this client will send, and the server refuses
+    ///     independently.
+    /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => builder.UseInfoCarrier(_backend);
+        => builder.UseInfoCarrier(_backend, ClientOptions(_backend));
+
+    /// <summary>
+    ///     The InfoCarrier client options a fixture's store implies. Shared with
+    ///     <see cref="RelationalInfoCarrierTestStore" />, which needs the same answer.
+    /// </summary>
+    internal static Action<InfoCarrierDbContextOptionsBuilder>? ClientOptions(InfoCarrierBackendTestStore backend)
+        => backend.ArbitrarySqlExecution
+            ? o => o.AllowArbitrarySqlExecution()
+            : null;
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

@@ -2949,6 +2949,49 @@ re-parents of families already running, because R25–R30 showed that is where t
       and no fixture grants the gate. That is the next step, and the gate is what unblocks it
       rather than the other way round.
 
+- [x] **R96. The raw-SQL spec bases pointed at the gate, and R77 revived to unblock them (#60).**
+      `test/` only, so `eng/measure.sh` is the gate. **`failed` 157 -> 133**, `total` unchanged at
+      29235. **FIXED 24, BROKEN none.**
+
+      **Neither half buys anything alone, which is why they land together.** R77's
+      `RelationalInfoCarrierTestStore` was parked on 2026-09-01 having measured **zero** green
+      tests - it turned 26 `InvalidCastException`s into 26 `FromSql` refusals, and a refusal was
+      the right answer then. R95 changed that, and the cast is the *first* blocker on 26 of the 27
+      raw-SQL reds. Cherry-picked as written, with the `ServiceLifetime` and relational-nulls work
+      that landed in between merged around it, and ADR-013's amendment re-dated to this step.
+
+      **The grant is per fixture, as `relationalClientStore` is, and for the same reason.**
+      `SharedTestStoreProperties.ArbitrarySqlExecution` gives the server
+      `AddInfoCarrierArbitrarySqlExecution()` and the client `AllowArbitrarySqlExecution()`. Seven
+      fixtures opt in. **Not granted suite-wide**: the default refusal is what every other fixture
+      exercises, two of them assert it directly through `FromSqlAssertions`, and a global grant
+      would claim of every fixture that its deployment had made a security decision it has not.
+
+      **The 24, by class.** 14 `JsonQuerySqlite` `FromSql_on_entity_with_json_*`, 3
+      `TPHInheritanceQuery` (including `Casting_to_base_type_joining_with_query_type_works`, the
+      real defect R77 recorded the cast as hiding), 2 `OwnedQuery`, 2 `QueryNoClientEval`, 2
+      `NorthwindBulkUpdates.Update_FromSql_set_constant`, and 1 each of `NullSemanticsQuery` and
+      `SharedTypeQuery`.
+
+      **Where the other three stopped, read out of the reasons diff rather than the count.**
+
+      - **`NorthwindBulkUpdates.Delete_FromSql_converted_to_subquery` (2) moved from a cast to
+        `SQLite Error 1: 'no such table: Order Details'`** - a *harness* mismatch, not a wire one.
+        The base is written against `NorthwindRelationalContext`, which maps `OrderDetail`
+        `ToTable("Order Details")`; this tier builds its store from `NorthwindContext`'s core model,
+        where the table is `OrderDetails`. `Update_FromSql_set_constant` passes because it names
+        `[Customers]`, which both models agree on. Same shape as the `ProductView` and
+        `Product.CategoryID` notes already in `NorthwindInfoCarrierSqliteServerContext`.
+      - **`SharedTypeQuery`'s remaining 2** moved to
+        `"Relational-specific methods can only be used when the context is using a relational
+        database provider"`, raised by `RelationalDatabaseFacadeExtensions.SqlQueryRaw`. That is
+        **D8 item 2** - `SqlQuery<T>` and `Database.ExecuteSql` are separate entry points, not query
+        roots - and is untouched by this step, as D8's amendment says.
+
+      **A test that moves from a cast to a translation failure to a real store error has moved
+      twice and the count says so only once.** Two of these three are further along than they were
+      and still red; the reasons diff is the only thing that shows it.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

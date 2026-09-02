@@ -35,7 +35,9 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             copyDbContextParameters: (client, server) =>
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
             serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+                arbitrarySqlExecution: true);
 
     /// <summary>
     ///     Snaps <c>OrderDetail.Discount</c> back to its two-decimal value after seeding.

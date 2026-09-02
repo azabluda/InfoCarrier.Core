@@ -99,7 +99,9 @@ public class NullSemanticsQueryInfoCarrierTest(NullSemanticsQueryInfoCarrierTest
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 onAddOptions: ApplyRelationalNulls,
                 configureConventions: ConfigureConventions,
-                serverOptionsLifetime: ServiceLifetime.Transient);
+                serverOptionsLifetime: ServiceLifetime.Transient,
+                relationalClientStore: true,
+                arbitrarySqlExecution: true);
 
         // The server half of the flag. Transient options mean this runs once per server context,
         // so it sees the value the test in flight set.

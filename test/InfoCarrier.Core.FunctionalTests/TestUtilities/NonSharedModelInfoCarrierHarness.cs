@@ -35,8 +35,19 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     </para>
 /// </remarks>
 /// <param name="backend">The backing provider, usually <c>InfoCarrierTestStoreFactory.InMemory</c>.</param>
+/// <param name="relationalClientStore">
+///     Whether the client shell must be a <c>RelationalTestStore</c> - see
+///     <see cref="RelationalInfoCarrierTestStore" />. Per adopting class, as it is per fixture
+///     everywhere else.
+/// </param>
+/// <param name="arbitrarySqlExecution">
+///     Whether both sides grant raw SQL execution (#60). Same opt-in as a shared fixture's, threaded
+///     through <see cref="Prepare" /> because this harness builds its properties per test.
+/// </param>
 public sealed class NonSharedModelInfoCarrierHarness(
-    InfoCarrierTestStoreFactory.InfoCarrierBackendTestStoreFactory backend)
+    InfoCarrierTestStoreFactory.InfoCarrierBackendTestStoreFactory backend,
+    bool relationalClientStore = false,
+    bool arbitrarySqlExecution = false)
 {
     private SharedTestStoreProperties _pending;
     private ITestStoreFactory? _testStoreFactory;
@@ -45,7 +56,8 @@ public sealed class NonSharedModelInfoCarrierHarness(
     ///     The factory to return from the adopting class's <c>TestStoreFactory</c>.
     /// </summary>
     public ITestStoreFactory TestStoreFactory
-        => _testStoreFactory ??= InfoCarrierTestStoreFactory.CreateDeferred(backend, () => _pending);
+        => _testStoreFactory ??= InfoCarrierTestStoreFactory.CreateDeferred(
+            backend, () => _pending, relationalClientStore);
 
     /// <summary>
     ///     Records what the next store must be built for. Call from the adopting class's
@@ -72,6 +84,8 @@ public sealed class NonSharedModelInfoCarrierHarness(
             OnAddOptions = ServerOptions(onConfiguring, addOptions),
 
             CopyDbContextParameters = CopyContextState,
+
+            ArbitrarySqlExecution = arbitrarySqlExecution,
         };
 
     /// <summary>
