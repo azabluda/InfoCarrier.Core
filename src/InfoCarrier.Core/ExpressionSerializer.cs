@@ -79,4 +79,22 @@ public class ExpressionSerializer(
         var forward = new ExpressionToNodeTranslator(typeMapper, valueMapper);
         return new ExpressionSerializer(forward, typeResolver, valueMapper);
     }
+    /// <summary>
+    ///     Creates a serializer for a model, admitting no types beyond the ones it implies.
+    /// </summary>
+    /// <remarks>
+    ///     <b>A binary-compatibility overload, kept because 10.0.0 shipped this signature.</b>
+    ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
+    ///     compiler emits one member and the old arity disappears from the assembly, which
+    ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
+    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
+    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
+    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    /// </remarks>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public static ExpressionSerializer CreateForModel(
+        Microsoft.EntityFrameworkCore.Metadata.IModel model,
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers)
+        => CreateForModel(model, valueMappers, allowedTypes: null);
+
 }

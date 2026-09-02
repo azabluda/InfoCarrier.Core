@@ -8,7 +8,7 @@ namespace InfoCarrier.Core;
 /// <summary>
 ///     The EF Core options extension that carries the client's <see cref="IInfoCarrierClient" />
 ///     and registers InfoCarrier provider services (DI-first, requirements §4.2). Added by
-///     <see cref="InfoCarrierDbContextOptionsBuilderExtensions.UseInfoCarrier" />.
+///     <see cref="InfoCarrierDbContextOptionsBuilderExtensions.UseInfoCarrier(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder, IInfoCarrierClient, System.Action{InfoCarrierDbContextOptionsBuilder})" />.
 /// </summary>
 public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 {

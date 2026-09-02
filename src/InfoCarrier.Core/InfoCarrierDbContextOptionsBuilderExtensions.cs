@@ -102,4 +102,55 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     private static InfoCarrierOptionsExtension GetOrCreateExtension(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>()
             ?? new InfoCarrierOptionsExtension();
+    /// <summary>
+    ///     Configures the context to query through the given InfoCarrier client.
+    /// </summary>
+    /// <remarks>
+    ///     <b>A binary-compatibility overload, kept because 10.0.0 shipped this signature.</b>
+    ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
+    ///     compiler emits one member and the old arity disappears from the assembly, which
+    ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
+    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
+    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
+    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    /// </remarks>
+    [RequiresUnreferencedCode(
+         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
+         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
+         + "client does run; test the paths your model actually uses. See "
+         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
+     RequiresDynamicCode(
+         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
+         + "generic types over types the payload names, neither of which Native AOT can generate.")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public static DbContextOptionsBuilder UseInfoCarrier(
+        this DbContextOptionsBuilder optionsBuilder,
+        IInfoCarrierClient client)
+        => UseInfoCarrier(optionsBuilder, client, infoCarrierOptionsAction: null);
+
+    /// <summary>
+    ///     Configures the typed context to query through the given InfoCarrier client.
+    /// </summary>
+    /// <remarks>
+    ///     See the overload above: a binary-compatibility shim for the 10.0.0 signature.
+    /// </remarks>
+    /// <typeparam name="TContext">The context type.</typeparam>
+    /// <param name="optionsBuilder">The builder being configured.</param>
+    /// <param name="client">The client this context queries through.</param>
+    /// <returns>The same builder, so calls can be chained.</returns>
+    [RequiresUnreferencedCode(
+         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
+         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
+         + "client does run; test the paths your model actually uses. See "
+         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
+     RequiresDynamicCode(
+         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
+         + "generic types over types the payload names, neither of which Native AOT can generate.")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder,
+        IInfoCarrierClient client)
+        where TContext : DbContext
+        => UseInfoCarrier(optionsBuilder, client, infoCarrierOptionsAction: null);
+
 }

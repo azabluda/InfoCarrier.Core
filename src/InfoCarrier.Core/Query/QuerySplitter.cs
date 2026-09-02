@@ -1656,4 +1656,25 @@ public sealed class QuerySplitter
             return true;
         }
     }
+    /// <summary>
+    ///     Creates a splitter that refuses a query carrying raw SQL.
+    /// </summary>
+    /// <remarks>
+    ///     <b>A binary-compatibility overload, kept because 10.0.0 shipped this signature.</b>
+    ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
+    ///     compiler emits one member and the old arity disappears from the assembly, which
+    ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
+    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
+    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
+    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    /// </remarks>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public QuerySplitter(
+        IModel model,
+        TypeAllowlist? allowlist,
+        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger)
+        : this(model, allowlist, queryLogger, arbitrarySqlAllowed: false)
+    {
+    }
+
 }
