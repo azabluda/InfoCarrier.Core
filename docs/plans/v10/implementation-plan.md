@@ -2863,6 +2863,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       the security section first and on its own**, before either piece of code; the shape of both
       code pieces is already known and neither is the hard part.
 
+- [x] **R94. What a raw SQL string is actually allowed to do, measured before the gate was named.**
+      `test/` only, so `eng/measure.sh` is the gate. `failed` unchanged at 157, `total` 29228 ->
+      29231; FIXED none, BROKEN none, REASONS unchanged. The three new tests are
+      `Sqlite/RawSqlExecutionProbeTest` and all three are green.
+
+      **Moved ahead of the registration on purpose, and the reason is that it decides the
+      registration's name.** D8 recommended the security section first; this is the half of that
+      section which is a fact rather than a position, and landing the gate before measuring it
+      would have meant rewriting the prose afterwards. Two questions, both about
+      `Microsoft.Data.Sqlite` and EF Core rather than about this provider, and nothing here crosses
+      the wire.
+
+      **Does one `CommandText` execute more than one statement? YES.**
+      `SELECT 1; DROP TABLE Probe;` drops the table. Measured on both driver paths, because they
+      are different code and only the second is the one EF takes for a query: `ExecuteNonQuery`
+      runs everything, and on `ExecuteReader` the trailing statements run as the reader is advanced
+      past the first result set - which disposal does, so a caller who reads one row and stops has
+      still run the `DROP`. `Microsoft.Data.Sqlite` prepares and steps the statements in sequence
+      by design and offers no single-statement mode.
+
+      **Does EF hand an uncomposed `FromSqlRaw` to the store unwrapped? YES.** The caller's string
+      is the whole command, character for character - the only difference is the newline
+      `ToQueryString` appends, and the query is executed as well so the assertion does not rest on
+      a path the execution does not take. The `FROM (<sql>) AS x` wrap does exist, and the contrast
+      test pins it, but it appears only when something is composed on top: it is an artefact of
+      composition, and **the caller decides whether to compose**.
+
+      **What the two answers settle.** There is no read-only version of `FromSql` to grant.
+      Enabling it enables arbitrary SQL execution on the server's connection under whatever rights
+      it holds, so the gate must be named for that and not for the API it unblocks - which is what
+      R95 does. The answers live in the test file's own remarks rather than in prose here, because
+      a fact in prose goes stale and this one is what a review will rest on.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

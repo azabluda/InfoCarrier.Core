@@ -2279,5 +2279,16 @@
 # REASON" DECIDED THE BEHAVIOUR -- R84, R89 and this. The type allowlist is load-bearing for far
 # more than deserialization safety and nothing says so where it is declared.
 
+# 2026-09-02 (R94) -- `failed` unchanged at 157, `total` 29228 -> 29231. Three new tests, all
+# green: `Sqlite/RawSqlExecutionProbeTest`, the measurement #60's security gate is named from.
+# FIXED none, BROKEN none, REASONS unchanged.
+#
+# BOTH ANSWERS WENT THE WAY THAT REMOVES OPTIONS. One `CommandText` executes every statement it
+# contains -- `SELECT 1; DROP TABLE X` drops the table, on the `ExecuteReader` path EF itself takes
+# -- and an uncomposed `FromSqlRaw` reaches the store unwrapped, the caller's string being the
+# whole command. The `FROM (...)` wrap is real but is an artefact of COMPOSING on the query, which
+# the caller chooses. So there is no read-only subset of `FromSql` to grant, and the opt-in has to
+# be named for arbitrary SQL execution.
+
 failed=157
-total=29228
+total=29231
