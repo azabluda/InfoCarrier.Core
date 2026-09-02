@@ -439,6 +439,60 @@ the flag per fixture makes the same bases run both ways, and the difference is t
 from outside `InfoCarrier.Core` satisfied EF's type test and took `failed` 143 → 141 with D3
 untouched. That class is the first member this package would hold.
 
+#### D3 amendment 2026-09-02 (R120) — level 1 is built, and the seam it needed has exactly one reader
+
+**`src/InfoCarrier.Core.Relational` now exists and ships.** It holds
+`InfoCarrierRelationalQueryRoots`, which names `FromSqlQueryRootExpression` and
+`SqlQueryRootExpression` outright, and `InfoCarrierRelationalFacadeDependencies`, moved out of the
+test project. `RelationalQueryRootShape.cs` is deleted: **276 lines and 10 trim suppressions**, and
+the trim count fell with them. **D3 as written is still untouched** — `InfoCarrier.Core` references
+nothing relational, and the seam it exposes is
+`InfoCarrier.Core.Metadata.IInfoCarrierRelationalQueryRoots` with a no-op default.
+
+**The finding is the constraint, and it cost a wrong answer to see.** The prototype gave the same
+fact two carriers. `ServerBoundaryAnalyzer` read the seam from the **options**, which it must:
+`ExtensionInfo.GetServiceProviderHashCode()` is `0` and `ShouldUseSameServiceProvider` is true for
+every InfoCarrier options shape, so every client context in a process shares one internal service
+provider and anything per-context has to travel on the options. `ExpressionToNodeTranslator` read it
+from **DI**, because it is DI-scoped. A client that set the option but not the service therefore
+**admitted** a raw-SQL root at the boundary and then **dropped its SQL** in the translator — the
+whole table came back, which is the defect R75 closed.
+`FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated` answered **2 where 1 is
+correct**, and a red test would have been the better outcome.
+
+**The rule that generalises, and it is not about relational at all.** *A fact two components read
+independently is a fact that can disagree with itself, and the disagreement is silent when one
+component's answer only widens what the other is allowed to do.* Permission and knowledge were split
+across two carriers here, and the boundary check held while the thing it guarded stopped being
+carried.
+
+**The shape of the fix.** `InfoCarrierOptionsExtension.RelationalQueryRootsFor(context)` is the one
+reader. `QueryExecutor` calls it once per execution and hands the same object to `QuerySplitter`
+(hence to the analyzer) and to `ExpressionSerializer.ToNode`. The translator takes it per
+translation and scopes it exactly as it scopes parameter identity: set at depth 0, untouched in the
+recursion. Nothing else resolves it.
+
+**The server half is a separate provider and asks separately.** `InProcessInfoCarrierServer` resolves
+it from the application's collection and passes it to `ServerQueryExecutor`, beside the value
+mappers, the allowed types and the raw-SQL grant. **Not from the context**: the server context builds
+its own internal service provider and never sees the application's collection, so a lookup through
+the context answered "nothing is relational here" for a server that had registered a real
+implementation.
+
+**Three registration entry points, and that is not untidiness.**
+
+| Call | Where | Why it is separate |
+|---|---|---|
+| `AddInfoCarrierRelational()` | both halves | the query roots, and nothing else |
+| `AddInfoCarrierRelationalClient()` | **client only** | also replaces `IDatabaseFacadeDependencies`, which `Database.SqlQuery<T>` type-tests. A relational *server* already has EF's own, and that one owns a live connection |
+| `InfoCarrierDbContextOptionsBuilder.UseRelationalQueryRoots(...)` | client, no DI | most clients never build an `IServiceCollection`; they only call `UseInfoCarrier`. `SqliteSmokeTest` is exactly that shape |
+
+**One further cost, measured.** `EnablePackageValidation` is set for every packable project in
+`Directory.Build.props`, and a brand-new package has no baseline: restore fails with `NU1101`
+hunting an `InfoCarrier.Core.Relational 10.0.0` that cannot exist. The new csproj sets
+`<EnablePackageValidation>false</EnablePackageValidation>` with a comment saying to turn it on after
+the first release.
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).

@@ -42,6 +42,7 @@ public sealed class QuerySplitter
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
     private readonly bool _arbitrarySqlAllowed;
+    private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots;
     private readonly ServerBoundaryAnalyzer _analyzer;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Query>? _queryLogger;
 
@@ -64,16 +65,24 @@ public sealed class QuerySplitter
     ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />. Default
     ///     <c>false</c>, which is the refusal every caller had before it existed.
     /// </param>
+    /// <param name="relationalRoots">
+    ///     How to recognise EF's relational raw-SQL query roots (#97), or <see langword="null" />
+    ///     when nothing has said the backing store is relational. <b>Knowledge, not permission</b>
+    ///     — the parameter above is the permission, and both are required before a raw-SQL root
+    ///     crosses.
+    /// </param>
     public QuerySplitter(
         IModel model,
         TypeAllowlist? allowlist = null,
         IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null,
-        bool arbitrarySqlAllowed = false)
+        bool arbitrarySqlAllowed = false,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
     {
         _model = model;
         _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
         _arbitrarySqlAllowed = arbitrarySqlAllowed;
-        _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed);
+        _relationalRoots = relationalRoots;
+        _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed, relationalRoots);
         _queryLogger = queryLogger;
     }
 
@@ -240,7 +249,7 @@ public sealed class QuerySplitter
 
         foreach (Expression node in nodes)
         {
-            if (!ServerBoundaryAnalyzer.IsSerializableKind(node, _arbitrarySqlAllowed))
+            if (!ServerBoundaryAnalyzer.IsSerializableKind(node, _arbitrarySqlAllowed, _relationalRoots))
             {
                 return $"'{Abbreviate(node)}' ({node.NodeType}) has no wire representation.";
             }
@@ -1664,9 +1673,9 @@ public sealed class QuerySplitter
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public QuerySplitter(

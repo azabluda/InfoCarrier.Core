@@ -3700,6 +3700,90 @@ re-parents of families already running, because R25–R30 showed that is where t
 
       No gate to run: nothing under `src/` or `test/` changed.
 
+- [x] **R120. `InfoCarrier.Core.Relational` ships, and the seam it needs has exactly one reader.**
+      Level 1 of #97's three. `src/` and `test/` change, so both gates ran, and a public signature
+      changes, so `dotnet pack` ran too.
+
+      **What is built.** A third shipped package, `src/InfoCarrier.Core.Relational`. It holds
+      `InfoCarrierRelationalQueryRoots`, which names `FromSqlQueryRootExpression` and
+      `SqlQueryRootExpression` outright, and `InfoCarrierRelationalFacadeDependencies`, moved out
+      of the test project. `InfoCarrier.Core` gains
+      `Metadata.IInfoCarrierRelationalQueryRoots` with a no-op default that refuses rather than
+      drops. **`RelationalQueryRootShape.cs` is deleted: 276 lines and 10 trim suppressions.**
+      `architecture.md` §6a carries the **D3 amendment 2026-09-02 (R120)**, and **D3 as written is
+      untouched** — the relational reference lives outside `InfoCarrier.Core`.
+
+      **THE FINDING, and it cost a wrong answer rather than a red test.** The prototype gave one
+      fact two carriers. `ServerBoundaryAnalyzer` read the seam from the **options**, which it must:
+      `ExtensionInfo.GetServiceProviderHashCode()` is `0` and `ShouldUseSameServiceProvider` is true
+      for every InfoCarrier options shape, so every client context in a process shares one internal
+      service provider and anything per-context has to travel on the options.
+      `ExpressionToNodeTranslator` read it from **DI**, because it is DI-scoped. A client that set
+      the option but not the service therefore **admitted** a raw-SQL root at the boundary and then
+      **dropped its SQL** in the translator, and the whole table came back — the defect R75 closed.
+      `SqliteSmokeTest.FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated`
+      answered **2 where 1 is correct**.
+
+      **The fix is one reader.** `InfoCarrierOptionsExtension.RelationalQueryRootsFor(context)` is
+      it. `QueryExecutor` calls it once per execution and hands the same object to `QuerySplitter`
+      (hence to the analyzer) and to `ExpressionSerializer.ToNode`. The translator takes it per
+      translation and scopes it as it scopes parameter identity: set at depth 0, untouched in the
+      recursion; the constructor parameter the prototype had is gone. `ExpressionSerializer
+      .CreateForModel` is back to its 10.0.0 shape — the server never forward-translates a query
+      root, so it never needed the seam, and one of the prototype's two compatibility overloads went
+      with it.
+
+      **A second half of the same mistake, found by running the tests.** The prototype resolved the
+      server's implementation from the server `DbContext`'s services. A server context builds its
+      own internal service provider and never sees the application's collection, so that answered
+      "nothing is relational here" for a server that had registered a real one, and
+      `A_FromSql_query_crosses_once_both_sides_grant_it` failed on the rebuild instead of the
+      translation. `InProcessInfoCarrierServer` now resolves it from the application's provider and
+      passes it to `ServerQueryExecutor`, beside the value mappers, the allowed types and the
+      raw-SQL grant, which is where the other three already came from.
+
+      **All 25 `SqliteSmokeTest` tests pass**, including the three the prototype left red.
+
+      **Three registration entry points, and it is not tidiness.** `AddInfoCarrierRelational()` on
+      both halves; `AddInfoCarrierRelationalClient()` on the **client only**, because it also
+      replaces `IDatabaseFacadeDependencies` and a relational server already has EF's own over a
+      live connection; and `InfoCarrierDbContextOptionsBuilder.UseRelationalQueryRoots(...)`,
+      because most clients never build an `IServiceCollection` — `SqliteSmokeTest` is exactly that
+      shape.
+
+      **Gates.** `eng/measure.sh r120 r119-check`: `Passed: 29013, Failed: 141, Total: 29392,
+      Skipped: 238`, **FIXED none, BROKEN none, REASONS unchanged** — the same 141 as `main`, which
+      is the answer this change should give, since the three smoke tests were red only on the
+      prototype. `dotnet pack` clean on all three packages, so the widened `QuerySplitter`,
+      `ServerBoundaryAnalyzer` and `ServerQueryExecutor` constructors and the new
+      `ExpressionSerializer.ToNode` overload are binary-compatible with 10.0.0.
+      `CI=true dotnet build --configuration Release`: `5 Warning(s), 0 Error(s)`.
+
+      **`eng/trim-ratchet.sh`: `ours` 89, `total` 855, and the baseline does NOT move.** The
+      expectation that removing 276 lines of reflection would lower it was wrong, and the reason is
+      worth carrying: **the ten attributes on that file were `UnconditionalSuppressMessage`, so
+      those diagnostics were never in the 89.** Deleting suppressed reflection cannot lower a count
+      that excluded it. Two measurements say so directly, 89 with the file and 89 without, and the
+      publish log carries **no `InfoCarrier.Core.Relational` diagnostic at all** — verified, not
+      assumed. `eng/trim-baseline.txt` records this so the next reader does not go looking for the
+      win here: what went away is ten written arguments a trimmer could not check, replaced by two
+      type names a compiler does.
+
+      **Two costs recorded rather than rediscovered.** `EnablePackageValidation` is on for every
+      packable project, and a brand-new package has no baseline to fetch: restore fails `NU1101`
+      hunting an `InfoCarrier.Core.Relational 10.0.0` that cannot exist, so the new csproj turns it
+      off with a comment saying to turn it on after the first release. And `release.yml` pushes by
+      **exact filename, not a glob** — it now names the third package, in three places, or a
+      release would have shipped nothing of it.
+
+      Level 2 (EF's relational conventions on the client model) and level 3 (a relational model on
+      the client) are untouched and stay open. `roadmap.md`'s deferred row is updated to say level 1
+      is built.
+
+      **One deviation, stated rather than hidden.** Five XML doc comments R119 left stale, on the
+      binary-compatibility overloads, were corrected after `measure.sh` had already built. They are
+      doc comments: no IL changes, and the trim publish and the pack both ran after them.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

@@ -53,6 +53,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         {
             services = services.AddInfoCarrierArbitrarySqlExecution();
 
+            // #97. The SERVER half of the relational seam: how to REBUILD a raw-SQL query root.
+            // `AddInfoCarrierRelational` and not `...Client` -- the client-only call also replaces
+            // `IDatabaseFacadeDependencies`, and this server is an ordinary EF application whose
+            // own relational one owns a live connection.
+            services = InfoCarrier.Core.Relational
+                .InfoCarrierRelationalServiceCollectionExtensions.AddInfoCarrierRelational(services);
+
             // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type
             // allowlist refuses one by default exactly as ADR-008 constraint 2 requires. R85's seam
             // is what an application uses to admit it; the harness is an application, and it admits

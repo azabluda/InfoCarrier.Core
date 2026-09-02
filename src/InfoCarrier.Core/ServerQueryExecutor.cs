@@ -37,14 +37,37 @@ namespace InfoCarrier.Core;
 ///     <b>This is the security boundary</b>; the client's matching option only decides what it
 ///     sends. Default <c>false</c>, so a server that says nothing refuses.
 /// </param>
+/// <param name="relationalQueryRoots">
+///     How to REBUILD EF's relational raw-SQL query roots (#97) - true when the application
+///     registered <c>AddInfoCarrierRelational()</c> from the <c>InfoCarrier.Core.Relational</c>
+///     package. <b>Knowledge, not permission</b>: the parameter above is the permission, and a
+///     server that has the knowledge and not the grant still refuses. Default
+///     <see langword="null" />, which rebuilds nothing and says so.
+/// </param>
 public class ServerQueryExecutor(
     DbContext context,
     IExpressionSerializer expressionSerializer,
-    bool arbitrarySqlAllowed = false)
+    bool arbitrarySqlAllowed = false,
+    Metadata.IInfoCarrierRelationalQueryRoots? relationalQueryRoots = null)
 {
     private readonly DbContext _context = context;
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
+
+    /// <summary>
+    ///     How to rebuild EF's relational raw-SQL query roots (#97).
+    /// </summary>
+    /// <remarks>
+    ///     <b>A parameter, and NOT resolved from the context.</b> The server's own services live
+    ///     in the application's collection -- the one <c>InProcessInfoCarrierServer</c> was built
+    ///     with -- and not in the context's internal provider, which EF builds for itself. That is
+    ///     already true of the value mappers, the allowed types and the raw-SQL grant beside this
+    ///     one, and reading this seam from the context instead answered
+    ///     <see cref="Metadata.NoRelationalQueryRoots" /> for a server that had registered a real
+    ///     one.
+    /// </remarks>
+    private readonly Metadata.IInfoCarrierRelationalQueryRoots _relationalQueryRoots
+        = relationalQueryRoots ?? Metadata.NoRelationalQueryRoots.Instance;
 
     /// <summary>
     ///     Executes the query described by <paramref name="request" /> and returns the wire result.
@@ -163,7 +186,7 @@ public class ServerQueryExecutor(
         {
             RequireArbitrarySql();
 
-            return RelationalQueryRootShape.CreateSqlQueryRoot(
+            return _relationalQueryRoots.CreateScalarRoot(
                 elementType,
                 sqlQuery.Sql,
                 ((ExpressionSerializer)_expressionSerializer).ToExpression(sqlQuery.Arguments));
@@ -189,7 +212,7 @@ public class ServerQueryExecutor(
             // The arguments are rebuilt as an expression and handed to EF, which binds them as
             // DbParameters. They are never spliced into the text: a value in a string has lost
             // its type, and the round trip is the only reason this node carries a tree at all.
-            return RelationalQueryRootShape.CreateFromSqlRoot(
+            return _relationalQueryRoots.CreateEntityRoot(
                 entityType,
                 fromSql.Sql,
                 ((ExpressionSerializer)_expressionSerializer).ToExpression(fromSql.Arguments));
@@ -594,9 +617,9 @@ public class ServerQueryExecutor(
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public ServerQueryExecutor(DbContext context, IExpressionSerializer expressionSerializer)

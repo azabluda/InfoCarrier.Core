@@ -138,8 +138,8 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         // exception for another. The two are wanted together or not at all.
         if (_props().ArbitrarySqlExecution)
         {
-            serviceCollection = InfoCarrierRelationalFacadeDependencies
-                .AddInfoCarrierRelationalFacade(serviceCollection);
+            serviceCollection = InfoCarrier.Core.Relational
+                .InfoCarrierRelationalServiceCollectionExtensions.AddInfoCarrierRelationalClient(serviceCollection);
         }
 
         return serviceCollection;

@@ -234,6 +234,25 @@ server's by the backing store, so `FindTypeMapping()` is not one answer but two.
 short-circuits the wire primitives before any mapping is consulted; anything else must be derived
 from the **CLR type alone**, through a service no provider replaces.
 
+**A fact two components read independently can disagree with itself, and the disagreement is silent
+when one component's answer only widens what the other is allowed to do.** R120's finding, and it
+cost a wrong answer rather than a red test. `IInfoCarrierRelationalQueryRoots` says what EF's
+relational raw-SQL query roots are. `ServerBoundaryAnalyzer` read it from the **options**, which it
+must — `ExtensionInfo.GetServiceProviderHashCode()` is `0`, so every client context in a process
+shares one internal service provider and anything per-context has to travel on the options. The
+forward translator read it from **DI**, because it is DI-scoped. A client that set the option but
+not the service then **admitted** a raw-SQL root at the boundary and **dropped its SQL** in the
+translator: the whole table came back, silently, which is the defect R75 closed.
+`InfoCarrierOptionsExtension.RelationalQueryRootsFor` is now the one reader, called once per
+execution in `QueryExecutor` and handed to both. **When a permission and the knowledge it guards
+live on different carriers, check that one reader answers for both.**
+
+**There are three shipped packages, and `release.yml` names them one by one.** `InfoCarrier.Core`,
+`InfoCarrier.Core.AspNetCore` and `InfoCarrier.Core.Relational`. The push steps use exact filenames
+rather than a glob, so **a fourth package would ship nothing until that workflow named it**.
+`InfoCarrier.Core.Relational` sets `EnablePackageValidation=false` until it has a published stable
+version to compare with; every other packable project validates against `10.0.0`.
+
 ## Current state
 
 **M8 is CLOSED (2026-08-24).** Every exit criterion has a resolution: three done (HTTP transport,

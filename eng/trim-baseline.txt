@@ -79,5 +79,26 @@
 # no reflection and costs no warning. It was rejected: it would stop this loop but not the store
 # command, so the database would keep working for a client that had gone. That is the cost the fix
 # exists to remove.
+# 2026-09-02 (R120) — 89 -> 89, AND THE EXPECTATION THAT IT WOULD FALL WAS WRONG. Recorded because
+# the reasoning behind the expectation is the kind that repeats. #97 deleted
+# `RelationalQueryRootShape.cs`: 276 lines that resolved two EF relational expression types by full
+# name, read four properties off them and called `Activator.CreateInstance` twice, under **ten
+# `UnconditionalSuppressMessage` attributes**. Removing that much reflection was expected to lower
+# `ours`.
+#
+# It could not have. Those ten attributes are SUPPRESSIONS: each one already kept its diagnostic out
+# of this count, so the code contributed 0 to the 89 while it existed and contributes 0 now that it
+# is gone. **Deleting suppressed reflection cannot lower a count that never included it.** The two
+# measurements say so directly -- 89 with the file, 89 without it, and nothing else in the change
+# touches the trimmer.
+#
+# THE WIN IS REAL AND THIS FILE IS THE WRONG PLACE TO LOOK FOR IT. What went away is ten written
+# arguments that a trimmer could not check, replaced by two type names in
+# `InfoCarrier.Core.Relational` that a compiler does. That package contributes **no IL diagnostic of
+# its own** -- verified in the publish log, not assumed -- so `ours` is the same 89 spread over one
+# fewer file.
+#
+# THE RULE: a suppression is not a warning. Count the suppressions separately if the goal is to
+# remove unverifiable reflection, because this ratchet will report no progress on it.
 ours=89
 total=855

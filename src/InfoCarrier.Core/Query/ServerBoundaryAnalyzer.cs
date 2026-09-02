@@ -37,10 +37,19 @@ namespace InfoCarrier.Core.Query;
 ///     <see cref="IInfoCarrierArbitrarySqlExecution" /> registration is, and it refuses a
 ///     raw-SQL payload however this client is configured.
 /// </param>
-public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitrarySqlAllowed = false)
+/// <param name="relationalRoots">
+///     How to recognise EF's relational raw-SQL query roots (#97), or <see langword="null" /> when
+///     nothing has said the backing store is relational. <b>Knowledge, not permission</b>: the
+///     parameter above is the permission, and both are needed before such a root crosses.
+/// </param>
+public sealed class ServerBoundaryAnalyzer(
+    TypeAllowlist allowlist,
+    bool arbitrarySqlAllowed = false,
+    Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
 {
     private readonly TypeAllowlist _allowlist = allowlist;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
+    private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots = relationalRoots;
 
     /// <summary>
     ///     Creates an analyzer that refuses a query carrying raw SQL.
@@ -50,9 +59,9 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public ServerBoundaryAnalyzer(TypeAllowlist allowlist)
@@ -67,7 +76,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var walker = new Walker(_allowlist, _arbitrarySqlAllowed);
+        var walker = new Walker(_allowlist, _arbitrarySqlAllowed, _relationalRoots);
         walker.Visit(root);
         return new BoundaryAnalysis(root, walker.Results);
     }
@@ -77,7 +86,10 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
     ///     minimal set of research-findings §5 (block, loop, try, goto, switch, label) have no
     ///     wire representation, so a subtree containing one can never be shipped.
     /// </summary>
-    internal static bool IsSerializableKind(Expression node, bool arbitrarySqlAllowed = false)
+    internal static bool IsSerializableKind(
+        Expression node,
+        bool arbitrarySqlAllowed = false,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
         => node switch
         {
             // The EXACT type, not the base. A query root carrying state beyond its entity type is
@@ -87,25 +99,25 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
             // it: a `FromSqlRaw` with a `WHERE` came back as the whole table, silently. Refusing
             // the subclass instead sends it down `QuerySplitter.RejectClientEvaluation`, which
             // raises EF's own `TranslationFailed` — the answer every other provider gives for a
-            // construct it cannot translate. Named by shape rather than by type because
+            // construct it cannot translate. The subclasses are recognised through the
+            // `IInfoCarrierRelationalQueryRoots` seam rather than named here, because
             // `FromSqlQueryRootExpression` lives in `EFCore.Relational`, which this assembly does
-            // not reference (M9).
+            // not reference (M9, D3).
             { } root when root.GetType() == typeof(Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression)
                 => true,
 
-            // The one subclass this wire does know, and only where the application asked for it
-            // (#60). `FromSqlQueryRootStubNode` carries the `Sql` and the arguments that the
-            // paragraph above records as having been dropped, and `RelationalQueryRootShape`
-            // names the type by shape for the same reason the comment above gives. Without the
-            // option this stays `false`, so the refusal below is unchanged and every existing
-            // caller sees EF's own `TranslationFailed`.
-            { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsFromSqlRoot(root) => true,
-
-            // Its scalar sibling, under the same grant (#56). `Database.SqlQuery<T>` produces this
-            // root for a `T` the type-mapping source recognises, and `SqlQueryRootStubNode` carries
-            // the same `Sql` and arguments. Same default refusal: without the option this is
-            // `false` and the caller sees EF's own `TranslationFailed`.
-            { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsSqlQueryRoot(root) => true,
+            // The two subclasses this wire does know -- `FromSqlQueryRootExpression` (#60) and
+            // `SqlQueryRootExpression` (#56) -- and only where the application asked for them.
+            // `FromSqlQueryRootStubNode` and `SqlQueryRootStubNode` carry the `Sql` and the
+            // arguments the paragraph above records as having been dropped.
+            //
+            // TWO CONDITIONS AND THEY ANSWER DIFFERENT QUESTIONS. `arbitrarySqlAllowed` is
+            // permission and defaults to refusing; `relationalRoots` is KNOWLEDGE and is null
+            // until `InfoCarrier.Core.Relational` supplies it (#97). Where either is missing this
+            // is `false`, the catch-all below refuses the node, and the caller sees EF's own
+            // `TranslationFailed` -- never a root shipped with its SQL silently dropped, which is
+            // the defect R75 closed.
+            { } root when arbitrarySqlAllowed && relationalRoots?.IsRawSqlRoot(root) == true => true,
 
             Microsoft.EntityFrameworkCore.Query.QueryRootExpression => false,
             // Any other extension node — QueryParameterExpression included, though those are
@@ -244,7 +256,10 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
     /// <summary>
     ///     Folds each node's verdict from its direct children, post-order.
     /// </summary>
-    private sealed class Walker(TypeAllowlist allowlist, bool arbitrarySqlAllowed) : ExpressionVisitor
+    private sealed class Walker(
+        TypeAllowlist allowlist,
+        bool arbitrarySqlAllowed,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots) : ExpressionVisitor
     {
         // One entry per direct child, popped when the parent folds them.
         private readonly List<NodeFacts> _pending = [];
@@ -261,7 +276,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
             int mark = _pending.Count;
             base.Visit(node);
 
-            bool serverOk = IsSerializableKind(node, arbitrarySqlAllowed);
+            bool serverOk = IsSerializableKind(node, arbitrarySqlAllowed, relationalRoots);
             bool hasRoot = IsQueryRoot(node);
             HashSet<ParameterExpression>? free = null;
 

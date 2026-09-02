@@ -19,6 +19,21 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 /// </remarks>
 public class SqliteSmokeTest
 {
+    /// <remarks>
+    ///     <b>Every server here says its store is relational (#97), because it is SQLite.</b>
+    ///     <c>InfoCarrierBackendTestStore</c> registers this for a fixture that asked for raw SQL,
+    ///     and this class does not go through a fixture: it builds
+    ///     <see cref="SharedTestStoreProperties" /> by hand and never sets
+    ///     <c>ArbitrarySqlExecution</c>, so that registration does not reach it. Stated here rather
+    ///     than in each test that needs it, so the two halves are configured in one place each --
+    ///     the client's is on <see cref="CreateClient" />.
+    ///     <para>
+    ///         <b>It grants nothing.</b> Whether the server will run a string is still
+    ///         <c>AddInfoCarrierArbitrarySqlExecution()</c>, which two tests add and the rest do
+    ///         not; <c>A_FromSql_query_is_refused_...</c> and
+    ///         <c>Granting_it_on_the_client_alone_...</c> pin both refusals with this in place.
+    ///     </para>
+    /// </remarks>
     private static SqliteInfoCarrierBackendTestStore CreateStore(
         Func<IServiceCollection, IServiceCollection>? onAddServices = null)
         => new(
@@ -31,14 +46,30 @@ public class SqliteSmokeTest
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
-                OnAddServices = onAddServices,
+                OnAddServices = services => InfoCarrier.Core.Relational
+                    .InfoCarrierRelationalServiceCollectionExtensions.AddInfoCarrierRelational(
+                        onAddServices?.Invoke(services) ?? services),
             });
 
+    /// <remarks>
+    ///     <b>Every client here says its backing store is relational (#97), and this class is why
+    ///     that option exists.</b> It builds its client by hand rather than through
+    ///     <c>InfoCarrierTestStoreFactory</c>, so there is no <c>IServiceCollection</c> to call
+    ///     <c>AddInfoCarrierRelationalClient()</c> on — which is the shape most consumer
+    ///     applications have. The instance comes from the caller for the same reason
+    ///     <c>AllowTypes</c>'s types do: <c>InfoCarrier.Core</c> cannot name a relational type.
+    /// </remarks>
     private static SqliteSmokeContext CreateClient(
         SqliteInfoCarrierBackendTestStore store,
         Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptions = null)
         => new(new DbContextOptionsBuilder<SqliteSmokeContext>()
-            .UseInfoCarrier(store, infoCarrierOptions)
+            .UseInfoCarrier(
+                store,
+                o =>
+                {
+                    o.UseRelationalQueryRoots(new InfoCarrier.Core.Relational.InfoCarrierRelationalQueryRoots());
+                    infoCarrierOptions?.Invoke(o);
+                })
             .Options);
 
     private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(

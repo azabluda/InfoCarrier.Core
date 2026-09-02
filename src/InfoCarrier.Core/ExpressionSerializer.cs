@@ -34,6 +34,37 @@ public class ExpressionSerializer(
     public virtual ExpressionNode ToNode(Expression expression)
         => _forward.Translate(expression);
 
+    /// <summary>
+    ///     Translates an expression to its node DTO, recognising EF's relational raw-SQL query
+    ///     roots the given way (#97).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The seam arrives per call because this object does not know which context is
+    ///         asking.</b> It is registered <c>Scoped</c>, but every InfoCarrier client context in
+    ///         a process shares one internal service provider
+    ///         (<c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>), so a DI-injected
+    ///         answer would be one answer for all of them. The value is per context and travels on
+    ///         the options; <c>QueryExecutor</c> reads it once per execution through
+    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRootsFor</c> and hands the same object
+    ///         to the boundary analyzer and to this method. One reader, so the two cannot disagree.
+    ///     </para>
+    ///     <para>
+    ///         Not on <see cref="IExpressionSerializer" />: the interface is a wire seam an
+    ///         application may implement, and the one caller already holds this class.
+    ///     </para>
+    /// </remarks>
+    /// <param name="expression">The tree to translate.</param>
+    /// <param name="relationalRoots">
+    ///     The seam, or <see langword="null" /> when nothing has said the backing store is
+    ///     relational.
+    /// </param>
+    /// <returns>The node DTO.</returns>
+    public virtual ExpressionNode ToNode(
+        Expression expression,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots)
+        => _forward.Translate(expression, relationalRoots);
+
     /// <inheritdoc />
     public virtual Expression ToExpression(ExpressionNode node)
         => ToExpression(node, (stub, type) => throw new NotSupportedException(
@@ -68,6 +99,13 @@ public class ExpressionSerializer(
     ///     <see cref="InProcessInfoCarrierServer" />, which reads it from the service provider it
     ///     was built with.
     /// </param>
+    /// <remarks>
+    ///     <b>It takes no relational seam, and that is not an omission.</b> This builds the
+    ///     <em>server's</em> pipeline, and the server never forward-translates a query root: it
+    ///     receives one as a node and rebuilds it on the reverse path, where
+    ///     <c>ServerQueryExecutor</c> resolves <c>IInfoCarrierRelationalQueryRoots</c> from its own
+    ///     context's services.
+    /// </remarks>
     public static ExpressionSerializer CreateForModel(
         Microsoft.EntityFrameworkCore.Metadata.IModel model,
         IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null,
@@ -87,9 +125,9 @@ public class ExpressionSerializer(
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public static ExpressionSerializer CreateForModel(

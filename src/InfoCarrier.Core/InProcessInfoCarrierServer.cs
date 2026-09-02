@@ -68,6 +68,22 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private bool ArbitrarySqlAllowed
         => _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
 
+    /// <summary>
+    ///     How this server rebuilds EF's relational raw-SQL query roots
+    ///     (<see cref="Metadata.IInfoCarrierRelationalQueryRoots" />, #97).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider, like the three above, and absent unless the application
+    ///     registered <c>AddInfoCarrierRelational()</c> from the
+    ///     <c>InfoCarrier.Core.Relational</c> package. <b>This provider, and not the context's:</b>
+    ///     the context builds its own internal service provider and never sees the application's
+    ///     collection, so a lookup through the context answers <c>null</c> for a server that has
+    ///     registered one. <b>It grants nothing</b> — <see cref="ArbitrarySqlAllowed" /> above is
+    ///     the boundary and still defaults to refusing.
+    /// </remarks>
+    private Metadata.IInfoCarrierRelationalQueryRoots? RelationalQueryRoots
+        => _serviceProvider.GetService<Metadata.IInfoCarrierRelationalQueryRoots>();
+
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
@@ -77,7 +93,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         try
         {
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
-            var executor = new ServerQueryExecutor(lease.Context, serializer, ArbitrarySqlAllowed);
+            var executor = new ServerQueryExecutor(
+                lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
             return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         }
         finally

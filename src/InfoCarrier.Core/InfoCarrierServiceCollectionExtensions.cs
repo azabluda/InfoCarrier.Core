@@ -90,6 +90,13 @@ public static class InfoCarrierServiceCollectionExtensions
         // application's collection's business, not EF's.
         services.TryAddSingleton<Metadata.IInfoCarrierDocumentMapping, Metadata.AnnotationDocumentMapping>();
 
+        // How to recognise EF's relational raw-SQL query roots (#97). The default knows nothing,
+        // which makes a raw-SQL root refused rather than shipped with its SQL dropped; the
+        // `InfoCarrier.Core.Relational` package replaces it. Registered here for the same reason
+        // as the line above -- a provider's own service is the application's collection's
+        // business, not EF's.
+        services.TryAddSingleton<Metadata.IInfoCarrierRelationalQueryRoots, Metadata.NoRelationalQueryRoots>();
+
         services.TryAddScoped<TypeNodeMapper>();
         services.TryAddScoped<TypeNodeResolver>();
         services.TryAddScoped<IDynamicValueMapper, DynamicValueMapper>();

@@ -6,10 +6,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
+namespace InfoCarrier.Core.Relational;
 
 /// <summary>
 ///     The client-side <see cref="IRelationalDatabaseFacadeDependencies" /> that lets
@@ -32,8 +30,9 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         <c>context.GetService&lt;IDatabaseFacadeDependencies&gt;()</c>, so the registration is
 ///         replaceable from outside the package — and the harness is an application, exactly as it
 ///         is for R85's <c>AddInfoCarrierAllowedTypes</c> and R95's
-///         <c>AddInfoCarrierArbitrarySqlExecution</c>. A shipped <c>InfoCarrier.Core.Relational</c>
-///         package would hold this same class; that is a packaging step, not a design one.
+///         <c>AddInfoCarrierArbitrarySqlExecution</c>. <b>This package is that application's
+///         shipped half</b> (#97): it references the relational package so no consumer has to
+///         write this class by hand.
 ///     </para>
 ///     <para>
 ///         <b>The three relational members throw, and nothing on this path calls them.</b>
@@ -42,9 +41,9 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         the <em>core</em> interface. <see cref="RelationalConnection" />,
 ///         <see cref="RawSqlCommandBuilder" /> and <see cref="CommandLogger" /> have no meaning on
 ///         a client with no database. That shape is already proven here:
-///         <see cref="RelationalInfoCarrierTestStore" /> refuses <c>Connection</c> the same way,
-///         and ADR-013's amendment records why it is sound — the callers that want the connection
-///         are not the callers that want the rest.
+///         the test suite's <c>RelationalInfoCarrierTestStore</c> refuses <c>Connection</c> the
+///         same way, and ADR-013's amendment records why it is sound — the callers that want the
+///         connection are not the callers that want the rest.
 ///     </para>
 /// </remarks>
 public sealed class InfoCarrierRelationalFacadeDependencies(
@@ -113,32 +112,6 @@ public sealed class InfoCarrierRelationalFacadeDependencies(
     /// <inheritdoc />
     public IRawSqlCommandBuilder RawSqlCommandBuilder
         => throw new InvalidOperationException(NoDatabase(nameof(RawSqlCommandBuilder)));
-
-    /// <summary>
-    ///     Registers this as the client's facade dependencies, under both interfaces.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         Under both, and forwarding rather than constructing twice, because EF's own
-    ///         <c>EntityFrameworkRelationalServicesBuilder</c> does exactly that:
-    ///         <c>TryAdd&lt;IDatabaseFacadeDependencies&gt;(p =&gt; p.GetRequiredService&lt;IRelationalDatabaseFacadeDependencies&gt;())</c>.
-    ///         The type test is satisfied only if the two resolve to the same object.
-    ///     </para>
-    ///     <para>
-    ///         <c>RemoveAll</c> first, so the order of this call and
-    ///         <c>AddEntityFrameworkInfoCarrier</c> does not matter: EF registers the core
-    ///         implementation with <c>TryAdd</c>, which stands down if ours is already there, and
-    ///         <c>RemoveAll</c> takes it out if it is not.
-    ///     </para>
-    /// </remarks>
-    public static IServiceCollection AddInfoCarrierRelationalFacade(IServiceCollection services)
-    {
-        services.RemoveAll<IDatabaseFacadeDependencies>();
-
-        return services
-            .AddScoped<IRelationalDatabaseFacadeDependencies, InfoCarrierRelationalFacadeDependencies>()
-            .AddScoped<IDatabaseFacadeDependencies>(p => p.GetRequiredService<IRelationalDatabaseFacadeDependencies>());
-    }
 
     private static string NoDatabase(string member)
         => $"The InfoCarrier client has no database of its own, so '{member}' has no value here. "
