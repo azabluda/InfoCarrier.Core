@@ -70,6 +70,15 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             }
         }
 
+        // The SERVER half of the projection-DTO seam, and NOT inside the raw-SQL grant above: a
+        // type the model does not imply is refused whether or not the payload carries SQL. This is
+        // the boundary half -- it decides what a PAYLOAD may name -- so it is a fixture's explicit
+        // declaration and never inferred. See `SharedTestStoreProperties.AllowedTypes`.
+        if (AllowedTypes.Length > 0)
+        {
+            services = services.AddInfoCarrierAllowedTypes(AllowedTypes);
+        }
+
         services = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
@@ -205,6 +214,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     which have to set the matching client-side option.
     /// </summary>
     public bool ArbitrarySqlExecution => _testStoreProperties.ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     The fixture's declared projection types, for both halves of the seam to read.
+    /// </summary>
+    /// <remarks>
+    ///     Exposed here rather than passed twice, so the client store
+    ///     (<c>InfoCarrierTestStore.ClientOptions</c>) and this server half cannot disagree about
+    ///     what the fixture declared. That is the one-reader rule R120 records.
+    /// </remarks>
+    public Type[] AllowedTypes => _testStoreProperties.AllowedTypes ?? [];
 
     /// <summary>
     ///     The backing store's <see cref="DbParameter" /> type, when it has one - admitted on both

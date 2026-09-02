@@ -53,7 +53,8 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Action<ModelConfigurationBuilder>? configureConventions = null,
         ServiceLifetime? serverOptionsLifetime = null,
         bool relationalClientStore = false,
-        bool arbitrarySqlExecution = false)
+        bool arbitrarySqlExecution = false,
+        Type[]? allowedTypes = null)
     {
         var props = new SharedTestStoreProperties
         {
@@ -66,6 +67,7 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             OnAddServices = onAddServices,
             ServerOptionsLifetime = serverOptionsLifetime,
             ArbitrarySqlExecution = arbitrarySqlExecution,
+            AllowedTypes = allowedTypes,
         };
 
         return new InfoCarrierTestStoreFactory(() => props, tier, relationalClientStore);

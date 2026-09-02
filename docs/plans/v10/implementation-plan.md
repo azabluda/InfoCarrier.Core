@@ -3941,6 +3941,53 @@ re-parents of families already running, because R25–R30 showed that is where t
       wants them for every Tier B fixture, which is a large blast radius and should be measured on
       its own first.
 
+- [x] **R124. `SqlQueryTestBase` adopted — the last specification base with no subclass anywhere,
+      and Tier B's missing list goes to 0.** `test/` only, so `eng/measure.sh` is the whole gate.
+      **`failed` 141 -> 242, `total` 29393 -> 29512**, both deliberate and both noted in
+      `test/known-failures.txt`. FIXED 1
+      (`RelationalInfoCarrierComplianceTest.All_test_bases_must_be_implemented`), BROKEN 102, every
+      one of them in the new class. Read as `failing 2 of 9151` on Tier A -- unchanged -- plus
+      `failing 240 of 20361` on Tier B.
+
+      **The compliance gate is now green on both tiers.** Tier A's missing list was already 0; Tier
+      B's was 1 and is 0. That pair of tests, and not a list in `CLAUDE.md`, is the answer to "which
+      bases are in", and the answer is now "all of them".
+
+      **ADR-013's three-way test was applied before a line was written, and it passes.** The base's
+      1301 lines contain no `UseTransaction`, no `GetDbTransaction()` and no
+      `ExecuteWithStrategyInTransactionAsync`; its one abstract member is `CreateDbParameter`, and
+      every route to a context runs through `Fixture.CreateContext()`. Nothing in it requires the
+      client to be relational. The fixture already carried `arbitrarySqlExecution: true`, so the
+      grant needed no change.
+
+      **The four `Bad_data_error_handling_invalid_cast*` overrides are EF's own**, taken from
+      `SqlQuerySqliteTest`: SQLite is dynamically typed, so there is no invalid cast to make. EF's
+      remaining overrides are `AssertSql` baselines, which have no meaning on this side of the wire,
+      so those tests are left to the base exactly as `FromSqlQueryInfoCarrierTest` leaves them.
+
+      **The harness gains one seam, and it is the product's own.** `SharedTestStoreProperties`
+      gains `AllowedTypes`, wired to `AllowTypes` on the client and `AddInfoCarrierAllowedTypes` on
+      the server, and `NorthwindQueryInfoCarrierSqliteFixture` declares the four `Unmapped*`
+      projection types. **Not gated on `ArbitrarySqlExecution`, unlike the store's parameter type**:
+      a `DbParameter` can only appear in a raw-SQL payload, and a projection DTO cannot, so gating
+      it would state a dependency that is not there.
+
+      **THE MEASUREMENT THAT MATTERS IS THE ONE THAT MOVED NO COUNT.** With the base adopted and
+      nothing declared, the class ran 17 of 119 and 90 of the 102 reds were
+      `not on the type allowlist`. With the four types declared, the class ran **17 of 119 again**
+      -- the identical count -- and every one of those 90 had moved to
+      `Entity type '...' not found in the server model`. A count that did not move and a reasons
+      diff that did: this is the case `measure.sh`'s third level exists for, and reading the count
+      alone would have said the declaration did nothing. It did the whole thing.
+
+      **The control is in the same run.** `SqlQueryRaw_queryable_simple_mapped_type` passed both
+      times, because `CustomerQuery` **is** in the model. The allowlist was never wrong; an ad-hoc
+      entity type simply is not something a model implies.
+
+      **All 102 are classified in `test/known-failures.txt`** -- 90 the server-model gap R125
+      closes, 10 the message-text class `FromSqlQueryTestBase` already carries, 2 the
+      `RelationalTypeMapping` cast ADR-013 records. None is of unknown standing.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

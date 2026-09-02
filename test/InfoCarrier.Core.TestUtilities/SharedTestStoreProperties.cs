@@ -117,4 +117,33 @@ public struct SharedTestStoreProperties
     ///     </para>
     /// </remarks>
     public bool ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     CLR types this fixture's queries name that its model does not imply (ADR-008
+    ///     constraint 2).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A projection DTO is the case, and <c>SqlQueryTestBase</c> is the base that
+    ///         made it real.</b> <c>Database.SqlQuery&lt;UnmappedCustomer&gt;</c> makes EF build an
+    ///         <em>ad-hoc</em> entity type, which lives outside <c>IModel.GetEntityTypes()</c>, so
+    ///         <c>TypeAllowlist.ForModel</c> cannot infer it and the boundary refuses the query
+    ///         root. That is the allowlist doing its job: the type is not in the model, and
+    ///         nothing about the model implies it.
+    ///     </para>
+    ///     <para>
+    ///         <b>An application declares such a type explicitly, and the harness is an
+    ///         application.</b> The seam is <c>InfoCarrierDbContextOptionsBuilder.AllowTypes</c> on
+    ///         the client and <c>AddInfoCarrierAllowedTypes</c> on the server, and
+    ///         <see cref="Expressions.IInfoCarrierAllowedTypes" /> requires <b>both</b> halves —
+    ///         one alone fails asymmetrically. A fixture setting this gets both.
+    ///     </para>
+    ///     <para>
+    ///         <b>Not gated on <see cref="ArbitrarySqlExecution" />, unlike the store's parameter
+    ///         type.</b> A <c>DbParameter</c> can only appear in a raw-SQL payload; a projection
+    ///         DTO is independent of raw SQL, and gating it would state a dependency that is not
+    ///         there.
+    ///     </para>
+    /// </remarks>
+    public Type[]? AllowedTypes;
 }

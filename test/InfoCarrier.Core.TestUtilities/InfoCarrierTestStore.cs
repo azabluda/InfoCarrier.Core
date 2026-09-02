@@ -54,22 +54,36 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     /// </summary>
     public static Action<InfoCarrierDbContextOptionsBuilder>? ClientOptions(InfoCarrierBackendTestStore backend)
     {
-        if (!backend.ArbitrarySqlExecution)
+        bool arbitrarySql = backend.ArbitrarySqlExecution;
+        Type[] allowedTypes = backend.AllowedTypes;
+
+        // The raw-SQL grant and the projection types are INDEPENDENT declarations, and reading the
+        // first as a precondition of the second was the shape this method had until
+        // `SqlQueryTestBase` was adopted. A fixture may declare a DTO and grant no SQL.
+        if (!arbitrarySql && allowedTypes.Length == 0)
         {
             return null;
         }
 
-        Type? parameterType = backend.StoreParameterType;
+        Type? parameterType = arbitrarySql ? backend.StoreParameterType : null;
 
         return o =>
         {
-            o.AllowArbitrarySqlExecution();
+            if (arbitrarySql)
+            {
+                o.AllowArbitrarySqlExecution();
+            }
 
             // The client half of the same pair. Both halves or neither, as ADR-012 requires: a type
             // admitted on the client alone produces a query the server refuses to read.
             if (parameterType is not null)
             {
                 o.AllowTypes(parameterType);
+            }
+
+            if (allowedTypes.Length > 0)
+            {
+                o.AllowTypes(allowedTypes);
             }
         };
     }

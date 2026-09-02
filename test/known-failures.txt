@@ -2779,5 +2779,45 @@
 # copy is GREEN (missing 0) and Tier B's carries the same single missing base the one test carried.
 # The name list changes by exactly that rename, which is the whole FIXED/BROKEN diff for this step.
 
-failed=141
-total=29393
+# 2026-09-03 (R124) -- `failed` RISES 141 -> 242 AND `total` RISES 29393 -> 29512, BOTH DELIBERATE,
+# and this is the note CLAUDE.md asks for. `SqlQueryTestBase` is adopted
+# (`Sqlite/Query/SqlQueryInfoCarrierTest`), which is the LAST specification base with no subclass
+# anywhere: `RelationalInfoCarrierComplianceTest.All_test_bases_must_be_implemented` goes GREEN and
+# Tier B's missing list is now **0**, as Tier A's already was. That test is the one FIXED name in
+# this step's diff.
+#
+# `total` rises by exactly 119, which is that class's test count and nothing else. BROKEN is 102,
+# every one of them in the new class, and the class stands at 17 of 119. All 102 are classified and
+# none is of unknown standing:
+#
+#  * **90 -- `Entity type '...Unmapped*' not found in the server model.`** THE ONE DEFECT, and it
+#    was predicted in this repository before it was measured: R110 wrote that the gap is
+#    *"`ServerQueryExecutor.RebindQueryRoot` resolves through the server's model and the server
+#    never builds the matching ad-hoc type"*. `Database.SqlQuery<UnmappedCustomer>` makes EF build
+#    an AD-HOC entity type, which never enters `IModel.GetEntityTypes()`; the client's `AdHocMapper`
+#    builds one and the server has none. Closed by R125.
+#
+#    **The reason moved twice in this step and the first move is the evidence the second rests on.**
+#    Before the fixture declared the projection types, all 90 failed at the CLIENT boundary with
+#    `not on the type allowlist` -- the allowlist doing its job, since an ad-hoc type is not in the
+#    model and nothing about the model implies it. `SqlQueryRaw_queryable_simple_mapped_type` passed
+#    in the same run and is the control: `CustomerQuery` IS in the model. Declaring the four types
+#    through the product's own seam (`AllowTypes` + `AddInfoCarrierAllowedTypes`) moved every one of
+#    the 90 onto the server-model lookup, which is what proves the declaration reached both halves.
+#
+#  * **10 `Assert.Equal() Failure: Strings differ`** -- 6 `Bad_data_error_handling_null*` and 4
+#    `*_not_enough_columns_throws`. Both are the message-text class this file already carries for
+#    `FromSqlQueryTestBase`: this tier's server context maps `Product.CategoryID`, which the core
+#    `NorthwindContext` ignores, so a SELECT of a column subset misses a required column before any
+#    value is read. Same note, same cause, as the `ProductView` paragraph there.
+#
+#  * **2 `SqlQueryRaw_queryable_simple_projection_composed`** -- the base's own body casts the
+#    client's type mapping to `RelationalTypeMapping`. ADR-013's gate question answered inside a
+#    test rather than in a fixture; `FromSqlQueryTestBase` carries the identical pair.
+#
+# The four `Bad_data_error_handling_invalid_cast*` are EF's own overrides, taken from
+# `SqlQuerySqliteTest`: SQLite is dynamically typed, so there is no invalid cast to make. That is
+# convergence with the reference provider, not a workaround of ours.
+
+failed=242
+total=29512

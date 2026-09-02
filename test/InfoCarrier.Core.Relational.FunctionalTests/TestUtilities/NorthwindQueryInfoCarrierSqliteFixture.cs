@@ -45,7 +45,42 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
-            arbitrarySqlExecution: true);
+            arbitrarySqlExecution: true,
+            allowedTypes: AdHocProjectionTypes);
+
+    /// <summary>
+    ///     The projection types <c>SqlQueryTestBase</c> names, declared as an application must
+    ///     declare them (ADR-008 constraint 2).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b><c>Database.SqlQuery&lt;T&gt;</c> into an unmapped type is the one query root
+    ///         whose type the model cannot imply.</b> EF builds an <em>ad-hoc</em> entity type for
+    ///         it, which does not appear in <c>IModel.GetEntityTypes()</c>, so
+    ///         <c>TypeAllowlist.ForModel</c> has nothing to infer from and the boundary refuses the
+    ///         root — 90 of <c>SqlQueryInfoCarrierTest</c>'s 119 tests, measured before this list
+    ///         existed. <c>SqlQueryRaw_queryable_simple_mapped_type</c> passed in the same run,
+    ///         which is the control: <c>CustomerQuery</c> IS in the model.
+    ///     </para>
+    ///     <para>
+    ///         <b>This is the product's own route and not a workaround.</b> An application that
+    ///         projects into a DTO calls <c>AllowTypes</c> on the client and
+    ///         <c>AddInfoCarrierAllowedTypes</c> on the server; the harness is an application and
+    ///         does the same. Nothing is skipped and no assertion is weakened.
+    ///     </para>
+    ///     <para>
+    ///         Declared on the shared Northwind fixture, so every Tier B Northwind class carries
+    ///         them. That widens nothing for a class that never names one: the allowlist decides
+    ///         what a payload MAY name, and a query that names none is unaffected.
+    ///     </para>
+    /// </remarks>
+    private static Type[] AdHocProjectionTypes =>
+    [
+        typeof(UnmappedCustomer),
+        typeof(UnmappedOrder),
+        typeof(UnmappedProduct),
+        typeof(UnmappedEmployee),
+    ];
 
     /// <summary>
     ///     Snaps <c>OrderDetail.Discount</c> back to its two-decimal value after seeding.
