@@ -2358,5 +2358,15 @@
 # `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters` (`Database.SqlQueryRaw`,
 # D8 item 2).
 
+# 2026-09-02 (R100) -- `failed` unchanged at 147, `total` 29383 -> 29384. One new test, green:
+# `GearsOfWarFromSqlQueryTestBase`. Missing bases 9 -> 8.
+#
+# #60 CLOSED OUT AGAINST D8's OWN NUMBERS. Of the 27 raw-SQL failures D8 counted, 25 are green; the
+# two that are not are `Delete_FromSql_converted_to_subquery`, whose cause is the harness mismatch
+# R97 measured and reverted. Of the 6 missing raw-SQL bases, 2 are adopted. The other four are ONE
+# axis: three need `Database.SqlQuery`/`ExecuteSql` (D8 item 2, refused by
+# `GetFacadeDependencies` before a query is built) and `FromSqlSprocQueryTestBase` needs stored
+# procedures, which SQLite has not and for which EF ships no SQLite class.
+
 failed=147
-total=29383
+total=29384

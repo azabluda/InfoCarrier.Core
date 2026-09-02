@@ -3053,6 +3053,28 @@ re-parents of families already running, because R25–R30 showed that is where t
       two of its three reds "permanently red until #60 is decided"; they went green in R96 and the
       paragraph had outlived them.
 
+- [x] **R100. `GearsOfWarFromSqlQueryTestBase` adopted, and #60's scope closed out.** `test/` only.
+      `failed` unchanged at 147, `total` 29383 -> 29384. **Missing bases 9 -> 8.** The one test is
+      green on its first run.
+
+      **One test, and it needed a fixture nothing else here had.** The base is constrained to
+      `GearsOfWarQueryRelationalFixture`, and this suite's Gears of War fixtures are the TPT and
+      TPC ones, which derive from `GearsOfWarQueryFixtureBase` - a sibling, not a parent. So the
+      fixture is new and brings a store of its own, for one assertion. **Adopted on policy rather
+      than on the count**: EF ships a SQLite class for the base, so the only justification CLAUDE.md
+      accepts for leaving one unadopted does not apply.
+
+      **What #60 came to, against D8's numbers.** Of the **27** raw-SQL failures D8 counted, **25
+      are green** (R96's 24 and R98's 1 in `SharedTypeQuery`), and the two that are not are
+      `Delete_FromSql_converted_to_subquery`, whose cause is the harness mismatch R97 measured and
+      reverted. Of the **6** missing raw-SQL bases, **2 are adopted** (`FromSqlQueryTestBase`,
+      `GearsOfWarFromSqlQueryTestBase`). The remaining four are one axis, not four:
+      `NorthwindSqlQueryTestBase`, `SqlQueryTestBase` and `SqlExecutorTestBase` all need
+      `Database.SqlQuery`/`ExecuteSql`, which D8 item 2 describes and which
+      `RelationalDatabaseFacadeExtensions.GetFacadeDependencies` refuses before a query is built;
+      `FromSqlSprocQueryTestBase` needs stored procedures, which SQLite has not and for which EF
+      ships no SQLite class.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

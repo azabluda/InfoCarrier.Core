@@ -808,6 +808,15 @@ server it talks to would.
 R89, R91 and now R98 — and D7's note about it being load-bearing far beyond deserialization safety
 is the general form.
 
+**Where the numbers at the top of D8 came out (R100).** Of the **27** failures, **25 are green**;
+the two that are not are `Delete_FromSql_converted_to_subquery`, whose cause is a harness mismatch
+between `NorthwindRelationalContext`'s table names and the core model this tier builds its store
+from (R97 fixed it, measured 236 other breakages, and reverted). Of the **6** missing bases,
+**`FromSqlQueryTestBase` and `GearsOfWarFromSqlQueryTestBase` are adopted**. The remaining four are
+one axis rather than four: `NorthwindSqlQueryTestBase`, `SqlQueryTestBase` and `SqlExecutorTestBase`
+are all item 2, and `FromSqlSprocQueryTestBase` needs stored procedures, which SQLite has not and
+for which EF ships no SQLite class.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
