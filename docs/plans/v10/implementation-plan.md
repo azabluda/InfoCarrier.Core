@@ -3269,6 +3269,20 @@ re-parents of families already running, because R25–R30 showed that is where t
       have the same idea. **A one-line generalization of a two-test win is exactly the shape that
       does not get measured**, and this one is negative by a factor of thirty.
 
+- [x] **R108. The third-tier question filed as an issue, and the roadmap row points at it.**
+      Documents only — `roadmap.md`, the deferred table row R106 added. Owner approved the text.
+
+      **The row said what would answer the question and named nowhere to answer it.** R106 recorded
+      `UdfDbFunction`'s 55 reds as a tier question rather than a gap to ignore, and left the tier
+      itself as prose in a table this repository closes rather than tracks. Filed as
+      [#96](https://github.com/azabluda/InfoCarrier.Core/issues/96), "Add a third test tier for the
+      bases SQLite cannot host", which states the two-tier position, `UdfDbFunctionTestBase` as the
+      worked example, and that the tier may be relational or not. Nothing is decided there and no
+      design exists.
+
+      The deferred table's non-relational backend entry stays where it is: it asks the same question
+      from the other end and neither entry is committed.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
