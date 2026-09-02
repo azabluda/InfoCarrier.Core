@@ -133,6 +133,40 @@ public class InfoCarrierComplianceTest : RelationalComplianceTestBase
         // ---- The other five bases on EF's list are implemented here and stay implemented; see
         // ---- the class remarks.
 
+        // ---- Added in R105, each re-read before it was listed and none taken on trust. All three
+        // ---- are the FIRST category: the client is not relational. They had been reported as
+        // ---- missing with no recorded reason, which is the one state this gate is meant to make
+        // ---- impossible.
+
+        // All 136 of its tests run through `TestHelpers.ExecuteWithStrategyInTransactionAsync`,
+        // and the `UseTransaction` they hand it is declared on the test base itself as
+        // `public void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
+        //     => facade.UseTransaction(transaction.GetDbTransaction());`
+        // -- NON-virtual, so no fixture can replace it with `UseInfoCarrierTransaction`, and
+        // `GetDbTransaction()` needs a relational client. This is ADR-013's own worked example
+        // ("One use costs a test; 136 costs the base"), re-checked against EF 10 rather than
+        // carried over: the count is still 136 of 136 and the method is still non-virtual.
+        typeof(JsonUpdateTestBase<>),
+
+        // `StoreValueGenerationFixtureBase.OnModelCreating` opens with
+        // `context.GetService<ISqlGenerationHelper>()` and builds every computed column from it.
+        // That service lives in `EFCore.Relational`, and this harness runs a fixture's
+        // `OnModelCreating` on BOTH sides, so the client throws before a test runs. Blocked by
+        // the same thing as `SqlQuery<T>` (D8 item 2, R102) and by nothing smaller.
+        typeof(StoreValueGenerationTestBase<>),
+
+        // Its two abstract members are `SetQuerySplittingBehavior` and
+        // `ClearQuerySplittingBehavior`, and EF's SQLite class implements them by configuring a
+        // `RelationalOptionsExtension` on the CLIENT's options builder -- the second by writing a
+        // private field through reflection. A remoting client has no such extension.
+        //
+        // **The reason recorded until now was narrower and wrong.** ADR-013's R77 amendment said
+        // this base "calls CloseConnection() on the cast store", which is true of exactly one test
+        // of ten and would have cost a test rather than the base under R14's rule. The blocker is
+        // the required surface, not that one call. Its subject is moot here as well:
+        // `QuerySplitter`'s `SplitHintStrippingVisitor` removes `AsSplitQuery` on purpose.
+        typeof(AdHocQuerySplittingQueryTestBase),
+
         // Stored procedures, which SQLite does not have. EF's list carries the same entry.
         typeof(FromSqlSprocQueryTestBase<>),
         typeof(StoredProcedureUpdateTestBase),

@@ -3197,6 +3197,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       this tier builds its store from the model and `ProductView` needs the column — which is the
       note already standing in `NorthwindInfoCarrierSqliteServerContext`.
 
+- [x] **R105. The last three unexamined missing bases, re-read and classified.** `test/` only.
+      `failed` unchanged at 143, `total` unchanged at 29384, FIXED none, BROKEN none, REASONS
+      unchanged. **Missing bases 5 -> 2**, and the two left are the D3-blocked pair.
+
+      **All three were reported as missing with no recorded reason, which is the one state this
+      gate exists to make impossible.** Each is now listed with a reason that was checked against
+      EF 10 rather than carried over. All three fall in the list's FIRST category: the client is not
+      relational.
+
+      - **`JsonUpdateTestBase` — 136 of 136.** Every test runs through
+        `ExecuteWithStrategyInTransactionAsync`, and the `UseTransaction` handed to it is declared
+        on the test base as `public void ... => facade.UseTransaction(transaction.GetDbTransaction())`.
+        **Non-virtual**, so no fixture can substitute `UseInfoCarrierTransaction`, and
+        `GetDbTransaction()` needs a relational client. ADR-013's own worked example, re-counted
+        rather than assumed: still 136, still non-virtual.
+      - **`StoreValueGenerationTestBase`.** `StoreValueGenerationFixtureBase.OnModelCreating` opens
+        with `context.GetService<ISqlGenerationHelper>()` and builds every computed column from it.
+        That service is `EFCore.Relational`'s, and this harness runs a fixture's `OnModelCreating`
+        on **both** sides, so the client throws before a test runs. Blocked by D3, exactly as
+        `SqlQuery<T>` is.
+      - **`AdHocQuerySplittingQueryTestBase` — and the reason on record was wrong.** ADR-013's R77
+        amendment said it "calls `CloseConnection()` on the cast store", which is true of **one test
+        of ten** and under R14's rule would cost a test rather than the base. The real blocker is
+        the base's required surface: its two abstract members, `SetQuerySplittingBehavior` and
+        `ClearQuerySplittingBehavior`, are implemented by every provider as configuration of a
+        `RelationalOptionsExtension` on the **client's** options builder — EF's SQLite class writes
+        a private field by reflection to do the second. A remoting client has no such extension. Its
+        subject is moot here besides: `SplitHintStrippingVisitor` removes `AsSplitQuery` on purpose.
+
+      **Which is the third standing classification found wrong in this session** — R97's, R98's and
+      now R77's. `CLAUDE.md` already says a classification is not evidence and age is not evidence;
+      three for three is the strongest form of that this repository has recorded.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

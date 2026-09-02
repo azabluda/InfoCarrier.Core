@@ -2417,5 +2417,23 @@
 # `e.Ignore(p => p.CategoryID)`, so its `Product` maps exactly the six columns the base's SQL
 # selects, and its Northwind store is a prebuilt `northwind.db` rather than one built from the model.
 
+# 2026-09-02 (R105) -- NO CHANGE to either figure. `failed` stays 143 and `total` 29384. What moves
+# is the compliance gate's missing list, 5 -> 2, and the two left are the D3-blocked pair
+# (`NorthwindSqlQueryTestBase`, `SqlQueryTestBase`; see R102).
+#
+# THE LAST THREE UNEXAMINED MISSING BASES, RE-READ AND CLASSIFIED. All three are the first
+# category -- the client is not relational -- and all three had been reported as missing with no
+# recorded reason, which is the one state the gate exists to prevent.
+# `JsonUpdateTestBase`: 136 of 136 route through a NON-virtual `UseTransaction` calling
+# `GetDbTransaction()`. `StoreValueGenerationTestBase`: its fixture's `OnModelCreating` resolves
+# `ISqlGenerationHelper`, which is `EFCore.Relational`'s, and this harness runs that customization
+# on both sides. `AdHocQuerySplittingQueryTestBase`: its two ABSTRACT members configure a
+# `RelationalOptionsExtension` on the client's options builder.
+#
+# THE REASON ON RECORD FOR THE THIRD WAS WRONG. ADR-013's R77 amendment said it calls
+# `CloseConnection()` on the cast store -- true of one test of ten, which under R14's rule costs a
+# test and not the base. Third standing classification found wrong this session, after R97's and
+# R98's.
+
 failed=143
 total=29384
