@@ -2593,5 +2593,41 @@
 # (it defines the store's scalar functions on every connection), so the shape counts have moved for
 # a recorded reason and re-deriving them is batch 4's job, not a correction to make from outside.
 
-failed=143
+# 2026-09-02 (R114) -- 143 -> 141, and it is OPTION D. FIXED 2, BROKEN none. `total` unchanged at
+# 29384. `test/` only.
+#
+# **D3 IS NOT REVERSED AND DOES NOT NEED TO BE.** `Database.SqlQuery<T>` was recorded as blocked by
+# `RelationalDatabaseFacadeExtensions.GetFacadeDependencies`, whose
+# `dependencies is IRelationalDatabaseFacadeDependencies` runs before any expression is built. R110
+# measured the way past it: `DatabaseFacade` resolves that service with
+# `context.GetService<IDatabaseFacadeDependencies>()`, so ANYTHING OUTSIDE `InfoCarrier.Core` can
+# register an implementation, and `InfoCarrier.Core` still references nothing relational.
+# `InfoCarrierRelationalFacadeDependencies` is that implementation; the harness registers it, as it
+# already registers R85's allowed types and ADR-012's geometry mapper.
+#
+# **THE THREE RELATIONAL MEMBERS THROW AND NOTHING ON THIS PATH CALLS THEM.** `SqlQueryRaw` reads
+# `QueryProvider`, `TypeMappingSource` and `AdHocMapper`, all on the CORE interface;
+# `RelationalConnection`, `RawSqlCommandBuilder` and the relational `CommandLogger` have no meaning
+# on a client with no database. Same shape as `RelationalInfoCarrierTestStore`'s refused
+# `Connection`, and ADR-013's amendment is why it is sound.
+#
+# **GATED ON `ArbitrarySqlExecution`, NOT ON A FLAG OF ITS OWN.** `Database.SqlQuery<T>` IS
+# arbitrary SQL execution: without the server half the call cannot work, so registering the facade
+# without it would trade one exception for another.
+#
+# THE TWO THAT MOVED are both `SharedTypeQueryInfoCarrierTest` --
+# `Ad_hoc_query_for_shared_type_entity_type_works` and, unexpectedly,
+# `Ad_hoc_query_for_default_shared_type_entity_type_throws`, whose recorded cause was a
+# `QueryFilterRewritingConvention` failure while building the CLIENT'S MODEL. It was downstream of
+# the same call after all.
+#
+# WHAT DID NOT MOVE, and the reasons diff says so rather than the count: the 7
+# "Relational-specific methods" become 4 -- the remaining four are ADR-013's non-virtual
+# `UseTransaction` (R113), a different call site -- and 2 new
+# "No part of the query can be executed on the server" appear. Those are
+# `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters`, now past the type test
+# and refused one layer later by the TYPE ALLOWLIST over `UnmappedCustomer`. That is ADR-008
+# constraint 2 working, and the next step's subject.
+
+failed=141
 total=29384

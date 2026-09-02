@@ -127,9 +127,23 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     ///     classes. See <see cref="InfoCarrierBackendTestStore" /> for the server half.
     /// </remarks>
     public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
-        => serviceCollection
+    {
+        serviceCollection = serviceCollection
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
+
+        // #56 option D, and gated on the SAME flag as the server's raw-SQL grant rather than on a
+        // flag of its own. `Database.SqlQuery<T>` IS arbitrary SQL execution: without the server
+        // half the call cannot work, so registering the facade shim without it would only trade one
+        // exception for another. The two are wanted together or not at all.
+        if (_props().ArbitrarySqlExecution)
+        {
+            serviceCollection = InfoCarrierRelationalFacadeDependencies
+                .AddInfoCarrierRelationalFacade(serviceCollection);
+        }
+
+        return serviceCollection;
+    }
 
     /// <inheritdoc />
     /// <remarks>

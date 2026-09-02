@@ -3478,6 +3478,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       and `r105` shows 2 `no such table` plus 2 `near "(": syntax error`. R86 changed that group on
       purpose, so re-deriving the shape counts is batch 4's work.
 
+- [x] **R114. Option D built: the client's relational facade dependencies, registered from outside
+      the package.** `test/` only — `InfoCarrierRelationalFacadeDependencies` plus one registration
+      in `InfoCarrierTestStoreFactory`. **`failed` 143 → 141**, `total` unchanged at 29384,
+      FIXED 2, BROKEN none. Owner's decision, 2026-09-02.
+
+      **D3 is not reversed and does not need to be.** `DatabaseFacade` resolves its dependencies
+      with `context.GetService<IDatabaseFacadeDependencies>()`, so anything outside
+      `InfoCarrier.Core` can register an implementation of the relational interface and the package
+      still references nothing relational. The harness is that application, exactly as it is for
+      R85's `AddInfoCarrierAllowedTypes` and R95's `AddInfoCarrierArbitrarySqlExecution`.
+
+      **The three relational members throw and nothing on this path calls them.** `SqlQueryRaw`
+      reads `QueryProvider`, `TypeMappingSource` and `AdHocMapper` — all on the core interface.
+
+      **Gated on `ArbitrarySqlExecution` rather than on a flag of its own**, because
+      `Database.SqlQuery<T>` *is* arbitrary SQL execution and the two are wanted together or not at
+      all.
+
+      **The two that moved are both `SharedTypeQueryInfoCarrierTest`**, and one of them is a
+      surprise: `Ad_hoc_query_for_default_shared_type_entity_type_throws` was recorded as failing
+      inside `QueryFilterRewritingConvention` while building the *client's* model. It was
+      downstream of the same call.
+
+      **Read the reasons diff, not the count.** The 7 "Relational-specific methods" become 4 — the
+      remaining four are ADR-013's non-virtual `UseTransaction`, a different call site (R113) — and
+      2 new "No part of the query can be executed on the server" appear:
+      `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters` is now past the type
+      test and refused one layer later by the **type allowlist** over `UnmappedCustomer`.
+
+      **A shipped `InfoCarrier.Core.Relational` package would hold this same class**, and that is a
+      packaging step rather than a design one: it costs a new `csproj`, `release.yml`'s package list
+      and three user-facing pages. Not taken here.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
