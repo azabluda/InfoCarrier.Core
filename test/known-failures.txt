@@ -2757,11 +2757,27 @@
 #    the best entry in this file to copy: the base asserts a throw over a table EF leaves EMPTY, so
 #    the "no exception was thrown" everyone read was a VACUOUS CONTROL. J15 wrote a test of its own
 #    that asserts the ANSWER, and it passes.
-#  * 1 `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` -- red by design (M1), and its
-#    missing list is now **1** (`SqlQueryTestBase`) after R115.
+#  * 1 `RelationalInfoCarrierComplianceTest.All_test_bases_must_be_implemented` -- red by design
+#    (M1), and its missing list is still **1** (`SqlQueryTestBase`) after R115. It was
+#    `InfoCarrierComplianceTest`'s until R122 split the spec suite by backing store; see below.
 #
 # **NOTHING IN THE 141 IS OF UNKNOWN STANDING, and that is now a re-derived statement rather than an
 # inherited one.** The last whole-tail re-derivation was M9's archive, at thirteen.
+#
+# 2026-09-02 (R122) -- THE SUITE IS TWO PROJECTS NOW, AND THESE FIGURES ARE THE TWO ADDED TOGETHER.
+# ADR-009 Tier A is test/InfoCarrier.Core.FunctionalTests (InMemory) and Tier B is
+# test/InfoCarrier.Core.Relational.FunctionalTests (SQLite). eng/measure.sh runs both and
+# eng/ratchet.sh reads both TRX; the split reads as `failing 2 of 9151` plus `failing 139 of 20242`.
+# ONE BASELINE PAIR COVERS BOTH, deliberately: with a pair per project a test that MOVES between
+# them reads as a fix in one and a break in the other, and the name diff stops working across the
+# boundary.
+#
+# `total` RISES 29392 -> 29393, A DELIBERATE RISE OF ONE, and this is the note CLAUDE.md asks for.
+# The compliance gate is two classes now instead of one, so `All_test_bases_must_be_implemented`
+# exists twice -- once per assembly -- while `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory`
+# still exists once, on the relational one. Two tests became three. `failed` does not move: Tier A's
+# copy is GREEN (missing 0) and Tier B's carries the same single missing base the one test carried.
+# The name list changes by exactly that rename, which is the whole FIXED/BROKEN diff for this step.
 
 failed=141
-total=29392
+total=29393

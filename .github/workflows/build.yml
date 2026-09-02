@@ -12,7 +12,13 @@ on:
 env:
   DOTNET_VERSION: '10.0.x'
   SOLUTION: InfoCarrier.Core.slnx
+
+  # THE SPEC SUITE IS TWO PROJECTS, one per backing store, and both are part of the same ratchet.
+  # ADR-009 Tier A is the InMemory one and Tier B the relational one. They are listed separately
+  # rather than run through the solution because the solution also holds
+  # InfoCarrier.Core.TransportTests, which is not a spec project and is gated by the fast job.
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
+  RELATIONAL_TEST_PROJECT: test/InfoCarrier.Core.Relational.FunctionalTests/InfoCarrier.Core.Relational.FunctionalTests.csproj
 
   # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
   # fails the build on the server while local development keeps them as warnings. GitHub Actions
@@ -97,6 +103,13 @@ jobs:
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --filter "FullyQualifiedName~ExpressionRoundTripTest|FullyQualifiedName~InMemorySmokeTest"
 
+      # The relational tier's own vertical slice, and the only place the raw-SQL seam is exercised
+      # end to end. It lives in the other project since the split, so the fast gate names it too.
+      - name: Test (relational smoke)
+        run: >
+          dotnet test ${{ env.RELATIONAL_TEST_PROJECT }} --no-build --configuration Release
+          --filter "FullyQualifiedName~SqliteSmokeTest"
+
       # Phase 1 of M8. A separate project on purpose: InfoCarrier.Core.FunctionalTests is what
       # the spec ratchet counts, and these are not spec tests.
       - name: Test (HTTP transport)
@@ -151,16 +164,33 @@ jobs:
       #
       # ~15 minutes locally at 22312 tests, so allow generously rather than have a slow runner
       # look like a regression.
-      - name: Test (full suite)
+      # ONE RESULTS DIRECTORY, TWO TRX. The ratchet aggregates them into one set of counters and
+      # one sorted name list, gated against the single baseline pair -- see eng/ratchet.sh for why
+      # a baseline per project would stop "fixed here, broken there" from failing the gate.
+      #
+      # Two steps and not one `dotnet test` over the solution: the solution also holds
+      # InfoCarrier.Core.TransportTests, which is not part of this number.
+      - name: Test (full suite, Tier A)
         continue-on-error: true
         timeout-minutes: 90
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
+      - name: Test (full suite, Tier B)
+        continue-on-error: true
+        timeout-minutes: 90
+        run: >
+          dotnet test ${{ env.RELATIONAL_TEST_PROJECT }} --no-build --configuration Release
+          --logger "trx;LogFileName=results-relational.trx" --results-directory artifacts/test-results
+
       - name: Ratchet
         id: ratchet
-        run: ./eng/ratchet.sh artifacts/test-results/results.trx test/known-failures.txt
+        run: >
+          ./eng/ratchet.sh
+          artifacts/test-results/results.trx
+          artifacts/test-results/results-relational.trx
+          test/known-failures.txt
 
       - name: Upload results
         if: always()
@@ -216,7 +246,7 @@ jobs:
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2  # v3.0.0
         with:
           name: Spec suite
-          path: artifacts/test-results/results.trx
+          path: artifacts/test-results/results.trx,artifacts/test-results/results-relational.trx
           reporter: dotnet-trx
           use-actions-summary: 'false'
           list-suites: 'failed'

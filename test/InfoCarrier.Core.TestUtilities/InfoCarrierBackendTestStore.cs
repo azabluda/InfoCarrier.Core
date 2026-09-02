@@ -1,0 +1,403 @@
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+using System.Data.Common;
+using InfoCarrier.Core.Common;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.TestUtilities;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
+
+/// <summary>
+///     The backend test store: an EF spec-test <see cref="TestStore" /> that doubles as the
+///     <see cref="IInfoCarrierClient" /> the client provider talks to (v1's
+///     <c>InfoCarrierBackendTestStore</c> pattern, rebuilt for EF Core 10).
+/// </summary>
+/// <remarks>
+///     Two <see cref="IServiceProvider" />s exist: the client provider (built by the spec-test
+///     fixture) and this store's <em>server</em> provider (built eagerly here, with a
+///     <c>TestModelSource</c> for the server model and the server <see cref="DbContext" />).
+///     Every request and result round-trips through the configured
+///     <see cref="IInfoCarrierSerializer" /> in-process, so wire-serializability failures
+///     surface exactly as over a network (v1's <c>SimulateNetworkTransferJson</c>).
+/// </remarks>
+public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClient
+{
+    private readonly SharedTestStoreProperties _testStoreProperties;
+    private readonly IInfoCarrierSerializer _serializer;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="InfoCarrierBackendTestStore" /> class,
+    ///     building the server service provider eagerly.
+    /// </summary>
+    protected InfoCarrierBackendTestStore(
+        string name,
+        bool shared,
+        SharedTestStoreProperties testStoreProperties)
+        : base(name, shared)
+    {
+        _testStoreProperties = testStoreProperties;
+
+        IServiceCollection services = AddServices(new ServiceCollection().AddLogging());
+        if (testStoreProperties.OnAddServices is { } onAddServices)
+        {
+            services = onAddServices(services);
+        }
+
+        // The SERVER half of the raw-SQL seam (#60), and the half that is the security boundary.
+        // Absent unless the fixture asked, which is what makes the default a refusal rather than a
+        // hole -- `SqliteSmokeTest` builds its stores without going through a fixture and pins
+        // both directions.
+        if (testStoreProperties.ArbitrarySqlExecution)
+        {
+            services = services.AddInfoCarrierArbitrarySqlExecution();
+
+            // Whatever else the store needs on the SERVER once raw SQL is granted. The SQLite
+            // store registers `AddInfoCarrierRelational()` there, which is how the server learns
+            // to REBUILD a raw-SQL query root (#97). This class cannot name that call: it is
+            // shared with Tier A, and naming it would put the relational package on Tier A's
+            // compile line.
+            services = AddStoreSpecificServices(services);
+
+            // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type
+            // allowlist refuses one by default exactly as ADR-008 constraint 2 requires. R85's seam
+            // is what an application uses to admit it; the harness is an application, and it admits
+            // the store's own parameter type alongside the raw-SQL grant because the two are only
+            // ever wanted together.
+            if (StoreParameterType is { } parameterType)
+            {
+                services = services.AddInfoCarrierAllowedTypes(parameterType);
+            }
+        }
+
+        services = services
+            .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
+            .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+
+            // The server half of ADR-012's seam. A value the wire cannot walk has to be mapped
+            // on *both* halves — the client's is registered in
+            // `InfoCarrierTestStoreFactory.AddProviderServices` — and a mapper registered on one
+            // side only fails asymmetrically, which is precisely the "computed twice by two
+            // providers" hazard the ADR states the contract in CLR-type terms to avoid.
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
+
+            // The server half of ADR-012's standard mappers. The client gets them from
+            // `AddEntityFrameworkInfoCarrier`; a server builds its own collection, so it asks.
+            .AddInfoCarrierStandardValueMappers();
+
+        // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
+        // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`
+        // only when the test supplies a customization — registering one built from `null` would
+        // replace the context's model with an empty one.
+        if (_testStoreProperties.OnModelCreating is { } modelCustomization)
+        {
+            services = services.AddSingleton(
+                TestModelSource.GetFactory(modelCustomization, _testStoreProperties.ConfigureConventions));
+        }
+
+        services = services
+            .AddDbContext(
+                ServerContextType,
+                (s, b) => AddProviderOptions(b),
+                ServiceLifetime.Transient,
+                _testStoreProperties.ServerOptionsLifetime ?? ServiceLifetime.Singleton);
+
+        // Only when the fixture's context is a *subclass*. A spec fixture may be
+        // `SharedStoreFixtureBase<DbContext>` — `LazyLoadProxyTestBase`'s is — and then this
+        // registration would re-register `DbContext` itself as scoped, overriding the transient
+        // one `AddDbContext` just made and making it unresolvable from the root provider:
+        // "cannot resolve scoped service 'DbContext' from root provider", every test in the
+        // class failing identically before any of them ran.
+        if (ServerContextType != typeof(DbContext))
+        {
+            SharedTestStoreProperties props = _testStoreProperties;
+            services = services.AddScoped<DbContext>(sp =>
+            {
+                var serverContext = (DbContext)sp.GetRequiredService(ServerContextType);
+
+                // The one place a request's client context and its server context are both in
+                // hand. `CopyDbContextParameters` had been declared and assigned since the
+                // factory was written and never invoked, which is why three query-filter tests
+                // read the server's default tenant instead of the client's.
+                if (CurrentClientContext.Value is { } clientContext)
+                {
+                    props.CopyDbContextParameters?.Invoke(clientContext, serverContext);
+                }
+
+                return serverContext;
+            });
+        }
+
+        ServiceProvider = services.BuildServiceProvider(validateScopes: true);
+
+        _serializer = ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
+
+        // The whole suite now goes through the real envelope path (C45): the product's
+        // `TransportInfoCarrierClient` wraps each request in an `InfoCarrierEnvelope`, a transport
+        // carries it, and the product's `InfoCarrierEnvelopeServer` checks the protocol version
+        // and dispatches. Before this the store implemented `IInfoCarrierClient` itself and both
+        // halves of the envelope protocol were unexercised — the M5 exit criterion.
+        _client = new TransportInfoCarrierClient(
+            new EnvelopeTransport(
+                (envelope, cancellationToken) => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
+                    .DispatchAsync(envelope, cancellationToken)),
+            _serializer);
+    }
+
+    private readonly IInfoCarrierClient _client;
+
+    /// <summary>
+    ///     Carries an envelope to the in-process server.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Not <see cref="InProcessInfoCarrierTransport" />, and the reason is a
+    ///         measurement rather than a preference.</b> That transport re-serializes the whole
+    ///         envelope, and an envelope's payload is <em>already serialized bytes</em> — so the
+    ///         payload would be base64'd into a second JSON document on every hop. C37 measured
+    ///         this suite's largest result at <b>560,839,164 bytes</b>; base64 makes that about
+    ///         750 MB of additional JSON, twice per query, for coverage that is already had.
+    ///     </para>
+    ///     <para>
+    ///         <b>Nothing is lost by not doing it.</b> The payload makes a genuine round trip
+    ///         regardless — <see cref="TransportInfoCarrierClient" /> serializes it and
+    ///         <see cref="InfoCarrierEnvelopeServer" /> deserializes it — which is where every
+    ///         wire-serializability failure this suite has ever caught was caught. What this
+    ///         transport adds is the envelope itself: the version is checked, the operation is
+    ///         dispatched by discriminator, and the response comes back wrapped.
+    ///     </para>
+    ///     <para>
+    ///         The envelope's own serializability is covered by <c>InMemorySmokeTest</c>, which
+    ///         uses the real <see cref="InProcessInfoCarrierTransport" /> on small payloads.
+    ///     </para>
+    /// </remarks>
+    /// <remarks>
+    ///     <para>
+    ///         The handler takes the <see cref="CancellationToken" /> as well as the envelope, and
+    ///         that is not decoration (C66). It used to be a
+    ///         <c>Func&lt;InfoCarrierEnvelope, Task&lt;InfoCarrierEnvelope&gt;&gt;</c>, so this
+    ///         transport <b>dropped the caller's token on the floor</b> and every server operation
+    ///         in the whole suite ran with <see cref="CancellationToken.None" /> — thousands of
+    ///         `…Async(cancellationToken)` calls whose token stopped here.
+    ///     </para>
+    ///     <para>
+    ///         The product was never wrong: <see cref="InProcessInfoCarrierTransport" /> has always
+    ///         taken the two-argument handler. This is the same shape as C45's finding — a wire
+    ///         concern that only the harness stood between the suite and — and it is why W6 could
+    ///         be threaded end to end and still be untested.
+    ///     </para>
+    /// </remarks>
+    private sealed class EnvelopeTransport(
+        Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler) : IInfoCarrierTransport
+    {
+        public Task<InfoCarrierEnvelope> SendAsync(
+            InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
+            => handler(request, cancellationToken);
+    }
+
+    /// <summary>
+    ///     The server URL/name this store stands in for.
+    /// </summary>
+    public string ServerUrl => Name;
+
+    /// <summary>
+    ///     Whether this store's fixture granted raw SQL execution (#60). Read by the client shells,
+    ///     which have to set the matching client-side option.
+    /// </summary>
+    public bool ArbitrarySqlExecution => _testStoreProperties.ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     The backing store's <see cref="DbParameter" /> type, when it has one - admitted on both
+    ///     sides alongside <see cref="ArbitrarySqlExecution" />.
+    /// </summary>
+    /// <remarks>
+    ///     Named by the STORE and not by this provider, which is the whole point of R85's seam:
+    ///     `InfoCarrier.Core` references no provider and cannot spell `SqliteParameter`.
+    /// </remarks>
+    public virtual Type? StoreParameterType => null;
+
+    /// <summary>
+    ///     The store's own additions to the <em>server's</em> services, once the fixture has
+    ///     granted raw SQL execution.
+    /// </summary>
+    /// <remarks>
+    ///     Nothing by default, and called only inside that grant, because everything a store adds
+    ///     here today exists to serve a raw-SQL payload. Same seam as
+    ///     <see cref="StoreParameterType" /> above and for the same reason: the store names what
+    ///     this class may not.
+    /// </remarks>
+    protected virtual IServiceCollection AddStoreSpecificServices(IServiceCollection services)
+        => services;
+
+    /// <summary>
+    ///     An <b>unopened</b> connection carrying the backing store's connection string, for
+    ///     <c>RelationalTestStore</c> to read <c>ConnectionString</c> from.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Only a relational store has one, so the base throws rather than inventing one.</b>
+    ///     It used to return a bare <c>SqliteConnection</c> from this class, which named a
+    ///     relational provider in the store-neutral half of the harness. Nothing on the Tier A path
+    ///     calls this: the only caller is <c>RelationalInfoCarrierTestStore</c>, which exists in
+    ///     the relational test project alone.
+    /// </remarks>
+    public virtual DbConnection CreateStoreConnection()
+        => throw new InvalidOperationException(
+            $"'{GetType().Name}' is not a relational store, so it has no connection string. "
+            + "Only a RelationalTestStore asks for one, and only a relational tier creates those.");
+
+    /// <summary>
+    ///     Creates a server-side <see cref="DbContext" /> from the server provider.
+    /// </summary>
+    public virtual DbContext CreateDbContext()
+        => (DbContext)ServiceProvider!.GetRequiredService(ServerContextType);
+
+    /// <summary>
+    ///     The context type the server runs, which may add store-specific model configuration
+    ///     the client neither has nor needs (e.g. defining queries for keyless entity types).
+    /// </summary>
+    private Type ServerContextType
+        => _testStoreProperties.ServerContextType ?? _testStoreProperties.ContextType;
+
+    /// <summary>
+    ///     Adds the backend provider services (e.g. InMemory, SqlServer) to the collection.
+    /// </summary>
+    protected abstract IServiceCollection AddServices(IServiceCollection serviceCollection);
+
+    /// <summary>
+    ///     Builds the server context's options.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="EnableSensitiveDataLogging" /> because the spec fixtures set it on the
+    ///     client (<c>FixtureBase.AddOptions</c>) and an exception raised while the *server*
+    ///     compiles the same query should read the same way. Without it,
+    ///     <c>Local_variable_from_OnModelCreating_can_throw_exception</c> got EF's message minus
+    ///     the expression that caused it — right exception, right place, two words different.
+    ///     Deliberately not the rest of <c>AddOptions</c>: its
+    ///     <c>ConfigureWarnings(Default(Throw))</c> is a statement about what the test author
+    ///     wrote, and the server runs a tree this provider generated.
+    /// </remarks>
+    public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
+    {
+        // `EnableDetailedErrors()` DOES NOT BELONG HERE, and R107 measured why. Adding it beside
+        // the line below -- the obvious generalization of R104, which turns it on for one fixture
+        // -- costs **68 `JsonQuerySqliteInfoCarrierTest` tests**, `failed` 143 -> 211.
+        //
+        // R109 found the cause and IT IS NOT THIS PROVIDER'S. One property loses its value:
+        // `JsonOwnedAllTypes.TestInt16Collection`, declared `IReadOnlyList<short>`. With the
+        // option on it materializes EMPTY; with it off it holds its three elements. That is the
+        // single `Expected: 3, Actual: 0` every one of the 68 stops at, because `AssertAllTypes`
+        // reaches it before it reaches anything else that differs.
+        //
+        // **Measured on the SERVER context, which is a plain EF Core SQLite context with no
+        // InfoCarrier code in the read path at all** -- the same 0 comes back from
+        // `Backend.CreateDbContext()` directly, before any request crosses the wire, and the
+        // client then faithfully reports what the server sent. EF's own
+        // `CreateReadJsonPropertyValueExpression` is the only place the option touches a JSON
+        // read: it wraps the read in a `TryCatch`, and `Utf8JsonReaderManager` is a `ref struct`
+        // passed by reference through it. A minimal model with an `IReadOnlyList<short>` in a
+        // `ToJson()` owned type does NOT reproduce, so the trigger needs more of EF's model than
+        // the property type alone; the mechanism is EF's to find.
+        //
+        // The switch stays per fixture regardless, and this repository has nothing to fix.
+        builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
+
+        // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
+        // file rather than output attached to a failing test.
+        if (ServerSqlLog.IsEnabled)
+        {
+            // CommandError as well as CommandExecuted. A statement that *failed* is the one a
+            // diagnostic most needs and the one CommandExecuted never carries, because it is
+            // logged only on success -- so the log used to stop at the last statement that
+            // worked and stay silent about the one that did not. Found while tracing the
+            // ManyToManyTracking foreign-key failure R35 uncovered.
+            builder = builder.LogTo(
+                ServerSqlLog.Write,
+                [
+                    Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted,
+                    Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandError,
+                ]);
+        }
+
+        return _testStoreProperties.OnAddOptions?.Invoke(builder) ?? builder;
+    }
+
+    /// <inheritdoc />
+    public async Task<QueryDataResult> QueryDataAsync(
+        QueryDataRequest request,
+        DbContext clientContext,
+        CancellationToken cancellationToken = default)
+    {
+        using var _ = WithClientContext(clientContext);
+        return await _client.QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<SaveChangesResult> SaveChangesAsync(
+        SaveChangesRequest request,
+        DbContext clientContext,
+        CancellationToken cancellationToken = default)
+    {
+        using var _ = WithClientContext(clientContext);
+        return await _client.SaveChangesAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     The client context of the request currently in flight, for the server context factory
+    ///     below to copy per-request parameters from.
+    /// </summary>
+    /// <remarks>
+    ///     A context property the model reads — <c>NorthwindContext.TenantPrefix</c>, which a
+    ///     query filter closes over — never reaches the wire: the client captures its tree before
+    ///     EF applies query filters, and the *server* applies its own model's filter using its
+    ///     own context. So the value has to be carried out of band. `AsyncLocal` because the
+    ///     server is a singleton serving concurrent requests, and the scope is one request.
+    /// </remarks>
+    private static readonly AsyncLocal<DbContext?> CurrentClientContext = new();
+
+    private static IDisposable WithClientContext(DbContext clientContext)
+    {
+        DbContext? previous = CurrentClientContext.Value;
+        CurrentClientContext.Value = clientContext;
+        return new Restore(() => CurrentClientContext.Value = previous);
+    }
+
+    private sealed class Restore(Action onDispose) : IDisposable
+    {
+        public void Dispose() => onDispose();
+    }
+
+    // The transaction operations go through the envelope too. They are the ones with no payload
+    // worth speaking of, which is exactly why they had never exercised the dispatch: a bug in the
+    // operation discriminator for `ReleaseSavepoint` would have been invisible.
+
+    /// <inheritdoc />
+    public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
+        => _client.BeginTransactionAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
+        => _client.CommitTransactionAsync(transactionId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
+        => _client.RollbackTransactionAsync(transactionId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => _client.CreateSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => _client.RollbackToSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+        => _client.ReleaseSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+        => _client.SupportsSavepointsAsync(transactionId, cancellationToken);
+
+    private IInfoCarrierServer CreateServer()
+        => ServiceProvider!.GetRequiredService<IInfoCarrierServer>();
+}

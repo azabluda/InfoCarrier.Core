@@ -48,6 +48,7 @@ reasons="$out/$label.reasons.txt"
 # thing about pointing a hand run at the .slnx.
 projects=(
     "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj"
+    "$root/test/InfoCarrier.Core.Relational.FunctionalTests/InfoCarrier.Core.Relational.FunctionalTests.csproj"
 )
 
 dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.log" 2>&1 || {

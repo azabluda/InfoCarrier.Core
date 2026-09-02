@@ -3818,6 +3818,96 @@ re-parents of families already running, because R25–R30 showed that is where t
       `build.yml` is untouched: its call is two arguments, the last of which is the baseline, which
       is what the new parser reads.
 
+- [x] **R122. The spec suite splits by backing store, and the compliance gate splits with it.**
+      `test/` and `eng/` and the workflows; no product code, so `eng/measure.sh` is the gate and the
+      trim ratchet has nothing to say.
+
+      **Three test projects where there was one**, EF Core's own layout:
+      `test/InfoCarrier.Core.FunctionalTests` is ADR-009 Tier A over InMemory,
+      `test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B over SQLite, and
+      `test/InfoCarrier.Core.TestUtilities` is the store-neutral harness they share. **Tier A
+      references neither `EFCore.Relational.Specification.Tests` nor `InfoCarrier.Core.Relational`,
+      and neither does the shared harness**, because a reference is transitive. That is the whole
+      purpose: a relational client over an InMemory backend is the disagreement the seam exists to
+      prevent, and it was a per-fixture flag before, which asks politely.
+
+      **The seam the split forced, and it is the interesting part.** The shared harness could not
+      keep naming relational types, so the backend-store delegate and the `relationalClientStore`
+      bool became one `InfoCarrierTier` object. A tier answers four questions for itself: which
+      backend store, which client shell, which client services, which logger factory. Everything
+      relational is overridden in `SqliteInfoCarrierTier`, in the Tier B assembly;
+      `InMemoryInfoCarrierTier` overrides one member and takes the store-neutral defaults for the
+      rest, which is the honest measure of how much of the harness was ever store-specific. The
+      same shape appears twice more: `InfoCarrierBackendTestStore.AddStoreSpecificServices` (the
+      server's `AddInfoCarrierRelational`) and `CreateStoreConnection`, which used to return a bare
+      `SqliteConnection` from the store-neutral base and now throws there.
+
+      **Two things Tier A was carrying that it did not need, both found by the compiler rather than
+      by reading.**
+
+      - **Seven Tier A fixtures implemented `ITestSqlLoggerFactory`**, purely to satisfy
+        `RelationalComplianceTestBase`'s second assertion. Tier A is now checked by the plain
+        `ComplianceTestBase`, which does not ask, and what the property returned was the *client's*
+        log — on a client with no database, empty.
+      - **`SpatialQueryInfoCarrierTest` sat on `SpatialQueryRelationalTestBase`, which declares no
+        tests.** Read before it was decided, as the handoff required: fourteen lines whose whole
+        contribution is a `RelationalQueryAsserter` that calls `TestSqlLoggerFactory.OutputSql()`
+        when an assertion fails, on a client that emits no SQL. It now sits on the core
+        `SpatialQueryTestBase` and **loses nothing**, because the base declared nothing to lose. It
+        is listed in Tier B's `IgnoredTestBases` with that measurement: adopting it there would
+        need SpatiaLite for a base that declares no tests.
+
+      **`ModelBuilding` and `DocumentMappingPinTest` moved to Tier B**, which the compiler decided:
+      the first derives from `RelationalModelBuilderTest` and a stack of `Relational…TestBase`, and
+      the second calls `UseSqlite`.
+
+      **TWO COMPLIANCE TESTS, AND BOTH ARE WHERE THEY SHOULD BE.** `InfoCarrierComplianceTest`
+      scans the core specification assembly against Tier A; `RelationalInfoCarrierComplianceTest`
+      overrides `GetBaseTestClasses()` to scan the relational one against Tier B, so the two do not
+      both claim the core bases — without that override Tier B would report a hundred bases missing
+      that are not missing at all. **Tier A's missing list is 0 and Tier B's is 1**
+      (`SqlQueryTestBase`), which is the same 1 the single test reported before the split.
+
+      **Tier A's `IgnoredTestBases` was generated from the test's own output**, not written by
+      hand: 108 core bases adopted on Tier B, because InMemory cannot host them and the tier that
+      translates is where they run (ADR-009). One reason covers the list and it is a true one; the
+      per-base reasoning is in the archive. An entry is a claim that a subclass exists in the
+      sibling assembly, and the pair of tests is what checks it. The old list, every entry of it,
+      was relational and moved to Tier B — the compiler established that by refusing to resolve a
+      single one of them in Tier A.
+
+      **Gates.** `eng/measure.sh r122 r120`: **`Passed: 29014, Failed: 141, Total: 29393`**, read
+      as `failing 2 of 9151` on Tier A plus `failing 139 of 20242` on Tier B. **`failed` does not
+      move.** FIXED one and BROKEN one, and they are the same failure renamed:
+      `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` became
+      `RelationalInfoCarrierComplianceTest.All_test_bases_must_be_implemented`. REASONS unchanged.
+      `CI=true dotnet build --configuration Release`: `5 Warning(s), 0 Error(s)`.
+
+      **`total` rises 29392 → 29393, a deliberate rise of one, and the cause is arithmetic rather
+      than behaviour.** The compliance gate is two classes now, so
+      `All_test_bases_must_be_implemented` exists twice while
+      `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` still exists once. Two tests
+      became three. `test/known-failures.txt` carries the note and
+      `test/known-failures.names.txt` carries the rename.
+
+      **`build.yml` runs both projects into one results directory and hands both TRX to the
+      ratchet**, which R121 taught to aggregate. The fast gate gains `SqliteSmokeTest`, which moved
+      to the other project and is the only place the raw-SQL seam runs end to end.
+
+      **One thing the Release build caught that a Debug build would not have.** The culture pin is a
+      `[ModuleInitializer]`, and moving it into the shared library made `CA2255` an error under
+      `CI=true`: *"only intended to be used in application code"*. **The analyzer is right and the
+      hazard is real** — a library's module initializer runs when that library is first loaded,
+      which is not guaranteed to precede the test threads of the assembly that referenced it, and
+      the whole point of the pin is that it runs before any of them. `InvariantCulture.Pin()` is now
+      an ordinary method in the shared harness and each test assembly carries its own three-line
+      `[ModuleInitializer]` that calls it. Re-measured after that change: `FAILING: 141 TOTAL:
+      29393`, FIXED none, BROKEN none, REASONS unchanged, so the pin still does what it did.
+
+      **Both compliance tests are green in the sense that matters**: Tier A's passes outright, and
+      Tier B's carries the one missing base it is supposed to carry. The end state the split was for
+      — two compliance tests, both meaningful, neither able to hide the other's gap — exists.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

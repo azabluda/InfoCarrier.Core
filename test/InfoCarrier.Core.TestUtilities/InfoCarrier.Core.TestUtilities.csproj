@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The store-neutral half of the test harness, shared by every spec test project.
+
+    EF Core keeps its equivalents in EFCore.Specification.Tests/TestUtilities, inside the
+    specification assembly itself. They are here in a project of their own because this repository
+    has two halves per test: a client with no database and a server on a real provider, and the
+    harness that wires them is neither tier's property.
+
+    NOTHING RELATIONAL MAY BE REFERENCED FROM HERE. A reference is transitive, so anything this
+    project names reaches InfoCarrier.Core.FunctionalTests, and Tier A must not have a relational
+    client. InMemory is not a relational store, and a relational client over it recreates exactly
+    the disagreement the split exists to prevent (architecture.md section 6a, D3). The relational
+    half of the harness lives in InfoCarrier.Core.Relational.FunctionalTests/TestUtilities.
+
+    InMemory IS referenced, and that is not an exception to the rule above: EF's InMemory provider
+    is not relational, and the InMemory backend store is the Tier A half of the same seam.
+  -->
+  <PropertyGroup>
+    <Description>The store-neutral test harness shared by the InfoCarrier.Core spec test projects.</Description>
+    <RootNamespace>InfoCarrier.Core.FunctionalTests.TestUtilities</RootNamespace>
+    <AssemblyName>InfoCarrier.Core.TestUtilities</AssemblyName>
+    <IsPackable>false</IsPackable>
+
+    <!--
+      Not a documented API, but the doc file is generated anyway: IDE0005 (unnecessary using) does
+      not run without one. The doc-comment warnings that come with it are switched off by the
+      folder-scoped .editorconfig, not here.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!--
+      This project is a library, not a test project. It carries the xunit reference because the
+      fixtures it holds implement xunit interfaces, but it declares no tests and must not be
+      collected as if it did.
+    -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" />
+    <PackageReference Include="xunit" />
+  </ItemGroup>
+
+</Project>

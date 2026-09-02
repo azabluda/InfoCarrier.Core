@@ -39,15 +39,26 @@ question, and how to check the loaded solution first:
 
 ```powershell
 dotnet build InfoCarrier.Core.slnx                       # note: .slnx, not .sln
-dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the suite
+bash eng/measure.sh <label> [baseline]                   # THE SUITE: both tiers, one number
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj                       # Tier A, InMemory
+dotnet test  test/InfoCarrier.Core.Relational.FunctionalTests/InfoCarrier.Core.Relational.FunctionalTests.csproj # Tier B, SQLite
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
-dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 17 tests, separate project
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 19 tests, separate project
 ```
 
-**Point test runs at the `.csproj`, never at the `.slnx`.** The solution holds both test projects,
-and running them together inflates `Total` past what `test/known-failures.txt` was written against.
-`eng/measure.sh` is scoped to the `.csproj` for the same reason, so a hand run scoped any other way
-is not comparable to it.
+**THE SPEC SUITE IS TWO PROJECTS SINCE R122, and its number is the two added together.**
+`test/InfoCarrier.Core.FunctionalTests` is ADR-009 Tier A (InMemory) and
+`test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B (SQLite); the store-neutral harness they
+share is `test/InfoCarrier.Core.TestUtilities`. **Tier A references nothing relational** — not
+`EFCore.Relational.Specification.Tests`, not `InfoCarrier.Core.Relational` — and that is the whole
+point of the split: a relational client over an InMemory backend is the disagreement the seam exists
+to prevent. It was a per-fixture flag before, which asks politely.
+
+**Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
+both and adds the figures. The solution also holds `InfoCarrier.Core.TransportTests`, which is not a
+spec project, so a solution-wide run inflates `Total` past what `test/known-failures.txt` was written
+against. **A run of one tier alone is not comparable to the baseline either**, because the baseline
+covers both.
 
 **Report test results as `Passed: N, Failed: M, Total: T`, read out of the run's own output.** Never
 estimate a count, and never derive one figure from the others.
@@ -286,8 +297,13 @@ archived in `docs/plans/v10/archive/implementation-plan-m9-phase-j.md` and is ne
 `docs/plans/v10/implementation-plan.md` holds M8's Phases H and I only.
 
 **M6 is CLOSED (2026-08-11).** Every spec base EF ships that this provider can host is adopted, and
-`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is what enforces it. That test, not a
-list in this file, is the current answer to "which bases are in".
+`All_test_bases_must_be_implemented` is what enforces it. **There are TWO of those tests since R122,
+one per test project, and both must stay green** — `InfoCarrierComplianceTest` scans the core
+specification assembly against Tier A, and `RelationalInfoCarrierComplianceTest` scans the relational
+one against Tier B, with `GetBaseTestClasses()` overridden so the two do not both claim the core
+bases. Tier A's missing list is **0** and Tier B's is **1** (`SqlQueryTestBase`), which is what the
+single test reported before the split. Those tests, not a list in this file, are the current answer
+to "which bases are in".
 
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.

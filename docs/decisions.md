@@ -557,3 +557,41 @@ fixture may want the first without the second.
 **One base it must not be pointed at.** `AdHocQuerySplittingQueryTestBase` calls `CloseConnection()`
 on the cast store, so it needs a live connection. What it tests — a connection dropping mid
 split-query — has no meaning across this wire, and a green there would be manufactured.
+
+**Amended 2026-09-02 (R122) — "the test project" is now one of three, and only one of them may.**
+The spec suite split by backing store, as EF Core's own does:
+`test/InfoCarrier.Core.FunctionalTests` is Tier A over InMemory,
+`test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B over SQLite, and
+`test/InfoCarrier.Core.TestUtilities` is the store-neutral harness they share. **The reference this
+ADR grants belongs to the Tier B project alone.** Tier A references neither
+`EFCore.Relational.Specification.Tests` nor the `InfoCarrier.Core.Relational` package, and neither
+does the shared harness, because a reference is transitive.
+
+**The decision is unchanged and so is every adoption. What changed is enforcement.** The flags this
+ADR describes — `relationalClientStore`, and the raw-SQL grant beside it — were per fixture, which
+asks politely: nothing stopped a Tier A fixture from setting one, and a relational client over an
+InMemory backend is the disagreement the seam exists to prevent (`architecture.md` §6a **D3**). A
+project boundary does not ask. The flags remain, because they still answer a per-fixture question
+inside Tier B; what they can no longer do is cross the tier.
+
+**Two things it cost, both measured rather than argued.**
+
+- **Seven Tier A fixtures implemented `ITestSqlLoggerFactory` and none of them needed to.** The
+  interface exists in the relational specification assembly and was implemented solely to satisfy
+  `RelationalComplianceTestBase`'s second assertion. Tier A is now checked by the plain
+  `ComplianceTestBase`, which does not ask, and what the property returned was the *client's* log —
+  on a client with no database, empty. Tier B's fixtures still implement it, and its assertion is
+  green.
+- **`SpatialQueryInfoCarrierTest` gave up `SpatialQueryRelationalTestBase` for the core base, and
+  lost no test doing it.** That base is fourteen lines and **declares no tests**: its whole
+  contribution is a `RelationalQueryAsserter` that calls `TestSqlLoggerFactory.OutputSql()` when an
+  assertion fails, on a client that emits no SQL. It is listed in Tier B's `IgnoredTestBases` with
+  that measurement, because adopting it there would need SpatiaLite for nothing it declares.
+
+**The compliance gate is now two tests and both must be green.** `InfoCarrierComplianceTest` scans
+the core specification assembly against Tier A; `RelationalInfoCarrierComplianceTest` overrides
+`GetBaseTestClasses()` to scan the relational one against Tier B, so the two do not both claim the
+core bases. Tier A's list of ignored bases names the **108 core bases adopted on Tier B**, generated
+from the test's own output rather than written by hand, and an entry there is a claim that a
+subclass exists in the sibling assembly. Missing: **0 on Tier A, 1 on Tier B** (`SqlQueryTestBase`),
+which is the same 1 the single test reported before the split.

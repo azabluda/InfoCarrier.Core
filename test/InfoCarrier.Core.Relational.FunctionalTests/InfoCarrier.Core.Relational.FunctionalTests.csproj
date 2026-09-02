@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ADR-009 Tier B: the spec suite run against a client whose backing store is a relational
+    database, over SQLite. EF Core's own layout, one test project per store.
+
+    THIS IS THE ONLY TEST PROJECT THAT MAY REFERENCE ANYTHING RELATIONAL. Tier A lives in
+    InfoCarrier.Core.FunctionalTests and references neither EFCore.Relational.Specification.Tests
+    nor InfoCarrier.Core.Relational, so a relational client cannot reach an InMemory backend by
+    accident. That was a per-fixture flag before the split, which asks politely; a project boundary
+    does not ask.
+  -->
+  <PropertyGroup>
+    <Description>Functional tests for InfoCarrier.Core against a relational backing store (ADR-009 Tier B, SQLite).</Description>
+    <RootNamespace>InfoCarrier.Core.FunctionalTests.Sqlite</RootNamespace>
+    <AssemblyName>InfoCarrier.Core.Relational.FunctionalTests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!--
+      CompiledModelTestBase compiles the model it scaffolds, in-process, against this assembly's
+      own compilation references. Without this it cannot resolve `netstandard` and says so by
+      name. Every EF test project that hosts this base sets it.
+    -->
+    <PreserveCompilationContext>true</PreserveCompilationContext>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\..\src\InfoCarrier.Core.Relational\InfoCarrier.Core.Relational.csproj" />
+    <ProjectReference Include="..\InfoCarrier.Core.TestUtilities\InfoCarrier.Core.TestUtilities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      SQLitePCLRaw is not pinned anywhere in this repo, so it resolves to EF Core's own floor,
+      2.1.11 / SQLite 3.49.1. That version carries GHSA-2m69-gcr7-jv3q, suppressed here.
+
+      Why not take the fix (2.1.13, SQLite 3.50.2+): 3.50.2 also switched CAST(real AS TEXT)
+      from 15 significant digits to full precision. Four Northwind aggregate spec tests here
+      (NorthwindAggregateOperatorsQueryInfoCarrierTest.Average_over_max_subquery and
+      Average_over_nested_subquery, sync and async) compare a `(decimal)` cast aggregate against
+      an EF Core expected computed as `(decimal)(double)`, which snaps to 15 digits; the SQLite
+      side is `ef_avg(CAST(realAvg AS TEXT))`. Through 3.49 both carried 15 digits and agreed;
+      on 3.50.2+ `ef_avg` keeps more and the result diverges in the last place. Plain EF Core
+      SQLite fails these four the same way on 3.50.2+, and the diverging value is a mid query
+      `AVG` that is never stored, so no seed or model change reaches it (the `Discount` seed
+      rounding in NorthwindQueryInfoCarrierSqliteFixture fixes a different, unrelated pair).
+
+      Safe to suppress: this project ships nothing (IsPackable=false), is never packaged, and
+      runs only EF generated SQL against throwaway local .db files. Revisit when EF Core updates
+      these expected values or ships its own SQLite override.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+</Project>
