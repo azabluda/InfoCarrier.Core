@@ -493,6 +493,61 @@ hunting an `InfoCarrier.Core.Relational 10.0.0` that cannot exist. The new cspro
 `<EnablePackageValidation>false</EnablePackageValidation>` with a comment saying to turn it on after
 the first release.
 
+#### D3 amendment 2026-09-02 (R123) — level 2 is scoped, and it is blocked on ONE decision that is the owner's
+
+**Nothing was built. This entry is the expensive half of level 2 done in advance, so the next
+attempt does not re-derive it.** Level 2 is "register EF's own relational conventions on the client
+model", so that `ToTable`, `ToJson`, TPT/TPC and `EntityTypeHierarchyMappingConvention` are EF's
+rather than this repository's 131-line copy.
+
+**Good news first: the convention itself runs on a client model, and that was read from EF's source
+rather than assumed.**
+
+| Question | Answer | How |
+|---|---|---|
+| Does `EntityTypeHierarchyMappingConvention` need relational *services*? | **No.** It takes `RelationalConventionSetBuilderDependencies` and never touches it in `ProcessModelFinalizing` | read `EFCore.Relational/Metadata/Conventions/EntityTypeHierarchyMappingConvention.cs` end to end |
+| What is in that dependency object, then? | `IRelationalAnnotationProvider` and `IUpdateSqlGenerator`, neither of which the client has | read `RelationalConventionSetBuilderDependencies` |
+| Does `GetTableName()` need one? | **No.** `GetDefaultTableName` reads model metadata and `Model.GetMaxIdentifierLength()`, and nothing else | read `RelationalEntityTypeExtensions` |
+
+So the convention can be constructed from the relational package with a dependency object whose two
+members throw, exactly as `InfoCarrierRelationalFacadeDependencies` already does for its three
+relational members and for the reason ADR-013 records: **the callers that want them are not the
+callers that want the rest**, and a throw is louder than a wrong answer if EF ever changes that.
+
+**THE BLOCKER, and it is not the conventions.** It is *which client gets them*, and it is R120's
+one-reader problem in its model-building form.
+
+- **A convention set cannot read a context's options.** `ProviderConventionSetBuilderDependencies`
+  exposes `ContextType` — a `Type` — and no `ICurrentDbContext`. So the seam cannot travel on the
+  options the way `IInfoCarrierRelationalQueryRoots` does; it has to be registered in DI.
+- **DI is one answer for every client context in the process**, because
+  `ExtensionInfo.GetServiceProviderHashCode()` is `0`. That is the fact R120 was about.
+- **And the model itself is shared.** This provider registers no `IModelCacheKeyFactory`, so EF's
+  default is in force and it keys the model on the context CLR type. Two contexts of the same type,
+  one configured relational and one not, get **one model** — so even a per-context answer could not
+  be honoured without replacing that factory.
+
+**Two ways forward, and choosing between them is a decision rather than a step.**
+
+1. **Level 2 is a process-wide statement.** `AddInfoCarrierRelational()` on the client's service
+   collection means "every InfoCarrier client in this process has a relational backing store". Cheap,
+   honest for the overwhelming majority of applications, and it makes the relational conventions a
+   property of the deployment rather than of the context. What it gives up is the mixed process.
+2. **Replace `IModelCacheKeyFactory`** so the options participate in the key, and carry the seam on
+   the options as level 1 does. Correct in the mixed process, and it costs a model per options shape
+   plus a new public service this provider did not have.
+
+**Do not start level 2 without answering that.** Starting with (1) and discovering (2) later is a
+public-API change and a model-cache change at once.
+
+**One more thing measured while scoping, because it changes the test plan.** The relational client
+services are registered today only where a fixture asked for **raw SQL**
+(`InfoCarrierTestStoreFactory.AddProviderServices`, gated on `ArbitrarySqlExecution`). Level 2 wants
+them wherever the backing store is relational, which is every Tier B fixture. So the first
+measurement of level 2 is not the conventions at all: it is **turning the relational client on for
+the whole of Tier B**, which is a large blast radius and should be measured on its own before a
+single convention moves.
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).

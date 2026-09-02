@@ -3908,6 +3908,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       Tier B's carries the one missing base it is supposed to carry. The end state the split was for
       — two compliance tests, both meaningful, neither able to hide the other's gap — exists.
 
+- [x] **R123. Level 2 scoped and filed, NOT built, and it is blocked on one decision.** Documents
+      only — `architecture.md` §6a **D3 amendment 2026-09-02 (R123)**. **Nothing executable
+      changed.** No gate to run.
+
+      **What was established, and it is the half that costs time.** EF's own
+      `EntityTypeHierarchyMappingConvention` **runs on a client model unchanged**: it takes
+      `RelationalConventionSetBuilderDependencies` and never touches it, and `GetTableName()` needs
+      no relational service either — `GetDefaultTableName` reads model metadata and
+      `GetMaxIdentifierLength()` and nothing else. All three read out of EF's source. So the
+      131-line hand-written copy really can go, and the dependency object it would need can throw on
+      both its members, exactly as `InfoCarrierRelationalFacadeDependencies` does and for the reason
+      ADR-013 records.
+
+      **The blocker is not the conventions. It is which client gets them, and it is R120's finding
+      in its model-building form.** A convention set cannot read a context's options —
+      `ProviderConventionSetBuilderDependencies` exposes `ContextType`, a `Type`, and no
+      `ICurrentDbContext` — so the seam must be registered in DI, and DI is one answer for every
+      client context in the process. **Worse, the model is shared too**: this provider registers no
+      `IModelCacheKeyFactory`, so EF's default keys the model on the context CLR type, and a
+      per-context answer could not be honoured even if the seam could carry one.
+
+      **Two ways forward and they are the owner's to choose**: level 2 is a process-wide statement
+      (`AddInfoCarrierRelational()` means "every client here is relational"), or
+      `IModelCacheKeyFactory` is replaced so the options participate. Starting with the first and
+      needing the second later is a public-API change and a model-cache change at once, so it is
+      not a thing to discover halfway.
+
+      **And the first measurement of level 2 is not a convention.** The relational client services
+      are registered today only where a fixture asked for raw SQL
+      (`InfoCarrierTestStoreFactory.AddProviderServices`, gated on `ArbitrarySqlExecution`). Level 2
+      wants them for every Tier B fixture, which is a large blast radius and should be measured on
+      its own first.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
