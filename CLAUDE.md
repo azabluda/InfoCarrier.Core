@@ -91,13 +91,14 @@ invisible to `trim-ratchet.sh`. Nothing gates that axis, because Native AOT is n
 | `docs/`, `eng/` text only | neither |
 | **a public signature in `src/`** | **`dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release`** as well |
 
-**The pack gate runs on `main` ALONE, so a public-API break is invisible on a PR branch.** The
-`Packages` workflow is the only job that runs `dotnet pack`, and package validation compares the
-assembly with the published `10.0.0` (`Directory.Build.props`). **Adding an optional parameter to a
-public member is source-compatible and BINARY breaking** — the compiler emits one member and the old
-arity leaves the assembly, which validation reports as `CP0002`. Six such breaks rode a green PR
-into `main` and turned it red on merge (R119). Run the pack line locally before merging anything
-that touches a public signature; it takes seconds and needs no network beyond the baseline package.
+**The pack gate now runs on the PR too, and it did not until R119.** Package validation compares
+the assembly with the published `10.0.0` (`Directory.Build.props`). **Adding an optional parameter
+to a public member is source-compatible and BINARY breaking** — the compiler emits one member and
+the old arity leaves the assembly, which validation reports as `CP0002`. Six such breaks rode a
+green PR into `main` and turned it red on merge, because the `Packages` workflow was then the only
+job that packed and it runs on `main` alone. `build.yml`'s *fast-gate* job now packs as well, so
+the break fails on the branch. Run the pack line locally anyway before pushing a public-signature
+change; it takes seconds and needs no network beyond the baseline package.
 
 The trim ratchet is a clean publish: ~41 s in CI, about a minute locally. That is cheap enough that
 "product code changed" is the whole trigger — do not try to judge whether a change *looks*

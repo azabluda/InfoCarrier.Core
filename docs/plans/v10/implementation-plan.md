@@ -3669,6 +3669,37 @@ re-parents of families already running, because R25–R30 showed that is where t
       `InfoCarrier.Core` under every level, so a non-relational backend — the other end of #96 —
       stays possible.
 
+- [x] **R119. The public-API gate moves onto the pull request.** `.github/workflows/build.yml` and
+      `CLAUDE.md`; no product or test code. The *fast-gate* job now runs
+      `dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release --output artifacts/pack`
+      straight after its Release build, and publishes nothing.
+
+      **Why.** `dotnet pack` is what runs package validation — `Directory.Build.props` sets
+      `EnablePackageValidation` against the published `10.0.0` baseline — and until now the
+      `Packages` workflow was the only job that packed. That workflow runs on `main` alone, so a
+      binary break was invisible until it had already merged. #91 merged green and turned `main`
+      red with six `CP0002` breaks, every one an optional parameter added to a public member:
+      source-compatible and binary breaking, because the compiler emits one member and the old
+      arity leaves the assembly. `UseInfoCarrier` was among them. Commit `ea2f560` restored the six
+      as explicit `[EditorBrowsable(Never)]` overloads rather than suppressing them, and the two
+      `UseInfoCarrier` shims needed the same `RequiresUnreferencedCode` / `RequiresDynamicCode`
+      attributes as the members they forward to — without those the trim ratchet went 89 → 91.
+
+      **Cost.** Seconds, on a Release build that has already happened. No path filtering was added
+      because `build.yml` has none to follow: it already runs its build and its 90-minute spec
+      ratchet on every push and pull request, documentation-only ones included. `docs.yml` and
+      `packages.yml` are the workflows that filter, and neither is touched.
+
+      **Left for the next `src/` commit, deliberately.** Five XML doc comments in
+      `src/InfoCarrier.Core` — on `ExpressionSerializer.CreateForModel`, `UseInfoCarrier`,
+      `QuerySplitter`, `ServerBoundaryAnalyzer` and `ServerQueryExecutor`, one per binary-
+      compatibility overload — still end "the `Packages` workflow is the only job that checks it —
+      it runs on `main` alone". That sentence is now false. It is not corrected here because
+      `CLAUDE.md`'s gate table asks for a full suite run and a trim publish for any change under
+      `src/`, and R120 widens all five of those files anyway.
+
+      No gate to run: nothing under `src/` or `test/` changed.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

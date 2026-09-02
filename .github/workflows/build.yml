@@ -73,6 +73,25 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
 
+      # THE PUBLIC-API GATE, and it belongs on the pull request rather than after the merge.
+      # `dotnet pack` is what runs package validation: Directory.Build.props sets
+      # EnablePackageValidation with a baseline of the published 10.0.0, so the SDK downloads that
+      # package and compares assemblies. A break is reported as CP0002 and fails the pack.
+      #
+      # WRITTEN AFTER SIX SUCH BREAKS RODE A GREEN PULL REQUEST INTO `main` (#91, fixed in R119).
+      # Every one was an optional parameter added to a public member -- source-compatible and
+      # BINARY breaking, because the compiler emits one member and the old arity leaves the
+      # assembly. `UseInfoCarrier` was among them, so a compiled consumer application would have
+      # broken. Until this step existed, packages.yml was the only job that packed, and it runs on
+      # `main` alone; the break was therefore invisible until it was already merged.
+      #
+      # Seconds, on top of a Release build that has already happened. Nothing is published: the
+      # output goes to artifacts/pack and is not uploaded. packages.yml stays the only publisher.
+      - name: Pack (public-API gate)
+        run: >
+          dotnet pack ${{ env.SOLUTION }} --no-build --configuration Release
+          --output artifacts/pack
+
       - name: Test (round-trip + smoke)
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
