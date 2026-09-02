@@ -855,6 +855,88 @@ take.
 explicit that such a reversal is a dated decision rather than a code change that quietly contradicts
 one. The pricing is recorded so the decision can be made against a number.
 
+#### D8 item 2 re-priced 2026-09-02 (R110) — D3 does not have to be reversed
+
+**R102 read the blocker correctly and then assumed only one way past it.** Its step 1 —
+`InfoCarrier.Core` references `EFCore.Relational` again — is not the only route, and it is not the
+cheapest. Two others were put by the owner and both were checked here rather than argued.
+
+**Naming the relational types by string does not work, and this is the one place that trick fails.**
+Two sites in this repository already name relational things by string:
+`QuerySplitter`'s `RelationalQueryableExtensionsFullName`, and `RelationalQueryRootShape`, which
+reads a `FromSqlQueryRootExpression` by its shape. Both work because the question there is *what is
+this node called*. Here the question is *does this object implement this interface*:
+
+```csharp
+dependencies is IRelationalDatabaseFacadeDependencies relationalDependencies
+```
+
+That is a CLR type test. It is answered by the runtime type's interface table, and no name, string
+or shape can satisfy it. **Read, not measured** — but it is a language rule, not a judgement.
+
+**An implementation registered from outside the package works, and it was measured.**
+`DatabaseFacade` resolves its dependencies from the context's own service provider:
+
+```csharp
+private IDatabaseFacadeDependencies Dependencies
+    => field ??= context.GetService<IDatabaseFacadeDependencies>();
+```
+
+So anything that can name `IRelationalDatabaseFacadeDependencies` can replace that registration, and
+`InfoCarrier.Core` never has to be the thing that names it. A probe registered a class implementing
+that interface through `DbContextOptionsBuilder.ReplaceService<IDatabaseFacadeDependencies, …>()`
+on an ordinary InfoCarrier client, and the type test passed: the facade resolved the replacement and
+`is IRelationalDatabaseFacadeDependencies` was true. **D3 stands as written, unamended.**
+
+**The relational half throws and nothing on this path calls it.** The three members the relational
+interface adds — `RelationalConnection`, `RawSqlCommandBuilder`, `CommandLogger` — have no meaning
+on a client with no database, and the probe's implementation threw from all three. Every call still
+completed, because `SqlQueryRaw` reads only `QueryProvider`, `TypeMappingSource` and `AdHocMapper`,
+and all three are on the **core** interface. This is the shape ADR-013's amendment already records
+for `RelationalInfoCarrierTestStore`.
+
+**Two shapes for the registration, and the difference is who ships the class.**
+
+| | Who names `EFCore.Relational` | Cost to the consumer |
+|---|---|---|
+| **D1** — the application registers it | the application | writes the class, or copies it; the same seam as R85's `AddInfoCarrierAllowedTypes` and R95's `AddInfoCarrierArbitrarySqlExecution` |
+| **D2** — an optional companion package, e.g. `InfoCarrier.Core.Relational` | that package | one `PackageReference` and one call |
+
+D1 is what the probe used and is what proves the mechanism. **D2 is the better product** and costs
+nothing extra to build once D1 works: the class is the same class, and the reference becomes opt-in
+at the NuGet level rather than at the DI level. Neither is started; this is the owner's call.
+
+**Past the type test, the two roots behave differently, and both were measured.**
+
+1. **The scalar root is exactly the new work R102 predicted.** `SqlQueryRaw<int>` built a
+   `SqlQueryRootExpression` and the client refused it with *"`SqlQueryRootExpression` (Extension)
+   has no wire representation"*. A direct sibling of R95's `FromSqlQueryRootStubNode`, as priced.
+2. **The non-scalar root gets further than R102 expected, and dies somewhere else.**
+   `SqlQueryRaw<TDto>` for a navigation-free DTO reached `AdHocMapper.GetOrAddEntityType` on the
+   **client**, which built the entity type without complaint, produced a `FromSqlQueryRootExpression`
+   — R95's node, already crossing — and was then refused by **this provider's own type allowlist**,
+   naming the DTO. That refusal is ADR-008 constraint 2 working, and the answer to it is an ordinary
+   application registration: R85's `AddInfoCarrierAllowedTypes` on the server and `AllowTypes` on
+   the client. With the DTO admitted on both sides the query crossed the wire and the **server**
+   raised *"Entity type 'BlogRow' not found in the server model"*.
+
+**So R102's point 4 is confirmed, and it is now measured rather than reasoned.** The gap is not
+"getting an ad-hoc entity type across" — the client builds one and the node already crosses. The gap
+is that `ServerQueryExecutor.RebindQueryRoot` resolves through the server's model and the server has
+never been asked to create the matching ad-hoc type. What would close it is the server calling its
+own `AdHocMapper` when a `FromSqlQueryRootExpression` names a type its model does not hold, which is
+a smaller thing than a new capability but is still a change to the rebind path and to what the
+server will construct on a client's say-so. **It is the same security question the raw-SQL gate
+asked and it should be answered the same way.**
+
+**A type test that a DTO reached through `SqlQuery` is nothing like a type test a query root
+reached through the model**, and that is the whole reason the allowlist refused first: nothing in
+the model implies a `SqlQuery<T>` result type. Any work here starts from that, not from the SQL.
+
+**Still not taken, and still the owner's decision.** What changed is that the decision no longer has
+to be *"reverse D3 or drop two bases"*. The third option is real, was measured, and leaves the
+milestone exit criterion intact.
+
 **`SqlExecutorTestBase` is not part of this and should never have been listed with it (R102).** Its
 first three tests are `Executes_stored_procedure`, `Executes_stored_procedure_with_parameter` and
 `Executes_stored_procedure_with_generated_parameter`: it is a stored-procedure base wearing a

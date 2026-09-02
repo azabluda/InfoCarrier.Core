@@ -3326,6 +3326,51 @@ re-parents of families already running, because R25–R30 showed that is where t
       value is lost, and says the loss is EF Core's -- which is what the next reader with R107's
       idea needs to see.
 
+- [x] **R110. `Database.SqlQuery<T>`: options C and D evaluated, and D3 does not have to be
+      reversed.** Documents only — `architecture.md` §6a **D8 item 2**, a new dated subsection.
+      Nothing executable changed and no decision is taken; the owner's is still open.
+
+      **Option C — name the relational types by string — cannot work, and the reason is a language
+      rule.** `GetFacadeDependencies` asks `dependencies is IRelationalDatabaseFacadeDependencies`.
+      That is a CLR type test, answered by the runtime type's interface table. The two sites in this
+      repository that already name relational things by string —
+      `QuerySplitter.RelationalQueryableExtensionsFullName` and `RelationalQueryRootShape` — both
+      answer *what is this node called*, which a name can settle. *Does this object implement this
+      interface* is not that question. **Read, not measured.**
+
+      **Option D — a replacement registered from outside `InfoCarrier.Core` — works, and it was
+      measured.** `DatabaseFacade.Dependencies` is
+      `field ??= context.GetService<IDatabaseFacadeDependencies>()`, so the registration is
+      replaceable. A probe registered an `IRelationalDatabaseFacadeDependencies` through
+      `ReplaceService` on an ordinary InfoCarrier client: the facade resolved it and the type test
+      passed. The three relational-only members threw from that class and **every call still
+      completed**, because `SqlQueryRaw` reads only `QueryProvider`, `TypeMappingSource` and
+      `AdHocMapper`, all on the core interface. **D3 stands as written.**
+
+      **Two shapes, and D2 is the better product.** D1 has the application write the class — the
+      same seam as R85's `AddInfoCarrierAllowedTypes` and R95's
+      `AddInfoCarrierArbitrarySqlExecution` — and is what the probe used. D2 ships the same class in
+      an optional `InfoCarrier.Core.Relational` package, so the reference is opt-in at the NuGet
+      level rather than at the DI level. Neither is started.
+
+      **Past the type test, both roots were measured and one of them moved.** The scalar case is the
+      new work R102 predicted: `SqlQueryRootExpression` *"has no wire representation"*. The
+      non-scalar case gets further than R102 expected — the **client's** `AdHocMapper` builds the
+      entity type without complaint and produces R95's `FromSqlQueryRootExpression`, which already
+      crosses; what refuses it is this provider's **type allowlist**, answered by an ordinary R85
+      registration on both sides. With the DTO admitted the query reached the **server**, which
+      raised *"Entity type 'BlogRow' not found in the server model"*.
+
+      **So R102's point 4 is confirmed and re-stated.** The gap is not getting an ad-hoc entity type
+      across the wire; it is that `ServerQueryExecutor.RebindQueryRoot` resolves through the
+      server's model and the server never builds the matching ad-hoc type. Smaller than "a new
+      capability", and it raises the same security question the raw-SQL gate raised, because it is
+      the server constructing a type on a client's say-so.
+
+      **What changed for the owner.** The choice is no longer *reverse D3 or record two bases as out
+      of scope*. There is a third option, it was measured, and it leaves the milestone exit
+      criterion intact.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
