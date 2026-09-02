@@ -2553,5 +2553,45 @@
 # -- a passing sibling, a base that overrides nothing, EF's own TODO -- so the reason can be
 # falsified by re-reading rather than only agreed with.
 
+# 2026-09-02 (R113) -- RETRIAGE BATCH 3, the "client is not relational" tail. `failed` UNCHANGED at
+# 143, `total` unchanged at 29384. Nothing executable changed. Five more recorded reasons, 9 more
+# tests, **all five held**. Running total: 12 reasons, 71 of the 143, one wrong.
+#
+#  * The 2 `TPTTableSplittingInfoCarrierTest.ExecuteUpdate_works_for_table_sharing` and the 2
+#    `EntitySplittingInfoCarrierTest.ExecuteDelete_throws_for_entity_splitting` -- both entries say
+#    the base's `UseTransaction` calls `GetDbTransaction()` and is NON-VIRTUAL, with no virtual hook
+#    between it and `ExecuteWithStrategyInTransactionAsync`. **RE-VERIFIED WITH THE COMPILER**, not
+#    taken on the note's word: `TableSplittingTestBase.UseTransaction` and
+#    `EntitySplittingTestBase.UseTransaction` are both `public void`, no `virtual`. The stack traces
+#    land on exactly that frame. This is the one shape CLAUDE.md tells you to write a
+#    `UseTransaction` override for, and it is also the one where an override cannot reach.
+#  * The 3 `ModelBuilderGenericInfoCarrierTest+InfoCarrierGenericOwnedTypes` -- the entry says this
+#    provider builds no relational model on the client, so an assertion about table splitting,
+#    owned-type identity under it, or sproc mapping has nothing to read, and it records the exact
+#    `Assert.Same` shape: a keyless shared entity type where the owned navigation's was expected.
+#    The r105 messages match it word for word (`Actual: EntityType: CustomerDetails Keyless Owned`
+#    against `Expected: OtherCustomer.Details#CustomerDetails ... Owned`).
+#  * `ModelBuilderGenericInfoCarrierTest+InfoCarrierGenericComplexType
+#    .Complex_properties_can_be_configured_by_type` -- recorded as "fails because it passes", and it
+#    does: `Assert.Throws() Failure: No exception was thrown`.
+#  * `DataAnnotationInfoCarrierTest.Table_can_configure_TPT_with_Owned` -- recorded as asserting over
+#    `GetTableMappings()` on the CLIENT's model. The stack trace confirms it to the frame:
+#    `RelationalTypeBaseExtensions.GetTableMappings` -> `EnsureRelationalModel` ->
+#    `GetRelationalModel`, which throws because there is none.
+#
+# **THE BATCH-2 RULE HOLDS AGAIN AND GAINS A COROLLARY.** Every one of these five names a mechanism,
+# and three of them name the *evidence* as well -- `isVirtual: false`, the exact `Assert.Same`
+# shape, the method the assertion calls. Those three could be re-checked in one tool call each, and
+# were. **A reason that says how it was checked is a reason the next reader can re-check cheaply**,
+# which is the difference between a record and a claim.
+#
+# STILL UNEXAMINED after three batches: the 55 `UdfDbFunctionInfoCarrierTest` reds (parked behind
+# the third-tier question, #96, and classified in R74 by shape) and about 17 singletons. One drift
+# is already visible in the Udf group and is NOT yet a finding: R74 counted 2 failures reaching the
+# store, and r105 shows 2 `no such table: GetTopTwoSellingProducts` PLUS 2
+# `near "(": syntax error`, both `InfoCarrierServerException`. R86 changed that group deliberately
+# (it defines the store's scalar functions on every connection), so the shape counts have moved for
+# a recorded reason and re-deriving them is batch 4's job, not a correction to make from outside.
+
 failed=143
 total=29384

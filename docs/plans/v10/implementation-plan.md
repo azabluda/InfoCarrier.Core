@@ -3449,6 +3449,35 @@ re-parents of families already running, because R25–R30 showed that is where t
       something **green** — a passing sibling, a base that overrides nothing, EF's own TODO — so the
       reason can be falsified by re-reading rather than only agreed with.
 
+- [x] **R113. Retriage batch 3: the "client is not relational" tail, five reasons, all five held.**
+      Documents only — `test/known-failures.txt`. `failed` unchanged at 143, `total` unchanged at
+      29384. Nothing executable changed. Running total **12 reasons, 71 of the 143, one wrong**.
+
+      **The 4 `UseTransaction` reds were re-verified with the compiler rather than taken on the
+      note's word.** `TableSplittingTestBase.UseTransaction` and
+      `EntitySplittingTestBase.UseTransaction` are both `public void … => facade.UseTransaction(
+      transaction.GetDbTransaction())` — no `virtual`, exactly as recorded, and the stack traces
+      land on that frame. This is the shape `CLAUDE.md` tells you to write a `UseTransaction`
+      override for, and also the one where an override cannot reach.
+
+      **The 3 `ModelBuilderGeneric…OwnedTypes`, the 1 `…ComplexType` and the 1 `DataAnnotation` all
+      held**, each to the frame: a keyless shared entity type where the owned navigation's was
+      expected, a `Throws` that did not throw, and `GetTableMappings` → `EnsureRelationalModel` →
+      `GetRelationalModel` on a client that builds none.
+
+      **Batch 2's rule holds and gains a corollary.** All five name a mechanism, and three name the
+      **evidence** as well — `isVirtual: false`, the exact `Assert.Same` shape, the method the
+      assertion calls. Each of those three was re-checked in one tool call.
+
+      > A reason that says how it was checked is a reason the next reader can re-check cheaply.
+
+      **What is left for batch 4.** The 55 `UdfDbFunctionInfoCarrierTest` reds — parked behind the
+      third-tier question ([#96](https://github.com/azabluda/InfoCarrier.Core/issues/96)) and
+      classified by shape in R74 — and about 17 singletons. One drift in the Udf group is visible
+      and is deliberately **not** called a correction: R74 counted 2 failures reaching the store,
+      and `r105` shows 2 `no such table` plus 2 `near "(": syntax error`. R86 changed that group on
+      purpose, so re-deriving the shape counts is batch 4's work.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
