@@ -3230,6 +3230,25 @@ re-parents of families already running, because R25–R30 showed that is where t
       now R77's. `CLAUDE.md` already says a classification is not evidence and age is not evidence;
       three for three is the strongest form of that this repository has recorded.
 
+- [x] **R106. `UdfDbFunction`'s 55 recorded as future scope rather than ignored.** Documents only —
+      `roadmap.md`, the deferred table. Owner's decision, 2026-09-02.
+
+      **R103 established the new fact and deliberately did not act on it.** EF's own
+      `SqliteComplianceTest` ignores `UdfDbFunctionTestBase`, so the reference provider does not run
+      that base on the only relational store this suite has. The 55 reds R90 classified have
+      therefore never been judged against a store that hosts the base at all, and every reading of
+      them so far has been against one that does not.
+
+      **Not added to `IgnoredTestBases`, and that is the decision.** The class stays adopted and the
+      reds stay visible. Dropping it would lower `failed` by 55 while answering nothing, which is
+      the failure mode `CLAUDE.md` names outright — and R86 already went further than EF's SQLite
+      suite here, defining the store's scalar functions on every connection for 14 tests, so this is
+      not a base this repository has nothing to say about.
+
+      **What would answer it is another tier.** Relational or not: the deferred table's
+      non-relational backend entry is the same question from the other end, and neither is
+      committed.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
