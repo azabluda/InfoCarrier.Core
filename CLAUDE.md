@@ -301,9 +301,10 @@ archived in `docs/plans/v10/archive/implementation-plan-m9-phase-j.md` and is ne
 one per test project, and both must stay green** — `InfoCarrierComplianceTest` scans the core
 specification assembly against Tier A, and `RelationalInfoCarrierComplianceTest` scans the relational
 one against Tier B, with `GetBaseTestClasses()` overridden so the two do not both claim the core
-bases. Tier A's missing list is **0** and Tier B's is **1** (`SqlQueryTestBase`), which is what the
-single test reported before the split. Those tests, not a list in this file, are the current answer
-to "which bases are in".
+bases. **BOTH MISSING LISTS ARE 0 SINCE R124** (2026-09-03), which closed the last one:
+`SqlQueryTestBase` had no subclass anywhere and now has `Sqlite/Query/SqlQueryInfoCarrierTest`.
+Those tests, not a list in this file, are the current answer to "which bases are in", and the answer
+is now "all of them".
 
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
