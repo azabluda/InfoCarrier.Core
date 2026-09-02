@@ -30,6 +30,29 @@ public class ExpressionSerializer(
     /// </summary>
     public virtual IDynamicValueMapper ValueMapper => _valueMapper;
 
+    /// <summary>
+    ///     Widens this serializer's type resolver with the executing context's own declared types,
+    ///     for the duration of one execution.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Same reason as <see cref="ToNode(Expression, Metadata.IInfoCarrierRelationalQueryRoots?)" />
+    ///         above: this object does not know which context is asking.</b> It is registered
+    ///         <c>Scoped</c>, its resolver's allowlist is derived from the model alone, and what
+    ///         the application declared with <c>AllowTypes</c> travels on the options. So the
+    ///         value arrives per call, from the one place that reads it —
+    ///         <c>QueryExecutor</c>, which hands the same list to the boundary analyzer.
+    ///     </para>
+    ///     <para>
+    ///         Not on <see cref="IExpressionSerializer" />, for the reason stated on
+    ///         <c>ToNode</c>: the interface is a wire seam an application may implement, and the
+    ///         one caller already holds this class.
+    ///     </para>
+    /// </remarks>
+    /// <param name="types">The executing context's declared types.</param>
+    public virtual void UseExecutionAllowedTypes(IReadOnlyList<Type> types)
+        => _typeResolver.UseExecutionAllowedTypes(types);
+
     /// <inheritdoc />
     public virtual ExpressionNode ToNode(Expression expression)
         => _forward.Translate(expression);

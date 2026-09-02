@@ -4021,6 +4021,45 @@ re-parents of families already running, because R25–R30 showed that is where t
       allowlist off DI, and the disagreement was silent because the only registered type this suite
       had before was a `DbParameter`, which is sent and never returned. R126 closes it.
 
+- [x] **R126. The client materializes rows of a type its own options declared, and `QueryExecutor`
+      is now the one reader for both directions.** `src/` change with new public members, so
+      `eng/measure.sh`, `eng/trim-ratchet.sh` **and** `dotnet pack`. **`failed` 222 -> 160**,
+      `total` unchanged at 29512. FIXED 62, BROKEN none. **The reasons diff removes one whole class
+      and adds nothing.** Trim ratchet `ours` 89 <= 89. Pack clean, no `CP0002`: the two new members
+      are additions, not arity changes. `CI=true dotnet build --configuration Release` reports
+      `5 Warning(s), 0 Error(s)`.
+
+      **R120'S SHAPE, A THIRD TIME, AND THE THIRD TIME IS THE ONE THAT GENERALISES.** A permission
+      and the knowledge it guards lived on different carriers. `AllowTypes` travels on the
+      **options**, which `InfoCarrierOptionsExtension.AllowedTypesFor` requires be read per
+      execution and never captured, because `CompileQuery`'s result is cached across every context
+      of one options shape. The result materializer resolves through a **DI-scoped**
+      `TypeNodeResolver` whose allowlist is `TypeAllowlist.ForModel(model)` and knows only what the
+      model implies. So the boundary admitted a declared type and the materializer refused the rows
+      that came back.
+
+      **It was silent for a reason worth naming: the only registered type this suite had before was
+      a `DbParameter`, and a `DbParameter` is SENT and never RETURNED.** The two readers could not
+      disagree out loud until a declared type made the round trip, which
+      `Database.SqlQuery<UnmappedCustomer>` is the first thing in this repository to do. The rule
+      that generalises: **when a fact is read off two carriers, the disagreement stays hidden until
+      something exercises both directions.**
+
+      **The fix keeps the per-execution rule rather than working around it.** `QueryExecutor` reads
+      `AllowedTypesFor` once and hands the same list to the boundary analyzer and, through
+      `ExpressionSerializer.UseExecutionAllowedTypes`, to the resolver.
+      `TypeNodeResolver.UseExecutionAllowedTypes` widens and never narrows, and **its cache now
+      memoizes the resolution and never the permission** — a name resolved while one execution's
+      declared types were in force must not stay admitted for the next execution, whose context may
+      declare nothing, so a cache hit still falls through to the allowlist check.
+
+      **`SqlQueryInfoCarrierTest` is 97 of 119**, from 17 at adoption, across R124 -> R125 -> R126.
+      The 22 still red are classified in `test/known-failures.txt`: 20 are this tier's store
+      (EF's own `NorthwindContext` calls `Ignore(o => o.Freight)` and this tier builds its store
+      from the model, where EF's SQLite suite reads a prebuilt `northwind.db` that has the column
+      regardless — read from EF's source, not inferred), and 2 are ADR-013's `RelationalTypeMapping`
+      cast, which `FromSqlQueryTestBase` already carries as an identical pair.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

@@ -27,6 +27,39 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly IModel? _model = model;
     private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
+    private IReadOnlyList<Type> _executionAllowedTypes = [];
+
+    /// <summary>
+    ///     Widens what this resolver admits for the duration of ONE execution, with the types the
+    ///     executing context's own options declare.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The allowlist this object was built with cannot carry them, and that is a
+    ///         carrier problem rather than an oversight.</b> This service is DI-scoped, so its
+    ///         allowlist is <c>TypeAllowlist.ForModel(model)</c> and knows only what the model
+    ///         implies. The application's own registrations
+    ///         (<see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" />) travel on the
+    ///         <em>options</em>, and <c>InfoCarrierOptionsExtension.AllowedTypesFor</c> says why
+    ///         they must be read per execution and never captured: what <c>CompileQuery</c> returns
+    ///         is cached across every context sharing an options shape.
+    ///     </para>
+    ///     <para>
+    ///         <b>So the boundary and the materializer read the same fact off different carriers,
+    ///         which is R120's shape exactly</b>, and it was silent for the same reason: the
+    ///         difference only shows when a declared type comes BACK. A <c>DbParameter</c> — the
+    ///         only registered type this suite had before — is sent and never returned, so the two
+    ///         readers never disagreed out loud until <c>Database.SqlQuery&lt;T&gt;</c> returned
+    ///         rows of a declared DTO. <c>QueryExecutor</c> is now the one reader for both.
+    ///     </para>
+    ///     <para>
+    ///         <b>It widens and never narrows.</b> Everything the model implies stays admitted;
+    ///         this only adds what the application declared.
+    ///     </para>
+    /// </remarks>
+    /// <param name="types">The executing context's declared types.</param>
+    public virtual void UseExecutionAllowedTypes(IReadOnlyList<Type> types)
+        => _executionAllowedTypes = types ?? [];
 
     /// <summary>
     ///     Resolves a type node to its CLR type.
@@ -34,12 +67,15 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     public virtual Type Resolve(TypeNode node)
     {
         string cacheKey = node.ToString();
-        if (_cache.TryGetValue(cacheKey, out Type? cached))
-        {
-            return cached;
-        }
 
-        Type resolved = ResolveCore(node);
+        // THE CACHE MEMOIZES THE RESOLUTION AND NEVER THE PERMISSION, and the two were one lookup
+        // until `UseExecutionAllowedTypes` existed. A name resolved while one execution's declared
+        // types were in force must not stay admitted for the next execution, whose context may
+        // declare nothing. So a hit still falls through to the allowlist check below.
+        if (!_cache.TryGetValue(cacheKey, out Type? resolved))
+        {
+            resolved = ResolveCore(node);
+        }
 
         // A generic argument is part of a name, not a payload of its own — nothing is ever
         // constructed from one — so it is judged as part of the type it appears in rather than
@@ -50,7 +86,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
 
         // Enforced after resolution, not instead of it: the name has to be resolved to know
         // what it denotes, but nothing is constructed from it until it clears the allowlist.
-        if (!_allowlist.IsAllowed(resolved))
+        if (!_allowlist.IsAllowed(resolved) && !_executionAllowedTypes.Contains(resolved))
         {
             throw new InvalidOperationException(BuildRejection(resolved));
         }

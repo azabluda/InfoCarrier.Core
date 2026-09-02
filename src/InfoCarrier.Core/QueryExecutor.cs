@@ -73,10 +73,23 @@ internal sealed class QueryExecutor<TElement>
         // The allowlist is built here rather than taken as null, so the application's own
         // registered types reach the boundary analysis. Read per execution and never captured, for
         // the reason `InfoCarrierDatabase.ClientFor` records.
+        // ONE READER FOR BOTH DIRECTIONS. The boundary analyzer below decides what may be SENT;
+        // the result materializer decides what may be READ BACK, and it resolves through a
+        // DI-scoped `TypeNodeResolver` whose own allowlist knows only the model. Those are the two
+        // carriers R120 warns about, and they disagreed silently here until a declared projection
+        // type came back over the wire: `Database.SqlQuery<UnmappedCustomer>` cleared the boundary
+        // and then failed to materialize its own rows. A `DbParameter` -- the only registered type
+        // this suite had before -- is sent and never returned, which is why nothing showed.
+        IReadOnlyList<Type> allowedTypes = InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context);
+
+        if (expressionSerializer is ExpressionSerializer serializer)
+        {
+            serializer.UseExecutionAllowedTypes(allowedTypes);
+        }
+
         _split = new QuerySplitter(
             queryContext.Context.Model,
-            Expressions.TypeAllowlist.ForModel(
-                queryContext.Context.Model, InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context)),
+            Expressions.TypeAllowlist.ForModel(queryContext.Context.Model, allowedTypes),
             queryContext.QueryLogger,
             InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context),
             _relationalRoots).Split(substituted);

@@ -2838,5 +2838,28 @@
 # `FromSqlQueryInfoCarrierTest.Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters`,
 # which this file already classified as `Database.SqlQueryRaw` and which is the same gap.
 
-failed=222
+# 2026-09-03 (R126) -- 222 -> 160, `total` unchanged at 29512. FIXED 62, BROKEN none, and the
+# reasons diff removes ONE WHOLE CLASS and adds nothing: the 62
+# `Type '...' is not on the deserialization allowlist` are gone. The client now materializes rows of
+# a type its own options declared. `QueryExecutor` reads the declared types once per execution and
+# hands them to both the boundary analyzer and the result materializer's `TypeNodeResolver`, so the
+# two carriers R120 warns about have one reader.
+#
+# **`SqlQueryInfoCarrierTest` is 97 of 119 after three steps**, from 17 at adoption. The 22 still
+# red are classified and none is a wire defect:
+#
+#  * **20 `no such column: m.Freight` / `The required column 'Freight'|'Address' was not present`**
+#    -- THIS TIER'S STORE, and it is the mirror image of the `Product.CategoryID` entry above rather
+#    than a new kind of thing. EF's own `NorthwindContext` calls `e.Ignore(o => o.Freight)`, and
+#    this tier BUILDS ITS STORE FROM THE MODEL, so the `Orders` table has no `Freight` column. EF's
+#    SQLite suite reads a prebuilt `northwind.db` that has every Northwind column whether the model
+#    maps it or not, so `SELECT * FROM [Orders]` returns `Freight` there and binds it to
+#    `UnmappedOrder.Freight`. Nothing about this provider is involved: the SQL crosses the wire
+#    intact and the server's own store answers it. Read from EF's source, not inferred.
+#
+#  * **2 `SqlQueryRaw_queryable_simple_projection_composed`** -- the base's own body casts the
+#    client's type mapping to `RelationalTypeMapping`. ADR-013's gate question answered inside a
+#    test; `FromSqlQueryTestBase` carries the identical pair and this file already records it.
+
+failed=160
 total=29512
