@@ -2861,5 +2861,23 @@
 #    client's type mapping to `RelationalTypeMapping`. ADR-013's gate question answered inside a
 #    test; `FromSqlQueryTestBase` carries the identical pair and this file already records it.
 
+# 2026-09-03 (R127) -- `failed` UNCHANGED at 160, `total` RISES 29512 -> 29514, A DELIBERATE RISE OF
+# TWO, and this is the note CLAUDE.md asks for. The two are `Sqlite/RelationalClientTierPinTest`,
+# both green. #97 level 2 step one turns the relational client on for EVERY Tier B fixture instead
+# of only the ones that asked for raw SQL, and THE MEASUREMENT MOVED NOTHING IN ALL THREE LEVELS:
+# same count, byte-identical name list, `REASONS: unchanged`.
+#
+# That is the case CLAUDE.md warns about by name -- a matcher that never fired and a change that did
+# not help look identical from outside -- so the code was ESTABLISHED TO HAVE RUN rather than
+# assumed. The pin reads the registration out of the collection each tier builds, and it is RED
+# without the change and GREEN with it, verified by reverting the one file and re-running. Its
+# second test pins the other direction: Tier A registers nothing relational, because InMemory is not
+# a relational store.
+#
+# The null result is itself the finding, and it is recorded in `architecture.md` section 6a, D3
+# amendment 2026-09-03 (R127): the facade shim and the query-root seam are inert for a client that
+# never uses `Database.SqlQuery<T>` or a raw-SQL root, so whatever level 2's CONVENTIONS change
+# later is attributable to the conventions alone. Measuring this step on its own is what buys that.
+
 failed=160
-total=29512
+total=29514

@@ -4060,6 +4060,56 @@ re-parents of families already running, because R25–R30 showed that is where t
       regardless — read from EF's source, not inferred), and 2 are ADR-013's `RelationalTypeMapping`
       cast, which `FromSqlQueryTestBase` already carries as an identical pair.
 
+- [x] **R127. #97 level 2, step one: the relational client is on for the whole of Tier B, and the
+      measurement moved nothing in all three levels.** `test/` only, so `eng/measure.sh` is the
+      whole gate. **`failed` unchanged at 160**, `total` 29512 -> 29514, a deliberate rise of two
+      and both of them green. FIXED none, BROKEN none, **`REASONS: unchanged`**.
+      `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R127)**.
+
+      **The owner's decision is taken and recorded: level 2 is a process-wide statement**, answer
+      (1) of the two R123 set out. `IModelCacheKeyFactory` is therefore **not** replaced, and
+      nothing should add one.
+
+      **What changed.** `SqliteInfoCarrierTier.AddClientServices` registered
+      `AddInfoCarrierRelationalClient()` only where a fixture had asked for raw SQL. That gate was
+      #56 option D's, and it was about `Database.SqlQuery<T>` rather than about the store: the shim
+      alone traded one exception for another, so the two were wanted together. It stops holding once
+      the package also decides how the client's **model** is built, which is a property of the
+      backing store and not of a permission.
+
+      **A NULL RESULT IS THE ONE CASE `CLAUDE.md` SINGLES OUT, AND IT WAS TREATED AS ONE.** A
+      matcher that never fired and a change that did not help look identical from outside, so the
+      code was **established to have run** rather than assumed.
+      `Sqlite/RelationalClientTierPinTest` reads the registration straight out of the collection
+      each tier builds, and it is **red without the change and green with it** — verified by
+      reverting the one file, rebuilding and re-running, not by reasoning. Its second test pins the
+      other direction: **Tier A registers nothing relational**, which is this handoff's stopping
+      rule 4 in test form and is structural rather than conditional, since the override lives in the
+      relational project and `InfoCarrierTier.AddClientServices` adds nothing by default.
+
+      **The null result is itself the finding.** The facade shim and the query-root seam are inert
+      for a client that never uses `Database.SqlQuery<T>` or a raw-SQL root: widening the
+      registration from a handful of fixtures to all 20,363 Tier B tests changed no answer anywhere.
+      So level 2's registration has a blast radius of nil, and whatever the **conventions** change
+      later is attributable to the conventions alone. Measuring this step separately is what buys
+      that, and it is why R123 asked for it.
+
+      **STEP TWO IS BLOCKED ON A DIFFERENT CARRIER PROBLEM AND IS NOT STARTED.**
+      `IProviderConventionSetBuilder` is registered by `AddEntityFrameworkInfoCarrier` through
+      `EntityFrameworkServicesBuilder.TryAdd`, and that call is made by
+      `InfoCarrierOptionsExtension.ApplyServices` into **EF's internal service provider** — not into
+      the application's collection, which is what `AddInfoCarrierRelationalClient` runs on. A client
+      that does not call `UseInternalServiceProvider` therefore cannot have its convention set
+      replaced by a DI call at all, and `SqliteSmokeTest` is exactly that shape. Same question
+      `UseRelationalQueryRoots` answered for level 1, same two honest answers, and it is the owner's
+      to take before any code. The full reading is in the D3 amendment.
+
+      **And when step two is built, `InfoCarrier.Core.Relational` must REPLACE rather than
+      duplicate** (owner's instruction, 2026-09-03): a subclass of `InfoCarrierConventionSetBuilder`
+      that calls the base and swaps EF's relational conventions in for the hand-written ones, with
+      `InfoCarrierHierarchyMappingConvention` deleted in the same commit. Two implementations of one
+      fact in two packages drift silently, which is the failure mode D3 and ADR-012 already record.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

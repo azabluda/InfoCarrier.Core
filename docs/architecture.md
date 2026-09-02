@@ -548,6 +548,53 @@ measurement of level 2 is not the conventions at all: it is **turning the relati
 the whole of Tier B**, which is a large blast radius and should be measured on its own before a
 single convention moves.
 
+#### D3 amendment 2026-09-03 (R127) — level 2 step one is done, and the next step is a DI reach problem
+
+**The owner's decision is taken: level 2 is a process-wide statement**, answer (1) of the two the
+R123 amendment set out. Registering `InfoCarrier.Core.Relational` in a client's services says that
+the clients built from that collection have a relational backing store. **`IModelCacheKeyFactory` is
+therefore NOT replaced**, and nothing should add one.
+
+**Step one is done and it is not a convention.** The relational client services were registered only
+where a fixture asked for raw SQL; they are now registered for **every** Tier B fixture, which is
+what "the backing store is relational" means on this tier. The R123 amendment asked for that blast
+radius to be measured on its own, and it was.
+
+**THE MEASUREMENT MOVED NOTHING, IN ALL THREE LEVELS.** `failed` 160 both sides, the failing-test
+name list byte-identical, and `REASONS: unchanged`. That is the case `CLAUDE.md` warns about — a
+matcher that never fired looks exactly like a change that did not help — so the code was
+**established to have run** rather than assumed. `Sqlite/RelationalClientTierPinTest` reads the
+registration out of the collection each tier builds: it is **red without the change and green with
+it**, verified by reverting the one file and re-running. It also pins the other direction, that Tier
+A registers nothing relational, which is stopping rule 4 in test form.
+
+**What the null result actually tells us, and it is worth having.** The facade shim and the
+query-root seam are inert for a client that never uses `Database.SqlQuery<T>` or a raw-SQL root.
+Widening the registration from a handful of fixtures to all of Tier B changed no answer anywhere in
+20,361 tests. So the blast radius of level 2's *registration* is nil, and whatever the conventions
+change later will be attributable to the conventions alone. That is exactly what measuring this step
+separately was for.
+
+**THE NEXT STEP HITS A DIFFERENT CARRIER PROBLEM, and it should be read before it is started.** The
+conventions live behind `IProviderConventionSetBuilder`, which `InfoCarrier.Core` registers through
+`EntityFrameworkServicesBuilder.TryAdd` inside `AddEntityFrameworkInfoCarrier` — and that call is
+made by `InfoCarrierOptionsExtension.ApplyServices`, into **EF's internal service provider**, not
+into the application's collection. `AddInfoCarrierRelationalClient` runs on the application's
+collection. So a client that does not call `UseInternalServiceProvider` cannot have the convention
+set replaced by a DI call at all, and `SqliteSmokeTest` is exactly that shape. **This is the same
+question `UseRelationalQueryRoots` answered for level 1**, and the honest answers are the same two:
+an options-carried seam that `InfoCarrierConventionSetBuilder` reads, or an explicit statement that
+level 2 needs an internal service provider. It has to be decided before code, for the reason R123
+gives.
+
+**And when it is built, ICC.R must REPLACE rather than duplicate.** The shape is a subclass of
+`InfoCarrierConventionSetBuilder` in `InfoCarrier.Core.Relational` that calls the base and then
+swaps EF's relational conventions in for the three hand-written ones
+(`InfoCarrierHierarchyMappingConvention`, `InfoCarrierValueGenerationConvention`, and the
+`Relational:` annotation strings behind them), with the hand-written files deleted in the same
+commit. Two implementations of one fact in two packages drift silently, which is the failure mode
+this document already records in D3 and ADR-012.
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).
