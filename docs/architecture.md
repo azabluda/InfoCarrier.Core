@@ -808,6 +808,61 @@ server it talks to would.
 R89, R91 and now R98 — and D7's note about it being load-bearing far beyond deserialization safety
 is the general form.
 
+#### D8 item 2 priced 2026-09-02 (R102) — it is blocked by D3, and by nothing smaller
+
+**`Database.SqlQuery<T>` is not reachable from a client that does not reference
+`EFCore.Relational`, and the obstacle is a type test rather than a capability.**
+`RelationalDatabaseFacadeExtensions.SqlQueryRaw` opens with `GetFacadeDependencies`, which does
+
+```csharp
+dependencies is IRelationalDatabaseFacadeDependencies relationalDependencies
+    ? relationalDependencies
+    : throw new InvalidOperationException(RelationalStrings.RelationalNotInUse);
+```
+
+and that interface lives in `EFCore.Relational`. **A client can only satisfy it by referencing the
+package**, which is exactly what M9's J5 removed and what D3 records. Nothing in this repository
+gets past that line: it runs before any expression is built, so no wire node, no allowlist entry and
+no boundary change can be reached.
+
+**What it would need, in order, if D3 were reversed.**
+
+1. `InfoCarrier.Core` references `Microsoft.EntityFrameworkCore.Relational` again.
+2. An `IRelationalDatabaseFacadeDependencies` registered on the client whose **relational half
+   throws** — `RelationalConnection`, `RawSqlCommandBuilder`, `CommandLogger` — and whose core half
+   is real. That shape is already proven here: it is exactly what
+   `RelationalInfoCarrierTestStore` does to `RelationalTestStore` (ADR-013's amendment), and the
+   reason it works is the same, that the callers wanting the connection are not the callers wanting
+   the rest.
+3. `SqlQueryRaw` then builds one of two roots, and only the first is new work.
+   `SqlQueryRootExpression` for a `TResult` the type-mapping source recognises — a scalar — is a
+   direct sibling of R95's `FromSqlQueryRootStubNode` and costs about what that did.
+   `FromSqlQueryRootExpression` for anything else already crosses.
+4. **The second root has a further problem that is not about SQL.** It is built over
+   `AdHocMapper.GetOrAddEntityType(typeof(TResult))`, an entity type created on the **client's**
+   model at call time. The server resolves a query root through *its* model
+   (`ServerQueryExecutor.RebindQueryRoot`), and an ad-hoc type is in neither the shared model nor
+   the server's. So `SqlQuery<SomeDto>` needs the ad-hoc entity type to cross as well, which is a
+   new capability rather than a new node.
+
+**What it is worth.** Two missing bases, `NorthwindSqlQueryTestBase` and `SqlQueryTestBase`, both of
+which EF ships SQLite classes for; and 6 of the current failures, 4 in `FromSqlQueryInfoCarrierTest`
+and 2 in `SharedTypeQueryInfoCarrierTest`. **Every test in both bases routes through
+`Database.SqlQuery`** — 137 call sites across the two files — so there is no partial adoption to
+take.
+
+**Recommendation: not taken here.** Step 1 reverses a milestone exit criterion and `CLAUDE.md` is
+explicit that such a reversal is a dated decision rather than a code change that quietly contradicts
+one. The pricing is recorded so the decision can be made against a number.
+
+**`SqlExecutorTestBase` is not part of this and should never have been listed with it (R102).** Its
+first three tests are `Executes_stored_procedure`, `Executes_stored_procedure_with_parameter` and
+`Executes_stored_procedure_with_generated_parameter`: it is a stored-procedure base wearing a
+general name. **EF's own `SqliteComplianceTest` ignores it**, alongside `FromSqlSprocQueryTestBase`
+and `StoredProcedureUpdateTestBase`, and only SQL Server implements any of the three. So `ExecuteSql`
+is not what item 2 needs, and D8's original sentence pairing `SqlQuery<T>` with `Database.ExecuteSql`
+put a store limitation and a client limitation in one bucket.
+
 **Where the numbers at the top of D8 came out (R100).** Of the **27** failures, **25 are green**;
 the two that are not are `Delete_FromSql_converted_to_subquery`, whose cause is a harness mismatch
 between `NorthwindRelationalContext`'s table names and the core model this tier builds its store

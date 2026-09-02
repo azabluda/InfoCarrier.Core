@@ -3098,6 +3098,31 @@ re-parents of families already running, because R25–R30 showed that is where t
 
       Both places that name the table now carry a comment pointing at the other.
 
+- [x] **R102. `Database.SqlQuery<T>` priced, and it is blocked by D3 rather than by wire work.**
+      Documents only — `architecture.md` §6a **D8 item 2**. No gate runs; nothing executable
+      changed.
+
+      **The obstacle is a type test, and it runs before anything this repository owns.**
+      `SqlQueryRaw` opens with `GetFacadeDependencies`, which throws `RelationalNotInUse` unless the
+      context's dependencies **are** an `IRelationalDatabaseFacadeDependencies` — an interface in
+      `EFCore.Relational`, which `InfoCarrier.Core` stopped referencing in M9 J5. No wire node, no
+      allowlist entry and no boundary change is reachable past it.
+
+      **Reversing D3 is step one of four, and it is a milestone exit criterion.** The other three
+      are ordinary: a facade-dependencies implementation whose relational half throws (the shape
+      `RelationalInfoCarrierTestStore` already proves), a `SqlQueryRootExpression` node that is a
+      direct sibling of R95's, and — for a non-scalar `TResult` — getting `AdHocMapper`'s
+      client-side entity type to cross, which is a new capability rather than a new node.
+
+      **Worth 2 missing bases and 6 failures**, and there is no partial adoption: every test in both
+      bases routes through `Database.SqlQuery`.
+
+      **`SqlExecutorTestBase` is removed from this item.** Its first three tests are
+      `Executes_stored_procedure`; it is a stored-procedure base wearing a general name, and
+      **EF's own `SqliteComplianceTest` ignores it** along with `FromSqlSprocQueryTestBase` and
+      `StoredProcedureUpdateTestBase`. Only SQL Server implements the three. D8's original sentence
+      put a store limitation and a client limitation in one bucket.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
