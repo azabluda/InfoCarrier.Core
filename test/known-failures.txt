@@ -2380,5 +2380,22 @@
 # test. R97 inferred the general cause from the SHAPE of the failure, which was consistent with both
 # explanations; the stack was not read until now and separates them in one line.
 
+# 2026-09-02 (R103) -- NO CHANGE to either figure. `failed` stays 145 and `total` 29384. What moves is
+# the compliance gate's missing list, 8 -> 5.
+#
+# EF's OWN `SqliteComplianceTest` HAS AN `IgnoredTestBases` AND NOBODY HERE HAD READ IT. Three of
+# its nine entries are bases this suite reports as missing, and only SQL Server implements any of
+# them: `FromSqlSprocQueryTestBase`, `StoredProcedureUpdateTestBase` and -- despite its name --
+# `SqlExecutorTestBase`, whose first three tests are `Executes_stored_procedure`. SQLite is this
+# suite's only relational store, so a base the reference provider declares out of scope for SQLite
+# has no store here either, which is CLAUDE.md's own bar for leaving one unadopted.
+#
+# THE OTHER SIX ENTRIES ARE NOT COPIED, AND THAT IS THE POINT. Five are implemented here; four of
+# those are GREEN (EF ignores the `Owned*Projection*` family for its issue #26708 and
+# `TPCRelationshipsQueryTestBase` for test-infrastructure reasons, neither of which reaches this
+# provider), and `UdfDbFunctionTestBase` carries 55 classified reds. Listing an implemented base
+# changes nothing; deleting its class to match would remove passing coverage, or 55 reds' worth of
+# information.
+
 failed=145
 total=29384

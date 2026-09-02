@@ -23,9 +23,26 @@ namespace InfoCarrier.Core.FunctionalTests;
 ///         forgotten.
 ///     </para>
 ///     <para>
-///         Only bases that are <em>conceptually inapplicable to a remoting provider</em> belong
-///         in <see cref="IgnoredTestBases" />. A base that is merely not built yet must stay
-///         out of the list so this test keeps reporting it.
+///         <strong>Two things may be ignored, and they are different axes.</strong> A base
+///         <em>conceptually inapplicable to a remoting provider</em> is the original category and
+///         still the common one. The second, added 2026-09-02, is a base <strong>EF's own
+///         <c>SqliteComplianceTest</c> ignores</strong>: this suite's only relational store is
+///         SQLite (ADR-009 Tier B), so a base the reference provider declares out of scope for
+///         SQLite has no store here to run on either. CLAUDE.md's bar for leaving a base unadopted
+///         is "EF ships no test for it on any store we have", and that is exactly what EF's list
+///         records. Each such entry names EF's reason rather than inventing one.
+///     </para>
+///     <para>
+///         <strong>Aligning the two lists means aligning what is <em>missing</em>, not deleting
+///         what is adopted.</strong> Five bases EF's SQLite list ignores are implemented here, and
+///         four of those are green: EF ignores the <c>Owned*Projection*</c> family for its own
+///         issue #26708 and <c>TPCRelationshipsQueryTestBase</c> for a test-infrastructure reason,
+///         and neither reaches this provider. Listing an implemented base changes nothing, and
+///         removing its class to match would delete passing coverage.
+///     </para>
+///     <para>
+///         A base that is merely not built yet must stay out of the list so this test keeps
+///         reporting it.
 ///     </para>
 /// </remarks>
 public class InfoCarrierComplianceTest : RelationalComplianceTestBase
@@ -109,5 +126,22 @@ public class InfoCarrierComplianceTest : RelationalComplianceTestBase
         // and GetStoreType() on the client's model, and the store types it expects are the backing
         // provider's. R23 measured 104 red of 576 on exactly that assumption and reverted.
         typeof(JsonTypesRelationalTestBase),
+
+        // ---- Added in R103. THE SECOND CATEGORY: EF's own SqliteComplianceTest ignores these,
+        // ---- and SQLite is the only relational store this suite has (ADR-009 Tier B). Only
+        // ---- SQL Server implements any of the three. The reasons below are EF's, not ours.
+        // ---- The other five bases on EF's list are implemented here and stay implemented; see
+        // ---- the class remarks.
+
+        // Stored procedures, which SQLite does not have. EF's list carries the same entry.
+        typeof(FromSqlSprocQueryTestBase<>),
+        typeof(StoredProcedureUpdateTestBase),
+
+        // Also stored procedures, despite the name. Its first three tests are
+        // Executes_stored_procedure, _with_parameter and _with_generated_parameter, and every one
+        // of them runs a sproc through Database.ExecuteSqlRaw. EF's list carries it beside the two
+        // above for that reason, and D8 item 2 used to pair it with `SqlQuery<T>` -- which is a
+        // client limitation, where this is a store one (R102).
+        typeof(SqlExecutorTestBase<>),
     ];
 }

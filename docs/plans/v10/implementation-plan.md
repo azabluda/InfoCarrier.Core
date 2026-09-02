@@ -3123,6 +3123,48 @@ re-parents of families already running, because R25–R30 showed that is where t
       `StoredProcedureUpdateTestBase`. Only SQL Server implements the three. D8's original sentence
       put a store limitation and a client limitation in one bucket.
 
+- [x] **R103. The ignored-bases list aligned with EF's own SQLite one.** `test/` only. `failed`
+      unchanged at 145, `total` unchanged at 29384. **Missing bases 8 -> 5.**
+
+      **EF's `SqliteComplianceTest` has an `IgnoredTestBases` of its own and nobody here had read
+      it.** It lists nine; three of them are bases this suite reports as missing, and only SQL
+      Server implements any of the three:
+
+      | Base | EF's reason |
+      |---|---|
+      | `FromSqlSprocQueryTestBase<>` | stored procedures, which SQLite has not |
+      | `StoredProcedureUpdateTestBase` | EF's own comment: *"SQLite doesn't support stored procedures"* |
+      | `SqlExecutorTestBase<>` | also stored procedures, despite the name |
+
+      **`SqlExecutorTestBase` is the one worth naming.** Its first three tests are
+      `Executes_stored_procedure`, `_with_parameter` and `_with_generated_parameter`, every one
+      running a sproc through `Database.ExecuteSqlRaw`. D8 item 2 had paired it with
+      `SqlQuery<T>`, which is a **client** limitation, where this is a **store** one. R102 split
+      them and this removes it from the list.
+
+      **The compliance test's own rule needed a second category, and it now has one.** It said only
+      a base *conceptually inapplicable to a remoting provider* may be ignored. SQLite is this
+      suite's only relational store (ADR-009 Tier B), so a base the reference provider declares out
+      of scope for SQLite has no store here to run on either — which is precisely CLAUDE.md's bar,
+      *"EF ships no test for it on any store we have"*. Each entry names EF's reason rather than
+      inventing one.
+
+      **Aligning means aligning what is MISSING, not deleting what is adopted, and the other six
+      entries on EF's list say why.** Five of them are implemented here.
+      `TPCRelationshipsQueryTestBase` and the three `Owned*Projection*` classes are **green** — EF
+      ignores the projection family for its own issue #26708 and the TPC one for a
+      test-infrastructure reason, and neither reaches this provider, so removing those classes
+      would delete passing coverage. `UdfDbFunctionTestBase` is implemented with **55 classified
+      reds** (R90); dropping it would lower `failed` by 55 without fixing anything, which is the
+      failure mode CLAUDE.md names outright. **Listing an implemented base changes nothing**, so
+      none of the five is listed.
+
+      **The five still missing, and none is a SQLite question.** `NorthwindSqlQueryTestBase` and
+      `SqlQueryTestBase` are D3-blocked (R102); `AdHocQuerySplittingQueryTestBase` needs
+      `CloseConnection` and ADR-013 says it must not get one; `JsonUpdateTestBase` assumes a
+      relational client; `StoreValueGenerationTestBase` has not been re-read since it was
+      classified.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
