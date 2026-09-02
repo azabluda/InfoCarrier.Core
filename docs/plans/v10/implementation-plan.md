@@ -3283,6 +3283,49 @@ re-parents of families already running, because R25–R30 showed that is where t
       The deferred table's non-relational backend entry stays where it is: it asks the same question
       from the other end and neither entry is committed.
 
+- [x] **R109. The 68 JSON failures are EF Core's, on the server, before the wire.** One comment
+      rewritten at the site and this entry. Nothing executable changed.
+
+      **R107 left the mechanism unchased and said so.** It measured `failed` 143 -> 211 for one
+      line and stopped at the number, recording "detailed errors change how EF reads a column ...
+      whatever the mechanism". The owner asked for the mechanism, because a value that changes when
+      only an error *message* was supposed to change is a defect wearing the clothes of a test
+      setting.
+
+      **It is one property.** `JsonOwnedAllTypes.TestInt16Collection`, declared
+      `IReadOnlyList<short>`. With `EnableDetailedErrors()` on it materializes with **zero**
+      elements; with it off it holds its three. `JsonQueryFixtureBase.AssertAllTypes` walks its
+      collections in declaration order and reaches this one twelfth, before anything else that
+      could differ, so all 68 failures report the same `Expected: 3, Actual: 0` and all 68 are the
+      same defect. Every other collection on the same object -- `string[]`,
+      `ReadOnlyCollection<string>`, `int[]`, `List<long>`, the converted enums -- reads correctly
+      in the same materialization.
+
+      **Measured on the server context, where this provider is absent.**
+      `Backend.CreateDbContext()` is a plain EF Core SQLite context; reading
+      `JsonEntityAllTypes` through it returns `TestInt16Collection` empty before any request
+      crosses the wire, and the client afterwards reports exactly what the server sent. Toggling
+      the option is the only difference between the two runs: 0 with it, 3 without it, on both
+      sides. **So this is not the projection split, not the wire format and not the client's
+      model** -- three explanations the shape of the failure would have supported.
+
+      **What EF does differently is a `TryCatch`.**
+      `RelationalShapedQueryCompilingExpressionVisitor.ShaperProcessingExpressionVisitor
+      .CreateReadJsonPropertyValueExpression` is the only place the option touches a JSON read,
+      and all it does is wrap the read in one, to call `ThrowExtractJsonPropertyException`. The
+      reader threaded through those reads is `Utf8JsonReaderManager`, a **`ref struct` passed by
+      reference**, which is the kind of argument an expression-tree `TryExpression` forces the
+      compiler to treat specially. **A minimal model does not reproduce it**: a `ToJson()` owned
+      type carrying `List<int>`, `List<string>` and an `IReadOnlyList<short>` reads all three
+      correctly with the option on, with and without a property initializer. So the trigger needs
+      more of EF's model than the property type alone, and finding it is EF's work, not this
+      repository's.
+
+      **Nothing to fix here, and the option stays per fixture.** R104's two-test win on one
+      Northwind fixture is unaffected. The site's comment now names the property, says where the
+      value is lost, and says the loss is EF Core's -- which is what the next reader with R107's
+      idea needs to see.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

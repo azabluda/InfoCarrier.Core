@@ -251,10 +251,25 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     {
         // `EnableDetailedErrors()` DOES NOT BELONG HERE, and R107 measured why. Adding it beside
         // the line below -- the obvious generalization of R104, which turns it on for one fixture
-        // -- costs **68 `JsonQuerySqliteInfoCarrierTest` tests**, `failed` 143 -> 211. Detailed
-        // errors change how EF reads a column, and the JSON collection reads then come back with
-        // default values (`Expected: 3, Actual: 0` inside `AssertPrimitiveCollection`). Whatever
-        // the mechanism, the cost is not hypothetical and the switch stays per fixture.
+        // -- costs **68 `JsonQuerySqliteInfoCarrierTest` tests**, `failed` 143 -> 211.
+        //
+        // R109 found the cause and IT IS NOT THIS PROVIDER'S. One property loses its value:
+        // `JsonOwnedAllTypes.TestInt16Collection`, declared `IReadOnlyList<short>`. With the
+        // option on it materializes EMPTY; with it off it holds its three elements. That is the
+        // single `Expected: 3, Actual: 0` every one of the 68 stops at, because `AssertAllTypes`
+        // reaches it before it reaches anything else that differs.
+        //
+        // **Measured on the SERVER context, which is a plain EF Core SQLite context with no
+        // InfoCarrier code in the read path at all** -- the same 0 comes back from
+        // `Backend.CreateDbContext()` directly, before any request crosses the wire, and the
+        // client then faithfully reports what the server sent. EF's own
+        // `CreateReadJsonPropertyValueExpression` is the only place the option touches a JSON
+        // read: it wraps the read in a `TryCatch`, and `Utf8JsonReaderManager` is a `ref struct`
+        // passed by reference through it. A minimal model with an `IReadOnlyList<short>` in a
+        // `ToJson()` owned type does NOT reproduce, so the trigger needs more of EF's model than
+        // the property type alone; the mechanism is EF's to find.
+        //
+        // The switch stays per fixture regardless, and this repository has nothing to fix.
         builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
 
         // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
