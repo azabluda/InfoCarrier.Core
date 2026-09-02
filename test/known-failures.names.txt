@@ -22,8 +22,6 @@ InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Bad_da
 InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Bad_data_error_handling_null(async: True)
 InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Bad_data_error_handling_null_no_tracking(async: False)
 InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Bad_data_error_handling_null_no_tracking(async: True)
-InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Bad_data_error_handling_null_projection(async: False)
-InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Bad_data_error_handling_null_projection(async: True)
 InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.FromSqlRaw_queryable_simple_projection_composed(async: False)
 InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.FromSqlRaw_queryable_simple_projection_composed(async: True)
 InfoCarrier.Core.FunctionalTests.Sqlite.Query.FromSqlQueryInfoCarrierTest.Include_closed_connection_opened_by_it_when_buffering(async: False)

@@ -2397,5 +2397,25 @@
 # changes nothing; deleting its class to match would remove passing coverage, or 55 reds' worth of
 # information.
 
-failed=145
+# 2026-09-02 (R104) -- `failed` 145 -> 143, `total` unchanged at 29384. FIXED 2
+# (`Bad_data_error_handling_null_projection`), BROKEN none. The names file moves with it.
+#
+# THE SERVER NEVER HAD DETAILED ERRORS ON. EF wraps a failed column read into
+# `ErrorMaterializingPropertyNullReference` only under `if (_detailedErrorsEnabled ...)` in
+# `ShaperProcessingExpressionVisitor`. Here the read happens on the SERVER, and a shared fixture's
+# own `AddOptions` deliberately does not reach the server (A29), so a raw
+# `SqliteException: The data is NULL at ordinal 5` crossed where EF's message was expected.
+#
+# FOUND BY MEASURING A HYPOTHESIS THAT WAS WRONG. R98 put all six `Bad_data_error_handling_null*`
+# down to this tier's `Product.CategoryID` addition. Removing that property did NOT make the six
+# green and DID break four `NorthwindKeylessEntities` tests, which is how the second cause surfaced.
+# The four that remain do materialize `Product` and still stop at "The required column 'CategoryID'
+# was not present"; clearing that costs the four keyless tests, a measured net zero, and is not
+# taken.
+#
+# EF's OWN SQLITE SUITE DOES NOTHING ABOUT THIS BECAUSE IT HAS NO PROBLEM: `NorthwindContext` does
+# `e.Ignore(p => p.CategoryID)`, so its `Product` maps exactly the six columns the base's SQL
+# selects, and its Northwind store is a prebuilt `northwind.db` rather than one built from the model.
+
+failed=143
 total=29384

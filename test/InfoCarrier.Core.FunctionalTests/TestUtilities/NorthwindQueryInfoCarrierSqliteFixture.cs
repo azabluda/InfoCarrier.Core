@@ -34,6 +34,14 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
+            // EF wraps a failed column read into `ErrorMaterializingProperty*` ONLY when detailed
+            // errors are on -- the try/catch around the read is emitted by
+            // `ShaperProcessingExpressionVisitor` under `if (_detailedErrorsEnabled ...)`. Here the
+            // read happens on the SERVER, and a shared fixture's own `AddOptions` deliberately does
+            // not reach it (A29), so the server had detailed errors off and a raw
+            // `SqliteException: The data is NULL at ordinal 5` crossed where EF's own message was
+            // expected. This is the server half of what the fixture already asks of the client.
+            onAddOptions: b => b.EnableDetailedErrors(),
             serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
             configureConventions: ConfigureConventions,
             relationalClientStore: true,

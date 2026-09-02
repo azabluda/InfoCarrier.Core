@@ -3165,6 +3165,38 @@ re-parents of families already running, because R25–R30 showed that is where t
       relational client; `StoreValueGenerationTestBase` has not been re-read since it was
       classified.
 
+- [x] **R104. The server never had detailed errors on, so EF's materialization messages could not
+      form.** `test/` only. **`failed` 145 -> 143**, `total` unchanged at 29384. FIXED 2
+      (`Bad_data_error_handling_null_projection`, sync and async), BROKEN none.
+
+      **Found by measuring a hypothesis that was wrong, which is the part worth keeping.** R98
+      classified six `Bad_data_error_handling_null*` reds as this tier's `Product.CategoryID`
+      addition showing through. Removing that property to check the price gave the answer directly:
+      **the six did not go green, and four other tests broke.** What surfaced underneath was a
+      second, unrelated cause.
+
+      **EF wraps a failed column read into `ErrorMaterializingPropertyNullReference` only when
+      detailed errors are enabled** — `ShaperProcessingExpressionVisitor` emits the try/catch under
+      `if (_detailedErrorsEnabled ...)`. On this provider the read happens on the **server**, and a
+      shared fixture's own `AddOptions` deliberately does not reach the server (A29), so the server
+      had them off and a raw `SqliteException: The data is NULL at ordinal 5` crossed where EF's
+      message was expected. One `onAddOptions` closes it.
+
+      **Only two of the six, and the arithmetic on the other four is why they stay.** The projection
+      pair never materializes the whole entity, so EF's FromSql column check does not fire and the
+      wrap is all they needed. The other four do materialize `Product`, so they still stop at
+      *"The required column 'CategoryID' was not present"*. Removing the property clears that and
+      **costs four `NorthwindKeylessEntities` tests**, because `ProductView`'s `ToSqlQuery` reads
+      the column — measured, +4 and -4, a net zero that trades message-text coverage for view
+      coverage. **Not taken.**
+
+      **What EF's own SQLite suite does about this: nothing, because it does not have the
+      problem.** `NorthwindContext` line 49 is `e.Ignore(p => p.CategoryID)`, so its `Product` maps
+      exactly the six columns the base's SQL selects, and EF's SQLite Northwind store is a prebuilt
+      `northwind.db` rather than one built from the model. The property exists here only because
+      this tier builds its store from the model and `ProductView` needs the column — which is the
+      note already standing in `NorthwindInfoCarrierSqliteServerContext`.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
