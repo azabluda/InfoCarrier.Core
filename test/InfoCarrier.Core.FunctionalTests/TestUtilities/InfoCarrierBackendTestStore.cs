@@ -249,6 +249,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
     {
+        // `EnableDetailedErrors()` DOES NOT BELONG HERE, and R107 measured why. Adding it beside
+        // the line below -- the obvious generalization of R104, which turns it on for one fixture
+        // -- costs **68 `JsonQuerySqliteInfoCarrierTest` tests**, `failed` 143 -> 211. Detailed
+        // errors change how EF reads a column, and the JSON collection reads then come back with
+        // default values (`Expected: 3, Actual: 0` inside `AssertPrimitiveCollection`). Whatever
+        // the mechanism, the cost is not hypothetical and the switch stays per fixture.
         builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
 
         // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a

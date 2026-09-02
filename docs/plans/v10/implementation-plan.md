@@ -3249,6 +3249,26 @@ re-parents of families already running, because R25–R30 showed that is where t
       non-relational backend entry is the same question from the other end, and neither is
       committed.
 
+- [x] **R107. Server detailed errors for every fixture: measured at 211 and rejected.** Nothing
+      executable changed — this entry and one comment at the site are the record.
+
+      **The obvious generalization of R104, and it is a trap.** R104 turned detailed errors on for
+      the Northwind SQLite fixture and gained 2. `InfoCarrierBackendTestStore.AddProviderOptions`
+      already applies `EnableSensitiveDataLogging()` to **every** server context, so
+      `EnableDetailedErrors()` beside it is one line and reaches all 77 fixtures without touching
+      any of them.
+
+      **It costs 68 tests.** `failed` 143 -> **211**, every new one in
+      `JsonQuerySqliteInfoCarrierTest` and every one an `Assert.Equal() Failure: Values differ`
+      inside `JsonQueryFixtureBase.AssertPrimitiveCollection` — `Expected: 3, Actual: 0`. Detailed
+      errors change the shape of EF's column read, and the JSON primitive collections then
+      materialize as defaults. The mechanism was not chased further: the number settles the
+      question.
+
+      **So the switch stays per fixture**, and the site now says so, because the next reader will
+      have the same idea. **A one-line generalization of a two-test win is exactly the shape that
+      does not get measured**, and this one is negative by a factor of thirty.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

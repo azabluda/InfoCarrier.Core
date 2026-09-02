@@ -2435,5 +2435,19 @@
 # test and not the base. Third standing classification found wrong this session, after R97's and
 # R98's.
 
+# 2026-09-02 (R107) -- NO CHANGE. `failed` stays 143 and `total` 29384; the experiment behind this
+# note was measured and reverted.
+#
+# SERVER DETAILED ERRORS FOR EVERY FIXTURE COSTS 68 TESTS. R104 turned them on for the Northwind
+# SQLite fixture and gained 2. `InfoCarrierBackendTestStore.AddProviderOptions` already applies
+# `EnableSensitiveDataLogging()` to every server context, so `EnableDetailedErrors()` beside it is
+# ONE LINE reaching all 77 fixtures -- and it takes `failed` 143 -> 211, every new failure in
+# `JsonQuerySqliteInfoCarrierTest` and every one `Values differ` inside
+# `JsonQueryFixtureBase.AssertPrimitiveCollection` (`Expected: 3, Actual: 0`). Detailed errors
+# change the shape of EF's column read and the JSON primitive collections materialize as defaults.
+#
+# THE SWITCH STAYS PER FIXTURE, and the site carries a comment saying so. A one-line generalization
+# of a two-test win is exactly the shape nobody measures.
+
 failed=143
 total=29384
