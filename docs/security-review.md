@@ -333,6 +333,31 @@ and authenticating the transport. **A deployment that relies on query filters fo
 authorization must not register this.**
 
 
+### 5a addendum — `Database.SqlQuery<T>` joins the same gate (#56, R115)
+
+Written **2026-09-02**. **No new posture, and that is the point of recording it.**
+
+`Database.SqlQuery<T>` is a second entry point to the same capability, and it now crosses the wire
+as `SqlQueryRootStubNode`. It is refused by **the same grant, in the same place**: the server
+rebuilds it only under `AddInfoCarrierArbitrarySqlExecution()`, the client sends it only under
+`AllowArbitrarySqlExecution()`, and `ServerQueryExecutor.RequireArbitrarySql` is one method serving
+both roots because there is one grant to serve.
+
+**Nothing above needs re-deriving for it.** R94 measured the two facts this section rests on — one
+`CommandText` runs every statement in it, and an uncomposed raw query reaches the store unwrapped —
+and both are properties of the store and of EF's command path, not of which extension method the
+caller typed. A `SqlQuery<int>("SELECT 1; DROP TABLE Probe;")` is the probe's own case.
+
+**What is new is small and worth naming.** A scalar root has **no entity type**, so the server
+rebuilds it from the CLR element type the wire carried rather than resolving one through its model.
+That is less authority than the entity root, not more: the model is not consulted and nothing is
+added to it. The `T` is still subject to ADR-008 constraint 2 like every other named type.
+
+**Not yet granted, and deliberately.** The *non-scalar* `SqlQuery<TDto>` builds an ad-hoc entity
+type on the client's model, and making it work server-side would mean the server constructing an
+entity type on a client's say-so. That is a genuine widening, it is unbuilt, and it gets its own
+reading before it is taken.
+
 ## 6. Cancellation (W6) — half landed, and the half that touches this path is the open one
 
 **Amended 2026-08-10 (C66).** The *cooperative* half is done and now tested: the caller's

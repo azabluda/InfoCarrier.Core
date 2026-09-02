@@ -83,6 +83,12 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitra
             // caller sees EF's own `TranslationFailed`.
             { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsFromSqlRoot(root) => true,
 
+            // Its scalar sibling, under the same grant (#56). `Database.SqlQuery<T>` produces this
+            // root for a `T` the type-mapping source recognises, and `SqlQueryRootStubNode` carries
+            // the same `Sql` and arguments. Same default refusal: without the option this is
+            // `false` and the caller sees EF's own `TranslationFailed`.
+            { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsSqlQueryRoot(root) => true,
+
             Microsoft.EntityFrameworkCore.Query.QueryRootExpression => false,
             // Any other extension node — QueryParameterExpression included, though those are
             // substituted away before the split — has no translation.

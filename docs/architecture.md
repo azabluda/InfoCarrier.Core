@@ -941,6 +941,46 @@ the model implies a `SqlQuery<T>` result type. Any work here starts from that, n
 to be *"reverse D3 or drop two bases"*. The third option is real, was measured, and leaves the
 milestone exit criterion intact.
 
+#### D8 item 2 BUILT 2026-09-02 (R114, R115) — option D, and D3 untouched
+
+**The owner chose option D. It is built, and the count moved.** `failed` 143 → 141 on the shim
+alone, and `NorthwindSqlQueryTestBase` then adopted with **8 of 8 green on the first run**
+(`total` 29384 → 29392). Compliance missing bases **2 → 1**.
+
+**Two pieces, and only the second is product code.**
+
+1. **`InfoCarrierRelationalFacadeDependencies`** (`test/`, R114) implements
+   `IRelationalDatabaseFacadeDependencies` and is registered by the harness, which is an
+   application. `RelationalConnection`, `RawSqlCommandBuilder` and the relational `CommandLogger`
+   throw; nothing on this path calls them. **`InfoCarrier.Core` references nothing relational and
+   D3 stands as written.** A shipped `InfoCarrier.Core.Relational` package would hold this same
+   class — a packaging step, not a design one, costing a new `csproj`, `release.yml`'s package list
+   and three user-facing pages. Not taken.
+2. **`SqlQueryRootStubNode`** (`src/`, R115) carries EF's `SqlQueryRootExpression` across the wire.
+   **A scalar root is the one query root with no entity type**, so
+   `ServerQueryExecutor.RebindQueryRoot` answers it *before* it resolves one, rebuilding from the
+   CLR element type the wire carried. Same grant as `FromSqlQueryRootStubNode`, and
+   `RequireArbitrarySql` is now one method serving both because there is one grant.
+   `security-review.md` §5a has the addendum.
+
+**The trim ratchet caught the only mistake, and its lesson generalises.** Sharing one
+`ResolveRootType(string fullName)` between the two roots turned a `const`-folded literal into a
+**parameter**, which the trim analyzer cannot read: `IL2057`, 89 → 90, and the ratchet failed.
+Splitting the two `Type.GetType` calls back apart returned it to 89. **That is the same lesson as
+the `foreach`-not-`Select` note in the same file, from the other direction**: a suppression covers a
+member's own body, and so does the analyzer's ability to see a constant. `src/` changed, so both
+gates ran; `eng/measure.sh` and `eng/trim-ratchet.sh` are separate axes and this change failed one
+while passing the other.
+
+**What is still not built, and it is the other base.** `SqlQueryTestBase` (61 methods) projects into
+`UnmappedProduct` and `UnmappedCustomer`, which take EF down the ad-hoc entity-type path.
+Measured, not predicted: the **client's** `AdHocMapper` builds that entity type without complaint
+and R95's node carries it; the type allowlist refuses the DTO until an application admits it
+(R85's seam); and past that the **server** raises *"not found in the server model"*. Closing it
+means the server calling its own `AdHocMapper` when a raw-SQL root names a type its model does not
+hold — **the server constructing an entity type on a client's say-so**, which is a widening and
+gets its own security reading before it is taken.
+
 **`SqlExecutorTestBase` is not part of this and should never have been listed with it (R102).** Its
 first three tests are `Executes_stored_procedure`, `Executes_stored_procedure_with_parameter` and
 `Executes_stored_procedure_with_generated_parameter`: it is a stored-procedure base wearing a

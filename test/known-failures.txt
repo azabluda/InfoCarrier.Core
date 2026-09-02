@@ -2629,5 +2629,31 @@
 # and refused one layer later by the TYPE ALLOWLIST over `UnmappedCustomer`. That is ADR-008
 # constraint 2 working, and the next step's subject.
 
+# 2026-09-02 (R115) -- `failed` UNCHANGED at 141, `total` 29384 -> 29392. FIXED none, BROKEN none,
+# REASONS unchanged. Eight new tests and ALL EIGHT GREEN: `NorthwindSqlQueryTestBase` adopts.
+# Compliance missing bases 2 -> 1. `src/` changed, so both gates ran.
+#
+# **`SqlQueryRootStubNode`, and it had to be a node of its own.** `Database.SqlQuery<T>` makes EF
+# build `SqlQueryRootExpression` for a `T` the type-mapping source recognises and
+# `FromSqlQueryRootExpression` over an ad-hoc entity type otherwise. THE SCALAR ROOT IS THE ONE
+# QUERY ROOT WITH NO ENTITY TYPE, so `ServerQueryExecutor.RebindQueryRoot` answers it before the
+# model lookup -- which would otherwise throw "not found in the server model" on a well-formed
+# query -- and rebuilds it from the CLR element type the wire carried. Same grant as its sibling;
+# `RequireArbitrarySql` is now one method for both because there is one grant.
+#
+# **THE TRIM RATCHET CAUGHT THE ONLY MISTAKE AND THE COUNT COULD NOT HAVE.** Sharing one
+# `ResolveRootType(string fullName)` between the two roots turned a `const`-folded literal into a
+# PARAMETER, which the trim analyzer cannot read: `IL2057`, `ours` 89 -> **90**, FAIL. Splitting the
+# two `Type.GetType` calls apart put it back to 89. `eng/measure.sh` was GREEN on the failing
+# version. Two axes, and CLAUDE.md says so; this is the second time in this repository that a
+# suppression's scope decided the number.
+#
+# `SqlQueryTestBase` IS NOT ADOPTED, and the reason is measured rather than assumed: its 61 methods
+# project into `UnmappedProduct`/`UnmappedCustomer`, so EF takes the ad-hoc entity-type path. The
+# CLIENT builds that type without complaint and R95's node carries it; the type allowlist refuses
+# the DTO until an application admits it; past that the SERVER raises "not found in the server
+# model". Closing it means the server calling its own `AdHocMapper` on a client's say-so, which is a
+# widening and gets its own security reading first.
+
 failed=141
-total=29384
+total=29392

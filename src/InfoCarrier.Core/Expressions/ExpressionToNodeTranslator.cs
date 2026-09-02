@@ -113,19 +113,39 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
             // A raw-SQL queryable captured as a constant - the same root as the extension branch
             // below, reached when the caller closed over the `FromSql` query rather than writing
             // it inline. Its state is carried, not dropped (#60).
-            _result = RelationalQueryRootShape.TryRead(queryable.Expression, out string? capturedSql, out Expression? capturedArgument)
-                ? new FromSqlQueryRootStubNode
+            if (RelationalQueryRootShape.TryRead(
+                queryable.Expression, out string? capturedSql, out Expression? capturedArgument))
+            {
+                _result = new FromSqlQueryRootStubNode
                 {
                     ElementType = rootElement,
                     Type = type,
                     Sql = capturedSql,
                     Arguments = Translate(capturedArgument),
-                }
-                : new QueryRootStubNode
+                };
+                return node;
+            }
+
+            // The scalar sibling (#56). `Database.SqlQuery<T>` closed over and captured as a
+            // constant, exactly as the entity root above can be.
+            if (RelationalQueryRootShape.TryReadSqlQuery(
+                queryable.Expression, out string? capturedScalarSql, out Expression? capturedScalarArgument))
+            {
+                _result = new SqlQueryRootStubNode
                 {
                     ElementType = rootElement,
                     Type = type,
+                    Sql = capturedScalarSql,
+                    Arguments = Translate(capturedScalarArgument),
                 };
+                return node;
+            }
+
+            _result = new QueryRootStubNode
+            {
+                ElementType = rootElement,
+                Type = type,
+            };
             return node;
         }
 
@@ -181,6 +201,22 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
                     Type = rootType,
                     Sql = sql,
                     Arguments = arguments,
+                };
+                return node;
+            }
+
+            // The scalar sibling (#56), and it must be tested separately rather than folded into
+            // the branch above: `SqlQueryRootExpression` has NO entity type, so the server rebuilds
+            // it from the CLR element type instead of resolving one through its model.
+            if (RelationalQueryRootShape.TryReadSqlQuery(root, out string? scalarSql, out Expression? scalarArgument))
+            {
+                ExpressionNode scalarArguments = Translate(scalarArgument);
+                _result = new SqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = rootType,
+                    Sql = scalarSql,
+                    Arguments = scalarArguments,
                 };
                 return node;
             }

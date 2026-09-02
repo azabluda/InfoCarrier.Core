@@ -3511,6 +3511,44 @@ re-parents of families already running, because R25–R30 showed that is where t
       packaging step rather than a design one: it costs a new `csproj`, `release.yml`'s package list
       and three user-facing pages. Not taken here.
 
+- [x] **R115. The scalar `SqlQuery` wire node, and `NorthwindSqlQueryTestBase` adopted green.**
+      `src/` and `test/`. **`failed` unchanged at 141, `total` 29384 → 29392** for the eight tests
+      the new base brings, **all eight green on the first run**. FIXED none, BROKEN none, REASONS
+      unchanged. Compliance missing bases **2 → 1**.
+
+      **`SqlQueryRootStubNode` is the sibling of R95's node and had to be a node of its own.**
+      `Database.SqlQuery<T>` makes EF build `SqlQueryRootExpression` when the type-mapping source
+      recognises `T`, and `FromSqlQueryRootExpression` over an ad-hoc entity type when it does not.
+      **The scalar root is the one query root with no entity type**, so
+      `ServerQueryExecutor.RebindQueryRoot` answers it *before* the model lookup — which would
+      otherwise throw "not found in the server model" on a perfectly well-formed query — and
+      rebuilds it from the CLR element type the wire carried. `RelationalQueryRootShape` reads and
+      rebuilds it by shape, exactly as it already does for the entity root.
+
+      **One grant, now one method.** `RequireArbitrarySql` serves both roots.
+      `security-review.md` §5a has an addendum saying why nothing above it needs re-deriving: R94's
+      two measurements are properties of the store and of EF's command path, not of which extension
+      method the caller typed.
+
+      **`NorthwindSqlQueryInfoCarrierTest` takes no override from EF's SQLite class**, which adds
+      only `CreateDbParameter` and a private `AssertSql`; the baselines have no meaning on a client
+      that emits no SQL.
+
+      **The trim ratchet caught the only mistake and the count could not have.** Sharing one
+      `ResolveRootType(string fullName)` between the two roots turned a `const`-folded literal into
+      a **parameter**, which the trim analyzer cannot read: `IL2057`, `ours` 89 → **90**, FAIL.
+      Splitting the two `Type.GetType` calls apart returned it to 89. Same lesson as the
+      `foreach`-not-`Select` note in the same file, from the other direction: **a suppression covers
+      a member's own body, and so does the analyzer's ability to see a constant.** `eng/measure.sh`
+      was green on the failing version — the two gates are separate axes, and CLAUDE.md says so.
+
+      **`SqlQueryTestBase` is not adopted and the reason is measured.** Its 61 methods project into
+      `UnmappedProduct`/`UnmappedCustomer`, so EF takes the ad-hoc entity-type path: the client
+      builds the type, R95's node carries it, the allowlist refuses the DTO until an application
+      admits it, and the **server** then raises "not found in the server model". Closing that means
+      the server calling its own `AdHocMapper` on a client's say-so, which is a widening and gets
+      its own reading first.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
