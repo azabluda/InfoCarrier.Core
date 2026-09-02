@@ -2992,6 +2992,33 @@ re-parents of families already running, because R25–R30 showed that is where t
       twice and the count says so only once.** Two of these three are further along than they were
       and still red; the reasons diff is the only thing that shows it.
 
+- [x] **R97. `Delete_FromSql_converted_to_subquery`'s table name: tried, measured at 369, reverted.**
+      Nothing executable changed — this entry is the record, and it is here because the change
+      *looked* like a one-liner and the run said otherwise.
+
+      **The hypothesis was right about the cause.** R96 left those two failing on
+      `no such table: Order Details`, because the base writes `FROM [Order Details]` —
+      `NorthwindRelationalContext`'s mapping — while this tier builds its store from
+      `NorthwindContext`'s core model, where the table is `OrderDetails`. Adding
+      `modelBuilder.Entity<OrderDetail>().ToTable("Order Details")` to
+      `NorthwindInfoCarrierSqliteServerContext` **does fix both**: run alone, the class goes to
+      173 of 175, the two remaining being `Update_with_invalid_lambda_in_set_property_throws`,
+      which R92 already priced as the right refusal with a message this package cannot name.
+
+      **And it broke 236 other tests.** `failed` 133 -> **369**, every new one
+      `SQLite Error 1: 'no such table: OrderDetails'` raised inside
+      `SharedStoreFixtureBase.InitializeAsync` — at **seeding**, not at query. The store named
+      "Northwind" is shared by many Tier B classes, only the first of them creates the schema (the
+      `Created` guard in `SqliteInfoCarrierBackendTestStore`), and not all of them build their
+      server context from `NorthwindInfoCarrierSqliteServerContext`. Renaming the table in one of
+      those contexts therefore splits the schema from the seed.
+
+      **Reverted, and the two stay red with their cause recorded.** The fix is not one line: it is
+      "every server context sharing the Northwind store agrees on the table name", which is a
+      harness change of a different size and buys two tests. **The class of mistake is the one
+      CLAUDE.md already names** — a per-class run and a full run answer different questions, and
+      only the second one knows about a shared store.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

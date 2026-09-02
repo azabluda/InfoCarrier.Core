@@ -2320,5 +2320,22 @@
 # context is using a relational database provider", out of `SqlQueryRaw` -- D8 item 2, a separate
 # entry point that is not a query root and was never in this step's scope.
 
+# 2026-09-02 (R97) -- NO CHANGE. `failed` stays 133 and `total` 29235; the experiment behind this
+# note was measured and reverted.
+#
+# `Delete_FromSql_converted_to_subquery` (2) fails on `no such table: Order Details` because the
+# base writes `FROM [Order Details]`, which is `NorthwindRelationalContext`'s mapping, and this tier
+# builds its store from `NorthwindContext`'s core model where the table is `OrderDetails`. Mapping
+# `OrderDetail` `ToTable("Order Details")` in `NorthwindInfoCarrierSqliteServerContext` FIXES BOTH --
+# the class runs 173 of 175 alone -- AND BREAKS 236 OTHERS: `failed` 133 -> 369, every new one
+# `no such table: OrderDetails` raised inside `SharedStoreFixtureBase.InitializeAsync`, i.e. at
+# SEEDING. The "Northwind" store is shared, only the first class creates its schema, and not every
+# Tier B fixture builds its server context from that class. Renaming the table in one of them splits
+# the schema from the seed.
+#
+# A PER-CLASS RUN AND A FULL RUN ANSWER DIFFERENT QUESTIONS, and only the second knows about a
+# shared store. The real fix is "every server context sharing this store agrees on the name", which
+# is a larger harness change for two tests, and is not taken.
+
 failed=133
 total=29235
