@@ -3549,6 +3549,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       the server calling its own `AdHocMapper` on a client's say-so, which is a widening and gets
       its own reading first.
 
+- [x] **R116. Retriage batch 4: the 55 `UdfDbFunction` reds.** Documents only —
+      `test/known-failures.txt`. `failed` unchanged at 141, `total` unchanged at 29392. Nothing
+      executable changed. Running total **13 reasons, 126 of the 141, one wrong and one figure
+      stale**.
+
+      **R74's classification holds in substance, and its checkable half checks out.** It says the
+      55 are one mechanism and that **not one is a wrong answer**. Re-derived from `r115b.log`:
+      29 client-boundary refusals, 10 `NotImplementedException` from EF's own stub bodies, 6 message
+      differences, 4 "no part of the query", 4 store errors, 1 client-side navigation read, 1
+      `System.Exception` from the test model. **No `Values differ` and no `Collections differ`
+      anywhere in the group** — every failure is an exception or a message text.
+
+      **One figure is stale, and it is the one this entry would be quoted for.** R74 wrote "only 2
+      are the store". **Today it is 4**: two `no such table: GetTopTwoSellingProducts` and two
+      `near "(": syntax error`, all four `InfoCarrierServerException` raised after the server
+      reached SQLite. The group was 75 when R74 counted and is 55 now — R86 closed 14 — so the
+      shapes moved for a recorded reason. **It strengthens R74's point**: four failures reach the
+      store and the store refuses them, which is the fail-safe direction.
+
+      **The 6 message differences are one shape and all six are `QF_*`.** Each expects EF's
+      *"Unable to translate a collection subquery"* and gets this provider's *"No part of the query
+      can be executed on the server"*. Both refuse the same query; what differs is **which refusal
+      fires** — the whole-query one rather than the per-subtree one `RejectClientEvaluation`
+      raises. **That is the largest single lead left in this group: six tests, one message.**
+
+      **`Scalar_Function_With_Translator_Translates_Instance` reads like a defect and is not one.**
+      Its `System.Exception` comes from `UDFSqlContext.MyCustomLengthInstance`, the test model's own
+      throwing stub, and the frames below are `lambda_method…` and `ListSelectIterator` — the call
+      was evaluated on the client, which is what R74's funcletizer family describes. The stub is
+      the evidence, not the failure.
+
+      The group stays red and stays adopted (R106,
+      [#96](https://github.com/azabluda/InfoCarrier.Core/issues/96)).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

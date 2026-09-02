@@ -2655,5 +2655,49 @@
 # model". Closing it means the server calling its own `AdHocMapper` on a client's say-so, which is a
 # widening and gets its own security reading first.
 
+# 2026-09-02 (R116) -- RETRIAGE BATCH 4: the 55 `UdfDbFunction` reds, the group no batch had
+# touched. `failed` UNCHANGED at 141, `total` unchanged at 29392. Nothing executable changed.
+# Running total: 13 reasons, **126 of the 141**, one wrong and one figure stale.
+#
+# **R74'S CLASSIFICATION HOLDS IN SUBSTANCE.** It says all of them are one mechanism -- this
+# provider does not support `HasDbFunction` over the wire -- and that NOT ONE IS A WRONG ANSWER.
+# The second half is checkable and it checks out: re-derived from `r115b.log`, the 55 are
+# 29 client-boundary refusals, 10 `NotImplementedException` from EF's own stub bodies, 6 message
+# differences, 4 "no part of the query", 4 store errors, 1 client-side navigation read and 1
+# `System.Exception` thrown by the test model itself. **There is no `Values differ` and no
+# `Collections differ` anywhere in the group.** Every failure is an exception or a message text.
+#
+# **ONE FIGURE IN IT IS STALE, AND IT IS THE ONE THIS FILE WOULD BE QUOTED FOR.** R74 wrote
+# "ONLY 2 ARE THE STORE (`no such table: GetTopTwoSellingProducts`)". **Today it is 4**, in two
+# shapes, both `InfoCarrierServerException` raised after the server reached SQLite:
+#
+#   no such table: GetTopTwoSellingProducts   DbSet_mapped_to_function
+#                                             TVF_with_navigation_in_projection_groupby_aggregate
+#   near "(": syntax error                    Compare_function_without_null_propagation_to_null
+#                                             Nullable_navigation_property_access_preserves_schema_for_sql_function
+#
+# The group was 75 when R74 counted and is 55 now -- R86 closed 14 by defining the store's scalar
+# functions on every connection -- so the shapes moved for a recorded reason and this is a stale
+# figure rather than a wrong reason. **It strengthens R74's point rather than weakening it**: four
+# failures reach the store and are refused BY the store, which is the fail-safe direction.
+#
+# **THE 6 MESSAGE DIFFERENCES ARE ONE SHAPE AND ALL SIX ARE `QF_*`.** Every one expects EF's
+# "Unable to translate a collection subquery" and gets this provider's "No part of the query can be
+# executed on the server". **Both refuse the same query; what differs is WHICH refusal fires**, not
+# only its text -- the whole-query one rather than the per-subtree one `QuerySplitter
+# .RejectClientEvaluation` raises. That is a lead rather than a defect, and it is the largest
+# single lead left in this group: six tests, one message.
+#
+# `Scalar_Function_With_Translator_Translates_Instance` is worth naming because its message reads
+# like a defect and is not one. `System.Exception : Exception of type 'System.Exception' was
+# thrown` comes from `UDFSqlContext.MyCustomLengthInstance`, the TEST MODEL'S OWN throwing stub,
+# and the frames below it are `lambda_method…` and `Enumerable.ListSelectIterator` -- so the call
+# was evaluated on the CLIENT, which is exactly what R74's funcletizer family describes. The stub
+# is the evidence, not the failure.
+#
+# **THE WHOLE GROUP STAYS RED AND STAYS ADOPTED** (R106, and issue #96): EF's own
+# `SqliteComplianceTest` ignores this base, so nobody has judged these 55 against a store that
+# hosts the group at all.
+
 failed=141
 total=29392
