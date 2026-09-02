@@ -639,11 +639,22 @@ public sealed class QuerySplitter
         // EF's own wording, down to the details clause — the spec suite asserts it
         // (`AssertTranslationFailed` / `WithDetails`), and a caller who has seen this message
         // from any other provider should not have to learn a second one.
+        //
+        // `ExpressionPrinter.Print` AND NOT `ToString()`, which is how EF renders every one of
+        // these messages (`QueryableMethodTranslatingExpressionVisitor`,
+        // `NavigationExpandingExpressionVisitor`). `Expression.ToString()` has no case for an
+        // extension node, so it prints the TYPE NAME in brackets — a caller was told
+        // `The LINQ expression '[Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression]'
+        // could not be translated` where every other provider says `DbSet<MockEntity>()`. The
+        // wording was already EF's; the expression inside it was not, and R117 found that by
+        // re-reading a failure rather than by reading this code.
+        string printed = Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(offender);
+
         throw new InvalidOperationException(
             details is null
-                ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(offender.ToString())
+                ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(printed)
                 : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
-                    offender.ToString(), details));
+                    printed, details));
     }
 
     /// <summary>

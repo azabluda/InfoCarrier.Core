@@ -3583,6 +3583,46 @@ re-parents of families already running, because R25–R30 showed that is where t
       The group stays red and stays adopted (R106,
       [#96](https://github.com/azabluda/InfoCarrier.Core/issues/96)).
 
+- [x] **R117. The refusal message prints the expression EF's way, and retriage batch 5 closes the
+      141.** `src/` — one line in `QuerySplitter.RejectClientEvaluation` — plus
+      `test/known-failures.txt`. **`failed` unchanged at 141**, `total` unchanged at 29392, FIXED
+      none, BROKEN none. Both gates ran; trim ratchet `ours` 89 ≤ 89.
+
+      **The count cannot see this and the reasons diff is the whole result.**
+
+      ```
+      -  29 The LINQ expression '[Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression].
+      +  23 The LINQ expression 'DbSet<Customer>()
+      +   3 The LINQ expression 'DbSet<Product>()
+      +   2 The LINQ expression 'DbSet<Order>()
+      +   1 The LINQ expression 'DbSet<Address>()
+      ```
+
+      `RejectClientEvaluation` rendered the offending expression with `Expression.ToString()`, which
+      has no case for an extension node and prints its **type name in brackets**. EF renders every
+      one of these messages with `ExpressionPrinter.Print`. **The wording was already EF's; the
+      expression inside it was not**, and the comment above the throw claimed the whole message was
+      EF's — half right for five milestones.
+
+      **No test flipped, and that was checked before the change rather than after.** Five failures
+      assert on this text, and each has a second difference behind the rendering: EF names a
+      different operator (R67, R68), or renders a rewritten tree that ADR-006's raw capture cannot
+      reproduce (J18). Those readings were right and still stand. What changes is what a consumer
+      sees.
+
+      **Batch 5 re-reads the last 20, so all 141 are now re-read.** Running total across five
+      batches: **141 of 141, one reason wrong (batch 1's) and one figure stale (batch 4's)**.
+      Everything else held — R84's, R29's, J22's, C64's, the topology pair, C20's, R68's, J18's,
+      J15's, and the compliance test, whose missing list is now **1**.
+
+      **The best entry in the file to copy is J15's**, found again in this pass:
+      `Composition_over_collection_of_complex_mapped_as_scalar` asserts a throw over a table EF
+      leaves **empty**, so the "no exception was thrown" everyone read was a **vacuous control**.
+      J15 wrote a test that asserts the answer instead, and it passes.
+
+      **Nothing in the 141 is of unknown standing, and that is now a re-derived statement rather
+      than an inherited one.** The last whole-tail re-derivation was M9's archive, at thirteen.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

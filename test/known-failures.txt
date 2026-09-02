@@ -2699,5 +2699,69 @@
 # `SqliteComplianceTest` ignores this base, so nobody has judged these 55 against a store that
 # hosts the group at all.
 
+# 2026-09-02 (R117) -- RETRIAGE BATCH 5, which CLOSES THE 141, and one fix that the count cannot
+# see. `failed` UNCHANGED at 141, `total` unchanged at 29392. FIXED none, BROKEN none.
+# **READ THE REASONS DIFF -- IT IS THE WHOLE RESULT.**
+#
+#   -  29 The LINQ expression '[Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression].
+#   +  23 The LINQ expression 'DbSet<Customer>()
+#   +   3 The LINQ expression 'DbSet<Product>()
+#   +   2 The LINQ expression 'DbSet<Order>()
+#   +   1 The LINQ expression 'DbSet<Address>()
+#
+# **`QuerySplitter.RejectClientEvaluation` printed the offending expression with
+# `Expression.ToString()`, which has no case for an extension node and prints its TYPE NAME in
+# brackets.** EF renders every one of these messages with `ExpressionPrinter.Print` --
+# `QueryableMethodTranslatingExpressionVisitor` and `NavigationExpandingExpressionVisitor` both do
+# -- so a caller who had seen this message from any other provider was shown
+# `'[Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression]'` where every other provider
+# says `'DbSet<Customer>()'`. **The WORDING was already EF's; the EXPRESSION INSIDE IT was not.**
+# The comment above the throw claimed the whole message was EF's, and it was half right for five
+# milestones. `src/`, so both gates: trim ratchet `ours` 89 <= 89, unchanged.
+#
+# **NO TEST FLIPPED AND THAT WAS NOT THE POINT.** It was checked first: five failures assert on this
+# text (`Casts_are_removed_from_expression_tree_when_redundant`, the two
+# `Update_with_invalid_lambda_in_set_property_throws` and `Throws_when_orderby_multiple`), and each
+# has a SECOND difference behind the rendering -- EF names a different operator (R67, R68) or
+# renders a rewritten tree that ADR-006's raw capture cannot reproduce (J18). Those readings were
+# right and they still stand. What changes is what a CONSUMER sees.
+#
+# ---- BATCH 5: the last 20, and the 141 are now all re-read -------------------------------------
+#
+# Running total: **13 reasons in batches 1-4 covering 126, plus these 20. All 141.** One reason
+# wrong (batch 1's), one figure stale (batch 4's), nothing else moved.
+#
+#  * 4 `Bad_data_error_handling_null*` -- R84's reading holds: this tier maps `Product.CategoryID`,
+#    which core `NorthwindContext` ignores, so a SELECT omitting it fails earlier and with a better
+#    message. Harness, not wire.
+#  * 4 `OwnedJsonStructuralEquality*` -- R29's reading holds. `Associate_with_parameter_null` FAILS
+#    BECAUSE IT PASSES; the other three are "exception type was not an exact match" on the same
+#    family. Named in `website/docs/limitations.md`.
+#  * 2 `ComplexTypesTracking.Can_track_entity_with_complex_property_bag_collections(Added)` -- J22's
+#    reading holds: an upstream defect on a path only this provider takes, priced and not taken.
+#  * 2 `GearsOfWar.Correlated_collection_with_distinct_3_levels` (Tier A) -- C64's reading holds: an
+#    assertion no correct answer can satisfy. Still the only two wrong answers in the suite.
+#  * 2 `TPTTableSplitting.Warn_when_save_optional_dependent_with_null_values*` -- the recorded
+#    reading holds and it is the topology class CLAUDE.md names. The warning is raised by the
+#    relational UPDATE pipeline, which runs on the SERVER; the client's logger never sees it, so
+#    `Log.Single(l => l.Level == Warning)` finds nothing. The sensitive twin gets the
+#    sensitive-data-logging notice instead, which is the same fact from the other end.
+#  * 2 `Update_with_invalid_lambda_in_set_property_throws` -- C20's reading holds; R64 confirmed
+#    adopting the relational base did not close them.
+#  * 1 `Throws_when_orderby_multiple` -- R68's reading holds: two untranslatable operators, EF names
+#    the inner and this provider the outer, and it is not fixable in EF's direction because the
+#    server never sees a query the client already refused.
+#  * 1 `Casts_are_removed_from_expression_tree_when_redundant` -- J18's reading holds AND IT
+#    PREDICTED THIS STEP: "only EF's rendering of the tree is left, which ADR-006 cannot reproduce."
+#  * 1 `Composition_over_collection_of_complex_mapped_as_scalar` -- J15's reading holds, and it is
+#    the best entry in this file to copy: the base asserts a throw over a table EF leaves EMPTY, so
+#    the "no exception was thrown" everyone read was a VACUOUS CONTROL. J15 wrote a test of its own
+#    that asserts the ANSWER, and it passes.
+#  * 1 `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` -- red by design (M1), and its
+#    missing list is now **1** (`SqlQueryTestBase`) after R115.
+#
+# **NOTHING IN THE 141 IS OF UNKNOWN STANDING, and that is now a re-derived statement rather than an
+# inherited one.** The last whole-tail re-derivation was M9's archive, at thirteen.
+
 failed=141
 total=29392
