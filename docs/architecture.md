@@ -792,9 +792,21 @@ buys — two `GetProperty` reads on the client and one `Activator.CreateInstance
 in `RelationalQueryRootShape` — is the premise `eng/trim-baseline.txt` already describes, and every
 call site carries a narrow `[UnconditionalSuppressMessage]` naming why the members survive.
 
-**Item 2 is untouched and stays priced.** `SqlQuery<T>` and `Database.ExecuteSql` are separate
-entry points, not query roots, and `SqlExecutorTestBase` passes `DbParameter` objects that the
-client cannot construct. It accounts for **0 of the 27** raw-SQL reds and one missing base.
+**Item 2 is untouched and stays priced — but half of its stated reason was wrong.** `SqlQuery<T>`
+and `Database.ExecuteSql` are separate entry points rather than query roots, and that half stands:
+`RelationalDatabaseFacadeExtensions.GetFacadeDependencies` refuses a non-relational context before
+any query is built, which is where four tests now stop. **The `DbParameter` half does not.** R98
+adopted `FromSqlQueryTestBase` and 32 of its 54 first-run failures were
+`Type 'Microsoft.Data.Sqlite.SqliteParameter' is not on the deserialization allowlist` — not a wire
+limit at all. A `DbParameter` is an ordinary object with a parameterless constructor and settable
+properties; the wire walks it and the server rebuilds it with no special handling, and admitting
+the type through R85's seam turns all 32 green. **"The client cannot construct one" was never
+tested and is false**: the test project references the store's provider, as any application whose
+server it talks to would.
+
+**Which is the fourth time in this issue that the type allowlist decided the behaviour** — R84,
+R89, R91 and now R98 — and D7's note about it being load-bearing far beyond deserialization safety
+is the general form.
 
 ## 7. Out of scope (initial release) — requirements §6
 

@@ -16,22 +16,22 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         The base asserts that an untranslatable operator is <em>refused</em> rather than run on
 ///         the client, which is this provider's own rule
 ///         (<c>QuerySplitter.RejectClientEvaluation</c>) stated by someone else's tests. Of its
-///         fourteen tests ten pass, one is skipped by EF itself (<c>Throws_when_group_by</c>,
-///         EF issue #18923) and three are red.
+///         fourteen tests twelve pass, one is skipped by EF itself (<c>Throws_when_group_by</c>,
+///         EF issue #18923) and one is red.
 ///     </para>
 ///     <para>
-///         <b>None of the three reds is a defect of this provider.</b>
+///         <b>Two of the three reds this paragraph used to list are now green (R96).</b>
+///         <c>Doesnt_throw_when_from_sql_not_composed</c> and <c>Throws_when_from_sql_composed</c>
+///         were called "permanently red until #60 is decided"; #60 was decided, the fixture opts
+///         into the raw-SQL grant, and both pass. <b>Neither half would have done it alone</b> —
+///         the first died on <c>NorthwindQueryRelationalFixture</c>'s
+///         <c>(RelationalTestStore)TestStore</c> cast before reaching the query at all, which is
+///         what R96 revived R77 for.
+///     </para>
+///     <para>
+///         <b>The one red is not a defect of this provider.</b>
 ///     </para>
 ///     <list type="bullet">
-///         <item>
-///             <description>
-///                 <c>Doesnt_throw_when_from_sql_not_composed</c> and
-///                 <c>Throws_when_from_sql_composed</c> — issue #60. Both need a relational
-///                 <c>FromSql</c> on the client; the first does not even reach it, dying on
-///                 <c>NorthwindQueryRelationalFixture</c>'s <c>(RelationalTestStore)TestStore</c>
-///                 cast first. Permanently red until #60 is decided.
-///             </description>
-///         </item>
 ///         <item>
 ///             <description>
 ///                 <c>Throws_when_orderby_multiple</c> — <b>a message-text difference, not a

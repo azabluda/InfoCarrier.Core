@@ -3019,6 +3019,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       CLAUDE.md already names** — a per-class run and a full run answer different questions, and
       only the second one knows about a shared store.
 
+- [x] **R98. `FromSqlQueryTestBase` adopted — the first base #60 unblocks outright, and a
+      `DbParameter` turns out to cross.** `test/` only. **`failed` 133 -> 147, a deliberate rise of
+      14**, `total` 29235 -> 29383 (148 new tests, 134 of them green). The missing-bases list drops
+      **10 -> 9**.
+
+      **134 of 148, and the 14 reds are classified in the class's own remarks rather than here.**
+      Six are this tier's `Product.CategoryID` harness note reappearing, four reach for the
+      client's own `DbConnection` and are refused by ADR-013's design, two cast the client's type
+      mapping to `RelationalTypeMapping` inside the base's own body, and two are D8 item 2.
+
+      **The finding is not the count.** The first run was **94 of 148**, and 32 of the 54 failures
+      were `Type 'Microsoft.Data.Sqlite.SqliteParameter' is not on the deserialization allowlist`.
+      **A `DbParameter` crosses this wire perfectly well**: it is an ordinary object with a
+      parameterless constructor and settable properties, the wire walks it, and the server rebuilds
+      it with no special handling. It was refused only because ADR-008 constraint 2 refuses every
+      type the model does not imply, and R85's seam is what admits it —
+      `InfoCarrierBackendTestStore.StoreParameterType`, admitted on both halves alongside the
+      raw-SQL grant because the two are only ever wanted together.
+
+      **D8 item 2 is amended rather than closed.** Half its stated reason was wrong: "passes
+      `DbParameter` objects, a provider type the client cannot construct" was never tested and is
+      false — a test project references its own server's provider, as any such application would.
+      The half that stands is that `SqlQuery<T>` and `Database.ExecuteSql` are separate entry
+      points: `RelationalDatabaseFacadeExtensions.GetFacadeDependencies` refuses a non-relational
+      context before a query is built at all, and that is where four tests now stop.
+
+      **Fourth time in this issue that the type allowlist decided the behaviour** — R84, R89, R91,
+      R98. D7's note that it is load-bearing far beyond deserialization safety is the general form,
+      and this is the first time it decided something in the *helpful* direction.
+
+      **`QueryNoClientEvalInfoCarrierTest`'s class doc is corrected in the same commit.** It called
+      two of its three reds "permanently red until #60 is decided"; they went green in R96 and the
+      paragraph had outlived them.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

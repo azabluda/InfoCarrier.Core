@@ -2337,5 +2337,26 @@
 # shared store. The real fix is "every server context sharing this store agrees on the name", which
 # is a larger harness change for two tests, and is not taken.
 
-failed=133
-total=29235
+# 2026-09-02 (R98) -- `failed` 133 -> 147, A DELIBERATE RISE OF 14, and `total` 29235 -> 29383.
+# `FromSqlQueryTestBase` adopted: 148 new tests, 134 green, 14 red and every one classified in
+# `Sqlite/Query/FromSqlQueryInfoCarrierTest`'s own remarks. Missing bases 10 -> 9.
+#
+# A `DbParameter` CROSSES THIS WIRE, which D8 had priced as a blocker without testing it. The first
+# run was 94 of 148 and 32 of the 54 failures were `SqliteParameter is not on the deserialization
+# allowlist` -- not a wire limit but ADR-008 constraint 2 doing its job. A `DbParameter` is an
+# ordinary object with a parameterless constructor and settable properties; the wire walks it and
+# the server rebuilds it with nothing special. R85's seam admits it
+# (`InfoCarrierBackendTestStore.StoreParameterType`), on both halves, alongside the raw-SQL grant.
+#
+# THE 14: 6 `Bad_data_error_handling_null*` (this tier maps `Product.CategoryID`, which core
+# `NorthwindContext` ignores, so a SELECT omitting it fails earlier and with a better message --
+# the same harness note already written in `NorthwindInfoCarrierSqliteServerContext`); 4
+# `Include_*_connection*` (they open or close the CLIENT's `DbConnection`, which
+# `RelationalInfoCarrierTestStore` refuses by design -- ADR-013's amendment names that half as the
+# half that must stay refused); 2 `FromSqlRaw_queryable_simple_projection_composed` (the base's own
+# body casts the client's type mapping to `RelationalTypeMapping`); 2
+# `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters` (`Database.SqlQueryRaw`,
+# D8 item 2).
+
+failed=147
+total=29383

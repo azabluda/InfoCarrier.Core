@@ -53,9 +53,26 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     ///     <see cref="RelationalInfoCarrierTestStore" />, which needs the same answer.
     /// </summary>
     internal static Action<InfoCarrierDbContextOptionsBuilder>? ClientOptions(InfoCarrierBackendTestStore backend)
-        => backend.ArbitrarySqlExecution
-            ? o => o.AllowArbitrarySqlExecution()
-            : null;
+    {
+        if (!backend.ArbitrarySqlExecution)
+        {
+            return null;
+        }
+
+        Type? parameterType = backend.StoreParameterType;
+
+        return o =>
+        {
+            o.AllowArbitrarySqlExecution();
+
+            // The client half of the same pair. Both halves or neither, as ADR-012 requires: a type
+            // admitted on the client alone produces a query the server refuses to read.
+            if (parameterType is not null)
+            {
+                o.AllowTypes(parameterType);
+            }
+        };
+    }
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

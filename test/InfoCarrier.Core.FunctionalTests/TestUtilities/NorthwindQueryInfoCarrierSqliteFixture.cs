@@ -37,7 +37,7 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
-                arbitrarySqlExecution: true);
+            arbitrarySqlExecution: true);
 
     /// <summary>
     ///     Snaps <c>OrderDetail.Discount</c> back to its two-decimal value after seeding.

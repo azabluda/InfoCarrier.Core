@@ -52,6 +52,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         if (testStoreProperties.ArbitrarySqlExecution)
         {
             services = services.AddInfoCarrierArbitrarySqlExecution();
+
+            // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type
+            // allowlist refuses one by default exactly as ADR-008 constraint 2 requires. R85's seam
+            // is what an application uses to admit it; the harness is an application, and it admits
+            // the store's own parameter type alongside the raw-SQL grant because the two are only
+            // ever wanted together.
+            if (StoreParameterType is { } parameterType)
+            {
+                services = services.AddInfoCarrierAllowedTypes(parameterType);
+            }
         }
 
         services = services
@@ -189,6 +199,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     which have to set the matching client-side option.
     /// </summary>
     public bool ArbitrarySqlExecution => _testStoreProperties.ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     The backing store's <see cref="DbParameter" /> type, when it has one - admitted on both
+    ///     sides alongside <see cref="ArbitrarySqlExecution" />.
+    /// </summary>
+    /// <remarks>
+    ///     Named by the STORE and not by this provider, which is the whole point of R85's seam:
+    ///     `InfoCarrier.Core` references no provider and cannot spell `SqliteParameter`.
+    /// </remarks>
+    public virtual Type? StoreParameterType => null;
 
     /// <summary>
     ///     An <b>unopened</b> connection carrying the backing store's connection string, for
