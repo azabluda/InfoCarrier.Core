@@ -2819,5 +2819,24 @@
 # `SqlQuerySqliteTest`: SQLite is dynamically typed, so there is no invalid cast to make. That is
 # convergence with the reference provider, not a workaround of ours.
 
-failed=242
+# 2026-09-03 (R125) -- 242 -> 222, `total` unchanged at 29512. FIXED 20, BROKEN none. The server now
+# builds the AD-HOC entity type a raw-SQL root names when its model has none, which is the defect
+# R124's note above describes and which R110 predicted in this file's own words two milestones ago:
+# "ServerQueryExecutor.RebindQueryRoot resolves through the server's model and the server never
+# builds the matching ad-hoc type". It resolves `IAdHocMapper` off the server context -- EF's own
+# public service, the one `RelationalDatabaseFacadeExtensions.SqlQuery` uses on the client.
+#
+# **It closed 20 of the 90, not 90, and the other 70 are a SECOND defect on the return path.** They
+# now read `Type '...UnmappedCustomer' is not on the deserialization allowlist`, raised in
+# `TypeNodeResolver` from `ClientResultMaterializer` -- the client refusing to materialize rows of a
+# type its own options declared. That is R120's shape a third time: the boundary reads the declared
+# types off the OPTIONS and the materializer reads its allowlist off DI, and the two disagreed
+# silently because a `DbParameter`, the only registered type this suite had before, is sent and
+# never returned. Closed by R126.
+#
+# 19 of the 20 fixed are in `SqlQueryInfoCarrierTest`; the twentieth is
+# `FromSqlQueryInfoCarrierTest.Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters`,
+# which this file already classified as `Database.SqlQueryRaw` and which is the same gap.
+
+failed=222
 total=29512

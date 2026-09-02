@@ -3988,6 +3988,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       closes, 10 the message-text class `FromSqlQueryTestBase` already carries, 2 the
       `RelationalTypeMapping` cast ADR-013 records. None is of unknown standing.
 
+- [x] **R125. The server builds the ad-hoc entity type a raw-SQL root names, instead of reporting
+      it missing from a model it was never going to be in.** `src/` change, so both
+      `eng/measure.sh` and `eng/trim-ratchet.sh`. **`failed` 242 -> 222**, `total` unchanged at
+      29512. FIXED 20, BROKEN none. Trim ratchet `ours` 89 <= 89, `total` 855, unchanged.
+      `CI=true dotnet build --configuration Release` reports the expected `5 Warning(s),
+      0 Error(s)`. No public signature moves -- `RebindQueryRoot` is private -- so no pack gate.
+
+      **This repository predicted the fix before it wrote it.** R110 recorded, in the plan, that
+      *"the gap is not getting an ad-hoc entity type across the wire; it is that
+      `ServerQueryExecutor.RebindQueryRoot` resolves through the server's model and the server never
+      builds the matching ad-hoc type"*. That is exactly what this step does, and the prediction was
+      re-derived independently from a stack trace before the entry was found again.
+
+      **`IAdHocMapper` is EF's own public service and the client already uses it.** `Database.SqlQuery<T>`
+      into an unmapped type is answered by an ad-hoc entity type, which never enters
+      `IModel.GetEntityTypes()`; `RelationalDatabaseFacadeExtensions.SqlQuery` builds one on the
+      client through this service, and the server now does the same. Nothing is invented.
+
+      **The two gates are unchanged, and the comment in the code says why that matters.** A CLR type
+      reaches `RebindQueryRoot` only if the server's own `TypeAllowlist` admitted it in
+      `TypeNodeResolver`, which for a type the model does not imply means the application registered
+      it with `AddInfoCarrierAllowedTypes`; and `RequireArbitrarySql` still refuses a raw-SQL root
+      outright unless the server granted execution. The conjunction is *declared type* **and**
+      *raw-SQL grant*, and neither half is relaxed.
+
+      **IT CLOSED 20 OF THE 90, NOT 90, AND THAT IS THE USEFUL PART.** The other 70 moved to a
+      second, distinct defect on the RETURN path: `Type '...UnmappedCustomer' is not on the
+      deserialization allowlist`, raised in `TypeNodeResolver` from `ClientResultMaterializer`. The
+      client refuses to materialize rows of a type its own options declared. **R120's shape a third
+      time** -- the boundary reads the declared types off the options, the materializer reads its
+      allowlist off DI, and the disagreement was silent because the only registered type this suite
+      had before was a `DbParameter`, which is sent and never returned. R126 closes it.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

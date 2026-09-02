@@ -197,9 +197,36 @@ public class ServerQueryExecutor(
         IEntityType? entityType = stub.ElementType.EntityTypeName is not null
             ? _context.Model.FindEntityType(stub.ElementType.EntityTypeName)
             : _context.Model.FindEntityType(elementType);
-        entityType ??= _context.Model.FindEntityType(elementType)
-            ?? throw new InvalidOperationException(
+        entityType ??= _context.Model.FindEntityType(elementType);
+
+        // `Database.SqlQuery<T>` INTO A TYPE THE MODEL DOES NOT MAP (#56), which is the entity-typed
+        // half of the scalar case answered above. EF does not put such a type in the model: it
+        // builds an AD-HOC entity type for it, on demand, through `IAdHocMapper` — the same service
+        // `RelationalDatabaseFacadeExtensions.SqlQuery` uses on the client. So the model lookup
+        // above is correct and still finds nothing, and this is the one root whose entity type has
+        // to be MADE rather than found.
+        //
+        // WHY THIS IS NOT A WIDENING. It sits behind a conjunction of two gates that are already
+        // the ones this file states elsewhere. First, `elementType` reached this method at all only
+        // because the server's OWN `TypeAllowlist` admitted it in `TypeNodeResolver` — a type the
+        // model does not imply gets there only when the application registered it with
+        // `AddInfoCarrierAllowedTypes`, which `IInfoCarrierAllowedTypes` documents as the security
+        // half of that seam. Second, `RequireArbitrarySql` below: a raw-SQL root is refused outright
+        // unless this server granted execution. Neither gate is relaxed and no new one is invented;
+        // what changes is that a payload passing BOTH is now answered instead of being told the
+        // type is missing from a model it was never going to be in.
+        if (entityType is null && stub is FromSqlQueryRootStubNode)
+        {
+            RequireArbitrarySql();
+
+            entityType = _context.GetService<IAdHocMapper>().GetOrAddEntityType(elementType);
+        }
+
+        if (entityType is null)
+        {
+            throw new InvalidOperationException(
                 $"Entity type '{stub.ElementType}' not found in the server model.");
+        }
 
         // The raw-SQL root (#60). Refused unless this server registered the grant, and the check
         // is here rather than at the parse: the node is well-formed either way, and what a server
