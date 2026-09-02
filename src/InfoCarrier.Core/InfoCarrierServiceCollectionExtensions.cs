@@ -36,6 +36,11 @@ public static class InfoCarrierServiceCollectionExtensions
             .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
             .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
 
+            // `EF.Functions.Collate` and friends must survive parameter extraction rather than be
+            // evaluated on the client, and EF's core filter does not know the relational host that
+            // declares them -- see `InfoCarrierEvaluatableExpressionFilter`.
+            .TryAdd<IEvaluatableExpressionFilter, InfoCarrierEvaluatableExpressionFilter>()
+
             // The client's model has to agree with the backing store's, and one key shape is
             // decided by the caller's own `ToJson()` rather than by the store — see
             // `InfoCarrierKeyDiscoveryConvention`.
@@ -92,6 +97,96 @@ public static class InfoCarrierServiceCollectionExtensions
         services.TryAddScoped<IExpressionSerializer, ExpressionSerializer>();
 
         return services;
+    }
+
+    /// <summary>
+    ///     Permits a wire payload to name these CLR types on <em>this server</em>, beyond the ones
+    ///     its model implies (ADR-008 constraint 2).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The server half of the seam whose client half is
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" />. <b>Register the same
+    ///         types on both.</b> The usual reason to need it is the <c>EF.Functions</c> host of
+    ///         this server's own provider, such as <c>SqliteDbFunctionsExtensions</c> or
+    ///         <c>SqlServerDbFunctionsExtensions</c>, which a server can name with <c>typeof</c>
+    ///         because it references the provider and <c>InfoCarrier.Core</c> cannot.
+    ///     </para>
+    ///     <para>
+    ///         <b>This is a security decision and is deliberately explicit.</b> Nothing here is
+    ///         inferred. <c>docs/security-review.md</c> section 2 records that the deserializer's
+    ///         safety is a conjunction, broken by admitting any of <c>Binder</c>,
+    ///         <c>MethodBase</c>, <c>MethodInfo</c>, <c>ConstructorInfo</c>, <c>PropertyInfo</c>,
+    ///         <c>Activator</c>, <c>Assembly</c> or <c>AppDomain</c>, none of which looks dangerous
+    ///         alone. Read it before adding a type.
+    ///     </para>
+    ///     <para>
+    ///         Each call adds one registration and the server reads them all, so several calls
+    ///         compose and none replaces another.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <param name="types">The types to admit.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierAllowedTypes(this IServiceCollection services, params Type[] types)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(types);
+
+        services.AddSingleton<Expressions.IInfoCarrierAllowedTypes>(new AllowedTypes(types));
+
+        return services;
+    }
+
+    private sealed class AllowedTypes(IEnumerable<Type> types) : Expressions.IInfoCarrierAllowedTypes
+    {
+        public IEnumerable<Type> Types { get; } = [.. types];
+    }
+
+    /// <summary>
+    ///     Permits a wire payload to carry SQL <em>this server</em> will execute (#60).
+    ///     <b>This grants arbitrary SQL execution on the server's connection.</b>
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Read the name literally.</b> It is not "enable <c>FromSql</c>", because
+    ///         <c>Sqlite/RawSqlExecutionProbeTest</c> (R94) measured what enabling it grants and
+    ///         the answer is larger than a query feature. One <c>CommandText</c> executes every
+    ///         statement it contains - <c>SELECT 1; DROP TABLE X</c> drops the table, on the
+    ///         reader path EF itself takes - and an uncomposed <c>FromSqlRaw</c> reaches the store
+    ///         unwrapped, so the subquery wrap that would have confined a caller to reading is an
+    ///         artefact of composition and the caller decides whether to compose. A client that
+    ///         can reach this server can therefore run any statement the store's grammar allows,
+    ///         under whatever rights the server's connection holds.
+    ///     </para>
+    ///     <para>
+    ///         <b>The controls that still work are outside the model.</b> A raw-SQL query does not
+    ///         go through the server's <c>OnModelCreating</c>, so the server's query filters are
+    ///         not in the statement: a deployment relying on them for row-level authorization must
+    ///         not register this. What remains is a database account limited to the rights the
+    ///         caller should have, a server-side query interceptor, and an authenticated
+    ///         transport. <c>docs/security-review.md</c> section 5a is the reading.
+    ///     </para>
+    ///     <para>
+    ///         The server half of the seam whose client half is
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    ///         <b>Only this half is a security boundary</b>, and it is default-deny: a server that
+    ///         does not call this refuses a raw-SQL payload however the client is configured.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierArbitrarySqlExecution(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IInfoCarrierArbitrarySqlExecution, ArbitrarySqlExecution>();
+
+        return services;
+    }
+
+    private sealed class ArbitrarySqlExecution : IInfoCarrierArbitrarySqlExecution
+    {
     }
 
     /// <summary>

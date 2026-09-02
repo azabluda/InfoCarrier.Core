@@ -48,7 +48,7 @@ public class MusicStoreInfoCarrierTest(MusicStoreInfoCarrierTest.MusicStoreInfoC
         ///     backend that has to be emptied — the same rule A74 found for reseeding.
         /// </remarks>
         public override IDisposable BeginTransaction(DbContext context)
-            => new BackendCleaner(((InfoCarrierTestStore)TestStore).Backend);
+            => new BackendCleaner(((IInfoCarrierClientTestStore)TestStore).Backend);
 
         private sealed class BackendCleaner(InfoCarrierBackendTestStore backend) : IDisposable
         {

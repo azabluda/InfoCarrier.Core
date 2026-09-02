@@ -351,6 +351,46 @@ after. **What the attribute buys is a consumer being told at their own call site
 thing that was missing: before it, a consumer publishing trimmed learned about this provider's
 reflection from EF Core's generic warning or from nothing at all.
 
+### The client is missing what `EFCore.Relational` replaces, and one of those is a query service (R78, R80)
+
+**M9 removed `InfoCarrier.Core`'s reference to `Microsoft.EntityFrameworkCore.Relational`, and the
+cost of that is not only the annotations named by string.** EF registers a *different set of
+services* when a provider is relational, and this client gets the core set. Most of those
+differences are downstream of ADR-006's capture point and so cannot matter here. **One is not.**
+`IEvaluatableExpressionFilter` governs EF's parameter extraction, which runs *before*
+`IDatabase.CompileQuery`, and the relational implementation exists for exactly one reason: to stop
+EF evaluating an `EF.Functions` marker whose body only throws. Without it,
+`c.ContactName == EF.Functions.Collate("maria anders", collation)` was executed on the client and
+raised *"the query has switched to client-evaluation"*, while
+`EF.Functions.Collate(c.ContactName, collation) == "maria anders"` worked. The difference is not the
+feature. It is whether the operand is a column, because a constant operand is what makes the whole
+call evaluatable.
+
+**The generalisation, and it is the useful part: a marker needs BOTH halves.** R78 admitted
+`RelationalDbFunctionsExtensions` to `TypeAllowlist` so the call could be *serialized*; R80 added
+the filter so a call is *left there* to serialize. Either alone looks like a partial fix and reads
+like a separate defect, which is why R79's six reds were triaged into two unrelated families and
+both readings were wrong.
+
+**The measured gap this opened up, and it is bigger than either step.** A probe written and run
+rather than reasoned about: `EF.Functions.Glob(c.ContactName, "*M*")` on the SQLite tier is
+**refused by `QuerySplitter.RejectClientEvaluation`**, because `SqliteDbFunctionsExtensions` is not
+on the allowlist and cannot be — it lives in the server's provider assembly. EF's own
+`NorthwindDbFunctionsQuerySqliteTest` shows the server translates it to `GLOB` without difficulty.
+**So no store-specific `EF.Functions` family crosses this wire at all**: SQLite's `Glob`/`Hex`/
+`Substr`, SQL Server's `DateDiff*`/`Contains`/`FreeText`, and every third-party provider's. `Like`
+works only because it is declared on the *core* `DbFunctionsExtensions`, and reading "`Like` and
+`Glob` both work" off one green `Like` test is how that was missed.
+
+**Why it was not fixed in the same session.** The allowlist is also the server's deserialization
+defence (`security-review.md` §2), and admitting a class this repository cannot enumerate, in an
+assembly it does not reference, is a change to the trust boundary rather than a widening of a list.
+R78's two entries were nameable constants in a known assembly; "any provider's `DbFunctions`
+extensions" is not. **The reproduction is two lines and belongs in the decision, not in a survey**:
+add a `Glob` theory to `NorthwindDbFunctionsQueryInfoCarrierTest` mirroring EF's SQLite class, and
+it fails at `QuerySplitter.cs` with `Translation of method
+'Microsoft.EntityFrameworkCore.SqliteDbFunctionsExtensions.Glob' failed`.
+
 ## Three closed investigations
 
 **The runtime culture is pinned to invariant, and that was a ratchet fix rather than a test fix

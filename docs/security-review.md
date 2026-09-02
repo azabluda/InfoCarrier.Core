@@ -20,7 +20,7 @@ Every arrow is a place a hostile payload gets a say.
 | 2 | envelope → operation | `InfoCarrierEnvelopeServer`: protocol version checked, operation matched by name |
 | 3 | payload → request DTO | source-generated `JsonSerializerContext`, no reflection fallback |
 | 4 | `SerializedQuery` → `ExpressionNode` | payload bound again; `ExpressionJsonContext` `MaxDepth = 256` |
-| 5 | `$kind` → node type | closed set of 15 `[JsonDerivedType]`s; unregistered discriminator fails the parse |
+| 5 | `$kind` → node type | closed set of 16 `[JsonDerivedType]`s; unregistered discriminator fails the parse |
 | 6 | `TypeNode` → CLR type | `TypeAllowlist` |
 | 7 | `MethodNode` → `MethodInfo` | `ResolveMethod` + `Admit`: public, or two named markers |
 | 8 | `Operator` → `ExpressionType` | per-node-kind allowlist of the pure subset |
@@ -37,7 +37,15 @@ Stages 1, 4, 5, 7 and 8 were closed during M5 (C36, C37, C30, and the type allow
   `Type.GetType("System.Diagnostics.Process")` — a *public* method on an *admitted* type — and
   obtain, **at run time on the server, after every deserialization-time check has passed**, a type
   the allowlist never saw.
-- **Every enum**, by the closing `return type.IsEnum`. So `BindingFlags` is admissible.
+- **Every enum**, by the `type.IsEnum` clause of `Evaluate`. So `BindingFlags` is admissible.
+  **That clause used to be the closing line, and it was reached less often than this sentence
+  claimed** (R72, 2026-09-01): a type *nested in a generic type* is itself a constructed generic
+  type, so the generic decomposition above it denied every such enum before the rule ran. The
+  clause now sits before that decomposition, which makes the statement in this bullet true rather
+  than aspirational. **It widens nothing the conjunction below depends on** — the surface that
+  bullet is measured against is `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+  `PropertyInfo`, `Activator`, `Assembly` and `AppDomain`, and an enum is none of them and derives
+  from none of them.
 
 Neither is a hole, and the reason is precise and load-bearing:
 
@@ -188,15 +196,167 @@ The library cannot do it: the timeout belongs to the call the *caller* wrote, an
 static overload the caller named into a different one server-side would be this provider silently
 changing the semantics of a query — the class of thing ADR-006 exists to prevent.
 
+## 4b. Amendment — the relational operation hosts admitted (R78), and why the conjunction survives
+
+`TypeAllowlist` admitted `EF`, `DbFunctions` and the *core* `DbFunctionsExtensions`, but not the two
+classes that actually declare the markers a caller writes:
+`Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions` (`EF.Functions.Collate`, `Least`,
+`Greatest`) and `Microsoft.EntityFrameworkCore.EFExtensions` (`EF.Constant`, `EF.Parameter`,
+`EF.MultipleParameters`). Both live in `EFCore.Relational`, which `InfoCarrier.Core` does not
+reference (M9), so neither can be written as `typeof`. They are matched by **full name and assembly
+name** instead, the same by-name route `ServerBoundaryAnalyzer` takes for
+`FromSqlQueryRootExpression`.
+
+**Why the refusal was wrong.** The server is an ordinary relational provider and translates all six
+markers. Refusing them at the client boundary made this provider disagree with every reference
+implementation, which is precisely the reasoning that admitted `Regex` in §4a — and it cost six reds
+in `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` before anyone noticed, because this
+repository had no `EF.Functions` coverage at all.
+
+**Why §2's conjunction survives.** That bound is over the reflection *invocation* surface —
+`Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`, `Activator`, `Assembly`,
+`AppDomain`. Neither class is on it, derives from anything on it, or constructs anything on it.
+Their parameters are `DbFunctions`, scalars, `string` and arrays. The generic markers
+(`EF.Constant<T>` and friends) are bounded **by §2's own mechanism rather than by luck**:
+`ResolveMethod` resolves every parameter type through this same allowlist, so a `T` bound to an
+unadmitted type fails the signature lookup before the method is found — exactly how `Binder` blocks
+`Type.InvokeMember`. Naming a host permits the type to be *named*; a method still has to resolve by
+signature.
+
+**What is accepted.** Nothing new. These are query-shaping markers with no side effect on the
+server beyond the SQL they contribute, and unlike raw SQL they cannot reach a table the model does
+not map — the distinction R75 turned on.
+
+## 4c. Amendment — the application may register types explicitly (R85), and why that is the safe shape
+
+Reviewed **2026-09-01**. §2 ends with a sentence that had no API behind it until now:
+
+> *Never admitted by inference — only ever by an application registering one explicitly, which is
+> its own decision.*
+
+**What forced the question.** A caller cannot use their own store's `EF.Functions`. `Like` works
+because it is declared on EF Core's **core** `DbFunctionsExtensions`; `Glob` is
+`SqliteDbFunctionsExtensions`, `DateDiffDay` is `SqlServerDbFunctionsExtensions`, and
+`InfoCarrier.Core` references no provider, so it can name neither. Measured, not assumed: a `Glob`
+probe was refused by `QuerySplitter.RejectClientEvaluation` while the server translated the same
+call to `GLOB` without difficulty. **A list of provider names inside this package was rejected as
+the fix** — it cannot enumerate providers it does not reference, and a *pattern* (*"any class named
+`*DbFunctionsExtensions`"*) cannot be reviewed, because §2's argument is a per-class conjunction and
+a pattern admits classes nobody has seen.
+
+**The shape, and it is two halves that do different jobs.**
+
+| Half | API | What it decides | Security boundary? |
+|---|---|---|---|
+| client | `UseInfoCarrier(client, o => o.AllowTypes(…))` | what this application's own code may **send** | **no** |
+| server | `services.AddInfoCarrierAllowedTypes(…)` | what a **payload** may name | **yes** |
+
+Only the second one is this document's subject. The client's list governs code the application
+already controls; widening it can produce a query the server refuses, never a payload the server
+accepts. **The server's list is the one to review**, and it is the one `TypeNodeResolver` reads.
+
+**Why this does not weaken §2.** It cannot be reached by inference — there is no rule that guesses,
+and every entry is a line an application wrote. The conjunction is unchanged and is still broken by
+admitting any of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`,
+`Activator`, `Assembly` or `AppDomain`; that hazard now has a place to be stated, and both API
+members state it. **This is strictly better than the alternative that was actually in front of us**,
+which was to widen the *static* list inside this package on behalf of every deployment at once.
+
+**`SqliteDbFunctionsExtensions` itself clears §2's bar**, for the record and as the worked example:
+a static class on no reflection surface, deriving from nothing on it, constructing nothing, whose
+parameters are `DbFunctions`, `string` and `byte[]`. That is R78's reading applied to a third class.
+
+**Pinned by three tests in `SqliteSmokeTest`**, not by this prose: the call is refused with nothing
+registered, it works with both halves registered, and — the one that makes the two registrations
+look like something other than duplication — **registering on the client alone still fails on the
+server**, with this document's own rejection message.
+
 ## 5. Not in scope, and stated so
 
 - **Authentication and authorization.** No identity travels in `InfoCarrierEnvelope`. A deployment
   must authenticate the transport and decide what a caller may see. Row-level authorization is an
   application concern — EF query filters on the *server's* model are the natural mechanism, and
-  they are applied by the server's own `OnModelCreating`, which the client cannot influence.
+  they are applied by the server's own `OnModelCreating`. **A client cannot influence those
+  filters — but it can write a query they are not part of, and §5a is the reading of that.**
 - **Transport confidentiality and integrity.** TLS is the transport's business.
 - **Denial of service beyond payload size.** A well-formed query that is merely expensive is not
   distinguishable here from a legitimate one. Timeouts and quotas belong in the host.
+
+## 5a. Amendment — raw SQL (#60, R95), and why it is a change of posture rather than a wider list
+
+Written **2026-09-02**, from R94's measurements rather than from an expectation.
+
+**Every other control in this document is about what a payload may *name*.** §2's conjunction,
+ADR-008's allowlist, §4a's `Regex`, §4b's operation hosts, §4c's application registration — each
+one asks whether some CLR type or method may appear in a tree the server rebuilds, and the server
+then executes only trees built from a vocabulary it controls. **`FromSql` is the first construct
+where the client hands the server a string to run.** A payload that names nothing dangerous can
+still carry `DROP TABLE`, so §2 is not the precedent here and cannot be stretched to be one:
+there is no set to enumerate and no per-class conjunction to check, because SQL text is not a
+naming question. **§4c rhymes with the API shape and gives no support to the argument.**
+
+**What was measured, and it decides the name of the gate.**
+`Sqlite/RawSqlExecutionProbeTest` (R94) answers the two questions this section rests on, and both
+answers are in the direction that removes options:
+
+| Question | Answer |
+|---|---|
+| Does one `CommandText` run more than one statement? | **Yes.** `SELECT 1; DROP TABLE Probe;` drops the table — on `ExecuteNonQuery` and on the `ExecuteReader` path EF itself takes, where the trailing statements run as the reader is advanced or disposed. |
+| Does EF pass an uncomposed `FromSqlRaw` through unwrapped? | **Yes.** The caller's string *is* the command, character for character. The `FROM (…)` wrap appears only when something is composed on top, and the caller decides whether to compose. |
+
+**Therefore there is no read-only version of this feature to grant.** The wrap that would have
+produced one is optional from the caller's side, and the store executes every statement regardless.
+Enabling raw SQL on a server enables **arbitrary SQL execution** on that server's connection, under
+whatever rights it holds — `INSERT`, `DROP`, `ATTACH`, anything the store's own grammar allows.
+
+**The shape, and it is R85's two halves doing the same two jobs.**
+
+| Half | API | What it decides | Security boundary? |
+|---|---|---|---|
+| client | `UseInfoCarrier(client, o => o.AllowArbitrarySqlExecution())` | whether this application's own code may **send** raw SQL | **no** |
+| server | `services.AddInfoCarrierArbitrarySqlExecution()` | whether a **payload** may carry SQL this server runs | **yes** |
+
+**Default-deny, and the default is what ships.** A server that does not register refuses a raw-SQL
+payload; a client that does not register refuses to send one, with EF's own `TranslationFailed` —
+the answer every other provider gives for a construct it cannot translate. **The name says what is
+granted rather than which API is unblocked**, because "enable `FromSql`" reads as a query feature
+and this is not one.
+
+**What a deployment loses by registering, stated once.** The server's query filters are applied by
+EF when it builds a query from the server's model. A raw-SQL query does not go through that: the
+client writes its own `FROM`, so no filter is in the statement. Combined with the standing note
+that `IgnoreQueryFilters` is not refused (`roadmap.md`, `cold-read-findings.md` §1), **a server
+that registers this has no query-filter-shaped tenancy control left at all** — not for reads and
+not for `ExecuteUpdate`/`ExecuteDelete`. The controls that still work are the ones outside the
+model: a database account with the rights the caller should have, a server-side query interceptor,
+and authenticating the transport. **A deployment that relies on query filters for row-level
+authorization must not register this.**
+
+
+### 5a addendum — `Database.SqlQuery<T>` joins the same gate (#56, R115)
+
+Written **2026-09-02**. **No new posture, and that is the point of recording it.**
+
+`Database.SqlQuery<T>` is a second entry point to the same capability, and it now crosses the wire
+as `SqlQueryRootStubNode`. It is refused by **the same grant, in the same place**: the server
+rebuilds it only under `AddInfoCarrierArbitrarySqlExecution()`, the client sends it only under
+`AllowArbitrarySqlExecution()`, and `ServerQueryExecutor.RequireArbitrarySql` is one method serving
+both roots because there is one grant to serve.
+
+**Nothing above needs re-deriving for it.** R94 measured the two facts this section rests on — one
+`CommandText` runs every statement in it, and an uncomposed raw query reaches the store unwrapped —
+and both are properties of the store and of EF's command path, not of which extension method the
+caller typed. A `SqlQuery<int>("SELECT 1; DROP TABLE Probe;")` is the probe's own case.
+
+**What is new is small and worth naming.** A scalar root has **no entity type**, so the server
+rebuilds it from the CLR element type the wire carried rather than resolving one through its model.
+That is less authority than the entity root, not more: the model is not consulted and nothing is
+added to it. The `T` is still subject to ADR-008 constraint 2 like every other named type.
+
+**Not yet granted, and deliberately.** The *non-scalar* `SqlQuery<TDto>` builds an ad-hoc entity
+type on the client's model, and making it work server-side would mean the server constructing an
+entity type on a client's say-so. That is a genuine widening, it is unbuilt, and it gets its own
+reading before it is taken.
 
 ## 6. Cancellation (W6) — half landed, and the half that touches this path is the open one
 

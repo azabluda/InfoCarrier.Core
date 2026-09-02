@@ -17,6 +17,11 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     /// </summary>
     /// <param name="optionsBuilder">The options builder.</param>
     /// <param name="client">The client that ships operations to the server.</param>
+    /// <param name="infoCarrierOptionsAction">
+    ///     Configures this provider's own options — currently
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> and nothing else. The
+    ///     shape every EF Core provider uses, so a second option needs no new overload here.
+    /// </param>
     /// <returns>The same builder for chaining.</returns>
     [RequiresUnreferencedCode(
          "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
@@ -28,7 +33,8 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
          + "generic types over types the payload names, neither of which Native AOT can generate.")]
     public static DbContextOptionsBuilder UseInfoCarrier(
         this DbContextOptionsBuilder optionsBuilder,
-        IInfoCarrierClient client)
+        IInfoCarrierClient client,
+        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptionsAction = null)
     {
         InfoCarrierOptionsExtension extension = GetOrCreateExtension(optionsBuilder)
             .WithInfoCarrierClient(client);
@@ -43,6 +49,12 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         // other provider produces. Adding ours first printed `"using InfoCarrier NoTracking"`.
         EnsureCoreOptionsFirst(optionsBuilder);
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
+
+        // After the extension is in, because `InfoCarrierDbContextOptionsBuilder` reads the
+        // current one back off the builder and adds to it. Running it first would have it clone an
+        // extension this method then overwrites.
+        infoCarrierOptionsAction?.Invoke(new InfoCarrierDbContextOptionsBuilder(optionsBuilder));
+
         return optionsBuilder;
     }
 
@@ -59,9 +71,11 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
          + "generic types over types the payload names, neither of which Native AOT can generate.")]
     public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
         this DbContextOptionsBuilder<TContext> optionsBuilder,
-        IInfoCarrierClient client)
+        IInfoCarrierClient client,
+        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptionsAction = null)
         where TContext : DbContext
-        => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder, client);
+        => (DbContextOptionsBuilder<TContext>)UseInfoCarrier(
+            (DbContextOptionsBuilder)optionsBuilder, client, infoCarrierOptionsAction);
 
     /// <summary>
     ///     Adds <see cref="CoreOptionsExtension" /> to the builder before this provider's own

@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -6,8 +6,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 
 /// <summary>
-///     The one warning the <c>Associations</c> bases contract with their fixtures about, forwarded
-///     to the server (C69).
+///     The one warning a spec base contracts with its fixture about, forwarded to the server (C69).
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -19,6 +18,15 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 ///         `NavigationsFixtureBase` and `OwnedNavigationsRelationalFixtureBase` both return
 ///         <see langword="false" />, so for those two families the throw is part of the contract
 ///         rather than an accident of configuration.
+///     </para>
+///     <para>
+///         <b>A second family asks for the same event, which is why this class is no longer named
+///         after the first (R69).</b> <c>OwnedQueryRelationalTestBase</c> overrides
+///         <c>ElementAt_over_owned_collection</c>, <c>ElementAtOrDefault_over_owned_collection</c>
+///         and <c>Skip_Take_over_owned_collection</c> to expect the throw, and names the reason in
+///         a comment on each — <i>"The query uses a row limiting operator ('Skip'/'Take') without
+///         an 'OrderBy' operator."</i> Same contract, same knob, one definition: six red tests in
+///         <c>OwnedQueryInfoCarrierTest</c> without it.
 ///     </para>
 ///     <para>
 ///         <b>Why the server needs telling.</b> That diagnostic comes from

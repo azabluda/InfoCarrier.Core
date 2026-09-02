@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -244,6 +244,159 @@ public class ComplexNavigationsCollectionsQueryInfoCarrierTest(ComplexNavigation
     public override Task Projecting_collection_with_group_by_after_optional_reference_correlated_with_parent(bool async)
         => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Projecting_collection_with_group_by_after_optional_reference_correlated_with_parent(async));
+}
+
+/// <summary>
+///     <c>ComplexNavigationsCollectionsSplitQueryRelationalTestBase</c> on ADR-009 <b>Tier B</b>
+///     (#56) — the collections corpus again, with <c>AsSplitQuery</c> applied at every query root.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The base injects the hint through <c>RewriteServerQueryExpression</c>, so all
+///         23 of its tests run it. This provider does not split: <c>QuerySplitter</c>
+///         removes the hint before the boundary analysis, so what the server receives is the same
+///         single query the class above sends. The answers are therefore identical, which is why
+///         nearly every override here is the one the class above already carries.
+///     </para>
+///     <para>
+///         <b>4 of them are not, and they are the measured cost of not splitting.</b>
+///         EF's own <c>ComplexNavigationsCollectionsSplitQuerySqliteTest</c> does not override
+///         <c>Filtered_include_after_different_filtered_include_different_level</c>, <c>Filtered_include_complex_three_level_with_middle_having_filter1</c>, <c>Filtered_include_complex_three_level_with_middle_having_filter2</c>, <c>Skip_Take_on_grouping_element_with_collection_include</c> — a real split query fetches those
+///         collections in a second statement and never asks for <c>APPLY</c>. A single statement
+///         does, so SQLite refuses them here exactly as it refuses them for the unsplit class,
+///         and each override is the one EF's own <em>unsplit</em> SQLite class carries for the
+///         same test. The store's answer is the same; only the number of statements differs.
+///     </para>
+///     <para>
+///         <b>One of EF's overrides is deliberately absent</b>, as in the unsplit class:
+///         <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> passes
+///         here, because the projection split reassembles that collection on the client.
+///     </para>
+/// </remarks>
+public class ComplexNavigationsCollectionsSplitQueryInfoCarrierTest(ComplexNavigationsQueryInfoCarrierFixture fixture)
+    : ComplexNavigationsCollectionsSplitQueryRelationalTestBase<ComplexNavigationsQueryInfoCarrierFixture>(fixture)
+{
+    /// <inheritdoc />
+    public override Task Complex_query_issue_21665(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Complex_query_issue_21665(async));
+
+    /// <inheritdoc />
+    public override Task Complex_query_with_let_collection_projection_FirstOrDefault(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Complex_query_with_let_collection_projection_FirstOrDefault(async));
+
+    /// <inheritdoc />
+    public override Task Complex_query_with_let_collection_projection_FirstOrDefault_with_ToList_on_inner_and_outer(
+        bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base
+                .Complex_query_with_let_collection_projection_FirstOrDefault_with_ToList_on_inner_and_outer(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_Skip_Take_with_another_Skip_Take_on_top_level(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_Skip_Take_with_another_Skip_Take_on_top_level(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_Take_with_another_Take_on_top_level(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_Take_with_another_Take_on_top_level(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_after_different_filtered_include_different_level(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_after_different_filtered_include_different_level(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_complex_three_level_with_middle_having_filter1(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_complex_three_level_with_middle_having_filter1(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_complex_three_level_with_middle_having_filter2(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_complex_three_level_with_middle_having_filter2(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_multiple_multi_level_includes_with_first_level_using_filter_include_on_one_of_the_chains_only(
+        bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base
+                .Filtered_include_multiple_multi_level_includes_with_first_level_using_filter_include_on_one_of_the_chains_only(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_outer_parameter_used_inside_filter(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_outer_parameter_used_inside_filter(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_same_filter_set_on_same_navigation_twice_followed_by_ThenIncludes(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Filtered_include_same_filter_set_on_same_navigation_twice_followed_by_ThenIncludes(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_FirstOrDefault_on_top_level(
+        bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base
+                .Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_FirstOrDefault_on_top_level(async));
+
+    /// <inheritdoc />
+    public override Task Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_unordered_Take_on_top_level(
+        bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base
+                .Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_unordered_Take_on_top_level(async));
+
+    /// <inheritdoc />
+    public override Task Include_inside_subquery(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_inside_subquery(async));
+
+    /// <inheritdoc />
+    public override Task Projecting_collection_with_group_by_after_optional_reference_correlated_with_parent(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Projecting_collection_with_group_by_after_optional_reference_correlated_with_parent(async));
+
+    /// <inheritdoc />
+    public override Task SelectMany_with_predicate_and_DefaultIfEmpty_projecting_root_collection_element_and_another_collection(
+        bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base
+                .SelectMany_with_predicate_and_DefaultIfEmpty_projecting_root_collection_element_and_another_collection(async));
+
+    /// <inheritdoc />
+    public override Task Skip_Take_Distinct_on_grouping_element(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Skip_Take_Distinct_on_grouping_element(async));
+
+    /// <inheritdoc />
+    public override Task Skip_Take_Select_collection_Skip_Take(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Skip_Take_Select_collection_Skip_Take(async));
+
+    /// <inheritdoc />
+    public override Task Skip_Take_on_grouping_element_inside_collection_projection(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Skip_Take_on_grouping_element_inside_collection_projection(async));
+
+    /// <inheritdoc />
+    public override Task Skip_Take_on_grouping_element_with_collection_include(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Skip_Take_on_grouping_element_with_collection_include(async));
+
+    /// <inheritdoc />
+    public override Task Skip_Take_on_grouping_element_with_reference_include(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Skip_Take_on_grouping_element_with_reference_include(async));
+
+    /// <inheritdoc />
+    public override Task Take_Select_collection_Take(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Take_Select_collection_Take(async));
 }
 
 /// <summary>

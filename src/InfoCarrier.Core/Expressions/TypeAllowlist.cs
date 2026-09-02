@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -82,6 +83,42 @@ public sealed class TypeAllowlist
         // deployer's mitigation. `RegexOptions` needs no entry — every enum is already admitted.
         typeof(System.Text.RegularExpressions.Regex),
     ];
+
+    // Operation hosts that live in `EFCore.Relational`, which this assembly does not reference
+    // (M9), so they cannot be named with `typeof`. Matched by full name AND assembly instead --
+    // the same by-name route `ServerBoundaryAnalyzer` takes for `FromSqlQueryRootExpression`.
+    //
+    //   RelationalDbFunctionsExtensions -> EF.Functions.Collate / Least / Greatest
+    //   EFExtensions                    -> EF.Constant / EF.Parameter / EF.MultipleParameters
+    //
+    // WHY THEY WERE MISSING, and it was not deliberate. `EF` and `DbFunctions` are both admitted
+    // above, and so is the *core* `DbFunctionsExtensions` -- but the markers a caller actually
+    // writes are declared on these two relational classes, so every `EF.Functions.Collate` and
+    // every `EF.MultipleParameters` was refused at the client boundary and raised EF's own
+    // `TranslationFailed`. The server could translate all of them: it is an ordinary relational
+    // provider. This is the shape M9 J20 reversed for `Regex` -- a refusal that made this provider
+    // disagree with every reference implementation -- and it cost six reds in
+    // `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` alone.
+    //
+    // WHY THIS DOES NOT BREAK `security-review.md` §2's CONJUNCTION. That bound is over the
+    // reflection *invocation* surface -- `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+    // `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. Neither class is on it, neither
+    // derives from anything on it, and neither constructs anything on it. Their parameters are
+    // `DbFunctions`, scalars, `string` and arrays. The generic ones (`EF.Constant<T>` and
+    // friends) are bounded by §2's own mechanism rather than by luck: `ResolveMethod` resolves
+    // every parameter type through this same allowlist, so a `T` bound to an unadmitted type
+    // fails the signature lookup before the method is found. Naming a host permits the type to be
+    // named; a method still has to resolve by signature.
+    private static readonly HashSet<string> RelationalOperationHostNames =
+    [
+        "Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions",
+        "Microsoft.EntityFrameworkCore.EFExtensions",
+    ];
+
+    private static bool IsRelationalOperationHost(Type type)
+        => type.FullName is { } name
+            && RelationalOperationHostNames.Contains(name)
+            && type.Assembly.GetName().Name == "Microsoft.EntityFrameworkCore.Relational";
 
     private static readonly HashSet<Type> BuiltInGenericDefinitions =
     [
@@ -176,6 +213,30 @@ public sealed class TypeAllowlist
                         AddDeclaredType(member.ClrType, allowed);
                     }
                 }
+            }
+        }
+
+        // The classes declaring the model's own `HasDbFunction` methods (R84).
+        //
+        // A user-defined function is an ordinary method on a class the model names, and that class
+        // is almost never an entity type -- it is a `DbContext` subclass or a static helper. So
+        // every mapped function was refused at the client boundary and `QuerySplitter` raised EF's
+        // `TranslationFailed`, while the server -- an ordinary relational provider with the same
+        // model -- translated it without difficulty. 81 red tests, and R74 recorded the symptom as
+        // "this provider does not support `HasDbFunction`".
+        //
+        // WHY THIS IS NOT A WIDENING `security-review.md` §2 HAS TO RE-EXAMINE. It is model-derived,
+        // like every entity type and property type above: the application named these methods in
+        // its own `OnModelCreating`, and a payload that names one reaches a method the model maps
+        // and nothing else. §2a's argument for C53 applies word for word, and the same guard is
+        // applied for the same reason -- a declaring type on the reflection invocation surface is
+        // refused rather than trusted, so the conjunction does not depend on nobody ever mapping
+        // a function onto one.
+        foreach (MethodInfo function in Metadata.ModelDbFunctions.ForModel(model))
+        {
+            if (function.DeclaringType is { } declaring && !IsReflectionInvocationSurface(declaring))
+            {
+                allowed.Add(declaring);
             }
         }
 
@@ -407,6 +468,22 @@ public sealed class TypeAllowlist
                 || Array.TrueForAll(type.GetGenericArguments(), IsAllowed);
         }
 
+        // An enum is data, not behaviour, and travels as its underlying value, so allowing it
+        // cannot construct anything. Asked HERE rather than only at the end of this method,
+        // because a type NESTED IN A GENERIC TYPE is itself a constructed generic type even when
+        // it declares no type parameter of its own: `MappingQueryTestBase<TFixture>+ShipVia` has
+        // `IsConstructedGenericType` true, so the branch below decomposed it, asked whether the
+        // open definition was listed — which no enum ever is — and denied it. The rule this file
+        // states ("every enum is already admitted") was therefore false for exactly the shape EF's
+        // specification suites use, and `MappingQueryTestBase.Project_nullable_enum` is what
+        // found it. The enclosing type's generic arguments say nothing about an enum's value, so
+        // there is nothing here to decompose. This is the same statement as the exact-match branch
+        // above, for a type admitted by rule rather than by the set.
+        if (type.IsEnum)
+        {
+            return true;
+        }
+
         if (type.IsConstructedGenericType)
         {
             return IsAllowed(type.GetGenericTypeDefinition())
@@ -425,13 +502,14 @@ public sealed class TypeAllowlist
             return true;
         }
 
-        if (BuiltInTypes.Contains(type) || BuiltInOperationHosts.Contains(type) || _allowed.Contains(type))
+        if (BuiltInTypes.Contains(type) || BuiltInOperationHosts.Contains(type)
+            || IsRelationalOperationHost(type) || _allowed.Contains(type))
         {
             return true;
         }
 
-        // An enum is data, not behaviour, and travels as its underlying value anyway; allowing
-        // it cannot construct anything.
-        return type.IsEnum;
+        // Every enum has already been admitted above, before the generic decomposition that used
+        // to hide the nested ones.
+        return false;
     }
 }

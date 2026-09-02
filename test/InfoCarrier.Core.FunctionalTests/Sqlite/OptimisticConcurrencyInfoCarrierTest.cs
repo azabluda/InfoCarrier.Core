@@ -193,7 +193,7 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         /// </remarks>
         public override async Task ReseedAsync()
         {
-            InfoCarrierBackendTestStore backend = ((InfoCarrierTestStore)TestStore).Backend;
+            InfoCarrierBackendTestStore backend = ((IInfoCarrierClientTestStore)TestStore).Backend;
             using DbContext context = backend.CreateDbContext();
             await context.Database.EnsureDeletedAsync();
             await context.Database.EnsureCreatedAsync();

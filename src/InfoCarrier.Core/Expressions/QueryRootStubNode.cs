@@ -8,7 +8,15 @@ namespace InfoCarrier.Core.Expressions;
 ///     distinguishes shared-type entities); the server rebinds it to a real
 ///     <c>DbSet&lt;T&gt;</c> / <c>EntityQueryRootExpression</c> via its model.
 /// </summary>
-public sealed record QueryRootStubNode : ExpressionNode
+/// <remarks>
+///     <b>Not sealed, and the one derived node is <see cref="FromSqlQueryRootStubNode" /></b>
+///     (#60). A query root that carries state beyond its entity type is a subclass on EF's side
+///     too, and the wire mirrors that rather than widening this node with fields most roots do not
+///     have. <c>ServerBoundaryAnalyzer.IsSerializableKind</c> matches EF's root by its EXACT type
+///     for the same reason: a subclass it does not know is refused rather than shipped with its
+///     extra state silently dropped.
+/// </remarks>
+public record QueryRootStubNode : ExpressionNode
 {
     /// <inheritdoc />
     public override NodeKind Kind => NodeKind.QueryRootStub;

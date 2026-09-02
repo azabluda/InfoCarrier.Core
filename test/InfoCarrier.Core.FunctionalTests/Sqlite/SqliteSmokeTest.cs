@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -18,7 +19,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 /// </remarks>
 public class SqliteSmokeTest
 {
-    private static SqliteInfoCarrierBackendTestStore CreateStore()
+    private static SqliteInfoCarrierBackendTestStore CreateStore(
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -29,10 +31,350 @@ public class SqliteSmokeTest
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
+                OnAddServices = onAddServices,
             });
 
-    private static SqliteSmokeContext CreateClient(SqliteInfoCarrierBackendTestStore store)
-        => new(new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options);
+    private static SqliteSmokeContext CreateClient(
+        SqliteInfoCarrierBackendTestStore store,
+        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptions = null)
+        => new(new DbContextOptionsBuilder<SqliteSmokeContext>()
+            .UseInfoCarrier(store, infoCarrierOptions)
+            .Options);
+
+    private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
+    {
+        SqliteInfoCarrierBackendTestStore store = CreateStore(onAddServices);
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" });
+                await context.SaveChangesAsync();
+            });
+
+        return store;
+    }
+
+    // R85. The two halves of the allowed-types seam, and the closed default that makes it a seam
+    // rather than a hole.
+    //
+    // `EF.Functions.Glob` is SQLite's, declared on `SqliteDbFunctionsExtensions` in the provider
+    // assembly. `InfoCarrier.Core` references no provider and cannot name it, so before this the
+    // call was refused at the client boundary while the server -- an ordinary SQLite provider --
+    // translated it to `GLOB` without difficulty. `EF.Functions.Like` hid the gap for a whole
+    // milestone, because `Like` is declared on EF's CORE `DbFunctionsExtensions` and always worked.
+    //
+    // The same story is every store's: `DateDiffDay` and `FreeText` are SQL Server's, and a
+    // third-party provider has its own. The answer is not a list in this package -- it cannot
+    // enumerate providers it does not reference -- but a registration the application makes, on
+    // both sides, exactly as ADR-012 requires of a value mapper.
+    [ConditionalFact]
+    public async Task A_provider_specific_EF_Functions_call_is_refused_when_nothing_is_registered()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        // EF's own `TranslationFailed`, raised by `QuerySplitter.RejectClientEvaluation`. The
+        // closed default of ADR-008 constraint 2: a type the model does not imply is not named.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+
+        Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
+    }
+
+    [ConditionalFact]
+    public async Task A_provider_specific_EF_Functions_call_crosses_once_both_sides_admit_its_host()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
+
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => o.AllowTypes(typeof(SqliteDbFunctionsExtensions)));
+
+        // Two of the three titles do not start with "al"; the answer proves the server ran GLOB
+        // rather than the client running something equivalent, because the client cannot run it
+        // at all -- `SqliteDbFunctionsExtensions.Glob` throws when invoked.
+        Assert.Equal(1, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+        Assert.Equal(2, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "*a*")));
+    }
+
+    [ConditionalFact]
+    public async Task Registering_the_host_on_the_client_alone_still_fails_on_the_server()
+    {
+        // ADR-012's rule restated for types, and the reason the server half is a separate call:
+        // a type admitted on one side only is worse than one admitted on neither. The client now
+        // ships the query and the SERVER refuses to read it, which is the half that is a security
+        // boundary. Without this test the two registrations look like duplication.
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => o.AllowTypes(typeof(SqliteDbFunctionsExtensions)));
+
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+
+        Assert.Contains("deserialization allowlist", refused.Message, StringComparison.Ordinal);
+    }
+
+    // R95. The raw-SQL gate (#60), in the same three shapes R85's allowed-types seam is pinned in,
+    // plus one for the arguments.
+    //
+    // WHAT IS GRANTED IS ARBITRARY SQL EXECUTION, NOT A QUERY FEATURE, and the API names it that
+    // way because `Sqlite/RawSqlExecutionProbeTest` (R94) measured what it means: one
+    // `CommandText` runs every statement it contains, and an uncomposed `FromSqlRaw` reaches the
+    // store unwrapped. There is no read-only subset to offer, so there is none in the API.
+    //
+    // These four also REPLACE the tripwire `FromSqlAssertions` describes -- "if `FromSql` is ever
+    // supported, every one of them fails". It is supported now, on an opt-in a server has to make,
+    // and the refusal that class asserts is still the default and is still asserted, here.
+    [ConditionalFact]
+    public async Task A_FromSql_query_is_refused_when_neither_side_grants_it()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        // The refusal names the node, which is exactly what `FromSqlAssertions` pins across the
+        // inherited suites -- so this is the same refusal those tests assert, restated where the
+        // gate lives. Default-deny, and the behaviour every caller had before the gate existed.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+
+        Assert.Contains("FromSqlQueryRootExpression", refused.Message, StringComparison.Ordinal);
+    }
+
+    [ConditionalFact]
+    public async Task A_FromSql_query_crosses_once_both_sides_grant_it()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierArbitrarySqlExecution());
+
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+
+        // The store holds two blogs. THE `WHERE` IS THE POINT: before R75 a `FromSqlRaw` carrying
+        // one came back as the whole table, because the wire's query-root node had no field for
+        // the SQL and the subclass was shipped as its base. An answer of 2 here is that regression
+        // returning, and it would otherwise look like an ordinary passing query.
+        Assert.Equal(1, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = 'alpha'").CountAsync());
+        Assert.Equal(2, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+
+        // And composed over, which is the shape EF wraps in a subquery.
+        Blog[] composed = [.. await client.Blogs
+            .FromSqlRaw(@"SELECT * FROM ""Blogs""")
+            .Where(b => b.Title == "beta")
+            .ToArrayAsync()];
+
+        Assert.Equal("beta", Assert.Single(composed).Title);
+    }
+
+    [ConditionalFact]
+    public async Task Granting_it_on_the_client_alone_is_refused_by_the_server()
+    {
+        // The half that makes the two registrations something other than duplication, and the one
+        // that is the security boundary. The client now ships the query and the SERVER refuses to
+        // run the string, which is what `docs/security-review.md` section 5a is about.
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+
+        // Raised on the SERVER and rehydrated here by `InfoCarrierFaultMapper`, which round-trips
+        // an `InvalidOperationException` as itself -- so the exception TYPE says nothing about
+        // which side refused, and the message is what does.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+
+        Assert.Contains("does not permit a payload to carry SQL", refused.Message, StringComparison.Ordinal);
+    }
+
+    [ConditionalFact]
+    public async Task FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierArbitrarySqlExecution());
+
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+
+        // `{0}` becomes a `DbParameter` on the server, which is the only shape in which an
+        // argument keeps its type across the wire. A quote in the value is the assertion that it
+        // was bound and not spliced: interpolated into the text it would be a syntax error, and
+        // matching zero rows through a parameter is the correct answer.
+        Assert.Equal(
+            1,
+            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "alpha").CountAsync());
+        Assert.Equal(
+            0,
+            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "al'pha").CountAsync());
+    }
+
+    // R89. Being NAMEABLE on the wire is not being SHIPPABLE, and conflating the two removed a
+    // refusal. `QuerySplitter.ClientCodeFinder` refuses a method whose declaring type the
+    // allowlist does not admit; R84 admitted the declaring type of every `HasDbFunction` mapping
+    // so the call could be named, and for a function mapped as an INSTANCE method that type is
+    // the caller's own `DbContext`. The clause then stopped firing while the call stayed
+    // unshippable for a different reason -- its `Object` is a constant holding the live client
+    // context, which no wire carries.
+    //
+    // What that cost was measured, not reasoned about: a boundary probe on
+    // `UdfDbFunctionInfoCarrierTest.Scalar_Function_Where_Correlated_Instance` reported
+    // `shippable=1` -- the bare query root -- and the client filtered the whole table. Across R84
+    // the reasons diff shows 38 `TranslationFailed` refusals disappearing into 18 client
+    // evaluations and 15 "no part of the query can be executed".
+    //
+    // `SqliteSmokeContext.TitleIsLong` is mapped with `HasDbFunction`, which is what puts this
+    // context type on the allowlist -- the exact condition, reproduced without depending on the
+    // inherited UDF class. `TitleIsLong` throws, so a regression arrives named in the assertion
+    // message rather than as a green count.
+    [ConditionalFact]
+    public async Task A_predicate_calling_a_mapped_function_on_the_client_context_is_refused()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.Blogs.CountAsync(b => client.TitleIsLong(b.Title)));
+
+        Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
+    }
+
+    // R91. D7's `RelationalDbFunctionAttributeConvention` row, settled by reading both models.
+    //
+    // `HasDbFunction` is a call the caller's own `OnModelCreating` makes, so both models get it.
+    // `[DbFunction]` is picked up by a RELATIONAL convention, which only the server runs -- so the
+    // server's model maps the method and the client's does not. R84's `ModelDbFunctions` reads the
+    // client's model, so the allowlist never admits the declaring type and the call is refused
+    // rather than translated.
+    //
+    // THE CALL STILL CROSSES, AND THAT WAS NOT THE PREDICTION. The models disagree, but what
+    // decides the outcome is the ALLOWLIST, and `SqliteSmokeContext` is on it for an unrelated
+    // reason -- `TitleIsLong`'s `HasDbFunction` mapping put it there. So the static call ships,
+    // the server translates it against ITS model, and the only thing that fails is the store
+    // lacking the function. That is the correct end-to-end behaviour; had this context declared
+    // no mapped function at all, the same call would have been refused instead.
+    //
+    // Which is the third time in this session that "the allowlist admitted the type for an
+    // unrelated reason" decided the behaviour -- R84, R89 and here. The type allowlist is load
+    // bearing for far more than deserialization safety, and nothing says so where it is declared.
+    [ConditionalFact]
+    public async Task A_DbFunction_declared_by_attribute_reaches_the_servers_model_and_not_the_clients()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
+        await using SqliteSmokeContext client = CreateClient(store);
+        using DbContext server = store.CreateDbContext();
+
+        string[] onTheServer = [.. InfoCarrier.Core.Metadata.ModelDbFunctions.ForModel(server.Model)
+            .Select(m => m.Name).Order()];
+        string[] onTheClient = [.. InfoCarrier.Core.Metadata.ModelDbFunctions.ForModel(client.Model)
+            .Select(m => m.Name).Order()];
+
+        // The divergence, established before anything is concluded from it.
+        Assert.Equal([nameof(SqliteSmokeContext.TitleIsLong), nameof(SqliteSmokeContext.TitleIsShort)], onTheServer);
+        Assert.Equal([nameof(SqliteSmokeContext.TitleIsLong)], onTheClient);
+
+        // And what it costs: nothing here. The call reaches the store as a function call, which is
+        // what a server that maps it should produce. `TitleIsShort` throws when invoked, so this
+        // could not be a client-side answer wearing a store-side message.
+        InfoCarrierServerException reached = await Assert.ThrowsAsync<InfoCarrierServerException>(
+            () => client.Blogs.CountAsync(b => SqliteSmokeContext.TitleIsShort(b.Title)));
+
+        Assert.Contains("no such function: TitleIsShort", reached.Message, StringComparison.Ordinal);
+    }
+
+    // R91. D7's `TableSharingConcurrencyTokenConvention` row, settled by running it.
+    //
+    // Where entity types share a table and only some carry a concurrency token, that relational
+    // convention gives the others a SHADOW token property mapped to the same column. This client
+    // does not run it, so the server's model has a property the client's does not -- and the
+    // property set is what `SaveChanges` sends. Nothing this repository inherits can reach the
+    // shape: EF's only functional coverage is `OptimisticConcurrencySqlServerTest`, SQL Server's
+    // own class rather than a specification base, over `rowversion`.
+    //
+    // TWO MEASURED ANSWERS, AND THE FIRST IS WHY THE SECOND WAS SO NEARLY MISSED.
+    //
+    // ONE: the convention needs BOTH `IsConcurrencyToken` AND `ValueGenerated.OnUpdate` --
+    // `GetConcurrencyTokensMap.FindConcurrencyColumns` skips anything else. `ValueGenerated.OnUpdate`
+    // on a token means `rowversion`, which SQLite does not have; an application-managed token, the
+    // only kind this tier can express, never reaches the convention at all. So on every store this
+    // repository tests, the convention CANNOT FIRE, and the client not running it is unobservable
+    // by construction rather than by luck. The first version of this probe used a plain
+    // `IsConcurrencyToken()` and passed while proving nothing -- the model assertions below are
+    // what caught that.
+    //
+    // TWO: forced to fire, the divergence is real and costs nothing. The server's model gains the
+    // synthesized property and the client's does not, and both halves of the split still round-trip
+    // and save. The server applies its own model to entries the client sent by property NAME; a
+    // property the client never mentions is simply not among them.
+    //
+    // `_TableSharingConcurrencyTokenConvention_` is a literal here on purpose: the constant is
+    // private to EF, and this is a probe rather than a contract.
+    [ConditionalFact]
+    public async Task A_table_split_pair_whose_server_model_has_a_synthesized_concurrency_token_round_trips()
+    {
+        await using var store = new SqliteInfoCarrierBackendTestStore(
+            Guid.NewGuid().ToString(),
+            shared: false,
+            new SharedTestStoreProperties
+            {
+                ContextType = typeof(TableSplitSmokeContext),
+                OnModelCreating = (_, _) => { },
+            });
+
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(
+                    new SharedRoot
+                    {
+                        Id = 1,
+                        Name = "root",
+                        Version = "v1",
+                        Detail = new SharedDetail { Note = "first" },
+                    });
+                await context.SaveChangesAsync();
+            });
+
+        await using (var client = new TableSplitSmokeContext(
+            new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            // ESTABLISH THAT THE DIVERGENCE IS REAL BEFORE CONCLUDING ANYTHING FROM A GREEN ROUND
+            // TRIP. A convention that never fired and a divergence that costs nothing look
+            // identical from outside, and CLAUDE.md names that mistake. The server's model must
+            // have the synthesized token on `SharedDetail` and the client's must not; if EF ever
+            // stops synthesizing it, this fails here rather than silently making the rest vacuous.
+            const string synthesized = "_TableSharingConcurrencyTokenConvention_Version";
+
+            using DbContext server = store.CreateDbContext();
+            Assert.NotNull(server.Model.FindEntityType(typeof(SharedDetail))!.FindProperty(synthesized));
+            Assert.Null(client.Model.FindEntityType(typeof(SharedDetail))!.FindProperty(synthesized));
+
+            SharedDetail detail = await client.Details.SingleAsync();
+            detail.Note = "second";
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        await using (var client = new TableSplitSmokeContext(
+            new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            SharedRoot root = await client.Roots.SingleAsync();
+            root.Name = "renamed";
+            Assert.Equal(1, await client.SaveChangesAsync());
+        }
+
+        await using (var client = new TableSplitSmokeContext(
+            new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            Assert.Equal("second", (await client.Details.SingleAsync()).Note);
+            Assert.Equal("renamed", (await client.Roots.SingleAsync()).Name);
+
+            // `Version` is deliberately not asserted. `ValueGeneratedOnAddOrUpdate` makes EF omit
+            // the property from the INSERT and expect the store to supply it, and SQLite supplies
+            // nothing -- so it reads back null, on this wire and on a direct SQLite context alike.
+            // That is the store's behaviour, not this provider's, and asserting it would pin the
+            // wrong thing.
+        }
+    }
 
     [ConditionalFact]
     public async Task Client_query_round_trips_through_a_relational_server()
@@ -439,5 +781,48 @@ public class SqliteSmokeTest
 
         await using SqliteSmokeContext after = CreateClient(store);
         Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
+    }
+
+    [ConditionalFact]
+    public async Task A_left_join_keeps_an_owned_value_that_has_no_public_member()
+    {
+        // R64. `LeftJoin` was missing from `ProjectionShape`'s operator list, so a left join's
+        // result selector was never entered and every owned type it projected came back with no
+        // entity type. That has two consequences and this test pins the loud one: the tracking
+        // downgrade `ServerQueryExecutor.TrackingBehaviorFor` makes for an ownerless owned type
+        // never fires, and the server refuses the query outright -- "a tracking query is
+        // attempting to project an owned entity without a corresponding owner". Measured red
+        // before the fix and green after.
+        //
+        // The quiet consequence is the worse one and this model does not reproduce it: with four
+        // owned types sharing one CLR type, as `OwnedQueryTestBase` has, the mapper falls back to
+        // the public CLR members and the value comes back with `City` set and `Line` -- which
+        // lives in a private field behind an indexer -- silently missing.
+        // `OwnedQueryRelationalTestBase.Left_join_on_entity_with_owned_navigations` is what covers
+        // that half, and this repository does not run it yet (R62).
+        //
+        // `Line` is asserted beside `City` because the defect took one and left the other.
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new Blog { Id = 1, Title = "alpha" });
+                context.Add(
+                    new Located { Id = 1, Address = new LocatedAddress { City = "Zurich", ["Line"] = "Bahnhofstrasse 1" } });
+                await context.SaveChangesAsync();
+            });
+
+        await using SqliteSmokeContext client = CreateClient(store);
+
+        var rows = await client.Blogs
+            .LeftJoin(client.Located, b => b.Id, l => l.Id, (b, l) => new { b.Title, Address = l!.Address })
+            .ToListAsync();
+
+        var row = Assert.Single(rows);
+        LocatedAddress address = Assert.IsType<LocatedAddress>(row.Address);
+        Assert.Equal("Zurich", address.City);
+        Assert.Equal("Bahnhofstrasse 1", address["Line"]);
     }
 }

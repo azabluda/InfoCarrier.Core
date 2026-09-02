@@ -59,5 +59,7 @@ public class TPHInheritanceQueryInfoCarrierFixture : TPHInheritanceQueryFixture
             InfoCarrierTestStoreFactory.Sqlite,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+                arbitrarySqlExecution: true);
 }

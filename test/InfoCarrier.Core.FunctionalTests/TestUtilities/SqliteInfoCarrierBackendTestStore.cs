@@ -123,6 +123,13 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     }
 
     /// <inheritdoc />
+    public override Type StoreParameterType => typeof(SqliteParameter);
+
+    /// <inheritdoc />
+    public override System.Data.Common.DbConnection CreateStoreConnection()
+        => new SqliteConnection(_connectionString);
+
+    /// <inheritdoc />
     protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
         => serviceCollection
             .AddEntityFrameworkSqlite()

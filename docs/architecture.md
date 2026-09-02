@@ -391,6 +391,54 @@ would ship a query the server cannot execute, and the failure would arrive from 
 than from the boundary that should have refused it. **Removing the package reference does nothing
 about this**, which is why (c) is two steps and why the package is the second.
 
+#### D3 amendment 2026-09-02 (R118) — the reference may come back, in a companion package, and D3 still stands
+
+**Raised by the owner. Filed as [#97](https://github.com/azabluda/InfoCarrier.Core/issues/97), which
+carries the full measurement. Nothing is decided and no design exists.**
+
+**The idea.** A second shipped package, `InfoCarrier.Core.Relational`, referenced by **both halves**
+when the client knows its backend is relational. `InfoCarrier.Core` still references nothing
+relational, so **D3 as written is untouched** and a non-relational backend stays possible — which is
+what D3 bought and what the other end of #96 asks for.
+
+**Why it is worth measuring rather than dismissing.** J5 removed the reference and paid for it in
+string literals. Counted on 2026-09-02:
+
+| Paid today | Size |
+|---|---|
+| 9 magic `Relational:` annotation strings in 4 product files | pinned by a 268-line `DocumentMappingPinTest` |
+| `RelationalQueryRootShape.cs`, two EF types resolved by name | 276 lines, **10 trim suppressions** |
+| `InfoCarrierHierarchyMappingConvention.cs`, a narrower hand-written `EntityTypeHierarchyMappingConvention` | 131 lines |
+| `AnnotationDocumentMapping` + `IInfoCarrierDocumentMapping` | 149 lines |
+
+**Every one is a fact computed twice by two providers**, and the second computation is a string
+literal. That is the same hazard `CLAUDE.md` opens with; J5 did not remove it, it changed its shape.
+
+**The constraint that decides the design, read from EF's source rather than assumed.**
+`EntityFrameworkRelationalServicesBuilder.TryAddCoreServices()` is **all-or-nothing and collides with
+ADR-006**: it registers `IDatabase → RelationalDatabase`, and this provider captures the query at
+`IDatabase.CompileQuery`. It also takes `IDbContextTransactionManager`, `IDatabaseCreator`,
+`ITypeMappingSource`, `IAdHocMapper` and the whole SQL-generation stack. **So "make the client
+relational" cannot mean calling that builder**, and EF publishes no seam that splits its metadata
+half from its command half.
+
+**Three levels, and only the third is risky.** Level 1 references the package and supplies today's
+string answers behind seams — most of the deletion, almost no risk. Level 2 registers EF's own
+relational conventions on the client model. **Level 3, a relational model on the client
+(`GetRelationalModel`), needs an `IRelationalTypeMappingSource` the client cannot honestly have —
+that is B4, and it is why D3 was drawn where it is.** Levels 1 and 2 do not depend on it.
+
+**Testing needs no re-parenting, and that was checked.** 52 test files and 117 declaration sites
+already sit on relational spec bases (ADR-013); EF's own relational bases derive from the core ones
+and override, which is the layering this repository copied. The per-fixture switch also exists:
+`relationalClientStore`, used by 8 fixtures. **Tier A must not get it** — InMemory is not relational,
+and a relational client over it would recreate the disagreement the change exists to remove. Keeping
+the flag per fixture makes the same bases run both ways, and the difference is the measurement.
+
+**R114 already proved the registration shape.** An `IRelationalDatabaseFacadeDependencies` supplied
+from outside `InfoCarrier.Core` satisfied EF's type test and took `failed` 143 → 141 with D3
+untouched. That class is the first member this package would hold.
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).
@@ -617,6 +665,386 @@ application's configuration; this asks it about the provider's own.
 `JsonOwnedCollectionUpdate` at 5 of 5, plus
 `The_two_models_agree_on_the_key_of_every_JSON_mapped_owned_collection`. B12's own symptom was
 **wrong data with no exception**, so a green build is not evidence here — the measurement is.
+
+### D7 — the client gets EF's core services, and nobody had listed what the relational set adds
+
+**Raised 2026-09-01, after three defects turned out to be one shape.** `EF.Functions.Collate` over a
+constant was executed on the client instead of translated (R80); a `HasDbFunction` call whose
+arguments were all constants was evaluated the same way (R84); and a `FromSql` query filter still
+fails while the **client's** model is built (open, below). All three are one sentence: **EF
+registers a different set of services and conventions when a provider is relational, this client
+gets the core set, and the difference had never been written down.** Each was found by a failing
+test, which is the expensive way to find any of them.
+
+**The inventory.** `EntityFrameworkRelationalServicesBuilder.TryAddCoreServices` makes **61**
+`TryAdd` calls and registers **36** dependency objects.
+`RelationalConventionSetBuilder.CreateConventionSet` **adds 20** conventions and **replaces 4**.
+
+**The cut that makes the list short, and it is ADR-006.** This client captures the raw expression
+tree at `IDatabase.CompileQuery` and never compiles past it. Everything EF registers in order to
+turn a query tree into SQL, batch a `SaveChanges`, open a connection, run a migration or read a
+`DbDataReader` is **downstream of the capture point and belongs to the server's provider** — not
+missing here, not wanted here. That is **50 of the 61** in one stroke: the SQL generator and the
+whole translating-visitor stack, the update pipeline and its row-value factories, migrations, the
+connection and its transaction factory, the command and connection loggers, the three
+`IInterceptorAggregator`s, and the liftable-constant machinery. Two of them the client already
+replaces with services that **throw** and say why (`InfoCarrierQueryPipelineFactories`), and four
+more it replaces with its own (`IDatabase`, `IDatabaseCreator`, `IDbContextTransactionManager`,
+and `IQueryContextFactory` below).
+
+**The eleven that run before the capture point, or outside a query altogether.** These are the
+client's own business, and this is the list that did not exist.
+
+| EF's relational service | What the relational one adds | Standing here |
+|---|---|---|
+| `IEvaluatableExpressionFilter` | Two clauses: `EF.Functions` hosts, and `model.FindDbFunction` | **Was the gap.** `InfoCarrierEvaluatableExpressionFilter` ports both (R80, R84). |
+| `IModelCustomizer` | Nothing — `RelationalModelCustomizer` is an empty subclass | Nothing to lose. Verified by reading it. |
+| `IExecutionStrategyFactory` | Nothing by default — both return `NonRetryingExecutionStrategy`; the relational one only adds the hook for `RelationalOptionsExtension.ExecutionStrategyFactory` | Nothing to lose; the client has no relational options. Verified by reading both. |
+| `ICompiledQueryCacheKeyGenerator` | `UseRelationalNulls`, `QuerySplittingBehavior` and a buffering flag, all read off `RelationalOptionsExtension` | **Cannot apply**, and R82's rule says why: those three are the *server's* configuration. |
+| `ITypeMappingSource` | The store's type mappings | Deliberate. `InfoCarrierTypeMappingSource` answers from the CLR type alone, which is CLAUDE.md's "computed twice by two providers" rule. |
+| `IValueGeneratorSelector` | Store-generated key defaults | Deliberate; `InfoCarrierValueGeneratorSelector`, found neutral by D3's audit. |
+| `IQueryContextFactory` | The connection on the query context | Deliberate; `InfoCarrierQueryContextFactory`. |
+| `IModelValidator` | Store-mapping validation — shared tables, column clashes, TPT | Not wanted. The client replaces core's for the opposite reason: to *relax* a rule (a hierarchy needs no discriminator here). |
+| `IModelRuntimeInitializer` | Builds the relational model — tables, columns, foreign keys | Not wanted; store layout, and the server builds its own. |
+| `IStructuralTypeMaterializerSource` | One override: `ReadComplexTypeDirectly` is false for a JSON-mapped complex type, so the shaper handles it rather than the materializer | **Open, unverified.** It is D3's question again — *is this mapped to a document?* — and `IInfoCarrierDocumentMapping` is the seam that would answer it. No failure is attributed to it today. |
+| `IAdHocMapper` | Builds an entity type for a CLR type a query names and the model does not map | **Open, unverified**, and bound up with `FromSql` (#60), which is out of scope without the owner. |
+
+**The conventions, which are where the live defect is.** Of the 18 `RelationalConventionSetBuilder`
+*adds*, fifteen decide **store layout** — table and column names and comments, check constraints,
+sequences, stored procedures, table sharing and splitting, property overrides, discriminator
+length, the JSON property-name attributes. None of them can change what this client puts on the
+wire, because the wire carries an expression tree and a change-tracking graph, not a table. Three
+are worth naming:
+
+| Convention | Reading |
+|---|---|
+| `RelationalMapToJsonConvention` | Sets the container annotation `AnnotationDocumentMapping` reads. The client does not run it, and D3's pins are green — `JsonQuery` 393/0, `JsonOwnedCollectionUpdate` 5/5 — because a caller's own `ToJson()` sets the annotation directly. The *implicit* cases are what the convention adds, and none is covered. |
+| `TableSharingConcurrencyTokenConvention` | Adds a **shadow concurrency-token property** where two entity types share a table. **CLOSED 2026-09-02 (R91), by running it.** It cannot fire on any store this suite has: `GetConcurrencyTokensMap` skips a token that is not also `ValueGenerated.OnUpdate`, which on a token means `rowversion`. Forced to fire, the divergence is real and costs nothing — the server applies its own model to entries the client sent by property *name*, and both halves of a split still save. |
+| `RelationalDbFunctionAttributeConvention` | Puts a `[DbFunction]`-attributed method into the model, so the server's model maps it and the client's does not — asserted both ways. **CLOSED 2026-09-02 (R91), and the answer was not the prediction:** the call still crosses and the server translates it, because what decides that is the **allowlist**, and the context type was on it for an unrelated reason. Had the context declared no mapped function at all, the same call would have been refused. |
+
+Of the 4 *replacements*: `KeyDiscoveryConvention` and `ValueGenerationConvention` the client already
+makes (`InfoCarrierKeyDiscoveryConvention`, `InfoCarrierValueGenerationConvention`), and
+`EntityTypeHierarchyMappingConvention` — an addition rather than a replacement — is mirrored by
+`InfoCarrierHierarchyMappingConvention`. `RuntimeModelConvention` is **open and unverified**; it is
+the compiled model, and `Scaffolding.CompiledModel` is green. The fourth is the defect:
+
+**`QueryFilterRewritingConvention` is not replaced, and three tests fail because of it.**
+`RelationalQueryFilterRewritingConvention` teaches the rewriter that a `FromSql*` call is a query
+root and turns it into a `FromSqlQueryRootExpression`. The core one does not know `FromSql`, so it
+rewrites the inner `Set<T>()` into an `IQueryable` and leaves it where a `DbSet<T>` parameter is
+expected: *"Expression of type `IQueryable<Dictionary<string, object>>` cannot be used for parameter
+of type `DbSet<Dictionary<string, object>>` of method `FromSqlRaw`"*, raised **while the client's
+model is built, before any query runs**. Three of `SharedTypeQueryInfoCarrierTest`'s four reds are
+this.
+
+**CLOSED 2026-09-02 (R88).** `InfoCarrierQueryFilterRewritingConvention` leaves a
+`FromSql*` call exactly as the caller wrote it, which is R82's rule — the server applies its
+own model's filter, so the client's only has to be *representable*. Two of the three pass;
+the third converged onto #60, reaching `FromSqlRaw` on a non-relational client and saying
+so. **The other four rows above are still open and unverified.**
+
+**A fourth defect, found 2026-09-02 (R89), and it is the same sentence turned inside out.**
+`RelationalEvaluatableExpressionFilter`'s second clause is what R84 ported so a mapped function
+survives parameter extraction; admitting the mapping's declaring type to the allowlist is what let
+the call be *named*. For a function mapped as an **instance** method that declaring type is the
+caller's own `DbContext`, and admitting it silently removed the refusal that had been standing in
+for the missing capability: **38 `TranslationFailed` refusals vanished at R84** and became client
+evaluations. R89 restores the refusal by making a constant holding a `DbContext` never server-ok.
+
+**OPEN, and it is a security question rather than a rewrite.** Making an instance-mapped function
+actually *cross* needs a wire node that resolves to the **server's** context, the way
+`QueryRootStubNode` resolves to the server's model. That is a new capability handed to a payload,
+so `security-review.md` §2's per-class conjunction has to be re-argued for it before any code is
+written. Worth roughly ten of the residual `UdfDbFunction` reds; not started, and not to be started
+without the owner.
+
+**What three of these rows turned out to have in common, and it is not the convention set.**
+R84, R89 and R91 were each decided by whether the **type allowlist** happened to admit a type — for
+R84 the host of a mapped function, for R89 the caller's own `DbContext`, for R91 a context that was
+on the list because of a *different* function. The allowlist is documented as a deserialization
+control (ADR-008, `security-review.md` §2) and it is also, undocumented, the thing that decides
+where the query boundary falls and whether an untranslatable call is refused or quietly run on the
+client. **Nothing says so where it is declared**, and each of the three cost a measurement to find.
+
+**The pattern all three defects share, and it is the part that transfers.** Every one is a service
+EF replaces *for a reason that has nothing to do with SQL* — the filter protects a call from being
+evaluated, the convention teaches a rewriter about a method — and this client needs the same
+behaviour for the same reason while wanting none of the SQL. **A relational service is not
+automatically a store service**, and reading the class name is not how to tell them apart: the
+question is whether it runs before `IDatabase.CompileQuery`.
+
+### D8 — `FromSql` (#60) is a milestone with a security precondition, priced 2026-09-02
+
+**Raised by R92, which priced it rather than starting it.** The owner cleared #60 for work; this
+entry is what that work would be, so the decision to start it is taken against a number rather than
+an impression.
+
+**What it is worth, counted out of `artifacts/measure/r91.log` rather than estimated.**
+
+| | |
+|---|---|
+| **27 of the 157** current failures are raw-SQL shaped | 14 `JsonQuerySqlite`, 4 `NorthwindBulkUpdates`, 3 `TPHInheritanceQuery`, 2 `OwnedQuery`, 2 `QueryNoClientEval`, 1 `SharedTypeQuery`, 1 `NullSemanticsQuery` |
+| **6 of the 10** unimplemented spec bases are raw-SQL bases | `FromSqlQueryTestBase`, `FromSqlSprocQueryTestBase`, `GearsOfWarFromSqlQueryTestBase`, `NorthwindSqlQueryTestBase`, `SqlQueryTestBase`, `SqlExecutorTestBase` |
+
+**Corrected 2026-09-02, same day: the first count of this was 21 and it was low.** It matched on
+the test *name* and so missed the ones that fail earlier, on a cast. **`R77`'s
+`InvalidCastException` — `InfoCarrierTestStore` cannot be cast to `RelationalTestStore` — is not a
+separate item; it is this one's first blocker**, and all 26 tests carrying it are raw-SQL tests.
+**Reviving R77 on its own would therefore turn 26 failures from a cast into a translation failure
+and buy no green test at all**, which settles the standing "do not revive it without a base that
+demonstrably needs it": a base that needs it exists, and it needs #60 more.
+
+The other four missing bases are unrelated: `JsonUpdateTestBase` (ADR-013 — the client is never
+relational), `StoredProcedureUpdateTestBase`, `StoreValueGenerationTestBase`,
+`AdHocQuerySplittingQueryTestBase`. **An earlier note said seven of ten wait on #60; the count is
+six.**
+
+**Three pieces of work, and the third is not code.**
+
+1. **A wire node for `FromSqlQueryRootExpression`.** `ServerBoundaryAnalyzer.IsSerializableKind`
+   refuses it today *by exact type match*, with a comment recording what happened when it did not:
+   a `FromSqlRaw` with a `WHERE` came back as the whole table, silently. The type lives in
+   `Microsoft.EntityFrameworkCore.Relational`, which this package deliberately does not reference
+   (D3, M9 J5) — so the node has to carry `Sql` + `Argument` and be rebuilt on the server, the way
+   `QueryRootStubNode` is rebuilt against the server's model.
+2. **`SqlQuery<T>` and `Database.ExecuteSql` are separate entry points**, not query roots, and
+   `SqlExecutorTestBase` does not go through the query pipeline at all.
+3. **A `security-review.md` section, before either.** Every argument in that document is about what
+   a payload may *name* — ADR-008's allowlist, the per-class conjunction of §2. **Raw SQL is a
+   different axis: a payload that names nothing dangerous can still carry `DROP TABLE`.** Today the
+   server executes only trees it rebuilt from a vocabulary it controls, and `FromSql` would be the
+   first construct where the client hands the server a string to run. That is a change of posture,
+   not an extension of the allowlist, and §2 cannot be stretched to cover it.
+
+**Recommendation: item 3 first, and on its own.** The two code pieces are ordinary work whose shape
+is already known; the security section decides whether they should exist, and in what form — an
+opt-in server registration in the shape of R85's `AddInfoCarrierAllowedTypes` is the obvious
+candidate, but that is the owner's call and a review's, not a step's.
+
+#### D8 amendment 2026-09-02 — built, and the ordering was changed once for a measured reason
+
+**The gate is `AddInfoCarrierArbitrarySqlExecution` (server) and `AllowArbitrarySqlExecution`
+(client), and the name is the finding.** R94 put the two questions the security section rests on to
+a test rather than to a reading, and both answers removed an option: **one `CommandText` executes
+every statement it contains**, and **an uncomposed `FromSqlRaw` reaches the store unwrapped**. The
+`FROM (…)` subquery that would have confined a caller to reading is an artefact of *composing* on
+the query, and the caller decides whether to compose. So there is no read-only version of
+`FromSql` to grant, the API cannot honestly be called "enable raw queries", and §2's per-class
+conjunction gives no support — SQL text is not a naming question and there is no set to enumerate.
+`security-review.md` §5a is the written form.
+
+**Item 3 still came first in substance, and item 1 was built in the same step rather than the
+next.** A registration that admits a node the wire cannot yet carry is a switch that turns on a
+broken path, so R95 lands the gate and the `FromSqlQueryRootStubNode` together. The reflection that
+buys — two `GetProperty` reads on the client and one `Activator.CreateInstance` on the server, all
+in `RelationalQueryRootShape` — is the premise `eng/trim-baseline.txt` already describes, and every
+call site carries a narrow `[UnconditionalSuppressMessage]` naming why the members survive.
+
+**Item 2 is untouched and stays priced — but half of its stated reason was wrong.** `SqlQuery<T>`
+and `Database.ExecuteSql` are separate entry points rather than query roots, and that half stands:
+`RelationalDatabaseFacadeExtensions.GetFacadeDependencies` refuses a non-relational context before
+any query is built, which is where four tests now stop. **The `DbParameter` half does not.** R98
+adopted `FromSqlQueryTestBase` and 32 of its 54 first-run failures were
+`Type 'Microsoft.Data.Sqlite.SqliteParameter' is not on the deserialization allowlist` — not a wire
+limit at all. A `DbParameter` is an ordinary object with a parameterless constructor and settable
+properties; the wire walks it and the server rebuilds it with no special handling, and admitting
+the type through R85's seam turns all 32 green. **"The client cannot construct one" was never
+tested and is false**: the test project references the store's provider, as any application whose
+server it talks to would.
+
+**Which is the fourth time in this issue that the type allowlist decided the behaviour** — R84,
+R89, R91 and now R98 — and D7's note about it being load-bearing far beyond deserialization safety
+is the general form.
+
+#### D8 item 2 priced 2026-09-02 (R102) — it is blocked by D3, and by nothing smaller
+
+**`Database.SqlQuery<T>` is not reachable from a client that does not reference
+`EFCore.Relational`, and the obstacle is a type test rather than a capability.**
+`RelationalDatabaseFacadeExtensions.SqlQueryRaw` opens with `GetFacadeDependencies`, which does
+
+```csharp
+dependencies is IRelationalDatabaseFacadeDependencies relationalDependencies
+    ? relationalDependencies
+    : throw new InvalidOperationException(RelationalStrings.RelationalNotInUse);
+```
+
+and that interface lives in `EFCore.Relational`. **A client can only satisfy it by referencing the
+package**, which is exactly what M9's J5 removed and what D3 records. Nothing in this repository
+gets past that line: it runs before any expression is built, so no wire node, no allowlist entry and
+no boundary change can be reached.
+
+**What it would need, in order, if D3 were reversed.**
+
+1. `InfoCarrier.Core` references `Microsoft.EntityFrameworkCore.Relational` again.
+2. An `IRelationalDatabaseFacadeDependencies` registered on the client whose **relational half
+   throws** — `RelationalConnection`, `RawSqlCommandBuilder`, `CommandLogger` — and whose core half
+   is real. That shape is already proven here: it is exactly what
+   `RelationalInfoCarrierTestStore` does to `RelationalTestStore` (ADR-013's amendment), and the
+   reason it works is the same, that the callers wanting the connection are not the callers wanting
+   the rest.
+3. `SqlQueryRaw` then builds one of two roots, and only the first is new work.
+   `SqlQueryRootExpression` for a `TResult` the type-mapping source recognises — a scalar — is a
+   direct sibling of R95's `FromSqlQueryRootStubNode` and costs about what that did.
+   `FromSqlQueryRootExpression` for anything else already crosses.
+4. **The second root has a further problem that is not about SQL.** It is built over
+   `AdHocMapper.GetOrAddEntityType(typeof(TResult))`, an entity type created on the **client's**
+   model at call time. The server resolves a query root through *its* model
+   (`ServerQueryExecutor.RebindQueryRoot`), and an ad-hoc type is in neither the shared model nor
+   the server's. So `SqlQuery<SomeDto>` needs the ad-hoc entity type to cross as well, which is a
+   new capability rather than a new node.
+
+**What it is worth.** Two missing bases, `NorthwindSqlQueryTestBase` and `SqlQueryTestBase`, both of
+which EF ships SQLite classes for; and 6 of the current failures, 4 in `FromSqlQueryInfoCarrierTest`
+and 2 in `SharedTypeQueryInfoCarrierTest`. **The 6 is a count by class and R111 corrected it to 3 by
+cause**: `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters` (sync and async)
+and `Ad_hoc_query_for_shared_type_entity_type_works` are the only three whose stack trace reaches
+`GetFacadeDependencies`. The other ten failures in those two classes have four other causes. The
+bases are where item 2's value is; the current-failure figure never was. **Every test in both bases routes through
+`Database.SqlQuery`** — 137 call sites across the two files — so there is no partial adoption to
+take.
+
+**Recommendation: not taken here.** Step 1 reverses a milestone exit criterion and `CLAUDE.md` is
+explicit that such a reversal is a dated decision rather than a code change that quietly contradicts
+one. The pricing is recorded so the decision can be made against a number.
+
+#### D8 item 2 re-priced 2026-09-02 (R110) — D3 does not have to be reversed
+
+**R102 read the blocker correctly and then assumed only one way past it.** Its step 1 —
+`InfoCarrier.Core` references `EFCore.Relational` again — is not the only route, and it is not the
+cheapest. Two others were put by the owner and both were checked here rather than argued.
+
+**Naming the relational types by string does not work, and this is the one place that trick fails.**
+Two sites in this repository already name relational things by string:
+`QuerySplitter`'s `RelationalQueryableExtensionsFullName`, and `RelationalQueryRootShape`, which
+reads a `FromSqlQueryRootExpression` by its shape. Both work because the question there is *what is
+this node called*. Here the question is *does this object implement this interface*:
+
+```csharp
+dependencies is IRelationalDatabaseFacadeDependencies relationalDependencies
+```
+
+That is a CLR type test. It is answered by the runtime type's interface table, and no name, string
+or shape can satisfy it. **Read, not measured** — but it is a language rule, not a judgement.
+
+**An implementation registered from outside the package works, and it was measured.**
+`DatabaseFacade` resolves its dependencies from the context's own service provider:
+
+```csharp
+private IDatabaseFacadeDependencies Dependencies
+    => field ??= context.GetService<IDatabaseFacadeDependencies>();
+```
+
+So anything that can name `IRelationalDatabaseFacadeDependencies` can replace that registration, and
+`InfoCarrier.Core` never has to be the thing that names it. A probe registered a class implementing
+that interface through `DbContextOptionsBuilder.ReplaceService<IDatabaseFacadeDependencies, …>()`
+on an ordinary InfoCarrier client, and the type test passed: the facade resolved the replacement and
+`is IRelationalDatabaseFacadeDependencies` was true. **D3 stands as written, unamended.**
+
+**The relational half throws and nothing on this path calls it.** The three members the relational
+interface adds — `RelationalConnection`, `RawSqlCommandBuilder`, `CommandLogger` — have no meaning
+on a client with no database, and the probe's implementation threw from all three. Every call still
+completed, because `SqlQueryRaw` reads only `QueryProvider`, `TypeMappingSource` and `AdHocMapper`,
+and all three are on the **core** interface. This is the shape ADR-013's amendment already records
+for `RelationalInfoCarrierTestStore`.
+
+**Two shapes for the registration, and the difference is who ships the class.**
+
+| | Who names `EFCore.Relational` | Cost to the consumer |
+|---|---|---|
+| **D1** — the application registers it | the application | writes the class, or copies it; the same seam as R85's `AddInfoCarrierAllowedTypes` and R95's `AddInfoCarrierArbitrarySqlExecution` |
+| **D2** — an optional companion package, e.g. `InfoCarrier.Core.Relational` | that package | one `PackageReference` and one call |
+
+D1 is what the probe used and is what proves the mechanism. **D2 is the better product** and costs
+nothing extra to build once D1 works: the class is the same class, and the reference becomes opt-in
+at the NuGet level rather than at the DI level. Neither is started; this is the owner's call.
+
+**Past the type test, the two roots behave differently, and both were measured.**
+
+1. **The scalar root is exactly the new work R102 predicted.** `SqlQueryRaw<int>` built a
+   `SqlQueryRootExpression` and the client refused it with *"`SqlQueryRootExpression` (Extension)
+   has no wire representation"*. A direct sibling of R95's `FromSqlQueryRootStubNode`, as priced.
+2. **The non-scalar root gets further than R102 expected, and dies somewhere else.**
+   `SqlQueryRaw<TDto>` for a navigation-free DTO reached `AdHocMapper.GetOrAddEntityType` on the
+   **client**, which built the entity type without complaint, produced a `FromSqlQueryRootExpression`
+   — R95's node, already crossing — and was then refused by **this provider's own type allowlist**,
+   naming the DTO. That refusal is ADR-008 constraint 2 working, and the answer to it is an ordinary
+   application registration: R85's `AddInfoCarrierAllowedTypes` on the server and `AllowTypes` on
+   the client. With the DTO admitted on both sides the query crossed the wire and the **server**
+   raised *"Entity type 'BlogRow' not found in the server model"*.
+
+**So R102's point 4 is confirmed, and it is now measured rather than reasoned.** The gap is not
+"getting an ad-hoc entity type across" — the client builds one and the node already crosses. The gap
+is that `ServerQueryExecutor.RebindQueryRoot` resolves through the server's model and the server has
+never been asked to create the matching ad-hoc type. What would close it is the server calling its
+own `AdHocMapper` when a `FromSqlQueryRootExpression` names a type its model does not hold, which is
+a smaller thing than a new capability but is still a change to the rebind path and to what the
+server will construct on a client's say-so. **It is the same security question the raw-SQL gate
+asked and it should be answered the same way.**
+
+**A type test that a DTO reached through `SqlQuery` is nothing like a type test a query root
+reached through the model**, and that is the whole reason the allowlist refused first: nothing in
+the model implies a `SqlQuery<T>` result type. Any work here starts from that, not from the SQL.
+
+**Still not taken, and still the owner's decision.** What changed is that the decision no longer has
+to be *"reverse D3 or drop two bases"*. The third option is real, was measured, and leaves the
+milestone exit criterion intact.
+
+#### D8 item 2 BUILT 2026-09-02 (R114, R115) — option D, and D3 untouched
+
+**The owner chose option D. It is built, and the count moved.** `failed` 143 → 141 on the shim
+alone, and `NorthwindSqlQueryTestBase` then adopted with **8 of 8 green on the first run**
+(`total` 29384 → 29392). Compliance missing bases **2 → 1**.
+
+**Two pieces, and only the second is product code.**
+
+1. **`InfoCarrierRelationalFacadeDependencies`** (`test/`, R114) implements
+   `IRelationalDatabaseFacadeDependencies` and is registered by the harness, which is an
+   application. `RelationalConnection`, `RawSqlCommandBuilder` and the relational `CommandLogger`
+   throw; nothing on this path calls them. **`InfoCarrier.Core` references nothing relational and
+   D3 stands as written.** A shipped `InfoCarrier.Core.Relational` package would hold this same
+   class — a packaging step, not a design one, costing a new `csproj`, `release.yml`'s package list
+   and three user-facing pages. Not taken.
+2. **`SqlQueryRootStubNode`** (`src/`, R115) carries EF's `SqlQueryRootExpression` across the wire.
+   **A scalar root is the one query root with no entity type**, so
+   `ServerQueryExecutor.RebindQueryRoot` answers it *before* it resolves one, rebuilding from the
+   CLR element type the wire carried. Same grant as `FromSqlQueryRootStubNode`, and
+   `RequireArbitrarySql` is now one method serving both because there is one grant.
+   `security-review.md` §5a has the addendum.
+
+**The trim ratchet caught the only mistake, and its lesson generalises.** Sharing one
+`ResolveRootType(string fullName)` between the two roots turned a `const`-folded literal into a
+**parameter**, which the trim analyzer cannot read: `IL2057`, 89 → 90, and the ratchet failed.
+Splitting the two `Type.GetType` calls back apart returned it to 89. **That is the same lesson as
+the `foreach`-not-`Select` note in the same file, from the other direction**: a suppression covers a
+member's own body, and so does the analyzer's ability to see a constant. `src/` changed, so both
+gates ran; `eng/measure.sh` and `eng/trim-ratchet.sh` are separate axes and this change failed one
+while passing the other.
+
+**What is still not built, and it is the other base.** `SqlQueryTestBase` (61 methods) projects into
+`UnmappedProduct` and `UnmappedCustomer`, which take EF down the ad-hoc entity-type path.
+Measured, not predicted: the **client's** `AdHocMapper` builds that entity type without complaint
+and R95's node carries it; the type allowlist refuses the DTO until an application admits it
+(R85's seam); and past that the **server** raises *"not found in the server model"*. Closing it
+means the server calling its own `AdHocMapper` when a raw-SQL root names a type its model does not
+hold — **the server constructing an entity type on a client's say-so**, which is a widening and
+gets its own security reading before it is taken.
+
+**`SqlExecutorTestBase` is not part of this and should never have been listed with it (R102).** Its
+first three tests are `Executes_stored_procedure`, `Executes_stored_procedure_with_parameter` and
+`Executes_stored_procedure_with_generated_parameter`: it is a stored-procedure base wearing a
+general name. **EF's own `SqliteComplianceTest` ignores it**, alongside `FromSqlSprocQueryTestBase`
+and `StoredProcedureUpdateTestBase`, and only SQL Server implements any of the three. So `ExecuteSql`
+is not what item 2 needs, and D8's original sentence pairing `SqlQuery<T>` with `Database.ExecuteSql`
+put a store limitation and a client limitation in one bucket.
+
+**Where the numbers at the top of D8 came out (R100).** Of the **27** failures, **25 are green**;
+the two that are not are `Delete_FromSql_converted_to_subquery`, whose cause is a harness mismatch
+between `NorthwindRelationalContext`'s table names and the core model this tier builds its store
+from (R97 fixed it, measured 236 other breakages, and reverted). Of the **6** missing bases,
+**`FromSqlQueryTestBase` and `GearsOfWarFromSqlQueryTestBase` are adopted**. The remaining four are
+one axis rather than four: `NorthwindSqlQueryTestBase`, `SqlQueryTestBase` and `SqlExecutorTestBase`
+are all item 2, and `FromSqlSprocQueryTestBase` needs stored procedures, which SQLite has not and
+for which EF ships no SQLite class.
 
 ## 7. Out of scope (initial release) — requirements §6
 

@@ -56,4 +56,21 @@ public enum NodeKind
     ///     (research-findings §2). Carries entity-type identity; rebound server-side.
     /// </summary>
     QueryRootStub = 14,
+
+    /// <summary>
+    ///     A query-root stub carrying raw SQL, standing in for EF Core's relational
+    ///     <c>FromSqlQueryRootExpression</c> (#60). A <see cref="QueryRootStub" /> that also
+    ///     carries the caller's SQL text and its arguments; rebound server-side, and only on a
+    ///     server that registered
+    ///     <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />.
+    /// </summary>
+    FromSqlQueryRootStub = 15,
+
+    /// <summary>
+    ///     A query-root stub carrying raw SQL whose result is a <em>scalar</em>, standing in for
+    ///     EF Core's relational <c>SqlQueryRootExpression</c> (#56). The sibling of
+    ///     <see cref="FromSqlQueryRootStub" />, and separate from it because a scalar root has no
+    ///     entity type for the server to resolve. Same grant, same default refusal.
+    /// </summary>
+    SqlQueryRootStub = 16,
 }

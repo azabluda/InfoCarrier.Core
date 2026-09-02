@@ -34,8 +34,18 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
+            // EF wraps a failed column read into `ErrorMaterializingProperty*` ONLY when detailed
+            // errors are on -- the try/catch around the read is emitted by
+            // `ShaperProcessingExpressionVisitor` under `if (_detailedErrorsEnabled ...)`. Here the
+            // read happens on the SERVER, and a shared fixture's own `AddOptions` deliberately does
+            // not reach it (A29), so the server had detailed errors off and a raw
+            // `SqliteException: The data is NULL at ordinal 5` crossed where EF's own message was
+            // expected. This is the server half of what the fixture already asks of the client.
+            onAddOptions: b => b.EnableDetailedErrors(),
             serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+            arbitrarySqlExecution: true);
 
     /// <summary>
     ///     Snaps <c>OrderDetail.Discount</c> back to its two-decimal value after seeding.
@@ -62,8 +72,12 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     {
         await base.SeedAsync(context);
 
+        // The table name is `NorthwindInfoCarrierSqliteServerContext`'s, which maps `OrderDetail`
+        // to "Order Details" so the relational spec bases can write that name into their own raw
+        // SQL. This statement is the only other place the name is written by hand, and R97 moved
+        // one without the other.
         await context.Database.ExecuteSqlRawAsync(
-            """UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)""");
+            """UPDATE "Order Details" SET "Discount" = round("Discount", 2)""");
     }
 
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)

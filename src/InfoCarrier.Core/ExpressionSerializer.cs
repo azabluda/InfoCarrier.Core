@@ -55,6 +55,12 @@ public class ExpressionSerializer(
     ///     DI (which is scoped to the context).
     /// </summary>
     /// <param name="model">The server's EF model.</param>
+    /// <param name="allowedTypes">
+    ///     Extra types a payload may name on this server
+    ///     (<see cref="IInfoCarrierAllowedTypes" />). <b>This is the security boundary</b>: the
+    ///     client's matching list only decides what it sends. See <c>docs/security-review.md</c>
+    ///     section 2.
+    /// </param>
     /// <param name="valueMappers">
     ///     The server's <see cref="ValueMapping.IInfoCarrierValueMapper" /> chain. A value the
     ///     wire cannot walk has to be mapped on <em>both</em> halves, and the server's half is
@@ -64,10 +70,11 @@ public class ExpressionSerializer(
     /// </param>
     public static ExpressionSerializer CreateForModel(
         Microsoft.EntityFrameworkCore.Metadata.IModel model,
-        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null)
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null,
+        IEnumerable<Type>? allowedTypes = null)
     {
         var typeMapper = new TypeNodeMapper(model);
-        var typeResolver = new TypeNodeResolver(model);
+        var typeResolver = new TypeNodeResolver(model, TypeAllowlist.ForModel(model, allowedTypes));
         var valueMapper = new DynamicValueMapper(model, typeMapper, typeResolver, valueMappers);
         var forward = new ExpressionToNodeTranslator(typeMapper, valueMapper);
         return new ExpressionSerializer(forward, typeResolver, valueMapper);

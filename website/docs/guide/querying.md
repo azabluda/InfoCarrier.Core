@@ -115,9 +115,17 @@ local change tracker.
 
 ## What is not part of the surface
 
-Relational-only APIs are not part of this provider: `FromSql`, `Database.ExecuteSqlRaw`,
-`GetDbTransaction`, migrations and `EnsureCreated`. Schema management and raw SQL belong on the
-server, where the real provider is. Expose them as server-side operations of your own.
+Relational-only APIs are not part of this provider: `Database.ExecuteSqlRaw`, `GetDbTransaction`,
+migrations and `EnsureCreated`. Schema management belongs on the server, where the real provider is.
+Expose it as a server-side operation of your own.
+
+`FromSql` works, but only where the server opts in. The server calls
+`services.AddInfoCarrierArbitrarySqlExecution()` and the client `o.AllowArbitrarySqlExecution()`.
+Without both, the query is refused like any untranslatable one.
+
+Grant it with care. One command text runs every statement in it, and an uncomposed `FromSql` reaches
+the database unchanged, so a caller who has the grant can run any SQL the database allows, with the
+server's own rights. The server's query filters are not in such a query.
 
 ## Round trips and result size
 

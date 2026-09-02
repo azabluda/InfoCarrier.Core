@@ -143,8 +143,8 @@ EF Core provider.
 
 ### Queries this provider answers that other providers do not
 
-Five other scenarios in EF's suite assert that a provider either rejects the query or returns the
-wrong rows. This provider answers all five correctly. A test suite you port from another provider
+Four other scenarios in EF's suite assert that a provider either rejects the query or returns the
+wrong rows. This provider answers all four correctly. A test suite you port from another provider
 will expect an exception, and LINQ that relies on this will not run unchanged there.
 
 Composing LINQ over a collection stored through a value converter:
@@ -161,21 +161,6 @@ context.Dashboards
     .Select(d => new { d.Name, Heights = d.Layouts.Select(l => l.Height).ToList() })
     .ToList();
 // EF Core providers: throws.   This provider: returns the rows.
-```
-
-`Contains` over a collection of enums stored as a string:
-
-```csharp
-modelBuilder.Entity<User>()
-    .Property(e => e.Roles)               // List<Role> stored as "Seller,Buyer"
-    .HasConversion(
-        v => string.Join(',', v),
-        v => ParseRoles(v),
-        roleComparer);
-
-var role = Role.Seller;
-context.Users.Where(u => u.Roles.Contains(role)).ToList();
-// EF Core providers: throws.   This provider: returns the matching rows.
 ```
 
 Filtering a complex collection, then `Contains`:
@@ -220,7 +205,7 @@ These are not defects. They follow from where the client sits.
 
 | | |
 |---|---|
-| Relational-only APIs, such as `FromSql`, `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
+| Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |

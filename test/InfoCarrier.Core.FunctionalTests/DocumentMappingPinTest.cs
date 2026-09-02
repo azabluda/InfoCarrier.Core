@@ -4,6 +4,7 @@ using InfoCarrier.Core.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using System.Reflection;
 using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
@@ -85,6 +86,86 @@ public class DocumentMappingPinTest
             InfoCarrierHierarchyMappingConvention.TpcMappingStrategy);
     }
 
+    // `InfoCarrierEvaluatableExpressionFilter`'s one, and it is a TYPE name rather than an
+    // annotation name -- but it is named by string for exactly the same reason and fails the same
+    // silent way. A rename would stop the filter matching, `EF.Functions.Collate` over a constant
+    // operand would go back to being evaluated on the client, and the only symptom is EF's own
+    // "switched to client-evaluation" from a query that used to work.
+    [ConditionalFact]
+    public void The_relational_DbFunctions_host_name_is_still_EFs()
+        => Assert.Equal(
+            InfoCarrierEvaluatableExpressionFilter.RelationalDbFunctionsExtensionsName,
+            typeof(RelationalDbFunctionsExtensions).FullName);
+
+    // `ModelDbFunctions`, and this one is pinned TWICE because it names two things by string: the
+    // annotation, and the `MethodInfo` property on the value behind it. The second is read by
+    // reflection, so a rename would not even fail to compile -- it would answer "this model maps no
+    // functions", which puts every mapped function back to being refused at the client boundary and
+    // client-evaluated into its own `throw`. That is 81 tests, silently.
+    [ConditionalFact]
+    public void The_db_functions_annotation_name_is_still_EFs()
+        => Assert.Equal(
+            ModelDbFunctions.DbFunctionsAnnotation,
+            RelationalAnnotationNames.DbFunctions);
+
+    [ConditionalFact]
+    public void The_db_function_methods_agree_with_EFs_own_GetDbFunctions()
+    {
+        using var context = new DbFunctionPinContext();
+        IModel model = context.Model;
+
+        // EF's own answer, through the API this provider cannot call.
+        List<MethodInfo> expected = model.GetDbFunctions()
+            .Select(f => f.MethodInfo)
+            .OfType<MethodInfo>()
+            .OrderBy(m => m.Name)
+            .ToList();
+
+        List<MethodInfo> actual = ModelDbFunctions.ForModel(model)
+            .OrderBy(m => m.Name)
+            .ToList();
+
+        // Asserted rather than hoped for: a model with no functions would satisfy the equality
+        // below while proving nothing, and that is exactly the failure mode a rename produces.
+        Assert.Equal(2, expected.Count);
+        Assert.Equal(expected, actual);
+
+        // And the empty case, which is every other fixture in this suite.
+        using var plain = new PinContext();
+        Assert.Empty(ModelDbFunctions.ForModel(plain.Model));
+    }
+
+    // `InfoCarrierQueryFilterRewritingConvention`'s two. The second is derived from EF rather than
+    // written down: the methods the convention must leave alone are exactly those on this class
+    // whose FIRST parameter is a `DbSet<>`, because that is the parameter core EF's rewriter fills
+    // with an `IQueryable`. A new overload group EF adds would fail this test rather than fail a
+    // caller's model build with `ArgumentException`.
+    [ConditionalFact]
+    public void The_FromSql_host_name_is_still_EFs()
+        => Assert.Equal(
+            InfoCarrierQueryFilterRewritingConvention.FromSqlDeclaringTypeName,
+            typeof(RelationalQueryableExtensions).FullName);
+
+    [ConditionalFact]
+    public void Every_DbSet_taking_method_EF_declares_there_is_one_the_convention_leaves_alone()
+    {
+        string[] takingADbSet = typeof(RelationalQueryableExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(m => m.GetParameters() is [{ ParameterType: { IsGenericType: true } first }, ..]
+                && first.GetGenericTypeDefinition() == typeof(DbSet<>))
+            .Select(m => m.Name)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        // Asserted rather than hoped for, as above: an empty set would satisfy the equality below
+        // while proving nothing.
+        Assert.NotEmpty(takingADbSet);
+        Assert.Equal(
+            InfoCarrierQueryFilterRewritingConvention.FromSqlMethodNames.Order().ToArray(),
+            takingADbSet);
+    }
+
     [ConditionalFact]
     public void The_walk_agrees_with_EF_for_every_type_including_nested_ones()
     {
@@ -124,6 +205,30 @@ public class DocumentMappingPinTest
         Assert.Equal(2, inContainer);
         Assert.Null(mapping.FindContainerName(model.FindEntityType(typeof(PinOwner))!));
         Assert.NotNull(mapping.FindContainerName(model.FindEntityType(typeof(PinDetail))!));
+    }
+
+    private class DbFunctionPinContext : DbContext
+    {
+        public static int Doubled(int value)
+            => throw new NotSupportedException();
+
+        public static string Tagged(string value)
+            => throw new NotSupportedException();
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+            => optionsBuilder.UseSqlite("Data Source=:memory:");
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<DbFunctionPinEntity>();
+            modelBuilder.HasDbFunction(typeof(DbFunctionPinContext).GetMethod(nameof(Doubled))!);
+            modelBuilder.HasDbFunction(typeof(DbFunctionPinContext).GetMethod(nameof(Tagged))!);
+        }
+    }
+
+    private class DbFunctionPinEntity
+    {
+        public int Id { get; set; }
     }
 
     private class PinOwner

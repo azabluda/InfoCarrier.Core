@@ -29,12 +29,19 @@ public sealed class QuerySplitter
         nameof(EntityFrameworkQueryableExtensions.AsNoTrackingWithIdentityResolution),
         nameof(EntityFrameworkQueryableExtensions.IgnoreQueryFilters),
         nameof(EntityFrameworkQueryableExtensions.IgnoreAutoIncludes),
-        "AsSplitQuery",
-        "AsSingleQuery",
     ];
+
+    // The two relational query hints, which this provider cannot honour and strips outright --
+    // see `SplitHintStrippingVisitor` below. Named as strings because `InfoCarrier.Core` does not
+    // reference `EFCore.Relational` (M9), so `RelationalQueryableExtensions` is not a type here.
+    private const string RelationalQueryableExtensionsFullName
+        = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions";
+
+    private static readonly HashSet<string> SplitHints = ["AsSplitQuery", "AsSingleQuery"];
 
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
+    private readonly bool _arbitrarySqlAllowed;
     private readonly ServerBoundaryAnalyzer _analyzer;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Query>? _queryLogger;
 
@@ -52,14 +59,21 @@ public sealed class QuerySplitter
     ///     instead. Optional because the splitter is also constructed in tests that have no
     ///     context; a null one simply skips those checks.
     /// </param>
+    /// <param name="arbitrarySqlAllowed">
+    ///     Whether this client may send a query carrying raw SQL (#60), from
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />. Default
+    ///     <c>false</c>, which is the refusal every caller had before it existed.
+    /// </param>
     public QuerySplitter(
         IModel model,
         TypeAllowlist? allowlist = null,
-        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null)
+        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null,
+        bool arbitrarySqlAllowed = false)
     {
         _model = model;
         _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
-        _analyzer = new ServerBoundaryAnalyzer(_allowlist);
+        _arbitrarySqlAllowed = arbitrarySqlAllowed;
+        _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed);
         _queryLogger = queryLogger;
     }
 
@@ -103,6 +117,27 @@ public sealed class QuerySplitter
         // it. Left alone, `IgnoreQueryFilters(["ActiveFilter", "NameFilter"])` was unshippable
         // whole, so only the query root travelled and the marker stayed on the client where it
         // does nothing at all — the server applied the filters the caller had just excluded.
+        // `AsSplitQuery` and `AsSingleQuery` are relational hints about how many statements the
+        // store issues. This provider issues none, so there is nothing here for them to mean, and
+        // they are removed before anything else reads the tree.
+        //
+        // THEY USED TO BE LISTED IN `QueryMarkers` AND STRIPPED NOWHERE. That set is only ever
+        // consulted by `MarkerStrippingVisitor`, whose first test is
+        // `DeclaringType == typeof(EntityFrameworkQueryableExtensions)` -- and both hints are
+        // declared on `RelationalQueryableExtensions`, so neither entry could ever match. What
+        // happened instead is that the boundary analyzer met a call it did not know and cut
+        // *below* it: the server ran whatever was under the hint, and the client applied
+        // `AsSplitQuery` to a materialized `EnumerableQuery`, where EF's own method returns its
+        // source untouched because the provider is not an `EntityQueryProvider`. On a hint at the
+        // top of the chain that is invisible -- the whole query is under it and the answer is
+        // right, which is how it read as "silently ignored" (plan step R47). On a hint at a
+        // *nested* query root it is not: the cut is forced below that root, so an `Include` or a
+        // navigation above it has no server query to read from. Measured on EF's three
+        // `*SplitQueryRelationalTestBase` classes, which insert the hint at every root: 456 of 638
+        // failing, 106 of them this provider's own "reads navigation X, but no query sent to the
+        // server returned it", and the rest wrong answers.
+        query = new SplitHintStrippingVisitor().Visit(query)!;
+
         query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
 
         // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
@@ -123,6 +158,7 @@ public sealed class QuerySplitter
         query = ProjectionRewriter.Rewrite(query, _analyzer, out IReadOnlySet<Expression> reassemblies, rootRebuild);
 
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
+
 
         if (analysis.IsWhollyServerExecutable)
         {
@@ -204,7 +240,7 @@ public sealed class QuerySplitter
 
         foreach (Expression node in nodes)
         {
-            if (!ServerBoundaryAnalyzer.IsSerializableKind(node))
+            if (!ServerBoundaryAnalyzer.IsSerializableKind(node, _arbitrarySqlAllowed))
             {
                 return $"'{Abbreviate(node)}' ({node.NodeType}) has no wire representation.";
             }
@@ -603,11 +639,22 @@ public sealed class QuerySplitter
         // EF's own wording, down to the details clause — the spec suite asserts it
         // (`AssertTranslationFailed` / `WithDetails`), and a caller who has seen this message
         // from any other provider should not have to learn a second one.
+        //
+        // `ExpressionPrinter.Print` AND NOT `ToString()`, which is how EF renders every one of
+        // these messages (`QueryableMethodTranslatingExpressionVisitor`,
+        // `NavigationExpandingExpressionVisitor`). `Expression.ToString()` has no case for an
+        // extension node, so it prints the TYPE NAME in brackets — a caller was told
+        // `The LINQ expression '[Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression]'
+        // could not be translated` where every other provider says `DbSet<MockEntity>()`. The
+        // wording was already EF's; the expression inside it was not, and R117 found that by
+        // re-reading a failure rather than by reading this code.
+        string printed = Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(offender);
+
         throw new InvalidOperationException(
             details is null
-                ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(offender.ToString())
+                ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(printed)
                 : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
-                    offender.ToString(), details));
+                    printed, details));
     }
 
     /// <summary>
@@ -910,6 +957,17 @@ public sealed class QuerySplitter
 
             return Expression.Constant(array, declared);
         }
+    }
+
+    private sealed class SplitHintStrippingVisitor : ExpressionVisitor
+    {
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+            => node.Method.IsStatic
+                && node.Arguments.Count == 1
+                && SplitHints.Contains(node.Method.Name)
+                && node.Method.DeclaringType?.FullName == RelationalQueryableExtensionsFullName
+                    ? Visit(node.Arguments[0])
+                    : base.VisitMethodCall(node);
     }
 
     private sealed class MarkerStrippingVisitor : ExpressionVisitor
@@ -1369,6 +1427,64 @@ public sealed class QuerySplitter
                 && !allowlist.IsAllowed(type)
                 && type.GetMethod(nameof(Equals), [typeof(object)])?.DeclaringType == typeof(object);
 
+        /// <summary>
+        ///     A method invoked on the caller's own <see cref="DbContext" /> instance.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>Being nameable on the wire is not the same as being shippable, and the two
+        ///         were conflated.</b> The clause above refuses a method whose declaring type the
+        ///         allowlist does not admit. R84 admitted the declaring type of every
+        ///         <c>HasDbFunction</c> mapping so that the call could be <em>named</em> — and for
+        ///         a function mapped as an <em>instance</em> method that type is the caller's
+        ///         <c>DbContext</c>, so this clause stopped firing while the call remained
+        ///         unshippable for a different reason: its <c>Object</c> is a
+        ///         <c>ConstantExpression</c> holding the live client context, which no wire can
+        ///         carry.
+        ///     </para>
+        ///     <para>
+        ///         <b>The result was the exact failure this class exists to prevent.</b> Measured
+        ///         with a boundary probe on
+        ///         <c>Scalar_Function_Where_Correlated_Instance</c>: the analysis returned
+        ///         <c>shippable=1</c> — the bare query root — and the client filtered the whole
+        ///         table locally. Nothing refused it, because the only refusal that would have
+        ///         read the declaring type now finds it allowed. The reasons diff across R84 shows
+        ///         the same thing at scale: <b>38 <c>TranslationFailed</c> refusals disappeared</b>
+        ///         and became 18 client evaluations and 15 "no part of the query can be executed".
+        ///     </para>
+        ///     <para>
+        ///         <b><see cref="DbContext" />'s own API is exempt</b>, and the test is where the
+        ///         method is <em>declared</em>. <c>Set&lt;T&gt;()</c> is declared on
+        ///         <see cref="DbContext" /> and names a query root the server rebinds against its
+        ///         own model (<c>QueryRootStubNode</c>); a function mapped by
+        ///         <c>HasDbFunction</c> is declared on the caller's derived context and has no
+        ///         such rebinding. That difference is the whole rule.
+        ///     </para>
+        ///     <para>
+        ///         <b>This refuses; it does not make the call work.</b> Making an instance-mapped
+        ///         function cross would need a wire node that resolves to the <em>server's</em>
+        ///         context, which is a new capability handed to a payload and therefore a
+        ///         <c>security-review.md</c> question rather than a rewrite. Refusing is what
+        ///         every other EF provider does with a call it cannot translate.
+        ///     </para>
+        /// </remarks>
+        private static bool IsCallOnTheClientsContext(
+            MethodCallExpression node,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Type? contextType)
+        {
+            if (node.Object is ConstantExpression { Value: DbContext } instance
+                && node.Method.DeclaringType is { } declaring
+                && typeof(DbContext).IsAssignableFrom(declaring)
+                && declaring != typeof(DbContext))
+            {
+                contextType = instance.Type;
+                return true;
+            }
+
+            contextType = null;
+            return false;
+        }
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (_found is not null)
@@ -1381,6 +1497,14 @@ public sealed class QuerySplitter
                 _found = new ClientCodeReason(
                     Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
                         DisplayName(declaring), node.Method.Name));
+                return node;
+            }
+
+            if (IsCallOnTheClientsContext(node, out Type? contextType))
+            {
+                _found = new ClientCodeReason(
+                    Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.QueryUnableToTranslateMethod(
+                        DisplayName(contextType), node.Method.Name));
                 return node;
             }
 

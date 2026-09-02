@@ -60,6 +60,32 @@ public struct SharedTestStoreProperties
     public Action<DbContext, DbContext>? CopyDbContextParameters;
 
     /// <summary>
+    ///     The lifetime of the server context's <see cref="DbContextOptions" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <see cref="ServiceLifetime.Singleton" /> for every fixture but one, because the
+    ///         options never change: the connection string and the model are fixed for the store's
+    ///         lifetime, and building them once is what the whole suite wants.
+    ///     </para>
+    ///     <para>
+    ///         <b><see cref="ServiceLifetime.Transient" /> is for a fixture whose server options
+    ///         differ per REQUEST.</b> Only <c>NullSemanticsQueryInfoCarrierTest</c> needs it. Its
+    ///         base calls <c>CreateContext(useRelationalNulls: true)</c> in some tests and
+    ///         <c>false</c> in others, and <c>UseRelationalNulls</c> is a provider option that
+    ///         belongs to the server. Singleton options cannot express "this request wants
+    ///         relational nulls", so that fixture asks for transient ones and reads an ambient flag
+    ///         in its <see cref="OnAddOptions" />.
+    ///     </para>
+    ///     <para>
+    ///         Opt-in rather than the default, because transient options are rebuilt on every
+    ///         server context resolution — about 29,000 times in a full run — and no other fixture
+    ///         gets anything for the cost.
+    ///     </para>
+    /// </remarks>
+    public ServiceLifetime? ServerOptionsLifetime;
+
+    /// <summary>
     ///     Extra services the <em>server</em> provider needs.
     /// </summary>
     /// <remarks>
@@ -69,4 +95,26 @@ public struct SharedTestStoreProperties
     ///     asserts in <c>SeedAsync</c> that it ran, and the seed executes against the server.
     /// </remarks>
     public Func<IServiceCollection, IServiceCollection>? OnAddServices;
+
+    /// <summary>
+    ///     Whether this fixture's client and server both grant raw SQL execution (#60).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Per fixture, and default off, for the same reason
+    ///         <c>relationalClientStore</c> is</b> - the opt-in list is the record of which bases
+    ///         need it. A fixture that sets this gets
+    ///         <c>services.AddInfoCarrierArbitrarySqlExecution()</c> on the server and
+    ///         <c>o.AllowArbitrarySqlExecution()</c> on the client, which are the two halves of the
+    ///         seam and only the first of which is a security boundary.
+    ///     </para>
+    ///     <para>
+    ///         <b>Not granted suite-wide</b>, deliberately. The default refusal is what every other
+    ///         fixture exercises, and two of them assert it directly through
+    ///         <see cref="FromSqlAssertions" />. Granting globally would delete that coverage and
+    ///         claim, of every fixture in the suite, that its deployment had made a security
+    ///         decision it has not.
+    ///     </para>
+    /// </remarks>
+    public bool ArbitrarySqlExecution;
 }

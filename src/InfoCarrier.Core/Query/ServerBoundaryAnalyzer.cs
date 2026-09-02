@@ -28,9 +28,19 @@ namespace InfoCarrier.Core.Query;
 ///     Initializes a new instance of the <see cref="ServerBoundaryAnalyzer" /> class.
 /// </remarks>
 /// <param name="allowlist">The types the server will accept. Must match the server's.</param>
-public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
+/// <param name="arbitrarySqlAllowed">
+///     Whether this client may send a query carrying raw SQL (#60) - set from
+///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />, and
+///     <c>false</c> by default. It changes exactly one verdict, in
+///     <see cref="IsSerializableKind" />: whether EF's relational raw-SQL query root has a wire
+///     representation. <b>It is not a security boundary</b> - the server's own
+///     <see cref="IInfoCarrierArbitrarySqlExecution" /> registration is, and it refuses a
+///     raw-SQL payload however this client is configured.
+/// </param>
+public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist, bool arbitrarySqlAllowed = false)
 {
     private readonly TypeAllowlist _allowlist = allowlist;
+    private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
 
     /// <summary>
     ///     Analyzes a captured query tree.
@@ -39,7 +49,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var walker = new Walker(_allowlist);
+        var walker = new Walker(_allowlist, _arbitrarySqlAllowed);
         walker.Visit(root);
         return new BoundaryAnalysis(root, walker.Results);
     }
@@ -49,10 +59,37 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     ///     minimal set of research-findings §5 (block, loop, try, goto, switch, label) have no
     ///     wire representation, so a subtree containing one can never be shipped.
     /// </summary>
-    internal static bool IsSerializableKind(Expression node)
+    internal static bool IsSerializableKind(Expression node, bool arbitrarySqlAllowed = false)
         => node switch
         {
-            Microsoft.EntityFrameworkCore.Query.QueryRootExpression => true,
+            // The EXACT type, not the base. A query root carrying state beyond its entity type is
+            // a subclass, and `QueryRootStubNode` has no field for that state — so matching the
+            // base here shipped the subclass as a plain root and DROPPED what made it different.
+            // `FromSqlQueryRootExpression` (relational, `Sql` + `Argument`) is the case that found
+            // it: a `FromSqlRaw` with a `WHERE` came back as the whole table, silently. Refusing
+            // the subclass instead sends it down `QuerySplitter.RejectClientEvaluation`, which
+            // raises EF's own `TranslationFailed` — the answer every other provider gives for a
+            // construct it cannot translate. Named by shape rather than by type because
+            // `FromSqlQueryRootExpression` lives in `EFCore.Relational`, which this assembly does
+            // not reference (M9).
+            { } root when root.GetType() == typeof(Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression)
+                => true,
+
+            // The one subclass this wire does know, and only where the application asked for it
+            // (#60). `FromSqlQueryRootStubNode` carries the `Sql` and the arguments that the
+            // paragraph above records as having been dropped, and `RelationalQueryRootShape`
+            // names the type by shape for the same reason the comment above gives. Without the
+            // option this stays `false`, so the refusal below is unchanged and every existing
+            // caller sees EF's own `TranslationFailed`.
+            { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsFromSqlRoot(root) => true,
+
+            // Its scalar sibling, under the same grant (#56). `Database.SqlQuery<T>` produces this
+            // root for a `T` the type-mapping source recognises, and `SqlQueryRootStubNode` carries
+            // the same `Sql` and arguments. Same default refusal: without the option this is
+            // `false` and the caller sees EF's own `TranslationFailed`.
+            { } root when arbitrarySqlAllowed && RelationalQueryRootShape.IsSqlQueryRoot(root) => true,
+
+            Microsoft.EntityFrameworkCore.Query.QueryRootExpression => false,
             // Any other extension node — QueryParameterExpression included, though those are
             // substituted away before the split — has no translation.
             { NodeType: ExpressionType.Extension } => false,
@@ -66,6 +103,46 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     internal static bool IsQueryRoot(Expression node)
         => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression
             or ConstantExpression { Value: IQueryable };
+
+    /// <summary>
+    ///     Whether a node is the caller's live <see cref="DbContext" />, which nothing can ship.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A query filter or projection that calls a method <em>on the context</em> — a
+    ///         function mapped by <c>HasDbFunction</c> as an instance method is the ordinary way
+    ///         to get one — funcletizes to a <see cref="ConstantExpression" /> holding the client's
+    ///         own context object. It is not data, it is a live object graph with a connection, a
+    ///         change tracker and a service provider hanging off it, and the server has one of its
+    ///         own.
+    ///     </para>
+    ///     <para>
+    ///         <b>The type allowlist does not catch it, and cannot be asked to.</b> R84 admits the
+    ///         declaring type of every <c>HasDbFunction</c> mapping so the call can be
+    ///         <em>named</em> on the wire, and for an instance mapping that type is the context.
+    ///         Both outcomes were then wrong, and which one you got depended on nothing that
+    ///         matters — measured with a boundary probe on two contexts:
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             admitted: the whole query was judged shippable and the <b>server</b> tried to
+    ///             rebuild a <c>DbContext</c> from the payload —
+    ///             <c>"Cannot dynamically create an instance … no parameterless constructor"</c>.
+    ///         </item>
+    ///         <item>
+    ///             not admitted: the query was not shippable and not refused either, so the client
+    ///             fetched the whole table and ran the predicate locally.
+    ///         </item>
+    ///     </list>
+    ///     <para>
+    ///         Refusing it here makes both cases the same one: not server-ok, therefore not
+    ///         shipped, therefore examined by <c>QuerySplitter.RejectClientEvaluation</c>, which
+    ///         raises EF's own <c>TranslationFailed</c> — what every other provider answers for a
+    ///         call it cannot translate.
+    ///     </para>
+    /// </remarks>
+    internal static bool CarriesTheClientsContext(Expression node)
+        => node is ConstantExpression { Value: DbContext };
 
     /// <summary>
     ///     The element type of a queryable type, or the type itself when it is not one.
@@ -149,7 +226,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
     /// <summary>
     ///     Folds each node's verdict from its direct children, post-order.
     /// </summary>
-    private sealed class Walker(TypeAllowlist allowlist) : ExpressionVisitor
+    private sealed class Walker(TypeAllowlist allowlist, bool arbitrarySqlAllowed) : ExpressionVisitor
     {
         // One entry per direct child, popped when the parent folds them.
         private readonly List<NodeFacts> _pending = [];
@@ -166,7 +243,7 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
             int mark = _pending.Count;
             base.Visit(node);
 
-            bool serverOk = IsSerializableKind(node);
+            bool serverOk = IsSerializableKind(node, arbitrarySqlAllowed);
             bool hasRoot = IsQueryRoot(node);
             HashSet<ParameterExpression>? free = null;
 
@@ -193,6 +270,11 @@ public sealed class ServerBoundaryAnalyzer(TypeAllowlist allowlist)
             {
                 // The lambda binds its own parameters; anything left is bound further out.
                 free.ExceptWith(lambda.Parameters);
+            }
+
+            if (serverOk && CarriesTheClientsContext(node))
+            {
+                serverOk = false;
             }
 
             if (serverOk)

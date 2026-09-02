@@ -72,6 +72,25 @@ public class NorthwindInfoCarrierSqliteServerContext(DbContextOptions options) :
             WHERE "p"."Discontinued" = 0
             """);
 
+        // `NorthwindRelationalContext` maps this one `ToTable("Order Details")`, and the relational
+        // spec bases write that name into raw SQL by hand -- `NorthwindBulkUpdatesRelationalTestBase
+        // .Delete_FromSql_converted_to_subquery` has `FROM [Order Details]` in its source. This
+        // tier's server derives from the CORE `NorthwindContext`, where the table is `OrderDetails`,
+        // and builds its store from that model, so the base's SQL found no table. Its sibling
+        // `Update_FromSql_set_constant` passed untouched because it names `[Customers]`, which both
+        // models spell the same way -- which is what makes this a HARNESS mismatch and not anything
+        // about the wire.
+        //
+        // Server-side only, like everything else here: a table name is the store's business and no
+        // part of it crosses. Same shape as the `ProductView` and `Product.CategoryID` notes above.
+        //
+        // THE ONE OTHER PLACE THIS NAME IS WRITTEN BY HAND IS
+        // `NorthwindQueryInfoCarrierSqliteFixture.SeedAsync`, and R97 changed this line without
+        // that one: the seed's `UPDATE "OrderDetails"` then threw inside the shared store's
+        // initialization and took 236 tests in the classes sharing "Northwind" with it. Both are
+        // needed or neither.
+        modelBuilder.Entity<OrderDetail>().ToTable("Order Details");
+
         modelBuilder.Entity<CustomerQueryWithQueryFilter>().ToSqlQuery(
             """
             SELECT "c"."CompanyName", (

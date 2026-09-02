@@ -106,11 +106,44 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
         // query-root stubs (research-findings §2).
         if (node.Value is IQueryable queryable)
         {
+            TypeNode rootElement = RootElementType(
+                queryable.ElementType,
+                queryable.Expression as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression);
+
+            // A raw-SQL queryable captured as a constant - the same root as the extension branch
+            // below, reached when the caller closed over the `FromSql` query rather than writing
+            // it inline. Its state is carried, not dropped (#60).
+            if (RelationalQueryRootShape.TryRead(
+                queryable.Expression, out string? capturedSql, out Expression? capturedArgument))
+            {
+                _result = new FromSqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = type,
+                    Sql = capturedSql,
+                    Arguments = Translate(capturedArgument),
+                };
+                return node;
+            }
+
+            // The scalar sibling (#56). `Database.SqlQuery<T>` closed over and captured as a
+            // constant, exactly as the entity root above can be.
+            if (RelationalQueryRootShape.TryReadSqlQuery(
+                queryable.Expression, out string? capturedScalarSql, out Expression? capturedScalarArgument))
+            {
+                _result = new SqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = type,
+                    Sql = capturedScalarSql,
+                    Arguments = Translate(capturedScalarArgument),
+                };
+                return node;
+            }
+
             _result = new QueryRootStubNode
             {
-                ElementType = RootElementType(
-                    queryable.ElementType,
-                    queryable.Expression as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression),
+                ElementType = rootElement,
                 Type = type,
             };
             return node;
@@ -151,12 +184,47 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
         // EF Core's EntityQueryRootExpression (NodeType Extension) becomes a query-root stub.
         if (node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root)
         {
+            TypeNode rootElement = RootElementType(
+                root.ElementType,
+                root as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression);
+            TypeNode rootType = _typeMapper.ToTypeNode(node.Type);
+
+            // EF's relational raw-SQL root carries a SQL string and an argument expression that a
+            // plain stub has no field for, and dropping them is what silently returned the whole
+            // table before R75. `Translate` runs FIRST because it assigns `_result` itself (#60).
+            if (RelationalQueryRootShape.TryRead(root, out string? sql, out Expression? argument))
+            {
+                ExpressionNode arguments = Translate(argument);
+                _result = new FromSqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = rootType,
+                    Sql = sql,
+                    Arguments = arguments,
+                };
+                return node;
+            }
+
+            // The scalar sibling (#56), and it must be tested separately rather than folded into
+            // the branch above: `SqlQueryRootExpression` has NO entity type, so the server rebuilds
+            // it from the CLR element type instead of resolving one through its model.
+            if (RelationalQueryRootShape.TryReadSqlQuery(root, out string? scalarSql, out Expression? scalarArgument))
+            {
+                ExpressionNode scalarArguments = Translate(scalarArgument);
+                _result = new SqlQueryRootStubNode
+                {
+                    ElementType = rootElement,
+                    Type = rootType,
+                    Sql = scalarSql,
+                    Arguments = scalarArguments,
+                };
+                return node;
+            }
+
             _result = new QueryRootStubNode
             {
-                ElementType = RootElementType(
-                    root.ElementType,
-                    root as Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression),
-                Type = _typeMapper.ToTypeNode(node.Type),
+                ElementType = rootElement,
+                Type = rootType,
             };
             return node;
         }

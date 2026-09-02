@@ -85,16 +85,62 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
 
     public DbSet<Coded> Coded => Set<Coded>();
 
+    public DbSet<Located> Located => Set<Located>();
+
+    /// <summary>
+    ///     A store function mapped as an <em>instance</em> method on the context, for R89's pin.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Instance, and mapped, are both load-bearing.</b> R84 admits the declaring type
+    ///         of every <c>HasDbFunction</c> mapping to the allowlist so that the call can be
+    ///         <em>named</em> on the wire; for an instance mapping that type is this context. The
+    ///         pin is that being nameable did not make the call shippable — its <c>Object</c> is
+    ///         the live client context — and that it is therefore still refused.
+    ///     </para>
+    ///     <para>
+    ///         <b>It throws on purpose.</b> The failure guarded against is the client fetching the
+    ///         whole table and running this locally. A body returning a plausible answer would let
+    ///         that regression pass as a green count; a body that throws makes it arrive named, in
+    ///         the assertion message.
+    ///     </para>
+    /// </remarks>
+    public bool TitleIsLong(string? title)
+        => throw new NotSupportedException($"{nameof(TitleIsLong)} must never run on the client.");
+
+    /// <summary>
+    ///     The same thing declared by <b>attribute</b> rather than by <c>HasDbFunction</c>, for
+    ///     R91's probe of D7's <c>RelationalDbFunctionAttributeConvention</c> row.
+    /// </summary>
+    /// <remarks>
+    ///     That convention is relational, so only the server runs it. The probe asks whether the
+    ///     two models therefore disagree about which methods this model maps.
+    /// </remarks>
+    [DbFunction]
+    public static bool TitleIsShort(string? title)
+        => throw new NotSupportedException($"{nameof(TitleIsShort)} must never run on the client.");
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        // R89's pin. Mapping it is what puts this context type on the allowlist, which is the
+        // condition the pin is about; no test ever runs the function, so the store needs no
+        // definition for it.
+        modelBuilder.HasDbFunction(typeof(SqliteSmokeContext).GetMethod(nameof(TitleIsLong))!);
 
         modelBuilder.Entity<StructKeyed>()
             .Property(e => e.Id)
             .HasConversion(k => k.Value, v => new IntStructKey(v));
 
         modelBuilder.Entity<Addressed>().ComplexProperty(e => e.Address);
+
+        // An OWNED type one of whose values has no public CLR member -- it lives in a private
+        // field reached through an indexer. That is the shape R64 turns on: a value the wire can
+        // carry only if it knows the entity type, so a projection whose shape went unresolved
+        // dropped it silently while the public members beside it survived.
+        modelBuilder.Entity<Located>().OwnsOne(e => e.Address, b => b.IndexerProperty<string>("Line"));
 
         // An alternate key, which SQLite renders as a UNIQUE table constraint. It is the only
         // thing in this model that reaches CommandBatchPreparer.AddUniqueValueEdges' unique-
@@ -197,4 +243,124 @@ public class GuidKeyed
     public Guid Id { get; set; }
 
     public string? Label { get; set; }
+}
+
+/// <summary>
+///     An entity with an owned address, for R64's <c>LeftJoin</c> pin.
+/// </summary>
+/// <remarks>
+///     Modelled on <c>OwnedQueryTestBase.OwnedAddress</c>, which is where the defect was found:
+///     one value behind an indexer and one an ordinary property, so a wire that falls back to
+///     public CLR members loses exactly half of it and the loss is visible in one assertion.
+/// </remarks>
+public class Located
+{
+    public int Id { get; set; }
+
+    public LocatedAddress Address { get; set; } = new();
+}
+
+/// <summary>
+///     An owned address whose <c>Line</c> has no public CLR member.
+/// </summary>
+public class LocatedAddress
+{
+    private string? _line;
+
+    public string? City { get; set; }
+
+    public object? this[string name]
+    {
+        get => name == "Line"
+            ? _line
+            : throw new InvalidOperationException($"Indexer property with key {name} is not defined on {nameof(LocatedAddress)}.");
+
+        set
+        {
+            if (name != "Line")
+            {
+                throw new InvalidOperationException(
+                    $"Indexer property with key {name} is not defined on {nameof(LocatedAddress)}.");
+            }
+
+            _line = (string?)value;
+        }
+    }
+}
+
+/// <summary>
+///     The principal half of a table-split pair, carrying the concurrency token.
+/// </summary>
+public class SharedRoot
+{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
+
+    /// <summary>
+    ///     An application-managed concurrency token — the shape SQLite supports, since it has no
+    ///     native <c>rowversion</c>.
+    /// </summary>
+    public string? Version { get; set; }
+
+    public SharedDetail? Detail { get; set; }
+}
+
+/// <summary>
+///     The dependent half, which shares <see cref="SharedRoot" />'s table and has no token of
+///     its own. That is the shape <c>TableSharingConcurrencyTokenConvention</c> exists for.
+/// </summary>
+public class SharedDetail
+{
+    public int Id { get; set; }
+
+    public string? Note { get; set; }
+
+    public SharedRoot? Root { get; set; }
+}
+
+/// <summary>
+///     Two entity types split across one table, one of them carrying a concurrency token.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>A probe for D7's <c>TableSharingConcurrencyTokenConvention</c> row, and a context of
+///         its own so the model change reaches nothing else.</b> That convention is relational:
+///         where entity types share a table and only some carry a concurrency token, it gives the
+///         others a <em>shadow</em> token property named
+///         <c>_TableSharingConcurrencyTokenConvention_&lt;name&gt;</c> mapped to the same column.
+///         This client does not run it, so the server's model has a property the client's does
+///         not — and the property set is what <c>SaveChanges</c> sends.
+///     </para>
+///     <para>
+///         <b>EF ships no store-agnostic test for it.</b> Its only functional coverage is
+///         <c>OptimisticConcurrencySqlServerTest</c>, which is SQL Server's own class rather than
+///         a specification base and uses <c>rowversion</c>; the rest is a unit test in
+///         <c>EFCore.Relational.Tests</c>. So nothing this repository inherits can reach it, and
+///         a probe is the only way to know.
+///     </para>
+/// </remarks>
+public class TableSplitSmokeContext(DbContextOptions<TableSplitSmokeContext> options) : DbContext(options)
+{
+    public DbSet<SharedRoot> Roots => Set<SharedRoot>();
+
+    public DbSet<SharedDetail> Details => Set<SharedDetail>();
+
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.Entity<SharedRoot>(b =>
+        {
+            b.ToTable("Shared");
+            // BOTH clauses are required and only one is obvious. `FindConcurrencyColumns` skips
+            // a token that is not also `ValueGenerated.OnUpdate`, so an application-managed token
+            // -- the only kind SQLite has -- never reaches the convention at all.
+            b.Property(e => e.Version).IsConcurrencyToken().ValueGeneratedOnAddOrUpdate();
+            b.HasOne(e => e.Detail).WithOne(e => e.Root).HasForeignKey<SharedDetail>(e => e.Id);
+        });
+
+        modelBuilder.Entity<SharedDetail>().ToTable("Shared");
+    }
 }

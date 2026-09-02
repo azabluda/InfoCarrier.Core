@@ -1,6 +1,8 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Data.Common;
 using InfoCarrier.Core.Common;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +45,25 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             services = onAddServices(services);
         }
 
+        // The SERVER half of the raw-SQL seam (#60), and the half that is the security boundary.
+        // Absent unless the fixture asked, which is what makes the default a refusal rather than a
+        // hole -- `SqliteSmokeTest` builds its stores without going through a fixture and pins
+        // both directions.
+        if (testStoreProperties.ArbitrarySqlExecution)
+        {
+            services = services.AddInfoCarrierArbitrarySqlExecution();
+
+            // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type
+            // allowlist refuses one by default exactly as ADR-008 constraint 2 requires. R85's seam
+            // is what an application uses to admit it; the harness is an application, and it admits
+            // the store's own parameter type alongside the raw-SQL grant because the two are only
+            // ever wanted together.
+            if (StoreParameterType is { } parameterType)
+            {
+                services = services.AddInfoCarrierAllowedTypes(parameterType);
+            }
+        }
+
         services = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
             .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
@@ -73,7 +94,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
                 ServerContextType,
                 (s, b) => AddProviderOptions(b),
                 ServiceLifetime.Transient,
-                ServiceLifetime.Singleton);
+                _testStoreProperties.ServerOptionsLifetime ?? ServiceLifetime.Singleton);
 
         // Only when the fixture's context is a *subclass*. A spec fixture may be
         // `SharedStoreFixtureBase<DbContext>` — `LazyLoadProxyTestBase`'s is — and then this
@@ -174,6 +195,28 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public string ServerUrl => Name;
 
     /// <summary>
+    ///     Whether this store's fixture granted raw SQL execution (#60). Read by the client shells,
+    ///     which have to set the matching client-side option.
+    /// </summary>
+    public bool ArbitrarySqlExecution => _testStoreProperties.ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     The backing store's <see cref="DbParameter" /> type, when it has one - admitted on both
+    ///     sides alongside <see cref="ArbitrarySqlExecution" />.
+    /// </summary>
+    /// <remarks>
+    ///     Named by the STORE and not by this provider, which is the whole point of R85's seam:
+    ///     `InfoCarrier.Core` references no provider and cannot spell `SqliteParameter`.
+    /// </remarks>
+    public virtual Type? StoreParameterType => null;
+
+    /// <summary>
+    ///     An <b>unopened</b> connection carrying the backing store's connection string, for
+    ///     <c>RelationalTestStore</c> to read <c>ConnectionString</c> from. EXPERIMENT (decision 1).
+    /// </summary>
+    public virtual DbConnection CreateStoreConnection() => new SqliteConnection();
+
+    /// <summary>
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.
     /// </summary>
     public virtual DbContext CreateDbContext()
@@ -206,6 +249,27 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
     {
+        // `EnableDetailedErrors()` DOES NOT BELONG HERE, and R107 measured why. Adding it beside
+        // the line below -- the obvious generalization of R104, which turns it on for one fixture
+        // -- costs **68 `JsonQuerySqliteInfoCarrierTest` tests**, `failed` 143 -> 211.
+        //
+        // R109 found the cause and IT IS NOT THIS PROVIDER'S. One property loses its value:
+        // `JsonOwnedAllTypes.TestInt16Collection`, declared `IReadOnlyList<short>`. With the
+        // option on it materializes EMPTY; with it off it holds its three elements. That is the
+        // single `Expected: 3, Actual: 0` every one of the 68 stops at, because `AssertAllTypes`
+        // reaches it before it reaches anything else that differs.
+        //
+        // **Measured on the SERVER context, which is a plain EF Core SQLite context with no
+        // InfoCarrier code in the read path at all** -- the same 0 comes back from
+        // `Backend.CreateDbContext()` directly, before any request crosses the wire, and the
+        // client then faithfully reports what the server sent. EF's own
+        // `CreateReadJsonPropertyValueExpression` is the only place the option touches a JSON
+        // read: it wraps the read in a `TryCatch`, and `Utf8JsonReaderManager` is a `ref struct`
+        // passed by reference through it. A minimal model with an `IReadOnlyList<short>` in a
+        // `ToJson()` owned type does NOT reproduce, so the trigger needs more of EF's model than
+        // the property type alone; the mechanism is EF's to find.
+        //
+        // The switch stays per fixture regardless, and this repository has nothing to fix.
         builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
 
         // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a

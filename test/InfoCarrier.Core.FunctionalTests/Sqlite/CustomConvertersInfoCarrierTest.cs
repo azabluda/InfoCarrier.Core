@@ -1,7 +1,8 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
@@ -45,6 +46,34 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     /// </remarks>
     public override Task Can_insert_and_read_back_with_case_insensitive_string_key()
         => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <summary>
+    ///     <c>CustomConvertersSqliteTest</c>'s own override, adopted verbatim once R72 let the
+    ///     query reach the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This test used to pass here, and passing was the wrong answer.</b>
+    ///         <c>MessageGroup</c> is an enum nested in the generic
+    ///         <c>CustomConvertersTestBase&lt;TFixture&gt;</c>, so R72's allowlist defect refused
+    ///         it, the boundary analyzer refused the <c>Contains</c> with it, and the projection
+    ///         split evaluated the whole <c>Where</c> on the client — which answers a query
+    ///         <b>SQLite cannot translate</b>. EF's own SQLite class overrides this test to assert
+    ///         exactly that refusal, which is CLAUDE.md's standing test for a newly-red SQLite
+    ///         test: the query now reaches SQL, and this is convergence with the reference
+    ///         provider rather than a regression.
+    ///     </para>
+    ///     <para>
+    ///         Its sibling <c>Collection_enum_as_string_Contains</c> moved the other way in the
+    ///         same run and needs no override: it asserts the refusal, this provider now raises
+    ///         it, and it goes green.
+    ///     </para>
+    /// </remarks>
+    public override void Value_conversion_on_enum_collection_contains()
+        => Assert.Contains(
+            CoreStrings.TranslationFailed("")[47..],
+            Assert.Throws<InvalidOperationException>(() => base.Value_conversion_on_enum_collection_contains()).Message);
 
     /// <summary>
     ///     Runs the query of <see cref="Composition_over_collection_of_complex_mapped_as_scalar" />
@@ -108,11 +137,15 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
 
     private const int CompositionSeedSecondId = 4002;
 
-    // `Value_conversion_on_enum_collection_contains` is EF's other behavioural SQLite override and
-    // is deliberately NOT taken. Adopting it measured `Assert.Throws() Failure: No exception was
-    // thrown`: the query this provider ships is answered rather than refused, so EF's assertion
-    // that SQLite cannot translate it is not true of this arrangement. An override that measurement
-    // disproves is a workaround, and CLAUDE.md says to delete it rather than keep it for symmetry.
+    // REVERSED BY R72, and the reason the earlier measurement disproved it is now known.
+    // `Value_conversion_on_enum_collection_contains` -- EF's other behavioural SQLite override --
+    // used to be left out of this class, because adopting it measured `Assert.Throws() Failure: No
+    // exception was thrown`. That reading was right about the evidence and wrong about the
+    // mechanism: the query was answered rather than refused only because `TypeAllowlist` denied
+    // `MessageGroup`, an enum nested in a generic type, so the `Contains` never reached the
+    // boundary as shippable. With the allowlist fixed the query reaches SQLite, SQLite refuses it
+    // exactly as EF says it does, and the override is adopted above. An override measurement
+    // disproves is still a workaround to delete -- what changed is that measurement.
 
     public class CustomConvertersInfoCarrierFixture : CustomConvertersFixtureBase
     {

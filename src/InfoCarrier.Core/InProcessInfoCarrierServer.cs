@@ -44,6 +44,30 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private IEnumerable<ValueMapping.IInfoCarrierValueMapper> ValueMappers
         => _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>();
 
+    /// <summary>
+    ///     The extra CLR types this server permits a payload to name
+    ///     (<see cref="Expressions.IInfoCarrierAllowedTypes" />).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider for the same reason the mappers are: a list of types has nothing
+    ///     to hold per request. Empty unless the application registered some, which is the closed
+    ///     default ADR-008 constraint 2 requires.
+    /// </remarks>
+    private IEnumerable<Type> AllowedTypes
+        => _serviceProvider.GetServices<Expressions.IInfoCarrierAllowedTypes>().SelectMany(a => a.Types);
+
+    /// <summary>
+    ///     Whether this server permits a payload to carry SQL it will execute
+    ///     (<see cref="IInfoCarrierArbitrarySqlExecution" />, #60).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider, like the two above, and absent unless the application
+    ///     registered it. <b>This is the security boundary for raw SQL</b> - see
+    ///     <c>docs/security-review.md</c> section 5a.
+    /// </remarks>
+    private bool ArbitrarySqlAllowed
+        => _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
+
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
@@ -52,8 +76,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers);
-            var executor = new ServerQueryExecutor(lease.Context, serializer);
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
+            var executor = new ServerQueryExecutor(lease.Context, serializer, ArbitrarySqlAllowed);
             return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -70,7 +94,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers);
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
             var executor = new ServerSaveChangesExecutor(
                 lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
             return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
