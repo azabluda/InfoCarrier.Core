@@ -2512,5 +2512,46 @@
 # re-reading. The 2026-08-29 entry summarises thirty-six at once, and the summary flattened two
 # mechanisms into the more interesting one. That is the shape to distrust first in the next batch.
 
+# 2026-09-02 (R112) -- RETRIAGE BATCH 2, and IT CORRECTS BATCH 1'S RULE. `failed` UNCHANGED at 143,
+# `total` unchanged at 29384. Nothing executable changed. Three more recorded reasons re-read, 13
+# more tests, **all three held**. Running total: 7 reasons, 62 of the 143, one wrong.
+#
+#  * The 8 `Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_split`
+#    -- one method in four classes, `SqliteStrings.ApplyNotSupported`. The 2026-08-30 entry says
+#    every one is a `_split` variant, that EF does not override them because on a relational client
+#    `AsSplitQuery` avoids `APPLY` entirely, and that here the marker never reaches the server so
+#    they run as a single query. **Checked against EF's own suites and it is exactly right**: the
+#    method is declared on `ManyToManyQueryRelationalTestBase` and
+#    `ManyToManyNoTrackingQueryRelationalTestBase` with a plain `AssertQuery` over
+#    `.Include(...OrderBy().Skip(1).Take(2)).ThenInclude(...).AsSplitQuery()`, and neither
+#    `EFCore.Sqlite.FunctionalTests` nor the relational specification assembly overrides it
+#    anywhere. So these are OURS by way of `SplitHintStrippingVisitor`, not SQLite's limitation --
+#    and the file already says so, in those words, and prices #60 from it.
+#  * The 3 `PrimitiveCollectionsQuerySqliteInfoCarrierTest` "no exception was thrown" -- the
+#    2026-08-31 entry names EF's own TODO as the cause (array indexing becomes a subquery with a
+#    `CAST`, the type-mapping inference does not propagate inside, the parameter is left without a
+#    mapping) and says this provider does not reach that state while the base's own result
+#    assertions still hold. Held.
+#  * The 2 `Collection_projection_before_set_operation_fails` -- held, and the entry does something
+#    better than hold: it names the sibling `Collection_projection_after_set_operation_fails_if_distinct`
+#    as PASSING, which is what narrowed the user-facing claim to the *before* shape.
+#
+# **BATCH 1'S RULE WAS TOO CRUDE AND THIS BATCH DISPROVES IT.** R111 wrote "a reason written per
+# test held; the one reason written per FAMILY did not". All three above are family reasons and all
+# three held. The real division is not how many tests a reason covers:
+#
+#   **A reason that names the MECHANISM held. The one that named the SYMPTOM did not.**
+#
+# "The marker never reaches the server so they run as a single query" is a mechanism, and it
+# survived being checked against EF's suites. "The base asserts that a correlated collection with
+# `Distinct` must be refused and this provider answers it" is a symptom -- true of 28 of the 36
+# tests it covered and false of the other 8, which assert a client-evaluation refusal instead. A
+# mechanism can be checked; a symptom can only be recognised, and recognition is what put two
+# mechanisms in one bucket.
+#
+# The three that held also share a second habit worth copying: each names something that is GREEN
+# -- a passing sibling, a base that overrides nothing, EF's own TODO -- so the reason can be
+# falsified by re-reading rather than only agreed with.
+
 failed=143
 total=29384

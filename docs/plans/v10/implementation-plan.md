@@ -3415,6 +3415,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       and gives each its own cause — fourteen for fourteen. The 2026-08-29 entry summarises
       thirty-six at once, and the summary flattened two mechanisms into the more interesting one.
 
+- [x] **R112. Retriage batch 2: three more reasons re-read, all three held, and batch 1's rule
+      corrected.** Documents only — `test/known-failures.txt`. `failed` unchanged at 143, `total`
+      unchanged at 29384. Nothing executable changed. Running total **7 reasons, 62 of the 143, one
+      wrong**.
+
+      **The 8 APPLY reds held, and holding them meant checking EF's suites.** One method in four
+      classes:
+      `Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_split`.
+      It is declared on `ManyToManyQueryRelationalTestBase` and its no-tracking twin as a plain
+      `AssertQuery` over `.Include(… OrderBy().Skip(1).Take(2)).ThenInclude(…).AsSplitQuery()`, and
+      **neither `EFCore.Sqlite.FunctionalTests` nor the relational specification assembly overrides
+      it anywhere** — so on EF's own SQLite provider it passes, because the split query avoids
+      `APPLY`. Here `SplitHintStrippingVisitor` removes the marker and the single query needs
+      `APPLY`, which SQLite has not. **These are ours, and the recorded reason already says so in
+      those words** and prices #60 from it.
+
+      **The 3 `PrimitiveCollectionsQuerySqlite` and the 2
+      `Collection_projection_before_set_operation_fails` held too.** The first names EF's own TODO
+      as the cause; the second names the passing sibling that narrowed the user-facing claim to the
+      *before* shape.
+
+      **R111's rule was too crude and this batch disproves it.** It said a reason written per test
+      held and the one written per family did not. All three above are family reasons and all three
+      held. The division is not how many tests a reason covers:
+
+      > **A reason that names the mechanism held. The one that named the symptom did not.**
+
+      *"The marker never reaches the server so they run as a single query"* can be checked against
+      EF's suites, and was. *"The base asserts that a correlated collection with `Distinct` must be
+      refused and this provider answers it"* can only be recognised, and recognition is what put two
+      mechanisms in one bucket. The three that held share a second habit worth copying: each names
+      something **green** — a passing sibling, a base that overrides nothing, EF's own TODO — so the
+      reason can be falsified by re-reading rather than only agreed with.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
