@@ -3623,6 +3623,52 @@ re-parents of families already running, because R25–R30 showed that is where t
       **Nothing in the 141 is of unknown standing, and that is now a re-derived statement rather
       than an inherited one.** The last whole-tail re-derivation was M9's archive, at thirteen.
 
+- [x] **R118. `InfoCarrier.Core.Relational` measured and filed, not built.** Documents only —
+      `architecture.md` §6a **D3 amendment**, `roadmap.md`'s deferred table, and
+      [#97](https://github.com/azabluda/InfoCarrier.Core/issues/97). Owner's idea, 2026-09-02.
+      Nothing executable changed and nothing is decided.
+
+      **What J5 actually did.** It removed the `EFCore.Relational` reference and paid for it in
+      string literals. Counted: **9 magic `Relational:` annotation strings** in four product files,
+      pinned by a **268-line** `DocumentMappingPinTest`; `RelationalQueryRootShape.cs` at **276
+      lines and 10 trim suppressions**, resolving two EF expression types by name;
+      `InfoCarrierHierarchyMappingConvention.cs` at **131 lines**, a deliberately narrower
+      hand-written copy of EF's `EntityTypeHierarchyMappingConvention`; and the 149-line document
+      mapping seam. **Every one is a fact computed twice by two providers** — the hazard `CLAUDE.md`
+      opens with. J5 did not remove it; it changed its shape from a reference to a string.
+
+      **The constraint that decides the design, read from EF's source.**
+      `EntityFrameworkRelationalServicesBuilder.TryAddCoreServices()` is **all-or-nothing and
+      collides with ADR-006**: it registers `IDatabase` → `RelationalDatabase`, and this provider
+      captures at `IDatabase.CompileQuery`. It also takes `IDbContextTransactionManager`,
+      `IDatabaseCreator`, `ITypeMappingSource`, `IAdHocMapper` and the whole SQL-generation stack.
+      **So "make the client relational" cannot mean calling that builder**, and EF publishes no seam
+      that splits its metadata half from its command half.
+
+      **Three levels, and only the third is risky.** Level 1 references the package and answers
+      today's strings behind seams — most of the deletion, almost no risk. Level 2 registers EF's
+      relational conventions on the client model. **Level 3 (`GetRelationalModel`) needs an
+      `IRelationalTypeMappingSource` the client cannot honestly have: that is B4, and it is why D3
+      was drawn where it is.**
+
+      **Worth about 14 of the 141, and about 8 that it must not touch.** Plausible: 3
+      `ModelBuilderGeneric…OwnedTypes`, 1 `Table_can_configure_TPT_with_Owned`, 2
+      `FromSqlRaw_queryable_simple_projection_composed`, 8 `_split` reds that
+      `SplitHintStrippingVisitor` creates. Not: the 4 `GetDbTransaction` and the 4
+      `Include_*_connection*`, which want a real connection on the client.
+
+      **Testing needs no re-parenting, and that was checked rather than assumed.** 52 test files and
+      117 declaration sites already sit on relational spec bases (ADR-013), and EF's own relational
+      bases derive from the core ones and override — the layering this repository copied. The
+      per-fixture switch exists too: `relationalClientStore`, used by 8 fixtures. **Tier A must not
+      get it**, because InMemory is not relational and a relational client over it would recreate the
+      disagreement the change exists to remove. The same bases running both ways *is* the
+      measurement.
+
+      **D3 is not reversed and the amendment says so twice.** The reference lives outside
+      `InfoCarrier.Core` under every level, so a non-relational backend — the other end of #96 —
+      stays possible.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
