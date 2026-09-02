@@ -847,7 +847,11 @@ no boundary change can be reached.
 
 **What it is worth.** Two missing bases, `NorthwindSqlQueryTestBase` and `SqlQueryTestBase`, both of
 which EF ships SQLite classes for; and 6 of the current failures, 4 in `FromSqlQueryInfoCarrierTest`
-and 2 in `SharedTypeQueryInfoCarrierTest`. **Every test in both bases routes through
+and 2 in `SharedTypeQueryInfoCarrierTest`. **The 6 is a count by class and R111 corrected it to 3 by
+cause**: `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters` (sync and async)
+and `Ad_hoc_query_for_shared_type_entity_type_works` are the only three whose stack trace reaches
+`GetFacadeDependencies`. The other ten failures in those two classes have four other causes. The
+bases are where item 2's value is; the current-failure figure never was. **Every test in both bases routes through
 `Database.SqlQuery`** — 137 call sites across the two files — so there is no partial adoption to
 take.
 

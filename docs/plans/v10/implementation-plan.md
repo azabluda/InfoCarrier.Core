@@ -3371,6 +3371,50 @@ re-parents of families already running, because R25–R30 showed that is where t
       of scope*. There is a third option, it was measured, and it leaves the milestone exit
       criterion intact.
 
+- [x] **R111. Retriage batch 1: four recorded reasons re-read, one wrong.** Documents only —
+      `test/known-failures.txt` gains a dated entry, `architecture.md` §6a D8 item 2 has one figure
+      corrected. `failed` unchanged at 143, `total` unchanged at 29384. Nothing executable changed.
+
+      **Why this exists.** Three standing classifications were examined last session and all three
+      were wrong (R97's, R98's, R77's). This batch covers **49 of the 143**, read out of
+      `artifacts/measure/r105.log` message *and first stack frame*, because the message alone is
+      what let R97's wrong reason stand.
+
+      **Wrong: the 36 TPT/TPC `GearsOfWar` reds are two mechanisms, not one.** The recorded reason
+      says the base refuses a correlated collection with `Distinct` and this provider answers it.
+      True for 7 of the 9 methods. The other two — `Where_coalesce_with_anonymous_types` and
+      `Correlated_collection_order_by_constant_null_of_non_mapped_type`, 8 tests across the two
+      hierarchies — are wrapped by `GearsOfWarQueryRelationalTestBase` in `AssertTranslationFailed`,
+      not in a `DistinctOnCollectionNotSupported` assertion. They assert a *client-evaluation*
+      refusal, which is a different thing entirely.
+
+      **And one of the two carries a cost the reason does not mention, measured with
+      `INFOCARRIER_SERVER_SQL=1`.** `Where_coalesce_with_anonymous_types` asks for
+      `where (new { … } ?? new { … }) != null select g.Nickname`, and the server ran
+      `SELECT` of **nine `Gear` columns and a discriminator**, joined to `Officers`, with no `WHERE`.
+      The anonymous type in the predicate puts the whole tail — predicate *and* projection — on the
+      client side of the boundary. **No rows are lost and the answer is right**: the predicate is a
+      tautology, so nothing could have been filtered. What is lost is W1's minimal-column payload.
+      Saying "we answer what other providers refuse" and stopping there hides that.
+      `Correlated_collection_order_by_constant_null_of_non_mapped_type` is benign under the same
+      probe — it orders by a constant null, and its base query has no predicate to lose.
+
+      **Held: three reasons, each checked to the stack frame.** The 7 "Relational-specific methods"
+      are one message from **two** call sites and the file already separates them — 4 at
+      `DbContextTransactionExtensions.GetDbTransaction` (ADR-013's shape), 3 at
+      `RelationalDatabaseFacadeExtensions.GetFacadeDependencies` (D3, D8 item 2). The 4
+      `Include_*_connection*` do stop at `RelationalTestStore.CloseConnection()`. The 2
+      `FromSqlRaw_queryable_simple_projection_composed` do throw inside the base method's own body.
+      R84 recorded all three correctly.
+
+      **One figure corrected.** D8 item 2's "6 current failures" counts by class; by cause it is
+      **3**. See the amendment.
+
+      **The rule this batch produced, and it is the one to carry into batch 2.** *A reason written
+      per test held; the one reason written per family did not.* R84's entry names fourteen tests
+      and gives each its own cause — fourteen for fourteen. The 2026-08-29 entry summarises
+      thirty-six at once, and the summary flattened two mechanisms into the more interesting one.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

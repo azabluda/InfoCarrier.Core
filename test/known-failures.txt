@@ -2449,5 +2449,68 @@
 # THE SWITCH STAYS PER FIXTURE, and the site carries a comment saying so. A one-line generalization
 # of a two-test win is exactly the shape nobody measures.
 
+# 2026-09-02 (R111) -- RETRIAGE BATCH 1. `failed` UNCHANGED at 143, `total` unchanged at 29384.
+# Nothing executable changed. Four recorded reasons were re-read against `artifacts/measure/r105.log`
+# -- the actual message AND the first stack frame, not the message alone -- covering 49 of the 143.
+# ONE OF THE FOUR IS WRONG, and the three that held share a property the wrong one does not.
+#
+# WRONG: the 36 TPT/TPC `GearsOfWar` reds are TWO mechanisms, not one. The 2026-08-29 entry above
+# reads "the base asserts that a correlated collection with `Distinct` MUST BE REFUSED, and this
+# provider answers it". That is right for 7 of the 9 distinct methods (28 tests): they come from
+# `GearsOfWarQueryRelationalTestBase`, which wraps each in
+# `Assert.ThrowsAsync<InvalidOperationException>` against
+# `RelationalStrings.DistinctOnCollectionNotSupported`.
+#
+# The other TWO methods -- `Where_coalesce_with_anonymous_types` and
+# `Correlated_collection_order_by_constant_null_of_non_mapped_type`, 8 tests across the two
+# hierarchies -- are not `Distinct` tests and have nothing to do with correlated collections. The
+# same relational base wraps them in `AssertTranslationFailed`, so what they assert is that a
+# CLIENT-EVALUATION refusal is raised. This provider does not raise it. Different mechanism,
+# different section of `limitations.md` if either is ever named there.
+#
+# AND ONE OF THE TWO CARRIES A COST THE ENTRY DOES NOT MENTION, measured with
+# `INFOCARRIER_SERVER_SQL=1` on `TPTGearsOfWarQueryInfoCarrierTest`:
+#
+#   Where_coalesce_with_anonymous_types  ->  SELECT g.Nickname, g.SquadId, g.AssignedCityName,
+#                                            g.CityOfBirthName, g.FullName, g.HasSoulPatch,
+#                                            g.LeaderNickname, g.LeaderSquadId, g.Rank, <disc>
+#                                            FROM Gears g LEFT JOIN Officers o ON ...
+#
+# The base's query is `where (new { .. } ?? new { .. }) != null select g.Nickname`. NINE COLUMNS AND
+# A DISCRIMINATOR CROSS WHERE `Nickname` ALONE WAS ASKED FOR, because the anonymous type in the
+# predicate puts the whole tail -- predicate and projection together -- on the client side of the
+# boundary. **No rows are lost and the answer is right**: the predicate is a tautology (`new {...}`
+# is never null), so nothing could have been filtered anyway. What is lost is W1, the minimal-column
+# payload. That is a cost, not a wrong answer, and it is the honest thing to say about it.
+#
+# `Correlated_collection_order_by_constant_null_of_non_mapped_type` is benign under the same probe:
+# its `OrderByDescending(s => (MyDTO)null)` orders by a constant and dropping it changes nothing,
+# and the base's own query has no predicate, so the join was always going to cross whole.
+#
+# HELD, all three, and each was checked to the stack frame:
+#
+#  * The 7 "Relational-specific methods can only be used ..." are ONE MESSAGE FROM TWO CALL SITES,
+#    and the file already separates them correctly. 4 arrive at
+#    `DbContextTransactionExtensions.GetDbTransaction` (`ExecuteDelete_throws_for_entity_splitting`
+#    and `ExecuteUpdate_works_for_table_sharing`, both pairs), which is ADR-013's non-virtual
+#    `UseTransaction` shape. 3 arrive at `RelationalDatabaseFacadeExtensions.GetFacadeDependencies`,
+#    which is D3 and D8 item 2. R84's entry names both causes and names them right.
+#  * The 4 `Include_*_connection*` really do stop at `RelationalTestStore.CloseConnection()`, the
+#    harness's own deliberate refusal, as R84 records.
+#  * The 2 `FromSqlRaw_queryable_simple_projection_composed` really do throw inside the base method's
+#    own body, casting the client's type mapping to `RelationalTypeMapping`, as R84 records.
+#
+# AND ONE FIGURE IS CORRECTED. D8 item 2 was priced as worth "6 of the current failures, 4 in
+# `FromSqlQueryInfoCarrierTest` and 2 in `SharedTypeQueryInfoCarrierTest`". That counts by CLASS.
+# By CAUSE it is **3**: `Multiple_occurrences_of_FromSql_with_db_parameter_adds_two_parameters`
+# (sync and async) and `Ad_hoc_query_for_shared_type_entity_type_works`. The other ten failures in
+# those two classes have four different causes and none is the D3 type test. The bases are still
+# where item 2's value is; the current-failure figure is not.
+#
+# THE RULE THIS BATCH PRODUCED. **A reason written per test held; the one reason written per FAMILY
+# did not.** R84's list names fourteen tests and gives each its own cause, and all fourteen survived
+# re-reading. The 2026-08-29 entry summarises thirty-six at once, and the summary flattened two
+# mechanisms into the more interesting one. That is the shape to distrust first in the next batch.
+
 failed=143
 total=29384
