@@ -3013,11 +3013,12 @@ re-parents of families already running, because R25–R30 showed that is where t
       server context from `NorthwindInfoCarrierSqliteServerContext`. Renaming the table in one of
       those contexts therefore splits the schema from the seed.
 
-      **Reverted, and the two stay red with their cause recorded.** The fix is not one line: it is
-      "every server context sharing the Northwind store agrees on the table name", which is a
-      harness change of a different size and buys two tests. **The class of mistake is the one
-      CLAUDE.md already names** — a per-class run and a full run answer different questions, and
-      only the second one knows about a shared store.
+      **Reverted, and the two stayed red until R101. The diagnosis in this entry was wrong and R101
+      says why.** It read "the fix is not one line: every server context sharing the Northwind store
+      must agree on the table name", which was inferred from the shape of the failure rather than
+      from its stack. The stack names one line in one file. **The half of this entry that stands is
+      the measurement**: a per-class run and a full run answer different questions, and only the
+      second one knows about a shared store.
 
 - [x] **R98. `FromSqlQueryTestBase` adopted — the first base #60 unblocks outright, and a
       `DbParameter` turns out to cross.** `test/` only. **`failed` 133 -> 147, a deliberate rise of
@@ -3074,6 +3075,28 @@ re-parents of families already running, because R25–R30 showed that is where t
       `RelationalDatabaseFacadeExtensions.GetFacadeDependencies` refuses before a query is built;
       `FromSqlSprocQueryTestBase` needs stored procedures, which SQLite has not and for which EF
       ships no SQLite class.
+
+- [x] **R101. The `Order Details` rename, done properly, and R97's diagnosis corrected.** `test/`
+      only. **`failed` 147 -> 145**, `total` unchanged at 29384. FIXED 2
+      (`Delete_FromSql_converted_to_subquery`, sync and async), BROKEN none.
+
+      **R97 reverted this for a reason that turned out to be wrong, and reading the stack is what
+      settled it.** The 236 breakages were not several server contexts disagreeing about a table
+      name. They were **one hand-written table name in one statement**:
+      `NorthwindQueryInfoCarrierSqliteFixture.SeedAsync` runs
+      `UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)`, the float-widening fix that
+      predates all of this. Renaming the table on the model without renaming it there threw inside
+      the shared store's initialization, and every class sharing "Northwind" then failed at
+      `SharedStoreFixtureBase.InitializeAsync`. The 236 were one exception, counted once per test.
+
+      **R97's entry asserted the general cause and this entry withdraws it.** The evidence for the
+      general claim was the *shape* of the failure (many classes, at seeding) and the shape was
+      consistent with both explanations. One `grep -m1 -A22` at the stack would have separated them
+      the same day, and did not cost anything when finally run. **An evidenced hypothesis can be
+      right about the evidence and wrong about the mechanism** is already in `CLAUDE.md`; this is
+      that, at its smallest.
+
+      Both places that name the table now carry a comment pointing at the other.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

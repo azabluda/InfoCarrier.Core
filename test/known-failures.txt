@@ -2368,5 +2368,17 @@
 # `GetFacadeDependencies` before a query is built) and `FromSqlSprocQueryTestBase` needs stored
 # procedures, which SQLite has not and for which EF ships no SQLite class.
 
-failed=147
+# 2026-09-02 (R101) -- `failed` 147 -> 145, `total` unchanged at 29384. FIXED 2
+# (`Delete_FromSql_converted_to_subquery`), BROKEN none. The names file moves with it.
+#
+# R97's DIAGNOSIS WAS WRONG AND THIS CORRECTS IT. The 236 breakages that made R97 revert were not
+# several server contexts disagreeing about a table name; they were ONE hand-written table name in
+# ONE statement -- `NorthwindQueryInfoCarrierSqliteFixture.SeedAsync`'s
+# `UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)`. Renaming the table on the model
+# without renaming it there threw inside the shared store's initialization, so every class sharing
+# "Northwind" failed at `SharedStoreFixtureBase.InitializeAsync`: one exception, counted once per
+# test. R97 inferred the general cause from the SHAPE of the failure, which was consistent with both
+# explanations; the stack was not read until now and separates them in one line.
+
+failed=145
 total=29384

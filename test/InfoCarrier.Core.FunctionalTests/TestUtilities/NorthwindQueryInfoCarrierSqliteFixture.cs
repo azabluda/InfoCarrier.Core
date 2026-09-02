@@ -64,8 +64,12 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     {
         await base.SeedAsync(context);
 
+        // The table name is `NorthwindInfoCarrierSqliteServerContext`'s, which maps `OrderDetail`
+        // to "Order Details" so the relational spec bases can write that name into their own raw
+        // SQL. This statement is the only other place the name is written by hand, and R97 moved
+        // one without the other.
         await context.Database.ExecuteSqlRawAsync(
-            """UPDATE "OrderDetails" SET "Discount" = round("Discount", 2)""");
+            """UPDATE "Order Details" SET "Discount" = round("Discount", 2)""");
     }
 
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)
