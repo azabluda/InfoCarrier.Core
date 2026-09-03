@@ -650,6 +650,24 @@ assertion, because a `RemoveAll` that stopped working would leave both and the l
 `AnnotationDocumentMapping` and `ModelDbFunctions` spell more. Each is a separate step with its own
 measurement, because deleting a string deletes its pin.
 
+#### D3 amendment 2026-09-03 (R129) — the conventions are not one job, and one of them cannot run here
+
+**`RelationalValueGenerationConvention` was tried and backed out: `failed` 160 -> 720, 560 broken,
+458 of them one message.** `The property '__synthesizedOrdinal' cannot be configured as
+'ValueGeneratedOnUpdate'`. That property is the ordinal EF synthesizes for a JSON-mapped collection,
+and EF's relational value generation reaches into relational **model** machinery around it that this
+client does not build. **Level 3 leaking into level 2.**
+
+**So level 2 is per convention, not per package.** This document scoped it as "register EF's own
+relational conventions", which reads as one job with one answer. It is not.
+`EntityTypeHierarchyMappingConvention` reads annotations and model metadata and runs here with no
+failure; `RelationalValueGenerationConvention` derives from a core convention and drags the
+relational model with it. **From outside they look alike. Each is its own experiment and needs its
+own full measurement.**
+
+`InfoCarrierValueGenerationConvention` therefore stays, with its two `Relational:` strings and their
+pin. Its own comment already said why it works: *"Narrow on purpose."*
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).

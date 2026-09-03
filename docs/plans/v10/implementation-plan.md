@@ -4161,6 +4161,43 @@ re-parents of families already running, because R25–R30 showed that is where t
       `Relational:` strings by hand, and `AnnotationDocumentMapping` and `ModelDbFunctions` spell
       more. One step each, one measurement each, because deleting a string deletes its pin.
 
+- [x] **R129. EF's `RelationalValueGenerationConvention` CANNOT run on a client model. Attempted,
+      measured, REVERTED.** Documents only in the end — the code change was made, measured and
+      backed out, so nothing executable changed and no gate applies. The tree is byte-identical to
+      R128, which `r128b` measured, so the baseline files do not move: `failed=160, total=29515`.
+
+      **The measurement: `failed` 160 -> 720. BROKEN 560, FIXED none.** One cause dominates:
+      **458 × `The property '__synthesizedOrdinal' cannot be configured as 'ValueGeneratedOnUpdate'`.**
+
+      **What it means, and it is the boundary of level 2 rather than a bug in the change.**
+      `__synthesizedOrdinal` is the ordinal property EF synthesizes for a JSON-mapped collection —
+      this repository already knows the name, because `AnnotationDocumentMapping.SynthesizedOrdinal`
+      pins it against `RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName`. EF's
+      relational value-generation convention reaches into relational **model** concepts around that
+      property, and the client does not build a relational model. **That is level 3 leaking into
+      level 2**, and level 3 is out of scope for the reason D3's charter now states.
+
+      **THE RULE THIS PRODUCES, AND IT IS THE PART THAT TRANSFERS.** D3 scoped level 2 as *"register
+      EF's own relational conventions on the client model"*, as though the conventions were one job
+      with one answer. **They are not interchangeable in cost, and the difference is not visible from
+      the outside.** `EntityTypeHierarchyMappingConvention` reads annotations and model metadata only
+      — it ran with no failure at all (R128). `RelationalValueGenerationConvention` derives from a
+      core convention and pulls relational model machinery with it — it broke 560 tests. **Each
+      convention is its own experiment and needs its own full measurement**, which is exactly what
+      taking them one at a time was for.
+
+      **`InfoCarrierValueGenerationConvention` stays, and its doc comment was already right.** It
+      says *"Narrow on purpose"*, and narrow is what makes it work: only a property whose
+      `ValueGenerated` is still `Never`, and only where the caller declared a default. Its two
+      `Relational:` strings and their `DocumentMappingPinTest` case stay with it.
+
+      **A partial run said this was fine and the full run said otherwise.** A filtered check over
+      `DocumentMappingPinTest` and `StoreGenerated*` reported 337 of 337 green, which is true and
+      says nothing: the 458 live in `AdHocJsonQuery*` and the JSON-mapped families, which that
+      filter never touched. Recorded because it is `CLAUDE.md`'s "never state a verdict from partial
+      output" arriving in a new disguise — the partial run was not read as a verdict, but it would
+      have been easy to.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
