@@ -3005,6 +3005,33 @@
 # exists. They were `SQLite Error 1: 'no such column: m0.Freight'` and are now
 # `Type 'System.ValueTuple`2[...UnmappedOrder...]'` -- the wire type allowlist refusing the tuple a
 # composed raw-SQL query projects. That is the next problem in the same tests, unaddressed.
+#
+# 2026-09-03 (R139) -- `failed` RISES 150 -> 151 and `total` RISES 29509 -> 29513. **A DELIBERATE
+# RISE, and the one test is red on purpose.** `UnmappedMemberBoundaryTest` adds four tests, three
+# green and one red:
+#   A_predicate_on_a_member_the_client_model_does_not_map_is_refused
+#
+# **THE DEFECT IT PINS.** This repository is two models. The client's model is the authority for
+# what is mapped, and nothing enforces that: `ServerBoundaryAnalyzer` admits every member read
+# without asking the model, and `QuerySplitter`'s client-code finder refuses only a METHOD the
+# server cannot run or a TYPE the wire cannot carry. A property the client ignores is neither, so
+# where the server's model happens to map it the query is translated and answered -- a query EF Core
+# refuses on every other provider returns data instead.
+#
+# **IT WAS INVISIBLE BECAUSE NOTHING COULD MAKE THE TWO MODELS DISAGREE.** Every fixture builds both
+# from one `OnModelCreating`. The R138 entry above found it by accident. `Shipment` in
+# `SmokeContext.cs` is the permanent version: the context ignores `Note` for both sides and the
+# store's own model customizer maps it on the server alone. The three green tests are the controls
+# -- the client model really lacks the property, the server model really has it, and the mapped
+# member beside it still works -- so the red one cannot pass by accident.
+#
+# **THE FIX IS WRITTEN AND NOT SHIPPED, and the reason is a measured trade.** Teaching both readers
+# the client model makes the pin pass and costs SIXTEEN spec tests: every one is a query that
+# already refused, where EF answers with a context-specific diagnostic a client-side check cannot
+# reproduce -- "invalid inside an 'Include' operation", `ExecuteUpdate`'s own message, and the
+# `string.Equals` overload named ahead of the member. Measured at `failed` 166. The choice between
+# 16 message-text differences and one silent wrong answer is the owner's. `findings.md` has the
+# full account.
 
-failed=150
-total=29509
+failed=151
+total=29513

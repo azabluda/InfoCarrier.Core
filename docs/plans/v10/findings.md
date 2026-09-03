@@ -36,10 +36,41 @@ ever made them disagree on this axis. It is R120's shape once more — a fact tw
 independently — except here the two readers are two *models*, and the disagreement widens what the
 client is allowed to do rather than narrowing it.
 
-**Not fixed, and not priced.** The shipped fix for R138 puts the columns in the store by
-`ALTER TABLE` and fills them from `NorthwindData.CreateOrders()`, so both models keep ignoring the
-properties and the eight stay green. That reproduces EF's prebuilt store exactly. It also puts the
-defect back out of sight, which is why it is written down here.
+**Pinned in the suite since R139, and it is red on purpose.**
+`UnmappedMemberBoundaryTest` builds the disagreement deliberately: `SqliteSmokeContext` ignores
+`Shipment.Note` for both sides and the store's own model customizer maps it on the server alone.
+Three of its four tests are controls -- the client model really lacks the property, the server model
+really has it and its column holds a value, and the mapped member beside it still works -- so the
+fourth cannot pass by accident. R138's own fix put the defect back out of sight; this brings it
+back into the count.
+
+**THE FIX IS WRITTEN, MEASURED AND NOT SHIPPED.** Two readers have to learn the client model:
+`ServerBoundaryAnalyzer`, so the subtree is not shipped, and `QuerySplitter`'s client-code finder,
+so it is refused rather than evaluated locally. **Both are needed** -- the analyzer's verdict alone
+refuses nothing, because the finder is what raises, and the finder never examines a node the
+analyzer marked shippable. With both, the pin passes and the refusal carries EF's own
+`QueryUnableToTranslateMember` wording.
+
+**It costs sixteen spec tests, and every one is a message difference on a query that already
+refused.** Measured at `failed` 166 against 150.
+
+| Family | What EF answers instead |
+|---|---|
+| `ComplexNavigationsCollectionsSharedType` and its split variant, `Multiple_complex_includes_self_ref` and `Complex_query_issue_21665` (8) | "The expression '...' is invalid inside an 'Include' operation" |
+| `NorthwindBulkUpdates.Update_unmapped_property_throws` (2) | `ExecuteUpdate`'s own message for setting an unmapped property |
+| `TPT`/`TPC` `GearsOfWar.Client_member_and_unsupported_string_Equals_in_the_same_query` (4) | the untranslatable `string.Equals` overload, named ahead of the member |
+| `NorthwindSelect.SelectMany_..._references_non_mapped_properties_...` (2) | its own |
+
+**Three narrowings were tried and none of them helps**, which is what makes this a trade rather than
+a bug in the attempt. Giving the member check the lowest priority within one argument does not help,
+because for most of these the refusal comes from the *analyzer* and never reaches the finder. Asking
+every entity type that shares a CLR type, rather than the one `FindEntityType` returns, is necessary
+for shared-type entity types but changes none of these. Excluding the `Include` and `ExecuteUpdate`
+argument positions does not help either, for the same reason as the first.
+
+**So the question is one for the owner**: sixteen message-text differences, against one query shape
+that silently answers where every other provider refuses. `website/docs/limitations.md` already
+records two message-text differences, so the category exists; sixteen more is a different order.
 
 **The rule that transfers: a guard that is never exercised is not evidence that it exists.** Eight
 tests asserted an unmapped-member refusal and passed, for two milestones, without the code under

@@ -4503,6 +4503,30 @@ re-parents of families already running, because R25–R30 showed that is where t
       unaddressed. This is exactly CLAUDE.md's "fixed what it aimed at and uncovered the next
       problem in the same tests" case, which a fixed/broken list alone cannot tell from a no-op.
 
+- [x] **R139. The unmapped-member defect is pinned in the suite, red on purpose, and the fix is
+      priced.** `test/` only, so `eng/measure.sh` alone. **`failed` RISES 150 -> 151 and `total`
+      29509 -> 29513**, both deliberate and both noted in `test/known-failures.txt`. FIXED none,
+      BROKEN one, and that one is the new pin. Release build `0 Error(s)`.
+
+      **What is pinned.** The client's model is the authority for what is mapped, and nothing
+      enforces it. `UnmappedMemberBoundaryTest` builds the only disagreement this repository can
+      produce: `SqliteSmokeContext` ignores `Shipment.Note` for both sides, and the store's own
+      model customizer maps it on the server alone. Three of the four tests are controls, so the red
+      one cannot pass by accident.
+
+      **THE FIX IS WRITTEN AND MEASURED AND NOT SHIPPED.** It needs BOTH readers to learn the client
+      model -- `ServerBoundaryAnalyzer` so the subtree is not shipped, and `QuerySplitter`'s
+      client-code finder so it is refused rather than evaluated locally -- because the analyzer's
+      verdict alone refuses nothing and the finder never examines a node the analyzer called
+      shippable. With both, the pin passes with EF's own `QueryUnableToTranslateMember` wording, and
+      **`failed` measures 166 against 150**: sixteen spec tests, every one a message difference on a
+      query that already refused. Three narrowings were tried and none helps. The account, the four
+      families and the reason each narrowing fails are in [`findings.md`](findings.md).
+
+      **This is an owner decision and it is recorded as one**, not left as a silent gap: sixteen
+      message-text differences against one query shape that answers where every other provider
+      refuses.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
