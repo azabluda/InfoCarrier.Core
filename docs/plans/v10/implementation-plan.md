@@ -4547,6 +4547,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       `UnmappedProduct` names only `CategoryID`, which the server model has mapped since R97, and
       `Customers` ignores nothing at all.
 
+- [x] **R141. One allowlist, so one decomposition: the response path stops keeping a second
+      set.** `src/` change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`.
+      **`failed` FALLS 149 -> 141**, `total` UNCHANGED at 29513. FIXED eight, BROKEN none; all eight
+      are `SqlQueryInfoCarrierTest`, which reaches **117 of 119**. Trim `ours` 89 <= 89. Pack clean.
+      Release build from a forced clean `obj`/`bin`: `0 Error(s)`.
+
+      **The defect.** The application's registered projection types reached the REQUEST path through
+      `TypeAllowlist.ForModel(model, registeredTypes)`, and the RESPONSE path as a SECOND set that
+      `TypeNodeResolver` consulted beside the allowlist. **A second set cannot be decomposed.** A
+      raw-SQL join projects `ValueTuple<UnmappedCustomer, UnmappedOrder>`; the allowlist admits
+      `ValueTuple<,>` and then asks whether each ARGUMENT is allowed; and the answer lived in the set
+      it could not see. `TypeAllowlist.With` widens the one list instead, and the resolver consults
+      only that.
+
+      **R120's shape and ADR-012's**: a fact two components read independently, where the
+      disagreement only widens what one of them may do, so nothing fails loudly. It was found by
+      following R138's reasons diff, which showed eight failures MOVING from a missing column to
+      this tuple rather than disappearing.
+
+      **It widens no surface, and that was checked against the review rather than asserted.** Every
+      added type is one the application registered explicitly, which `security-review.md` §4c
+      records as the safe shape, and the same types already cleared the request path. The §2
+      conjunction is untouched -- none of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+      `PropertyInfo`, `Activator`, `Assembly` or `AppDomain` can arrive this way -- and
+      `DeserializationHardeningTest` is green.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

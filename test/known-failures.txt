@@ -3046,6 +3046,24 @@
 #
 # `Products` needs nothing: `UnmappedProduct` names only `CategoryID`, which the server model has
 # mapped since the R97 era. `Customers` ignores nothing. So the store-shape family is closed.
+#
+# 2026-09-04 (R141) -- `failed` FALLS 149 -> 141, `total` UNCHANGED at 29513. FIXED eight, BROKEN
+# none, names file refreshed. All eight are `SqlQueryInfoCarrierTest`, which reaches 117 of 119.
+#
+# **ONE LIST, SO ONE DECOMPOSITION.** The application's registered projection types reached the
+# REQUEST path through `TypeAllowlist.ForModel(model, registeredTypes)` and the RESPONSE path as a
+# SECOND set that `TypeNodeResolver` consulted beside the allowlist. A second set cannot be
+# decomposed: a raw-SQL join projects `ValueTuple<UnmappedCustomer, UnmappedOrder>`, the allowlist
+# admits `ValueTuple<,>` and then asks whether each ARGUMENT is allowed, and the answer lived in the
+# set it could not see. `TypeAllowlist.With` widens the list instead, and the resolver consults one.
+#
+# **THE SAME SHAPE AS R120 AND ADR-012**: a fact two components read independently, where the
+# disagreement only widens what one of them may do, so nothing fails loudly.
+#
+# **It widens no surface.** Every added type is one the application registered explicitly, which
+# `docs/security-review.md` section 4c already records as the safe shape, and those same types
+# already cleared the request path. The section 2 conjunction is untouched and
+# `DeserializationHardeningTest` is green.
 
-failed=149
+failed=141
 total=29513

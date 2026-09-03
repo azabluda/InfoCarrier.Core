@@ -27,7 +27,11 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly IModel? _model = model;
     private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
-    private IReadOnlyList<Type> _executionAllowedTypes = [];
+
+    // The list actually consulted: the DI-scoped one until an execution declares more, then a
+    // widened copy of it. WIDENED RATHER THAN CONSULTED BESIDE, so the allowlist's own generic
+    // decomposition can see the added types -- see `TypeAllowlist.With`.
+    private TypeAllowlist _effective = allowlist ?? TypeAllowlist.ForModel(model);
 
     /// <summary>
     ///     Widens what this resolver admits for the duration of ONE execution, with the types the
@@ -59,7 +63,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     /// </remarks>
     /// <param name="types">The executing context's declared types.</param>
     public virtual void UseExecutionAllowedTypes(IReadOnlyList<Type> types)
-        => _executionAllowedTypes = types ?? [];
+        => _effective = _allowlist.With(types ?? []);
 
     /// <summary>
     ///     Resolves a type node to its CLR type.
@@ -86,7 +90,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
 
         // Enforced after resolution, not instead of it: the name has to be resolved to know
         // what it denotes, but nothing is constructed from it until it clears the allowlist.
-        if (!_allowlist.IsAllowed(resolved) && !_executionAllowedTypes.Contains(resolved))
+        if (!_effective.IsAllowed(resolved))
         {
             throw new InvalidOperationException(BuildRejection(resolved));
         }
