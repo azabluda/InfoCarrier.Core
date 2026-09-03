@@ -121,6 +121,15 @@ reflective, because `WireGrouping` did not look like five warnings.
 
 **And the build itself is a gate.** Warnings are errors when `CI=true`, so before any commit that
 touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
+
+**IT ONLY CHECKS WHAT IT RECOMPILES, AND THAT IS HOW R133 WENT RED ON THE PULL REQUEST.** MSBuild is
+incremental: a project already built by an earlier non-`CI` command is *up to date*, so the
+`CI=true` run skips it and reports `5 Warning(s), 0 Error(s)` without ever applying
+warnings-as-errors to the file you just edited. R133 edited `src/InfoCarrier.Core`, built that
+project alone without `CI=true` while iterating, then ran the gate — which recompiled nothing and
+passed. CI recompiled everything and failed on one `EF1001`. **After editing `src/`, delete that
+project's `obj` and `bin` before the gate**, or trust the gate only when its output shows the
+project being rebuilt.
 **`--configuration Release` is not optional, and leaving it off is how CI went red for ten commits
 without anyone noticing (N12).** The Blazor sample turns the trim analyzer on in Release only, so a
 Debug build cannot produce the diagnostic that fails the server. It takes seconds and it is what the
