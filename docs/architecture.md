@@ -300,6 +300,14 @@ compares the client model with the server model directly.
 
 ### D3 — why does `InfoCarrier.Core` reference `Microsoft.EntityFrameworkCore.Relational`?
 
+> **SUPERSEDED 2026-09-03 by the owner. D3 IS REVERTED.** `InfoCarrier.Core` references
+> `Microsoft.EntityFrameworkCore.Relational` again, and `InfoCarrier.Core.Relational` is folded back
+> into it. **Everything below stays as the record of why the split was made and what it measured**,
+> because the split may be wanted again and the measurements are the reason it would be. Read the
+> **supersession amendment 2026-09-03 (R131)** at the end of this entry first; it states the new
+> shape and the conditions that would reverse it back.
+
+
 **Raised 2026-08-11. Ideally the reference should not be there. Recorded with the facts so the
 investigation starts from evidence rather than from the question. No action now.**
 
@@ -667,6 +675,55 @@ own full measurement.**
 
 `InfoCarrierValueGenerationConvention` therefore stays, with its two `Relational:` strings and their
 pin. Its own comment already said why it works: *"Narrow on purpose."*
+
+#### D3 SUPERSESSION 2026-09-03 (R131) — one package, kept modular, and the conditions to split again
+
+**The owner's decision, taken on the measurements below rather than on preference.** A single
+`InfoCarrier.Core` package carries the relational half. The judgement is that **TPT and TPC are often
+required** and **2 MB is not prohibitive** for the applications this provider is for.
+
+**What the split was measured to cost and to buy, so a future reader does not re-derive it.**
+
+| Question | Measured answer |
+|---|---|
+| Browser payload of referencing `EFCore.Relational` | **+0.62 MB brotli**, 4.11 -> 4.73 MB on the Northwind Blazor sample; raw 13.48 -> 15.77 MB |
+| Is the cost conditional on use? | **No.** A build that references it and calls nothing ships the identical 4.73 MB. The trimmer keeps the assembly almost whole: 2.079 MB published against 2.09 MB on disk |
+| Does it drag in new packages? | **No.** All four of its dependencies already arrive with `Microsoft.EntityFrameworkCore` |
+| What does a client without it lose? | **262 of 20,368** Tier B tests: 137 `FromSql*` roots, 97 `Database.SqlQuery<T>`, 6 TPT/TPC, plus collateral |
+| How does it fail? | The first two **loudly**. TPT/TPC **partly silently**, and a fully plain client gets no warning at all |
+
+**THE EXPECTED GAIN IS IN THE TEST AND ANNOTATION CODE, NOT IN THE PRODUCT.** Naming EF's constants
+instead of spelling `Relational:` strings deletes the pins that exist only to hold those strings
+honest, and the seams that exist only because two packages had to agree. Nothing about query
+execution changes.
+
+**MODULAR MONOLITH: THE SEAM STAYS, THE PACKAGE BOUNDARY GOES.** This is the part that makes a future
+split cheap, and it is a requirement rather than a nicety.
+
+- The relational half keeps its own files and its own types. It is not dissolved into the classes
+  around it.
+- **The opt-in stays.** "My backing store is relational" is still something an application says, not
+  something the package assumes. A client over a non-relational store must not get relational
+  conventions on its model, which is what ADR-009 Tier A exercises and what stopping rule 4 of the
+  R124 handoff protects. One package removes the *packaging* choice, not the *configuration* one.
+- The registration seam (`AddInfoCarrierRelational` / `AddInfoCarrierRelationalClient`) and the
+  options seam (`UseRelationalQueryRoots`) keep their shapes and their names.
+
+**What would reverse this decision back.** Any one of these, and each is measurable rather than a
+matter of taste:
+
+1. **Blazor WebAssembly becomes a primary target** and 0.62 MB brotli starts to matter.
+2. **A non-relational backing store is adopted** (Cosmos, a document store), making the relational
+   half dead weight for a real deployment rather than a hypothetical one.
+3. **The relational half grows** past what a monolith should carry, for instance if level 3 is ever
+   attempted.
+
+**Level 3 is still out of scope, and the reference does not change that.** A relational model on the
+client needs an `IRelationalTypeMappingSource`, which is store knowledge on the far side of the wire
+(B4, 106 failures). Referencing the package does not supply it, and
+`EntityFrameworkRelationalServicesBuilder.TryAddCoreServices()` still collides with ADR-006. **The
+charter above still holds too**: this code reads relational annotations and names relational types,
+and never gives the client a `DbConnection`.
 
 ### D5 — the query boundary does not ask the backend what it can translate
 

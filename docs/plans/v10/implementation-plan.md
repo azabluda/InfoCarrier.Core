@@ -4252,6 +4252,35 @@ re-parents of families already running, because R25–R30 showed that is where t
       the tell. The suite was re-measured rather than reasoned about. This is the "read it out of
       the run, never derive it" rule catching a live mistake.
 
+- [x] **R131. D3 IS REVERTED (owner, 2026-09-03). One package, kept modular.** Documents only —
+      `architecture.md` §6a gains the **D3 SUPERSESSION 2026-09-03 (R131)** and D3's own heading
+      carries the notice. **Nothing executable changed.** No gate.
+
+      **The decision was taken on measurements, and they are recorded in the supersession so nobody
+      re-derives them.** Referencing `EFCore.Relational` costs **+0.62 MB brotli** on the Blazor
+      sample (4.11 -> 4.73), the cost is **unconditional** (a build that references it and calls
+      nothing ships the identical figure, because the trimmer keeps the assembly almost whole at
+      2.079 MB against 2.09 MB on disk), and it drags in **no new packages**. Going without it costs
+      **262 of 20,368** Tier B tests. The owner's judgement: TPT and TPC are often required, and 2 MB
+      is not prohibitive here.
+
+      **The expected gain is in test and annotation code, not in the product.** Naming EF's constants
+      instead of spelling `Relational:` strings deletes the pins that hold those strings honest, and
+      the seams that exist only because two packages had to agree.
+
+      **MODULAR MONOLITH, AND THE SEAM IS THE REQUIREMENT.** The package boundary goes; the
+      configuration seam stays. "My backing store is relational" is still something an application
+      says. A client over a non-relational store must not get relational conventions on its model —
+      ADR-009 Tier A exercises exactly that, and it is stopping rule 4 of this milestone's handoff.
+
+      **Three measurable conditions would reverse it back**, and they are listed in the
+      supersession: Blazor WASM becoming a primary target, a non-relational backing store being
+      adopted, or the relational half growing past what a monolith should carry.
+
+      **Level 3 stays out of scope and the reference does not change that.** B4's
+      `IRelationalTypeMappingSource` problem is store knowledge on the far side of the wire, and
+      `TryAddCoreServices()` still collides with ADR-006.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
