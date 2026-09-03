@@ -25,6 +25,11 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     : NorthwindQueryRelationalFixture<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
+    // EXPERIMENT (owner, 2026-09-04): both sides build from ONE `OnModelCreating`, which is what a
+    // real application does -- the sample shares `NorthwindContext` between client and server.
+    protected override Type ContextType
+        => typeof(NorthwindInfoCarrierSqliteServerContext);
+
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
     /// <inheritdoc />

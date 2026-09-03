@@ -49,6 +49,14 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
     : NorthwindBulkUpdatesRelationalFixture<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Both sides build from ONE <c>OnModelCreating</c>, which is what an application does and
+    ///     what version 1 of this provider did. See the Northwind Tier B fixture for the reasoning.
+    /// </remarks>
+    protected override Type ContextType
+        => typeof(NorthwindInfoCarrierSqliteServerContext);
+
     private ITestStoreFactory? _testStoreFactory;
 
     /// <inheritdoc />

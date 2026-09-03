@@ -4573,6 +4573,42 @@ re-parents of families already running, because R25–R30 showed that is where t
       `PropertyInfo`, `Activator`, `Assembly` or `AppDomain` can arrive this way -- and
       `DeserializationHardeningTest` is green.
 
+- [x] **R142. Tier B builds both models from ONE `OnModelCreating`, as version 1 did and as an
+      application does.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 141,
+      `total` UNCHANGED at 29513.** FIXED none, BROKEN none, `REASONS: unchanged`. Release build
+      `0 Error(s)`.
+
+      **The owner asked who decided the two models should differ, and the answer is that this
+      repository did.** `NorthwindInfoCarrierSqliteServerContext` gives the SERVER the store shape:
+      `ToSqlQuery` for each keyless type, `ToTable("Order Details")`, and `Product.CategoryID`. The
+      client got none of it. That was forced rather than chosen -- before D3's supersession the
+      client had no relational half, so it could not hold `ToTable` or `ToSqlQuery` at all.
+
+      **VERSION 1 NEVER DID THIS, and its harness is the model to copy.** `subrepos/infocarrier-v1`
+      carries ONE `ContextType` and ONE `OnModelCreating` in its `SharedTestStoreProperties`, and
+      its backend store resolves the server context from the same `ContextType` the client uses.
+      There is no second context class anywhere in it. Its two tiers, `InMemory/` and `SqlServer/`,
+      also live in one test project -- the shape R136 restored.
+
+      **So the client now uses the server's context class on both Tier B fixtures**, the Northwind
+      one and the bulk-updates one, and the client's model gains the store shape it would have in a
+      real deployment: `samples/Northwind.Client` and `samples/Northwind.Server` already share
+      `NorthwindContext` from `samples/Northwind.Shared`.
+
+      **TIER A CANNOT FOLLOW, and the reason is a package rather than a preference.** Its inheritance
+      fixture gives the server an InMemory *defining query* for the keyless `AnimalQuery`.
+      `ToInMemoryQuery` needs `Microsoft.EntityFrameworkCore.InMemory`, which the PRODUCT does not
+      reference and a real client therefore cannot call. Relational configuration is different: the
+      product carries it since D3's supersession, so a client can hold it honestly. The line is
+      "what a real client could hold", not "what the test project happens to reference".
+
+      **`serverContextType` keeps its second, unrelated use.** `SeedingInfoCarrierTest` and
+      `WithConstructorsInfoCarrierTest` supply a server context for its CONSTRUCTOR shape, not for
+      its model. That has nothing to do with this and is untouched.
+
+      **What is left disagreeing is one synthetic case**: `Shipment.Note` in
+      `UnmappedMemberBoundaryTest`, which exists to make the two-model defect visible and says so.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
