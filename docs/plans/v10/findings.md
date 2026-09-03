@@ -69,7 +69,15 @@ ever made them disagree on this axis. It is R120's shape once more — a fact tw
 independently — except here the two readers are two *models*, and the disagreement widens what the
 client is allowed to do rather than narrowing it.
 
-**Pinned in the suite since R139, and it is red on purpose.**
+**PINNED, THEN REMOVED BY A SCOPE DECISION (2026-09-04).** The pin created a split model on
+purpose, and the owner then removed split models from the harness entirely: one context class per
+fixture, both halves from one `OnModelCreating`, which is what version 1 of this provider did. A
+test that can only fail by building a configuration the project has declared out of scope does not
+earn its place, so it is gone and this account is what remains. **The condition that reopens it: if
+this provider ever offers a narrower client model as a feature, the guard becomes a prerequisite,
+and its price is already measured below.**
+
+**What the pin was, while it existed.**
 `UnmappedMemberBoundaryTest` builds the disagreement deliberately: `SqliteSmokeContext` ignores
 `Shipment.Note` for both sides and the store's own model customizer maps it on the server alone.
 Three of its four tests are controls -- the client model really lacks the property, the server model

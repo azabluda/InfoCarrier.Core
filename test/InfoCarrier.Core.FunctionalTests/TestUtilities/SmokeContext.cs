@@ -49,35 +49,6 @@ public class Tag
 }
 
 /// <summary>
-///     An entity with a member the CLIENT model does not map and the SERVER model does.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>The only place in this repository where the two models disagree about what is
-///         mapped</b>, and it exists to pin what happens then. <c>SqliteSmokeContext</c> ignores
-///         <see cref="Note" />, so the client's model has no such property; the store's own model
-///         customizer maps it, so the server's has one and the table has the column. Every other
-///         fixture builds both models from one <c>OnModelCreating</c>, which is why nothing else
-///         can exercise this.
-///     </para>
-///     <para>
-///         The shape is EF's own: the core <c>NorthwindContext</c> ignores ten <c>Order</c>
-///         properties that the real Northwind schema has, and R138 found this defect by mapping
-///         them on the server and watching four unmapped-property spec tests stop throwing.
-///     </para>
-/// </remarks>
-public class Shipment
-{
-    public int Id { get; set; }
-
-    /// <summary>Mapped on both sides, so a query that touches only this one is ordinary.</summary>
-    public string? Reference { get; set; }
-
-    /// <summary>Mapped on the server alone. The client's model does not know it exists.</summary>
-    public string? Note { get; set; }
-}
-
-/// <summary>
 ///     A minimal context usable on both client (InfoCarrier) and server (InMemory) sides.
 /// </summary>
 public class SmokeContext(DbContextOptions<SmokeContext> options) : DbContext(options)
@@ -115,8 +86,6 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     public DbSet<Coded> Coded => Set<Coded>();
 
     public DbSet<Located> Located => Set<Located>();
-
-    public DbSet<Shipment> Shipments => Set<Shipment>();
 
     /// <summary>
     ///     A store function mapped as an <em>instance</em> method on the context, for R89's pin.
@@ -166,11 +135,6 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
             .HasConversion(k => k.Value, v => new IntStructKey(v));
 
         modelBuilder.Entity<Addressed>().ComplexProperty(e => e.Address);
-
-        // THE CLIENT MODEL DOES NOT MAP THIS AND THE SERVER MODEL DOES. This context builds both,
-        // so the ignore reaches both; `UnmappedMemberBoundaryTest` hands the store a model
-        // customizer that maps it again on the server alone. See `Shipment`.
-        modelBuilder.Entity<Shipment>().Ignore(e => e.Note);
 
         // An OWNED type one of whose values has no public CLR member -- it lives in a private
         // field reached through an indexer. That is the shape R64 turns on: a value the wire can
