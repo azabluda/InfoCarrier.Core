@@ -108,7 +108,7 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     {
         await base.SeedAsync(context);
 
-        await AddTheOrderColumnsTheModelIgnoresAsync(context);
+        await AddTheColumnsTheModelIgnoresAsync(context);
 
         // The table name is `NorthwindInfoCarrierSqliteServerContext`'s, which maps `OrderDetail`
         // to "Order Details" so the relational spec bases can write that name into their own raw
@@ -119,7 +119,8 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     }
 
     /// <summary>
-    ///     Adds the ten <c>Orders</c> columns the Northwind model ignores, straight to the store.
+    ///     Adds the columns the Northwind model ignores, straight to the store: ten on
+    ///     <c>Orders</c> and twelve on <c>Employees</c>.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -161,7 +162,7 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     ///         historically held.
     ///     </para>
     /// </remarks>
-    private static async Task AddTheOrderColumnsTheModelIgnoresAsync(NorthwindContext context)
+    private static async Task AddTheColumnsTheModelIgnoresAsync(NorthwindContext context)
     {
         // Whole statements as literals, because `ExecuteSqlRawAsync` refuses both an interpolated
         // argument (EF1002) and a concatenated one (EF1003), and neither suppression is worth the
@@ -209,6 +210,59 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
                 Parameter("ShipPostalCode", order.ShipPostalCode),
                 Parameter("ShipCountry", order.ShipCountry),
                 Parameter("OrderID", order.OrderID));
+        }
+
+        // `Employees` is the same story with twelve columns, and `SqlQueryTestBase`'s
+        // `UnmappedEmployee` names all twelve. It surfaced second, as
+        // "The required column 'Address' was not present in the results of a 'FromSql' operation"
+        // -- a different message from the `Orders` one only because the failing query selects
+        // named columns where the other selects everything.
+        foreach (string statement in (string[])
+                 [
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""LastName"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""TitleOfCourtesy"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""BirthDate"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""HireDate"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""Address"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""Region"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""PostalCode"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""HomePhone"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""Extension"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""Photo"" BLOB",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""Notes"" TEXT",
+                     @"ALTER TABLE ""Employees"" ADD COLUMN ""PhotoPath"" TEXT",
+                 ])
+        {
+            await context.Database.ExecuteSqlRawAsync(statement);
+        }
+
+        foreach (Employee employee in NorthwindData.CreateEmployees())
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE "Employees" SET "LastName" = @LastName,
+                    "TitleOfCourtesy" = @TitleOfCourtesy, "BirthDate" = @BirthDate,
+                    "HireDate" = @HireDate, "Address" = @Address, "Region" = @Region,
+                    "PostalCode" = @PostalCode, "HomePhone" = @HomePhone,
+                    "Extension" = @Extension, "Photo" = @Photo, "Notes" = @Notes,
+                    "PhotoPath" = @PhotoPath
+                WHERE "EmployeeID" = @EmployeeID
+                """,
+                Parameter("LastName", employee.LastName),
+                Parameter("TitleOfCourtesy", employee.TitleOfCourtesy),
+                Parameter("BirthDate", employee.BirthDate),
+                Parameter("HireDate", employee.HireDate),
+                Parameter("Address", employee.Address),
+                Parameter("Region", employee.Region),
+                Parameter("PostalCode", employee.PostalCode),
+                Parameter("HomePhone", employee.HomePhone),
+                Parameter("Extension", employee.Extension),
+                Parameter("Photo", employee.Photo),
+                Parameter("Notes", employee.Notes),
+                Parameter("PhotoPath", employee.PhotoPath),
+
+                // `Employee.EmployeeID` is a `uint`, which SQLite has no parameter type for.
+                Parameter("EmployeeID", (long)employee.EmployeeID));
         }
 
         static SqliteParameter Parameter(string name, object? value)

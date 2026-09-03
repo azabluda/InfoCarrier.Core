@@ -3032,6 +3032,20 @@
 # `string.Equals` overload named ahead of the member. Measured at `failed` 166. The choice between
 # 16 message-text differences and one silent wrong answer is the owner's. `findings.md` has the
 # full account.
+#
+# 2026-09-04 (R140) -- `failed` FALLS 151 -> 149, `total` UNCHANGED at 29513. FIXED two, BROKEN
+# none, and the names file is refreshed with this commit. The R138 entry's route applied to the
+# other table it fits: twelve `Employees` columns the core Northwind model ignores -- LastName,
+# TitleOfCourtesy, BirthDate, HireDate, Address, Region, PostalCode, HomePhone, Extension, Photo,
+# Notes, PhotoPath -- added by `ALTER TABLE` and filled from `NorthwindData.CreateEmployees()`.
+# `SqlQueryTestBase`'s `UnmappedEmployee` names all twelve.
+#
+# It surfaced as "The required column 'Address' was not present in the results of a 'FromSql'
+# operation" rather than as `no such column`, and the difference is only that the failing query
+# selects named columns where the `Orders` one selected everything. That reason is gone.
+#
+# `Products` needs nothing: `UnmappedProduct` names only `CategoryID`, which the server model has
+# mapped since the R97 era. `Customers` ignores nothing. So the store-shape family is closed.
 
-failed=151
+failed=149
 total=29513

@@ -4527,6 +4527,26 @@ re-parents of families already running, because R25–R30 showed that is where t
       message-text differences against one query shape that answers where every other provider
       refuses.
 
+- [x] **R140. The twelve `Employees` columns the Northwind model ignores.** `test/` only, so `eng/measure.sh` alone. **`failed` FALLS 151 -> 149**, `total`
+      UNCHANGED at 29513. FIXED two, BROKEN none. Both baseline files move. Release build
+      `0 Error(s)`.
+
+      R138's route applied to the other table it fits. The core `NorthwindContext` ignores
+      `LastName`, `TitleOfCourtesy`, `BirthDate`, `HireDate`, `Address`, `Region`, `PostalCode`,
+      `HomePhone`, `Extension`, `Photo`, `Notes` and `PhotoPath`, and `SqlQueryTestBase`'s
+      `UnmappedEmployee` names all twelve. `ALTER TABLE` plus an `UPDATE` from
+      `NorthwindData.CreateEmployees()`, so neither model gains a property and the store holds what
+      EF's prebuilt `northwind.db` holds.
+
+      **It surfaced with a different message from the `Orders` half and the same cause.**
+      "The required column 'Address' was not present in the results of a 'FromSql' operation"
+      rather than `no such column`, because the failing query selects named columns where the other
+      selected everything.
+
+      **THE STORE-SHAPE FAMILY IS NOW CLOSED, and that was checked rather than assumed.**
+      `UnmappedProduct` names only `CategoryID`, which the server model has mapped since R97, and
+      `Customers` ignores nothing at all.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
