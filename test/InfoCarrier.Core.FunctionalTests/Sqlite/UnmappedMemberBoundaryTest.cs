@@ -128,7 +128,7 @@ public class UnmappedMemberBoundaryTest
     /// <remarks>
     ///     The model customizer runs on the server's context only, which is what lets the two
     ///     models differ at all. It is the same move
-    ///     <c>NorthwindInfoCarrierSqliteServerContext</c> makes for <c>Product.CategoryID</c>:
+    ///     <c>NorthwindInfoCarrierSqliteContext</c> makes for <c>Product.CategoryID</c>:
     ///     un-ignoring a property after the context's own <c>OnModelCreating</c> has ignored it.
     /// </remarks>
     private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync()

@@ -34,7 +34,7 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
     ///     provider did and what an application does. See the Tier B Northwind fixture.
     /// </remarks>
     protected override Type ContextType
-        => typeof(NorthwindInfoCarrierServerContext);
+        => typeof(NorthwindInfoCarrierContext);
 
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
@@ -46,9 +46,6 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
-            // The server adds the InMemory defining queries for the keyless entity types; the
-            // client model has the types but not the store's means of producing their rows.
-            serverContextType: typeof(NorthwindInfoCarrierServerContext),
             configureConventions: ConfigureConventions);
 
     /// <summary>

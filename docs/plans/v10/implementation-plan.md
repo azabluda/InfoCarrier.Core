@@ -4634,6 +4634,38 @@ re-parents of families already running, because R25–R30 showed that is where t
       `CollectionBehavior` is declared. It is one observation and it is written up in
       [`findings.md`](findings.md); `CLAUDE.md`'s "there is no known intermittent" is corrected.
 
+- [x] **R144. The two-model machinery is GONE. One context class per fixture, and no context class
+      is named for a side.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 141,
+      `total` UNCHANGED at 29513.** FIXED none, BROKEN none, `REASONS: unchanged`. Release build
+      `0 Error(s)`.
+
+      **The owner's instruction, and the reasoning behind it.** R142 and R143 converged the fixtures
+      but left the mechanism standing. This removes it. `SharedTestStoreProperties.ServerContextType`
+      is deleted, `InfoCarrierTestStoreFactory.Create`'s `serverContextType` parameter is deleted,
+      and `InfoCarrierBackendTestStore` reads `ContextType` for both sides. The harness now does
+      what version 1's did: **one `ContextType`, one `OnModelCreating`, both halves.**
+
+      **No context class carries `Server` or `Client` in its name any more.** Five were renamed:
+
+      | Was | Is |
+      |---|---|
+      | `NorthwindInfoCarrierServerContext` | `NorthwindInfoCarrierContext` |
+      | `NorthwindInfoCarrierSqliteServerContext` | `NorthwindInfoCarrierSqliteContext` |
+      | `InheritanceInfoCarrierServerContext` | `InheritanceInfoCarrierContext` |
+      | `WithConstructorsInfoCarrierServerContext` | `WithConstructorsInfoCarrierContext` |
+      | `SeedingInfoCarrierServerContext` | `SeedingInfoCarrierOptionsContext` |
+
+      **THE LAST ONE IS NAMED FOR A CONSTRUCTOR SHAPE, AND IT IS THE ONLY SECOND CLASS LEFT.** EF's
+      `SeedingContext` is abstract, takes a `string testId`, and declares no `DbContextOptions`
+      constructor, so nothing the harness registers can derive from it. Its `HasData` seed is
+      therefore written twice. That is a limitation of the base rather than a design of ours, and
+      the test itself catches the two copies drifting, because it asserts the rows.
+
+      **A belief was falsified and the prose that carried it is corrected.** Three fixtures said a
+      defining query "cannot be part of the client's model, which has no store to run it against".
+      The client holds the annotation and never runs it. Converging every fixture changed no answer
+      anywhere in 29,513 tests.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

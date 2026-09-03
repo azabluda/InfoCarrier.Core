@@ -2315,7 +2315,7 @@
 # the base names the table `NorthwindRelationalContext` maps with `ToTable("Order Details")`, and
 # this tier builds its store from `NorthwindContext`'s core model, where it is `OrderDetails`. A
 # harness mismatch of the same shape as the `ProductView` and `Product.CategoryID` notes already in
-# `NorthwindInfoCarrierSqliteServerContext`, and NOT a wire defect.
+# `NorthwindInfoCarrierSqliteContext`, and NOT a wire defect.
 # `SharedTypeQuery`'s remaining 2 moved to "Relational-specific methods can only be used when the
 # context is using a relational database provider", out of `SqlQueryRaw` -- D8 item 2, a separate
 # entry point that is not a query root and was never in this step's scope.
@@ -2326,7 +2326,7 @@
 # `Delete_FromSql_converted_to_subquery` (2) fails on `no such table: Order Details` because the
 # base writes `FROM [Order Details]`, which is `NorthwindRelationalContext`'s mapping, and this tier
 # builds its store from `NorthwindContext`'s core model where the table is `OrderDetails`. Mapping
-# `OrderDetail` `ToTable("Order Details")` in `NorthwindInfoCarrierSqliteServerContext` FIXES BOTH --
+# `OrderDetail` `ToTable("Order Details")` in `NorthwindInfoCarrierSqliteContext` FIXES BOTH --
 # the class runs 173 of 175 alone -- AND BREAKS 236 OTHERS: `failed` 133 -> 369, every new one
 # `no such table: OrderDetails` raised inside `SharedStoreFixtureBase.InitializeAsync`, i.e. at
 # SEEDING. The "Northwind" store is shared, only the first class creates its schema, and not every
@@ -2350,7 +2350,7 @@
 #
 # THE 14: 6 `Bad_data_error_handling_null*` (this tier maps `Product.CategoryID`, which core
 # `NorthwindContext` ignores, so a SELECT omitting it fails earlier and with a better message --
-# the same harness note already written in `NorthwindInfoCarrierSqliteServerContext`); 4
+# the same harness note already written in `NorthwindInfoCarrierSqliteContext`); 4
 # `Include_*_connection*` (they open or close the CLIENT's `DbConnection`, which
 # `RelationalInfoCarrierTestStore` refuses by design -- ADR-013's amendment names that half as the
 # half that must stay refused); 2 `FromSqlRaw_queryable_simple_projection_composed` (the base's own

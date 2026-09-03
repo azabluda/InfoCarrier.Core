@@ -37,12 +37,16 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
     /// <remarks>
     ///     The base maps <c>BlogQuery</c> as keyless and stops there; where its rows come from is
     ///     the store's business, and EF's own <c>WithConstructorsInMemoryFixture</c> supplies them
-    ///     with <c>ToInMemoryQuery</c>. A defining query is a query — it cannot be part of the
-    ///     client's model, which has no store to run it against — so it goes on the server's copy,
-    ///     exactly as the Northwind and inheritance fixtures split their keyless types (A1
-    ///     classified this failure and named the fix; this is it).
+    ///     with <c>ToInMemoryQuery</c>. This context carries it, and BOTH sides build from it.
+    ///     <para>
+    ///         <b>It used to sit on a separate server context, on the belief that a defining query
+    ///         cannot be part of the client's model because the client has no store to run it
+    ///         against.</b> That belief was measured and is wrong: the client holds the annotation
+    ///         and never runs it, and converging every fixture onto one context class changed no
+    ///         answer anywhere in the suite. Version 1 of this provider never split them.
+    ///     </para>
     /// </remarks>
-    public class WithConstructorsInfoCarrierServerContext(DbContextOptions options)
+    public class WithConstructorsInfoCarrierContext(DbContextOptions options)
         : WithConstructorsContext(options)
     {
         /// <inheritdoc />
@@ -62,7 +66,7 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
         ///     Both sides build from ONE <c>OnModelCreating</c>, as version 1 of this provider did.
         /// </remarks>
         protected override Type ContextType
-            => typeof(WithConstructorsInfoCarrierServerContext);
+            => typeof(WithConstructorsInfoCarrierContext);
 
         private ITestStoreFactory? _testStoreFactory;
 
@@ -74,7 +78,6 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
                 InfoCarrierTestStoreFactory.InMemory,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-                serverContextType: typeof(WithConstructorsInfoCarrierServerContext),
                 configureConventions: ConfigureConventions);
 
         /// <inheritdoc />

@@ -55,7 +55,7 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
     ///     what version 1 of this provider did. See the Northwind Tier B fixture for the reasoning.
     /// </remarks>
     protected override Type ContextType
-        => typeof(NorthwindInfoCarrierSqliteServerContext);
+        => typeof(NorthwindInfoCarrierSqliteContext);
 
     private ITestStoreFactory? _testStoreFactory;
 
@@ -67,7 +67,6 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 ((NorthwindContext)server).TenantPrefix = ((NorthwindContext)client).TenantPrefix,
-            serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
                 arbitrarySqlExecution: true);

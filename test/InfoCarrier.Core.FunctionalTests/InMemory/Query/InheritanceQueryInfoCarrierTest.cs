@@ -46,7 +46,7 @@ public class InheritanceQueryInfoCarrierTest(InheritanceQueryInfoCarrierFixture 
             CoreStrings.TranslationFailed(
                 """
                 DbSet<Bird>()
-                    .Select(b => InheritanceInfoCarrierServerContext.MaterializeView(b))
+                    .Select(b => InheritanceInfoCarrierContext.MaterializeView(b))
                     .OrderBy(a => a.CountryId)
                 """),
             message,
@@ -78,7 +78,7 @@ public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase
     ///     provider did and what an application does. See the Tier B Northwind fixture.
     /// </remarks>
     protected override Type ContextType
-        => typeof(InheritanceInfoCarrierServerContext);
+        => typeof(InheritanceInfoCarrierContext);
 
     private ITestStoreFactory? _testStoreFactory;
 
@@ -91,7 +91,6 @@ public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase
             // The keyless `AnimalQuery` is produced by an InMemory defining query, which is how
             // the *store* makes its rows and therefore no part of the client's model — the same
             // split the Northwind fixture makes for its keyless types.
-            serverContextType: typeof(InheritanceInfoCarrierServerContext),
             configureConventions: ConfigureConventions);
 
     /// <summary>
@@ -116,7 +115,7 @@ public class FiltersInheritanceQueryInfoCarrierFixture : InheritanceQueryInfoCar
 ///     The <em>server-side</em> inheritance context: the shared model plus the InMemory defining
 ///     query for the keyless <c>AnimalQuery</c>.
 /// </summary>
-public class InheritanceInfoCarrierServerContext(DbContextOptions options) : InheritanceContext(options)
+public class InheritanceInfoCarrierContext(DbContextOptions options) : InheritanceContext(options)
 {
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

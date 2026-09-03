@@ -52,8 +52,8 @@ public class TPTInheritanceQueryInfoCarrierTest(
 ///     The TPT inheritance fixture, wired to a SQLite backend behind the wire.
 /// </summary>
 /// <remarks>
-///     No <c>serverContextType</c>, unlike the Tier A inheritance fixture. That one exists to give
-///     the server an InMemory defining query for the keyless <c>AnimalQuery</c>;
+///     No context class of its own, unlike the Tier A inheritance fixture. That one carries an
+///     InMemory defining query for the keyless <c>AnimalQuery</c>;
 ///     <c>TPTInheritanceQueryFixture</c> ignores the keyless types outright, because EF maps them
 ///     to TPH.
 /// </remarks>

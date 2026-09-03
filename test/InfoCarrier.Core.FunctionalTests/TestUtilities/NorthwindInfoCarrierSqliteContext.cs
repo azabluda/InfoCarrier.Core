@@ -10,12 +10,12 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     SQL defining queries for the keyless entity types.
 /// </summary>
 /// <remarks>
-///     The same role <see cref="NorthwindInfoCarrierServerContext" /> plays for Tier A, in the
+///     The same role <see cref="NorthwindInfoCarrierContext" /> plays for Tier A, in the
 ///     dialect the backing store speaks. A defining query is how the store produces rows, which
 ///     is precisely the part of the model a remoting client has no business knowing — the client
 ///     needs the keyless types and nothing more.
 /// </remarks>
-public class NorthwindInfoCarrierSqliteServerContext(DbContextOptions options) : NorthwindContext(options)
+public class NorthwindInfoCarrierSqliteContext(DbContextOptions options) : NorthwindContext(options)
 {
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -48,7 +48,6 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         Action<ModelBuilder, DbContext>? onModelCreating,
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null,
         Action<DbContext, DbContext>? copyDbContextParameters = null,
-        Type? serverContextType = null,
         Func<IServiceCollection, IServiceCollection>? onAddServices = null,
         Action<ModelConfigurationBuilder>? configureConventions = null,
         ServiceLifetime? serverOptionsLifetime = null,
@@ -59,7 +58,6 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         var props = new SharedTestStoreProperties
         {
             ContextType = contextType,
-            ServerContextType = serverContextType,
             OnModelCreating = onModelCreating,
             ConfigureConventions = configureConventions,
             OnAddOptions = onAddOptions,

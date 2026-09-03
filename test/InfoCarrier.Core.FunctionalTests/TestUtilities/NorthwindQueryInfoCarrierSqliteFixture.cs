@@ -28,7 +28,7 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     // EXPERIMENT (owner, 2026-09-04): both sides build from ONE `OnModelCreating`, which is what a
     // real application does -- the sample shares `NorthwindContext` between client and server.
     protected override Type ContextType
-        => typeof(NorthwindInfoCarrierSqliteServerContext);
+        => typeof(NorthwindInfoCarrierSqliteContext);
 
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
@@ -48,7 +48,6 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             // `SqliteException: The data is NULL at ordinal 5` crossed where EF's own message was
             // expected. This is the server half of what the fixture already asks of the client.
             onAddOptions: b => b.EnableDetailedErrors(),
-            serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
             arbitrarySqlExecution: true,
@@ -98,7 +97,7 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     ///         value shown at 64-bit width — where EF Core's own SQLite suite reads a clean
     ///         <c>0.15</c> because it uses a prebuilt <c>northwind.db</c> rather than seeding from
     ///         the model (this tier has to build its store from the model; see
-    ///         <see cref="NorthwindInfoCarrierSqliteServerContext" />).
+    ///         <see cref="NorthwindInfoCarrierSqliteContext" />).
     ///     </para>
     ///     <para>
     ///         That widening gives <c>ef_sum(CAST("Discount" AS TEXT))</c> a per-row residual, and
@@ -115,7 +114,7 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
 
         await AddTheColumnsTheModelIgnoresAsync(context);
 
-        // The table name is `NorthwindInfoCarrierSqliteServerContext`'s, which maps `OrderDetail`
+        // The table name is `NorthwindInfoCarrierSqliteContext`'s, which maps `OrderDetail`
         // to "Order Details" so the relational spec bases can write that name into their own raw
         // SQL. This statement is the only other place the name is written by hand, and R97 moved
         // one without the other.

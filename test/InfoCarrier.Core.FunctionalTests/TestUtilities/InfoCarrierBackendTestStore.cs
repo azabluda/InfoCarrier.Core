@@ -106,7 +106,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
         services = services
             .AddDbContext(
-                ServerContextType,
+                _testStoreProperties.ContextType,
                 (s, b) => AddProviderOptions(b),
                 ServiceLifetime.Transient,
                 _testStoreProperties.ServerOptionsLifetime ?? ServiceLifetime.Singleton);
@@ -117,12 +117,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // one `AddDbContext` just made and making it unresolvable from the root provider:
         // "cannot resolve scoped service 'DbContext' from root provider", every test in the
         // class failing identically before any of them ran.
-        if (ServerContextType != typeof(DbContext))
+        if (_testStoreProperties.ContextType != typeof(DbContext))
         {
             SharedTestStoreProperties props = _testStoreProperties;
             services = services.AddScoped<DbContext>(sp =>
             {
-                var serverContext = (DbContext)sp.GetRequiredService(ServerContextType);
+                var serverContext = (DbContext)sp.GetRequiredService(props.ContextType);
 
                 // The one place a request's client context and its server context are both in
                 // hand. `CopyDbContextParameters` had been declared and assigned since the
@@ -268,14 +268,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.
     /// </summary>
     public virtual DbContext CreateDbContext()
-        => (DbContext)ServiceProvider!.GetRequiredService(ServerContextType);
-
-    /// <summary>
-    ///     The context type the server runs, which may add store-specific model configuration
-    ///     the client neither has nor needs (e.g. defining queries for keyless entity types).
-    /// </summary>
-    private Type ServerContextType
-        => _testStoreProperties.ServerContextType ?? _testStoreProperties.ContextType;
+        => (DbContext)ServiceProvider!.GetRequiredService(_testStoreProperties.ContextType);
 
     /// <summary>
     ///     Adds the backend provider services (e.g. InMemory, SqlServer) to the collection.

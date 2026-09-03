@@ -8,25 +8,22 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// <summary>
 ///     Captures fixture state (context type, model customization, options) so the
 ///     parameterless <see cref="Microsoft.EntityFrameworkCore.TestUtilities.ITestStoreFactory" />
-///     members can build correctly-configured client and server contexts (v1 pattern).
+///     members can build correctly-configured contexts on both sides of the wire (v1 pattern).
 /// </summary>
 public struct SharedTestStoreProperties
 {
     /// <summary>
-    ///     The client <see cref="DbContext" /> type, and the server's too unless
-    ///     <see cref="ServerContextType" /> overrides it.
-    /// </summary>
-    public Type ContextType;
-
-    /// <summary>
-    ///     The server <see cref="DbContext" /> type, when it must differ from the client's.
+    ///     The <see cref="DbContext" /> type, used by BOTH sides.
     /// </summary>
     /// <remarks>
-    ///     The two models are shared, but how the backing store <em>produces</em> rows is not
-    ///     part of that contract — a defining query for a keyless entity type is the server's
-    ///     business alone. <see langword="null" /> means "same as <see cref="ContextType" />".
+    ///     <b>One type, one model, both halves</b> — version 1 of this provider did exactly this,
+    ///     and an application does it too: <c>samples/Northwind.Client</c> and
+    ///     <c>samples/Northwind.Server</c> share one <c>NorthwindContext</c>. This harness carried a
+    ///     second <c>ServerContextType</c> until R144, so that the server could hold store shape the
+    ///     client had no way to express. Making every client relational removed that need, and
+    ///     converging every fixture was measured to change no answer anywhere in the suite.
     /// </remarks>
-    public Type? ServerContextType;
+    public Type ContextType;
 
     /// <summary>
     ///     The fixture's model customization.
