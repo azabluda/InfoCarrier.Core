@@ -4198,6 +4198,60 @@ re-parents of families already running, because R25–R30 showed that is where t
       output" arriving in a new disguise — the partial run was not read as a verdict, but it would
       have been easy to.
 
+- [x] **R130. A half-configured relational client is told so, and told what to call.** `src/`
+      change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed` unchanged at
+      160**, `total` 29515 -> 29519, a deliberate rise of four and all four green. FIXED none,
+      BROKEN none, `REASONS: unchanged`. Trim `ours` 89 <= 89. Pack clean. Release build
+      `5 Warning(s), 0 Error(s)`.
+
+      **Raised by the owner as a question — "plain ICC should return NotSupported and recommend
+      ICC.R; is that correct, and should tests assert it?"** The answer is yes, and checking it
+      found that **R128 had shipped a silent failure two commits earlier**.
+
+      **Three cases, and they were not alike.** Raw-SQL roots were already right:
+      `NoRelationalQueryRoots` refuses and its message names the package and the call.
+      `Database.SqlQuery<T>` throws EF's own `RelationalNotInUse`, which names nothing of ours and
+      still does not. **The conventions were silent**: a client that registered
+      `AddInfoCarrierRelational()` but not `AddInfoCarrierRelationalClient()` built a model EF's
+      relational conventions never touched, and nothing said so.
+
+      **The consequence is behavioural rather than cosmetic, and it was read rather than assumed.**
+      EF decides "non-TPH" by the absence of a discriminator, so `context.Set<Bird>().FromSqlRaw(...)`
+      — which EF refuses on a TPT root — was **admitted**. That is R128's own negative control
+      (`Using_from_sql_throws`) read properly.
+
+      **IT WARNS AND DOES NOT THROW, AND TWO MEASURED FALSE POSITIVES ARE WHY.** A first version
+      triggered on the configuration alone and broke
+      `OptimisticConcurrencyTestBase.External_model_builder_uses_validation`, which hands over a
+      model built externally with `UseModel` that no convention set can stamp — it replaced EF's own
+      `EntityRequiresKey` message with this one. Narrowing the trigger to configuration **and**
+      symptom fixed that and left a second: `F1FixtureBase` also builds its model externally.
+      **A diagnostic that refuses a legitimate model is worse than the silence it replaces.**
+
+      **The trigger is configuration and symptom, never the shape of the model alone.** A model
+      calling `ToTable` is ordinary on a client whose store is not relational — Tier A builds many —
+      so the model is not evidence by itself. What is evidence is the client's own statement plus a
+      hierarchy that still carries a discriminator while a derived type names its own store object.
+
+      **Three tests, and the third is the one that matters.** Half-configured warns and the message
+      names the fix; both halves does not warn (the control); **a plain client that said nothing does
+      not warn** (the negative control that keeps the guard from being too wide).
+
+      **Two limits are stated in the code rather than left as silence.** A client that says nothing
+      at all cannot be caught — finding out needs the model handshake §6a D2 describes and this
+      repository has not built. And the options-carried route is invisible, because `IModelValidator`
+      is a singleton and that value is per context.
+
+      **Three `Relational:` strings come back into `InfoCarrier.Core`, and they are pinned.** They
+      are a **detector's** strings rather than a fixer's: one that stops matching costs a missed
+      warning and never wrong data, which is why R128 could delete the hierarchy convention's four
+      outright and these three are worth carrying.
+
+      **`total` was almost recorded as 29518**, which is the measurement that preceded the pin test.
+      Two tests were added after that run and the draft note's arithmetic did not add up, which was
+      the tell. The suite was re-measured rather than reasoned about. This is the "read it out of
+      the run, never derive it" rule catching a live mistake.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

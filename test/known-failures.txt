@@ -2898,5 +2898,34 @@
 # descriptor naming the core one. The count is half the assertion: a `RemoveAll` that stopped
 # working would leave both present and the last would silently win.
 
+# 2026-09-03 (R130) -- `failed` UNCHANGED at 160, `total` RISES 29515 -> 29519, A DELIBERATE RISE OF
+# FOUR, all green: three in `Sqlite/HalfConfiguredRelationalClientTest` and one new pin in
+# `DocumentMappingPinTest`. FIXED none, BROKEN none, `REASONS: unchanged`.
+#
+# **THE FIGURE WAS ALMOST WRITTEN AS 29518, WHICH IS THE MEASUREMENT THAT PRECEDED THE PIN TEST.**
+# Recorded because it is exactly what the "read it out of the run's own summary, never derive it"
+# rule exists to stop: two tests were added AFTER that run, the note was drafted against the older
+# number, and the arithmetic in the draft did not add up -- which was the tell. The suite was
+# re-measured rather than reasoned about, and the answer is 29519.
+#
+# R128 moved the relational model conventions into `InfoCarrier.Core.Relational` and left a SILENT
+# failure behind: a client that registered `AddInfoCarrierRelational()` and not
+# `AddInfoCarrierRelationalClient()` built a model EF's relational conventions never touched, and
+# nothing said so. A TPT hierarchy kept the discriminator the server's model dropped, and EF then
+# ADMITTED `FromSqlRaw` on a non-TPH root where it refuses one. `InfoCarrierModelValidator` now
+# warns, naming the package and the call to make.
+#
+# **IT WARNS AND DOES NOT THROW, AND TWO MEASURED FALSE POSITIVES ARE WHY.** A version triggered on
+# the configuration alone broke `OptimisticConcurrencyTestBase.External_model_builder_uses_validation`,
+# which hands over a model built externally with `UseModel` that no convention set can stamp.
+# Narrowing the trigger to configuration AND symptom fixed that one and left `F1FixtureBase`, which
+# also builds its model externally. **A diagnostic that refuses a legitimate model is worse than the
+# silence it replaces.**
+#
+# The detector needs three `Relational:` annotation names back in `InfoCarrier.Core`, and they are
+# pinned. They are a DETECTOR's strings rather than a fixer's: one that stops matching costs a
+# missed warning and never wrong data, which is why R128 could delete the hierarchy convention's
+# four outright and these three are worth carrying.
+
 failed=160
-total=29515
+total=29519

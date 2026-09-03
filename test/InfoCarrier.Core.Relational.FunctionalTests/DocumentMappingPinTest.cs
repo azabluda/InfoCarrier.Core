@@ -65,6 +65,25 @@ public class DocumentMappingPinTest
             InfoCarrierValueGenerationConvention.DefaultValueSqlAnnotation);
     }
 
+    // `InfoCarrierModelValidator`'s THREE, and they are a DETECTOR's rather than a fixer's (R130).
+    // The validator warns a client that has said its store is relational but whose model shows a
+    // hierarchy the relational conventions never touched, and it recognises that shape by these
+    // three annotation names. A rename would cost a MISSED WARNING and never wrong data, which is
+    // why R128 could delete the hierarchy convention's four and this file still carries these.
+    [ConditionalFact]
+    public void The_half_configuration_detector_annotation_names_are_still_EFs()
+    {
+        Assert.Equal(
+            RelationalAnnotationNames.TableName,
+            InfoCarrierModelValidator.TableNameAnnotation);
+        Assert.Equal(
+            RelationalAnnotationNames.ViewName,
+            InfoCarrierModelValidator.ViewNameAnnotation);
+        Assert.Equal(
+            RelationalAnnotationNames.MappingStrategy,
+            InfoCarrierModelValidator.MappingStrategyAnnotation);
+    }
+
     // `InfoCarrierHierarchyMappingConvention`'s FOUR PINS ARE GONE, AND THAT IS THE POINT OF R128.
     // It named `Relational:MappingStrategy` and the three strategy values by hand, and this test
     // compared all four against EF's constants because a rename would have left the client keeping
