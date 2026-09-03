@@ -17,6 +17,13 @@
     The tiers are still real and they are about the BACKING STORE: InMemory/ is Tier A and Sqlite/
     is Tier B. What separates them now is which fixtures they build and which specification bases
     each can host, not which assembly they can see.
+
+    TestUtilities/ IS THAT HARNESS, folded in by R137. It was InfoCarrier.Core.TestUtilities, a
+    project of its own, and by R136 it had exactly one consumer: this one. Its stated reason was
+    that the harness is "neither tier's property" and that nothing relational may be named in it,
+    and one project makes the first moot and the second unenforceable by a boundary. What the
+    folder still says is true and worth keeping: InfoCarrierTier and its InMemory subclass are
+    store-neutral, and SqliteInfoCarrierTier is the per-store answer beside them.
   -->
   <PropertyGroup>
     <Description>Functional tests for InfoCarrier.Core against both ADR-009 backing stores: InMemory (Tier A) and SQLite (Tier B).</Description>
@@ -52,7 +59,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
-    <ProjectReference Include="..\InfoCarrier.Core.TestUtilities\InfoCarrier.Core.TestUtilities.csproj" />
   </ItemGroup>
 
   <ItemGroup>

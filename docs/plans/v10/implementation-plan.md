@@ -4430,6 +4430,31 @@ re-parents of families already running, because R25–R30 showed that is where t
       corrected to say the separation is a layering choice rather than a barrier. Folding it in is
       the next boundary that separates nothing, and it is deliberately not done in this step.
 
+- [x] **R137. The shared harness folds into the spec project, and R136's misplaced folder is
+      fixed.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 160, `total`
+      UNCHANGED at 29509**, FIXED none, BROKEN none, `REASONS: unchanged`, snapshot byte-identical.
+      Release build `0 Error(s)`, the five known Razor warnings. `decisions.md` ADR-013's R136
+      amendment records it.
+
+      **`InfoCarrier.Core.TestUtilities` had one consumer after R136**, and its stated reason -- the
+      harness is "neither tier's property" and nothing relational may be named in it -- is a
+      statement about two projects. There are not two. Its 19 files join the 7 that came from Tier B
+      in `test/InfoCarrier.Core.FunctionalTests/TestUtilities/`, 26 in one folder, and the project,
+      its `.csproj` and its solution entry are deleted. The namespace does not move
+      (`InfoCarrier.Core.FunctionalTests.TestUtilities`), so no test name changes and the baseline
+      is untouched.
+
+      **R136 PUT TIER B'S HARNESS ONE FOLDER TOO DEEP AND THE MEASUREMENT COULD NOT SEE IT.**
+      `git mv TestUtilities ../InfoCarrier.Core.FunctionalTests/TestUtilities` moved the directory
+      *into* the existing one, giving `TestUtilities/TestUtilities/`. It compiled, because the SDK
+      globs `**/*.cs`, and it measured identical, because a test's fully-qualified name does not
+      mention its path. **A pure-move measurement proves the moves changed no answer; it does not
+      prove the files landed where they were meant to.** Flattened here.
+
+      **What the folder still says is true.** `InfoCarrierTier` and `InMemoryInfoCarrierTier` are
+      store-neutral; `SqliteInfoCarrierTier` and the SQLite backend store are the per-store answers
+      beside them. That separation is a design, not a boundary, and it survives the fold.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

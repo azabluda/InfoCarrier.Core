@@ -49,10 +49,11 @@ dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTest
 
 **THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it was two between R122 and R136.**
 `test/InfoCarrier.Core.FunctionalTests` holds both ADR-009 tiers: `InMemory/` is Tier A and
-`Sqlite/` is Tier B, and `test/InfoCarrier.Core.TestUtilities` is still the store-neutral harness.
-The split existed to keep the `InfoCarrier.Core.Relational` package off Tier A's compile line, and
-there is no such package any more. **The tiers are a namespace now, not a project**, so a run of one
-tier is a `--filter` and the suite's number is one project's.
+`Sqlite/` is Tier B, and `TestUtilities/` is the harness both share. It was
+`test/InfoCarrier.Core.TestUtilities`, a project of its own, until R137 folded it in; by then it had
+one consumer. The split existed to keep the `InfoCarrier.Core.Relational` package off Tier A's
+compile line, and there is no such package any more. **The tiers are a namespace now, not a
+project**, so a run of one tier is a `--filter` and the suite's number is one project's.
 
 **EVERY CLIENT IS RELATIONAL SINCE R135, ON BOTH TIERS, AND THERE IS NO OPT-IN LEFT.**
 `AddEntityFrameworkInfoCarrier` registers the relational half unconditionally: EF's relational

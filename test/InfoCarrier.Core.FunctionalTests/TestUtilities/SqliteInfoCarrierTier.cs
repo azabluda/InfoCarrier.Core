@@ -9,11 +9,12 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Every override here is a thing the shared harness may not name.</b>
-///         <c>InfoCarrier.Core.TestUtilities</c> is referenced by Tier A as well, and a reference is
-///         transitive, so a relational type named there would put the relational package on Tier
-///         A's compile line. A relational client over an InMemory backend is exactly the
-///         disagreement the seam exists to prevent (<c>architecture.md</c> §6a <b>D3</b>).
+///         <b>Every override here is a per-store answer to a store-neutral question.</b> The
+///         reason used to be a compile line: the harness was its own project, referenced by Tier A
+///         as well, and a reference is transitive, so a relational type named there would have put
+///         the relational package on Tier A. That reason is gone with the package and with the
+///         project (D3 superseded; R135, R136, R137). The shape stays because it is the better
+///         one: <see cref="InfoCarrierTier" /> asks the question and each store answers it.
 ///     </para>
 ///     <para>
 ///         <b>This is the whole difference between the two tiers</b>, in one file: which backend

@@ -568,7 +568,9 @@ change no answer. **The reference this ADR grants therefore belongs to the one s
 tiers are still real and still about the backing store; they are a namespace rather than an
 assembly. `RelationalInfoCarrierComplianceTest` narrows its two assembly-wide scans to the Tier B
 namespace, because a compliance test written against one store's assembly has to be told which half
-of a merged one it answers for.
+of a merged one it answers for. **R137 folded `test/InfoCarrier.Core.TestUtilities` in as well**,
+for the same reason at one remove: with one spec project it had one consumer, and "the harness is
+neither tier's property" stops being a statement about projects. It is `TestUtilities/` now.
 
 **Amended 2026-09-02 (R122) — "the test project" is now one of three, and only one of them may.**
 The spec suite split by backing store, as EF Core's own does:
