@@ -17,10 +17,10 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     ///     ADR-009 Tier A: EF's InMemory provider, which is not a relational store.
     /// </summary>
     /// <remarks>
-    ///     Tier B lives in <c>InfoCarrier.Core.Relational.FunctionalTests</c> and is named there.
-    ///     It used to be a second static on this class, which meant this assembly referenced a
-    ///     relational provider and so did everything that referenced it. See
-    ///     <see cref="InfoCarrierTier" />.
+    ///     Tier B is <c>SqliteInfoCarrierTier</c>, which lives beside the <c>Sqlite/</c> tests it
+    ///     serves and is named there. It used to be a second static on this class, which meant this
+    ///     store-neutral project referenced a relational provider and so did everything referencing
+    ///     it. See <see cref="InfoCarrierTier" />.
     /// </remarks>
     public static InfoCarrierTier InMemory { get; } = new InMemoryInfoCarrierTier();
 

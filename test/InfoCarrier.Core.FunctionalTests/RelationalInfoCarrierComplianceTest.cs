@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Update;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -65,6 +67,47 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
     protected override IEnumerable<Type> GetBaseTestClasses()
         => typeof(RelationalComplianceTestBase).Assembly.ExportedTypes
             .Where(t => t.Name.Contains("TestBase", StringComparison.Ordinal));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         <b>THE RELATIONAL TIER'S FIXTURES ONLY, and R136 is why this override exists.</b>
+    ///         EF's version of this test scans the whole of <see cref="TargetAssembly" /> for a
+    ///         type implementing <c>IQueryFixtureBase</c> and not <c>ITestSqlLoggerFactory</c>.
+    ///         That is right for a provider whose test assembly holds one store. This assembly
+    ///         holds two since the spec projects merged, and ADR-009 Tier A's fixtures run over
+    ///         EF's InMemory provider: they emit no SQL, so a <c>TestSqlLoggerFactory</c> on them
+    ///         would assert nothing and claim something false.
+    ///     </para>
+    ///     <para>
+    ///         <b>This narrows the scan, it does not weaken the rule.</b> Every fixture in the
+    ///         relational tier is still checked, and the check still fails on a new one that
+    ///         forgets the interface. It is the same correction
+    ///         <see cref="GetBaseTestClasses" /> already makes for the same reason: a compliance
+    ///         test written against one assembly has to be told which half of a merged one it
+    ///         answers for. The tier is identified by namespace, which is also how the two tiers
+    ///         are laid out on disk, so a relational fixture placed outside it would escape this
+    ///         check -- put it under this namespace.
+    ///     </para>
+    /// </remarks>
+    public override void All_query_test_fixtures_must_implement_ITestSqlLoggerFactory()
+    {
+        string tierNamespace = typeof(RelationalInfoCarrierComplianceTest).Namespace!;
+
+        List<Type> queryFixturesWithoutTestSqlLogger = TargetAssembly
+            .GetTypes()
+            .Where(t => t.BaseType != typeof(object) && (t.IsPublic || t.IsNestedPublic))
+            .Where(t => t.Namespace?.StartsWith(tierNamespace, StringComparison.Ordinal) == true)
+            .Where(t => t.GetInterfaces().Contains(typeof(IQueryFixtureBase)))
+            .Where(t => !t.GetInterfaces().Contains(typeof(ITestSqlLoggerFactory)))
+            .ToList();
+
+        Assert.False(
+            queryFixturesWithoutTestSqlLogger.Count > 0,
+            "-- Missing ITestSqlLoggerFactory implementation for relational QueryFixtures --"
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, queryFixturesWithoutTestSqlLogger));
+    }
 
     /// <summary>
     ///     Bases that are conceptually inapplicable to InfoCarrier — each with the reason.

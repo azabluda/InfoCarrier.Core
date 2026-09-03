@@ -12,7 +12,6 @@
   <Folder Name="/test/">
     <Project Path="test/InfoCarrier.Core.TestUtilities/InfoCarrier.Core.TestUtilities.csproj" />
     <Project Path="test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj" />
-    <Project Path="test/InfoCarrier.Core.Relational.FunctionalTests/InfoCarrier.Core.Relational.FunctionalTests.csproj" />
     <Project Path="test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj" />
   </Folder>
 </Solution>

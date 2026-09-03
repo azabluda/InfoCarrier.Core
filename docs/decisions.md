@@ -558,6 +558,18 @@ fixture may want the first without the second.
 on the cast store, so it needs a live connection. What it tests — a connection dropping mid
 split-query — has no meaning across this wire, and a green there would be manufactured.
 
+**Amended 2026-09-03 (R136) — the two spec projects are one again, and the grant is unconditional.**
+`test/InfoCarrier.Core.FunctionalTests` holds both tiers, `InMemory/` and `Sqlite/`. The R122
+amendment below is superseded in its enforcement and unchanged in its substance: what it protected
+was a compile-line separation that mattered while `InfoCarrier.Core.Relational` was a package, and
+D3's supersession removed the package. Since R135 every client registers the relational half
+unconditionally, so the thing the boundary prevented is now the ordinary case and was measured to
+change no answer. **The reference this ADR grants therefore belongs to the one spec project.** The
+tiers are still real and still about the backing store; they are a namespace rather than an
+assembly. `RelationalInfoCarrierComplianceTest` narrows its two assembly-wide scans to the Tier B
+namespace, because a compliance test written against one store's assembly has to be told which half
+of a merged one it answers for.
+
 **Amended 2026-09-02 (R122) — "the test project" is now one of three, and only one of them may.**
 The spec suite split by backing store, as EF Core's own does:
 `test/InfoCarrier.Core.FunctionalTests` is Tier A over InMemory,

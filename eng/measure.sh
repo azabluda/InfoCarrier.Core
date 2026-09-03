@@ -12,12 +12,15 @@
 # So this prints the count *and* keeps the failing test names, because the count alone cannot
 # tell "fixed 4, broke 4" from "changed nothing".
 #
-# SEVERAL PROJECTS, ONE MEASUREMENT. The spec suite is split by backend store, one test project
-# each, and every one of them is part of the same number. `projects` below is that list; the
-# counters are summed and the failing names are merged into one sorted snapshot, exactly as
-# eng/ratchet.sh aggregates the TRX files in CI. One snapshot and not one per project, for the
-# reason ratchet.sh states at length: with a snapshot per project, a test that MOVES between
-# projects reads as a fix in one and a break in the other.
+# SEVERAL PROJECTS, ONE MEASUREMENT. `projects` below is the list; the counters are summed and the
+# failing names are merged into one sorted snapshot, exactly as eng/ratchet.sh aggregates the TRX
+# files in CI. One snapshot and not one per project, for the reason ratchet.sh states at length:
+# with a snapshot per project, a test that MOVES between projects reads as a fix in one and a break
+# in the other.
+#
+# THE LIST HOLDS ONE PROJECT TODAY, and it held two between R122 and R136, one per backing store.
+# The plural shape stays because the reason for it has not gone away: the next backing store adds a
+# project here, and the snapshot must still be one list.
 #
 # Usage:
 #   eng/measure.sh <label>              run, snapshot as <label>, print counts
@@ -48,7 +51,6 @@ reasons="$out/$label.reasons.txt"
 # thing about pointing a hand run at the .slnx.
 projects=(
     "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj"
-    "$root/test/InfoCarrier.Core.Relational.FunctionalTests/InfoCarrier.Core.Relational.FunctionalTests.csproj"
 )
 
 dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.log" 2>&1 || {

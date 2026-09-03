@@ -108,7 +108,7 @@ Raised by the same two readers, not yet checked in source:
   and `InheritanceQueryFixtureBase.GetFilteredExpectedData` narrows the expected rows to match. A
   provider that skipped the filter would fail every one of them on the row count.
   **This provider adopts that base** as `FiltersInheritanceBulkUpdatesInfoCarrierTest`
-  (`test/InfoCarrier.Core.Relational.FunctionalTests/Sqlite/BulkUpdates/BulkUpdatesInfoCarrierTests.cs`, moved there by R122), on
+  (`test/InfoCarrier.Core.FunctionalTests/Sqlite/BulkUpdates/BulkUpdatesInfoCarrierTests.cs`), on
   Tier B, and it is green: no `BulkUpdates` entry appears in `test/known-failures.txt`.
   **The routing question was already settled and is a different one**: neither operation has a
   separate server path here, so both travel in the tree and execute through the server's query

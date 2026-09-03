@@ -4393,6 +4393,43 @@ re-parents of families already running, because R25–R30 showed that is where t
       way to configure another there is one answer, so the boundary analyzer and the forward
       translator cannot disagree. `QueryExecutor` names `InfoCarrierRelationalQueryRoots.Instance`.
 
+- [x] **R136. The two spec test projects become one, and the tiers become a namespace.** `test/`,
+      `eng/` and CI only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 160, `total` UNCHANGED
+      at 29509.** FIXED none, BROKEN none, `REASONS: unchanged`, and the snapshot is
+      **byte-identical** to R135's -- which is the right measurement for a pure move, because a
+      fully-qualified test name does not mention its project. Release build `0 Error(s)`.
+      `decisions.md` ADR-013 carries the **amendment 2026-09-03 (R136)**.
+
+      **The split had one reason and it is gone.** R122 separated the projects to keep the
+      `InfoCarrier.Core.Relational` package off Tier A's compile line: a reference is transitive, so
+      naming a relational type in the shared harness would have reached Tier A, and a relational
+      client over an InMemory backend was the disagreement to prevent. D3's supersession removed the
+      package, and R135 made every client relational and measured that it changes no answer. Neither
+      half of the reason survives, so the boundary separated nothing.
+
+      **What moved.** 97 files, recorded by git as renames: `Sqlite/`, `TestUtilities/`,
+      `ModelBuilding/`, `RelationalInfoCarrierComplianceTest` and `RelationalMetadataAgreementTest`.
+      One file was deleted rather than moved -- the second `InvariantCultureInitializer`, identical
+      to Tier A's but for its namespace, and a module initializer is per assembly. The merged
+      `.csproj` is Tier A's plus three package references and the SQLite audit suppression.
+      `eng/measure.sh` takes one project, `build.yml` runs one `dotnet test` and passes one TRX, and
+      **both keep their plural shape**: `ratchet.sh` still unions several TRX into one counter set
+      and one name list, because a second backing store would need it again.
+
+      **MERGING FOUND SOMETHING THE BOUNDARY HAD HIDDEN, and this is the part worth carrying.**
+      `RelationalComplianceTestBase.All_query_test_fixtures_must_implement_ITestSqlLoggerFactory`
+      scans the whole target assembly. With one assembly it immediately demanded that Tier A's
+      InMemory query fixtures implement `ITestSqlLoggerFactory` -- which they must not, because they
+      emit no SQL and the interface would claim something false. It is overridden to scan the Tier B
+      namespace only, which is the same correction `GetBaseTestClasses()` already makes in that
+      class and for the same reason: **a compliance test written against one store's assembly has to
+      be told which half of a merged one it answers for.** All three compliance tests are green.
+
+      **`InfoCarrier.Core.TestUtilities` now has exactly one consumer** and its stated reason
+      ("nothing relational may be referenced from here") is dead. It is kept, with the prose
+      corrected to say the separation is a layering choice rather than a barrier. Folding it in is
+      the next boundary that separates nothing, and it is deliberately not done in this step.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

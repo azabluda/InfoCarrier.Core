@@ -11,19 +11,18 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>This replaced a delegate and a bool, and the reason is the project split.</b> The
-///         harness used to pick the backend store through a
-///         <c>Func&lt;…, InfoCarrierBackendTestStore&gt;</c> and decide the rest from a
-///         <c>relationalClientStore</c> flag, which meant the shared harness had to NAME the
-///         relational client store, the relational logger factory and the relational client
-///         services. Naming them means referencing them, a reference is transitive, and Tier A
-///         would have had the relational package on its own compile line. A relational client over
-///         an InMemory backend is exactly the disagreement the seam exists to prevent
-///         (<c>architecture.md</c> §6a <b>D3</b>).
+///         <b>This replaced a delegate and a bool.</b> The harness used to pick the backend store
+///         through a <c>Func&lt;…, InfoCarrierBackendTestStore&gt;</c> and decide the rest from a
+///         <c>relationalClientStore</c> flag, which meant this store-neutral project had to NAME
+///         the relational client store, the relational logger factory and the relational client
+///         services. The original reason was a compile line: a reference is transitive and Tier A
+///         would have had the relational package on its own. That reason is gone with the package
+///         (D3 superseded, R135, R136), and the shape stays because it is the better one — each
+///         tier answers for itself instead of a flag deciding for it per fixture.
 ///     </para>
 ///     <para>
-///         So each tier answers for itself, from its own assembly. Everything relational is
-///         overridden in <c>InfoCarrier.Core.Relational.FunctionalTests</c>; the defaults here are
+///         Everything relational is
+///         overridden by <c>SqliteInfoCarrierTier</c> in the spec project; the defaults here are
 ///         the store-neutral answers, and a tier that says nothing gets them.
 ///     </para>
 /// </remarks>

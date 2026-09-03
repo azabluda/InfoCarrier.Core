@@ -8,14 +8,16 @@
     has two halves per test: a client with no database and a server on a real provider, and the
     harness that wires them is neither tier's property.
 
-    NOTHING RELATIONAL MAY BE REFERENCED FROM HERE. A reference is transitive, so anything this
-    project names reaches InfoCarrier.Core.FunctionalTests, and Tier A must not have a relational
-    client. InMemory is not a relational store, and a relational client over it recreates exactly
-    the disagreement the split exists to prevent (architecture.md section 6a, D3). The relational
-    half of the harness lives in InfoCarrier.Core.Relational.FunctionalTests/TestUtilities.
+    NOTHING RELATIONAL IS REFERENCED FROM HERE, and since R136 that is a layering choice rather
+    than a barrier. It was a barrier while the spec suite was two projects and the relational half
+    was its own package: a reference is transitive, so a relational type named here would have
+    reached Tier A. Both reasons are gone. D3 is superseded and every client registers the
+    relational half unconditionally (R135). What is left is worth keeping on its own terms: this
+    project holds what BOTH tiers share, and a per-store type belongs in the tier that uses it.
+    SqliteInfoCarrierTier and the SQLite backend store live beside the Sqlite/ tests they serve.
 
-    InMemory IS referenced, and that is not an exception to the rule above: EF's InMemory provider
-    is not relational, and the InMemory backend store is the Tier A half of the same seam.
+    ONE CONSUMER SINCE R136, so this boundary is a candidate to fold in. It has not been, because
+    the separation still says something true about which code is store-neutral.
   -->
   <PropertyGroup>
     <Description>The store-neutral test harness shared by the InfoCarrier.Core spec test projects.</Description>

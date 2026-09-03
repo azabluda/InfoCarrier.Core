@@ -40,17 +40,19 @@ question, and how to check the loaded solution first:
 ```powershell
 dotnet build InfoCarrier.Core.slnx                       # note: .slnx, not .sln
 bash eng/measure.sh <label> [baseline]                   # THE SUITE: both tiers, one number
-dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj                       # Tier A, InMemory
-dotnet test  test/InfoCarrier.Core.Relational.FunctionalTests/InfoCarrier.Core.Relational.FunctionalTests.csproj # Tier B, SQLite
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the whole spec suite
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.InMemory"  # Tier A only
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 19 tests, separate project
 ```
 
-**THE SPEC SUITE IS TWO PROJECTS SINCE R122, and its number is the two added together.**
-`test/InfoCarrier.Core.FunctionalTests` is ADR-009 Tier A (InMemory) and
-`test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B (SQLite); the store-neutral harness they
-share is `test/InfoCarrier.Core.TestUtilities`. **Tier A references no relational SPEC assembly** —
-not `EFCore.Relational.Specification.Tests` — and that is now the whole of the difference.
+**THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it was two between R122 and R136.**
+`test/InfoCarrier.Core.FunctionalTests` holds both ADR-009 tiers: `InMemory/` is Tier A and
+`Sqlite/` is Tier B, and `test/InfoCarrier.Core.TestUtilities` is still the store-neutral harness.
+The split existed to keep the `InfoCarrier.Core.Relational` package off Tier A's compile line, and
+there is no such package any more. **The tiers are a namespace now, not a project**, so a run of one
+tier is a `--filter` and the suite's number is one project's.
 
 **EVERY CLIENT IS RELATIONAL SINCE R135, ON BOTH TIERS, AND THERE IS NO OPT-IN LEFT.**
 `AddEntityFrameworkInfoCarrier` registers the relational half unconditionally: EF's relational

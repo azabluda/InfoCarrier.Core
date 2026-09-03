@@ -2966,6 +2966,16 @@
 # counts: every hierarchy root now scaffolds `Relational:MappingStrategy` = `TPH`, because EF's own
 # `EntityTypeHierarchyMappingConvention` runs on every client model now. EF's SQL Server baselines
 # carry the same annotation with the value their model implies. `architecture.md` D3 amendment R135.
+#
+# 2026-09-03 (R136) -- THE SUITE IS ONE PROJECT AGAIN, so the R122 note above is superseded on that
+# point and unchanged on every other. Both tiers live in test/InfoCarrier.Core.FunctionalTests:
+# InMemory/ is Tier A and Sqlite/ is Tier B. eng/measure.sh takes one project and eng/ratchet.sh
+# reads one TRX; both keep their plural shape, because a second backing store would need it again
+# and ONE BASELINE PAIR STILL COVERS EVERYTHING, for the reason R122 gives.
+#
+# `failed` UNCHANGED at 160 and `total` UNCHANGED at 29509. FIXED none, BROKEN none, REASONS
+# unchanged, and the name list is byte-identical -- which is what a pure move must measure, because
+# a test's fully-qualified name does not mention its project.
 
 failed=160
 total=29509
