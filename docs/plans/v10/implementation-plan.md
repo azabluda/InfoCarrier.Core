@@ -4609,6 +4609,31 @@ re-parents of families already running, because R25–R30 showed that is where t
       **What is left disagreeing is one synthetic case**: `Shipment.Note` in
       `UnmappedMemberBoundaryTest`, which exists to make the two-model defect visible and says so.
 
+- [x] **R143. Every fixture builds both models from ONE `OnModelCreating`, and it turns nothing
+      green.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 141, `total`
+      UNCHANGED at 29513.** FIXED none, BROKEN none, `REASONS: unchanged`. Release build
+      `0 Error(s)`.
+
+      **The owner's question was whether identical models make failures disappear. The measured
+      answer is no.** Not one test changed its answer, on either tier. The remaining four fixtures
+      that supplied a separate server context are converged: Northwind Tier A, the Tier A
+      inheritance fixture, and the constructors fixture, which added a keyless type with
+      `ToInMemoryQuery` on the server alone. The seeding fixture needed nothing -- it already passes
+      the same type as both.
+
+      **What the separate server contexts were for.** Store shape, never a hidden property: a
+      defining query for a keyless type, a table name, and one column. **Nothing in the suite hid a
+      property from the client except the pin added in R139**, which was written to do exactly that.
+
+      **A ONE-OFF FAILURE APPEARED IN THIS STEP'S RUN AND IS AN INTERMITTENT, NOT A REGRESSION.**
+      `AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async: False)`
+      failed with `ObjectDisposedException`. It is Tier B, where the change is Tier A; its class
+      passes alone at 71 of 72; and the suite re-run at the same code state came back at 141 with
+      nothing broken. **The suspect is R136/R137**: the two tiers used to be two processes and are
+      one assembly now, xUnit parallelises collections within an assembly, and no
+      `CollectionBehavior` is declared. It is one observation and it is written up in
+      [`findings.md`](findings.md); `CLAUDE.md`'s "there is no known intermittent" is corrected.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

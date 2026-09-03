@@ -28,6 +28,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Both sides build from ONE <c>OnModelCreating</c>, which is what version 1 of this
+    ///     provider did and what an application does. See the Tier B Northwind fixture.
+    /// </remarks>
+    protected override Type ContextType
+        => typeof(NorthwindInfoCarrierServerContext);
+
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
     /// <inheritdoc />

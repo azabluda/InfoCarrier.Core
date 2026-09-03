@@ -57,6 +57,13 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
 
     public class InfoCarrierFixture : WithConstructorsFixtureBase
     {
+        /// <inheritdoc />
+        /// <remarks>
+        ///     Both sides build from ONE <c>OnModelCreating</c>, as version 1 of this provider did.
+        /// </remarks>
+        protected override Type ContextType
+            => typeof(WithConstructorsInfoCarrierServerContext);
+
         private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName

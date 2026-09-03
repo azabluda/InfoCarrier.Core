@@ -442,7 +442,17 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**There is no known intermittent.** Two have been closed, and they were closed by opposite routes.
+**ONE INTERMITTENT IS OPEN SINCE 2026-09-04 (R143), AND IT IS THE FIRST IN THIS REPOSITORY FOR A
+LONG TIME.** `AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async:
+False)` failed once with `ObjectDisposedException: Cannot access a disposed object`. It passes when
+its class runs alone (71 of 72, one skip), and the suite re-run at the same code state came back
+clean. **The suspected cause is R136/R137**: the two ADR-009 tiers used to run in two processes and
+now share one assembly, xUnit runs test collections in parallel within an assembly, and this
+repository sets no `CollectionBehavior`. So a Tier A class and a Tier B class can now run at the same
+time, which was impossible before. **This is a hypothesis with one observation behind it and is not
+established.** Read `findings.md` before spending on it.
+
+**The other two intermittents are closed**, and they were closed by opposite routes.
 C38's was **instrumented into the open**: `ServerSaveChangesExecutor` rethrows an identity conflict
 with the whole request appended, which turned a one-run-in-four failure into two dumps that arrived
 already diagnosed. R76's **never reproduced under instrumentation at all** — five clean full runs —

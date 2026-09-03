@@ -72,6 +72,14 @@ public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase
     // What the property returned was the CLIENT's log anyway, and this client has no database and
     // emits no SQL; `ServerSqlLog` is where the server's statements can be read.
 
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Both sides build from ONE <c>OnModelCreating</c>, which is what version 1 of this
+    ///     provider did and what an application does. See the Tier B Northwind fixture.
+    /// </remarks>
+    protected override Type ContextType
+        => typeof(InheritanceInfoCarrierServerContext);
+
     private ITestStoreFactory? _testStoreFactory;
 
     /// <inheritdoc />

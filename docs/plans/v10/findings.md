@@ -9,6 +9,39 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## One intermittent, observed once, and the merge is the suspect (R143, 2026-09-04)
+
+`AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async: False)` failed
+once in a full run with `ObjectDisposedException: Cannot access a disposed object`.
+
+**What was checked, in order.**
+
+1. **Could the change have caused it?** No. The commit under measurement converged
+   `WithConstructorsInfoCarrierTest`, which is ADR-009 Tier A over EF's InMemory provider. The
+   failing test is Tier B over SQLite, in an unrelated class, with no shared fixture.
+2. **Does the class fail alone?** No. 71 passed, 1 skipped, and the failing case was green.
+3. **Does the suite fail again at the same code state?** No. The re-run came back at 141 failures
+   with nothing broken and the reasons unchanged.
+
+So it is an intermittent, by the definition `CLAUDE.md` gives: the same code produced two different
+answers.
+
+**The suspected mechanism, with one observation behind it.** Before R136 the two tiers were two test
+projects and therefore two processes. They are one assembly now. xUnit runs test collections in
+parallel within an assembly, each class is its own collection by default, and this repository
+declares no `CollectionBehavior` anywhere. **A Tier A class and a Tier B class can now run at the
+same time, which was impossible before the merge.** `ObjectDisposedException` is consistent with a
+disposal race, and this repository has traced two earlier intermittents to shared-store disposal.
+
+**It is not established, and the next step is reproduction rather than a fix.** One occurrence in
+several full runs is a thin base. The cheap experiment is to declare a single test collection for the
+whole assembly, or to cap the parallel thread count, and see whether the failure stops appearing --
+but a failure that appears once cannot be shown to have stopped. The honest measurement is frequency
+over many runs, which is expensive here.
+
+**What must not happen is that this is forgotten.** `CLAUDE.md` said there was no known intermittent,
+and that sentence is now wrong. It has been corrected rather than left standing.
+
 ## The boundary analyzer does not consult the client model for member mappability (R138, 2026-09-03)
 
 **Found by an experiment that was reverted**, which is the only reason it is visible at all.
