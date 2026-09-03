@@ -4455,6 +4455,54 @@ re-parents of families already running, because R25–R30 showed that is where t
       store-neutral; `SqliteInfoCarrierTier` and the SQLite backend store are the per-store answers
       beside them. That separation is a design, not a boundary, and it survives the fold.
 
+- [x] **R138. The Tier B Northwind store gets the ten `Orders` columns its model ignores.** `test/`
+      only, so `eng/measure.sh` alone. **`failed` FALLS 160 -> 150**, `total` UNCHANGED at 29509.
+      **FIXED ten, BROKEN none**; every one is `SqlQueryInfoCarrierTest`, which goes 97 -> 107 of
+      119. `test/known-failures.txt` and `known-failures.names.txt` both move, as a falling count
+      requires. Release build `0 Error(s)`.
+
+      **The gap.** The core `NorthwindContext` ignores `RequiredDate`, `ShippedDate`, `ShipVia`,
+      `Freight`, `ShipName`, `ShipAddress`, `ShipCity`, `ShipRegion`, `ShipPostalCode` and
+      `ShipCountry`, and the real Northwind schema has all ten. EF's own SQLite suite has both at
+      once because its store is a prebuilt `northwind.db`; this tier builds its store from the
+      model, so it could have one or the other. `SqlQueryTestBase` reads `Orders` with raw SQL into
+      its own `UnmappedOrder`, which names nine of the ten, and failed with
+      `no such column: m.Freight` -- `Freight` only because it is the first the parser reaches.
+
+      **THREE ROUTES WERE MEASURED AND ONLY THE THIRD IS RIGHT.**
+
+      | Route | Result |
+      |---|---|
+      | Map the ten on the server model | `failed` 160 -> **158**. FIXED ten, **BROKEN eight** |
+      | `ALTER TABLE` alone | No change. The columns exist and hold null; the tests compare real values |
+      | `ALTER TABLE` plus an `UPDATE` from `NorthwindData.CreateOrders()` | `failed` 160 -> **150**. FIXED ten, BROKEN none |
+
+      **Why the first route breaks eight, and it is the finding rather than the fix.** This
+      repository is two models. With the property mapped on the server, the server answers a member
+      access the CLIENT's model calls unmapped, so
+      `Average_with_unmapped_property_access_throws_meaningful_exception`,
+      `Collection_select_nav_prop_all_client`, `Collection_where_nav_prop_all_client` and
+      `SelectMany_..._references_non_mapped_properties_...` stop throwing and return data. **The
+      boundary analyzer never asks the client model whether a member is mapped**, and that is
+      invisible while the two models agree -- which they always do, except under that experiment.
+      Recorded in [`findings.md`](findings.md), not fixed here.
+
+      **Shadow properties do not avoid it**, which was also measured: `Property<int?>("ShipVia")`
+      binds to the CLR member whose name it matches, ignored or not, so the server model maps it
+      either way. Raw DDL is the only route that gives the store the column without giving either
+      model the property.
+
+      **`SqliteParameter` and not a bare value**, because a null has to arrive as `DBNull` and EF's
+      raw-SQL path refuses `DBNull.Value` directly with *"no store type mapping for properties of
+      type 'DBNull'"* -- which cost one measurement, read as 103 of 127 where the baseline was 105.
+
+      **THE OTHER EIGHT FREIGHT FAILURES DID NOT VANISH, THEY MOVED**, and only the reasons diff
+      says so. `SQLite Error 1: 'no such column: m0.Freight'` is now
+      `Type 'System.ValueTuple``2[...UnmappedOrder...]'`: the wire type allowlist refusing the tuple
+      a composed raw-SQL query projects. That is the next problem in the same tests and is
+      unaddressed. This is exactly CLAUDE.md's "fixed what it aimed at and uncovered the next
+      problem in the same tests" case, which a fixed/broken list alone cannot tell from a no-op.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

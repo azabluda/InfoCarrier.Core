@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
@@ -107,12 +108,111 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
     {
         await base.SeedAsync(context);
 
+        await AddTheOrderColumnsTheModelIgnoresAsync(context);
+
         // The table name is `NorthwindInfoCarrierSqliteServerContext`'s, which maps `OrderDetail`
         // to "Order Details" so the relational spec bases can write that name into their own raw
         // SQL. This statement is the only other place the name is written by hand, and R97 moved
         // one without the other.
         await context.Database.ExecuteSqlRawAsync(
             """UPDATE "Order Details" SET "Discount" = round("Discount", 2)""");
+    }
+
+    /// <summary>
+    ///     Adds the ten <c>Orders</c> columns the Northwind model ignores, straight to the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Outside the model on purpose, and that is the whole point of this method.</b> The
+    ///         core <c>NorthwindContext</c> ignores <c>Freight</c>, <c>RequiredDate</c>,
+    ///         <c>ShippedDate</c>, <c>ShipVia</c>, <c>ShipName</c>, <c>ShipAddress</c>,
+    ///         <c>ShipCity</c>, <c>ShipRegion</c>, <c>ShipPostalCode</c> and <c>ShipCountry</c>,
+    ///         while the real Northwind schema has all ten. EF Core's own SQLite suite gets both at
+    ///         once because its store is a prebuilt <c>northwind.db</c>: the columns exist and the
+    ///         model does not know them. This tier builds its store from the model, so it could
+    ///         previously have one or the other.
+    ///     </para>
+    ///     <para>
+    ///         <b>Both are needed, by tests that contradict each other through the model.</b>
+    ///         <c>SqlQueryTestBase</c> reads <c>Orders</c> with raw SQL into its own
+    ///         <c>UnmappedOrder</c>, which names nine of the ten, and failed with
+    ///         <c>no such column: m.Freight</c> -- <c>Freight</c> only because it is the first one
+    ///         the parser reaches. Meanwhile
+    ///         <c>Average_with_unmapped_property_access_throws_meaningful_exception</c> averages
+    ///         <c>Order.ShipVia</c> and requires <c>QueryUnableToTranslateMember</c>, and
+    ///         <c>Collection_select_nav_prop_all_client</c> and its sibling read
+    ///         <c>ShipCity</c> the same way.
+    ///     </para>
+    ///     <para>
+    ///         <b>MAPPING THEM ON THE SERVER MODEL FIXES THE FIRST TEN AND BREAKS THOSE EIGHT, and
+    ///         that was measured rather than reasoned about.</b> This repository is two models: with
+    ///         the property mapped on the server, the server answers a member access the CLIENT's
+    ///         model calls unmapped, so a query EF refuses returns data instead. Shadow properties
+    ///         do not avoid it -- <c>Property&lt;int?&gt;("ShipVia")</c> binds to the CLR member
+    ///         whose name it matches, ignored or not. Raw DDL is the only route that gives the
+    ///         store the column without giving either model the property, which is exactly the
+    ///         state EF's own store is in.
+    ///     </para>
+    ///     <para>
+    ///         Every column is nullable and nothing seeds them, so every row holds null.
+    ///         <c>NorthwindData</c> never carried these values either, and
+    ///         <c>SqlQueryTestBase.AssertUnmappedOrders</c> compares two results read from the SAME
+    ///         store -- it asserts that the wire round-trips what is there, not what Northwind
+    ///         historically held.
+    ///     </para>
+    /// </remarks>
+    private static async Task AddTheOrderColumnsTheModelIgnoresAsync(NorthwindContext context)
+    {
+        // Whole statements as literals, because `ExecuteSqlRawAsync` refuses both an interpolated
+        // argument (EF1002) and a concatenated one (EF1003), and neither suppression is worth the
+        // ten lines it would save.
+        foreach (string statement in (string[])
+                 [
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""RequiredDate"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShippedDate"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipVia"" INTEGER",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""Freight"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipName"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipAddress"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipCity"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipRegion"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipPostalCode"" TEXT",
+                     @"ALTER TABLE ""Orders"" ADD COLUMN ""ShipCountry"" TEXT",
+                 ])
+        {
+            await context.Database.ExecuteSqlRawAsync(statement);
+        }
+
+        // The values come from the same objects the base just inserted, so the store holds what
+        // EF's prebuilt northwind.db holds. `SqliteParameter` rather than a bare value, because a
+        // null has to reach the provider as `DBNull` and EF's raw-SQL path refuses a plain
+        // `DBNull.Value` with "no store type mapping for properties of type 'DBNull'".
+        foreach (Order order in NorthwindData.CreateOrders())
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE "Orders" SET "RequiredDate" = @RequiredDate, "ShippedDate" = @ShippedDate,
+                    "ShipVia" = @ShipVia, "Freight" = @Freight, "ShipName" = @ShipName,
+                    "ShipAddress" = @ShipAddress, "ShipCity" = @ShipCity,
+                    "ShipRegion" = @ShipRegion, "ShipPostalCode" = @ShipPostalCode,
+                    "ShipCountry" = @ShipCountry
+                WHERE "OrderID" = @OrderID
+                """,
+                Parameter("RequiredDate", order.RequiredDate),
+                Parameter("ShippedDate", order.ShippedDate),
+                Parameter("ShipVia", order.ShipVia),
+                Parameter("Freight", order.Freight),
+                Parameter("ShipName", order.ShipName),
+                Parameter("ShipAddress", order.ShipAddress),
+                Parameter("ShipCity", order.ShipCity),
+                Parameter("ShipRegion", order.ShipRegion),
+                Parameter("ShipPostalCode", order.ShipPostalCode),
+                Parameter("ShipCountry", order.ShipCountry),
+                Parameter("OrderID", order.OrderID));
+        }
+
+        static SqliteParameter Parameter(string name, object? value)
+            => new(name, value ?? DBNull.Value);
     }
 
     private static void CopyDbContextParameters(NorthwindContext client, NorthwindContext server)

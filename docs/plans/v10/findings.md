@@ -9,6 +9,43 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## The boundary analyzer does not consult the client model for member mappability (R138, 2026-09-03)
+
+**Found by an experiment that was reverted**, which is the only reason it is visible at all.
+
+ADR-009 Tier B's Northwind store is built from the server model, where EF's own SQLite suite uses a
+prebuilt `northwind.db`. The core `NorthwindContext` **ignores** ten `Order` properties that the real
+Northwind schema has, so this tier's store had no such columns and ten `SqlQueryTestBase` tests
+failed with `no such column: m.Freight`.
+
+Mapping the ten on the *server* context fixes those ten and **breaks eight**:
+
+| Test | What it asserts |
+|---|---|
+| `Average_with_unmapped_property_access_throws_meaningful_exception` | `Average(o => o.ShipVia)` raises `QueryUnableToTranslateMember` |
+| `Collection_select_nav_prop_all_client`, `Collection_where_nav_prop_all_client` | the same for `ShipCity` |
+| `SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity` | the same, across a correlated subquery |
+
+They stop throwing and **return data**. The client's model still ignores `ShipVia`; the server's now
+maps it; and the member access crossed the wire anyway. **The boundary analyzer never asked the
+client model whether the member is mapped.**
+
+**Why it has been invisible.** The two models are built from the same `OnModelCreating`, so they
+agree about what is mapped in every test this suite runs. The experiment is the only thing that has
+ever made them disagree on this axis. It is R120's shape once more — a fact two components read
+independently — except here the two readers are two *models*, and the disagreement widens what the
+client is allowed to do rather than narrowing it.
+
+**Not fixed, and not priced.** The shipped fix for R138 puts the columns in the store by
+`ALTER TABLE` and fills them from `NorthwindData.CreateOrders()`, so both models keep ignoring the
+properties and the eight stay green. That reproduces EF's prebuilt store exactly. It also puts the
+defect back out of sight, which is why it is written down here.
+
+**The rule that transfers: a guard that is never exercised is not evidence that it exists.** Eight
+tests asserted an unmapped-member refusal and passed, for two milestones, without the code under
+test ever being reached — the store simply had no column, so the query failed earlier and for a
+different reason.
+
 ## What was built, and what each thing taught
 
 Not yet implemented, in rough priority order:

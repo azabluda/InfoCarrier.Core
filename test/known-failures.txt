@@ -2976,6 +2976,35 @@
 # `failed` UNCHANGED at 160 and `total` UNCHANGED at 29509. FIXED none, BROKEN none, REASONS
 # unchanged, and the name list is byte-identical -- which is what a pure move must measure, because
 # a test's fully-qualified name does not mention its project.
+#
+# 2026-09-03 (R138) -- `failed` FALLS 160 -> 150, `total` UNCHANGED at 29509. FIXED ten, BROKEN
+# none: every one is `SqlQueryInfoCarrierTest`, and the names file is refreshed with this commit.
+#
+# The Northwind store now holds the ten `Orders` columns the model ignores -- RequiredDate,
+# ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode,
+# ShipCountry -- added by `ALTER TABLE` and filled from `NorthwindData.CreateOrders()` in
+# `NorthwindQueryInfoCarrierSqliteFixture`. That is the state EF's own prebuilt northwind.db is in:
+# real schema, real values, model does not know them.
+#
+# **MAPPING THEM ON THE SERVER MODEL WAS TRIED FIRST AND IS WRONG, and it measured 160 -> 158.** It
+# fixes the same ten and breaks eight, because this repository is TWO models: with the property
+# mapped on the server, the server answers a member access the CLIENT's model calls unmapped, so
+# `Average_with_unmapped_property_access_throws_meaningful_exception`,
+# `Collection_select_nav_prop_all_client`, `Collection_where_nav_prop_all_client` and
+# `SelectMany_..._references_non_mapped_properties_...` stop throwing and return data. Shadow
+# properties do not avoid it: `Property<int?>("ShipVia")` binds to the CLR member whose name it
+# matches. Raw DDL is the only route that gives the store the column without giving either model
+# the property.
+#
+# **THAT EXPERIMENT ALSO EXPOSED A PROVIDER QUESTION, recorded and not fixed here.** Those eight
+# tests stop throwing because the boundary analyzer does not consult the CLIENT model for member
+# mappability. It is invisible while the two models agree, which they always do except under that
+# experiment. See `docs/plans/v10/findings.md`.
+#
+# **THE OTHER EIGHT FREIGHT FAILURES DID NOT VANISH, THEY MOVED**, which is why the reasons diff
+# exists. They were `SQLite Error 1: 'no such column: m0.Freight'` and are now
+# `Type 'System.ValueTuple`2[...UnmappedOrder...]'` -- the wire type allowlist refusing the tuple a
+# composed raw-SQL query projects. That is the next problem in the same tests, unaddressed.
 
-failed=160
+failed=150
 total=29509
