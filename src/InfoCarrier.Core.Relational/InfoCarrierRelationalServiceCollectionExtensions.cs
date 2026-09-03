@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -79,7 +80,20 @@ public static class InfoCarrierRelationalServiceCollectionExtensions
         services.RemoveAll<IDatabaseFacadeDependencies>();
         services.AddScoped<IRelationalDatabaseFacadeDependencies, InfoCarrierRelationalFacadeDependencies>();
 
-        return services.AddScoped<IDatabaseFacadeDependencies>(
+        services.AddScoped<IDatabaseFacadeDependencies>(
             p => p.GetRequiredService<IRelationalDatabaseFacadeDependencies>());
+
+        // THE CLIENT MODEL'S RELATIONAL CONVENTIONS (#97 level 2, R128). `InfoCarrier.Core`
+        // registers `InfoCarrierConventionSetBuilder` with `TryAdd`, and this REPLACES it with a
+        // subclass rather than adding a second builder beside it -- the owner's rule for this
+        // package, stated 2026-09-03. `RemoveAll` first, because `TryAdd` is first-wins and
+        // `AddEntityFrameworkInfoCarrier` may already have run; with the removal, the order of the
+        // two calls stops mattering, exactly as it does for `IInfoCarrierRelationalQueryRoots`.
+        //
+        // Scoped, which is the lifetime EF declares for this service in
+        // `EntityFrameworkServicesBuilder`.
+        services.RemoveAll<IProviderConventionSetBuilder>();
+
+        return services.AddScoped<IProviderConventionSetBuilder, InfoCarrierRelationalConventionSetBuilder>();
     }
 }

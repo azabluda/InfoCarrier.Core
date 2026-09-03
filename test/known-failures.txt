@@ -2879,5 +2879,24 @@
 # never uses `Database.SqlQuery<T>` or a raw-SQL root, so whatever level 2's CONVENTIONS change
 # later is attributable to the conventions alone. Measuring this step on its own is what buys that.
 
+# 2026-09-03 (R128) -- `failed` UNCHANGED at 160, `total` RISES 29514 -> 29515, A DELIBERATE RISE OF
+# ONE, and it is two movements not one: `RelationalClientTierPinTest` gains TWO tests, and
+# `DocumentMappingPinTest` LOSES one. #97 level 2 step two replaces the client's convention set
+# builder from `InfoCarrier.Core.Relational` and deletes the 131-line hand-written
+# `InfoCarrierHierarchyMappingConvention`; the pin that held its four `Relational:` strings against
+# EF's constants goes with it, because EF's own `EntityTypeHierarchyMappingConvention` reads those
+# constants directly and a rename is a COMPILE ERROR now rather than a pinned string.
+#
+# FIXED none, BROKEN none, `REASONS: unchanged` -- the second null result in a row, and it was
+# treated as one. THE NEGATIVE CONTROL IS WHAT MAKES IT EVIDENCE: with EF's convention removed from
+# the new builder and everything else identical, `TPTInheritanceQueryInfoCarrierTest.Using_from_sql_throws`
+# and its TPC sibling FAIL. Put it back and they pass. So the convention runs, does work, and the
+# hand-written copy it replaced was doing exactly the same work -- which is why no count moved.
+#
+# `RelationalClientTierPinTest` now also asserts that Tier B's `IProviderConventionSetBuilder`
+# registration is a SINGLE descriptor naming the relational subclass, and Tier A's a single
+# descriptor naming the core one. The count is half the assertion: a `RemoveAll` that stopped
+# working would leave both present and the last would silently win.
+
 failed=160
-total=29514
+total=29515

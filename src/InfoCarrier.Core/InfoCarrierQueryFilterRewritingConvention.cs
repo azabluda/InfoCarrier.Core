@@ -46,9 +46,17 @@ namespace InfoCarrier.Core;
 ///         <b>Matching the declaring type by name is deliberate, and it is not new.</b>
 ///         <see cref="Metadata.AnnotationDocumentMapping" /> reads
 ///         <c>Relational:ContainerColumnName</c> the same way, and
-///         <see cref="InfoCarrierHierarchyMappingConvention" /> reads four more. The strings below
+///         <see cref="InfoCarrierValueGenerationConvention" /> reads two more. The strings below
 ///         are pinned against EF's own members by <c>DocumentMappingPinTest</c>, in the test
 ///         project, which is where the relational reference belongs.
+///     </para>
+///     <para>
+///         <b>The list used to name a third, and R128 removed it.</b>
+///         <c>InfoCarrierHierarchyMappingConvention</c> spelled four <c>Relational:</c> strings by
+///         hand; it is deleted, and <c>InfoCarrier.Core.Relational</c> supplies EF's own
+///         <c>EntityTypeHierarchyMappingConvention</c> instead, which reads EF's constants. Those
+///         four are a compile error now rather than a pinned string, which is the direction the
+///         rest of this list is meant to travel in.
 ///     </para>
 /// </remarks>
 public class InfoCarrierQueryFilterRewritingConvention : QueryFilterRewritingConvention

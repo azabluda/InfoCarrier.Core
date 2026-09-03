@@ -608,6 +608,48 @@ swaps EF's relational conventions in for the three hand-written ones
 commit. Two implementations of one fact in two packages drift silently, which is the failure mode
 this document already records in D3 and ADR-012.
 
+#### D3 amendment 2026-09-03 (R128) — level 2 step two is BUILT, by replacement, and answer (C)
+
+**The owner chose (C) on 2026-09-03**: `InfoCarrier.Core.Relational` **replaces**
+`IProviderConventionSetBuilder` with a subclass of `InfoCarrierConventionSetBuilder`. Not
+`IConventionSetPlugin`, not `ModelConfigurationBuilder.Conventions`, and not a documented
+requirement for `UseInternalServiceProvider`.
+
+**The DI reach problem the R127 amendment described was real but narrower than it read.** Every EF
+spec fixture goes through `ServiceProviderFixtureBase`, which builds its provider from
+`TestStoreFactory.AddProviderServices(...)` and calls `UseInternalServiceProvider` — read from EF's
+source. So `AddInfoCarrierRelationalClient` reaches the client's convention set for the **whole
+suite** with no new seam. What is still open is a consumer that builds no collection at all;
+`SqliteSmokeTest` is that shape, and it is unaffected today because nothing it does needs a
+relational convention.
+
+**What was built.** `InfoCarrierRelationalConventionSetBuilder` extends the core builder, calls
+`base.CreateConventionSet()`, and adds EF's own `EntityTypeHierarchyMappingConvention`.
+`AddInfoCarrierRelationalClient` does `RemoveAll<IProviderConventionSetBuilder>()` and registers it
+Scoped, which is the lifetime EF declares. **`InfoCarrierHierarchyMappingConvention` is deleted** —
+131 lines, four hand-spelled `Relational:` strings, and the pin test that held them.
+
+**The relational dependency object is a stub whose every member throws, and that is the charter in
+code.** `EntityTypeHierarchyMappingConvention` takes `RelationalConventionSetBuilderDependencies`
+and never touches it. The two services that object carries — an `IRelationalAnnotationProvider` and
+an `IUpdateSqlGenerator` — are command-side, and this package does not give the client command-side
+anything. All 29 members throw with a message saying so. If EF ever starts reading them, the model
+build fails loudly instead of answering plausibly and wrongly.
+
+**A SECOND NULL RESULT, AND A NEGATIVE CONTROL IS WHAT MADE IT EVIDENCE.** `failed` 160 both sides,
+identical names, `REASONS: unchanged`. Removing EF's convention from the new builder and changing
+nothing else turns `TPTInheritanceQueryInfoCarrierTest.Using_from_sql_throws` and its TPC sibling
+red; restoring it turns them green. So the convention runs and does work, and the hand-written copy
+was doing the same work — which is exactly why no count moved. **The pins are permanent**:
+`RelationalClientTierPinTest` asserts a single `IProviderConventionSetBuilder` descriptor per tier,
+naming the relational subclass on Tier B and the core one on Tier A. The count is half the
+assertion, because a `RemoveAll` that stopped working would leave both and the last would win.
+
+**What is left of the duplication, and it is the next step rather than this one.**
+`InfoCarrierValueGenerationConvention` still spells two `Relational:` strings by hand, and
+`AnnotationDocumentMapping` and `ModelDbFunctions` spell more. Each is a separate step with its own
+measurement, because deleting a string deletes its pin.
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).

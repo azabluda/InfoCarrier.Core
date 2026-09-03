@@ -4110,6 +4110,57 @@ re-parents of families already running, because R25–R30 showed that is where t
       `InfoCarrierHierarchyMappingConvention` deleted in the same commit. Two implementations of one
       fact in two packages drift silently, which is the failure mode D3 and ADR-012 already record.
 
+- [x] **R128. #97 level 2, step two: the relational package REPLACES the client's convention set
+      builder, and the hand-written hierarchy convention is deleted.** `src/` change, so
+      `eng/measure.sh`, `eng/trim-ratchet.sh` **and** `dotnet pack`. **`failed` unchanged at 160**,
+      `total` 29514 -> 29515. FIXED none, BROKEN none, `REASONS: unchanged`. Trim ratchet `ours`
+      89 <= 89. `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R128)**.
+
+      **The owner chose answer (C) on 2026-09-03**, from four live alternatives: replace
+      `IProviderConventionSetBuilder` with a subclass, rather than `IConventionSetPlugin`,
+      `ModelConfigurationBuilder.Conventions`, or requiring `UseInternalServiceProvider`.
+
+      **R127's "blocked on DI reach" was real but narrower than it read, and this corrects it.**
+      EF's `ServiceProviderFixtureBase` builds its provider from
+      `TestStoreFactory.AddProviderServices(...)` and calls `UseInternalServiceProvider` — read from
+      EF's source. So `AddInfoCarrierRelationalClient` already reaches the convention set for every
+      spec fixture, and no new seam was needed. What is still open is the consumer that builds no
+      collection at all.
+
+      **`InfoCarrierHierarchyMappingConvention` is deleted**: 131 lines, four hand-spelled
+      `Relational:` strings, and the `DocumentMappingPinTest` case that held them against EF's
+      constants. That pin is not replaced by another pin — EF's own
+      `EntityTypeHierarchyMappingConvention` reads EF's constants, so **a rename is a compile error
+      now**, which is strictly stronger than the test was.
+
+      **The relational dependency object is a stub whose 29 members all throw.** The convention
+      holds `RelationalConventionSetBuilderDependencies` and never reads it; the two services it
+      carries are command-side, and D3's charter says this package gives the client metadata and
+      never anything reaching a connection. A throw is louder than a wrong answer.
+
+      **A SECOND NULL RESULT IN A ROW, AND THE NEGATIVE CONTROL IS WHAT MADE IT EVIDENCE.** Removing
+      EF's convention from the new builder, changing nothing else, turns
+      `TPTInheritanceQueryInfoCarrierTest.Using_from_sql_throws` and its TPC sibling **red**;
+      restoring it turns them green. So the convention runs and does work, and the copy it replaced
+      was doing the same work — which is why no count moved. Two permanent pins were added to
+      `RelationalClientTierPinTest`: a single `IProviderConventionSetBuilder` descriptor per tier,
+      the relational subclass on Tier B and the core one on Tier A.
+
+      **`total` moves by one and it is two movements.** Two pin tests added, one pin test deleted.
+
+      **The Release build caught what Debug did not**, twice: a dangling `cref` to the deleted type
+      (`CS1574`) and an unnecessary `using` (`IDE0005`), both errors only under `CI=true` in
+      Release. This is the N12 lesson holding.
+
+      **Pack is clean and that was verified rather than assumed.** Deleting a public type would be a
+      binary break, but `InfoCarrierHierarchyMappingConvention` is **not in the published `10.0.0`**
+      — checked in the baseline package's own XML — so there is nothing for validation to compare it
+      against.
+
+      **What remains of the duplication.** `InfoCarrierValueGenerationConvention` still spells two
+      `Relational:` strings by hand, and `AnnotationDocumentMapping` and `ModelDbFunctions` spell
+      more. One step each, one measurement each, because deleting a string deletes its pin.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

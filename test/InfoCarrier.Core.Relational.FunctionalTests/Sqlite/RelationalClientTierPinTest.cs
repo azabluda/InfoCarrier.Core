@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -60,6 +61,55 @@ public class RelationalClientTierPinTest
         IServiceCollection services = ProviderServicesFor(InfoCarrierTestStoreFactory.InMemory);
 
         Assert.DoesNotContain(services, d => d.ServiceType == typeof(IRelationalDatabaseFacadeDependencies));
+    }
+
+    /// <summary>
+    ///     Tier B's convention set builder is the relational subclass, not the core one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>#97 level 2, and this is a REPLACEMENT rather than a second registration.</b>
+    ///         <c>InfoCarrier.Core</c> registers <c>InfoCarrierConventionSetBuilder</c>;
+    ///         <c>AddInfoCarrierRelationalClient</c> removes it and registers the subclass, which
+    ///         calls the base and adds EF's own <c>EntityTypeHierarchyMappingConvention</c>. Two
+    ///         builders, or two hierarchy conventions, would be the duplication this package exists
+    ///         to remove.
+    ///     </para>
+    ///     <para>
+    ///         Asserting the count as well as the type is the half that matters: a
+    ///         <c>RemoveAll</c> that stopped working would leave both registrations present and the
+    ///         last one would silently win.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public void Tier_B_replaces_the_convention_set_builder_rather_than_adding_a_second()
+    {
+        IServiceCollection services = ProviderServicesFor(SqliteInfoCarrierTier.Instance);
+
+        ServiceDescriptor descriptor = Assert.Single(
+            services, d => d.ServiceType == typeof(IProviderConventionSetBuilder));
+
+        Assert.Equal(
+            typeof(InfoCarrier.Core.Relational.InfoCarrierRelationalConventionSetBuilder),
+            descriptor.ImplementationType);
+    }
+
+    /// <summary>
+    ///     Tier A keeps the core convention set builder.
+    /// </summary>
+    /// <remarks>
+    ///     The other half of the guardrail above. InMemory is not a relational store, so a client
+    ///     over it must not get relational conventions on its model.
+    /// </remarks>
+    [ConditionalFact]
+    public void Tier_A_keeps_the_core_convention_set_builder()
+    {
+        IServiceCollection services = ProviderServicesFor(InfoCarrierTestStoreFactory.InMemory);
+
+        ServiceDescriptor descriptor = Assert.Single(
+            services, d => d.ServiceType == typeof(IProviderConventionSetBuilder));
+
+        Assert.Equal(typeof(InfoCarrierConventionSetBuilder), descriptor.ImplementationType);
     }
 
     /// <summary>

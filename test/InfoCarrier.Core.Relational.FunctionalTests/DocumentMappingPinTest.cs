@@ -65,26 +65,14 @@ public class DocumentMappingPinTest
             InfoCarrierValueGenerationConvention.DefaultValueSqlAnnotation);
     }
 
-    // `InfoCarrierHierarchyMappingConvention`'s four. The three strategy VALUES are pinned as well
-    // as the annotation name, because they are compared against rather than merely read: a rename
-    // of `"TPT"` would leave this client keeping a discriminator the server had dropped, which is
-    // silent wrong data rather than an error.
-    [ConditionalFact]
-    public void The_mapping_strategy_annotation_and_values_are_still_EFs()
-    {
-        Assert.Equal(
-            RelationalAnnotationNames.MappingStrategy,
-            InfoCarrierHierarchyMappingConvention.MappingStrategyAnnotation);
-        Assert.Equal(
-            RelationalAnnotationNames.TphMappingStrategy,
-            InfoCarrierHierarchyMappingConvention.TphMappingStrategy);
-        Assert.Equal(
-            RelationalAnnotationNames.TptMappingStrategy,
-            InfoCarrierHierarchyMappingConvention.TptMappingStrategy);
-        Assert.Equal(
-            RelationalAnnotationNames.TpcMappingStrategy,
-            InfoCarrierHierarchyMappingConvention.TpcMappingStrategy);
-    }
+    // `InfoCarrierHierarchyMappingConvention`'s FOUR PINS ARE GONE, AND THAT IS THE POINT OF R128.
+    // It named `Relational:MappingStrategy` and the three strategy values by hand, and this test
+    // compared all four against EF's constants because a rename would have left the client keeping
+    // a discriminator the server had dropped -- silent wrong data rather than an error. The
+    // convention is deleted: `InfoCarrierRelationalConventionSetBuilder` supplies EF's own
+    // `EntityTypeHierarchyMappingConvention`, which reads EF's constants directly. **A rename is a
+    // compile error now**, which is strictly stronger than this test was, so there is nothing left
+    // here to pin. Every string this file still pins is one the product still spells by hand.
 
     // `InfoCarrierEvaluatableExpressionFilter`'s one, and it is a TYPE name rather than an
     // annotation name -- but it is named by string for exactly the same reason and fails the same
