@@ -3,7 +3,6 @@
 using InfoCarrier.Core.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using System.Reflection;
 using Xunit;
 
@@ -14,107 +13,59 @@ using Xunit;
 namespace InfoCarrier.Core.FunctionalTests;
 
 /// <summary>
-///     Pins <see cref="AnnotationDocumentMapping" /> to EF's relational metadata, which it names by
-///     <b>string</b> so that <c>InfoCarrier.Core</c> needs no reference to
-///     <c>Microsoft.EntityFrameworkCore.Relational</c> (M9 J5, D3 answer (c)).
+///     Checks this provider's relational metadata reading against EF's own, where naming a constant
+///     is not enough to catch a difference.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>This test is the price of that choice, and it is the whole price.</b> Naming a
-///         constant makes an EF rename a build error; naming a string makes it a silent behaviour
-///         change — and B12's symptom was wrong data with no exception, so silent is exactly what
-///         must not happen here. The test project may reference the relational assembly (ADR-013),
-///         so this is where the two can be compared.
+///         <b>THE STRING PINS ARE GONE (R133), AND THIS FILE IS WHAT SURVIVED THEM.</b> Ten
+///         annotation and type names used to be spelled out here as literals, because
+///         <c>InfoCarrier.Core</c> could not reference <c>Microsoft.EntityFrameworkCore.Relational</c>
+///         (M9 J5, D3 answer (c)), and seven tests held those literals against EF's constants. D3 is
+///         superseded: the product names EF's constants directly, so a rename is a build error and
+///         those seven tests asserted that a constant equals itself.
 ///     </para>
+///     <para>
+///         <b>These three could never have been constants.</b> Each compares a <em>behaviour</em>
+///         with EF's, and a rename is not what would break them:
+///     </para>
+///     <list type="bullet">
+///         <item>
+///             <description>
+///                 <c>ModelDbFunctions</c> reads a <c>MethodInfo</c> property by reflection, so a
+///                 change there answers "this model maps no functions" rather than failing to
+///                 compile. That is 81 tests, silently.
+///             </description>
+///         </item>
+///         <item>
+///             <description>
+///                 The methods the query-filter convention must leave alone are <em>derived</em>
+///                 from EF rather than listed: those on <c>RelationalQueryableExtensions</c> whose
+///                 first parameter is a <c>DbSet&lt;&gt;</c>. A new overload group EF adds fails
+///                 this test instead of failing a caller's model build.
+///             </description>
+///         </item>
+///         <item>
+///             <description>
+///                 <c>AnnotationDocumentMapping</c> reproduces EF's ownership-chain walk for a
+///                 container name. A change to how EF <em>resolves</em> the container breaks only
+///                 the walk, and only for nested types, which is precisely what B12 was.
+///             </description>
+///         </item>
+///     </list>
 ///     <para>
 ///         <b>Not at a store tier.</b> It builds a model and never opens a connection; SQLite is
 ///         here only because <c>ToJson()</c> is a relational model-building API. Nothing is queried
 ///         and nothing is saved.
 ///     </para>
-///     <para>
-///         The behavioural assertion matters more than the two constants. A rename would break the
-///         constants; a change to how EF <em>resolves</em> the container — the ownership-chain
-///         fallback that `AnnotationDocumentMapping` reproduces — would break only the walk, and
-///         only for nested types, which is precisely the case B12 was.
-///     </para>
 /// </remarks>
-public class DocumentMappingPinTest
+public class RelationalMetadataAgreementTest
 {
-    [ConditionalFact]
-    public void The_annotation_name_is_still_EFs()
-        => Assert.Equal(
-            RelationalAnnotationNames.ContainerColumnName,
-            AnnotationDocumentMapping.ContainerColumnNameAnnotation);
-
-    [ConditionalFact]
-    public void The_synthesized_ordinal_name_is_still_EFs()
-        => Assert.Equal(
-            RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName,
-            AnnotationDocumentMapping.SynthesizedOrdinal);
-
-    // `InfoCarrierValueGenerationConvention`'s two, pinned here for the same reason and in the same
-    // place: every relational annotation the product names by string rather than by constant.
-    [ConditionalFact]
-    public void The_default_value_annotation_names_are_still_EFs()
-    {
-        Assert.Equal(
-            RelationalAnnotationNames.DefaultValue,
-            InfoCarrierValueGenerationConvention.DefaultValueAnnotation);
-        Assert.Equal(
-            RelationalAnnotationNames.DefaultValueSql,
-            InfoCarrierValueGenerationConvention.DefaultValueSqlAnnotation);
-    }
-
-    // `InfoCarrierModelValidator`'s THREE, and they are a DETECTOR's rather than a fixer's (R130).
-    // The validator warns a client that has said its store is relational but whose model shows a
-    // hierarchy the relational conventions never touched, and it recognises that shape by these
-    // three annotation names. A rename would cost a MISSED WARNING and never wrong data, which is
-    // why R128 could delete the hierarchy convention's four and this file still carries these.
-    [ConditionalFact]
-    public void The_half_configuration_detector_annotation_names_are_still_EFs()
-    {
-        Assert.Equal(
-            RelationalAnnotationNames.TableName,
-            InfoCarrierModelValidator.TableNameAnnotation);
-        Assert.Equal(
-            RelationalAnnotationNames.ViewName,
-            InfoCarrierModelValidator.ViewNameAnnotation);
-        Assert.Equal(
-            RelationalAnnotationNames.MappingStrategy,
-            InfoCarrierModelValidator.MappingStrategyAnnotation);
-    }
-
-    // `InfoCarrierHierarchyMappingConvention`'s FOUR PINS ARE GONE, AND THAT IS THE POINT OF R128.
-    // It named `Relational:MappingStrategy` and the three strategy values by hand, and this test
-    // compared all four against EF's constants because a rename would have left the client keeping
-    // a discriminator the server had dropped -- silent wrong data rather than an error. The
-    // convention is deleted: `InfoCarrierRelationalConventionSetBuilder` supplies EF's own
-    // `EntityTypeHierarchyMappingConvention`, which reads EF's constants directly. **A rename is a
-    // compile error now**, which is strictly stronger than this test was, so there is nothing left
-    // here to pin. Every string this file still pins is one the product still spells by hand.
-
-    // `InfoCarrierEvaluatableExpressionFilter`'s one, and it is a TYPE name rather than an
-    // annotation name -- but it is named by string for exactly the same reason and fails the same
-    // silent way. A rename would stop the filter matching, `EF.Functions.Collate` over a constant
-    // operand would go back to being evaluated on the client, and the only symptom is EF's own
-    // "switched to client-evaluation" from a query that used to work.
-    [ConditionalFact]
-    public void The_relational_DbFunctions_host_name_is_still_EFs()
-        => Assert.Equal(
-            InfoCarrierEvaluatableExpressionFilter.RelationalDbFunctionsExtensionsName,
-            typeof(RelationalDbFunctionsExtensions).FullName);
-
     // `ModelDbFunctions`, and this one is pinned TWICE because it names two things by string: the
     // annotation, and the `MethodInfo` property on the value behind it. The second is read by
     // reflection, so a rename would not even fail to compile -- it would answer "this model maps no
     // functions", which puts every mapped function back to being refused at the client boundary and
     // client-evaluated into its own `throw`. That is 81 tests, silently.
-    [ConditionalFact]
-    public void The_db_functions_annotation_name_is_still_EFs()
-        => Assert.Equal(
-            ModelDbFunctions.DbFunctionsAnnotation,
-            RelationalAnnotationNames.DbFunctions);
-
     [ConditionalFact]
     public void The_db_function_methods_agree_with_EFs_own_GetDbFunctions()
     {
@@ -147,12 +98,6 @@ public class DocumentMappingPinTest
     // whose FIRST parameter is a `DbSet<>`, because that is the parameter core EF's rewriter fills
     // with an `IQueryable`. A new overload group EF adds would fail this test rather than fail a
     // caller's model build with `ArgumentException`.
-    [ConditionalFact]
-    public void The_FromSql_host_name_is_still_EFs()
-        => Assert.Equal(
-            InfoCarrierQueryFilterRewritingConvention.FromSqlDeclaringTypeName,
-            typeof(RelationalQueryableExtensions).FullName);
-
     [ConditionalFact]
     public void Every_DbSet_taking_method_EF_declares_there_is_one_the_convention_leaves_alone()
     {

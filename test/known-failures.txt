@@ -2927,5 +2927,26 @@
 # missed warning and never wrong data, which is why R128 could delete the hierarchy convention's
 # four outright and these three are worth carrying.
 
+# 2026-09-03 (R132) -- `failed` UNCHANGED at 160, `total` UNCHANGED at 29519. D3's supersession in
+# code: `InfoCarrier.Core.Relational` folded into `InfoCarrier.Core` at
+# `src/InfoCarrier.Core/Relational/`, keeping its namespace. FIXED none, BROKEN none, REASONS
+# unchanged, which is what a pure move should measure.
+#
+# 2026-09-03 (R133) -- `failed` UNCHANGED at 160, `total` FALLS 29519 -> 29512, A DELIBERATE FALL OF
+# SEVEN, and this is the note CLAUDE.md asks for whenever `total` drops. The seven are pin tests that
+# became tautologies: the product now names EF's own constants
+# (`RelationalAnnotationNames.ContainerColumnName`, `.DefaultValue`, `.DefaultValueSql`,
+# `.DbFunctions`, `.TableName`, `.ViewName`, `.MappingStrategy`,
+# `RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName`) and takes two type names from
+# `typeof(...)`, so each of those tests asserted that a constant equals itself. **A rename is a build
+# error now, which is strictly stronger than the test was.**
+#
+# **THIS IS NOT A SUPPRESSED TEST AND THE DISTINCTION MATTERS.** CLAUDE.md forbids deleting a test to
+# make the suite green. These seven were green and stayed green; what changed is that the compiler
+# took over their job. The three tests in the file that a constant CANNOT do are kept, and the file
+# is renamed `RelationalMetadataAgreementTest` to say what it now checks: a reflective `MethodInfo`
+# read, a set of methods derived from EF rather than listed, and EF's ownership-chain walk for a
+# container name.
+
 failed=160
-total=29519
+total=29512

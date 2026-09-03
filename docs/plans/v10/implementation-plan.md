@@ -4312,6 +4312,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       not the configuration one — a client over a non-relational store must still not get relational
       conventions on its model.
 
+- [x] **R133. The product names EF's constants, and seven pin tests become tautologies.** `src/`
+      change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed` unchanged at
+      160**, `total` 29519 -> 29512, a deliberate fall of seven. FIXED none, BROKEN none,
+      `REASONS: unchanged`. Trim `ours` 89 <= 89. Pack clean. Release build `5 Warning(s),
+      0 Error(s)`. **The first of the two gains the owner expected from reverting D3.**
+
+      **Ten names stop being literals.** Eight annotation names become EF's own constants
+      (`RelationalAnnotationNames.ContainerColumnName`, `.DefaultValue`, `.DefaultValueSql`,
+      `.DbFunctions`, `.TableName`, `.ViewName`, `.MappingStrategy`, and
+      `RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName`), and two type names come
+      from `typeof(...)` instead of being spelled out.
+
+      **THE PUBLIC CONSTANTS KEEP THEIR NAMES, AND THAT WAS CHECKED RATHER THAN ASSUMED.**
+      `AnnotationDocumentMapping` and `InfoCarrierValueGenerationConvention` **are** in the published
+      `10.0.0` — verified in the baseline package's own XML — so deleting their consts would be a
+      binary break. They are redefined as `= RelationalAnnotationNames.X` instead: same public
+      surface, compile-time checked, no `CP0002`. The two type names sit on types that never
+      shipped, so those could become `static readonly` from `typeof(...)`.
+
+      **SEVEN TESTS DELETED, THREE KEPT, AND THE SPLIT IS THE POINT.** CLAUDE.md forbids deleting a
+      test to make a suite green; that is not this. The seven were green and stayed green, and the
+      compiler took over their job — a rename is a build error now, which is stronger than the
+      assertion was. The three that a constant **cannot** do are kept, and the file is renamed
+      `RelationalMetadataAgreementTest` to say what it actually checks:
+
+      | Kept test | Why a constant cannot replace it |
+      |---|---|
+      | `The_db_function_methods_agree_with_EFs_own_GetDbFunctions` | `ModelDbFunctions` reads a `MethodInfo` property **by reflection**, so a change answers "this model maps no functions" instead of failing to compile. 81 tests, silently |
+      | `Every_DbSet_taking_method_EF_declares_there_is_one_the_convention_leaves_alone` | The method set is **derived** from EF, not listed: those on `RelationalQueryableExtensions` whose first parameter is a `DbSet<>`. A new EF overload group fails this test rather than a caller's model build |
+      | `The_walk_agrees_with_EF_for_every_type_including_nested_ones` | It reproduces EF's **ownership-chain walk**. A change in how EF resolves a container breaks only the walk, and only for nested types, which is what B12 was |
+
+      **Also updated:** every doc comment that said "Pinned by `DocumentMappingPinTest`" for a
+      constant the compiler now checks.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

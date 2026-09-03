@@ -30,16 +30,18 @@ namespace InfoCarrier.Core.Metadata;
 public sealed class AnnotationDocumentMapping : IInfoCarrierDocumentMapping
 {
     /// <summary>
-    ///     <c>RelationalAnnotationNames.ContainerColumnName</c>. Pinned by
-    ///     <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.ContainerColumnName</c>. EF's own constant, so a rename is a
+    ///     build error.
     /// </summary>
-    public const string ContainerColumnNameAnnotation = "Relational:ContainerColumnName";
+    public const string ContainerColumnNameAnnotation = RelationalAnnotationNames.ContainerColumnName;
 
     /// <summary>
-    ///     <c>RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName</c>. Pinned by
-    ///     <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName</c>. EF's own constant, so a rename is a
+    ///     build error.
     /// </summary>
-    public const string SynthesizedOrdinal = "__synthesizedOrdinal";
+    public const string SynthesizedOrdinal =
+        Microsoft.EntityFrameworkCore.Metadata.Conventions.RelationalKeyDiscoveryConvention
+            .SynthesizedOrdinalPropertyName;
 
     /// <inheritdoc />
     public IEnumerable<string> ContainerAnnotationNames { get; } = [ContainerColumnNameAnnotation];

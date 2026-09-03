@@ -47,8 +47,8 @@ namespace InfoCarrier.Core;
 ///         <see cref="Metadata.AnnotationDocumentMapping" /> reads
 ///         <c>Relational:ContainerColumnName</c> the same way, and
 ///         <see cref="InfoCarrierValueGenerationConvention" /> reads two more. The strings below
-///         are pinned against EF's own members by <c>DocumentMappingPinTest</c>, in the test
-///         project, which is where the relational reference belongs.
+///         are EF's own members now, so a rename is a build error.
+///         <c>RelationalMetadataAgreementTest</c> keeps only the checks a constant cannot make.
 ///     </para>
 ///     <para>
 ///         <b>The list used to name a third, and R128 removed it.</b>
@@ -63,13 +63,14 @@ public class InfoCarrierQueryFilterRewritingConvention : QueryFilterRewritingCon
 {
     /// <summary>
     ///     The full name of <c>Microsoft.EntityFrameworkCore.RelationalQueryableExtensions</c>,
-    ///     which declares the three <c>FromSql*</c> methods. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     which declares the three <c>FromSql*</c> methods. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string FromSqlDeclaringTypeName = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions";
+    public static readonly string FromSqlDeclaringTypeName =
+        typeof(Microsoft.EntityFrameworkCore.RelationalQueryableExtensions).FullName!;
 
     /// <summary>
     ///     The names of the <c>FromSql*</c> methods whose first parameter is a <c>DbSet</c>.
-    ///     Pinned by <c>DocumentMappingPinTest</c>.
+    ///     taken from EF, so a rename is a build error.
     /// </summary>
     public static readonly IReadOnlyList<string> FromSqlMethodNames = ["FromSql", "FromSqlRaw", "FromSqlInterpolated"];
 

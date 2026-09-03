@@ -29,7 +29,7 @@ namespace InfoCarrier.Core;
 ///         <c>DbFunctionsExtensions</c>. The relational host was therefore invisible to it.
 ///     </para>
 ///     <para>
-///         <b>Named by string, as M9 J5 decided, and pinned by <c>DocumentMappingPinTest</c>.</b>
+///         <b>Taken from the type itself since R133, so a rename is a build error.</b>
 ///         The assembly is checked as well as the full name, the same by-name route
 ///         <see cref="Expressions.TypeAllowlist" /> takes for this very class — which already admits
 ///         it across the wire (R78). The two halves belong together: the allowlist lets the call be
@@ -53,11 +53,17 @@ public class InfoCarrierEvaluatableExpressionFilter(EvaluatableExpressionFilterD
 {
     /// <summary>
     ///     <c>typeof(Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions).FullName</c>,
-    ///     which declares <c>Collate</c>, <c>Least</c> and <c>Greatest</c>. Pinned by
-    ///     <c>DocumentMappingPinTest</c>.
+    ///     which declares <c>Collate</c>, <c>Least</c> and <c>Greatest</c>.
     /// </summary>
-    public const string RelationalDbFunctionsExtensionsName
-        = "Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions";
+    /// <remarks>
+    ///     Taken from the type rather than written out (R133). It was a literal while
+    ///     <c>InfoCarrier.Core</c> could not reference the relational package, and a test held it
+    ///     against EF's own name because a rename would have failed silently: the filter would stop
+    ///     matching and <c>EF.Functions.Collate</c> would go back to client evaluation. The
+    ///     reference exists now, so a rename is a build error and the test is gone.
+    /// </remarks>
+    public static readonly string RelationalDbFunctionsExtensionsName
+        = typeof(Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions).FullName!;
 
     private const string RelationalAssemblyName = "Microsoft.EntityFrameworkCore.Relational";
 

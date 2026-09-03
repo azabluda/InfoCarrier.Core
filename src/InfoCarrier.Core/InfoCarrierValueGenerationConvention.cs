@@ -48,14 +48,14 @@ namespace InfoCarrier.Core;
 public class InfoCarrierValueGenerationConvention : IModelFinalizingConvention
 {
     /// <summary>
-    ///     <c>RelationalAnnotationNames.DefaultValue</c>. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.DefaultValue</c>. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string DefaultValueAnnotation = "Relational:DefaultValue";
+    public const string DefaultValueAnnotation = RelationalAnnotationNames.DefaultValue;
 
     /// <summary>
-    ///     <c>RelationalAnnotationNames.DefaultValueSql</c>. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.DefaultValueSql</c>. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string DefaultValueSqlAnnotation = "Relational:DefaultValueSql";
+    public const string DefaultValueSqlAnnotation = RelationalAnnotationNames.DefaultValueSql;
 
     /// <inheritdoc />
     public virtual void ProcessModelFinalizing(

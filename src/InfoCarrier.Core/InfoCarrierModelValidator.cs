@@ -56,19 +56,19 @@ public class InfoCarrierModelValidator(
     public const string RelationalConventionsAnnotation = "InfoCarrier:RelationalConventions";
 
     /// <summary>
-    ///     <c>RelationalAnnotationNames.TableName</c>. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.TableName</c>. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string TableNameAnnotation = "Relational:TableName";
+    public const string TableNameAnnotation = RelationalAnnotationNames.TableName;
 
     /// <summary>
-    ///     <c>RelationalAnnotationNames.ViewName</c>. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.ViewName</c>. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string ViewNameAnnotation = "Relational:ViewName";
+    public const string ViewNameAnnotation = RelationalAnnotationNames.ViewName;
 
     /// <summary>
-    ///     <c>RelationalAnnotationNames.MappingStrategy</c>. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.MappingStrategy</c>. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string MappingStrategyAnnotation = "Relational:MappingStrategy";
+    public const string MappingStrategyAnnotation = RelationalAnnotationNames.MappingStrategy;
 
     /// <inheritdoc />
     /// <remarks>
@@ -164,7 +164,7 @@ public class InfoCarrierModelValidator(
     ///         four this package used to spell for the fixing convention. These three come back for
     ///         a different job, and the stakes are different with them: a string that stops matching
     ///         costs a missed diagnostic, never wrong data. They are pinned against EF's constants
-    ///         by <c>DocumentMappingPinTest</c> all the same.
+    ///         by the compiler, because they are EF's own constants.
     ///     </para>
     /// </remarks>
     private static bool HasUnmappedNonTphHierarchy(IModel model)
