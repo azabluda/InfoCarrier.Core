@@ -422,6 +422,19 @@ ADR-006**: it registers `IDatabase → RelationalDatabase`, and this provider ca
 relational" cannot mean calling that builder**, and EF publishes no seam that splits its metadata
 half from its command half.
 
+**THE CHARTER, stated by the owner 2026-09-03, and it governs all three levels below.**
+`InfoCarrier.Core.Relational` exists so the client can **see the relational annotations** and
+**name the useful relational types**. It must **never** hand the client a `DbConnection`, or
+anything standing for one. The client has no database; a member that returned a connection would
+let a caller reach past the wire to the server's store, and a green from that path says nothing
+about this provider. Anything this package adds is metadata, annotations or CLR type identity, and a
+relational member with no meaning on a connectionless client **throws** rather than answering
+plausibly — a throw is louder than a wrong answer. That is already how
+`InfoCarrierRelationalFacadeDependencies` is built (`RelationalConnection`, `RawSqlCommandBuilder`
+and `CommandLogger` all throw) and how the harness's `RelationalInfoCarrierTestStore` refuses
+`Connection`. **This is also the sentence that puts level 3 out of scope**: a relational model on
+the client needs store knowledge, and store knowledge is the one thing on the far side of the wire.
+
 **Three levels, and only the third is risky.** Level 1 references the package and supplies today's
 string answers behind seams — most of the deletion, almost no risk. Level 2 registers EF's own
 relational conventions on the client model. **Level 3, a relational model on the client
