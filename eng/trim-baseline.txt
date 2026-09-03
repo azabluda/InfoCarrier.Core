@@ -100,5 +100,19 @@
 #
 # THE RULE: a suppression is not a warning. Count the suppressions separately if the goal is to
 # remove unverifiable reflection, because this ratchet will report no progress on it.
+# 2026-09-03 (R132) -- `ours` UNCHANGED at 89, `total` RISES 855 -> 1134, and the rise is NOT this
+# product's. D3 is superseded (architecture.md section 6a, owner's decision): `InfoCarrier.Core` now
+# references `Microsoft.EntityFrameworkCore.Relational`, so the Blazor publish ships that assembly
+# and EF Core's own bucket goes 585 -> 864. Every one of those 279 diagnostics is EF's, in EF's
+# code, and none of them is this repository's to fix -- which is exactly why only `ours` is gated
+# and why this file has said so since it was written.
+#
+# THE PAYLOAD RISES ON PURPOSE AND IT WAS MEASURED FIRST: +0.62 MB brotli on this sample, 4.11 ->
+# 4.73 MB, with the raw total 13.48 -> 15.77 MB. The cost is unconditional -- a build that
+# references the assembly and calls nothing from it ships the identical figure, because the trimmer
+# keeps it almost whole at 2.079 MB against 2.09 MB on disk. The decision weighed that against 262
+# of 20,368 tests lost without it. **This file is not the place that decides it**; the supersession
+# in `architecture.md` is, and it lists the three conditions that would reverse it.
+
 ours=89
-total=855
+total=1134

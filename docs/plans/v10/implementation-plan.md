@@ -4281,6 +4281,37 @@ re-parents of families already running, because R25–R30 showed that is where t
       `IRelationalTypeMappingSource` problem is store knowledge on the far side of the wire, and
       `TryAddCoreServices()` still collides with ADR-006.
 
+- [x] **R132. `InfoCarrier.Core.Relational` is folded into `InfoCarrier.Core`, as one module.**
+      `src/` change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed`
+      unchanged at 160, `total` unchanged at 29519.** FIXED none, BROKEN none, `REASONS: unchanged`
+      — the move changes no behaviour, which is what a move should measure. Pack clean, and it now
+      produces **two** packages instead of three.
+
+      **The four files moved intact and git recorded all four as renames.** They live at
+      `src/InfoCarrier.Core/Relational/` and keep the `InfoCarrier.Core.Relational` **namespace**, so
+      a consumer's `using InfoCarrier.Core.Relational;` still compiles and **a future split is a
+      folder move plus one `PackageReference` line**. That is the modular half of the owner's
+      "modular monolith", and it is a requirement rather than tidiness.
+
+      **Nothing published had to change.** The package never shipped a stable version — verified in
+      the `10.0.0` baseline's own XML, which contains none of its types — so there is no break to
+      manage and no `CP0002`.
+
+      **Trim: `ours` unchanged at 89, `total` 855 -> 1134.** The rise is EF Core's own bucket going
+      585 -> 864 because the Blazor publish now ships `Microsoft.EntityFrameworkCore.Relational`.
+      None of those 279 diagnostics is this repository's, which is why only `ours` is gated.
+      `eng/trim-baseline.txt` carries the note.
+
+      **Also updated because they named three packages:** `release.yml` (the `for id in` loop and
+      the third push step), `eng/doc-words.py` (the deleted `PACKAGE.md`), `InfoCarrier.Core.slnx`,
+      the Tier B test project, and two passages in `CLAUDE.md`.
+
+      **What did NOT change, deliberately.** The configuration seam. `AddInfoCarrierRelational`,
+      `AddInfoCarrierRelationalClient` and `UseRelationalQueryRoots` keep their names and their
+      meanings, and Tier A still registers none of them. One package removes the packaging choice,
+      not the configuration one — a client over a non-relational store must still not get relational
+      conventions on its model.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

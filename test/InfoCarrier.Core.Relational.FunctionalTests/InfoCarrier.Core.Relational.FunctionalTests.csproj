@@ -27,7 +27,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
-    <ProjectReference Include="..\..\src\InfoCarrier.Core.Relational\InfoCarrier.Core.Relational.csproj" />
     <ProjectReference Include="..\InfoCarrier.Core.TestUtilities\InfoCarrier.Core.TestUtilities.csproj" />
   </ItemGroup>
 

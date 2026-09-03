@@ -49,10 +49,14 @@ dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTest
 **THE SPEC SUITE IS TWO PROJECTS SINCE R122, and its number is the two added together.**
 `test/InfoCarrier.Core.FunctionalTests` is ADR-009 Tier A (InMemory) and
 `test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B (SQLite); the store-neutral harness they
-share is `test/InfoCarrier.Core.TestUtilities`. **Tier A references nothing relational** — not
-`EFCore.Relational.Specification.Tests`, not `InfoCarrier.Core.Relational` — and that is the whole
-point of the split: a relational client over an InMemory backend is the disagreement the seam exists
-to prevent. It was a per-fixture flag before, which asks politely.
+share is `test/InfoCarrier.Core.TestUtilities`. **Tier A references no relational SPEC assembly** —
+not `EFCore.Relational.Specification.Tests` — and its clients register no relational services, which
+is the point of the split: a relational client over an InMemory backend is the disagreement the seam
+exists to prevent. It was a per-fixture flag before, which asks politely.
+
+**The seam is now a configuration choice rather than a package choice** (D3 superseded 2026-09-03).
+`InfoCarrier.Core` carries the relational half, so Tier A's separation is that it never calls
+`AddInfoCarrierRelationalClient()`, not that it cannot reach the code.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
 both and adds the figures. The solution also holds `InfoCarrier.Core.TransportTests`, which is not a
@@ -258,11 +262,18 @@ translator: the whole table came back, silently, which is the defect R75 closed.
 execution in `QueryExecutor` and handed to both. **When a permission and the knowledge it guards
 live on different carriers, check that one reader answers for both.**
 
-**There are three shipped packages, and `release.yml` names them one by one.** `InfoCarrier.Core`,
-`InfoCarrier.Core.AspNetCore` and `InfoCarrier.Core.Relational`. The push steps use exact filenames
-rather than a glob, so **a fourth package would ship nothing until that workflow named it**.
-`InfoCarrier.Core.Relational` sets `EnablePackageValidation=false` until it has a published stable
-version to compare with; every other packable project validates against `10.0.0`.
+**There are TWO shipped packages since 2026-09-03, and `release.yml` names them one by one.**
+`InfoCarrier.Core` and `InfoCarrier.Core.AspNetCore`. The push steps use exact filenames rather than
+a glob, so **a third package would ship nothing until that workflow named it**. Every packable
+project validates against `10.0.0`.
+
+**`InfoCarrier.Core.Relational` was a third package and is not one any more.** D3 is superseded
+(`architecture.md` §6a, 2026-09-03): the relational half lives at
+`src/InfoCarrier.Core/Relational/`, keeps the `InfoCarrier.Core.Relational` **namespace**, and
+`InfoCarrier.Core` carries the `Microsoft.EntityFrameworkCore.Relational` reference. It never
+shipped a stable version, so nothing published had to change. **A future split is a folder move plus
+one `PackageReference` line**, and that is deliberate — the supersession lists the three measurable
+conditions that would call for it.
 
 ## Current state
 

@@ -21,7 +21,6 @@ BUDGET = {
     "README.md": 450,
     "src/InfoCarrier.Core/PACKAGE.md": 300,
     "src/InfoCarrier.Core.AspNetCore/PACKAGE.md": 300,
-    "src/InfoCarrier.Core.Relational/PACKAGE.md": 300,
 
     # api-surface.md points at things rather than teaching them, so it keeps the tighter figure
     # the package readmes came from.
@@ -95,8 +94,7 @@ def prose(text):
 
 def user_facing():
     files = ["README.md", "src/InfoCarrier.Core/PACKAGE.md",
-             "src/InfoCarrier.Core.AspNetCore/PACKAGE.md",
-             "src/InfoCarrier.Core.Relational/PACKAGE.md"]
+             "src/InfoCarrier.Core.AspNetCore/PACKAGE.md"]
     files += sorted(p.replace("\\", "/") for p in glob.glob("website/docs/**/*.md", recursive=True))
     return files
 

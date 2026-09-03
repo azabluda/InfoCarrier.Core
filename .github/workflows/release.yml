@@ -17,11 +17,12 @@
 # THE VERSION IS THE TAG. MinVer derives it (Directory.Build.props), which is why this workflow no
 # longer compares the two and why `fetch-depth: 0` below is load-bearing rather than tidy.
 #
-# ORDER MATTERS: InfoCarrier.Core first, then InfoCarrier.Core.AspNetCore and
-# InfoCarrier.Core.Relational, each of which declares a
+# ORDER MATTERS: InfoCarrier.Core first, then InfoCarrier.Core.AspNetCore, which declares a
 # dependency on it at the same version — nuget.org rejects a package whose dependency does not
 # resolve. (Before M8-22 the order was the other way round, because Abstractions was its own
-# package; it is now merged into InfoCarrier.Core.)
+# package; it is now merged into InfoCarrier.Core. InfoCarrier.Core.Relational was a third package
+# until 2026-09-03 and never shipped a stable version; D3's supersession folded it into
+# InfoCarrier.Core, where it lives under `src/InfoCarrier.Core/Relational/`.)
 name: Release
 
 on:
@@ -112,7 +113,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           missing=0
-          for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore InfoCarrier.Core.Relational; do
+          for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
             for ext in nupkg snupkg; do
               file="artifacts/pack/$id.$version.$ext"
               if [ -f "$file" ]; then
@@ -253,15 +254,6 @@ jobs:
       - name: Push InfoCarrier.Core.AspNetCore
         run: >
           dotnet nuget push "artifacts/pack/InfoCarrier.Core.AspNetCore.${GITHUB_REF_NAME#v}.nupkg"
-          --source https://api.nuget.org/v3/index.json
-          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
-
-      # After InfoCarrier.Core for the same reason as the step above: it declares a dependency on
-      # it at the same version. It does not depend on InfoCarrier.Core.AspNetCore, so the order of
-      # these two between themselves does not matter.
-      - name: Push InfoCarrier.Core.Relational
-        run: >
-          dotnet nuget push "artifacts/pack/InfoCarrier.Core.Relational.${GITHUB_REF_NAME#v}.nupkg"
           --source https://api.nuget.org/v3/index.json
           --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
 

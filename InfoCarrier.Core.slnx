@@ -2,7 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/InfoCarrier.Core/InfoCarrier.Core.csproj" />
     <Project Path="src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" />
-    <Project Path="src/InfoCarrier.Core.Relational/InfoCarrier.Core.Relational.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Northwind.Client/Northwind.Client.csproj" />
