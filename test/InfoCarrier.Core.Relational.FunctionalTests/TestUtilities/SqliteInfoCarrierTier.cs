@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -50,40 +49,6 @@ public sealed class SqliteInfoCarrierTier : InfoCarrierTier
         => relationalClientStore
             ? new RelationalInfoCarrierTestStore(backend)
             : base.CreateClientStore(backend, relationalClientStore);
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     <para>
-    ///         <b>Every fixture on this tier, and no longer only the ones that asked for raw
-    ///         SQL.</b> This is #97 level 2's first step and it is deliberately NOT a convention
-    ///         change: the owner's decision is that registering
-    ///         <c>InfoCarrier.Core.Relational</c> in a client's services is a process-wide
-    ///         statement that the backing store is relational, and on this tier it always is.
-    ///         `architecture.md` section 6a D3 asked for the blast radius to be measured on its own
-    ///         before a single convention moved, because the registration was previously gated on
-    ///         <c>ArbitrarySqlExecution</c> and reached a handful of fixtures.
-    ///     </para>
-    ///     <para>
-    ///         <b>It was #56 option D, gated on the raw-SQL grant, and that gate was about
-    ///         <c>Database.SqlQuery&lt;T&gt;</c> rather than about the store.</b> The reasoning
-    ///         held while the only thing this package bought was the facade shim: without the
-    ///         server half the call cannot work, so the shim alone traded one exception for
-    ///         another. It stops holding once the package also decides how the client's MODEL is
-    ///         built, which is a property of the backing store and not of a permission.
-    ///     </para>
-    ///     <para>
-    ///         <b>Tier A must never reach this.</b> Its backing store is InMemory, which is not a
-    ///         relational store, and a relational client over it is the disagreement the seam
-    ///         exists to prevent. That is structural rather than conditional: this override lives
-    ///         in the relational test project, and <see cref="InfoCarrierTier" />'s default adds
-    ///         nothing.
-    ///     </para>
-    /// </remarks>
-    public override IServiceCollection AddClientServices(
-        IServiceCollection services,
-        bool arbitrarySqlExecution)
-        => InfoCarrier.Core.Relational.InfoCarrierRelationalServiceCollectionExtensions
-            .AddInfoCarrierRelationalClient(services);
 
     /// <inheritdoc />
     /// <remarks>

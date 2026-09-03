@@ -38,6 +38,11 @@ namespace InfoCarrier.Core.Relational;
 /// </remarks>
 public sealed class InfoCarrierRelationalQueryRoots : IInfoCarrierRelationalQueryRoots
 {
+    /// <summary>
+    ///     The shared instance. This type has no state, so every caller can have the same object.
+    /// </summary>
+    public static readonly InfoCarrierRelationalQueryRoots Instance = new();
+
     /// <inheritdoc />
     public bool IsRawSqlRoot(Expression node)
         => node is FromSqlQueryRootExpression or SqlQueryRootExpression;

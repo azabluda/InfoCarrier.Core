@@ -44,7 +44,7 @@ public static class InfoCarrierServiceCollectionExtensions
             // The client's model has to agree with the backing store's, and one key shape is
             // decided by the caller's own `ToJson()` rather than by the store — see
             // `InfoCarrierKeyDiscoveryConvention`.
-            .TryAdd<IProviderConventionSetBuilder, InfoCarrierConventionSetBuilder>()
+            .TryAdd<IProviderConventionSetBuilder, Relational.InfoCarrierRelationalConventionSetBuilder>()
 
             // A hierarchy with no discriminator is legal on this client, because the server's
             // provider owns the inheritance mapping and the wire names the concrete type — see
@@ -95,7 +95,16 @@ public static class InfoCarrierServiceCollectionExtensions
         // `InfoCarrier.Core.Relational` package replaces it. Registered here for the same reason
         // as the line above -- a provider's own service is the application's collection's
         // business, not EF's.
-        services.TryAddSingleton<Metadata.IInfoCarrierRelationalQueryRoots, Metadata.NoRelationalQueryRoots>();
+        services.TryAddSingleton<Metadata.IInfoCarrierRelationalQueryRoots, Relational.InfoCarrierRelationalQueryRoots>();
+
+        // EXPERIMENT (always-on relational): the client facade dependencies that
+        // `AddInfoCarrierRelationalClient()` used to add. `RemoveAll` first on both, so a repeated
+        // call to this method leaves the collection unchanged.
+        services.RemoveAll<IRelationalDatabaseFacadeDependencies>();
+        services.RemoveAll<IDatabaseFacadeDependencies>();
+        services.AddScoped<IRelationalDatabaseFacadeDependencies, Relational.InfoCarrierRelationalFacadeDependencies>();
+        services.AddScoped<IDatabaseFacadeDependencies>(
+            p => p.GetRequiredService<IRelationalDatabaseFacadeDependencies>());
 
         services.TryAddScoped<TypeNodeMapper>();
         services.TryAddScoped<TypeNodeResolver>();

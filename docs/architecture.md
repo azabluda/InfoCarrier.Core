@@ -725,6 +725,57 @@ client needs an `IRelationalTypeMappingSource`, which is store knowledge on the 
 charter above still holds too**: this code reads relational annotations and names relational types,
 and never gives the client a `DbConnection`.
 
+#### D3 amendment 2026-09-03 (R135) — the opt-in goes too, and every client gets the relational half
+
+**The supersession above kept the opt-in, and the owner corrected that on 2026-09-03.** R131 wrote
+"the opt-in stays: my backing store is relational is still something an application says". That does
+not survive its own reasoning. One package that references `Microsoft.EntityFrameworkCore.Relational`
+and ships the relational half cannot save a consumer anything by withholding it — the 0.62 MB is in
+the payload whether or not the registration is made, and the trimmer keeps the assembly almost whole
+either way. An opt-in that buys nothing is not a choice; it is a way to get half a client.
+
+**So `AddEntityFrameworkInfoCarrier` registers the relational half unconditionally**, and there is
+nothing left for an application to say. What that deleted:
+
+| Deleted | Was |
+|---|---|
+| `AddInfoCarrierRelational()`, `AddInfoCarrierRelationalClient()` | The two registration flavours. A server needed the first and a client both; getting it wrong was silent |
+| `InfoCarrierDbContextOptionsBuilder.UseRelationalQueryRoots(...)` | The options route for a client with no `IServiceCollection`, plus `WithRelationalQueryRoots` and `RelationalQueryRoots` behind it |
+| `NoRelationalQueryRoots` | The no-op default. There is one implementation now and every client gets it |
+| R130's half-configuration warning | Its `StampConvention`, its three detector constants, and its three tests. A half-configured client cannot exist without a switch |
+
+**Measured, and it changes no answer.** `failed` **160**, unchanged. FIXED none, BROKEN none,
+`REASONS: unchanged`. `total` 29512 -> 29509, and the three are named above: R130's three warning
+tests. Trim `ours` 89 <= 89. Pack clean — every deleted member was added on this branch, so nothing
+in the published `10.0.0` lost a signature, and `InfoCarrierModelValidator`'s constructor went back
+to the one-parameter shape `10.0.0` ships. Release build `0 Error(s)`.
+
+**The one thing in 29,509 tests that did move, and why it is right.** Tier A now builds its client
+model with EF's relational conventions over an InMemory backend — the thing the R127 and R128
+amendments treated as the disagreement to prevent. Every hierarchy root in the compiled-model
+baselines gains one line:
+
+```csharp
+runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
+```
+
+EF's own SQL Server baselines carry the same annotation, with the value *their* model implies (`TPT`
+for the same entity, because that test maps it per type). The value follows the model, and the client
+model is built from the same `OnModelCreating` the server uses. So this is the client agreeing with
+the server about a fact it previously did not carry at all, which is what level 2 is for. The
+baselines are updated to match.
+
+**R120's two-carrier hazard is closed by construction rather than by discipline.** That finding —
+a permission and the knowledge it guards travelling on different carriers, agreeing only if one
+reader answers for both — had `IInfoCarrierRelationalQueryRoots` readable from the options *and*
+from DI, with `RelationalQueryRootsFor` as the single reader holding them together. With one
+implementation and no way to configure another, there is one answer and nothing to reconcile.
+`QueryExecutor` names `InfoCarrierRelationalQueryRoots.Instance` directly.
+
+**What ADR-009's two tiers are about now.** The backing store, and which specification bases each
+tier can host. **Not** whether the client is relational, which is what the R127 and R128 amendments
+and the two test projects' own comments said. Every client is relational.
+
 ### D5 — the query boundary does not ask the backend what it can translate
 
 **Raised 2026-08-16 in D3's audit; scoped properly 2026-08-17 (M9, J6).

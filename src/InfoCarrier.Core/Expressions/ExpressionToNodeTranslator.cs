@@ -58,7 +58,7 @@ public class ExpressionToNodeTranslator(
     ///     </para>
     /// </remarks>
     private Metadata.IInfoCarrierRelationalQueryRoots _relationalRoots
-        = Metadata.NoRelationalQueryRoots.Instance;
+        = Relational.InfoCarrierRelationalQueryRoots.Instance;
 
     /// <summary>
     ///     Translates an expression to its node DTO, recognising no relational query root.
@@ -86,7 +86,7 @@ public class ExpressionToNodeTranslator(
         if (_depth == 0)
         {
             _parameterIds.Clear();
-            _relationalRoots = relationalRoots ?? Metadata.NoRelationalQueryRoots.Instance;
+            _relationalRoots = relationalRoots ?? Relational.InfoCarrierRelationalQueryRoots.Instance;
         }
 
         _depth++;

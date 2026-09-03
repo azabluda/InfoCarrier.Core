@@ -62,7 +62,7 @@ internal sealed class QueryExecutor<TElement>
         _queryContext = queryContext;
         _client = client;
         _expressionSerializer = expressionSerializer;
-        _relationalRoots = InfoCarrierOptionsExtension.RelationalQueryRootsFor(queryContext.Context);
+        _relationalRoots = Relational.InfoCarrierRelationalQueryRoots.Instance;
 
         // Substitute compiled-query parameters as plain constants (research-findings §6).
         Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);

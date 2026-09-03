@@ -12,22 +12,23 @@ namespace InfoCarrier.Core.Metadata;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>A seam because <c>InfoCarrier.Core</c> cannot name those types.</b> Both live in
-///         <c>Microsoft.EntityFrameworkCore.Relational</c>, which this package deliberately does
-///         not reference (<c>architecture.md</c> §6a <b>D3</b>, M9 J5). Until #97 this was answered
-///         by reflection — two types resolved by full name, four <c>GetProperty</c> reads and two
-///         <c>Activator.CreateInstance</c> calls under ten trim suppressions. The implementation
-///         now lives in <c>InfoCarrier.Core.Relational</c>, which references the package and names
-///         the types outright, and <b>D3 still stands</b>: the reference is outside this assembly.
+///         <b>A seam that survived the package it was cut for.</b> Both root types live in
+///         <c>Microsoft.EntityFrameworkCore.Relational</c>, which <c>InfoCarrier.Core</c> used not
+///         to reference, so until #97 this was answered by reflection: two types resolved by full
+///         name, four <c>GetProperty</c> reads and two <c>Activator.CreateInstance</c> calls under
+///         ten trim suppressions. D3 is superseded since 2026-09-03 and the reference is now in
+///         this assembly, so the interface no longer hides anything the caller could not name.
+///         It stays because it is still the seam a non-relational backend would replace, and
+///         because <c>ServerQueryExecutor</c> takes it as a parameter.
 ///     </para>
 ///     <para>
-///         <b>Absent by default, and the default is a refusal rather than a hole.</b>
-///         <see cref="NoRelationalQueryRoots" /> is registered by
-///         <c>AddEntityFrameworkInfoCarrier</c>; it reports every node as not-a-raw-SQL-root, so
-///         <c>ServerBoundaryAnalyzer</c> falls through to its <c>QueryRootExpression =&gt; false</c>
-///         catch-all and the caller gets EF's own <c>TranslationFailed</c>. <b>A raw-SQL root is
-///         never shipped with its SQL silently dropped</b>, which is the defect R75 closed and the
-///         one this seam must not reopen.
+///         <b>There is one implementation and every client gets it.</b>
+///         <see cref="InfoCarrier.Core.Relational.InfoCarrierRelationalQueryRoots" /> is registered
+///         by <c>AddEntityFrameworkInfoCarrier</c> with no opt-in, because one package that carries
+///         the relational half cannot save a consumer anything by withholding it. A client over a
+///         non-relational backend never builds one of these roots, so the implementation answers
+///         nothing there. <b>A raw-SQL root is never shipped with its SQL silently dropped</b>,
+///         which is the defect R75 closed and the one this seam must not reopen.
 ///     </para>
 ///     <para>
 ///         <b>It does not decide whether raw SQL is permitted.</b> That is
@@ -80,64 +81,4 @@ public interface IInfoCarrierRelationalQueryRoots
     ///     is the one query root with no entity type for a model to resolve.
     /// </remarks>
     Expression CreateScalarRoot(Type elementType, string sql, Expression argument);
-}
-
-/// <summary>
-///     The default <see cref="IInfoCarrierRelationalQueryRoots" />: this half knows nothing about a
-///     relational store, so it recognises no raw-SQL root and rebuilds none.
-/// </summary>
-/// <remarks>
-///     Registered by <c>AddEntityFrameworkInfoCarrier</c> and replaced by
-///     <c>AddInfoCarrierRelational()</c> from the <c>InfoCarrier.Core.Relational</c> package. The
-///     same arrangement <see cref="AnnotationDocumentMapping" /> has: a default that is honest
-///     about knowing nothing, and an application that supplies the store's answer.
-/// </remarks>
-public sealed class NoRelationalQueryRoots : IInfoCarrierRelationalQueryRoots
-{
-    /// <summary>
-    ///     The shared instance. This type has no state, so every caller wanting "nothing is
-    ///     relational here" can have the same object.
-    /// </summary>
-    public static readonly NoRelationalQueryRoots Instance = new();
-
-    /// <inheritdoc />
-    public bool IsRawSqlRoot(Expression node)
-        => false;
-
-    /// <inheritdoc />
-    public bool TryReadEntityRoot(
-        Expression node,
-        [NotNullWhen(true)] out string? sql,
-        [NotNullWhen(true)] out Expression? argument)
-    {
-        sql = null;
-        argument = null;
-        return false;
-    }
-
-    /// <inheritdoc />
-    public bool TryReadScalarRoot(
-        Expression node,
-        [NotNullWhen(true)] out string? sql,
-        [NotNullWhen(true)] out Expression? argument)
-    {
-        sql = null;
-        argument = null;
-        return false;
-    }
-
-    /// <inheritdoc />
-    public Expression CreateEntityRoot(IEntityType entityType, string sql, Expression argument)
-        => throw NotRelational();
-
-    /// <inheritdoc />
-    public Expression CreateScalarRoot(Type elementType, string sql, Expression argument)
-        => throw NotRelational();
-
-    private static InvalidOperationException NotRelational()
-        => new(
-            "A raw-SQL query root reached this half, which does not know how to rebuild one. "
-            + "Reference the InfoCarrier.Core.Relational package and call "
-            + "services.AddInfoCarrierRelational() on both the client and the server when the "
-            + "backing store is relational.");
 }

@@ -1051,6 +1051,7 @@ namespace TestNamespace
                 shadowCount: 1,
                 relationshipCount: 4,
                 storeGeneratedCount: 0));
+            runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
 
             Customize(runtimeEntityType);
         }

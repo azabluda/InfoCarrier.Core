@@ -50,13 +50,20 @@ dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTest
 `test/InfoCarrier.Core.FunctionalTests` is ADR-009 Tier A (InMemory) and
 `test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B (SQLite); the store-neutral harness they
 share is `test/InfoCarrier.Core.TestUtilities`. **Tier A references no relational SPEC assembly** —
-not `EFCore.Relational.Specification.Tests` — and its clients register no relational services, which
-is the point of the split: a relational client over an InMemory backend is the disagreement the seam
-exists to prevent. It was a per-fixture flag before, which asks politely.
+not `EFCore.Relational.Specification.Tests` — and that is now the whole of the difference.
 
-**The seam is now a configuration choice rather than a package choice** (D3 superseded 2026-09-03).
-`InfoCarrier.Core` carries the relational half, so Tier A's separation is that it never calls
-`AddInfoCarrierRelationalClient()`, not that it cannot reach the code.
+**EVERY CLIENT IS RELATIONAL SINCE R135, ON BOTH TIERS, AND THERE IS NO OPT-IN LEFT.**
+`AddEntityFrameworkInfoCarrier` registers the relational half unconditionally: EF's relational
+conventions on the client model, the relational facade dependencies, and the one
+`IInfoCarrierRelationalQueryRoots` implementation. `AddInfoCarrierRelational()`,
+`AddInfoCarrierRelationalClient()`, `UseRelationalQueryRoots()` and `NoRelationalQueryRoots` are
+**deleted**, and so is R130's half-configuration warning, because a half-configured client cannot
+exist without a switch. One package that ships the relational half cannot save a consumer anything
+by withholding it — the payload carries it either way — so the opt-in bought nothing and could only
+be got wrong. **The tiers are about the backing store and which spec bases it can host, and no
+longer about whether the client is relational**; this file and `architecture.md` said the opposite
+until R135, and `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R135)** with the
+measurement.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
 both and adds the figures. The solution also holds `InfoCarrier.Core.TransportTests`, which is not a

@@ -184,6 +184,7 @@ namespace TestNamespace
 
         public static void CreateAnnotations(RuntimeEntityType runtimeEntityType)
         {
+            runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
 
             Customize(runtimeEntityType);
         }

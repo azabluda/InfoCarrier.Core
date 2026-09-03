@@ -2947,6 +2947,25 @@
 # is renamed `RelationalMetadataAgreementTest` to say what it now checks: a reflective `MethodInfo`
 # read, a set of methods derived from EF rather than listed, and EF's ownership-chain walk for a
 # container name.
+#
+# 2026-09-03 (R135) -- `failed` UNCHANGED at 160, `total` FALLS 29512 -> 29509, A DELIBERATE FALL OF
+# THREE, and this is the note CLAUDE.md asks for whenever `total` drops. The relational opt-in is
+# gone: `AddEntityFrameworkInfoCarrier` registers the relational half unconditionally, so
+# `AddInfoCarrierRelational()`, `AddInfoCarrierRelationalClient()`, `UseRelationalQueryRoots()` and
+# `NoRelationalQueryRoots` are deleted, and with them R130's half-configuration warning. The three
+# tests are R130's own, and they are named because a half-configured client cannot exist once there
+# is no switch to leave half-thrown:
+#   A_client_that_registers_only_the_shared_half_is_warned_and_told_what_to_call
+#   A_client_that_registers_the_client_half_is_not_warned
+#   A_plain_client_that_has_said_nothing_is_not_warned
+#
+# **NOT A SUPPRESSED TEST.** They asserted a diagnostic, and the diagnostic's subject was removed by
+# the owner's decision. FIXED none, BROKEN none, REASONS unchanged.
+#
+# One answer in the suite did move and it is in the compiled-model baselines rather than in the
+# counts: every hierarchy root now scaffolds `Relational:MappingStrategy` = `TPH`, because EF's own
+# `EntityTypeHierarchyMappingConvention` runs on every client model now. EF's SQL Server baselines
+# carry the same annotation with the value their model implies. `architecture.md` D3 amendment R135.
 
 failed=160
-total=29512
+total=29509

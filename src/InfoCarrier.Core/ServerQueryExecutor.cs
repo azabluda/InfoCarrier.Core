@@ -63,11 +63,11 @@ public class ServerQueryExecutor(
     ///     with -- and not in the context's internal provider, which EF builds for itself. That is
     ///     already true of the value mappers, the allowed types and the raw-SQL grant beside this
     ///     one, and reading this seam from the context instead answered
-    ///     <see cref="Metadata.NoRelationalQueryRoots" /> for a server that had registered a real
+    ///     <see cref="Relational.InfoCarrierRelationalQueryRoots" /> for a server that had registered a real
     ///     one.
     /// </remarks>
     private readonly Metadata.IInfoCarrierRelationalQueryRoots _relationalQueryRoots
-        = relationalQueryRoots ?? Metadata.NoRelationalQueryRoots.Instance;
+        = relationalQueryRoots ?? Relational.InfoCarrierRelationalQueryRoots.Instance;
 
     /// <summary>
     ///     Executes the query described by <paramref name="request" /> and returns the wire result.

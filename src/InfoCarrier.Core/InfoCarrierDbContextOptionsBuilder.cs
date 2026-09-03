@@ -20,45 +20,6 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     private readonly DbContextOptionsBuilder _optionsBuilder = optionsBuilder;
 
     /// <summary>
-    ///     Tells this client how to recognise EF's relational raw-SQL query roots (#97).
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>The instance comes from the caller</b>, exactly as
-    ///         <see cref="AllowTypes" />'s types do, and for the same reason:
-    ///         <c>InfoCarrier.Core</c> cannot name a relational type. Pass
-    ///         <c>new InfoCarrierRelationalQueryRoots()</c> from the
-    ///         <c>InfoCarrier.Core.Relational</c> package.
-    ///     </para>
-    ///     <para>
-    ///         <b>This is the route for a client that never builds an <c>IServiceCollection</c></b>,
-    ///         which is most of them: an application that only calls <c>UseInfoCarrier</c> has no
-    ///         other seam. A client that does build one can call
-    ///         <c>AddInfoCarrierRelationalClient()</c> instead.
-    ///     </para>
-    ///     <para>
-    ///         <b>It grants nothing.</b> Raw SQL still needs
-    ///         <see cref="AllowArbitrarySqlExecution" /> here and
-    ///         <c>AddInfoCarrierArbitrarySqlExecution()</c> on the server.
-    ///     </para>
-    /// </remarks>
-    /// <param name="relationalQueryRoots">The implementation to use.</param>
-    /// <returns>The same builder, so calls can be chained.</returns>
-    public virtual InfoCarrierDbContextOptionsBuilder UseRelationalQueryRoots(
-        Metadata.IInfoCarrierRelationalQueryRoots relationalQueryRoots)
-    {
-        ArgumentNullException.ThrowIfNull(relationalQueryRoots);
-
-        InfoCarrierOptionsExtension extension =
-            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
-                .WithRelationalQueryRoots(relationalQueryRoots);
-
-        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
-
-        return this;
-    }
-
-    /// <summary>
     ///     Permits a wire payload to name these CLR types, in addition to the ones the model
     ///     already implies (ADR-008 constraint 2).
     /// </summary>

@@ -10,8 +10,8 @@ using Xunit;
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>
-///     Which tier registers <c>InfoCarrier.Core.Relational</c> on the <em>client</em>, and which
-///     one must never (#97 level 2, <c>architecture.md</c> section 6a <b>D3</b>).
+///     Every InfoCarrier client gets the relational half, whatever the backing store is
+///     (#97 level 2, <c>architecture.md</c> section 6a <b>D3</b>).
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -24,28 +24,22 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         probe: it reads the registration straight out of the collection each tier builds.
 ///     </para>
 ///     <para>
-///         <b>The second assertion is a guardrail rather than a duplicate.</b> Tier A's backing
-///         store is EF's InMemory provider, which is not a relational store, and a relational
-///         client over it is exactly the disagreement the seam exists to prevent. Nothing today
-///         could produce one -- the override lives in this project and
-///         <c>InfoCarrierTier.AddClientServices</c> adds nothing by default -- and this pins that
-///         it stays so.
+///         <b>It asserted the opposite of this until D3 was reverted.</b> While the relational half
+///         was a separate package, a client only had it after an <c>AddInfoCarrierRelationalClient()</c>
+///         call, and Tier A was pinned to have nothing relational at all. One package with one
+///         registration path makes both tiers the same here, which is the point of the revert: a
+///         consumer cannot save anything by leaving the relational half out, so there is nothing to
+///         leave out and no half-configured client to diagnose.
 ///     </para>
 /// </remarks>
 public class RelationalClientTierPinTest
 {
     /// <summary>
-    ///     Tier B registers the relational client for <b>every</b> fixture, not only the ones that
-    ///     asked for raw SQL.
+    ///     Tier B's client resolves EF's relational facade dependencies, which is what
+    ///     <c>Database.SqlQuery&lt;T&gt;</c> tests for before it builds anything.
     /// </summary>
-    /// <remarks>
-    ///     <c>arbitrarySqlExecution</c> is deliberately left at its default here. That flag used to
-    ///     gate this registration, because the only thing the package bought was the
-    ///     <c>Database.SqlQuery&lt;T&gt;</c> facade shim; it is a permission, and whether the
-    ///     backing store is relational is not.
-    /// </remarks>
     [ConditionalFact]
-    public void Tier_B_registers_the_relational_client_even_without_the_raw_SQL_grant()
+    public void Tier_B_registers_the_relational_facade_dependencies()
     {
         IServiceCollection services = ProviderServicesFor(SqliteInfoCarrierTier.Instance);
 
@@ -53,38 +47,44 @@ public class RelationalClientTierPinTest
     }
 
     /// <summary>
-    ///     Tier A registers nothing relational, because InMemory is not a relational store.
+    ///     Tier A's client resolves them too, because the package carries them unconditionally.
     /// </summary>
+    /// <remarks>
+    ///     A client over a non-relational backend never produces a relational query root, so the
+    ///     registration answers nothing and costs nothing. What it removes is the half-configured
+    ///     state: there is no way to ask for InfoCarrier and get only part of it.
+    /// </remarks>
     [ConditionalFact]
-    public void Tier_A_registers_nothing_relational_on_the_client()
+    public void Tier_A_registers_them_as_well()
     {
         IServiceCollection services = ProviderServicesFor(InfoCarrierTestStoreFactory.InMemory);
 
-        Assert.DoesNotContain(services, d => d.ServiceType == typeof(IRelationalDatabaseFacadeDependencies));
+        Assert.Contains(services, d => d.ServiceType == typeof(IRelationalDatabaseFacadeDependencies));
     }
 
     /// <summary>
-    ///     Tier B's convention set builder is the relational subclass, not the core one.
+    ///     There is <b>one</b> convention set builder and it is the relational subclass, on both
+    ///     tiers.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         <b>#97 level 2, and this is a REPLACEMENT rather than a second registration.</b>
-    ///         <c>InfoCarrier.Core</c> registers <c>InfoCarrierConventionSetBuilder</c>;
-    ///         <c>AddInfoCarrierRelationalClient</c> removes it and registers the subclass, which
-    ///         calls the base and adds EF's own <c>EntityTypeHierarchyMappingConvention</c>. Two
-    ///         builders, or two hierarchy conventions, would be the duplication this package exists
-    ///         to remove.
+    ///         The subclass calls the base and adds EF's own
+    ///         <c>EntityTypeHierarchyMappingConvention</c>. Two builders, or two hierarchy
+    ///         conventions, would be the duplication the one-package layout exists to remove.
     ///     </para>
     ///     <para>
-    ///         Asserting the count as well as the type is the half that matters: a
-    ///         <c>RemoveAll</c> that stopped working would leave both registrations present and the
-    ///         last one would silently win.
+    ///         Asserting the count as well as the type is the half that matters: a registration
+    ///         that stopped replacing would leave both present and the last one would silently win.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
-    public void Tier_B_replaces_the_convention_set_builder_rather_than_adding_a_second()
+    [ConditionalTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void One_convention_set_builder_and_it_is_the_relational_one(bool relationalTier)
     {
-        IServiceCollection services = ProviderServicesFor(SqliteInfoCarrierTier.Instance);
+        IServiceCollection services = ProviderServicesFor(
+            relationalTier ? SqliteInfoCarrierTier.Instance : InfoCarrierTestStoreFactory.InMemory);
 
         ServiceDescriptor descriptor = Assert.Single(
             services, d => d.ServiceType == typeof(IProviderConventionSetBuilder));
@@ -95,30 +95,12 @@ public class RelationalClientTierPinTest
     }
 
     /// <summary>
-    ///     Tier A keeps the core convention set builder.
-    /// </summary>
-    /// <remarks>
-    ///     The other half of the guardrail above. InMemory is not a relational store, so a client
-    ///     over it must not get relational conventions on its model.
-    /// </remarks>
-    [ConditionalFact]
-    public void Tier_A_keeps_the_core_convention_set_builder()
-    {
-        IServiceCollection services = ProviderServicesFor(InfoCarrierTestStoreFactory.InMemory);
-
-        ServiceDescriptor descriptor = Assert.Single(
-            services, d => d.ServiceType == typeof(IProviderConventionSetBuilder));
-
-        Assert.Equal(typeof(InfoCarrierConventionSetBuilder), descriptor.ImplementationType);
-    }
-
-    /// <summary>
     ///     The client provider services a fixture on this tier would be built with.
     /// </summary>
     /// <remarks>
     ///     Read out of the collection rather than out of a built provider: what is being pinned is
-    ///     which tier makes the registration, and a resolved instance would answer a different
-    ///     question and need a context to resolve it from.
+    ///     which registration is made, and a resolved instance would answer a different question
+    ///     and need a context to resolve it from.
     /// </remarks>
     private static IServiceCollection ProviderServicesFor(InfoCarrierTier tier)
         => ((InfoCarrierTestStoreFactory)InfoCarrierTestStoreFactory.Create(

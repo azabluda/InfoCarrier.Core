@@ -46,9 +46,7 @@ public class SqliteSmokeTest
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
-                OnAddServices = services => InfoCarrier.Core.Relational
-                    .InfoCarrierRelationalServiceCollectionExtensions.AddInfoCarrierRelational(
-                        onAddServices?.Invoke(services) ?? services),
+                OnAddServices = services => onAddServices?.Invoke(services) ?? services,
             });
 
     /// <remarks>
@@ -63,13 +61,7 @@ public class SqliteSmokeTest
         SqliteInfoCarrierBackendTestStore store,
         Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptions = null)
         => new(new DbContextOptionsBuilder<SqliteSmokeContext>()
-            .UseInfoCarrier(
-                store,
-                o =>
-                {
-                    o.UseRelationalQueryRoots(new InfoCarrier.Core.Relational.InfoCarrierRelationalQueryRoots());
-                    infoCarrierOptions?.Invoke(o);
-                })
+            .UseInfoCarrier(store, infoCarrierOptions)
             .Options);
 
     private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(

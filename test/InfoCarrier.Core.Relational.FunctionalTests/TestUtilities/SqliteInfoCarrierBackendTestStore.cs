@@ -136,17 +136,6 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
             .AddSingleton<TestStoreIndex>();
 
     /// <inheritdoc />
-    /// <remarks>
-    ///     #97. The SERVER half of the relational seam: how to REBUILD a raw-SQL query root.
-    ///     <c>AddInfoCarrierRelational</c> and not <c>…Client</c> — the client-only call also
-    ///     replaces <c>IDatabaseFacadeDependencies</c>, and this server is an ordinary EF
-    ///     application whose own relational one owns a live connection.
-    /// </remarks>
-    protected override IServiceCollection AddStoreSpecificServices(IServiceCollection serviceCollection)
-        => InfoCarrier.Core.Relational.InfoCarrierRelationalServiceCollectionExtensions
-            .AddInfoCarrierRelational(serviceCollection);
-
-    /// <inheritdoc />
     protected override TestStoreIndex GetTestStoreIndex(IServiceProvider? serviceProvider)
         => serviceProvider?.GetService<TestStoreIndex>() ?? base.GetTestStoreIndex(serviceProvider);
 

@@ -4346,6 +4346,53 @@ re-parents of families already running, because R25–R30 showed that is where t
       **Also updated:** every doc comment that said "Pinned by `DocumentMappingPinTest`" for a
       constant the compiler now checks.
 
+- [x] **R135. There is no relational opt-in any more: every client gets the relational half.**
+      `src/` change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed`
+      unchanged at 160**, `total` 29512 -> 29509, a deliberate fall of three. FIXED none, BROKEN
+      none, `REASONS: unchanged`. Trim `ours` 89 <= 89. Pack clean. Release build from a forced
+      clean `obj`/`bin`: `0 Error(s)`. `architecture.md` §6a carries the **D3 amendment 2026-09-03
+      (R135)**.
+
+      **The owner's correction, and it follows from R131 rather than modifying it.** R131 reverted
+      D3 to one package but kept the opt-in. One package that already ships the relational half
+      cannot save a consumer anything by withholding it: the 0.62 MB brotli is in the payload
+      whether or not the registration is made. So the opt-in bought nothing and could only be got
+      wrong, which R134's session had just measured — merging the two registration flavours into
+      one broke all 25 `SqliteSmokeTest` cases, because a *server*'s collection has no
+      `IInfoCarrierDocumentMapping` to activate the convention set builder with. **The recorded
+      reason for two flavours was also wrong** — it claimed a server must not receive
+      `InfoCarrierRelationalFacadeDependencies` because its `RelationalConnection` throws — and
+      neither the right reason nor the wrong one matters once there is nothing to register.
+
+      **Deleted.** `AddInfoCarrierRelational()`, `AddInfoCarrierRelationalClient()` and the file
+      that held them; `UseRelationalQueryRoots(...)` with `WithRelationalQueryRoots` and
+      `RelationalQueryRoots` behind it; `NoRelationalQueryRoots`; R130's `Validate` override,
+      `HalfConfiguredMessage`, `RelationalConventionsAnnotation`, three detector constants,
+      `HasUnmappedNonTphHierarchy` and the `StampConvention` that fed it; and
+      `HalfConfiguredRelationalClientTest`. `RelationalClientTierPinTest` now asserts the opposite
+      of what it asserted, which is the point: both tiers register one convention set builder and it
+      is the relational subclass.
+
+      **The three tests in the `total` fall are named, because CLAUDE.md forbids an unexplained
+      one.** `A_client_that_registers_only_the_shared_half_is_warned_and_told_what_to_call`,
+      `A_client_that_registers_the_client_half_is_not_warned`,
+      `A_plain_client_that_has_said_nothing_is_not_warned`. All three tested a diagnostic that has
+      no subject once there is no half-configured state.
+
+      **THE ONE THING THAT MOVED IN 29,509 TESTS, and the first measurement did not survive it.**
+      The run before this one stood at 167 with four `CompiledModelInfoCarrierTest` failures, all on
+      `Difference found in DbContextModelBuilder.cs`. Deleting the stamp fixed one; the other three
+      were a real difference, read out by rewriting the baselines with
+      `EF_TEST_REWRITE_BASELINES=1` and diffing. It is one line per hierarchy root:
+      `runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH")`. EF's own SQL Server
+      baselines carry the same annotation with the value their model implies, so this is the client
+      carrying a fact it previously did not carry at all, derived from the same `OnModelCreating`
+      the server uses. Baselines updated.
+
+      **R120's two-carrier hazard is now closed by construction.** With one implementation and no
+      way to configure another there is one answer, so the boundary analyzer and the forward
+      translator cannot disagree. `QueryExecutor` names `InfoCarrierRelationalQueryRoots.Instance`.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

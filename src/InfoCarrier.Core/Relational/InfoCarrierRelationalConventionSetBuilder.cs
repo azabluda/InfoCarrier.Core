@@ -3,7 +3,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Update;
@@ -65,30 +64,7 @@ public class InfoCarrierRelationalConventionSetBuilder(
         conventionSet.ModelFinalizingConventions.Add(
             new EntityTypeHierarchyMappingConvention(Dependencies, RelationalDependencies));
 
-        // THE STAMP `InfoCarrierModelValidator` LOOKS FOR. A client that has said its store is
-        // relational and whose model carries no stamp was configured with `AddInfoCarrierRelational()`
-        // and not `AddInfoCarrierRelationalClient()`, and the validator refuses it rather than let
-        // the two models disagree in silence. Written as a convention because a convention set has
-        // no other way to reach the model it will build.
-        conventionSet.ModelFinalizingConventions.Add(new StampConvention());
-
         return conventionSet;
-    }
-
-    /// <summary>
-    ///     Records on the model that this package's conventions ran.
-    /// </summary>
-    /// <remarks>
-    ///     Read by <see cref="InfoCarrierModelValidator" />, which is the only consumer. It is a
-    ///     statement about how the model was BUILT, so a model annotation is the right carrier: it
-    ///     travels with the cached model rather than with a context or a service.
-    /// </remarks>
-    private sealed class StampConvention : IModelFinalizingConvention
-    {
-        public void ProcessModelFinalizing(
-            IConventionModelBuilder modelBuilder,
-            IConventionContext<IConventionModelBuilder> context)
-            => modelBuilder.HasAnnotation(InfoCarrierModelValidator.RelationalConventionsAnnotation, true);
     }
 
     /// <summary>
