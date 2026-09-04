@@ -3448,5 +3448,33 @@
 # `join o in os on new { a, b } equals new { x, y }` is a composite join key that EF translates.
 # Separating the two needs evidence, not a fourth syntactic rule -- see R162.
 
-failed=51
+# 2026-09-04 (R165) -- `failed` FALLS 51 -> 47, `total` unchanged at 29513. FIXED 4, BROKEN none.
+#
+#   -4  Assert.Throws() Failure: No exception was thrown  (18 -> 14)
+#
+# THE SECOND SILENT FULL-TABLE READ, CLOSED. The four `Where_coalesce_with_anonymous_types` read
+# the whole table exactly as R164's ordering case did: the `Where` stays on the client, the
+# boundary falls to the query root, and the server returns every row.
+#
+# WHY IT COULD BE CLOSED NARROWLY, AND THIS IS THE PART WORTH KEEPING. The obvious fix was to
+# refuse constructing an anonymous type in a row-deciding argument. That is what
+# `ClientCodeFinder.VisitNew` deliberately permits, because an anonymous type has structural
+# `Equals`, and the permission is load-bearing: EF's own specification suites hold **84**
+# `GroupBy(x => new { ... })` composite grouping keys and **12** `equals new` composite join keys.
+# Refusing construction would have been the 235-test mistake in a new shape.
+#
+# So the test is the COALESCE and not the construction. `new` never returns null, so
+# `new X() ?? y` is always `new X()` and the operator is dead. A composite key is a BARE
+# construction and never an operand of `??`, so `RejectDeadCoalesce` cannot reach one of those 96
+# sites. Relational only, for R164's reason: EF's in-memory provider evaluates it happily and its
+# copy of the test asserts an answer.
+#
+# AND THE HOLE ITSELF DOES NOT GENERALISE, which is the finding to carry. `GroupBy` and `Join`
+# are blind to their key TYPE in the same way `OrderBy` was, but R164's rule cannot be applied to
+# them: an ordering key is a scalar in every query that works, while a grouping or join key is
+# legitimately an anonymous type the allowlist rejects. The hole there is reachable only through a
+# CONSTANT key of an unmapped type, which no test in the suite exercises -- so there is nothing to
+# validate a guard against, and none was written.
+
+failed=47
 total=29513

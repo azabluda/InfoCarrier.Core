@@ -5188,6 +5188,29 @@ re-parents of families already running, because R25–R30 showed that is where t
       every day. Separating it from a coalesce inside a predicate is a fourth syntactic rule, and
       R162 is the record of what those cost.
 
+- [x] **R165. A coalesce over a freshly constructed object is refused, and the second silent
+      full-table read is gone.** `src/` change, so `eng/measure.sh` and `eng/trim-ratchet.sh`; no
+      public signature moved. **`failed` FALLS 51 -> 47**, FIXED 4, BROKEN none. Trim `ours`
+      unchanged at 90. The reasons diff moves one line by exactly four.
+
+      **COUNTING THE EXEMPTION'S USERS IS WHAT MADE THIS SMALL.** R164 left this open because
+      refusing anonymous construction in a row-deciding argument would break composite join keys.
+      Counted rather than feared: EF's specification suites hold **84** `GroupBy(x => new { ... })`
+      composite grouping keys and **12** `equals new` composite join keys. Both are a BARE
+      construction as the whole key selector. Neither is an operand of `??`. So the guard does not
+      need to touch `ClientCodeFinder.VisitNew` at all -- it tests the coalesce.
+
+      **And what it refuses is dead by construction.** `new` never returns null, so
+      `new X() ?? y` is always `new X()`. `RejectDeadCoalesce` cannot refuse a query that does
+      anything. Relational only, for R164's reason.
+
+      **The `GroupBy`/`Join` hole is recorded and NOT closed.** They are blind to their key type
+      the way `OrderBy` was, but R164's rule cannot be applied to them: an ordering key is a
+      scalar in every query that works, a grouping key is legitimately an anonymous type the
+      allowlist rejects. The hole there needs a CONSTANT key of an unmapped type, which no test
+      exercises -- so there is nothing to validate a guard against.
+      `docs/plans/v10/findings.md` carries the general rule the three guards produced.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

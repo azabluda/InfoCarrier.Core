@@ -1296,6 +1296,11 @@ public sealed class QuerySplitter
                 {
                     RejectUnshippableOrderingKey(node);
                 }
+
+                if (_found is null)
+                {
+                    RejectDeadCoalesce(node);
+                }
             }
 
             if (_found is null && _clientProjectedSources.Count > 0)
@@ -1454,6 +1459,61 @@ public sealed class QuerySplitter
         }
 
         /// <summary>
+        ///     Refuses a row-deciding argument that coalesces over a freshly constructed object,
+        ///     which no store can translate and which does nothing.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The same silent full-table read as
+        ///         <see cref="RejectUnshippableOrderingKey" />, reached a different way.</b>
+        ///         <c>where (new { Name = g.LeaderNickname } ?? new { Name = g.FullName }) != null</c>
+        ///         leaves the <c>Where</c> on the client, so the boundary falls to the query root
+        ///         and the server returns every row. Measured, not reasoned: the probe reported
+        ///         <c>shippable=1</c> with the bare root, and the server's SQL log showed one
+        ///         <c>SELECT</c> over the whole table.
+        ///     </para>
+        ///     <para>
+        ///         <b>Why the walk misses it, and why this does not widen the exemption it misses
+        ///         it through.</b> <see cref="ClientCodeFinder.VisitNew" /> refuses a constructed
+        ///         type only when it LACKS value equality, and an anonymous type has structural
+        ///         <c>Equals</c>. That exemption is load-bearing:
+        ///         <c>join o in os on new { a, b } equals new { x, y }</c> is a composite join key
+        ///         EF translates, and <c>GroupBy(x =&gt; new { x.A, x.B })</c> is a composite
+        ///         grouping key. EF's own specification suites hold <b>84</b> of the latter and
+        ///         <b>12</b> of the former, so refusing construction in a row-deciding argument
+        ///         would be the 235-test mistake again.
+        ///     </para>
+        ///     <para>
+        ///         <b>So the test is the coalesce, not the construction.</b> <c>new</c> never
+        ///         returns <see langword="null" />, so <c>new X() ?? y</c> is always
+        ///         <c>new X()</c> and the operator is dead. A composite key is a bare
+        ///         construction and is not an operand of <c>??</c>, so nothing this refuses is
+        ///         code that does anything.
+        ///     </para>
+        ///     <para>
+        ///         <b>Relational only</b>, for <see cref="RejectUnshippableOrderingKey" />'s
+        ///         reason: EF's in-memory provider evaluates this happily, and its copy of the
+        ///         test asserts an answer rather than a refusal.
+        ///     </para>
+        /// </remarks>
+        private void RejectDeadCoalesce(MethodCallExpression node)
+        {
+            if (!_serverStoreIsRelational)
+            {
+                return;
+            }
+
+            foreach (Expression argument in RowDecidingArguments(node))
+            {
+                if (DeadCoalesceFinder.Find(argument))
+                {
+                    _found = (node, null);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
         ///     Refuses an operator that applies a row-deciding lambda to a sequence some earlier
         ///     projection computed with client code.
         /// </summary>
@@ -1605,6 +1665,49 @@ public sealed class QuerySplitter
     ///     EF's details clause, or <see langword="null" /> when the bare message says enough.
     /// </summary>
     private readonly record struct ClientCodeReason(string? Details);
+
+    /// <summary>
+    ///     Finds a <c>??</c> whose left operand is a freshly constructed object.
+    /// </summary>
+    private sealed class DeadCoalesceFinder : ExpressionVisitor
+    {
+        private bool _found;
+
+        public static bool Find(Expression expression)
+        {
+            var finder = new DeadCoalesceFinder();
+            finder.Visit(expression);
+            return finder._found;
+        }
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            if (!_found
+                && node.NodeType == ExpressionType.Coalesce
+                && Unwrap(node.Left) is NewExpression or MemberInitExpression)
+            {
+                _found = true;
+                return node;
+            }
+
+            return _found ? node : base.VisitBinary(node);
+        }
+
+        // A construction may arrive boxed or up-cast, and the conversions have to come off before
+        // the test means anything -- the same reason `ClientCodeFinder.IsNull` strips them.
+        private static Expression Unwrap(Expression node)
+        {
+            while (node is UnaryExpression
+                   {
+                       NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs,
+                   } convert)
+            {
+                node = convert.Operand;
+            }
+
+            return node;
+        }
+    }
 
     private sealed class ClientCodeFinder(TypeAllowlist allowlist, bool methodsOnly = false)
         : ExpressionVisitor

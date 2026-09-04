@@ -9,6 +9,42 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## When a syntactic guard is safe, and when it is not (R162/R164/R165, 2026-09-04)
+
+Three guards were attempted in one session against the same background: this provider answers
+queries every relational provider refuses. Two shipped and one was reverted, and the difference
+between them is the transferable part.
+
+**The two that shipped refuse something PROVABLY dead or PROVABLY impossible.**
+`RejectUnshippableOrderingKey` refuses an ordering whose key type the allowlist does not admit.
+The allowlist admits every primitive and every mapped type, so a key it rejects is one no store
+could sort by. `RejectDeadCoalesce` refuses `new X() ?? y`, and `new` never returns null, so the
+operator is dead code. Neither can refuse a query that does anything. Both measured 4 fixed and 0
+broken.
+
+**The one that was reverted refused something that merely LOOKED wrong.** Whether EF accepts a
+`Distinct` inside a projected collection depends on identifier propagation through the `Distinct`
+and every projection above it, computed during relational translation. Three syntactic
+approximations were built; two measured 8 fixed and 8 BROKEN at an unchanged count of 55.
+
+**And the shipped rule does not generalise, which is worth knowing before the next attempt.**
+`GroupBy` and `Join` are blind to their key type in exactly the way `OrderBy` was. Extending
+R164's rule to them would refuse **84** composite grouping keys and **12** composite join keys in
+EF's own suites, because those keys are anonymous types the allowlist rejects by design. The rule
+worked for ordering only because an ordering key is a scalar in every query that works.
+
+**The question to ask first**, then, is not "does EF refuse this?" but **"can I state what this
+guard refuses in a sentence that is true by construction?"** A `new` is never null. A type the
+allowlist rejects is one no store can sort by. Neither sentence needs a measurement to be
+believed; the measurement only confirms nothing else was caught. When the sentence needs a
+qualifier -- "unless the identifier survives", "unless the parent keeps its columns" -- the guard
+is approximating someone else's algorithm, and R162 is what that costs.
+
+**The asymmetry that decides the close calls.** A missed refusal leaves the status quo. A false
+refusal breaks a query that works everywhere, which makes this provider less capable than EF
+rather than more portable. So "no test in the suite contradicts it" is not validation, and the
+absence of a test for a shape is a reason NOT to guard it.
+
 ## A guard that cannot be written on the client (R162, 2026-09-04)
 
 R160 refuses `Distinct` and the set operations applied ABOVE a projection that carries a
