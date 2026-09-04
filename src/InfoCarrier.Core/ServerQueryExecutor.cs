@@ -77,6 +77,13 @@ public class ServerQueryExecutor(
         // Start of a message exchange: wire reference ids restart at 1.
         ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
 
+        // A payload may name the context as the receiver of a mapped instance function. This is the
+        // context that fills it, and only a server has one to offer.
+        if (_expressionSerializer is ExpressionSerializer serializer)
+        {
+            serializer.UseServerContext(_context);
+        }
+
         try
         {
             // Deserialize + rebind the tree against the server model.

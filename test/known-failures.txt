@@ -3108,6 +3108,40 @@
 # Trim `ours` 89 -> 90, a deliberate rise recorded in `eng/trim-baseline.txt`: one IL2060 for the
 # `MakeGenericMethod` the generic hint needs. Two further warnings the first attempts cost were
 # avoidable and were avoided.
+#
+# 2026-09-04 (R151) -- `failed` FALLS 132 -> 112, `total` UNCHANGED at 29509. FIXED twenty, BROKEN
+# none, names file refreshed. **THE WIRE GAINED A NODE KIND**: `ServerContextStub`.
+#
+# A user-defined function mapped as an INSTANCE method on the context funcletizes to a receiver
+# holding the live client `DbContext`. This provider refuses that everywhere -- rightly: a context
+# is an object graph with a change tracker and a service provider, and the server has one of its
+# own. In a PREDICATE the refusal is correct and still happens. In a PROJECTION nothing refused it,
+# because client evaluation in a final projection is legal, **so the client RAN the function**. EF's
+# specification contexts give those methods a body that throws precisely to prove they were
+# translated rather than run, which is what `UdfDbFunctionTestBase` reported as
+# `NotImplementedException`.
+#
+# The receiver is now rewritten to `ServerContextExpression` before the boundary is drawn, crosses
+# as a stub carrying a TYPE AND NOTHING ELSE, and the server puts its own context there. Narrow by
+# construction: only a method the model maps with `HasDbFunction` is rewritten, and a context
+# reaching the boundary any other way is still refused.
+#
+# **THE MARKER IS REDUCIBLE, and that is not a detail.** The boundary may leave the call on the
+# client -- EF's own `Scalar_Function_ClientEval_...` tests require it -- so what the client compiles
+# must still be runnable. It reduces to the constant it replaced, which is exactly the old
+# behaviour. Without that the client compiler answers `ArgumentException: must be reducible node`.
+#
+# **ONE PIN NOW ASSERTS THE OPPOSITE OF WHAT IT DID**, and is renamed:
+# `A_predicate_calling_a_mapped_function_on_the_client_context_is_sent_to_the_server`. The store
+# defines no `TitleIsLong` SQL function, so the server answers `no such function: TitleIsLong` --
+# a message that can only come from SQL, which is the assertion. The method's body still throws, so
+# a client that ran it would say so by name.
+#
+# **WHAT IS LEFT IN THAT CLASS IS A STORE LIMITATION AND NOT THIS PROVIDER'S.** EF ships
+# `UdfDbFunctionSqlServerTests` and NO SQLite equivalent, and SQLite cannot define table-valued
+# functions at all, so `no such table: GetTopTwoSellingProducts` and its siblings are the store
+# saying what it does not have. The SQL Server tier is dropped here by the owner's decision, so this
+# base has no store that can host all of it.
 
-failed=132
+failed=112
 total=29509

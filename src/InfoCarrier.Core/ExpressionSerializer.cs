@@ -100,7 +100,33 @@ public class ExpressionSerializer(
     public virtual Expression ToExpression(
         ExpressionNode node,
         Func<QueryRootStubNode, Type, Expression> queryRootFactory)
-        => new NodeToExpressionTranslator(_typeResolver, _valueMapper, queryRootFactory).Translate(node);
+        => new NodeToExpressionTranslator(_typeResolver, _valueMapper, queryRootFactory)
+        {
+            ServerContextFactory = _serverContext is { } context
+                ? declared => declared.IsInstanceOfType(context)
+                    ? Expression.Constant(context, declared)
+                    : throw new InvalidOperationException(
+                        $"The payload names '{declared}' as the receiver of a mapped function, and "
+                        + $"this server's context is a '{context.GetType()}', which is not one. The "
+                        + "two halves were built from different context types.")
+                : null,
+        }.Translate(node);
+
+    private Microsoft.EntityFrameworkCore.DbContext? _serverContext;
+
+    /// <summary>
+    ///     Tells this serializer which context fills a <c>ServerContextStubNode</c>, for the
+    ///     duration of ONE execution.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The server calls this and the client never does.</b> The node only ever appears in a
+    ///     payload the client sent, and it means "the context this query runs against"; on the
+    ///     client that is the context it already had, and it never needs to resolve one. A
+    ///     serializer with no context refuses the node by name rather than answering it wrongly.
+    /// </remarks>
+    /// <param name="context">The server's context.</param>
+    public virtual void UseServerContext(Microsoft.EntityFrameworkCore.DbContext context)
+        => _serverContext = context;
 
     /// <summary>
     ///     Builds a model-aware serializer pipeline for the given EF model. Used by the server,

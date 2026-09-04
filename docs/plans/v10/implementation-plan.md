@@ -4785,6 +4785,41 @@ re-parents of families already running, because R25–R30 showed that is where t
       this class's existing `GetElementType` costs none. The remaining IL2060 is the premise the
       trim baseline has described since it was written.
 
+- [x] **R151. A user-defined function mapped as an instance method reaches the server.** `src/`
+      change and a **wire-format change**, so `eng/measure.sh`, `eng/trim-ratchet.sh` and
+      `dotnet pack`. **`failed` FALLS 132 -> 112**, `total` UNCHANGED at 29509. FIXED twenty, BROKEN
+      none. Trim `ours` UNCHANGED at 90. Pack clean.
+
+      **The defect, and it was not the refusal.** Such a call funcletizes to a receiver holding the
+      live client `DbContext`, which this provider refuses everywhere -- rightly. In a PREDICATE
+      that refusal is correct and still happens. **In a PROJECTION nothing refused it**, because
+      client evaluation in a final projection is legal, so the client RAN the function. EF's
+      specification contexts give those methods a body that throws precisely to prove they were
+      translated rather than run, which is what the suite reported as `NotImplementedException`.
+
+      **The fix carries a role, not an object.** The receiver becomes `ServerContextExpression`
+      before the boundary is drawn and crosses as `NodeKind.ServerContextStub`, which holds a type
+      and nothing else; the server puts its own context there and checks the type rather than
+      trusting it. Narrow by construction: only a method the model maps with `HasDbFunction` is
+      rewritten, so `CarriesTheClientsContext` still refuses every other route.
+
+      **THE MARKER IS REDUCIBLE, AND THAT IS THE PART THAT WAS LEARNED BY MEASURING.** The boundary
+      may leave the call on the client -- EF's own `Scalar_Function_ClientEval_...` tests require
+      exactly that -- so what the client compiles must still be runnable. It reduces to the constant
+      it replaced, which is the old behaviour precisely. Without it the client compiler answers
+      `ArgumentException: must be reducible node`.
+
+      **One pin now asserts the opposite of what it did**, and is renamed
+      `..._is_sent_to_the_server`. The store defines no `TitleIsLong` SQL function, so the server
+      answers `no such function: TitleIsLong` -- a message that can only come from SQL, which is the
+      assertion. The method's body still throws, so a client that ran it would say so by name.
+
+      **WHAT IS LEFT IN THAT CLASS IS A STORE LIMITATION, and it was checked rather than assumed.**
+      EF ships `UdfDbFunctionSqlServerTests` and **no SQLite equivalent**, and SQLite cannot define
+      table-valued functions at all. `no such table: GetTopTwoSellingProducts` is the store saying
+      what it does not have. With the SQL Server tier dropped by the owner's decision, this base has
+      no store here that can host all of it.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

@@ -119,6 +119,12 @@ public sealed class ServerBoundaryAnalyzer(
             // the defect R75 closed.
             { } root when arbitrarySqlAllowed && relationalRoots?.IsRawSqlRoot(root) == true => true,
 
+            // The receiver of a mapped instance function, put here by `QuerySplitter` in place of
+            // the client's live context. It carries a type and nothing else, and the server fills
+            // it with its own context. Every OTHER route by which a context could reach the
+            // boundary is still refused, by `CarriesTheClientsContext` below.
+            ServerContextExpression => true,
+
             Microsoft.EntityFrameworkCore.Query.QueryRootExpression => false,
             // Any other extension node — QueryParameterExpression included, though those are
             // substituted away before the split — has no translation.

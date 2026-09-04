@@ -228,6 +228,14 @@ public class ExpressionToNodeTranslator(
     /// <inheritdoc />
     protected override Expression VisitExtension(Expression node)
     {
+        // The receiver of a mapped instance function, put here by `QuerySplitter` in place of the
+        // client's live context. It carries a type and nothing else; the server fills the role.
+        if (node is Query.ServerContextExpression serverContext)
+        {
+            _result = new ServerContextStubNode { Type = _typeMapper.ToTypeNode(serverContext.Type) };
+            return node;
+        }
+
         // EF Core's EntityQueryRootExpression (NodeType Extension) becomes a query-root stub.
         if (node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root)
         {

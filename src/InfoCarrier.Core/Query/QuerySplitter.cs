@@ -160,6 +160,12 @@ public sealed class QuerySplitter
         // `*SplitQueryRelationalTestBase` classes, which insert the hint at every root: 456 of 638
         // failing, 106 of them this provider's own "reads navigation X, but no query sent to the
         // server returned it", and the rest wrong answers.
+        // An instance-mapped user-defined function keeps its receiver, but the receiver stops
+        // being the client's live context and becomes a marker the server fills. See
+        // `ServerContextExpression`. Before the boundary, because the boundary is what refuses the
+        // constant this replaces.
+        query = new InstanceDbFunctionReceiverVisitor(_model).Visit(query)!;
+
         // STRIPPED FROM THE TREE AND CARRIED ON THE REQUEST INSTEAD (R149). Everything above is
         // why it cannot stay in the tree; none of it says the server should not be told. The
         // server is the half with a relational provider, so it is the half that can honour the
@@ -986,6 +992,43 @@ public sealed class QuerySplitter
             }
 
             return Expression.Constant(array, declared);
+        }
+    }
+
+    /// <summary>
+    ///     Replaces the live client context in the receiver position of a mapped instance function
+    ///     with <see cref="ServerContextExpression" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The model decides, not the shape.</b> Only a method the model maps with
+    ///         <c>HasDbFunction</c> is rewritten. A call to any other instance method on the
+    ///         context is left exactly as it was, so it is still refused by
+    ///         <c>ServerBoundaryAnalyzer.CarriesTheClientsContext</c> and the caller still gets EF's
+    ///         own translation failure.
+    ///     </para>
+    ///     <para>
+    ///         <b>`FindDbFunction` is asked with the METHOD, which is how EF stores the mapping.</b>
+    ///         A name comparison would admit an unmapped overload of the same name, and the server
+    ///         would then be asked for SQL that does not exist.
+    ///     </para>
+    /// </remarks>
+    private sealed class InstanceDbFunctionReceiverVisitor(IModel model) : ExpressionVisitor
+    {
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (node.Object is ConstantExpression { Value: DbContext } receiver
+                && node.Method.DeclaringType is { } declaring
+                && model.FindDbFunction(node.Method) is not null)
+            {
+                return node.Update(
+                    new ServerContextExpression(
+                        receiver.Type == declaring ? receiver.Type : declaring,
+                        receiver.Value!),
+                    Visit(node.Arguments));
+            }
+
+            return base.VisitMethodCall(node);
         }
     }
 
