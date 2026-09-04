@@ -78,43 +78,6 @@ The cause is a defect in EF Core's own materializer, reached because this provid
 on the server from the values sent over the wire. Tracked upstream as
 [dotnet/efcore#36175](https://github.com/dotnet/efcore/issues/36175).
 
-## Use with caution
-
-### `Distinct` inside a projected collection
-
-A relational provider rejects this query. This provider reassembles the collection on the client
-and answers it. No other provider runs it, so there is no reference result to compare against.
-
-```csharp
-var report = context.Customers
-    .Select(c => new
-    {
-        c.Name,
-        Orders = c.Orders.Select(o => new
-        {
-            o.PlacedOn,
-            Products = o.Lines.Select(l => l.ProductName).Distinct().ToList(),
-        }).ToList(),
-    })
-    .ToList();
-```
-
-Apply `Distinct` after materializing instead:
-
-```csharp
-Products = o.Lines.Select(l => l.ProductName).ToList(),   // then .Distinct() in memory
-```
-
-`Distinct` and the set operations throw when applied to the projection rather than inside it, as
-on any relational provider.
-
-```csharp
-context.Customers
-    .Select(c => new { c.City, Orders = c.Orders.ToList() })
-    .Distinct()
-    .ToList();   // throws
-```
-
 ## Differences that are not limitations
 
 These behave correctly, and differ from another EF Core provider only in ways you would notice

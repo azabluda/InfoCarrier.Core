@@ -9,6 +9,65 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## A guard that cannot be written on the client (R162, 2026-09-04)
+
+R160 refuses `Distinct` and the set operations applied ABOVE a projection that carries a
+collection, and it works because that is a syntactic fact about the caller's own LINQ. The
+obvious next step was the same operator one position lower: a `Distinct` INSIDE the query, on a
+projection a collection join then has to be stitched back together against. Eight tests assert
+that refusal. **Three hypotheses were built and measured, all three were refuted, and the third
+refutation says the guard cannot be written here at all.**
+
+**Hypothesis 1: the projection must carry the source's primary key.** That is what the test names
+appear to say. Measured 8 fixed, 8 broken, `FAILING: 55` on both sides. The broken eight were the
+sibling tests, and EF ships the pair that kills it:
+`Correlated_collection_with_distinct_not_projecting_identifier_column` projects
+`new { w.Name, w.IsAutomatic }` and TRANSLATES, while
+`..._also_projecting_complex_expressions` projects
+`new { w.Name, w.IsAutomatic, w.OwnerFullName.Length }` and THROWS. Neither carries `Weapon.Id`.
+The test named "not projecting identifier column" is the GREEN one.
+
+**Hypothesis 2: the projection must be bare columns, because columns are the identity when the key
+is absent.** Fits that pair exactly. Measured 4 fixed, 0 broken -- but only four, because the gate
+was wrong: it asked `ProjectionRewriter` whether it had produced a collection reassembly, and a
+probe on `Correlated_collection_after_distinct_3_levels_without_original_identifiers` printed
+`reassemblies=0` for a query whose projection carries two nested collections. **"The split found a
+collection" and "the query projects one" read as the same question and are not.**
+
+**Hypothesis 2 with a syntactic gate.** Measured 8 fixed, 8 broken, `FAILING: 55` again. The new
+broken eight name the flaw:
+`Correlated_collection_after_distinct_with_complex_projection_not_containing_original_identifier`
+has a computed member (`o.OrderDate.Value.Month`), no identifier, and a projected collection, and
+every relational provider TRANSLATES it. Meanwhile `..._3_levels_without_original_identifiers`
+THROWS although its inner `Distinct` projects only bare columns: what fails there is that the
+projection ABOVE the `Distinct` keeps `xx.HasSoulPatch` and drops `xx.CityOfBirthName`, so the
+collection's parent rows stop being distinguishable.
+
+**So the fact being tested is not a property of the LINQ.** It is EF's identifier propagation
+through `Distinct` and through every projection above it, decided inside
+`RelationalQueryableMethodTranslatingExpressionVisitor` -- and the client does not translate. The
+server does, and the server would raise it, except that these projections are client-typed and the
+split never sends them whole. **Reverted.** The eight stay red and stay classified.
+
+**And the asymmetry is what settles it, not the difficulty.** A missed refusal leaves the status
+quo: this provider answers a query other providers reject. A FALSE refusal breaks a query that
+works everywhere, which makes this provider less capable than EF rather than more portable. A rule
+validated only by "no test in the suite contradicts it" is not validated: nothing in the suite
+projects `new { o.Id, Year = o.Date.Year }` inside a collection's `Distinct`, which is an entirely
+ordinary thing to write and which hypothesis 2 refuses.
+
+**Two rules came out of it that are cheap to apply.**
+
+  * **A `--filter` on a test name silently includes tests whose names EXTEND it and excludes
+    nothing** -- but a filter on the LONG name misses the short one. Filtering on
+    `..._also_projecting_complex_expressions` and
+    `..._without_original_identifiers` ran neither
+    `Correlated_collection_with_distinct_not_projecting_identifier_column` nor
+    `Correlated_collection_after_distinct_3_levels`, which are exactly the tests that broke.
+    **Filter by CLASS when a change could touch a family**, not by the test name you aimed at.
+  * **Read both halves of a matched pair before believing what a test name says.** Three of these
+    tests are named after the condition that does NOT cause the failure.
+
 ## The 140 remaining failures, triaged (R147, 2026-09-04)
 
 The last whole-tail re-derivation predates about twenty-five tests of movement. This one is read

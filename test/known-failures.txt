@@ -3304,5 +3304,27 @@
 # Widening this guard to reach them risks refusing ordinary queries, so they are a separate shape
 # and a separate measurement.
 
+# 2026-09-04 (R162) -- `failed` UNCHANGED at 55, `total` UNCHANGED at 29513. No code shipped.
+#
+# EIGHT FAILURES ARE RECLASSIFIED, AND THE CLASSIFICATION IS NOW EVIDENCED RATHER THAN ASSUMED.
+# The four `Correlated_collection_after_distinct_3_levels_without_original_identifiers` and four
+# `Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_ex`
+# `pressions` (TPC and TPT, sync and async) were carried as "the same family as R160, refusable the
+# same way". THEY ARE NOT REFUSABLE HERE. Three guards were built and measured; the full write-up
+# is in `docs/plans/v10/findings.md` under "A guard that cannot be written on the client".
+#
+# The short form: what EF refuses is decided by whether the identifying columns of a collection's
+# parent survive the `Distinct` AND every projection above it, which is computed during relational
+# translation. This client does not translate.
+# `Correlated_collection_after_distinct_with_complex_projection_not_containing_original_identifier`
+# is green on every relational provider with a computed member, no identifier and a projected
+# collection -- the same configuration the red ones have -- so no syntactic rule over the caller's
+# LINQ separates them. Two attempts each measured 8 fixed and 8 BROKEN at an unchanged count of 55,
+# which is the "fixed 4, broke 4" case this file's own gate exists to catch.
+#
+# THEY BELONG WITH THE OTHER "queries this provider answers that other providers do not", and
+# unlike R160's family there is no client-side way to stop answering them. Do not re-attempt
+# without a new mechanism; a fourth syntactic rule is not one.
+
 failed=55
 total=29513

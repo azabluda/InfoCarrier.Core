@@ -5103,6 +5103,34 @@ re-parents of families already running, because R25–R30 showed that is where t
       dashes and curly quotes (0). Run through the `humanizer` skill, as any user-facing edit
       here is.
 
+- [x] **R162. The `Use with caution` section goes entirely, and the guard behind it is not
+      buildable.** `website/` text only in the end; the `src/` attempt was measured and reverted.
+
+      **The owner's call on the documentation, and it corrects R161.** R161 narrowed the section
+      to the nested shape and kept it. It should not have been kept at all: what it described is a
+      RELATIONAL STORE's limitation that this provider does not share, and the page is a statement
+      of *this provider's* limitations. The page already has the right home for a query we answer
+      and others reject, one section down. R161's own example was weak evidence too -- it used a
+      SCALAR projection, `o.Lines.Select(l => l.ProductName).Distinct()`, which no test in the
+      suite pins; every red test in the family projects an anonymous type.
+
+      **The `UseNonRelationalServerStore()` row R161 added stays.** That one is ours, and it is a
+      consequence of the client having no database rather than a limitation.
+
+      **THE GUARD WAS BUILT THREE TIMES AND REVERTED.** `failed` UNCHANGED at 55, `total`
+      UNCHANGED at 29513. Two of the three measured **8 fixed and 8 BROKEN** at an unchanged
+      count, which is exactly the case `eng/measure.sh` prints names for. What EF refuses depends
+      on whether a collection's parent keeps its identifying columns through the `Distinct` and
+      through every projection above it, which is decided during relational translation; this
+      client does not translate. `docs/plans/v10/findings.md` carries the three hypotheses, the
+      pair of EF tests that kills each one, and the two transferable rules -- filter by CLASS not
+      by test name, and read both halves of a matched pair before believing what a name says.
+      `test/known-failures.txt` reclassifies the eight.
+
+      Gates: `py eng/doc-words.py --all --budget` (`limitations.md` at 689 of 750, 0 over),
+      `py eng/doc-links.py` (0 broken in 58 files), `eng/docs-serve.sh --build` clean, 0 em
+      dashes, en dashes or curly quotes.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
