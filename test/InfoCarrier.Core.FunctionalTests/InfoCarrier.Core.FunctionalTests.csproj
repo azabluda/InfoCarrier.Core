@@ -26,7 +26,7 @@
     store-neutral, and SqliteInfoCarrierTier is the per-store answer beside them.
   -->
   <PropertyGroup>
-    <Description>Functional tests for InfoCarrier.Core against both ADR-009 backing stores: InMemory (Tier A) and SQLite (Tier B).</Description>
+    <Description>Functional tests for InfoCarrier.Core against the ADR-009 backing stores: InMemory (Tier A), SQLite (Tier B) and Firebird (Tier C).</Description>
     <RootNamespace>InfoCarrier.Core.FunctionalTests</RootNamespace>
     <AssemblyName>InfoCarrier.Core.FunctionalTests</AssemblyName>
     <IsPackable>false</IsPackable>
@@ -65,6 +65,11 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <!-- ADR-009 Tier C. See Directory.Packages.props for why the engine arrives by package. -->
+    <PackageReference Include="FirebirdSql.EntityFrameworkCore.Firebird" />
+    <PackageReference Include="FirebirdDb.Embedded.NativeAssetManager" />
+    <PackageReference Include="FirebirdDb.Embedded.V5.NativeAssets.Windows.X64" />
+    <PackageReference Include="FirebirdDb.Embedded.V5.NativeAssets.Linux.X64" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

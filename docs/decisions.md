@@ -261,6 +261,51 @@ retained for Tier C.
 
 **Supersedes.** The Docker-only backend strategy in [`ci-cd.md`](ci-cd.md).
 
+### Amendment 2026-09-04 — Tier C is dropped as SQL Server and re-created as embedded Firebird
+
+**The SQL Server tier above is dropped, not deferred** (2026-08-24, owner's decision;
+[`plans/v10/roadmap.md`](plans/v10/roadmap.md), M7). What was withdrawn is a third *test tier* for
+this repository, never support for the store: the server side is an ordinary EF application and
+runs against whatever provider it references.
+
+**Tier C now means embedded Firebird, and the letter is reused deliberately.** Do not read a
+pre-2026-09-04 "Tier C" as this one; the row in the table above is the old meaning and is dead.
+
+**Why a third tier exists again.** One capability, and it is the only one that justifies the cost.
+SQLite has **no table-valued function and cannot be given one**: `Microsoft.Data.Sqlite` attaches
+scalar delegates to a connection and exposes no `sqlite3_create_module`, so there are no virtual
+tables and `SELECT ... FROM SomeFunction(...)` has no meaning. SQLite also has no `APPLY`. Between
+them those two gaps are the whole of `UdfDbFunctionTestBase` that Tier B leaves red, and EF ships
+that base for SQL Server only. Firebird has both: a *selectable stored procedure* is queried
+exactly as a table-valued function is, and `LATERAL` has been in the engine since version 4.
+
+**Why Firebird and not PostgreSQL.** PostgreSQL is the stronger store for this base on the
+evidence — Npgsql adopts it and skips 2 tests, where Firebird's own provider skips 23 — but it is
+a server process whose binaries are fetched at first run. **The constraint was no installation and
+no container**, and Firebird meets it the way SQLite does: the engine arrives as a NuGet package of
+native assets, one database is one file in the test output directory, and nothing is downloaded
+during a run. The trade was measured, not assumed.
+
+**Two things were measured before this was built, and both changed the decision.**
+
+1. **The store does everything, including what Firebird's own EF provider marks unsupported.**
+   A selectable procedure can be called with an argument from the outer table, both as
+   `FROM a, proc(a.col)` and inside a real `LATERAL` derived table.
+2. **The 14 "Not supported on Firebird" skips in that provider's suite are one SQL-generation
+   defect**, not a store limit. `FbQuerySqlGenerator` wraps a plain table as
+   `(SELECT * FROM "T") AS "t"` after `LATERAL`, because Firebird will not take a bare source
+   there, and the same branch was never added for a function. `FirebirdLateralQuerySqlGenerator`
+   in the test harness adds it, on the **server** half only, and is to be deleted when the fix
+   lands upstream.
+
+**Scope, and it is narrow.** A base belongs to exactly one tier. Only a base that *needs* a
+table-valued function or `APPLY` belongs here; everything else stays where its green already means
+something. Running a base on two tiers is duplication, not coverage.
+
+**Consequences.** The three community packages that carry the Firebird binaries are test-only and
+must never appear in `src/`. `eng/measure.sh` needs no change, because the tiers are namespaces in
+one project.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

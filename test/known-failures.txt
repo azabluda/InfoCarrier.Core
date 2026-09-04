@@ -3148,5 +3148,17 @@
 # method, it used to be run by the client and never asked the store for anything. One test fixed,
 # none broken.
 
+# 2026-09-04 (R153) -- `failed` UNCHANGED at 111, `total` RISES 29509 -> 29513, and the four are
+# ADR-009 Tier C's smoke tests. Firebird, embedded, no installation and no container: the tier
+# exists because SQLite has no table-valued function and no APPLY, which is the whole of
+# UdfDbFunctionTestBase that Tier B has to leave red. See the dated amendment to ADR-009.
+#
+# ONE OF THE FOUR PINS A DEFECT OF OURS THAT THIS TIER MADE VISIBLE. Nine failures in that class
+# were classified together as "the store has no table-valued function". Seven of them are: their
+# query root is a DbSet, they reach the store, and they answer `no such table`. TWO NEVER REACH
+# IT -- QF_Stand_Alone and QF_Stand_Alone_Parameter -- and fail with "No part of the query can be
+# executed on the server", which is this provider's boundary refusing a mapped queryable function
+# used as the ONLY query root. Only a store that HAS the function can tell the two apart.
+
 failed=111
-total=29509
+total=29513

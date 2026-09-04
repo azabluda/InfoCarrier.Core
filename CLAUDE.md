@@ -43,17 +43,34 @@ bash eng/measure.sh <label> [baseline]                   # THE SUITE: both tiers
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the whole spec suite
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.InMemory"  # Tier A only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 19 tests, separate project
 ```
 
 **THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it was two between R122 and R136.**
-`test/InfoCarrier.Core.FunctionalTests` holds both ADR-009 tiers: `InMemory/` is Tier A and
-`Sqlite/` is Tier B, and `TestUtilities/` is the harness both share. It was
+`test/InfoCarrier.Core.FunctionalTests` holds every ADR-009 tier: `InMemory/` is Tier A,
+`Sqlite/` is Tier B, `Firebird/` is Tier C since R153, and `TestUtilities/` is the harness they
+share. It was
 `test/InfoCarrier.Core.TestUtilities`, a project of its own, until R137 folded it in; by then it had
 one consumer. The split existed to keep the `InfoCarrier.Core.Relational` package off Tier A's
 compile line, and there is no such package any more. **The tiers are a namespace now, not a
 project**, so a run of one tier is a `--filter` and the suite's number is one project's.
+
+**TIER C IS EMBEDDED FIREBIRD SINCE R153, AND IT EXISTS FOR ONE CAPABILITY.** SQLite has no
+table-valued function and cannot be given one, and no `APPLY`; together those are the whole of
+`UdfDbFunctionTestBase` that Tier B has to leave red. Firebird has both, and it meets the
+no-installation and no-container bar the way SQLite does: the engine arrives as a NuGet package of
+native assets and one database is one `.fdb` file in the test output. **Only a base that NEEDS a
+table-valued function or `APPLY` belongs here.** The dated amendment to ADR-009 carries the whole
+reading, including why PostgreSQL is the better store on the evidence and was still not chosen.
+
+**`FirebirdLateralQuerySqlGenerator` corrects somebody else's bug and is deleted when they fix
+it.** The Firebird provider emits a bare function after `LATERAL`, which the store will not parse;
+it already wraps a plain *table* as `(SELECT * FROM "T") AS "t"` and simply never added the branch
+for a function. That one defect is what its own suite records as fourteen "Not supported on
+Firebird" skips. The correction lives on the **server** half of the harness, because the server is
+an ordinary EF application and the SQL is its provider's; nothing in `src/` knows about it.
 
 **EVERY CLIENT IS RELATIONAL SINCE R135, ON BOTH TIERS, AND THERE IS NO OPT-IN LEFT.**
 `AddEntityFrameworkInfoCarrier` registers the relational half unconditionally: EF's relational
@@ -156,7 +173,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
   hides `1 Error(s)`, which is how three successive "nothing logged" results were each read as a
   clearance while every run used a stale binary.
 - **"EF ships no InMemory test for this base" means move it to Tier B, not drop it.** ADR-009 has
-  two tiers precisely because InMemory cannot host everything, and a base adopted on the wrong one
+  three tiers precisely because InMemory cannot host everything, and a base adopted on the wrong one
   produces failures that describe the *backing store* rather than this provider. Only "EF ships no
   test for it on any store we have" justifies leaving a base unadopted. The tell: **if adopting a
   base means writing a workaround for a store capability the base assumes, check the tier before
@@ -307,7 +324,8 @@ remote cancel signal (W6)**, and it is now the only work left in the whole roadm
 **M7's SQL Server tier is DROPPED (2026-08-24, owner's decision), not deferred.** What is withdrawn
 is a *third test tier* for this repository's suite, never support for the store: the server side is
 an ordinary EF application and runs against whatever provider it references, so requirements §5 is
-unaffected and ADR-009 keeps its two tiers. **The cost is smaller than it first looks and is stated
+unaffected. **The letter C was reused on 2026-09-04 for embedded Firebird** and does not mean SQL
+Server any more (ADR-009's dated amendment); nothing about the drop above changed. **The cost is smaller than it first looks and is stated
 per feature in `roadmap.md`, because a first reading of it lumped four features together and was
 too broad for three of them.** Computed columns, sequences and `rowversion` all reduce, on this
 side of the wire, to mechanisms with direct green coverage: store-generated values

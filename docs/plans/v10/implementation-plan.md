@@ -4820,6 +4820,65 @@ re-parents of families already running, because R25–R30 showed that is where t
       what it does not have. With the SQL Server tier dropped by the owner's decision, this base has
       no store here that can host all of it.
 
+- [x] **R152. The store defines the instance-mapped scalar function.** `test/` change, so
+      `eng/measure.sh` alone. **`failed` 112 -> 111**, `total` unchanged at 29509. FIXED one,
+      BROKEN none.
+
+      `UDFSqlContext.StringLength` is mapped with `HasDbFunction` on a non-static method. Until the
+      step above, its receiver held the live client context, which no wire carries, so the client
+      ran the method and never asked the store for anything. The call arrives at the server now,
+      and the server answered `no such function: StringLength`. Defining it on the connection,
+      beside the eight scalars already there, is the whole change.
+
+      **The plan checkbox was written one step late**, which is the thing this file exists to
+      prevent. Recorded here rather than quietly backdated.
+
+- [x] **R153. ADR-009 gains Tier C: embedded Firebird, for the table-valued function.** `test/`
+      and `docs/` change, so `eng/measure.sh` alone. **`failed` UNCHANGED at 111**, `total` rises
+      29509 -> 29513 (the tier's four smoke tests, all green), FIXED none, BROKEN none, REASONS
+      unchanged.
+
+      **The tier exists for one capability.** SQLite has no table-valued function and cannot be
+      given one: `Microsoft.Data.Sqlite` attaches scalar delegates to a connection and exposes no
+      `sqlite3_create_module`, so there are no virtual tables and `SELECT ... FROM SomeFunction()`
+      has no meaning. It has no `APPLY` either. Those two gaps are the whole of
+      `UdfDbFunctionTestBase` Tier B leaves red, and EF ships that base for SQL Server only.
+
+      **PostgreSQL is the better store on the evidence and was not chosen.** Npgsql adopts the base
+      and skips 2 tests where Firebird's provider skips 23. But PostgreSQL is a server process
+      whose binaries are fetched at first run, and the constraint was **no installation and no
+      container**. Firebird meets it the way SQLite does: the engine arrives as a NuGet package of
+      native assets, one database is one `.fdb` file in the test output, and nothing is downloaded
+      during a run. ADR-009's dated amendment carries the full reading.
+
+      **TWO THINGS WERE MEASURED BEFORE ANY OF THIS WAS WRITTEN, and both changed the decision.**
+      A spike outside the repository established, first, that the STORE does everything: a
+      selectable stored procedure takes an argument from the outer table, both as
+      `FROM a, proc(a.col)` and inside a real `LATERAL` derived table. Second, that the 14
+      "Not supported on Firebird" skips in that provider's own suite are **one SQL-generation
+      defect**. `FbQuerySqlGenerator` wraps a plain table as `(SELECT * FROM "T") AS "t"` after
+      `LATERAL`, because Firebird will not take a bare source there, and the branch was never added
+      for a function. `FirebirdLateralQuerySqlGenerator` adds it in eleven lines.
+
+      **The correction is on the SERVER half and nothing in `src/` knows about it.** It could not
+      go on the options: EF refuses `ReplaceService` beside `UseInternalServiceProvider`, which
+      this harness uses, so it is a `RemoveAll` plus an `AddSingleton` on the server's service
+      collection. Delete the file when the fix lands upstream.
+
+      **THE SMOKE TEST CORRECTED A CLASSIFICATION ON ITS FIRST RUN, which is the whole argument for
+      the tier.** R151 above ends "what is left in that class is a store limitation". That is true
+      of seven of the nine and false of two. `QF_Stand_Alone` and `QF_Stand_Alone_Parameter` fail
+      with **"No part of the query can be executed on the server"**: a mapped queryable function
+      used as the ONLY query root is refused by `ServerBoundaryAnalyzer`, which sees a tree of
+      wholly expressible nodes and no query root in it. The correlated form works, because there
+      the root is a `DbSet` and the call is only a node inside it. The fourth smoke test pins the
+      refusal with the assertion it should one day carry written out beside it.
+
+      **The rule this produces: two failures with the same cause in mind can have different causes
+      in fact, and only a store that HAS the capability can tell them apart.** A store gap and a
+      boundary refusal both read as "the table-valued function does not work" until one of them
+      stops being a gap.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
