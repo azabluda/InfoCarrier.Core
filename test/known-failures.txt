@@ -3083,6 +3083,31 @@
 # **The condition that reopens it**: if this provider ever offers a narrower client model as a
 # feature -- "hide these columns from the client" -- the guard becomes a prerequisite and the price
 # is already known.
+#
+# 2026-09-04 (R149) -- `failed` FALLS 140 -> 132, `total` UNCHANGED at 29509. FIXED eight, BROKEN
+# none, names file refreshed. **THE WIRE FORMAT GAINED A FIELD** (owner's approval, 2026-09-04):
+# `QueryDataRequest.SplitQueryBehavior`.
+#
+# `AsSplitQuery` and `AsSingleQuery` are still stripped from the captured tree before the boundary
+# is drawn, and that stripping is not the mistake it looks like: leaving the hint in place measured
+# 236 failures of 326 across the three split-query specification classes, because the hint lands in
+# the CLIENT residual where EF's own method returns its source untouched. **None of that says the
+# server should not be told.** The hint now travels beside the tree, and
+# `ServerQueryExecutor.ApplySplitQueryBehavior` re-applies it to the rebuilt query where a real
+# relational provider can honour it. Optional field: an older client omits it and the server reads
+# null, which is exactly the behaviour that client had.
+#
+# The eight fixed are `Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_split`
+# across four many-to-many classes. SQLite refuses `APPLY`; a real split query never asks for it.
+#
+# **EIGHT OVERRIDES OF OURS WERE DELETED WITH IT, in two classes**, and the class remark had
+# predicted exactly that: it called them "the measured cost of not splitting". EF's own SQLite split
+# classes do not override them either. An override of ours that EF does not have is a workaround to
+# delete once the limitation goes.
+#
+# Trim `ours` 89 -> 90, a deliberate rise recorded in `eng/trim-baseline.txt`: one IL2060 for the
+# `MakeGenericMethod` the generic hint needs. Two further warnings the first attempts cost were
+# avoidable and were avoided.
 
-failed=140
+failed=132
 total=29509

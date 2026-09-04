@@ -113,6 +113,22 @@
 # keeps it almost whole at 2.079 MB against 2.09 MB on disk. The decision weighed that against 262
 # of 20,368 tests lost without it. **This file is not the place that decides it**; the supersession
 # in `architecture.md` is, and it lists the three conditions that would reverse it.
+# 2026-09-04 (R149) -- `ours` 89 -> 90, A DELIBERATE RISE OF ONE, and it is the same premise this
+# file has described since it was written. The split-query hint now travels beside the tree on
+# `QueryDataRequest.SplitQueryBehavior`, and `ServerQueryExecutor.ApplySplitQueryBehavior` re-applies
+# it to the rebuilt query. `AsSplitQuery<TEntity>` is generic and the element type is whatever the
+# caller's model named, so the call dispatches through `MakeGenericMethod`: IL2060, one unique
+# diagnostic, in a method that already sits beside two others of exactly this shape.
+#
+# TWO OF THE THREE WARNINGS IT FIRST COST WERE AVOIDABLE AND WERE AVOIDED, which is the part worth
+# keeping. The first version looked the methods up with `GetMethod(name)`, invisible to the trimmer
+# and worth two IL2xxx on its own; taking them from a delegate over the method instead is an
+# ordinary reference the trimmer sees and says nothing about. The second version added its own
+# `Type.GetInterfaces()` walker and cost an IL2070; reusing this class's existing `GetElementType`,
+# already counted here, costs nothing. So of three, two were avoidable and one is the premise.
+#
+# `total` is unchanged at 1134. It buys eight specification tests: SQLite refuses `APPLY`, and a
+# real split query never asks for it.
 
-ours=89
+ours=90
 total=1134

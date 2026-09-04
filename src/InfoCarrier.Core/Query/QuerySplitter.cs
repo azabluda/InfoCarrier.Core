@@ -37,7 +37,22 @@ public sealed class QuerySplitter
     private const string RelationalQueryableExtensionsFullName
         = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions";
 
-    private static readonly HashSet<string> SplitHints = ["AsSplitQuery", "AsSingleQuery"];
+    private const string AsSplitQueryName = "AsSplitQuery";
+
+    private static readonly HashSet<string> SplitHints = [AsSplitQueryName, "AsSingleQuery"];
+
+    /// <summary>
+    ///     What the last <see cref="Split" /> found the query asking for, or
+    ///     <see langword="null" /> when it asked for nothing.
+    /// </summary>
+    /// <remarks>
+    ///     <b>A property rather than another value on <c>SplitQuery</c></b>, because
+    ///     <c>SplitQuery</c>'s constructor shipped in <c>10.0.0</c> and adding a parameter to it
+    ///     would be a binary break that package validation reports as <c>CP0002</c>. A splitter is
+    ///     built per execution and <see cref="Split" /> is called once on it, so a property is as
+    ///     well scoped as a return value here.
+    /// </remarks>
+    public QuerySplittingBehavior? SplitQueryBehavior { get; private set; }
 
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
@@ -145,7 +160,13 @@ public sealed class QuerySplitter
         // `*SplitQueryRelationalTestBase` classes, which insert the hint at every root: 456 of 638
         // failing, 106 of them this provider's own "reads navigation X, but no query sent to the
         // server returned it", and the rest wrong answers.
-        query = new SplitHintStrippingVisitor().Visit(query)!;
+        // STRIPPED FROM THE TREE AND CARRIED ON THE REQUEST INSTEAD (R149). Everything above is
+        // why it cannot stay in the tree; none of it says the server should not be told. The
+        // server is the half with a relational provider, so it is the half that can honour the
+        // hint, and `QueryDataRequest.SplitQueryBehavior` is how it hears about it.
+        var splitHints = new SplitHintStrippingVisitor();
+        query = splitHints.Visit(query)!;
+        SplitQueryBehavior = splitHints.Behavior;
 
         query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
 
@@ -970,13 +991,38 @@ public sealed class QuerySplitter
 
     private sealed class SplitHintStrippingVisitor : ExpressionVisitor
     {
+        /// <summary>
+        ///     What the query asked for, or <see langword="null" /> when it said nothing.
+        /// </summary>
+        /// <remarks>
+        ///     <b>Stripped from the tree and carried on the request instead.</b> The hint cannot
+        ///     travel inside the tree -- see the call site for the 456 tests that proved it -- but
+        ///     it is the SERVER's business, and the server is the half with a relational provider
+        ///     that can honour it. Recording it here is what lets
+        ///     <c>QueryDataRequest.SplitQueryBehavior</c> carry it.
+        /// </remarks>
+        public QuerySplittingBehavior? Behavior { get; private set; }
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
-            => node.Method.IsStatic
+        {
+            if (node.Method.IsStatic
                 && node.Arguments.Count == 1
                 && SplitHints.Contains(node.Method.Name)
-                && node.Method.DeclaringType?.FullName == RelationalQueryableExtensionsFullName
-                    ? Visit(node.Arguments[0])
-                    : base.VisitMethodCall(node);
+                && node.Method.DeclaringType?.FullName == RelationalQueryableExtensionsFullName)
+            {
+                // THE INNERMOST HINT WINS, because this walk reaches the outer call first and the
+                // recursion below overwrites what it recorded. That is EF's own rule: its
+                // preprocessor lifts the hint out of the tree and applies it to the whole query,
+                // and where a query carries more than one, the one nearest the root decides.
+                Behavior = node.Method.Name == AsSplitQueryName
+                    ? QuerySplittingBehavior.SplitQuery
+                    : QuerySplittingBehavior.SingleQuery;
+
+                return Visit(node.Arguments[0]);
+            }
+
+            return base.VisitMethodCall(node);
+        }
     }
 
     private sealed class MarkerStrippingVisitor : ExpressionVisitor

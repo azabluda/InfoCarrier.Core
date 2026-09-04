@@ -253,20 +253,23 @@ public class ComplexNavigationsCollectionsQueryInfoCarrierTest(ComplexNavigation
 /// <remarks>
 ///     <para>
 ///         The base injects the hint through <c>RewriteServerQueryExpression</c>, so all
-///         23 of its tests run it. This provider does not split: <c>QuerySplitter</c>
-///         removes the hint before the boundary analysis, so what the server receives is the same
-///         single query the class above sends. The answers are therefore identical, which is why
-///         nearly every override here is the one the class above already carries.
+///         23 of its tests run it. <b>This provider splits since R149</b>:
+///         <c>QuerySplitter</c> still removes the hint before the boundary analysis -- it cannot
+///         travel inside the tree -- but it now travels BESIDE it on
+///         <c>QueryDataRequest.SplitQueryBehavior</c>, and <c>ServerQueryExecutor</c> re-applies it
+///         to the rebuilt query where a real relational provider can honour it.
 ///     </para>
 ///     <para>
-///         <b>4 of them are not, and they are the measured cost of not splitting.</b>
-///         EF's own <c>ComplexNavigationsCollectionsSplitQuerySqliteTest</c> does not override
-///         <c>Filtered_include_after_different_filtered_include_different_level</c>, <c>Filtered_include_complex_three_level_with_middle_having_filter1</c>, <c>Filtered_include_complex_three_level_with_middle_having_filter2</c>, <c>Skip_Take_on_grouping_element_with_collection_include</c> — a real split query fetches those
-///         collections in a second statement and never asks for <c>APPLY</c>. A single statement
-///         does, so SQLite refuses them here exactly as it refuses them for the unsplit class,
-///         and each override is the one EF's own <em>unsplit</em> SQLite class carries for the
-///         same test. The store's answer is the same; only the number of statements differs.
-///     </para>
+///         <b>Four overrides were deleted when that landed, and the paragraph they replace had
+///         predicted it.</b> It read: "4 of them are the measured cost of not splitting -- a real
+///         split query fetches those collections in a second statement and never asks for
+///         <c>APPLY</c>". The second statement is real now, so
+///         <c>Filtered_include_after_different_filtered_include_different_level</c>,
+///         <c>Filtered_include_complex_three_level_with_middle_having_filter1</c>,
+///         <c>Filtered_include_complex_three_level_with_middle_having_filter2</c> and
+///         <c>Skip_Take_on_grouping_element_with_collection_include</c> pass, and EF's own SQLite
+///         split class does not override them either. <b>An override of ours that EF does not have
+///         is a workaround to delete once the limitation goes</b>, and this is that.
 ///     <para>
 ///         <b>One of EF's overrides is deliberately absent</b>, as in the unsplit class:
 ///         <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> passes
@@ -303,24 +306,9 @@ public class ComplexNavigationsCollectionsSplitQueryInfoCarrierTest(ComplexNavig
             () => base.Filtered_include_Take_with_another_Take_on_top_level(async));
 
     /// <inheritdoc />
-    public override Task Filtered_include_after_different_filtered_include_different_level(bool async)
-        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
-            () => base.Filtered_include_after_different_filtered_include_different_level(async));
-
-    /// <inheritdoc />
     public override Task Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(bool async)
         => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(async));
-
-    /// <inheritdoc />
-    public override Task Filtered_include_complex_three_level_with_middle_having_filter1(bool async)
-        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
-            () => base.Filtered_include_complex_three_level_with_middle_having_filter1(async));
-
-    /// <inheritdoc />
-    public override Task Filtered_include_complex_three_level_with_middle_having_filter2(bool async)
-        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
-            () => base.Filtered_include_complex_three_level_with_middle_having_filter2(async));
 
     /// <inheritdoc />
     public override Task Filtered_include_multiple_multi_level_includes_with_first_level_using_filter_include_on_one_of_the_chains_only(
@@ -383,11 +371,6 @@ public class ComplexNavigationsCollectionsSplitQueryInfoCarrierTest(ComplexNavig
     public override Task Skip_Take_on_grouping_element_inside_collection_projection(bool async)
         => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Skip_Take_on_grouping_element_inside_collection_projection(async));
-
-    /// <inheritdoc />
-    public override Task Skip_Take_on_grouping_element_with_collection_include(bool async)
-        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
-            () => base.Skip_Take_on_grouping_element_with_collection_include(async));
 
     /// <inheritdoc />
     public override Task Skip_Take_on_grouping_element_with_reference_include(bool async)

@@ -4747,6 +4747,44 @@ re-parents of families already running, because R25–R30 showed that is where t
       **The rule this produces.** An assertion's failure message says what the code under it did. I
       was about to spend a suite run re-obtaining what the message already stated.
 
+- [x] **R149. The split-query hint crosses the wire, so the server can honour it.** `src/` change
+      and a **wire-format change** (owner's approval, 2026-09-04), so `eng/measure.sh`,
+      `eng/trim-ratchet.sh` and `dotnet pack`. **`failed` FALLS 140 -> 132**, `total` UNCHANGED at
+      29509. FIXED eight, BROKEN none. Trim `ours` 89 -> 90, recorded in `eng/trim-baseline.txt`.
+      Pack clean.
+
+      **The hint is still stripped from the tree, and that stripping is not the mistake it looks
+      like.** Leaving it in was measured first, on the owner's question: **236 failures of 326**
+      across the three split-query specification classes, because the hint lands in the CLIENT
+      residual where EF's own method returns its source untouched. **None of that says the server
+      should not be told.** `QueryDataRequest.SplitQueryBehavior` carries it beside the tree, and
+      `ServerQueryExecutor.ApplySplitQueryBehavior` re-applies it to the rebuilt query. The field is
+      optional: an older client omits it and the server reads `null`, which is that client's
+      behaviour exactly.
+
+      **Position does not matter, and that is EF's rule.** Its relational preprocessor lifts the
+      marker out of the tree and applies the behaviour to the whole query. Where the outermost node
+      is a scalar -- a query ending in `Count` or `First` -- the hint goes on that operator's source
+      instead.
+
+      **THE CONSTRAINT COST 100 TESTS BEFORE IT WAS GUARDED.** `AsSplitQuery<TEntity>` is
+      `where TEntity : class`, and a server query's element type is very often a `ValueTuple`,
+      because the projection rewriter re-carries client types as tuples. `MakeGenericMethod` answers
+      that with `VerificationException`. Skipping the hint there is honest rather than a workaround:
+      a tuple-projected query is one this provider reshaped, so the hint no longer describes what
+      the caller wrote.
+
+      **EIGHT OVERRIDES OF OURS WERE DELETED WITH IT, and the class remark had predicted it.** It
+      called those four tests, in two classes, "the measured cost of not splitting -- a real split
+      query fetches those collections in a second statement and never asks for `APPLY`". The second
+      statement is real now. EF's own SQLite split classes do not override them either.
+
+      **Two of the three trim warnings the first attempts cost were avoidable and were avoided.**
+      `GetMethod(name)` is invisible to the trimmer and cost two; a delegate over the method is an
+      ordinary reference and costs none. A second `Type.GetInterfaces()` walker cost one; reusing
+      this class's existing `GetElementType` costs none. The remaining IL2060 is the premise the
+      trim baseline has described since it was written.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

@@ -36,6 +36,7 @@ internal sealed class QueryExecutor<TElement>
     private readonly IInfoCarrierClient _client;
     private readonly IExpressionSerializer _expressionSerializer;
     private readonly SplitQuery _split;
+    private readonly QuerySplittingBehavior? _splitQueryBehavior;
     private readonly QueryTrackingBehavior _trackingBehavior;
     private readonly ClientResultMaterializer _materializer;
     private readonly bool _threadSafetyChecks;
@@ -87,12 +88,18 @@ internal sealed class QueryExecutor<TElement>
             serializer.UseExecutionAllowedTypes(allowedTypes);
         }
 
-        _split = new QuerySplitter(
+        var splitter = new QuerySplitter(
             queryContext.Context.Model,
             Expressions.TypeAllowlist.ForModel(queryContext.Context.Model, allowedTypes),
             queryContext.QueryLogger,
             InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context),
-            _relationalRoots).Split(substituted);
+            _relationalRoots);
+
+        _split = splitter.Split(substituted);
+
+        // Read AFTER the split, because the splitter records it while stripping. See
+        // `QueryDataRequest.SplitQueryBehavior` for why the hint travels beside the tree.
+        _splitQueryBehavior = splitter.SplitQueryBehavior;
 
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
@@ -262,6 +269,9 @@ internal sealed class QueryExecutor<TElement>
             IsAsync = async,
             ReturnsSingleResult = serverQuery.ReturnsSingleResult,
             TransactionId = InfoCarrierDatabase.ServerTransactionId(_queryContext.Context),
+
+            // Stripped from the tree by the splitter and carried here instead. See the property.
+            SplitQueryBehavior = _splitQueryBehavior,
         };
     }
 

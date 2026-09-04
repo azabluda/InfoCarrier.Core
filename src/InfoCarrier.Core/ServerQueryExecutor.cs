@@ -83,6 +83,11 @@ public class ServerQueryExecutor(
             ExpressionNode node = DeserializeNode(request.SerializedQuery);
             Expression query = Rebind(node);
 
+            // The client stripped `AsSplitQuery`/`AsSingleQuery` before drawing the boundary and
+            // sent what it stripped beside the tree. Put it back, here, where a real relational
+            // provider can act on it.
+            query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
+
             // The query is read for the entity types its rows carry: an owned or shared-type value
             // projected directly has no other name (A56). Read before execution, because it also
             // decides whether this query can be tracked at all.
@@ -272,6 +277,88 @@ public class ServerQueryExecutor(
                 + "applied to such a query.");
         }
     }
+
+    /// <summary>
+    ///     Re-applies the split-query hint the client stripped, when this server's store can
+    ///     honour it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Position does not matter, and that is EF's rule rather than a convenience.</b>
+    ///         <c>AsSplitQuery</c> is a marker: EF's relational preprocessor lifts it out of the
+    ///         tree and applies the behaviour to the WHOLE query, wherever the call sat. So
+    ///         wrapping the outermost queryable says the same thing the client said.
+    ///     </para>
+    ///     <para>
+    ///         <b>The outermost node is not always a queryable.</b> A query ending in a terminal
+    ///         operator -- <c>Count</c>, <c>First</c> -- is typed as its scalar result, and
+    ///         <c>AsSplitQuery&lt;T&gt;</c> will not bind to that. Where the operator's source is
+    ///         still a queryable, the hint goes there instead, which is where the caller wrote it.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only where the store is relational.</b> <c>AsSplitQuery</c> means nothing to a
+    ///         non-relational provider, and this provider's whole point is that the server runs
+    ///         whatever provider it references. A hint from a client whose backing store turned out
+    ///         not to be relational is dropped rather than forced.
+    ///     </para>
+    /// </remarks>
+    private Expression ApplySplitQueryBehavior(Expression query, QuerySplittingBehavior? behavior)
+    {
+        if (behavior is null || !_context.Database.IsRelational())
+        {
+            return query;
+        }
+
+        if (HintableElementType(query.Type) is { } elementType)
+        {
+            return Expression.Call(HintMethod(behavior.Value, elementType), query);
+        }
+
+        if (query is MethodCallExpression { Arguments.Count: > 0 } call
+            && HintableElementType(call.Arguments[0].Type) is { } sourceElementType)
+        {
+            Expression[] arguments = [.. call.Arguments];
+            arguments[0] = Expression.Call(HintMethod(behavior.Value, sourceElementType), arguments[0]);
+            return call.Update(call.Object, arguments);
+        }
+
+        return query;
+
+        // `GetElementType` is this class's own walker and is already counted by the trim ratchet;
+        // a second one of the same shape would have added an IL2070 for nothing. It answers the
+        // type itself when the type is not a sequence, which is the "not a queryable" case here.
+        //
+        // The value-type test is the generic constraint: `AsSplitQuery<TEntity>` and
+        // `AsSingleQuery<TEntity>` are `where TEntity : class`, and a server query's element type
+        // is very often a `ValueTuple`, because the projection rewriter re-carries the client's
+        // own types as tuples so the operators above them stay on the server. Handing one to
+        // `MakeGenericMethod` throws `VerificationException: violates the constraint of type
+        // parameter 'TEntity'`, which took 100 of the 326 split-query specification tests before
+        // this guard existed. Skipping is honest rather than a workaround: a tuple-projected query
+        // is one this provider reshaped, so the hint no longer describes what the caller wrote.
+        static Type? HintableElementType(Type type)
+            => GetElementType(type) is { } element && element != type && !element.IsValueType
+                ? element
+                : null;
+
+        static MethodInfo HintMethod(QuerySplittingBehavior behavior, Type elementType)
+            => (behavior == QuerySplittingBehavior.SplitQuery ? AsSplitQueryMethod : AsSingleQueryMethod)
+                .MakeGenericMethod(elementType);
+    }
+
+    // TAKEN FROM A DELEGATE RATHER THAN FROM `GetMethod(name)`, and the trim ratchet is why.
+    // A string lookup is invisible to the trimmer, which answered it with two IL2xxx warnings and
+    // took this product's count from 89 to 91. A delegate over the method is an ordinary reference:
+    // the trimmer sees it, keeps it, and says nothing. The generic argument is only a placeholder
+    // -- `GetGenericMethodDefinition` throws it away -- and `object` is used because both methods
+    // are constrained `where TEntity : class`.
+    private static readonly MethodInfo AsSplitQueryMethod =
+        new Func<IQueryable<object>, IQueryable<object>>(RelationalQueryableExtensions.AsSplitQuery)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo AsSingleQueryMethod =
+        new Func<IQueryable<object>, IQueryable<object>>(RelationalQueryableExtensions.AsSingleQuery)
+            .Method.GetGenericMethodDefinition();
 
     private Task<object?> ExecuteQueryAsync(Expression query, QueryDataRequest request, CancellationToken cancellationToken)
     {
