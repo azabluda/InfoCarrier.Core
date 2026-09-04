@@ -5211,6 +5211,35 @@ re-parents of families already running, because R25–R30 showed that is where t
       exercises -- so there is nothing to validate a guard against.
       `docs/plans/v10/findings.md` carries the general rule the three guards produced.
 
+- [x] **R166. `eng/usage-window.sh` is deleted.** `eng/` and `CLAUDE.md` text only, so no gate.
+      The script reported how much of the usage window was gone by running
+      `claude -p "/usage"`, which starts a session of its own, so asking the question spent the
+      budget the answer was about. Owner's instruction. The concern it served is met by staying at
+      committed, green states instead.
+
+- [x] **R167. The tail re-triaged at 47, and two classes were misfiled.** `test/` text only.
+      Thirteen classes, adding to 47.
+
+      **The four `Bad_data_error_handling_null*` are not a message-text difference.** They sat in
+      that class and the two strings are different DIAGNOSES: EF reports a null read on
+      `Product.Discontinued`, this provider reports `CategoryID` as a missing REQUIRED column. The
+      test's SQL omits four mapped columns, and every one of them is optional -- `CategoryID`,
+      `UnitsOnOrder` and `ReorderLevel` are nullable and `QuantityPerUnit` is a `string` -- so a
+      relational `FromSql` shaper tolerates their absence. Something here treats an optional
+      property as required, which is a requiredness disagreement between two models built by two
+      providers. **Not localised yet**: the failure carries no inner stack, so it does not cross
+      the fault path, and a model dump on both sides is the next step. A `FromSql` selecting a
+      subset of columns fails here and works on EF, so this is a defect and a documentable
+      limitation, not wording.
+
+      **The three `Contains_with_*` are an upstream EF defect surfacing differently.** EF's own
+      relational base carries this provider's exception message in a comment directly above
+      `Assert.ThrowsAsync<KeyNotFoundException>`. Both sides hit the same defect, `Contains` over
+      an owned-JSON nested collection reaching a shadow foreign key with no backing field; EF's
+      pipeline raises `KeyNotFoundException` and this one raises the `InvalidOperationException`
+      EF's comment identifies as the cause. **Do not raise `KeyNotFoundException` to match** --
+      that reproduces another product's bug deliberately.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

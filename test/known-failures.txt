@@ -3476,5 +3476,70 @@
 # CONSTANT key of an unmapped type, which no test in the suite exercises -- so there is nothing to
 # validate a guard against, and none was written.
 
+# 2026-09-04 (R167) -- THE TAIL RE-TRIAGED AT 47. `failed` and `total` unchanged; no code.
+#
+# Thirteen classes now, and they add to 47: 4+4+4+8+5+1+3+4+5+4+2+2+1. Three classes changed for
+# a reason other than R164 and R165 fixing eight tests, and TWO OF THE THREE WERE MISFILED.
+#
+# --- WHAT R164 AND R165 REMOVED -----------------------------------------------------------------
+# Class 4 ("we answer a query relational providers refuse, collection family") falls 16 -> 8. The 4
+# `Correlated_collection_order_by_constant_null_of_non_mapped_type` and the 4
+# `Where_coalesce_with_anonymous_types` were never portability items: each made the server return
+# the WHOLE TABLE. Both are refused now. What is left in the class is the eight R162 closed as not
+# refusable from the client.
+#
+# --- MISFILED 1: THE FOUR `Bad_data_error_handling_null*` ARE NOT MESSAGE TEXT (4) ---------------
+# 2 `Bad_data_error_handling_null`, 2 `Bad_data_error_handling_null_no_tracking`. They sat in the
+# "exception message text differs" class. THE TWO MESSAGES ARE DIFFERENT DIAGNOSES, NOT DIFFERENT
+# WORDINGS.
+#
+#   expected: "An error occurred while reading a database value ..."   (Product.Discontinued, bool)
+#   actual:   "The required column 'CategoryID' was not present in the results of a 'FromSql' ..."
+#
+# The test's SQL is
+# `SELECT [ProductID], [ProductName], [SupplierID], [UnitPrice], [UnitsInStock], NULL AS
+# [Discontinued] FROM [Products]`, so it omits four mapped columns and sets a non-nullable one to
+# NULL. EF reaches materialization and reports the null. This provider stops earlier and reports a
+# missing column.
+#
+# THE OMITTED COLUMNS ARE ALL OPTIONAL, WHICH IS THE POINT. `Product.CategoryID` is `int?`, and so
+# are `UnitsOnOrder` and `ReorderLevel`; `QuantityPerUnit` is a `string`. EF's message says "the
+# REQUIRED column", and a relational `FromSql` shaper tolerates an absent column for an optional
+# property. So something on this side treats an optional property as required, which is a
+# REQUIREDNESS DISAGREEMENT between two models built by two providers -- the class of defect
+# CLAUDE.md warns about under "anything the wire computes from a type mapping is computed twice".
+#
+# NOT LOCALISED YET. The failure carries no inner stack, so it is raised without crossing the
+# fault path -- unlike the class below, whose stack shows `TransportInfoCarrierClient`. Whether the
+# client or the server decides `CategoryID` is required is the next question, and a model dump on
+# both sides answers it. What is already established is that this is a DEFECT and not a wording
+# difference: a `FromSql` that selects a subset of columns fails here and works on EF.
+#
+# --- MISFILED 2: THE THREE `Contains_with_*` ARE AN UPSTREAM EF DEFECT (3) -----------------------
+# `Contains_with_parameter`, `Contains_with_nested_and_composed_operators`,
+# `Contains_with_operators_composed_on_the_collection`, all in
+# `OwnedJsonStructuralEqualityQueryInfoCarrierTest`. Expected `KeyNotFoundException`, actual
+# `InvalidOperationException`.
+#
+# EF'S OWN BASE NAMES OUR EXCEPTION IN A COMMENT ABOVE THE ASSERTION:
+#
+#   // No backing field could be found for property 'RootEntity.RequiredRelated#RelatedType
+#   //   .NestedCollection#NestedType.RelatedTypeRootEntityId' and the property does not have a getter.
+#   await Assert.ThrowsAsync<KeyNotFoundException>(base.Contains_with_parameter);
+#
+# That comment is this provider's message, word for word. So both sides hit the SAME upstream
+# defect -- `Contains` over an owned-JSON nested collection reaching a shadow foreign key with no
+# backing field -- and EF's pipeline happens to surface it as `KeyNotFoundException` while ours
+# surfaces the `InvalidOperationException` EF's own comment identifies as the cause. Ours is the
+# more accurate symptom. **Do not "fix" this by raising `KeyNotFoundException`**: that would
+# reproduce another product's bug on purpose. Reclassified from "owned JSON structural equality,
+# wrong exception type" to "upstream EF defect, different symptom", and it leaves
+# `Associate_with_parameter_null` alone in the old class.
+#
+# --- THE OTHER CLASSES ARE UNCHANGED FROM THE R163 ENTRY ABOVE ----------------------------------
+# 4 no `DbConnection`; 4 client type mapping is not a `RelationalTypeMapping`; 4 relational-specific
+# methods on the facade; 5 "we answer, other"; 4 model building needs one context; 5 message text
+# (the four above having left); 2 wrong answer; 2 upstream property-bag defect; 1 on its own.
+
 failed=47
 total=29513
