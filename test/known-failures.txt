@@ -3700,5 +3700,42 @@
 # and `ValidateBoolsWithDefaults`, both of which compare or generate store types. A client with no
 # store cannot supply any of it. Same wall as `FromSqlRaw_queryable_simple_projection_composed`.
 
+# 2026-09-04 (R171) -- `failed` AND `total` UNCHANGED at 41 / 29513, and the failing NAMES are
+# byte-identical to the baseline. The reason behind two of them changed and the state did not, so
+# this entry exists to say what the message is now and why the two tests are still red.
+#
+# A BULK OPERATION NOW GETS EF'S OTHER WORDING. EF raises `NonQueryTranslationFailed*` for
+# `ExecuteUpdate` and `ExecuteDelete` and `TranslationFailed*` for a query; the two differ in the
+# closing sentence, because the query form offers `AsEnumerable` and a bulk operation has no such
+# offer. `NorthwindBulkUpdatesRelationalTestBase.AssertTranslationFailed` builds
+# `CoreStrings.NonQueryTranslationFailedWithDetails("", details)[21..]` and searches for it, so the
+# closing sentence is inside what it compares. Only the `WithDetails` form is switched, because
+# `CoreStrings` ships no detail-less `NonQueryTranslationFailed` and with nothing to add the two
+# messages would be the same string.
+#
+# AND THE DETAILS CLAUSE NOW NAMES THE OFFENDING LAMBDA. `SetProperty(e => e.MaybeScalar(...), v)`
+# used to be refused with "translation of method 'MaybeScalar' failed", which is true and is not
+# what EF says: EF answers `RelationalStrings.InvalidPropertyInSetProperty` and names the argument,
+# because the argument is the caller's mistake. The setters arrive as
+# `new ITuple[]{ new Tuple<Delegate, object>(selector, value), ... }` -- MEASURED with a probe on
+# the refusal path, not guessed, which is where the reverted R169 attempt stopped.
+#
+# --- WHY THE TWO TESTS ARE STILL RED, AND IT IS A BOUND VARIABLE'S NAME ------------------------
+# The spec base compares against the message built over `(OrderDetail o) => o.MaybeScalar(e => e.OrderID)`
+# and the caller wrote `e => e.MaybeScalar(e => e.OrderID)`. The `o` is EF's own:
+# `NavigationExpandingExpressionVisitor.CreateNavigationExpansionExpression` renames the query's
+# parameter to `entityType.ShortName()[0].ToString().ToLowerInvariant()`, and renames the WHOLE
+# query. This provider refuses before any of EF's pipeline runs (ADR-006), so it has the caller's
+# names and nothing else.
+#
+# RENAMING JUST THE SELECTOR WOULD PASS THE TEST AND MAKE THE MESSAGE DISAGREE WITH ITSELF: the
+# query printed beside it still says `od => od.OrderID < 10250`, because that half is the caller's
+# too. One lambda named EF's way and the next named the caller's way is worse for a reader than
+# both named the caller's way. Declined on that ground, not on cost.
+#
+# The class is therefore MESSAGE TEXT (4), all four now priced: two here, `Throws_when_orderby_multiple`
+# (R138's family, sixteen tests) and `Casts_are_removed_from_expression_tree_when_redundant`
+# (printing the whole chain would change every refusal message in the suite).
+
 failed=41
 total=29513

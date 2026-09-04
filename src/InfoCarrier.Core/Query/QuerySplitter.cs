@@ -806,11 +806,143 @@ public sealed class QuerySplitter
         // re-reading a failure rather than by reading this code.
         string printed = Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(offender);
 
+        // A BULK OPERATION GETS EF'S OTHER WORDING, and until R171 it got the query one. EF raises
+        // `NonQueryTranslationFailed*` for `ExecuteUpdate` and `ExecuteDelete` and
+        // `TranslationFailed*` for a query, and the two differ in their closing sentence: the
+        // query form offers `AsEnumerable`, which is not on offer for a bulk operation. The spec
+        // suite asserts the difference exactly — `NorthwindBulkUpdatesRelationalTestBase`'s
+        // `AssertTranslationFailed` builds
+        // `CoreStrings.NonQueryTranslationFailedWithDetails("", details)[21..]` and looks for it in
+        // the message, so the closing sentence is inside what it compares.
+        //
+        // ONLY THE `WithDetails` FORM IS SWITCHED, because `CoreStrings` ships no detail-less
+        // `NonQueryTranslationFailed`. That is not a gap to work around: with nothing to add, the
+        // two messages would be the same string anyway.
+        if (serverStoreIsRelational
+            && offender is MethodCallExpression bulk
+            && bulk.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
+            && bulk.Method.Name is nameof(EntityFrameworkQueryableExtensions.ExecuteUpdate)
+                or nameof(EntityFrameworkQueryableExtensions.ExecuteUpdateAsync)
+                or nameof(EntityFrameworkQueryableExtensions.ExecuteDelete)
+                or nameof(EntityFrameworkQueryableExtensions.ExecuteDeleteAsync))
+        {
+            details = InvalidSetPropertySelector(bulk) ?? details;
+
+            if (details is not null)
+            {
+                throw new InvalidOperationException(
+                    Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings
+                        .NonQueryTranslationFailedWithDetails(printed, details));
+            }
+        }
+
         throw new InvalidOperationException(
             details is null
                 ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(printed)
                 : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
                     printed, details));
+    }
+
+    /// <summary>
+    ///     EF's details clause for an <c>ExecuteUpdate</c> whose <c>SetProperty</c> selector names
+    ///     something other than a property, or <see langword="null" /> when every selector is one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>SetProperty(e =&gt; e.MaybeScalar(x =&gt; x.OrderID), 10300)</c> names a METHOD
+    ///         CALL where <c>ExecuteUpdate</c> requires a property. This provider refused the query
+    ///         already, and said the method could not be translated — true, and not what EF says.
+    ///         EF names the offending lambda, because the caller's mistake is the argument and not
+    ///         the method inside it.
+    ///     </para>
+    ///     <para>
+    ///         <b>The setters arrive as a tuple array, not as a fluent chain</b>, and this was
+    ///         measured rather than assumed (R171, a probe on the refusal path). By the time the
+    ///         split sees the call its second argument is
+    ///         <c>new ITuple[]{ new Tuple&lt;Delegate, object&gt;(e =&gt; …, value), … }</c>, so a
+    ///         selector is the first argument of each constructed tuple. The first one that is not
+    ///         a member chain is reported, because EF reports one.
+    ///     </para>
+    ///     <para>
+    ///         <b>THIS DOES NOT MAKE <c>Update_with_invalid_lambda_in_set_property_throws</c>
+    ///         PASS, AND THE REASON IS A BOUND VARIABLE'S NAME.</b> The spec base compares against
+    ///         <c>RelationalStrings.InvalidPropertyInSetProperty</c> built over
+    ///         <c>(OrderDetail o) =&gt; o.MaybeScalar(e =&gt; e.OrderID)</c>, while the caller wrote
+    ///         <c>e =&gt; e.MaybeScalar(e =&gt; e.OrderID)</c>. The <c>o</c> is EF's:
+    ///         <c>NavigationExpandingExpressionVisitor.CreateNavigationExpansionExpression</c>
+    ///         renames the query's parameter to
+    ///         <c>entityType.ShortName()[0].ToString().ToLowerInvariant()</c>, and it renames the
+    ///         whole query. This provider refuses <em>before</em> any of EF's pipeline runs
+    ///         (ADR-006), so it has the caller's own names and nothing else.
+    ///     </para>
+    ///     <para>
+    ///         Renaming just this selector would satisfy the assertion and make the message
+    ///         disagree with itself — the query printed beside it still says
+    ///         <c>od =&gt; od.OrderID &lt; 10250</c>, because that half is the caller's too. A
+    ///         message that names one lambda's parameter EF's way and the next one the caller's
+    ///         way is worse than one that is consistently the caller's, so the two tests stay red
+    ///         and this stays as it is.
+    ///     </para>
+    /// </remarks>
+    private static string? InvalidSetPropertySelector(MethodCallExpression call)
+    {
+        var tuples = new List<NewExpression>();
+        foreach (Expression argument in call.Arguments)
+        {
+            new TupleCollector(tuples).Visit(argument);
+        }
+
+        foreach (NewExpression tuple in tuples)
+        {
+            if (tuple.Arguments.Count == 0
+                || Unquote(tuple.Arguments[0]) is not LambdaExpression selector
+                || IsMemberChain(selector.Body))
+            {
+                continue;
+            }
+
+            return Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.InvalidPropertyInSetProperty(
+                Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(selector));
+        }
+
+        return null;
+
+        static Expression Unquote(Expression node)
+            => node is UnaryExpression { NodeType: ExpressionType.Quote } quote ? quote.Operand : node;
+
+        static bool IsMemberChain(Expression body)
+        {
+            Expression? node = body;
+            while (node is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+            {
+                node = convert.Operand;
+            }
+
+            while (node is MemberExpression member)
+            {
+                node = member.Expression;
+            }
+
+            return node is ParameterExpression;
+        }
+    }
+
+    /// <summary>
+    ///     Collects every constructed tuple in a subtree — the carrier <c>ExecuteUpdate</c>'s
+    ///     setters arrive in.
+    /// </summary>
+    private sealed class TupleCollector(List<NewExpression> found) : ExpressionVisitor
+    {
+        /// <inheritdoc />
+        protected override Expression VisitNew(NewExpression node)
+        {
+            if (typeof(System.Runtime.CompilerServices.ITuple).IsAssignableFrom(node.Type))
+            {
+                found.Add(node);
+            }
+
+            return base.VisitNew(node);
+        }
     }
 
     /// <summary>

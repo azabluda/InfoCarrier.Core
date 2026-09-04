@@ -5327,6 +5327,33 @@ re-parents of families already running, because R25–R30 showed that is where t
       dependency object carries one service — `IRelationalTypeMappingSource` — so it joins the
       store-type-names class, which is now 6.
 
+- [x] **R171. A refused bulk operation gets EF's own wording and EF's own details clause.**
+      `src/` only, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`. **`failed` and `total`
+      unchanged at 41 / 29513, and the failing names are byte-identical.** Trim ratchet OK at
+      90 <= 90. It fixes nothing, and it is committed because the message it produces is now EF's
+      down to one bound variable's name.
+
+      **Two changes.** `ExecuteUpdate` and `ExecuteDelete` get `NonQueryTranslationFailed*` rather
+      than `TranslationFailed*`, which differ in their closing sentence — the query form offers
+      `AsEnumerable` and a bulk operation has no such offer. And a `SetProperty` selector that is
+      not a property is reported as `RelationalStrings.InvalidPropertyInSetProperty`, naming the
+      argument, where this provider used to report the method inside it.
+
+      **The setters' shape was measured, not guessed**, which is where R169's reverted attempt
+      stopped: a probe on the refusal path printed
+      `new ITuple[]{ new Tuple<Delegate, object>(e => e.MaybeScalar(e => e.OrderID), (object)10300) }`.
+
+      **`Update_with_invalid_lambda_in_set_property_throws` is still red, over a bound variable's
+      name.** The spec base builds its expected string over
+      `(OrderDetail o) => o.MaybeScalar(e => e.OrderID)`; the caller wrote `e => ...`. The `o` comes
+      from `NavigationExpandingExpressionVisitor.CreateNavigationExpansionExpression`, which renames
+      the query's parameter to `entityType.ShortName()[0].ToString().ToLowerInvariant()` — and
+      renames the *whole* query. This provider refuses before any of EF's pipeline runs (ADR-006).
+
+      **Renaming just the selector would pass the test and make the message disagree with itself**,
+      because the query printed beside it still carries the caller's `od`. Declined on that ground
+      rather than on cost.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
