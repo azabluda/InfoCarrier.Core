@@ -4686,6 +4686,34 @@ re-parents of families already running, because R25–R30 showed that is where t
       `Ignore`, which no realistic application writes. The fix is written and measured at about
       sixteen spec tests, every one a message difference on a query that already refuses.
 
+- [x] **R146. The intermittent is closed, by reading the source its stack named.** `test/` only, so
+      `eng/measure.sh` alone. **`failed` UNCHANGED at 140, `total` UNCHANGED at 29509.** FIXED none,
+      BROKEN none, `REASONS: unchanged`.
+
+      **The cause.** The failing stack ended inside EF, not inside this repository:
+      `SqliteConnection.Open()` threw `ObjectDisposedException: SQLitePCL.sqlite3` at
+      `sqlite3_create_collation`, so the native handle was already disposed.
+      `SqliteDatabaseCreator.Delete` answers a file-backed database with
+      **`SqliteConnection.ClearAllPools()`, which is process-wide and not per connection string**.
+      Every SQLite store here calls `EnsureDeletedAsync` at initialization, so one store's delete
+      disposes a pooled handle a concurrently initializing store is opening.
+
+      **The fix is `Pooling=false` in the test connection string.** With no pool the call has
+      nothing to dispose, so the exception cannot occur. **Proof by construction, and that is the
+      right kind here**: the failure appeared once in about ten full runs, so the three-run bar this
+      repository uses elsewhere would have shown nothing either way.
+
+      **The earlier suspicion was half right and is corrected in place.** The test-project merge does
+      raise the number of SQLite stores initializing at once in one process, which is why this
+      surfaced now. It is not the defect. The defect is a process-wide pool clear, and it was
+      reachable before the merge too.
+
+      **THE RULE THIS PRODUCES, and it is cheaper than either route used before.** Two earlier
+      intermittents were closed by instrumenting one into the open and by reproducing the other's
+      signature. This one was closed by reading the framework source the failing stack named, in
+      minutes rather than runs. **A stack that ends inside somebody else's code is a question about
+      their code.**
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

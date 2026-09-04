@@ -9,7 +9,7 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
-## One intermittent, observed once, and the merge is the suspect (R143, 2026-09-04)
+## An intermittent closed by reading the source it came from (R143/R146, 2026-09-04)
 
 `AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async: False)` failed
 once in a full run with `ObjectDisposedException: Cannot access a disposed object`.
@@ -26,7 +26,27 @@ once in a full run with `ObjectDisposedException: Cannot access a disposed objec
 So it is an intermittent, by the definition `CLAUDE.md` gives: the same code produced two different
 answers.
 
-**The suspected mechanism, with one observation behind it.** Before R136 the two tiers were two test
+**THE CAUSE, AND THE SUSPECT ABOVE WAS ONLY HALF RIGHT.** The stack says it plainly:
+`SqliteConnection.Open()` failed at `sqlite3_create_collation` with
+`ObjectDisposedException: SQLitePCL.sqlite3`. The native handle had already been disposed. EF's
+`SqliteDatabaseCreator.Delete` answers a file-backed database with
+**`SqliteConnection.ClearAllPools()`, which is process-wide and not per connection string**, and this
+harness calls `EnsureDeletedAsync` at the start of every store's initialization. So one store's
+delete disposes a pooled native handle that a concurrently initializing store is in the middle of
+opening.
+
+**Fixed by `Pooling=false` in the test connection string.** With no pool, `ClearAllPools` has nothing
+to dispose and the exception cannot occur. **That is proof by construction, and it is the right kind
+of proof here**: the failure appeared once in about ten full runs, so the three-run bar this
+repository uses elsewhere would have shown nothing either way. The suite measured 140 with the change
+and 140 without it.
+
+**THE RULE THIS PRODUCES.** Two earlier intermittents here were closed by instrumenting one into the
+open and by reproducing the other's signature. This one was closed by **reading the framework source
+the failing stack named**, which cost minutes rather than runs. Try that first: a stack that ends
+inside somebody else's code is a question about their code.
+
+**What was suspected first, and why it was not enough.** Before R136 the two tiers were two test
 projects and therefore two processes. They are one assembly now. xUnit runs test collections in
 parallel within an assembly, each class is its own collection by default, and this repository
 declares no `CollectionBehavior` anywhere. **A Tier A class and a Tier B class can now run at the

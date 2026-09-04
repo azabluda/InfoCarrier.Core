@@ -442,17 +442,18 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**ONE INTERMITTENT IS OPEN SINCE 2026-09-04 (R143), AND IT IS THE FIRST IN THIS REPOSITORY FOR A
-LONG TIME.** `AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async:
-False)` failed once with `ObjectDisposedException: Cannot access a disposed object`. It passes when
-its class runs alone (71 of 72, one skip), and the suite re-run at the same code state came back
-clean. **The suspected cause is R136/R137**: the two ADR-009 tiers used to run in two processes and
-now share one assembly, xUnit runs test collections in parallel within an assembly, and this
-repository sets no `CollectionBehavior`. So a Tier A class and a Tier B class can now run at the same
-time, which was impossible before. **This is a hypothesis with one observation behind it and is not
-established.** Read `findings.md` before spending on it.
+**There is no known intermittent. Three have been closed, and by three different routes.** The
+third was closed on 2026-09-04 **by reading the source it came from**, which is the cheapest route of
+the three and the one to try first. A SQLite store failed once inside `SqliteConnection.Open()` with
+`ObjectDisposedException: SQLitePCL.sqlite3`. EF's `SqliteDatabaseCreator.Delete` answers a
+file-backed database with **`SqliteConnection.ClearAllPools()`, which is process-wide**, and every
+SQLite store here calls `EnsureDeletedAsync` at initialization, so one store's delete disposes a
+pooled native handle another store is opening. The test connection string now sets `Pooling=false`,
+and with no pool the call has nothing to dispose. **That is proof by construction rather than by
+repetition**, which matters because the failure appeared once in about ten full runs and three clean
+runs would have shown nothing.
 
-**The other two intermittents are closed**, and they were closed by opposite routes.
+**The first two intermittents are closed**, and they were closed by opposite routes.
 C38's was **instrumented into the open**: `ServerSaveChangesExecutor` rethrows an identity conflict
 with the whole request appended, which turned a one-run-in-four failure into two dumps that arrived
 already diagnosed. R76's **never reproduced under instrumentation at all** — five clean full runs —
