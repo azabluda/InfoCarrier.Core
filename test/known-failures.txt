@@ -3226,5 +3226,50 @@
 # provider running one locally is caught by name. A closed piece is now lifted when it calls a
 # function the model maps, and for no other reason.
 
+# 2026-09-04 -- THE WHOLE TAIL RE-TRIAGED AT 77, and the headline is that NOT ONE of them is a
+# store limitation. There is no `InfoCarrierServerException` left in the reasons list at all,
+# which is what a store limitation looks like here. R157 and R158 removed the last of them.
+#
+# 47  WE ANSWER A QUERY EF REFUSES. 40 `Assert.Throws: No exception was thrown` plus 7
+#     `Exception type was not an exact match`. 36 are TPT/TPC GearsOfWar correlated collections
+#     followed by `Distinct`; the rest are PrimitiveCollections (3), a set operation over a
+#     collection projection (2), owned JSON structural equality (4), and two singletons. EF
+#     refuses all of them with `InsufficientInformationToIdentifyElementOfCollectionJoin` or a
+#     near relative: after a `Distinct` the identifying columns are gone from the shaper, so EF
+#     cannot say which parent a child row belongs to.
+#
+#     **IT IS NOT AN N+1, AND THAT WAS MEASURED RATHER THAN ARGUED.** Running
+#     `Projecting_entity_as_well_as_correlated_collection_followed_by_Distinct` with
+#     `INFOCARRIER_SERVER_SQL=1` gives **two** server statements for **two** test cases: one query
+#     each, a single `LEFT JOIN` ordered by the parent key. The projection split lifts a
+#     correlated collection into the server's query precisely so that the client never issues one
+#     query per row, and this is that working.
+#
+#     **THE OPEN RISK IS CORRECTNESS, NOT COST.** These tests assert only that an exception is
+#     raised; none of them checks data. So nothing in the suite says whether the answers this
+#     provider gives are RIGHT. R158 is the reason to care: a seventh member of this same family
+#     turned out to be answered by client-side stitching that could not have been correct, and it
+#     had been classified as generosity. **The way to settle the other 47 is to compare each
+#     answer against the same query run directly on the server context**, which is the shape
+#     `ServerParameterizationTest` already uses for SQL. Until that is done, "we answer what
+#     others refuse" is a hypothesis about 47 tests and not a finding.
+#
+#  8  THE CLIENT IS NOT A RELATIONAL DATABASE, and these say so by design. 4 reach for a
+#     `DbConnection` the client does not have; 4 call a relational-specific method on it.
+#
+#  4  `InfoCarrierTypeMapping` cannot be cast to `RelationalTypeMapping`, all in
+#     `FromSqlRaw_queryable_simple_projection_composed`. A real gap on the raw-SQL path.
+#
+#  9  MESSAGE TEXT. 6 `Strings differ` and 3 `Sub-string not found`: the right refusal in
+#     different words.
+#
+#  9  SINGLETONS AND SMALL FAMILIES. 2 `Assert.Same` (this repository is two contexts, so the
+#     assertion has no answer), 2 `Values differ` (C64's two wrong answers, whose assertion no
+#     correct answer satisfies), 2 an indexer's argument count, 1 model finalization, 1 empty
+#     sequence, 1 `Assert.True`.
+#
+# NO OTHER BASE BELONGS ON TIER C. The bar is a base that needs a capability SQLite has not got,
+# and after the re-read nothing in the tail names one.
+
 failed=77
 total=29513
