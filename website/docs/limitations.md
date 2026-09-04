@@ -80,21 +80,10 @@ on the server from the values sent over the wire. Tracked upstream as
 
 ## Use with caution
 
-### Projecting a collection, then `Distinct` or a set operation
+### `Distinct` inside a projected collection
 
-A relational provider rejects this query, and rejects it the same way with `Union` in place of
-`Distinct`. This provider reassembles the collection on the client, so it answers instead.
-
-```csharp
-context.Customers
-    .Select(c => new { c.City, Orders = c.Orders.ToList() })
-    .Distinct()
-    .ToList();
-// EF Core providers: throws.   This provider: returns the rows.
-```
-
-Three levels deep the answer is also unverifiable: no provider executes the query, so there is no
-reference result to compare against.
+A relational provider rejects this query. This provider reassembles the collection on the client
+and answers it. No other provider runs it, so there is no reference result to compare against.
 
 ```csharp
 var report = context.Customers
@@ -114,6 +103,16 @@ Apply `Distinct` after materializing instead:
 
 ```csharp
 Products = o.Lines.Select(l => l.ProductName).ToList(),   // then .Distinct() in memory
+```
+
+`Distinct` and the set operations throw when applied to the projection rather than inside it, as
+on any relational provider.
+
+```csharp
+context.Customers
+    .Select(c => new { c.City, Orders = c.Orders.ToList() })
+    .Distinct()
+    .ToList();   // throws
 ```
 
 ## Differences that are not limitations
@@ -144,8 +143,8 @@ EF Core provider.
 ### Queries this provider answers that other providers do not
 
 Four other scenarios in EF's suite assert that a provider either rejects the query or returns the
-wrong rows. This provider answers all four correctly. A test suite you port from another provider
-will expect an exception, and LINQ that relies on this will not run unchanged there.
+wrong rows. This provider answers all four correctly. A test suite you port will expect an
+exception, and LINQ that relies on this will not run unchanged elsewhere.
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -207,6 +206,7 @@ These are not defects. They follow from where the client sits.
 |---|---|
 | Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
+| The client never sees the server's provider, so it assumes a relational store and refuses what relational providers refuse. `UseInfoCarrier(client, o => o.UseNonRelationalServerStore())` says otherwise | |
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |
 | Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming is a separate question, and it works. | [Blazor WebAssembly](platforms/blazor-webassembly.md#trimming) |

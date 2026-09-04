@@ -5069,6 +5069,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       projection. Widening this guard to reach them risks refusing ordinary queries, so they are a
       separate shape and a separate measurement.
 
+- [x] **R161. `limitations.md` stops describing the behaviour R160 removed.** `website/` text
+      only, so no measurement gate; the documentation gates instead.
+
+      The page's `Use with caution` section named two shapes and treated them as one family. R160
+      refuses the first (`Distinct` or a set operation applied ABOVE a projection carrying a
+      collection) and leaves the second (a `Distinct` INSIDE the projected collection). The
+      section is now the second shape alone, and it says in one sentence that the first throws, so
+      that a reader who sees two near-identical queries knows which is which. **The example that
+      stayed is the one the failing test names still justify**:
+      `Correlated_collection_with_distinct_3_levels` on Tier A and
+      `Correlated_collection_after_distinct_3_levels_without_original_identifiers` on TPC and TPT
+      are still red, so the nested shape is still answered here and refused everywhere else.
+
+      **`UseNonRelationalServerStore()` is documented as a consequence of the client having no
+      database, in that table, and not as a limitation**, because that is what it is: the client
+      cannot see the server's provider, so it assumes the store is relational. The other home would
+      be `configuration/client.md`, which is at 601 of 620 words with no padding to cut;
+      `api-surface.md` lists no `InfoCarrierDbContextOptionsBuilder` member at all, so a row for
+      this one alone would be the page's only such row. The `limitations` page is where
+      `guide/errors.md` and `guide/querying.md` already send a reader who met a refusal.
+
+      **The measurement block is NOT touched.** It reads `Total tests: 22662, Passed: 22476,
+      Failed: 9, Skipped: 177`, measured against the published `10.0.0`, and this branch's suite
+      is a different suite: 29513 tests and 55 red, most of them newly adopted relational bases
+      that Phase R has not finished. Refreshing the block is release work and needs a run of the
+      released shape, not a run of this branch. R99 and R75 corrected prose on this page the same
+      way and left the block alone.
+
+      Gates: `py eng/doc-words.py --all --budget` (`limitations.md` at 750 of 750, whole site
+      11811 in 23 files, 0 over), `py eng/doc-links.py` (0 broken in 58 files),
+      `eng/docs-serve.sh --build` (`mkdocs build --strict`, clean), `grep -c` for em dashes, en
+      dashes and curly quotes (0). Run through the `humanizer` skill, as any user-facing edit
+      here is.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
