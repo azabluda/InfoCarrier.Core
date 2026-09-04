@@ -5294,6 +5294,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       conventions (4 tests), and a server-side warning being unable to reach the client's log
       (2 tests).
 
+- [x] **R170. The client runs EF's relational fix-up conventions, and only those.**
+      `src/` only, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`. **`failed` FALLS 43 -> 41**,
+      FIXED 2, BROKEN none. Trim ratchet OK at 90 <= 90.
+
+      The owner's answer to the first open question (2026-09-04) was that the client model may be
+      as relational as it needs to be to execute accurately over the wire, and that what must not
+      cross is a concrete store's own annotations. This is that answer, narrowed by measurement.
+
+      **EF's whole relational list was tried first and cost 681 tests: 43 -> 724.** ~560 were JSON
+      queries (`RelationalMapToJsonConvention`), 114 were `EntitySplittingQueryInfoCarrierTest`
+      (`EntitySplittingConvention`, confirmed alone on a second run), the rest compiled-model and
+      bulk-update tests.
+
+      **What survived is one kind of convention.** `PropertyOverridesConvention`,
+      `CheckConstraintConvention` and `StoredProcedureConvention` do not decide anything: they move
+      a relational annotation when EF replaces the entity type or property it hangs off. The client
+      was keeping the stale instance, which is exactly what the assertion said —
+      `Expected: EntityType: Book.Label#BookLabel ... Owned` against
+      `Actual: EntityType: BookLabel Keyless Owned`.
+
+      **The rule, written into the builder so the next reader does not repeat the 724.** A
+      convention that decides a table name, a column name, a JSON container or a value-generation
+      strategy makes a decision the *server* also makes, with a provider this client cannot see.
+      When the two agree it is redundant; when they disagree the client's answer is the wrong one,
+      because the store is the server's. A fix-up convention is free of that, because the caller
+      wrote the same thing on both sides.
+
+      **The other two tests of that class are now priced rather than open.**
+      `Can_use_table_splitting_with_owned_reference` needs the convention that costs 114.
+      `Complex_properties_can_be_configured_by_type` needs EF's `RelationalModelValidator`, whose
+      dependency object carries one service — `IRelationalTypeMappingSource` — so it joins the
+      store-type-names class, which is now 6.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

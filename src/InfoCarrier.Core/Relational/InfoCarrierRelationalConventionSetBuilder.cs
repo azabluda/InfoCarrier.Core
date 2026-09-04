@@ -34,15 +34,16 @@ namespace InfoCarrier.Core.Relational;
 ///     </para>
 ///     <para>
 ///         <b>Why the relational dependency object can be a stub, and why the stub throws.</b>
-///         <see cref="EntityTypeHierarchyMappingConvention" /> takes
-///         <see cref="RelationalConventionSetBuilderDependencies" /> and <b>never touches it</b> in
-///         <c>ProcessModelFinalizing</c> — read from EF's source, in R123 and again here. The two
-///         things that object carries, an <c>IRelationalAnnotationProvider</c> and an
-///         <c>IUpdateSqlGenerator</c>, are command-side services a client with no database cannot
-///         have. That is this package's charter (<c>architecture.md</c> §6a D3): annotations and
-///         type identity, never a connection or anything standing for one. So every member of both
-///         stubs throws. If EF ever starts calling one, this fails loudly at model build instead of
-///         answering plausibly and wrongly — the same reasoning ADR-013 records for
+///         Every convention EF ships takes <see cref="RelationalConventionSetBuilderDependencies" />
+///         and the four registered here <b>never touch it</b> — read from EF's source in R123, and
+///         measured again in R170, where a full spec run built every one of these models without
+///         reaching a stub member. The two things that object carries, an
+///         <c>IRelationalAnnotationProvider</c> and an <c>IUpdateSqlGenerator</c>, are command-side
+///         services a client with no database cannot have. That is this package's charter
+///         (<c>architecture.md</c> §6a D3): annotations and type identity, never a connection or
+///         anything standing for one. So every member of both stubs throws. If EF ever starts
+///         calling one, this fails loudly at model build instead of answering plausibly and
+///         wrongly — the same reasoning ADR-013 records for
 ///         <see cref="InfoCarrierRelationalFacadeDependencies" />'s three throwing members.
 ///     </para>
 /// </remarks>
@@ -58,12 +59,54 @@ public class InfoCarrierRelationalConventionSetBuilder(
     {
         ConventionSet conventionSet = base.CreateConventionSet();
 
-        // EF's own, in place of the copy `InfoCarrier.Core` used to carry. Core EF gives every
-        // hierarchy a discriminator and this is the convention that takes it back for TPT and TPC,
-        // so without it a client model keeps a discriminator the server's model has dropped.
-        conventionSet.ModelFinalizingConventions.Add(
-            new EntityTypeHierarchyMappingConvention(Dependencies, RelationalDependencies));
+        // THE FIX-UP CONVENTIONS, AND ONLY THOSE. Each of the three below answers one question:
+        // when EF replaces an entity type or a property during model building, what happens to the
+        // relational annotation that was hanging off the old instance? EF's own answer is to move
+        // it, and a client that does not move it keeps a STALE instance where the server's model
+        // has the finalized one:
+        //
+        //     Expected: EntityType: Book.Label#BookLabel CLR Type: BookLabel Owned
+        //     Actual:   EntityType: BookLabel Keyless Owned
+        //
+        // None of the three decides a name, a type or a shape, so none of them can disagree with
+        // the server about one. That is what makes them safe here and the rest of EF's list not.
+        conventionSet.Add(new PropertyOverridesConvention(Dependencies, RelationalDependencies));
+        conventionSet.Add(new CheckConstraintConvention(Dependencies, RelationalDependencies));
+        conventionSet.Add(new StoredProcedureConvention(Dependencies, RelationalDependencies));
 
+        // Core EF gives every hierarchy a discriminator and this is the convention that takes it
+        // back for TPT and TPC, so without it a client model keeps a discriminator the server's
+        // model has dropped. It was the only entry here between R123 and R170.
+        conventionSet.Add(new EntityTypeHierarchyMappingConvention(Dependencies, RelationalDependencies));
+
+        // EF'S WHOLE RELATIONAL LIST WAS TRIED HERE FIRST AND IT COST 681 TESTS (R170, measured:
+        // 43 -> 724). Read `RelationalConventionSetBuilder.CreateConventionSet` beside this method
+        // for what is missing, and do not add an entry back without measuring it alone. What the
+        // 724 were made of says why:
+        //
+        //   * ~560 were JSON queries, from `RelationalMapToJsonConvention`;
+        //   * 114 were `EntitySplittingQueryInfoCarrierTest`, and `EntitySplittingConvention` was
+        //     confirmed to be the whole of that on its own;
+        //   * the rest were compiled-model and bulk-update tests.
+        //
+        // THE SHAPE OF THE MISTAKE GENERALISES. A convention that decides a table name, a column
+        // name, a JSON container or a value-generation strategy makes a decision the SERVER also
+        // makes, with a provider this client cannot see. When the two agree the convention is
+        // redundant; when they disagree the client's answer is the wrong one, because the store is
+        // the server's. Only a fix-up convention -- one that moves an annotation the caller wrote
+        // -- is free of that, because the caller wrote the same thing on both sides.
+        //
+        // `RelationalMaxIdentifierLengthConvention` is not in EF's list at all: each provider adds
+        // it with its own limit, which is the concrete-store fact that stays on the server.
+        //
+        // THE TWO EF REPLACES HERE AND THIS BUILDER DOES NOT are `KeyDiscoveryConvention` and
+        // `QueryFilterRewritingConvention`. `InfoCarrierConventionSetBuilder` has already put its
+        // own in both slots, and both exist for a reason the relational half does not remove: key
+        // discovery has to agree with the document-mapping seam, and the filter rewriter has to
+        // leave a `FromSql` root alone. Replacing them with EF's would undo that silently.
+        //
+        // `RuntimeModelConvention` is left alone for the same shape of reason: EF's relational one
+        // writes the store schema into the compiled model, and this client has no schema to write.
         return conventionSet;
     }
 

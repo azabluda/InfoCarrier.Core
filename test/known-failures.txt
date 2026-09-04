@@ -3670,5 +3670,35 @@
 # --- 12. WRONG ANSWER, ASSERTION UNSATISFIABLE (2) -- C64, unchanged ----------------------------
 # --- 13. UPSTREAM EF DEFECT, PROPERTY-BAG COMPLEX COLLECTION (2) -- J22, unchanged --------------
 
-failed=43
+# 2026-09-04 (R170) -- `failed` FALLS 43 -> 41, `total` unchanged at 29513. FIXED 2, BROKEN none.
+# `Can_configure_owned_type` and `Can_use_sproc_mapping_with_owned_reference`.
+#
+# THE CLIENT NOW RUNS FOUR OF EF'S RELATIONAL CONVENTIONS INSTEAD OF ONE, and the three added are
+# all of one kind: `PropertyOverridesConvention`, `CheckConstraintConvention` and
+# `StoredProcedureConvention` move a relational annotation when EF replaces the entity type or
+# property it hangs off. Without them the client keeps the stale instance the assertion caught:
+#   Expected: EntityType: Book.Label#BookLabel CLR Type: BookLabel Owned
+#   Actual:   EntityType: BookLabel Keyless Owned
+#
+# EF'S WHOLE RELATIONAL LIST WAS TRIED FIRST AND COST 681 TESTS: 43 -> 724, measured, not feared.
+# ~560 were JSON queries (`RelationalMapToJsonConvention`), 114 were `EntitySplittingQuery`
+# (`EntitySplittingConvention`, confirmed alone on its own second run), the rest compiled-model and
+# bulk-update. The rule that came out of it is in the convention builder's own comment: a
+# convention that DECIDES a name, a shape or a strategy makes a decision the SERVER also makes,
+# with a provider this client cannot see -- redundant when they agree, wrong when they do not. Only
+# a fix-up convention is free of that, because the caller wrote the same thing on both sides.
+#
+# --- CLASS 9 IS NOW 2, NOT 4, AND BOTH REMAINING ARE PRICED ------------------------------------
+# `Can_use_table_splitting_with_owned_reference` needs `EntitySplittingConvention`, which is the
+# 114 above. Measured and declined, not unexplained.
+#
+# `Complex_properties_can_be_configured_by_type` JOINS THE STORE-TYPE-NAMES CLASS, which is now 6.
+# It wants `RelationalStrings.ComplexCollectionNotMappedToJson`, which only EF's
+# `RelationalModelValidator` raises, and that validator's dependency object
+# (`RelationalModelValidatorDependencies`) carries exactly one service:
+# `IRelationalTypeMappingSource`. Its `Validate` also calls `ValidateSharedColumnsCompatibility`
+# and `ValidateBoolsWithDefaults`, both of which compare or generate store types. A client with no
+# store cannot supply any of it. Same wall as `FromSqlRaw_queryable_simple_projection_composed`.
+
+failed=41
 total=29513
