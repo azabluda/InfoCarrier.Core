@@ -191,7 +191,8 @@ public sealed class QuerySplitter
         // reassembly *before* looking for the boundary (§3.2). Cutting above such a projection
         // is not merely coarse — it strands navigation reads and correlated subqueries on the
         // client, and it decomposes a `GroupBy` from the aggregate that makes it translatable.
-        query = ProjectionRewriter.Rewrite(query, _analyzer, out IReadOnlySet<Expression> reassemblies, rootRebuild);
+        query = ProjectionRewriter.Rewrite(
+            query, _analyzer, out IReadOnlySet<Expression> reassemblies, rootRebuild, _model);
 
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
 

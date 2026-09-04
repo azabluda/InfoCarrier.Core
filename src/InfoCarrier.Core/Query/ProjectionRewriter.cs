@@ -80,6 +80,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private Expression? _preserved;
 
     /// <summary>
+    ///     The client's model, used for one question: is this call a function the model maps to
+    ///     the store? See <see cref="CallsMappedFunction" />.
+    /// </summary>
+    private Microsoft.EntityFrameworkCore.Metadata.IModel? _model;
+
+    /// <summary>
     ///     Rewrites every client-typed projection in <paramref name="query" /> that sits directly
     ///     on a server-executable source.
     /// </summary>
@@ -94,16 +100,22 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     A reassembly an earlier pass produced, which this one must preserve rather than treat
     ///     as client code to rewrite again.
     /// </param>
+    /// <param name="model">
+    ///     The client's model, or <see langword="null" />. Read for one question only: whether a
+    ///     call names a function the model maps to the store, which the client cannot compute.
+    /// </param>
     public static Expression Rewrite(
         Expression query,
         ServerBoundaryAnalyzer analyzer,
         out IReadOnlySet<Expression> reassemblies,
-        Expression? alreadyReassembled = null)
+        Expression? alreadyReassembled = null,
+        Microsoft.EntityFrameworkCore.Metadata.IModel? model = null)
     {
         var rewriter = new ProjectionRewriter(analyzer)
         {
             _preserved = alreadyReassembled,
             _read = MemberReadCollector.Find(query),
+            _model = model,
         };
         Expression result = rewriter.Visit(query);
         reassemblies = rewriter._reassemblies;
@@ -636,19 +648,66 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
+    ///     Whether a subtree calls a function the model maps to the store, which the client
+    ///     therefore cannot compute.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This is the whole of R158, and the defect it closes had survived every store.</b>
+    ///         A mapped function whose arguments are all constants or parameters is
+    ///         <em>closed</em>: it refers to no row. <see cref="CollectFragments" /> lifts a
+    ///         subtree into the server's tuple only when it refers to a row, which is right for
+    ///         <c>1 + 1</c> — the client can compute that, and lifting it would put a constant on
+    ///         the wire once per row for nothing. It is wrong here. <c>CustomerOrderCount(1)</c>
+    ///         is closed and the client cannot compute it at all: the CLR method is a declaration,
+    ///         and EF's specification contexts give it a body that throws precisely so that a
+    ///         provider running it locally is caught by name rather than by a wrong number.
+    ///     </para>
+    ///     <para>
+    ///         <b>The condition is "the client cannot", not "the server could".</b> Almost
+    ///         anything closed could be lifted, and lifting it would cost payload and gain
+    ///         nothing. Only a mapped call has to be.
+    ///     </para>
+    ///     <para>
+    ///         <b>It does not force client evaluation off where EF requires it.</b> Lifting
+    ///         happens inside a client-typed projection that is already being split; the mapped
+    ///         call becomes one tuple slot and whatever client code wraps it still runs on the
+    ///         client, over the value the store returned. That is the same shape as a correlated
+    ///         mapped call, which has always worked.
+    ///     </para>
+    /// </remarks>
+    private bool CallsMappedFunction(Expression node)
+    {
+        if (_model is null)
+        {
+            return false;
+        }
+
+        if (node is MethodCallExpression call
+            && Microsoft.EntityFrameworkCore.RelationalModelExtensions.FindDbFunction(_model, call.Method) is not null)
+        {
+            return true;
+        }
+
+        return ChildrenOf(node).Any(CallsMappedFunction);
+    }
+
+    /// <summary>
     ///     The maximal subexpressions of a projection body that the server can evaluate for a row.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         A fragment must read the row: a body constant needs no round trip and stays on the
-    ///         client, where it costs nothing.
+    ///         client, where it costs nothing. <b>Unless the client cannot compute it</b>, which
+    ///         is a mapped store function and nothing else. See
+    ///         <see cref="CallsMappedFunction" />.
     ///     </para>
     ///     <para>
     ///         A fragment taken from the branch of a conditional carries that conditional's test in
     ///         <paramref name="guards" />. See <see cref="Guarded" /> for why.
     ///     </para>
     /// </remarks>
-    private static void CollectFragments(
+    private void CollectFragments(
         Expression node,
         BoundaryAnalysis analysis,
         IReadOnlyCollection<ParameterExpression> rowParameters,
@@ -658,7 +717,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     {
         NodeFacts facts = analysis.FactsFor(node);
 
-        if (facts.ServerOk && facts.Free.Count > 0 && facts.Free.All(rowParameters.Contains))
+        // `Free.Count > 0` asks "does this refer to a row", and a fragment that does is what the
+        // server has to compute. A CLOSED subtree is normally the client's to compute, and
+        // cheaper there — unless it calls a function only the store has. See above.
+        if (facts.ServerOk
+            && facts.Free.All(rowParameters.Contains)
+            && (facts.Free.Count > 0 || CallsMappedFunction(node)))
         {
             fragments.Add(node);
             if (guard is not null)

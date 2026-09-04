@@ -3202,5 +3202,29 @@
 # "queries this provider answers that other providers reject", once it is checked rather than
 # assumed.
 
-failed=84
+# 2026-09-04 (R158) -- `failed` FALLS 84 -> 77, `total` unchanged at 29513. FIXED seven, BROKEN
+# none, and `UdfDbFunctionTestBase` is now GREEN: 105 passed, 1 skipped by EF itself, 0 failed.
+#
+#   -6  System.NotImplementedException : The method or operation is not implemented.
+#   -1  Assert.Throws() Failure: No exception was thrown
+#
+# ONE DEFECT, NOT TWO. The classification above split these seven into "six of ours" and "one we
+# answer that others reject". The second reading was wrong and is corrected here.
+# `QF_Select_Correlated_Subquery_In_Anonymous_Nested` asks for lists inside lists over a
+# table-valued function, and EF refuses it on every relational provider: a function's rows have no
+# key, so a collection join cannot say which parent each child belongs to. This provider kept the
+# mapped call on the CLIENT, fetched the collections separately and stitched them, and so ANSWERED
+# a query EF says has no correct answer. That is worse than failing, because the answer looks
+# right. The same fix sends the call to the server, and the server's own provider refuses with
+# EF's own message.
+#
+# THE FIX IS ONE CONDITION. `ProjectionRewriter.CollectFragments` lifted a piece of a projection
+# into the server's tuple only when that piece read a row. That is correct for `1 + 1`: the client
+# can compute it, and lifting would put a constant on the wire once per row for nothing. It is
+# wrong for a mapped store function with constant arguments, which the client cannot compute at
+# all -- EF's specification contexts give those methods a body that throws, precisely so a
+# provider running one locally is caught by name. A closed piece is now lifted when it calls a
+# function the model maps, and for no other reason.
+
+failed=77
 total=29513

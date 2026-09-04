@@ -4990,6 +4990,43 @@ re-parents of families already running, because R25–R30 showed that is where t
       remark told readers to put a relational fixture under the SQLite namespace, and Tier C made
       that impossible to follow.
 
+- [x] **R158. A mapped store function crosses even when it reads no row.** `src/` change, so
+      `eng/measure.sh` and `eng/trim-ratchet.sh`. No public signature moved
+      (`ProjectionRewriter` is internal), so no pack. **`failed` FALLS 84 -> 77**, `total`
+      unchanged at 29513, FIXED seven, BROKEN none. Trim `ours` unchanged at 90.
+      **`UdfDbFunctionTestBase` is GREEN**: 105 passed, 1 skipped by EF itself, 0 failed.
+
+      **The defect is one condition and it had survived every store.**
+      `ProjectionRewriter.CollectFragments` lifted a piece of a client-typed projection into the
+      server's tuple only when that piece **read a row**. That is right for `1 + 1`: the client
+      can compute it, and lifting would put a constant on the wire once per row for nothing. It is
+      wrong for a mapped store function with constant arguments. `CustomerOrderCount(1)` reads no
+      row and the client cannot compute it at all -- the CLR method is a declaration, and EF's
+      specification contexts give it a body that **throws**, precisely so that a provider running
+      it locally is caught by name rather than by a wrong number. A closed piece is now lifted
+      when it calls a function the model maps, and for no other reason: the test is "the client
+      cannot", not "the server could", because almost anything closed *could* be lifted and
+      lifting it would cost payload for nothing.
+
+      **THE SEVENTH FAILURE WAS THE SAME DEFECT AND HAD BEEN CLASSIFIED AS THE OPPOSITE.** R157
+      recorded `QF_Select_Correlated_Subquery_In_Anonymous_Nested` as a candidate for "queries this
+      provider answers that other providers reject". It is not. The query asks for lists inside
+      lists over a table-valued function, and EF refuses it on every relational provider, because
+      a function's rows have no key and a collection join cannot then say which parent each child
+      belongs to. This provider kept the mapped call on the client, fetched the collections
+      separately and stitched them together, and so **answered a query EF says has no correct
+      answer**. Sending the call to the server makes the server's own provider refuse it with EF's
+      own message.
+
+      **The rule: "we answer what others refuse" is a claim that has to be checked, and the check
+      is whether the answer could be right.** Here it could not, and the difference was not
+      generosity but client-side work that should never have happened.
+
+      **It also did not force client evaluation off where EF requires it.** Lifting happens inside
+      a projection that is already being split, so the mapped call becomes one tuple slot and the
+      client code wrapping it still runs on the client over the value the store returned. EF's own
+      `Scalar_Function_ClientEval_*` tests stay green.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
