@@ -5268,6 +5268,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       lock. `total` unchanged at 29513 is what confirms no tests were lost. Do not run a second
       test process against a project a measurement is using, even for tests that touch no store.
 
+- [x] **R169. The tail re-triaged at 43, one message fix attempted and reverted, and two classes
+      left open as decisions.** `test/` text only; `failed` and `total` unchanged.
+
+      Thirteen classes, every one read from a test body or a measurement rather than from a reason
+      string. **Nine of the thirteen are closed**: blocked by the client having no database, no
+      store type names or no hook to override; closed by R162 as not decidable on the client; or
+      upstream defects in EF that this provider merely surfaces differently.
+
+      **`Table_can_configure_TPT_with_Owned` JOINS the store-type class**, which is now five: all
+      of them want a relational model on the client, and building one needs a store type name per
+      column.
+
+      **The attempt that was reverted.** EF raises
+      `CoreStrings.NonQueryTranslationFailedWithDetails` with
+      `RelationalStrings.InvalidPropertyInSetProperty` for a bulk operation and this provider
+      raises the plain query form. Selecting the non-query wording is easy and **useless alone**:
+      `CoreStrings` ships no detail-less `NonQueryTranslationFailed`, so without the details the
+      two messages are the same string. Producing the details needs the shape of the `SetProperty`
+      selector inside `new ITuple[]{ new Tuple<Delegate, object>(selector, value), ... }`, which
+      was not pinned down. ~90 lines measured as a no-op, so they were reverted.
+
+      **Two classes are left open because they are decisions, not defects**, and both are put to
+      the owner: the client's relational convention set holding exactly one of EF's relational
+      conventions (4 tests), and a server-side warning being unable to reach the client's log
+      (2 tests).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

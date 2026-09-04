@@ -3571,5 +3571,104 @@
 # and `SERVER FAULT: An error occurred while reading a database value ...` for the two passing
 # `SqlQueryInfoCarrierTest` ones -- same server, same store, different column lists.
 
+# 2026-09-04 (R169) -- THE TAIL RE-TRIAGED AT 43, AND EVERY CLASS IS NOW READ FROM A TEST BODY OR A
+# MEASUREMENT RATHER THAN FROM A REASON STRING. Thirteen classes: 4+5+4+8+2+2+1+3+4+4+2+2+2.
+#
+# --- 1. THE CLIENT HAS NO `DbConnection` (4) -- blocked by design -------------------------------
+# 2 `Include_closed_connection_opened_by_it_when_buffering`, 2
+# `Include_does_not_close_user_opened_connection_for_empty_result`.
+#
+# --- 2. THE CLIENT HAS NO STORE TYPE NAMES (5) -- blocked, and one test JOINS this class ---------
+# 2 `FromSqlRaw_queryable_simple_projection_composed`, 2
+# `SqlQueryRaw_queryable_simple_projection_composed`, and now `Table_can_configure_TPT_with_Owned`,
+# which fails with "The model must be finalized and its runtime dependencies must be initialized
+# before 'GetRelationalModel' can be used". All five want a RELATIONAL MODEL on the client, and
+# building one needs a store type name per column. `BoolTypeMapping`'s constructor requires a
+# `storeType` string; `RelationalTypeMapping.GenerateNonNullSqlLiteral` formats through
+# `SqlLiteralFormatString`, `{0}` by default, so a generic mapping for `bool` emits `True`. Neither
+# is answerable by a client with no store.
+#
+# --- 3. A NON-VIRTUAL `UseTransaction` (4) -- blocked, and now CONFIRMED for both bases ----------
+# 2 `ExecuteDelete_throws_for_entity_splitting`, 2 `ExecuteUpdate_works_for_table_sharing`. Both
+# `EntitySplittingTestBase.UseTransaction` and `TableSplittingTestBase.UseTransaction` are
+# `public void`, NOT virtual, and both call `facade.UseTransaction(transaction.GetDbTransaction())`.
+# There is no hook to override, which is exactly ADR-013's amendment. Read from EF's source.
+#
+# --- 4. A `Distinct` INSIDE A PROJECTED COLLECTION (8) -- closed, see the R162 entry -------------
+#
+# --- 5. EF'S OWN SQL-TRANSLATION GAPS, WHICH THIS PROVIDER NEVER REACHES (2) --------------------
+# `Parameter_collection_in_subquery_and_Convert_as_compiled_query` and
+# `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query`. EF's own
+# relational base says so in a comment: "We should apply the default type mapping to the parameter,
+# but need to figure out the exact rules when to do this", and the other expects
+# `SetOperationsRequireAtLeastOneSideWithValidTypeMapping`. Both are type-mapping INFERENCE failures
+# inside SQL generation. This client generates no SQL, so the gap does not arise and the query
+# works. Not a defect and nothing to fix.
+#
+# --- 6. WE ANSWER WHERE OTHERS REFUSE, AND THE PAGE SAYS SO (2) ---------------------------------
+# `Composition_over_collection_of_complex_mapped_as_scalar`,
+# `Column_collection_equality_inline_collection_with_parameters`. Both named on
+# `website/docs/limitations.md`.
+#
+# --- 7. WE RETURN THE RIGHT ROWS WHERE EF RETURNS THE WRONG ONES (1) ----------------------------
+# `Associate_with_parameter_null` expects `EqualException`, which is EF asserting that a relational
+# provider returns the WRONG rows.
+#
+# --- 8. AN UPSTREAM EF DEFECT WITH A DIFFERENT SYMPTOM (3) -- see the R167 entry ----------------
+#
+# --- 9. THE CLIENT'S RELATIONAL CONVENTION SET IS ONE CONVENTION (4) -- OPEN, NEEDS A DECISION ---
+# `Can_configure_owned_type`, `Can_use_sproc_mapping_with_owned_reference`,
+# `Can_use_table_splitting_with_owned_reference`, `Complex_properties_can_be_configured_by_type`.
+#
+# THE ROOT IS ONE LINE. `InfoCarrierRelationalConventionSetBuilder.CreateConventionSet` adds
+# EXACTLY ONE of EF's relational conventions, `EntityTypeHierarchyMappingConvention`, with a
+# `RelationalConventionSetBuilderDependencies` whose every member throws. So the client model gets
+# relational ANNOTATIONS through the core conventions and none of the relational model-building
+# behaviour beside them.
+#
+# THE SYMPTOM NAMES IT PRECISELY. Two of the three fail `Assert.Same` on an entity type:
+#   Expected: EntityType: OtherCustomer.Details#CustomerDetails CLR Type: CustomerDetails Owned
+#   Actual:   EntityType: CustomerDetails Keyless Owned
+# A check constraint and a stored procedure hold a STALE, KEYLESS instance of the owned type -- a
+# snapshot from before the ownership key was discovered -- where EF's own providers hold the
+# finalized one. The fourth is EF's relational base asserting that a complex COLLECTION not mapped
+# to JSON is a validation error, which `RelationalModelValidator` raises and this client's
+# validator does not.
+#
+# --- 10. EXCEPTION MESSAGE TEXT (4) -- three of them PRICED AND DECLINED ------------------------
+# 2 `Update_with_invalid_lambda_in_set_property_throws`, `Throws_when_orderby_multiple`,
+# `Casts_are_removed_from_expression_tree_when_redundant`.
+#
+# `Throws_when_orderby_multiple` belongs to R138's family: the fix is written and measured and
+# costs SIXTEEN spec tests, every one a message difference on a query that already refuses. See
+# `findings.md`.
+#
+# `Casts_are_removed_from_expression_tree_when_redundant` differs at position 65 for one reason:
+# EF prints the WHOLE chain, `DbSet<MockEntity>().Cast<IDummyEntity>().Where(e => e.Id == @id)`,
+# and this provider prints only the offending `Cast` subtree. Making it print the whole query would
+# change every refusal message in the suite for one test, so it is declined.
+#
+# THE TWO `Update_with_invalid_lambda_in_set_property_throws` WERE ATTEMPTED AND REVERTED (R169).
+# EF raises `CoreStrings.NonQueryTranslationFailedWithDetails` with
+# `RelationalStrings.InvalidPropertyInSetProperty` for a bulk operation; this provider raises the
+# plain query form with no details. Selecting the non-query wording is easy and USELESS ALONE --
+# `CoreStrings` ships no detail-less `NonQueryTranslationFailed`, so without the details clause the
+# two messages are identical. Producing the details means recognising which `SetProperty` selector
+# is not a property, and by the time the split sees it the setters are
+# `new ITuple[]{ new Tuple<Delegate, object>(selector, value), ... }`; the selector's node shape in
+# that array was not pinned down before the attempt was reverted. ~90 lines that measured as a
+# no-op. Reverted rather than committed.
+#
+# --- 11. A SERVER-SIDE WARNING CANNOT REACH THE CLIENT'S LOG (2) -- OPEN, A DESIGN QUESTION -----
+# `Warn_when_save_optional_dependent_with_null_values` and its `_sensitive` twin read
+# `TestSqlLoggerFactory.Log` on the CLIENT and expect
+# `RelationalResources.LogOptionalDependentWithAllNullProperties`, which EF's relational UPDATE
+# pipeline raises -- on the server. The client's logger never sees it, so the non-sensitive one
+# fails with "Sequence contains no matching element". Forwarding server log events to the client is
+# a protocol change with value well beyond these two tests, and nobody has asked for it.
+#
+# --- 12. WRONG ANSWER, ASSERTION UNSATISFIABLE (2) -- C64, unchanged ----------------------------
+# --- 13. UPSTREAM EF DEFECT, PROPERTY-BAG COMPLEX COLLECTION (2) -- J22, unchanged --------------
+
 failed=43
 total=29513
