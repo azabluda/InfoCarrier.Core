@@ -4714,6 +4714,33 @@ re-parents of families already running, because R25–R30 showed that is where t
       minutes rather than runs. **A stack that ends inside somebody else's code is a question about
       their code.**
 
+- [x] **R147. The 140 remaining failures are triaged, and two families are understood well enough to
+      price.** Documents only, so no gate.
+
+      **The table is in [`findings.md`](findings.md)** and each row says whether it is verified from
+      a stack or inferred from a reason string. Two families are the whole of the tail's interest.
+
+      **User-defined SQL functions, 33 tests in one class, and the cause is one thing.** An INSTANCE
+      function mapped with `HasDbFunction` has the client's own `DbContext` as its `Object`, and this
+      provider refuses to ship that -- for the reason `ServerBoundaryAnalyzer.CarriesTheClientsContext`
+      records, which is that the server has a context of its own. Inside a projection nothing then
+      refuses the call either, so the client RUNS it: ten of the tests fail with
+      `NotImplementedException` thrown from EF's own `UDFSqlContext.CustomerOrderCountInstance`, a
+      body that exists precisely to prove the call was translated rather than run. The other 23 are
+      refused instead. **A fix is a feature**: rewrite such a call to name the server's context.
+
+      **The `APPLY` family is closed as understood and not a defect.** `AsSplitQuery` is stripped, so
+      a query EF would run as a split query needs `APPLY`, which SQLite refuses. EF never overrides
+      these on its own SQLite suite, because a real split query needs no `APPLY`. **The stripping is
+      not the mistake it looks like**: it was measured as worth 456 tests. Honouring split queries
+      means carrying the hint to the server, which is a protocol change.
+
+      **WHAT THE TRIAGE SAYS TO DO NEXT IS NOT THE BIGGEST NUMBER.** 32 `GearsOfWar` tests fail
+      because this provider ANSWERS a query EF refuses -- EF cannot attribute rows after a `Distinct`
+      that drops the identifier columns. **Nothing checks those answers**, because the tests assert a
+      throw and never look at the rows. If they are wrong they are silent wrong answers, which this
+      repository counts separately and currently puts at two.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

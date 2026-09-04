@@ -9,6 +9,31 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## The 140 remaining failures, triaged (R147, 2026-09-04)
+
+The last whole-tail re-derivation predates about twenty-five tests of movement. This one is read
+from the reasons diff and the run log of the 140-failure state, and it is **partly verified and
+partly inferred** -- each row says which.
+
+| Count | Family | Reading |
+|---|---|---|
+| 32 | `TPT`/`TPC` `GearsOfWar`, eight query shapes across two tiers | **This provider ANSWERS what EF refuses.** EF cannot attribute rows after a `Distinct` that drops the identifier columns, so it raises a translation failure; this provider reassembles the projection on the client and returns data. **Whether those answers are CORRECT is unverified** -- the tests assert a throw and never look at the rows. That is the one thing in this tail worth measuring. Verified: the reason. Inferred: the correctness |
+| 33 | `UdfDbFunctionInfoCarrierTest` | **User-defined SQL functions, one feature area, two symptoms.** 10 fail with `NotImplementedException` thrown from EF's own `UDFSqlContext.CustomerOrderCountInstance`, which is a body that exists to prove the call was translated rather than run -- so **this client ran it**, inside a projection, where client evaluation is legal and nothing refuses it. The other 23 are refused instead, as `The LINQ expression 'DbSet<Customer>()...' could not be translated`. The blocker for both is that an INSTANCE function's `Object` is the client's own `DbContext`, which this provider refuses to ship for the reason `ServerBoundaryAnalyzer.CarriesTheClientsContext` records. Verified from a stack |
+| 12 | `Assert.Equal() Failure: Strings differ` | Message-text differences on queries that already refuse. Inferred from the reason |
+| 8 | `Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_split`, four classes | **`AsSplitQuery` is stripped, so the query needs `APPLY` and SQLite refuses it.** EF never overrides these on SQLite, because a genuine split query needs no `APPLY`. The stripping is not a mistake: it was measured as worth 456 tests, because the hint otherwise lands on the client where EF's own method is a no-op, and on a nested query root it forces the cut below that root. **Honouring split queries means carrying the hint to the SERVER**, which is a protocol change. Verified |
+| 7 | `Assert.Throws() Failure: Exception type was not an exact match` | Four `OwnedJsonStructuralEquality` and two `Correlated_collection_with_distinct_3_levels`. The second pair is the known pair whose assertion no correct answer satisfies. Inferred |
+| 4 | `this test store exposes no DbConnection` | By design. The client has no database |
+| 4 | `Relational-specific methods can only be used when the context is using a relational database` | Same boundary |
+| 4 | `Unable to cast InfoCarrierTypeMapping to RelationalTypeMapping` | The level-3 boundary: a relational model on the client needs store knowledge it cannot honestly have |
+| 4 | `No part of the query can be executed on the server` | Inferred |
+| ~32 | singles and pairs | Not re-read here |
+
+**THE ONE THING THIS TRIAGE SAYS TO DO NEXT, and it is not the biggest number.** The 32 GearsOfWar
+tests are the only place where this provider is known to *answer* a query EF refuses, and nothing in
+the suite checks the answers. EF refuses them because the rows cannot be attributed. If this
+provider's answers are wrong, they are silent wrong answers, which this repository counts separately
+and currently puts at two.
+
 ## An intermittent closed by reading the source it came from (R143/R146, 2026-09-04)
 
 `AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async: False)` failed
