@@ -85,19 +85,31 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
     ///         forgets the interface. It is the same correction
     ///         <see cref="GetBaseTestClasses" /> already makes for the same reason: a compliance
     ///         test written against one assembly has to be told which half of a merged one it
-    ///         answers for. The tier is identified by namespace, which is also how the two tiers
-    ///         are laid out on disk, so a relational fixture placed outside it would escape this
-    ///         check -- put it under this namespace.
+    ///         answers for.
+    ///     </para>
+    ///     <para>
+    ///         <b>A tier is identified by namespace, and there are two relational ones since
+    ///         R157.</b> Tier B is SQLite and Tier C is Firebird; both are relational, so both are
+    ///         checked. Listing them is what keeps the rule honest — the remark here used to say
+    ///         "put a relational fixture under this namespace or it escapes the check", and Tier C
+    ///         made that instruction impossible to follow. <b>A fourth tier must be added to this
+    ///         list</b>, and a relational fixture outside every namespace in it is still
+    ///         unchecked.
     ///     </para>
     /// </remarks>
     public override void All_query_test_fixtures_must_implement_ITestSqlLoggerFactory()
     {
-        string tierNamespace = typeof(RelationalInfoCarrierComplianceTest).Namespace!;
+        string[] relationalTierNamespaces =
+        [
+            typeof(RelationalInfoCarrierComplianceTest).Namespace!,
+            "InfoCarrier.Core.FunctionalTests.Firebird",
+        ];
 
         List<Type> queryFixturesWithoutTestSqlLogger = TargetAssembly
             .GetTypes()
             .Where(t => t.BaseType != typeof(object) && (t.IsPublic || t.IsNestedPublic))
-            .Where(t => t.Namespace?.StartsWith(tierNamespace, StringComparison.Ordinal) == true)
+            .Where(t => relationalTierNamespaces.Any(
+                tier => t.Namespace?.StartsWith(tier, StringComparison.Ordinal) == true))
             .Where(t => t.GetInterfaces().Contains(typeof(IQueryFixtureBase)))
             .Where(t => !t.GetInterfaces().Contains(typeof(ITestSqlLoggerFactory)))
             .ToList();

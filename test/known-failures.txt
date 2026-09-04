@@ -3174,5 +3174,33 @@
 # is the store saying it has no table-valued function. ELEVEN tests in that class are now blocked
 # by the store alone, and Tier C is what closes them.
 
-failed=111
+# 2026-09-04 (R157) -- `failed` FALLS 111 -> 84, `total` UNCHANGED at 29513. UdfDbFunctionTestBase
+# moves from Tier B to Tier C, which is the tier built for it. 34 of its 106 tests failed on
+# SQLite; 7 fail on Firebird.
+#
+# THE REASONS DIFF IS THE EVIDENCE AND IT IS EXACT. Every store gap disappears and nothing else
+# moves:
+#
+#   -14  requires the SQL APPLY operation, which is not supported on SQLite
+#   -6   no such table: GetTopTwoSellingProducts
+#   -4   no such table: GetCustomerOrderCountByYear
+#   -2   near "(": syntax error        (the schema-qualified IdentityString; Firebird has no
+#                                       schemas either, so the mapping clears the schema instead)
+#   -1   no such table: GetOrdersWithMultipleProducts
+#   +1   Assert.Throws() Failure: No exception was thrown
+#   -1   Assert.Equal() Failure: Strings differ
+#
+# The FIXED and BROKEN lists both name this class only, because the tests moved namespace: 34
+# SQLite names leave and 7 Firebird names arrive. That is a rename and not a regression, and the
+# reasons above are what says so.
+#
+# WHAT IS LEFT IS 6 + 1 AND NEITHER PART IS THE STORE'S. Six are
+# Scalar_Function_Anonymous_Type_Select_*: a mapped function in a final projection is answered by
+# the client's own method rather than by the store, which is this provider's gap and no store
+# fixes it. One is QF_Select_Correlated_Subquery_In_Anonymous_Nested, which expects a translation
+# failure and gets an answer -- the class of thing that belongs in the limitations document's
+# "queries this provider answers that other providers reject", once it is checked rather than
+# assumed.
+
+failed=84
 total=29513

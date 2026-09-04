@@ -4945,6 +4945,51 @@ re-parents of families already running, because R25–R30 showed that is where t
       **The rule: a helper that resolves paths from the PROCESS is answering a different question
       from one that resolves them from the ASSEMBLY, and `dotnet test` is where the two diverge.**
 
+- [x] **R156. Name the upstream issue where the correction says it can be deleted.**
+      FirebirdSQL/NETProvider#1277, with the repro, both working SQL forms and the suggested
+      branch. The generator subclass and ADR-009's amendment both said "delete when the fix lands
+      upstream" and neither said where to look. `docs/` and a comment; no gate.
+
+- [x] **R157. `UdfDbFunctionTestBase` moves to Tier C, which is the tier built for it.** `test/`
+      change, so `eng/measure.sh` alone. **`failed` FALLS 111 -> 84**, `total` unchanged at 29513.
+      In the class itself: **34 of 106 failing became 7.**
+
+      **THE REASONS DIFF IS THE EVIDENCE AND IT IS EXACT.** Every store gap disappears and nothing
+      else moves: 14 `APPLY`, 6 `GetTopTwoSellingProducts`, 4 `GetCustomerOrderCountByYear`, 2
+      schema-qualified `IdentityString`, 1 `GetOrdersWithMultipleProducts`; plus one
+      `Assert.Throws` and minus one `Assert.Equal`. The FIXED and BROKEN lists name only this
+      class, 34 leaving and 7 arriving, because the tests changed namespace. **A rename shows up
+      in both lists and in neither count, and only the reasons say which it was.**
+
+      **The fixture creates every routine the base names, which Firebird's own does not.** That
+      provider's `UdfDbFunctionFbTests` omits `GetCustomerOrderCountByYear` and its
+      `OnlyFrom2000` sibling and skips nine tests as "does not have the data". Those are its
+      choices, not the store's limits, so this seed follows the PostgreSQL fixture, which creates
+      all four table-valued ones.
+
+      **Three mappings are re-pointed and each is a real difference between stores.** `IsDate` is
+      mapped `IsBuiltIn()`, so it would be emitted bare and fold to upper case, missing the
+      mixed-case routine. `MyCustomLength` and `StringLength` are mapped to SQL Server's `len`,
+      whose Firebird spelling is `char_length`. `IdentityString` is mapped to schema `dbo`, and
+      Firebird has no schemas before version 6. The Firebird provider's own fixture makes all
+      three.
+
+      **Key generation has to be asked for.** The base assigns no keys and its assertions name
+      `Id == 1`, so the store must generate them; Firebird has no implicit identity, and the
+      provider emits a sequence and a trigger only when a property says so. The annotation is set
+      in `OnModelCreating`, which this harness runs on both sides, and only the server's DDL
+      generator reads it -- the client already knows the key is store-generated, because EF's core
+      convention says so for an integer primary key on any provider.
+
+      **What is left is 6 + 1 and neither part is the store's.** Six are
+      `Scalar_Function_Anonymous_Type_Select_*`: a mapped function in a final projection is
+      answered by the client's own method. One expects a translation failure and gets an answer.
+
+      `SqliteFunctionInterceptor` had one consumer and now has none, so it is deleted. The
+      relational compliance test's namespace filter now covers both relational tiers: its own
+      remark told readers to put a relational fixture under the SQLite namespace, and Tier C made
+      that impossible to follow.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
