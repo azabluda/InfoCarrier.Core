@@ -136,9 +136,48 @@ public sealed class ServerBoundaryAnalyzer(
             _ => false,
         };
 
+    /// <summary>
+    ///     Whether a node is something the server can execute from, rather than merely a node the
+    ///     wire can carry.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A call to a mapped <em>queryable</em> function is one, and saying so is the
+    ///         whole of R154.</b> EF declares every such function as an instance method on the
+    ///         context — <c>FromExpression(() =&gt; GetTopTwoSellingProducts())</c> is the shape,
+    ///         and there is no other — so the call's receiver is the client's live
+    ///         <see cref="Microsoft.EntityFrameworkCore.DbContext" />, replaced before the boundary
+    ///         is drawn by a <see cref="ServerContextExpression" />. When such a call sits
+    ///         <em>inside</em> a query rooted on a <c>DbSet</c> nothing was ever wrong: the root
+    ///         came from elsewhere. When the call IS the root, this method used to find a tree of
+    ///         wholly expressible nodes with no root in it, and the query was refused with "no part
+    ///         of the query can be executed on the server" — a correct answer to the question being
+    ///         asked and the wrong answer to the query.
+    ///     </para>
+    ///     <para>
+    ///         <b>The marker already carries the knowledge, so nothing new had to be plumbed
+    ///         in.</b> <c>QuerySplitter</c> creates a <see cref="ServerContextExpression" /> only
+    ///         for a method the model maps with <c>HasDbFunction</c>, so "its receiver is that
+    ///         marker and it returns an <see cref="IQueryable" />" already means "a mapped
+    ///         queryable function". No model, no constructor parameter, and no wire change: this
+    ///         analyzer takes the same three arguments it shipped with, which matters because
+    ///         adding an optional one to a public constructor is a binary break.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only the queryable ones.</b> A mapped scalar function on the context reaches the
+    ///         same marker and is not a root, which is right: it is a value inside a query, and a
+    ///         query made only of it has nothing to execute.
+    ///     </para>
+    /// </remarks>
     internal static bool IsQueryRoot(Expression node)
-        => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression
-            or ConstantExpression { Value: IQueryable };
+        => node switch
+        {
+            Microsoft.EntityFrameworkCore.Query.QueryRootExpression => true,
+            ConstantExpression { Value: IQueryable } => true,
+            MethodCallExpression { Object: ServerContextExpression } call
+                => typeof(IQueryable).IsAssignableFrom(call.Type),
+            _ => false,
+        };
 
     /// <summary>
     ///     Whether a node is the caller's live <see cref="DbContext" />, which nothing can ship.

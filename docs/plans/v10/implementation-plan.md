@@ -4879,6 +4879,45 @@ re-parents of families already running, because R25–R30 showed that is where t
       boundary refusal both read as "the table-valued function does not work" until one of them
       stops being a gap.
 
+- [x] **R154. A mapped queryable function is a query root.** `src/` change, so `eng/measure.sh`
+      and `eng/trim-ratchet.sh`. No public signature moved, so no pack. **`failed` UNCHANGED at
+      111**, `total` unchanged at 29513, FIXED none, BROKEN none. Trim `ours` unchanged at 90.
+
+      **THE COUNT AND BOTH NAME LISTS ARE IDENTICAL AND THE CHANGE IS REAL.** This is the exact
+      case the third level of `eng/measure.sh` exists for. The reasons diff:
+
+      ```
+      -2  No part of the query can be executed on the server: '[ServerContextExpression]...'
+      +1  no such table: GetTopTwoSellingProducts        (5 -> 6)
+      +1  no such table: GetCustomerOrderCountByYear     (3 -> 4)
+      ```
+
+      `QF_Stand_Alone` and `QF_Stand_Alone_Parameter` now reach the store and fail exactly as
+      their nine siblings do. **Eleven tests in that class are blocked by the store alone**, where
+      before it was nine and two.
+
+      **The defect.** EF declares every queryable function as an instance method on the context,
+      `FromExpression(() => GetTopTwoSellingProducts())`, and there is no other shape. So the
+      call's receiver is the client's live `DbContext`, which R151 replaces with a
+      `ServerContextExpression` before the boundary is drawn. Inside a query rooted on a `DbSet`
+      nothing was ever wrong, because the root came from elsewhere. **When the call IS the root**,
+      `IsQueryRoot` found a tree of wholly expressible nodes with no root in it and the query was
+      refused -- a correct answer to the question being asked and the wrong answer to the query.
+
+      **The fix is one clause and needed nothing plumbed in.** `QuerySplitter` creates that marker
+      only for a method the model maps with `HasDbFunction`, so "the receiver is the marker and
+      the call returns an `IQueryable`" already means "a mapped queryable function". No model, no
+      constructor parameter, no wire change. **That also avoided a binary break**: adding an
+      optional parameter to `ServerBoundaryAnalyzer`'s public constructor is source-compatible and
+      `CP0002`, which this repository has been caught by six times.
+
+      **Only the queryable ones.** A mapped scalar function reaches the same marker and is still
+      not a root, which is right: it is a value inside a query, and a query made only of it has
+      nothing to execute.
+
+      `FirebirdSmokeTest` carried this as a pin asserting the refusal; it now asserts the data,
+      and returns it.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

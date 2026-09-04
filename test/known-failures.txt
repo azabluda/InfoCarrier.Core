@@ -3160,5 +3160,19 @@
 # executed on the server", which is this provider's boundary refusing a mapped queryable function
 # used as the ONLY query root. Only a store that HAS the function can tell the two apart.
 
+# 2026-09-04 (R154) -- `failed` UNCHANGED at 111, `total` UNCHANGED at 29513, FIXED none, BROKEN
+# none, AND THE CHANGE IS REAL. This is the case this repository's measurement discipline exists
+# for: the count and both name lists are identical, and the REASONS moved.
+#
+#   -2  No part of the query can be executed on the server: '[ServerContextExpression]...'
+#   +1  no such table: GetTopTwoSellingProducts        (5 -> 6)
+#   +1  no such table: GetCustomerOrderCountByYear     (3 -> 4)
+#
+# QF_Stand_Alone and QF_Stand_Alone_Parameter used to be refused by this provider's boundary: a
+# mapped queryable function used as the ONLY query root left a tree of wholly expressible nodes
+# with no root in it. They now reach the store and fail exactly as their nine siblings do, which
+# is the store saying it has no table-valued function. ELEVEN tests in that class are now blocked
+# by the store alone, and Tier C is what closes them.
+
 failed=111
 total=29513

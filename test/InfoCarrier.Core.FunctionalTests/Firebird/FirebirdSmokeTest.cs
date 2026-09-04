@@ -143,8 +143,8 @@ public class FirebirdSmokeTest
     }
 
     /// <summary>
-    ///     A table-valued function used as the <em>only</em> query root is refused by this
-    ///     provider's boundary, and that is this provider's gap rather than the store's.
+    ///     A table-valued function used as the <em>only</em> query root. <b>This is what Tier B
+    ///     cannot do at all</b>, and until R154 this provider refused it as well.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -169,29 +169,26 @@ public class FirebirdSmokeTest
     ///         which is the correct answer to the question it is asking and the wrong answer here.
     ///     </para>
     ///     <para>
-    ///         <b>The pin asserts the refusal so the fix has something to flip.</b> Delete the
-    ///         assertion and restore the data comparison, which is written out below, when the
-    ///         analyzer learns this root.
+    ///         <b>The fix is one clause, and it needed nothing plumbed in.</b> The marker is
+    ///         created only for a method the model maps with <c>HasDbFunction</c>, so "receiver is
+    ///         that marker and the call returns an <c>IQueryable</c>" already means "a mapped
+    ///         queryable function", which is a query root. A mapped <em>scalar</em> function
+    ///         reaches the same marker and is still not a root, which is right: it is a value
+    ///         inside a query.
     ///     </para>
     /// </remarks>
     [ConditionalFact]
-    public async Task A_table_valued_function_as_the_only_query_root_is_still_refused()
+    public async Task A_table_valued_function_as_the_only_query_root_is_answered_by_the_server()
     {
         await using FirebirdInfoCarrierBackendTestStore store = await SeededStoreAsync();
         await using FirebirdSmokeContext client = CreateClient(store);
 
-        // What this should one day be:
-        //     Assert.Equal(["first", "second"], headings);
-        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.PostsOf(1)
-                .OrderBy(p => p.PostId)
-                .Select(p => p.Heading)
-                .ToListAsync());
+        List<string?> headings = await client.PostsOf(1)
+            .OrderBy(p => p.PostId)
+            .Select(p => p.Heading)
+            .ToListAsync();
 
-        Assert.Contains(
-            "No part of the query can be executed on the server",
-            refused.Message,
-            StringComparison.Ordinal);
+        Assert.Equal(["first", "second"], headings);
     }
 
     /// <summary>
