@@ -42,6 +42,19 @@ public sealed class QuerySplitter
     private static readonly HashSet<string> SplitHints = [AsSplitQueryName, "AsSingleQuery"];
 
     /// <summary>
+    ///     Whether the server's backing store is relational, and so whether relational query rules
+    ///     are enforced here. <see langword="true" /> unless the application said otherwise.
+    /// </summary>
+    /// <remarks>
+    ///     <b>An init property and not a constructor parameter</b>, for the reason the property
+    ///     below records: this class shipped in <c>10.0.0</c>, and adding a parameter to its
+    ///     constructor is a binary break that package validation reports as <c>CP0002</c>. A
+    ///     splitter is built per execution and <see cref="Split" /> is called once on it, so an
+    ///     init property is as well scoped as a parameter would be.
+    /// </remarks>
+    public bool ServerStoreIsRelational { get; init; } = true;
+
+    /// <summary>
     ///     What the last <see cref="Split" /> found the query asking for, or
     ///     <see langword="null" /> when it asked for nothing.
     /// </summary>
@@ -192,7 +205,12 @@ public sealed class QuerySplitter
         // is not merely coarse — it strands navigation reads and correlated subqueries on the
         // client, and it decomposes a `GroupBy` from the aggregate that makes it translatable.
         query = ProjectionRewriter.Rewrite(
-            query, _analyzer, out IReadOnlySet<Expression> reassemblies, rootRebuild, _model);
+            query,
+            _analyzer,
+            out IReadOnlySet<Expression> reassemblies,
+            out IReadOnlySet<Expression> collectionReassemblies,
+            rootRebuild,
+            _model);
 
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
 
@@ -216,6 +234,10 @@ public sealed class QuerySplitter
 
         RejectOpenFragments(analysis);
         RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
+        if (ServerStoreIsRelational)
+        {
+            RejectIdentityLosingCollectionProjection(query, collectionReassemblies);
+        }
 
         // Substitute each shipped subtree with a parameter the caller binds to its results.
         var parameters = new List<ParameterExpression>(analysis.Shippable.Count);
@@ -616,6 +638,101 @@ public sealed class QuerySplitter
             }
 
             return node;
+        }
+    }
+
+    /// <summary>
+    ///     Refuses <c>Distinct</c> or a set operation applied over a projection that carries a
+    ///     collection, which is what every other relational provider does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This provider could answer it, and answering was the defect.</b> The projection
+    ///         is rewritten before the boundary is drawn, so a <c>Distinct</c> above a
+    ///         client-typed projection ends up above the CLIENT-side reassembly and never reaches
+    ///         the server: the server SQL for such a query contains no <c>DISTINCT</c> at all,
+    ///         which is how this was confirmed rather than reasoned. EF refuses the same query on
+    ///         every other relational provider, because the identifying columns the collection
+    ///         needs do not survive the <c>Distinct</c>.
+    ///     </para>
+    ///     <para>
+    ///         <b>Answering it taught callers to write LINQ that runs nowhere else</b>, and the
+    ///         answer was unverifiable in the bargain: no other provider executes the query, so
+    ///         there is no reference result to compare it against, and this repository's own
+    ///         documentation said so. A query that works here and throws everywhere else is a
+    ///         trap, whatever it returns.
+    ///     </para>
+    ///     <para>
+    ///         <b>The message is EF's own, word for word.</b> A caller who ports this query to
+    ///         another provider has to recognise what they read here, and a suite ported the other
+    ///         way asserts that exact string.
+    ///     </para>
+    /// </remarks>
+    private static void RejectIdentityLosingCollectionProjection(
+        Expression query, IReadOnlySet<Expression> collectionReassemblies)
+    {
+        if (collectionReassemblies.Count > 0)
+        {
+            new IdentityLosingOperatorFinder(collectionReassemblies).Visit(query);
+        }
+    }
+
+    /// <summary>
+    ///     Finds a set operator sitting on a reassembly that carries a collection.
+    /// </summary>
+    private sealed class IdentityLosingOperatorFinder(IReadOnlySet<Expression> collectionReassemblies)
+        : ExpressionVisitor
+    {
+        // EF HAS A DIFFERENT MESSAGE FOR EACH, and using one for both is how the first version of
+        // this guard was measured: it fired correctly on all 36 and every one still failed, on
+        // `Assert.Equal` against the wrong string. `Distinct` erases the identity directly, and
+        // EF says so. The set operators erase it by merging two sources whose rows can no longer
+        // be told apart, and EF calls that a set operation after client evaluation, which is
+        // exactly what this reassembly is.
+        private static readonly Dictionary<string, string> Refusals = new(StringComparer.Ordinal)
+        {
+            [nameof(Queryable.Distinct)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.DistinctOnCollectionNotSupported,
+            [nameof(Queryable.Union)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            [nameof(Queryable.Concat)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            [nameof(Queryable.Intersect)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            [nameof(Queryable.Except)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+        };
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (Refusals.TryGetValue(node.Method.Name, out string? refusal)
+                && node.Arguments.Any(argument => ContainsReassembly(argument, collectionReassemblies)))
+            {
+                throw new InvalidOperationException(refusal);
+            }
+
+            return base.VisitMethodCall(node);
+        }
+
+        private static bool ContainsReassembly(Expression source, IReadOnlySet<Expression> reassemblies)
+        {
+            bool found = false;
+            new Search(reassemblies, () => found = true).Visit(source);
+            return found;
+        }
+
+        private sealed class Search(IReadOnlySet<Expression> reassemblies, Action onFound) : ExpressionVisitor
+        {
+            public override Expression? Visit(Expression? node)
+            {
+                if (node is not null && reassemblies.Contains(node))
+                {
+                    onFound();
+                    return node;
+                }
+
+                return base.Visit(node);
+            }
         }
     }
 

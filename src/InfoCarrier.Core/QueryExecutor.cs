@@ -93,7 +93,13 @@ internal sealed class QueryExecutor<TElement>
             Expressions.TypeAllowlist.ForModel(queryContext.Context.Model, allowedTypes),
             queryContext.QueryLogger,
             InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context),
-            _relationalRoots);
+            _relationalRoots)
+        {
+            // Read here and handed in, so one reader answers for the whole execution. That is
+            // R120's rule: a fact two components read independently can disagree with itself.
+            ServerStoreIsRelational =
+                InfoCarrierOptionsExtension.ServerStoreIsRelationalFor(queryContext.Context),
+        };
 
         _split = splitter.Split(substituted);
 

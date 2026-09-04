@@ -102,4 +102,39 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
 
         return this;
     }
+
+    /// <summary>
+    ///     States that the server's backing store is <em>not</em> relational, so relational query
+    ///     rules are not enforced on this client.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A statement of fact, not a permission.</b> The client has no database and never
+    ///         sees the server's provider, so it cannot work this out for itself; the deployment
+    ///         knows and says so once.
+    ///     </para>
+    ///     <para>
+    ///         <b>It changes one behaviour.</b> By default this provider refuses a <c>Distinct</c>
+    ///         or set operation applied over a projection that carries a collection, because every
+    ///         relational provider refuses that query and LINQ written here should run elsewhere
+    ///         unchanged. A non-relational store answers it, and refusing would fail a query the
+    ///         store supports.
+    ///     </para>
+    ///     <para>
+    ///         <b>Call it only when the server really is not relational.</b> Calling it against a
+    ///         relational server does not make the query work there; it removes the refusal here
+    ///         and lets a caller write LINQ that the server will reject.
+    ///     </para>
+    /// </remarks>
+    /// <returns>The same builder, so calls chain.</returns>
+    public virtual InfoCarrierDbContextOptionsBuilder UseNonRelationalServerStore()
+    {
+        InfoCarrierOptionsExtension extension =
+            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
+                .WithNonRelationalServerStore();
+
+        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
+
+        return this;
+    }
 }

@@ -236,6 +236,19 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public virtual Type? StoreParameterType => null;
 
     /// <summary>
+    ///     Whether this store is relational, which the CLIENT cannot work out for itself.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Knowledge, not permission.</b> The client has no database and never sees the
+    ///     server's provider, so a rule that is only true of a relational store has to be told.
+    ///     The one rule this carries today is the refusal of <c>Distinct</c> over a projection
+    ///     carrying a collection: every relational provider refuses it, and EF's InMemory provider
+    ///     answers it. Relational by default, because that is the ordinary deployment and a
+    ///     default that costs a wrong answer must be the one you ask for.
+    /// </remarks>
+    public virtual bool ServerStoreIsRelational => true;
+
+    /// <summary>
     ///     The store's own additions to the <em>server's</em> services, once the fixture has
     ///     granted raw SQL execution.
     /// </summary>

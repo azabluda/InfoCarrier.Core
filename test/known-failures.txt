@@ -3271,5 +3271,38 @@
 # NO OTHER BASE BELONGS ON TIER C. The bar is a base that needs a capability SQLite has not got,
 # and after the re-read nothing in the tail names one.
 
-failed=77
+# 2026-09-04 (R160) -- `failed` FALLS 77 -> 55, `total` unchanged at 29513. FIXED 22, BROKEN none.
+#
+#   -18  Assert.Throws() Failure: No exception was thrown              (40 -> 22)
+#   -4   Assert.Throws() Failure: Exception type was not an exact match  (7 -> 3)
+#
+# THIS PROVIDER NOW REFUSES `Distinct` AND SET OPERATIONS OVER A PROJECTION THAT CARRIES A
+# COLLECTION, as every relational provider does, and the reason is portability rather than
+# correctness. The answers it used to give may well have been right; nothing could check them,
+# because no other provider executes the query -- website/docs/limitations.md said exactly that.
+# What could be checked is that the LINQ ran here and threw everywhere else, which is a habit that
+# breaks the moment a caller ports it.
+#
+# WHY THE SERVER COULD NOT DO THE REFUSING. The projection is rewritten before the boundary is
+# drawn, so a `Distinct` above a client-typed projection ends up above the CLIENT-side reassembly
+# and never crosses. The server SQL for such a query contains no `DISTINCT` at all -- measured
+# with INFOCARRIER_SERVER_SQL, not reasoned. So the guard is on the client, and the message is
+# EF's own, picked per operator: DistinctOnCollectionNotSupported for `Distinct`, and
+# SetOperationsNotAllowedAfterClientEvaluation for the set operators.
+#
+# IT IS GATED ON THE BACKING STORE BEING RELATIONAL, and that is not decoration. The first version
+# refused everywhere and broke EIGHT Tier A tests: EF's InMemory provider is not relational, does
+# not refuse these queries, and answers them. The client has no database and never sees the
+# server's provider, so it cannot tell -- it is told, once, through
+# InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore(). Knowledge, not permission,
+# which is R120's distinction. Relational is the default, because it is the ordinary deployment.
+#
+# STILL OPEN: 16 tests in the same family whose `Distinct` sits INSIDE the collection rather than
+# above the projection -- Where_coalesce_with_anonymous_types,
+# Correlated_collection_order_by_constant_null_of_non_mapped_type, and
+# Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions.
+# Widening this guard to reach them risks refusing ordinary queries, so they are a separate shape
+# and a separate measurement.
+
+failed=55
 total=29513

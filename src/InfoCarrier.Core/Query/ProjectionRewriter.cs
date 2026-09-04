@@ -64,6 +64,27 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    ///     The reassemblies whose tuple carries a <em>collection</em> slot.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>These are the ones an outer <c>Distinct</c> or set operation must not be allowed
+    ///         to sit on.</b> EF refuses `Select(c => new { c.City, Orders = c.Orders.ToList() })`
+    ///         followed by `Distinct()` on every relational provider, because the identifying
+    ///         columns the collection needs do not survive the `Distinct`. This provider used to
+    ///         answer it: the projection is rewritten before the boundary is drawn, so the
+    ///         `Distinct` ends up above the CLIENT-side reassembly and never reaches the server at
+    ///         all. The server SQL for such a query contains no `DISTINCT`, which is how this was
+    ///         confirmed rather than reasoned.
+    ///     </para>
+    ///     <para>
+    ///         Only a collection slot matters. `Select(c => new { c.City }).Distinct()` is an
+    ///         ordinary query that every provider runs, and refusing it would be a regression.
+    ///     </para>
+    /// </remarks>
+    private readonly HashSet<Expression> _collectionReassemblies = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
     ///     Every member the query reads anywhere, by declaring type and name.
     /// </summary>
     /// <remarks>
@@ -96,6 +117,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     client-side operators a split is allowed to produce; see
     ///     <see cref="QuerySplitter" />'s client-evaluation guard.
     /// </param>
+    /// <param name="collectionReassemblies">
+    ///     The subset of <paramref name="reassemblies" /> whose tuple carries a collection slot.
+    ///     <c>QuerySplitter</c> refuses a <c>Distinct</c> or set operation applied over one of
+    ///     these, as every other relational provider does.
+    /// </param>
     /// <param name="alreadyReassembled">
     ///     A reassembly an earlier pass produced, which this one must preserve rather than treat
     ///     as client code to rewrite again.
@@ -108,6 +134,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         Expression query,
         ServerBoundaryAnalyzer analyzer,
         out IReadOnlySet<Expression> reassemblies,
+        out IReadOnlySet<Expression> collectionReassemblies,
         Expression? alreadyReassembled = null,
         Microsoft.EntityFrameworkCore.Metadata.IModel? model = null)
     {
@@ -119,6 +146,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         };
         Expression result = rewriter.Visit(query);
         reassemblies = rewriter._reassemblies;
+        collectionReassemblies = rewriter._collectionReassemblies;
         return result;
     }
 
@@ -227,8 +255,36 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
                     typeof(Func<,>).MakeGenericType(row.Type, selector.ReturnType), clientBody, row)));
 
         _reassemblies.Add(reassembly);
+        if (fragments.Any(f => CarriesACollection(f, consumed)))
+        {
+            _collectionReassemblies.Add(reassembly);
+        }
+
         return reassembly;
     }
+
+    /// <summary>
+    ///     Whether a tuple slot built from this fragment holds a collection rather than a value.
+    /// </summary>
+    /// <remarks>
+    ///     Broader than <see cref="IsQueryableCollection" />, which asks only about the exact
+    ///     <see cref="IQueryable{T}" /> shape that cannot travel. Here the question is what the
+    ///     slot <em>holds</em>, and a navigation already materialized into a list holds a
+    ///     collection just as much as a queryable does. <see cref="string" /> is a sequence of
+    ///     characters and is not one of these.
+    /// </remarks>
+    /// <remarks>
+    ///     <b>`IsAssignableFrom` rather than a walk over `GetInterfaces()`, and the trim ratchet
+    ///     is what decided it.</b> The first version asked each interface whether it was
+    ///     `IEnumerable&lt;&gt;`, which is reflection over a type the model named and costs an
+    ///     IL2070: `ours` went 90 to 91 for a question that needs no reflection at all. The
+    ///     non-generic interface answers it, and `string` is the one sequence that is not a
+    ///     collection.
+    /// </remarks>
+    private static bool CarriesACollection(Expression fragment, IReadOnlySet<Expression> consumed)
+        => IsQueryableCollection(fragment, consumed)
+            || (fragment.Type != typeof(string)
+                && typeof(System.Collections.IEnumerable).IsAssignableFrom(fragment.Type));
 
     /// <summary>
     ///     Whether a call's last argument is the selector that <em>produces its element type</em> —
@@ -385,6 +441,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             Expression.Quote(Expression.Lambda(clientBody, row)));
 
         _reassemblies.Add(reassembly);
+        if (fragments.Any(f => CarriesACollection(f, consumed)))
+        {
+            _collectionReassemblies.Add(reassembly);
+        }
+
         return reassembly;
     }
 

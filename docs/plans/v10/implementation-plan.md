@@ -5027,6 +5027,48 @@ re-parents of families already running, because R25–R30 showed that is where t
       client code wrapping it still runs on the client over the value the store returned. EF's own
       `Scalar_Function_ClientEval_*` tests stay green.
 
+- [x] **R159. Re-triage the tail at 77.** `test/` text only, recorded in
+      `test/known-failures.txt`. The finding is what is NOT there: no `InfoCarrierServerException`
+      remains, so not one of the 77 is a store limitation and no other base belongs on Tier C.
+
+- [x] **R160. Refuse `Distinct` and set operations over a projection carrying a collection.**
+      `src/` change, so `eng/measure.sh` and `eng/trim-ratchet.sh`; public members were ADDED, so
+      `dotnet pack` as well. **`failed` FALLS 77 -> 55**, FIXED 22, BROKEN none. Trim `ours`
+      unchanged at 90. Pack clean, no `CP0002`.
+
+      **THE REASON IS PORTABILITY, NOT CORRECTNESS, and it is the owner's call rather than a
+      measurement.** The answers this provider gave may well have been right; nothing could check
+      them, because no other provider executes the query -- `website/docs/limitations.md` said so
+      in as many words. What could be checked is that the LINQ ran here and threw everywhere else.
+
+      **The server could not do the refusing, and that was measured before it was designed.** The
+      projection is rewritten before the boundary is drawn, so a `Distinct` above a client-typed
+      projection ends up above the CLIENT-side reassembly and never crosses. Running one of these
+      with `INFOCARRIER_SERVER_SQL=1` gives a single `LEFT JOIN` with **no `DISTINCT` in it**.
+
+      **EF has a different message per operator and the first version used one for both.** It
+      fired correctly on all 36 tests and every one still failed, on `Assert.Equal` against the
+      wrong string. The count said "no change" and I read the count instead of the reason, which
+      is the mistake this repository's measurement discipline exists to prevent.
+
+      **IT IS GATED ON THE BACKING STORE BEING RELATIONAL, and the first version was not.**
+      Refusing everywhere broke **eight** Tier A tests: EF's InMemory provider is not relational,
+      does not refuse these queries, and answers them. The client cannot tell what the server's
+      store is, so it is told once, through
+      `InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore()` -- **knowledge, not
+      permission**, which is R120's distinction, and relational by default because that is the
+      ordinary deployment and a default that costs a wrong answer must be the one you ask for.
+      `QuerySplitter.ServerStoreIsRelational` is an **init property, not a constructor
+      parameter**, because that class shipped in `10.0.0`.
+
+      **The trim ratchet caught a real regression on the way.** The first collection test walked
+      `Type.GetInterfaces()`, reflection over a type the model named, and `ours` went 90 to 91.
+      The non-generic `IEnumerable` answers the same question with no reflection.
+
+      **Still open: 16 tests whose `Distinct` sits INSIDE the collection** rather than above the
+      projection. Widening this guard to reach them risks refusing ordinary queries, so they are a
+      separate shape and a separate measurement.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

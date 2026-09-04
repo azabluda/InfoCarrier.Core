@@ -60,7 +60,9 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
         // The raw-SQL grant and the projection types are INDEPENDENT declarations, and reading the
         // first as a precondition of the second was the shape this method had until
         // `SqlQueryTestBase` was adopted. A fixture may declare a DTO and grant no SQL.
-        if (!arbitrarySql && allowedTypes.Length == 0)
+        bool relationalStore = backend.ServerStoreIsRelational;
+
+        if (!arbitrarySql && allowedTypes.Length == 0 && relationalStore)
         {
             return null;
         }
@@ -69,6 +71,13 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
         return o =>
         {
+            // Knowledge the client cannot derive: only the store knows what it is. Tier A says so
+            // because EF's InMemory provider answers queries every relational provider refuses.
+            if (!relationalStore)
+            {
+                o.UseNonRelationalServerStore();
+            }
+
             if (arbitrarySql)
             {
                 o.AllowArbitrarySqlExecution();

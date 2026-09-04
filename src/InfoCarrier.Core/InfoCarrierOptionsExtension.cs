@@ -73,6 +73,55 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
 
     /// <summary>
+    ///     Whether the server's backing store is relational. <c>true</c> unless the application
+    ///     called <see cref="InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>KNOWLEDGE, NOT PERMISSION, and the distinction is R120's.</b> Nothing here is
+    ///         granted or withheld: this states a fact about the deployment that the client cannot
+    ///         work out for itself. The client has no database and never sees the server's
+    ///         provider, so it cannot tell a relational store from a document one, and some rules
+    ///         are only true of the first.
+    ///     </para>
+    ///     <para>
+    ///         <b>It guards one thing: refusing a <c>Distinct</c> or set operation over a
+    ///         projection that carries a collection.</b> Every relational provider refuses that
+    ///         query, so refusing it here keeps LINQ written against this provider portable.
+    ///         EF's InMemory provider does not refuse it, and enforcing a relational rule over a
+    ///         non-relational store would fail a query the store can answer -- measured, at eight
+    ///         specification tests.
+    ///     </para>
+    ///     <para>
+    ///         <b>The default is the relational one on purpose.</b> A server whose store is not
+    ///         relational is the rare deployment, and the default that costs a wrong answer must
+    ///         be the one you have to ask for.
+    ///     </para>
+    /// </remarks>
+    public virtual bool ServerStoreIsRelational { get; private set; } = true;
+
+    /// <summary>
+    ///     Clears <see cref="ServerStoreIsRelational" /> for this options instance.
+    /// </summary>
+    public virtual InfoCarrierOptionsExtension WithNonRelationalServerStore()
+    {
+        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
+        clone.ServerStoreIsRelational = false;
+        return clone;
+    }
+
+    /// <summary>
+    ///     Whether the context's own options say the server's store is relational, read
+    ///     <em>per execution</em> for the reason <see cref="AllowedTypesFor" /> records.
+    /// </summary>
+    internal static bool ServerStoreIsRelationalFor(Microsoft.EntityFrameworkCore.DbContext context)
+        => Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<IDbContextOptions>(context)
+            .Extensions
+            .OfType<InfoCarrierOptionsExtension>()
+            .FirstOrDefault()
+            ?.ServerStoreIsRelational ?? true;
+
+    /// <summary>
     ///     Whether the context's own options permit sending raw SQL, read <em>per execution</em>
     ///     for the reason <see cref="AllowedTypesFor" /> records.
     /// </summary>
