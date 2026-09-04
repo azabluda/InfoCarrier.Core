@@ -233,7 +233,7 @@ public sealed class QuerySplitter
         }
 
         RejectOpenFragments(analysis);
-        RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
+        RejectClientEvaluation(query, analysis, reassemblies, _allowlist, ServerStoreIsRelational);
         if (ServerStoreIsRelational)
         {
             RejectIdentityLosingCollectionProjection(query, collectionReassemblies);
@@ -776,7 +776,8 @@ public sealed class QuerySplitter
         Expression query,
         BoundaryAnalysis analysis,
         IReadOnlySet<Expression> reassemblies,
-        TypeAllowlist allowlist)
+        TypeAllowlist allowlist,
+        bool serverStoreIsRelational)
     {
         // Everything inside a shipped subtree runs on the server; everything else runs here.
         var serverSide = new HashSet<Expression>(ReferenceEqualityComparer.Instance);
@@ -785,7 +786,8 @@ public sealed class QuerySplitter
             new NodeCollector(serverSide).Visit(subtree);
         }
 
-        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist) is not var (offender, details))
+        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist, serverStoreIsRelational)
+            is not var (offender, details))
         {
             return;
         }
@@ -1218,15 +1220,20 @@ public sealed class QuerySplitter
 
         private IReadOnlySet<Expression> _clientProjectedSources = new HashSet<Expression>();
 
+
+        private bool _serverStoreIsRelational = true;
+
         public static (Expression Operator, string? Details)? Find(
             Expression query,
             IReadOnlySet<Expression> serverSide,
             IReadOnlySet<Expression> reassemblies,
-            TypeAllowlist allowlist)
+            TypeAllowlist allowlist,
+            bool serverStoreIsRelational)
         {
             var finder = new ClientEvaluationFinder(serverSide, reassemblies, allowlist)
             {
                 _clientProjectedSources = ClientProjectedSources(reassemblies, allowlist),
+                _serverStoreIsRelational = serverStoreIsRelational,
             };
 
             finder.Visit(query);
@@ -1283,6 +1290,11 @@ public sealed class QuerySplitter
                 if (_found is null)
                 {
                     RejectUnshippableTypeArgument(node);
+                }
+
+                if (_found is null)
+                {
+                    RejectUnshippableOrderingKey(node);
                 }
             }
 
@@ -1364,6 +1376,76 @@ public sealed class QuerySplitter
             if (target.IsGenericParameter
                 || target.IsAssignableFrom(source)
                 || allowlist.IsAllowed(target))
+            {
+                return;
+            }
+
+            _found = (node, null);
+        }
+
+        /// <summary>
+        ///     Refuses a client-side ordering whose <em>key type</em> is one the wire cannot
+        ///     carry.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The same gap as <see cref="RejectUnshippableTypeArgument" />, on a different
+        ///         operator: the walk above reads an operator's value arguments and never its type
+        ///         arguments.</b> <c>OrderByDescending(g =&gt; (MyDTO)null)</c> carries no method
+        ///         call, no constructed type and no comparison, so
+        ///         <see cref="ClientCodeFinder" /> finds nothing in it and the ordering simply
+        ///         runs in the residual.
+        ///     </para>
+        ///     <para>
+        ///         <b>What it does there is fetch the whole table, and that was measured rather
+        ///         than reasoned.</b> A probe on
+        ///         <c>Correlated_collection_order_by_constant_null_of_non_mapped_type</c> printed
+        ///         <c>shippable=1</c> with the shipped subtree being the bare query root, and the
+        ///         server's own SQL log showed one <c>SELECT</c> over the whole
+        ///         <c>Gears UNION ALL Officers</c> set. The ordering and the projection then ran
+        ///         on the client, over every row. Right answer, catastrophic plan, no diagnostic:
+        ///         the exact failure this class exists to prevent, and the one
+        ///         <c>A_filter_the_server_cannot_run_throws_rather_than_fetching_everything</c>
+        ///         pins for a <c>Where</c>.
+        ///     </para>
+        ///     <para>
+        ///         <b>Ordering only, and not <c>GroupBy</c>.</b> A <c>GroupBy</c> keyed on an
+        ///         anonymous type is perfectly translatable and lands here only because of this
+        ///         provider's type boundary; refusing that is what cost 235 tests once. An
+        ///         ordering key, by contrast, is a scalar in every query that works: the allowlist
+        ///         admits every primitive and every mapped type, so a key it rejects is one no
+        ///         store could sort by.
+        ///     </para>
+        /// </remarks>
+        private void RejectUnshippableOrderingKey(MethodCallExpression node)
+        {
+            // RELATIONAL ONLY, AND THE FIRST VERSION WAS NOT: refusing everywhere broke the two
+            // Tier A `Correlated_collection_order_by_constant_null_of_non_mapped_type`. EF's
+            // in-memory provider is LINQ to objects and sorts by anything, so a key type no store
+            // could sort by is still a key IT can sort by. R160's distinction, and its gate.
+            if (!_serverStoreIsRelational
+                || node.Method.Name is not (nameof(Queryable.OrderBy)
+                    or nameof(Queryable.OrderByDescending)
+                    or nameof(Queryable.ThenBy)
+                    or nameof(Queryable.ThenByDescending))
+                || node.Method.DeclaringType is not { } declaring
+                || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
+                || !node.Method.IsGenericMethod)
+            {
+                return;
+            }
+
+            Type[] typeArguments = node.Method.GetGenericArguments();
+            if (typeArguments.Length != 2)
+            {
+                return;
+            }
+
+            // A generic parameter is not a type yet, and a type the allowlist permits could have
+            // shipped -- so if it is here the boundary fell for some other reason, and that reason
+            // is not this one's to report. Both exemptions are its sibling's, for its reasons.
+            Type key = typeArguments[1];
+            if (key.IsGenericParameter || allowlist.IsAllowed(key))
             {
                 return;
             }

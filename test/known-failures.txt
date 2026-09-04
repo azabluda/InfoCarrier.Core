@@ -3417,5 +3417,36 @@
 # The test looks for a warning event that was not raised. Sits beside its `_sensitive` twin in
 # class 8 and fails differently, so it is filed on its own rather than folded in.
 
-failed=55
+# 2026-09-04 (R164) -- `failed` FALLS 55 -> 51, `total` unchanged at 29513. FIXED 4, BROKEN none.
+#
+#   -4  Assert.Throws() Failure: No exception was thrown  (22 -> 18)
+#
+# AND THE FIX IS NOT THE ONE THE TEST NAME SUGGESTS. The four
+# `Correlated_collection_order_by_constant_null_of_non_mapped_type` were filed under "we answer a
+# query relational providers refuse", which reads as a portability nicety. A boundary probe says
+# otherwise: `shippable=1`, the shipped subtree is the BARE QUERY ROOT, and the server's own SQL
+# log shows one `SELECT` over the whole `Gears UNION ALL Officers` set. The ordering and the
+# projection then ran on the CLIENT over every row. Right answer, catastrophic plan, no
+# diagnostic -- which is the failure `RejectClientEvaluation` exists to prevent and which
+# `A_filter_the_server_cannot_run_throws_rather_than_fetching_everything` pins for a `Where`.
+#
+# THE HOLE IS THAT THE WALK READS AN OPERATOR'S VALUE ARGUMENTS AND NOT ITS TYPE ARGUMENTS, which
+# is J17/J18's finding for `Cast` and `OfType` reappearing on a different operator.
+# `OrderByDescending(g => (MyDTO)null)` carries no method call, no constructed type and no
+# comparison, so `ClientCodeFinder` finds nothing in it. `RejectUnshippableOrderingKey` now reads
+# the KEY TYPE of the four ordering operators and refuses one the allowlist does not admit. Every
+# primitive and every mapped type is admitted, so a key it rejects is one no store could sort by.
+#
+# RELATIONAL ONLY, and the first version was not: refusing everywhere broke the two Tier A copies,
+# because EF's in-memory provider is LINQ to objects and sorts by anything. R160's gate, R160's
+# reason.
+#
+# STILL OPEN, and deliberately: the four `Where_coalesce_with_anonymous_types`.
+# `(new { Name = g.LeaderNickname } ?? new { Name = g.FullName }) != null` reads the whole table
+# the same way, but `ClientCodeFinder.VisitNew` exempts a constructed type that HAS value
+# equality, and an anonymous type has one. That exemption is load-bearing:
+# `join o in os on new { a, b } equals new { x, y }` is a composite join key that EF translates.
+# Separating the two needs evidence, not a fourth syntactic rule -- see R162.
+
+failed=51
 total=29513

@@ -5155,6 +5155,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       each writes something SEMANTICALLY EMPTY that a relational provider still refuses to
       translate, and this provider folds it away. They are the one open decision left in the tail.
 
+- [x] **R164. An ordering key the wire cannot carry is refused, instead of the whole table being
+      fetched.** `src/` change, so `eng/measure.sh` and `eng/trim-ratchet.sh`; no public signature
+      moved, so no pack. **`failed` FALLS 55 -> 51**, FIXED 4, BROKEN none. Trim `ours` unchanged
+      at 90. The reasons diff moves one line by exactly four.
+
+      **THE OWNER'S QUESTION IS WHAT FOUND IT.** These four were filed as a portability nicety:
+      we answer a query other providers refuse. Asked whether the server therefore runs a
+      different LINQ than the caller wrote, a probe on the split answered something worse.
+      `shippable=1`, the shipped subtree is the BARE QUERY ROOT, and the server's SQL log shows
+      one `SELECT` over the whole `Gears UNION ALL Officers` set. The ordering and the projection
+      ran on the client, over every row.
+
+      **The hole: the walk reads an operator's VALUE arguments and never its TYPE arguments.**
+      That is J17/J18's finding for `Cast` and `OfType`, on a different operator.
+      `OrderByDescending(g => (MyDTO)null)` has no method call, no constructed type and no
+      comparison, so `ClientCodeFinder` finds nothing.
+      `ClientEvaluationFinder.RejectUnshippableOrderingKey` now reads the key type of `OrderBy`,
+      `OrderByDescending`, `ThenBy` and `ThenByDescending`, and refuses one the allowlist does not
+      admit -- every primitive and every mapped type is admitted, so a rejected key is one no
+      store could sort by. Both of its sibling's exemptions are kept for its reasons: a generic
+      parameter is not a type yet, and an allowed type could have shipped.
+
+      **Gated on the backing store being relational, and the first version was not.** Refusing
+      everywhere broke the two Tier A copies: EF's in-memory provider is LINQ to objects and sorts
+      by anything. R160's distinction, and `RejectClientEvaluation` now takes the flag.
+
+      **`Where_coalesce_with_anonymous_types` is left open on purpose.** It reads the whole table
+      the same way, but `ClientCodeFinder.VisitNew` exempts a constructed type that HAS value
+      equality, and an anonymous type has one. That exemption is load-bearing:
+      `join o in os on new { a, b } equals new { x, y }` is a composite join key EF translates
+      every day. Separating it from a coalesce inside a predicate is a fourth syntactic rule, and
+      R162 is the record of what those cost.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
