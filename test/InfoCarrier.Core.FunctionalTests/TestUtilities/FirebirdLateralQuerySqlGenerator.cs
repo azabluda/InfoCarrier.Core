@@ -43,8 +43,11 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     <para>
 ///         <b>This is a test-harness class and it belongs on the SERVER half only.</b> The server
 ///         in this suite is an ordinary EF application over the Firebird provider, so what it
-///         emits is that provider's business. Nothing in <c>src/</c> knows about it. Delete this
-///         file when the fix lands upstream.
+///         emits is that provider's business. Nothing in <c>src/</c> knows about it.
+///     </para>
+///     <para>
+///         <b>Reported upstream as FirebirdSQL/NETProvider#1277 on 2026-09-04, with the repro and
+///         the suggested branch. Delete this file when that lands.</b>
 ///     </para>
 /// </remarks>
 public class FirebirdLateralQuerySqlGenerator(

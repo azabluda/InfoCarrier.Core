@@ -295,8 +295,9 @@ during a run. The trade was measured, not assumed.
    defect**, not a store limit. `FbQuerySqlGenerator` wraps a plain table as
    `(SELECT * FROM "T") AS "t"` after `LATERAL`, because Firebird will not take a bare source
    there, and the same branch was never added for a function. `FirebirdLateralQuerySqlGenerator`
-   in the test harness adds it, on the **server** half only, and is to be deleted when the fix
-   lands upstream.
+   in the test harness adds it, on the **server** half only. **Reported upstream as
+   [FirebirdSQL/NETProvider#1277](https://github.com/FirebirdSQL/NETProvider/issues/1277) on
+   2026-09-04**, with the repro and the suggested branch; delete the file when that lands.
 
 **Scope, and it is narrow.** A base belongs to exactly one tier. Only a base that *needs* a
 table-valued function or `APPLY` belongs here; everything else stays where its green already means
