@@ -4735,11 +4735,17 @@ re-parents of families already running, because R25–R30 showed that is where t
       not the mistake it looks like**: it was measured as worth 456 tests. Honouring split queries
       means carrying the hint to the server, which is a protocol change.
 
-      **WHAT THE TRIAGE SAYS TO DO NEXT IS NOT THE BIGGEST NUMBER.** 32 `GearsOfWar` tests fail
-      because this provider ANSWERS a query EF refuses -- EF cannot attribute rows after a `Distinct`
-      that drops the identifier columns. **Nothing checks those answers**, because the tests assert a
-      throw and never look at the rows. If they are wrong they are silent wrong answers, which this
-      repository counts separately and currently puts at two.
+      **THE BIGGEST FAMILY IS NOT A DEFECT, and the evidence was already on screen.** 32
+      `GearsOfWar` tests fail because this provider ANSWERS a query EF refuses: EF cannot attribute
+      rows after a `Distinct` that drops the identifier columns. EF's override wraps the CORE base
+      call -- an `AssertQuery` that checks every row -- inside `Assert.ThrowsAsync`, so **"No
+      exception was thrown" means that call ran to completion and its data assertions passed.** A
+      wrong answer looks different, and does so elsewhere in the same tail:
+      `Correlated_collection_with_distinct_3_levels` reports `Assert.Equal() Failure: Values differ`.
+      **The wrong-answer count is unchanged at two.**
+
+      **The rule this produces.** An assertion's failure message says what the code under it did. I
+      was about to spend a suite run re-obtaining what the message already stated.
 
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 

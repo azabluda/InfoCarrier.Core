@@ -17,7 +17,7 @@ partly inferred** -- each row says which.
 
 | Count | Family | Reading |
 |---|---|---|
-| 32 | `TPT`/`TPC` `GearsOfWar`, eight query shapes across two tiers | **This provider ANSWERS what EF refuses.** EF cannot attribute rows after a `Distinct` that drops the identifier columns, so it raises a translation failure; this provider reassembles the projection on the client and returns data. **Whether those answers are CORRECT is unverified** -- the tests assert a throw and never look at the rows. That is the one thing in this tail worth measuring. Verified: the reason. Inferred: the correctness |
+| 32 | `TPT`/`TPC` `GearsOfWar`, eight query shapes across two tiers | **This provider ANSWERS what EF refuses.** EF cannot attribute rows after a `Distinct` that drops the identifier columns, so it raises a translation failure; this provider reassembles the projection on the client and returns data. **The answers are CORRECT, and the existing failure message already said so.** EF's relational override wraps the CORE base call -- which is an `AssertQuery` that checks every row -- inside `Assert.ThrowsAsync<InvalidOperationException>`. "No exception was thrown" therefore means that call **ran to completion**, so its data assertions passed. A wrong answer surfaces differently and does so elsewhere in this same tail: `Correlated_collection_with_distinct_3_levels` reports `Assert.Equal() Failure: Values differ` from EF's `AssertResults`. Fully verified |
 | 33 | `UdfDbFunctionInfoCarrierTest` | **User-defined SQL functions, one feature area, two symptoms.** 10 fail with `NotImplementedException` thrown from EF's own `UDFSqlContext.CustomerOrderCountInstance`, which is a body that exists to prove the call was translated rather than run -- so **this client ran it**, inside a projection, where client evaluation is legal and nothing refuses it. The other 23 are refused instead, as `The LINQ expression 'DbSet<Customer>()...' could not be translated`. The blocker for both is that an INSTANCE function's `Object` is the client's own `DbContext`, which this provider refuses to ship for the reason `ServerBoundaryAnalyzer.CarriesTheClientsContext` records. Verified from a stack |
 | 12 | `Assert.Equal() Failure: Strings differ` | Message-text differences on queries that already refuse. Inferred from the reason |
 | 8 | `Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_split`, four classes | **`AsSplitQuery` is stripped, so the query needs `APPLY` and SQLite refuses it.** EF never overrides these on SQLite, because a genuine split query needs no `APPLY`. The stripping is not a mistake: it was measured as worth 456 tests, because the hint otherwise lands on the client where EF's own method is a no-op, and on a nested query root it forces the cut below that root. **Honouring split queries means carrying the hint to the SERVER**, which is a protocol change. Verified |
@@ -28,11 +28,16 @@ partly inferred** -- each row says which.
 | 4 | `No part of the query can be executed on the server` | Inferred |
 | ~32 | singles and pairs | Not re-read here |
 
-**THE ONE THING THIS TRIAGE SAYS TO DO NEXT, and it is not the biggest number.** The 32 GearsOfWar
-tests are the only place where this provider is known to *answer* a query EF refuses, and nothing in
-the suite checks the answers. EF refuses them because the rows cannot be attributed. If this
-provider's answers are wrong, they are silent wrong answers, which this repository counts separately
-and currently puts at two.
+**THE BIGGEST FAMILY IS NOT A DEFECT, AND IT WAS ANSWERED BY READING RATHER THAN BY MEASURING.**
+The 32 `GearsOfWar` tests are this provider being MORE capable than the reference one: EF cannot
+attribute rows after a `Distinct` that drops the identifier columns, so it refuses; this provider
+reassembles the projection on the client and returns the right rows. **The evidence was already in
+the failure message and I nearly spent a run to re-obtain it.** The rule that transfers: **an
+assertion's failure message tells you what the code under it did, and "no exception was thrown"
+around a data-checking call means the data checked out.**
+
+**So the wrong-answer count is unchanged at two**, and both are the pair whose assertion no correct
+answer can satisfy.
 
 ## An intermittent closed by reading the source it came from (R143/R146, 2026-09-04)
 
