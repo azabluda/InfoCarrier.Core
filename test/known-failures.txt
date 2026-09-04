@@ -3143,5 +3143,10 @@
 # saying what it does not have. The SQL Server tier is dropped here by the owner's decision, so this
 # base has no store that can host all of it.
 
-failed=112
+# 2026-09-04 (R152) -- 112 -> 111. `StringLength` is now defined on the SQLite connection. It is a
+# scalar function and it was missing only because R151 made its call arrive: mapped on a non-static
+# method, it used to be run by the client and never asked the store for anything. One test fixed,
+# none broken.
+
+failed=111
 total=29509

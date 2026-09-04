@@ -197,6 +197,21 @@ public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunc
                 "DollarValue",
                 arguments => Prefixed('$', arguments),
                 isDeterministic: true);
+
+            // AN INSTANCE FUNCTION, AND IT ONLY NEEDED DEFINING ONCE THE CALL STARTED ARRIVING.
+            // `UDFSqlContext.StringLength` is mapped with `HasDbFunction` on a NON-static method,
+            // so its receiver is the context. Until R151 such a call never reached a server: the
+            // receiver held the live client context, which no wire carries, so the client ran the
+            // method instead -- and its body throws, which is how EF proves it was translated
+            // rather than run. The call arrives now, so the store has to have the function.
+            //
+            // It is declared as returning `string` in EF's base and the tests compare two results
+            // to each other, so the value only has to be consistent. `null` in, `null` out, which
+            // is what `PropagatesNullability` on the mapping says.
+            connection.CreateFunction<string?, string?>(
+                "StringLength",
+                value => value?.Length.ToString(CultureInfo.InvariantCulture),
+                isDeterministic: true);
         }
 
         /// <summary>
