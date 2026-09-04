@@ -5240,6 +5240,34 @@ re-parents of families already running, because R25–R30 showed that is where t
       EF's comment identifies as the cause. **Do not raise `KeyNotFoundException` to match** --
       that reproduces another product's bug deliberately.
 
+- [x] **R168. `Product.CategoryID` leaves the server model and arrives as raw DDL instead.**
+      `test/` only, so `eng/measure.sh` alone. **`failed` FALLS 47 -> 43**, FIXED 4, BROKEN none.
+      The reasons diff moves `Assert.Equal() Failure: Strings differ` from 6 to 2.
+
+      **AND IT CORRECTS R167.** That entry read the four `Bad_data_error_handling_null*` as a
+      requiredness disagreement between two models, which would have been a provider defect. It is
+      a harness artefact, and the harness had already written down why:
+      `NorthwindInfoCarrierSqliteContext` re-mapped `Product.CategoryID` -- undoing EF's own
+      `Ignore` -- so the `ProductView` SQL query beside it had a column to read. That put the
+      property in the `Product` shaper's column list, and the spec test's raw SQL names only the
+      six columns EF's model maps.
+
+      **The fix already existed for two other tables.**
+      `NorthwindQueryInfoCarrierSqliteFixture.AddTheColumnsTheModelIgnoresAsync` adds ten `Orders`
+      columns and twelve on `Employees` as raw DDL and seeds them from `NorthwindData`, so the
+      store has them and neither model gets the property. `Products` now gets `CategoryID` the
+      same way, which is the state EF's prebuilt `northwind.db` is in.
+
+      **Which side raised it was measured.** A probe on the client's fault path printed
+      `SERVER FAULT: The required column 'CategoryID' ...` for the four failing tests and
+      `SERVER FAULT: An error occurred while reading a database value ...` for the two passing
+      `SqlQueryInfoCarrierTest` ones: same server, same store, different column lists.
+
+      **One process lesson.** A second `dotnet test` was run against the same project while the
+      measurement was in flight; the measurement's own log ends in `Build FAILED` because of the
+      lock. `total` unchanged at 29513 is what confirms no tests were lost. Do not run a second
+      test process against a project a measurement is using, even for tests that touch no store.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

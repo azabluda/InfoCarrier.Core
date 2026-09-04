@@ -3541,5 +3541,35 @@
 # methods on the facade; 5 "we answer, other"; 4 model building needs one context; 5 message text
 # (the four above having left); 2 wrong answer; 2 upstream property-bag defect; 1 on its own.
 
-failed=47
+# 2026-09-04 (R168) -- `failed` FALLS 47 -> 43, `total` unchanged at 29513. FIXED 4, BROKEN none.
+#
+#   -4  Assert.Equal() Failure: Strings differ  (6 -> 2)
+#
+# AND THE R167 ENTRY ABOVE IS CORRECTED. It read the four `Bad_data_error_handling_null*` as a
+# REQUIREDNESS DISAGREEMENT between two models -- an optional property treated as required. That
+# was wrong. It is a HARNESS artefact, and the harness had already written down why.
+#
+# `NorthwindInfoCarrierSqliteContext` carried
+# `modelBuilder.Entity<Product>().Property(p => p.CategoryID)`, undoing the `Ignore` EF's own
+# `NorthwindContext` applies, so that the `ProductView` SQL query mapped beside it had a
+# `CategoryID` column to turn into a category name. EF's own SQLite suite needs no such line
+# because its Northwind store is a prebuilt `northwind.db` that already holds the real schema.
+# Mapping the property put it in the `Product` shaper's column list, and
+# `FromSqlQueryTestBase.Bad_data_error_handling_null` writes raw SQL naming the six columns EF's
+# model maps and nothing else -- so `FromSqlQueryingEnumerable.BuildIndexMap` refused before the
+# null `Discontinued` EF asserts could be reached.
+#
+# THE FIX WAS ALREADY IN THE FIXTURE, FOR TWO OTHER TABLES. `AddTheColumnsTheModelIgnoresAsync`
+# adds ten `Orders` columns and twelve on `Employees` as raw DDL and seeds them from
+# `NorthwindData`, precisely so the store has them and neither model gets the property. `Products`
+# now gets its `CategoryID` the same way. Its own remarks already state the rule: raw DDL is the
+# only route that gives the store the column without giving either model the property, which is
+# exactly the state EF's prebuilt store is in.
+#
+# WHICH SIDE RAISED IT WAS MEASURED, NOT ASSUMED. A probe on the client's fault path printed
+# `SERVER FAULT: The required column 'CategoryID' was not present ...` for the four failing tests
+# and `SERVER FAULT: An error occurred while reading a database value ...` for the two passing
+# `SqlQueryInfoCarrierTest` ones -- same server, same store, different column lists.
+
+failed=43
 total=29513

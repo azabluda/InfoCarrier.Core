@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -214,6 +214,26 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
                 Parameter("ShipPostalCode", order.ShipPostalCode),
                 Parameter("ShipCountry", order.ShipCountry),
                 Parameter("OrderID", order.OrderID));
+        }
+
+        // `Products` needs one, and it is the only one of the three that something in the MODEL
+        // reads rather than a test. `NorthwindInfoCarrierSqliteContext` maps `ProductView` to a
+        // SQL query whose `CASE` turns `CategoryID` into a category name, so the column has to
+        // hold the real values. It used to be mapped on the server's `Product` instead, which put
+        // it in the shaper's required column list and broke the four
+        // `Bad_data_error_handling_null` tests: their raw SQL names the six columns EF's own
+        // model maps and nothing more.
+        await context.Database.ExecuteSqlRawAsync(
+            @"ALTER TABLE ""Products"" ADD COLUMN ""CategoryID"" INTEGER");
+
+        foreach (Product product in NorthwindData.CreateProducts())
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE "Products" SET "CategoryID" = @CategoryID WHERE "ProductID" = @ProductID
+                """,
+                Parameter("CategoryID", product.CategoryID),
+                Parameter("ProductID", product.ProductID));
         }
 
         // `Employees` is the same story with twelve columns, and `SqlQueryTestBase`'s

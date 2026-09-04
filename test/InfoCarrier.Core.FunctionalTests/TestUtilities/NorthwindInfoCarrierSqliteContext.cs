@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestModels.Northwind;
@@ -41,14 +41,16 @@ public class NorthwindInfoCarrierSqliteContext(DbContextOptions options) : North
             WHERE "p"."Discontinued" = 0
             """);
 
-        // The filter's search term is a per-instance value, so it cannot be baked into a static
-        // SQL string the way the others are; it is compared in the query filter instead.
-        // `NorthwindContext` ignores `Product.CategoryID`, and EF's SQLite suite never notices
-        // because its Northwind store is a prebuilt `northwind.db` holding the real schema. This
-        // tier builds its store from the model, so the column has to exist for the view below to
-        // have anything to read. Server-side only: the client model still ignores it, and a
-        // property the client does not know about is skipped when the row is read back.
-        modelBuilder.Entity<Product>().Property(p => p.CategoryID);
+        // `Product.CategoryID` USED TO BE MAPPED HERE, so that the `ProductView` query below had a
+        // column to read, and mapping it cost four tests. `FromSqlQueryTestBase`'s
+        // `Bad_data_error_handling_null` pair writes raw SQL naming the six columns EF's own model
+        // maps, and a mapped `CategoryID` puts a seventh in the shaper's required list, so the
+        // query died on "The required column 'CategoryID' was not present" instead of reaching the
+        // null EF asserts. The column now arrives as raw DDL in
+        // `NorthwindQueryInfoCarrierSqliteFixture.AddTheColumnsTheModelIgnoresAsync`, which is
+        // where the same problem was already solved for ten `Orders` columns and twelve on
+        // `Employees` -- the store gets the column, neither model gets the property, and that is
+        // exactly the state EF's own prebuilt `northwind.db` is in.
 
         // `NorthwindRelationalContext` maps this one `ToView("Alphabetical list of products")`,
         // and EF's SQLite suite passes because its Northwind store is a prebuilt `northwind.db`
