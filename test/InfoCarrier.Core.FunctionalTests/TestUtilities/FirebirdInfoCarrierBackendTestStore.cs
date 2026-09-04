@@ -2,7 +2,6 @@
 
 using System.Collections.Concurrent;
 using FirebirdSql.Data.FirebirdClient;
-using FirebirdSql.Embedded;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -46,17 +45,24 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     ///     The embedded engine's client library, resolved once per process.
     /// </summary>
     /// <remarks>
-    ///     The path is a real file under the test output directory. There is no registry entry, no
-    ///     service, and no environment variable: the native assets package puts the binaries in
-    ///     the build output and this reads back where they landed.
+    ///     <para>
+    ///         The path is a real file under the test output directory. There is no registry
+    ///         entry, no service, and no installation: the native assets package puts the binaries
+    ///         in the build output and this reads back where they landed.
+    ///     </para>
+    ///     <para>
+    ///         <b>Resolved here rather than by <c>FbNativeAssetManager.NativeAssetPath</c>, and
+    ///         that is a Linux fix rather than a preference.</b> That helper starts from the
+    ///         <em>process executable</em>. Under <c>dotnet test</c> on Windows the test host is an
+    ///         executable sitting in the output directory, so it lands in the right place; on Linux
+    ///         the host is the shared <c>dotnet</c> muxer, so it looks beside that instead and
+    ///         finds nothing. It answers <see langword="null" /> either way, which reads as
+    ///         "the package did not copy" and is not what happened: the binaries were copied
+    ///         correctly and were being looked for in the wrong directory.
+    ///         <see cref="AppContext.BaseDirectory" /> is the output directory on both platforms.
+    ///     </para>
     /// </remarks>
-    private static readonly Lazy<string> ClientLibrary = new(
-        () => FbNativeAssetManager.NativeAssetPath(FirebirdVersion.V5)
-            ?? throw new InvalidOperationException(
-                "The embedded Firebird binaries are not in the build output, so this tier cannot "
-                + "run. The native assets arrive by package reference and are resolved per "
-                + "platform: this project references the Windows and Linux x64 packages, and a "
-                + "machine that is neither gets nothing. See Directory.Packages.props."));
+    private static readonly Lazy<string> ClientLibrary = new(ResolveClientLibrary);
 
     // Keyed by file, exactly as Tier B's are, and concurrent for the same reason: the gate is per
     // file, so two files initialise at once.
@@ -100,6 +106,68 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
             // Tier B switched pooling off as well, for a different reason it records in full.
             Pooling = false,
         }.ToString();
+    }
+
+    /// <summary>
+    ///     Finds the embedded client library in the test output directory.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Only one platform's binaries are ever present: each native assets package copies
+    ///         under <c>IsOSPlatform</c>, so a Windows build has <c>win-x64</c> and nothing else.
+    ///         Probing both is therefore unambiguous, and it keeps the platform test in one place.
+    ///     </para>
+    ///     <para>
+    ///         <b><c>FIREBIRD</c> is set because the engine finds everything else relative to
+    ///         it.</b> The client library is only the front door; <c>firebird.conf</c>, the engine
+    ///         plugin, the character-set module and the time-zone data are located from the server
+    ///         root, and an embedded engine that cannot find them fails at connection time rather
+    ///         than at load time. Set only when the environment does not already name one, so a
+    ///         machine with a real Firebird installation is left alone.
+    ///     </para>
+    ///     <para>
+    ///         <b>The failure message lists what is actually there.</b> A tier whose binaries did
+    ///         not arrive should say so in the terms a reader can act on, which is the directory
+    ///         contents and not the expected path alone.
+    ///     </para>
+    /// </remarks>
+    private static string ResolveClientLibrary()
+    {
+        string root = Path.Combine(AppContext.BaseDirectory, "firebird");
+
+        foreach ((string rid, string relative) in ((string, string)[])
+            [
+                ("win-x64", "fbclient.dll"),
+                ("linux-x64", "lib/libfbclient.so.2"),
+            ])
+        {
+            string serverRoot = Path.Combine(root, rid, "V5");
+            string library = Path.Combine(serverRoot, relative);
+            if (!File.Exists(library))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FIREBIRD")))
+            {
+                Environment.SetEnvironmentVariable("FIREBIRD", serverRoot);
+            }
+
+            return library;
+        }
+
+        string present = Directory.Exists(root)
+            ? string.Join(
+                ", ",
+                Directory.EnumerateFileSystemEntries(root, "*", SearchOption.AllDirectories)
+                    .Select(entry => Path.GetRelativePath(root, entry))
+                    .Take(40))
+            : "the directory does not exist";
+
+        throw new InvalidOperationException(
+            $"No embedded Firebird client library under '{root}', so ADR-009 Tier C cannot run. "
+            + "The binaries arrive by package reference and each package copies only on its own "
+            + $"platform, so a machine that is neither Windows nor Linux x64 gets nothing. Found: {present}");
     }
 
     /// <summary>

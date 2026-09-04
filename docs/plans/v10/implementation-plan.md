@@ -4918,6 +4918,33 @@ re-parents of families already running, because R25–R30 showed that is where t
       `FirebirdSmokeTest` carried this as a pin asserting the refusal; it now asserts the data,
       and returns it.
 
+- [x] **R155. Tier C finds its own binaries, because the helper that shipped with them cannot.**
+      `test/` change. All four Tier C tests failed on the pull request with "the embedded Firebird
+      binaries are not in the build output", on `ubuntu-24.04`, while passing on Windows.
+
+      **THE BINARIES WERE THERE. THE HELPER WAS LOOKING BESIDE THE WRONG PROCESS.**
+      `FbNativeAssetManager.NativeAssetPath` starts from the process executable, through
+      `GetModuleFileNameW` on Windows and `readlink` on Linux. Under `dotnet test` on Windows the
+      test host is an executable in the output directory, so it lands correctly. On Linux the host
+      is the shared `dotnet` muxer, so it looks in the SDK's directory. It answers `null` either
+      way, and `null` reads as "the package did not copy", which is not what happened.
+
+      **The packages were cleared before the code was.** Both native assets packages were
+      downloaded and their MSBuild targets read: each copies under `IsOSPlatform`, and the Windows
+      build output holds `firebird/win-x64/V5` and no `linux-x64`, which is the copy behaving
+      exactly as written. The layouts differ by more than a name, so the resolver carries both:
+      `win-x64/V5/fbclient.dll` and `linux-x64/V5/lib/libfbclient.so.2`.
+
+      `AppContext.BaseDirectory` is the output directory on both platforms, so the resolver starts
+      there. It also sets `FIREBIRD` to the server root when the environment does not already name
+      one: the client library is only the front door, and the engine plugin, `firebird.conf`, the
+      character-set module and the time-zone data are all found relative to that root. And it
+      lists the directory contents when it fails, so the next reader of a red Tier C is told what
+      is actually present rather than only what was expected.
+
+      **The rule: a helper that resolves paths from the PROCESS is answering a different question
+      from one that resolves them from the ASSEMBLY, and `dotnet test` is where the two diverge.**
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
