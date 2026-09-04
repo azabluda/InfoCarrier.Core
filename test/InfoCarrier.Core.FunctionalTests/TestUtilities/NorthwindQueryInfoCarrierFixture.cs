@@ -14,18 +14,27 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     context remotes through the InfoCarrier backend store (InMemory first).
 /// </summary>
 /// <typeparam name="TModelCustomizer">The model customizer.</typeparam>
-public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>, ITestSqlLoggerFactory
+/// <remarks>
+///     <b>It no longer implements <c>ITestSqlLoggerFactory</c>, and losing it is the point of the
+///     project split.</b> That interface and its <c>TestSqlLoggerFactory</c> property live in
+///     <c>EFCore.Relational.Specification.Tests</c>, which this tier does not reference. They were
+///     here to satisfy <c>RelationalComplianceTestBase</c>'s second assertion (R54), and Tier A is
+///     now checked by the plain <c>ComplianceTestBase</c>, which does not ask. What the property
+///     returned was the <em>client's</em> log anyway, and this client has no database and emits no
+///     SQL; <c>ServerSqlLog</c> is where the server's statements can actually be read. Tier B's
+///     <c>NorthwindQueryInfoCarrierSqliteFixture</c> still implements it, because there the
+///     relational compliance base does ask.
+/// </remarks>
+public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
-    /// <summary>
-    ///     The compliance gate's second assertion (R54). The property is real —
-    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
-    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
-    ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
-    ///     server's statements can actually be read.
-    /// </summary>
-    public TestSqlLoggerFactory TestSqlLoggerFactory
-        => (TestSqlLoggerFactory)ListLoggerFactory;
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Both sides build from ONE <c>OnModelCreating</c>, which is what version 1 of this
+    ///     provider did and what an application does. See the Tier B Northwind fixture.
+    /// </remarks>
+    protected override Type ContextType
+        => typeof(NorthwindInfoCarrierContext);
 
     private ITestStoreFactory? _infoCarrierTestStoreFactory;
 
@@ -37,9 +46,6 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 CopyDbContextParameters((NorthwindContext)client, (NorthwindContext)server),
-            // The server adds the InMemory defining queries for the keyless entity types; the
-            // client model has the types but not the store's means of producing their rows.
-            serverContextType: typeof(NorthwindInfoCarrierServerContext),
             configureConventions: ConfigureConventions);
 
     /// <summary>

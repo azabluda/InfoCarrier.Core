@@ -110,9 +110,9 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [RequiresUnreferencedCode(
          "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "

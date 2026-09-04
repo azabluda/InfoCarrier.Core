@@ -8,25 +8,22 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// <summary>
 ///     Captures fixture state (context type, model customization, options) so the
 ///     parameterless <see cref="Microsoft.EntityFrameworkCore.TestUtilities.ITestStoreFactory" />
-///     members can build correctly-configured client and server contexts (v1 pattern).
+///     members can build correctly-configured contexts on both sides of the wire (v1 pattern).
 /// </summary>
 public struct SharedTestStoreProperties
 {
     /// <summary>
-    ///     The client <see cref="DbContext" /> type, and the server's too unless
-    ///     <see cref="ServerContextType" /> overrides it.
-    /// </summary>
-    public Type ContextType;
-
-    /// <summary>
-    ///     The server <see cref="DbContext" /> type, when it must differ from the client's.
+    ///     The <see cref="DbContext" /> type, used by BOTH sides.
     /// </summary>
     /// <remarks>
-    ///     The two models are shared, but how the backing store <em>produces</em> rows is not
-    ///     part of that contract — a defining query for a keyless entity type is the server's
-    ///     business alone. <see langword="null" /> means "same as <see cref="ContextType" />".
+    ///     <b>One type, one model, both halves</b> — version 1 of this provider did exactly this,
+    ///     and an application does it too: <c>samples/Northwind.Client</c> and
+    ///     <c>samples/Northwind.Server</c> share one <c>NorthwindContext</c>. This harness carried a
+    ///     second <c>ServerContextType</c> until R144, so that the server could hold store shape the
+    ///     client had no way to express. Making every client relational removed that need, and
+    ///     converging every fixture was measured to change no answer anywhere in the suite.
     /// </remarks>
-    public Type? ServerContextType;
+    public Type ContextType;
 
     /// <summary>
     ///     The fixture's model customization.
@@ -117,4 +114,54 @@ public struct SharedTestStoreProperties
     ///     </para>
     /// </remarks>
     public bool ArbitrarySqlExecution;
+
+    /// <summary>
+    ///     Whether this fixture's server sends the log events it raises back to the client
+    ///     (<c>IInfoCarrierServerLogForwarding</c>, R172).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Per fixture and default off, like the raw-SQL grant above, and for a sharper
+    ///         reason.</b> A forwarded event lands in the client's own logger, which is the same
+    ///         <c>TestSqlLoggerFactory</c> a spec base reads with <c>Assert.Single</c> and
+    ///         <c>Assert.Empty</c>. Granting it suite-wide would put the server's warnings into
+    ///         every such assertion at once.
+    ///     </para>
+    ///     <para>
+    ///         The fixtures that set it get the <b>sensitive</b> grant, because the base that
+    ///         needs forwarding at all — <c>TableSplittingTestBase</c> — has one test that asserts
+    ///         the sensitive wording and one that asserts the plain one, and which it gets is the
+    ///         context's own <c>EnableSensitiveDataLogging</c> rather than the grant's.
+    ///     </para>
+    /// </remarks>
+    public bool ServerLogForwarding;
+
+    /// <summary>
+    ///     CLR types this fixture's queries name that its model does not imply (ADR-008
+    ///     constraint 2).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A projection DTO is the case, and <c>SqlQueryTestBase</c> is the base that
+    ///         made it real.</b> <c>Database.SqlQuery&lt;UnmappedCustomer&gt;</c> makes EF build an
+    ///         <em>ad-hoc</em> entity type, which lives outside <c>IModel.GetEntityTypes()</c>, so
+    ///         <c>TypeAllowlist.ForModel</c> cannot infer it and the boundary refuses the query
+    ///         root. That is the allowlist doing its job: the type is not in the model, and
+    ///         nothing about the model implies it.
+    ///     </para>
+    ///     <para>
+    ///         <b>An application declares such a type explicitly, and the harness is an
+    ///         application.</b> The seam is <c>InfoCarrierDbContextOptionsBuilder.AllowTypes</c> on
+    ///         the client and <c>AddInfoCarrierAllowedTypes</c> on the server, and
+    ///         <see cref="Expressions.IInfoCarrierAllowedTypes" /> requires <b>both</b> halves —
+    ///         one alone fails asymmetrically. A fixture setting this gets both.
+    ///     </para>
+    ///     <para>
+    ///         <b>Not gated on <see cref="ArbitrarySqlExecution" />, unlike the store's parameter
+    ///         type.</b> A <c>DbParameter</c> can only appear in a raw-SQL payload; a projection
+    ///         DTO is independent of raw SQL, and gating it would state a dependency that is not
+    ///         there.
+    ///     </para>
+    /// </remarks>
+    public Type[]? AllowedTypes;
 }

@@ -121,7 +121,7 @@ public class TPTManyToManyQueryInfoCarrierFixture : TPTManyToManyQueryRelational
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);
@@ -137,7 +137,7 @@ public class TPCManyToManyQueryInfoCarrierFixture : TPCManyToManyQueryRelational
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);

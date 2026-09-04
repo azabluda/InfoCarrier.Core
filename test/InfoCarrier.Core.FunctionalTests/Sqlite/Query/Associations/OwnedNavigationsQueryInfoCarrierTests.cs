@@ -43,7 +43,7 @@ public class OwnedNavigationsQueryInfoCarrierFixture : OwnedNavigationsRelationa
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             onAddOptions: AssociationsWarnings.ThrowOnUnorderedRowLimiting,

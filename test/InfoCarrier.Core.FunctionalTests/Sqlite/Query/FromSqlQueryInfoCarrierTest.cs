@@ -41,7 +41,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///                 <b>6 <c>Bad_data_error_handling_null*</c></b> - the server answers
 ///                 <c>The required column 'CategoryID' was not present</c> where the base expects
 ///                 <c>An error occurred while reading a database value</c>. A consequence of this
-///                 tier's own harness: <c>NorthwindInfoCarrierSqliteServerContext</c> maps
+///                 tier's own harness: <c>NorthwindInfoCarrierSqliteContext</c> maps
 ///                 <c>Product.CategoryID</c>, which the core <c>NorthwindContext</c> ignores,
 ///                 because this tier builds its store from the model and the <c>ProductView</c>
 ///                 query needs the column to exist. The base's SQL selects a subset of columns, so

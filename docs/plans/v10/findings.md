@@ -9,6 +9,260 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## When a syntactic guard is safe, and when it is not (R162/R164/R165, 2026-09-04)
+
+Three guards were attempted in one session against the same background: this provider answers
+queries every relational provider refuses. Two shipped and one was reverted, and the difference
+between them is the transferable part.
+
+**The two that shipped refuse something PROVABLY dead or PROVABLY impossible.**
+`RejectUnshippableOrderingKey` refuses an ordering whose key type the allowlist does not admit.
+The allowlist admits every primitive and every mapped type, so a key it rejects is one no store
+could sort by. `RejectDeadCoalesce` refuses `new X() ?? y`, and `new` never returns null, so the
+operator is dead code. Neither can refuse a query that does anything. Both measured 4 fixed and 0
+broken.
+
+**The one that was reverted refused something that merely LOOKED wrong.** Whether EF accepts a
+`Distinct` inside a projected collection depends on identifier propagation through the `Distinct`
+and every projection above it, computed during relational translation. Three syntactic
+approximations were built; two measured 8 fixed and 8 BROKEN at an unchanged count of 55.
+
+**And the shipped rule does not generalise, which is worth knowing before the next attempt.**
+`GroupBy` and `Join` are blind to their key type in exactly the way `OrderBy` was. Extending
+R164's rule to them would refuse **84** composite grouping keys and **12** composite join keys in
+EF's own suites, because those keys are anonymous types the allowlist rejects by design. The rule
+worked for ordering only because an ordering key is a scalar in every query that works.
+
+**The question to ask first**, then, is not "does EF refuse this?" but **"can I state what this
+guard refuses in a sentence that is true by construction?"** A `new` is never null. A type the
+allowlist rejects is one no store can sort by. Neither sentence needs a measurement to be
+believed; the measurement only confirms nothing else was caught. When the sentence needs a
+qualifier -- "unless the identifier survives", "unless the parent keeps its columns" -- the guard
+is approximating someone else's algorithm, and R162 is what that costs.
+
+**The asymmetry that decides the close calls.** A missed refusal leaves the status quo. A false
+refusal breaks a query that works everywhere, which makes this provider less capable than EF
+rather than more portable. So "no test in the suite contradicts it" is not validation, and the
+absence of a test for a shape is a reason NOT to guard it.
+
+## A guard that cannot be written on the client (R162, 2026-09-04)
+
+R160 refuses `Distinct` and the set operations applied ABOVE a projection that carries a
+collection, and it works because that is a syntactic fact about the caller's own LINQ. The
+obvious next step was the same operator one position lower: a `Distinct` INSIDE the query, on a
+projection a collection join then has to be stitched back together against. Eight tests assert
+that refusal. **Three hypotheses were built and measured, all three were refuted, and the third
+refutation says the guard cannot be written here at all.**
+
+**Hypothesis 1: the projection must carry the source's primary key.** That is what the test names
+appear to say. Measured 8 fixed, 8 broken, `FAILING: 55` on both sides. The broken eight were the
+sibling tests, and EF ships the pair that kills it:
+`Correlated_collection_with_distinct_not_projecting_identifier_column` projects
+`new { w.Name, w.IsAutomatic }` and TRANSLATES, while
+`..._also_projecting_complex_expressions` projects
+`new { w.Name, w.IsAutomatic, w.OwnerFullName.Length }` and THROWS. Neither carries `Weapon.Id`.
+The test named "not projecting identifier column" is the GREEN one.
+
+**Hypothesis 2: the projection must be bare columns, because columns are the identity when the key
+is absent.** Fits that pair exactly. Measured 4 fixed, 0 broken -- but only four, because the gate
+was wrong: it asked `ProjectionRewriter` whether it had produced a collection reassembly, and a
+probe on `Correlated_collection_after_distinct_3_levels_without_original_identifiers` printed
+`reassemblies=0` for a query whose projection carries two nested collections. **"The split found a
+collection" and "the query projects one" read as the same question and are not.**
+
+**Hypothesis 2 with a syntactic gate.** Measured 8 fixed, 8 broken, `FAILING: 55` again. The new
+broken eight name the flaw:
+`Correlated_collection_after_distinct_with_complex_projection_not_containing_original_identifier`
+has a computed member (`o.OrderDate.Value.Month`), no identifier, and a projected collection, and
+every relational provider TRANSLATES it. Meanwhile `..._3_levels_without_original_identifiers`
+THROWS although its inner `Distinct` projects only bare columns: what fails there is that the
+projection ABOVE the `Distinct` keeps `xx.HasSoulPatch` and drops `xx.CityOfBirthName`, so the
+collection's parent rows stop being distinguishable.
+
+**So the fact being tested is not a property of the LINQ.** It is EF's identifier propagation
+through `Distinct` and through every projection above it, decided inside
+`RelationalQueryableMethodTranslatingExpressionVisitor` -- and the client does not translate. The
+server does, and the server would raise it, except that these projections are client-typed and the
+split never sends them whole. **Reverted.** The eight stay red and stay classified.
+
+**And the asymmetry is what settles it, not the difficulty.** A missed refusal leaves the status
+quo: this provider answers a query other providers reject. A FALSE refusal breaks a query that
+works everywhere, which makes this provider less capable than EF rather than more portable. A rule
+validated only by "no test in the suite contradicts it" is not validated: nothing in the suite
+projects `new { o.Id, Year = o.Date.Year }` inside a collection's `Distinct`, which is an entirely
+ordinary thing to write and which hypothesis 2 refuses.
+
+**Two rules came out of it that are cheap to apply.**
+
+  * **A `--filter` on a test name silently includes tests whose names EXTEND it and excludes
+    nothing** -- but a filter on the LONG name misses the short one. Filtering on
+    `..._also_projecting_complex_expressions` and
+    `..._without_original_identifiers` ran neither
+    `Correlated_collection_with_distinct_not_projecting_identifier_column` nor
+    `Correlated_collection_after_distinct_3_levels`, which are exactly the tests that broke.
+    **Filter by CLASS when a change could touch a family**, not by the test name you aimed at.
+  * **Read both halves of a matched pair before believing what a test name says.** Three of these
+    tests are named after the condition that does NOT cause the failure.
+
+## The 140 remaining failures, triaged (R147, 2026-09-04)
+
+The last whole-tail re-derivation predates about twenty-five tests of movement. This one is read
+from the reasons diff and the run log of the 140-failure state, and it is **partly verified and
+partly inferred** -- each row says which.
+
+| Count | Family | Reading |
+|---|---|---|
+| 32 | `TPT`/`TPC` `GearsOfWar`, eight query shapes across two tiers | **This provider ANSWERS what EF refuses.** EF cannot attribute rows after a `Distinct` that drops the identifier columns, so it raises a translation failure; this provider reassembles the projection on the client and returns data. **The answers are CORRECT, and the existing failure message already said so.** EF's relational override wraps the CORE base call -- which is an `AssertQuery` that checks every row -- inside `Assert.ThrowsAsync<InvalidOperationException>`. "No exception was thrown" therefore means that call **ran to completion**, so its data assertions passed. A wrong answer surfaces differently and does so elsewhere in this same tail: `Correlated_collection_with_distinct_3_levels` reports `Assert.Equal() Failure: Values differ` from EF's `AssertResults`. Fully verified |
+| 33 | `UdfDbFunctionInfoCarrierTest` | **User-defined SQL functions, one feature area, two symptoms.** 10 fail with `NotImplementedException` thrown from EF's own `UDFSqlContext.CustomerOrderCountInstance`, which is a body that exists to prove the call was translated rather than run -- so **this client ran it**, inside a projection, where client evaluation is legal and nothing refuses it. The other 23 are refused instead, as `The LINQ expression 'DbSet<Customer>()...' could not be translated`. The blocker for both is that an INSTANCE function's `Object` is the client's own `DbContext`, which this provider refuses to ship for the reason `ServerBoundaryAnalyzer.CarriesTheClientsContext` records. Verified from a stack |
+| 12 | `Assert.Equal() Failure: Strings differ` | Message-text differences on queries that already refuse. Inferred from the reason |
+| 8 | `Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_split`, four classes | **`AsSplitQuery` is stripped, so the query needs `APPLY` and SQLite refuses it.** EF never overrides these on SQLite, because a genuine split query needs no `APPLY`. The stripping is not a mistake: it was measured as worth 456 tests, because the hint otherwise lands on the client where EF's own method is a no-op, and on a nested query root it forces the cut below that root. **Honouring split queries means carrying the hint to the SERVER**, which is a protocol change. Verified |
+| 7 | `Assert.Throws() Failure: Exception type was not an exact match` | Four `OwnedJsonStructuralEquality` and two `Correlated_collection_with_distinct_3_levels`. The second pair is the known pair whose assertion no correct answer satisfies. Inferred |
+| 4 | `this test store exposes no DbConnection` | By design. The client has no database |
+| 4 | `Relational-specific methods can only be used when the context is using a relational database` | Same boundary |
+| 4 | `Unable to cast InfoCarrierTypeMapping to RelationalTypeMapping` | The level-3 boundary: a relational model on the client needs store knowledge it cannot honestly have |
+| 4 | `No part of the query can be executed on the server` | Inferred |
+| ~32 | singles and pairs | Not re-read here |
+
+**THE BIGGEST FAMILY IS NOT A DEFECT, AND IT WAS ANSWERED BY READING RATHER THAN BY MEASURING.**
+The 32 `GearsOfWar` tests are this provider being MORE capable than the reference one: EF cannot
+attribute rows after a `Distinct` that drops the identifier columns, so it refuses; this provider
+reassembles the projection on the client and returns the right rows. **The evidence was already in
+the failure message and I nearly spent a run to re-obtain it.** The rule that transfers: **an
+assertion's failure message tells you what the code under it did, and "no exception was thrown"
+around a data-checking call means the data checked out.**
+
+**So the wrong-answer count is unchanged at two**, and both are the pair whose assertion no correct
+answer can satisfy.
+
+## An intermittent closed by reading the source it came from (R143/R146, 2026-09-04)
+
+`AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async: False)` failed
+once in a full run with `ObjectDisposedException: Cannot access a disposed object`.
+
+**What was checked, in order.**
+
+1. **Could the change have caused it?** No. The commit under measurement converged
+   `WithConstructorsInfoCarrierTest`, which is ADR-009 Tier A over EF's InMemory provider. The
+   failing test is Tier B over SQLite, in an unrelated class, with no shared fixture.
+2. **Does the class fail alone?** No. 71 passed, 1 skipped, and the failing case was green.
+3. **Does the suite fail again at the same code state?** No. The re-run came back at 141 failures
+   with nothing broken and the reasons unchanged.
+
+So it is an intermittent, by the definition `CLAUDE.md` gives: the same code produced two different
+answers.
+
+**THE CAUSE, AND THE SUSPECT ABOVE WAS ONLY HALF RIGHT.** The stack says it plainly:
+`SqliteConnection.Open()` failed at `sqlite3_create_collation` with
+`ObjectDisposedException: SQLitePCL.sqlite3`. The native handle had already been disposed. EF's
+`SqliteDatabaseCreator.Delete` answers a file-backed database with
+**`SqliteConnection.ClearAllPools()`, which is process-wide and not per connection string**, and this
+harness calls `EnsureDeletedAsync` at the start of every store's initialization. So one store's
+delete disposes a pooled native handle that a concurrently initializing store is in the middle of
+opening.
+
+**Fixed by `Pooling=false` in the test connection string.** With no pool, `ClearAllPools` has nothing
+to dispose and the exception cannot occur. **That is proof by construction, and it is the right kind
+of proof here**: the failure appeared once in about ten full runs, so the three-run bar this
+repository uses elsewhere would have shown nothing either way. The suite measured 140 with the change
+and 140 without it.
+
+**THE RULE THIS PRODUCES.** Two earlier intermittents here were closed by instrumenting one into the
+open and by reproducing the other's signature. This one was closed by **reading the framework source
+the failing stack named**, which cost minutes rather than runs. Try that first: a stack that ends
+inside somebody else's code is a question about their code.
+
+**What was suspected first, and why it was not enough.** Before R136 the two tiers were two test
+projects and therefore two processes. They are one assembly now. xUnit runs test collections in
+parallel within an assembly, each class is its own collection by default, and this repository
+declares no `CollectionBehavior` anywhere. **A Tier A class and a Tier B class can now run at the
+same time, which was impossible before the merge.** `ObjectDisposedException` is consistent with a
+disposal race, and this repository has traced two earlier intermittents to shared-store disposal.
+
+**It is not established, and the next step is reproduction rather than a fix.** One occurrence in
+several full runs is a thin base. The cheap experiment is to declare a single test collection for the
+whole assembly, or to cap the parallel thread count, and see whether the failure stops appearing --
+but a failure that appears once cannot be shown to have stopped. The honest measurement is frequency
+over many runs, which is expensive here.
+
+**What must not happen is that this is forgotten.** `CLAUDE.md` said there was no known intermittent,
+and that sentence is now wrong. It has been corrected rather than left standing.
+
+## The boundary analyzer does not consult the client model for member mappability (R138, 2026-09-03)
+
+**Found by an experiment that was reverted**, which is the only reason it is visible at all.
+
+ADR-009 Tier B's Northwind store is built from the server model, where EF's own SQLite suite uses a
+prebuilt `northwind.db`. The core `NorthwindContext` **ignores** ten `Order` properties that the real
+Northwind schema has, so this tier's store had no such columns and ten `SqlQueryTestBase` tests
+failed with `no such column: m.Freight`.
+
+Mapping the ten on the *server* context fixes those ten and **breaks eight**:
+
+| Test | What it asserts |
+|---|---|
+| `Average_with_unmapped_property_access_throws_meaningful_exception` | `Average(o => o.ShipVia)` raises `QueryUnableToTranslateMember` |
+| `Collection_select_nav_prop_all_client`, `Collection_where_nav_prop_all_client` | the same for `ShipCity` |
+| `SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity` | the same, across a correlated subquery |
+
+They stop throwing and **return data**. The client's model still ignores `ShipVia`; the server's now
+maps it; and the member access crossed the wire anyway. **The boundary analyzer never asked the
+client model whether the member is mapped.**
+
+**Why it has been invisible.** The two models are built from the same `OnModelCreating`, so they
+agree about what is mapped in every test this suite runs. The experiment is the only thing that has
+ever made them disagree on this axis. It is R120's shape once more — a fact two components read
+independently — except here the two readers are two *models*, and the disagreement widens what the
+client is allowed to do rather than narrowing it.
+
+**PINNED, THEN REMOVED BY A SCOPE DECISION (2026-09-04).** The pin created a split model on
+purpose, and the owner then removed split models from the harness entirely: one context class per
+fixture, both halves from one `OnModelCreating`, which is what version 1 of this provider did. A
+test that can only fail by building a configuration the project has declared out of scope does not
+earn its place, so it is gone and this account is what remains. **The condition that reopens it: if
+this provider ever offers a narrower client model as a feature, the guard becomes a prerequisite,
+and its price is already measured below.**
+
+**What the pin was, while it existed.**
+`UnmappedMemberBoundaryTest` builds the disagreement deliberately: `SqliteSmokeContext` ignores
+`Shipment.Note` for both sides and the store's own model customizer maps it on the server alone.
+Three of its four tests are controls -- the client model really lacks the property, the server model
+really has it and its column holds a value, and the mapped member beside it still works -- so the
+fourth cannot pass by accident. R138's own fix put the defect back out of sight; this brings it
+back into the count.
+
+**THE FIX IS WRITTEN, MEASURED AND NOT SHIPPED.** Two readers have to learn the client model:
+`ServerBoundaryAnalyzer`, so the subtree is not shipped, and `QuerySplitter`'s client-code finder,
+so it is refused rather than evaluated locally. **Both are needed** -- the analyzer's verdict alone
+refuses nothing, because the finder is what raises, and the finder never examines a node the
+analyzer marked shippable. With both, the pin passes and the refusal carries EF's own
+`QueryUnableToTranslateMember` wording.
+
+**It costs sixteen spec tests, and every one is a message difference on a query that already
+refused.** Measured at `failed` 166 against 150.
+
+| Family | What EF answers instead |
+|---|---|
+| `ComplexNavigationsCollectionsSharedType` and its split variant, `Multiple_complex_includes_self_ref` and `Complex_query_issue_21665` (8) | "The expression '...' is invalid inside an 'Include' operation" |
+| `NorthwindBulkUpdates.Update_unmapped_property_throws` (2) | `ExecuteUpdate`'s own message for setting an unmapped property |
+| `TPT`/`TPC` `GearsOfWar.Client_member_and_unsupported_string_Equals_in_the_same_query` (4) | the untranslatable `string.Equals` overload, named ahead of the member |
+| `NorthwindSelect.SelectMany_..._references_non_mapped_properties_...` (2) | its own |
+
+**Three narrowings were tried and none of them helps**, which is what makes this a trade rather than
+a bug in the attempt. Giving the member check the lowest priority within one argument does not help,
+because for most of these the refusal comes from the *analyzer* and never reaches the finder. Asking
+every entity type that shares a CLR type, rather than the one `FindEntityType` returns, is necessary
+for shared-type entity types but changes none of these. Excluding the `Include` and `ExecuteUpdate`
+argument positions does not help either, for the same reason as the first.
+
+**So the question is one for the owner**: sixteen message-text differences, against one query shape
+that silently answers where every other provider refuses. `website/docs/limitations.md` already
+records two message-text differences, so the category exists; sixteen more is a different order.
+
+**The rule that transfers: a guard that is never exercised is not evidence that it exists.** Eight
+tests asserted an unmapped-member refusal and passed, for two milestones, without the code under
+test ever being reached — the store simply had no column, so the query failed earlier and for a
+different reason.
+
 ## What was built, and what each thing taught
 
 Not yet implemented, in rough priority order:

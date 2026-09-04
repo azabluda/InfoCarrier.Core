@@ -30,9 +30,63 @@ public class ExpressionSerializer(
     /// </summary>
     public virtual IDynamicValueMapper ValueMapper => _valueMapper;
 
+    /// <summary>
+    ///     Widens this serializer's type resolver with the executing context's own declared types,
+    ///     for the duration of one execution.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Same reason as <see cref="ToNode(Expression, Metadata.IInfoCarrierRelationalQueryRoots?)" />
+    ///         above: this object does not know which context is asking.</b> It is registered
+    ///         <c>Scoped</c>, its resolver's allowlist is derived from the model alone, and what
+    ///         the application declared with <c>AllowTypes</c> travels on the options. So the
+    ///         value arrives per call, from the one place that reads it —
+    ///         <c>QueryExecutor</c>, which hands the same list to the boundary analyzer.
+    ///     </para>
+    ///     <para>
+    ///         Not on <see cref="IExpressionSerializer" />, for the reason stated on
+    ///         <c>ToNode</c>: the interface is a wire seam an application may implement, and the
+    ///         one caller already holds this class.
+    ///     </para>
+    /// </remarks>
+    /// <param name="types">The executing context's declared types.</param>
+    public virtual void UseExecutionAllowedTypes(IReadOnlyList<Type> types)
+        => _typeResolver.UseExecutionAllowedTypes(types);
+
     /// <inheritdoc />
     public virtual ExpressionNode ToNode(Expression expression)
         => _forward.Translate(expression);
+
+    /// <summary>
+    ///     Translates an expression to its node DTO, recognising EF's relational raw-SQL query
+    ///     roots the given way (#97).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The seam arrives per call because this object does not know which context is
+    ///         asking.</b> It is registered <c>Scoped</c>, but every InfoCarrier client context in
+    ///         a process shares one internal service provider
+    ///         (<c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>), so a DI-injected
+    ///         answer would be one answer for all of them. The value is per context and travels on
+    ///         the options; <c>QueryExecutor</c> reads it once per execution through
+    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRootsFor</c> and hands the same object
+    ///         to the boundary analyzer and to this method. One reader, so the two cannot disagree.
+    ///     </para>
+    ///     <para>
+    ///         Not on <see cref="IExpressionSerializer" />: the interface is a wire seam an
+    ///         application may implement, and the one caller already holds this class.
+    ///     </para>
+    /// </remarks>
+    /// <param name="expression">The tree to translate.</param>
+    /// <param name="relationalRoots">
+    ///     The seam, or <see langword="null" /> when nothing has said the backing store is
+    ///     relational.
+    /// </param>
+    /// <returns>The node DTO.</returns>
+    public virtual ExpressionNode ToNode(
+        Expression expression,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots)
+        => _forward.Translate(expression, relationalRoots);
 
     /// <inheritdoc />
     public virtual Expression ToExpression(ExpressionNode node)
@@ -46,7 +100,33 @@ public class ExpressionSerializer(
     public virtual Expression ToExpression(
         ExpressionNode node,
         Func<QueryRootStubNode, Type, Expression> queryRootFactory)
-        => new NodeToExpressionTranslator(_typeResolver, _valueMapper, queryRootFactory).Translate(node);
+        => new NodeToExpressionTranslator(_typeResolver, _valueMapper, queryRootFactory)
+        {
+            ServerContextFactory = _serverContext is { } context
+                ? declared => declared.IsInstanceOfType(context)
+                    ? Expression.Constant(context, declared)
+                    : throw new InvalidOperationException(
+                        $"The payload names '{declared}' as the receiver of a mapped function, and "
+                        + $"this server's context is a '{context.GetType()}', which is not one. The "
+                        + "two halves were built from different context types.")
+                : null,
+        }.Translate(node);
+
+    private Microsoft.EntityFrameworkCore.DbContext? _serverContext;
+
+    /// <summary>
+    ///     Tells this serializer which context fills a <c>ServerContextStubNode</c>, for the
+    ///     duration of ONE execution.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The server calls this and the client never does.</b> The node only ever appears in a
+    ///     payload the client sent, and it means "the context this query runs against"; on the
+    ///     client that is the context it already had, and it never needs to resolve one. A
+    ///     serializer with no context refuses the node by name rather than answering it wrongly.
+    /// </remarks>
+    /// <param name="context">The server's context.</param>
+    public virtual void UseServerContext(Microsoft.EntityFrameworkCore.DbContext context)
+        => _serverContext = context;
 
     /// <summary>
     ///     Builds a model-aware serializer pipeline for the given EF model. Used by the server,
@@ -68,6 +148,13 @@ public class ExpressionSerializer(
     ///     <see cref="InProcessInfoCarrierServer" />, which reads it from the service provider it
     ///     was built with.
     /// </param>
+    /// <remarks>
+    ///     <b>It takes no relational seam, and that is not an omission.</b> This builds the
+    ///     <em>server's</em> pipeline, and the server never forward-translates a query root: it
+    ///     receives one as a node and rebuilds it on the reverse path, where
+    ///     <c>ServerQueryExecutor</c> resolves <c>IInfoCarrierRelationalQueryRoots</c> from its own
+    ///     context's services.
+    /// </remarks>
     public static ExpressionSerializer CreateForModel(
         Microsoft.EntityFrameworkCore.Metadata.IModel model,
         IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null,
@@ -87,9 +174,9 @@ public class ExpressionSerializer(
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public static ExpressionSerializer CreateForModel(

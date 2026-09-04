@@ -39,15 +39,57 @@ question, and how to check the loaded solution first:
 
 ```powershell
 dotnet build InfoCarrier.Core.slnx                       # note: .slnx, not .sln
-dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the suite
+bash eng/measure.sh <label> [baseline]                   # THE SUITE: both tiers, one number
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the whole spec suite
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.InMemory"  # Tier A only
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
-dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 17 tests, separate project
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 19 tests, separate project
 ```
 
-**Point test runs at the `.csproj`, never at the `.slnx`.** The solution holds both test projects,
-and running them together inflates `Total` past what `test/known-failures.txt` was written against.
-`eng/measure.sh` is scoped to the `.csproj` for the same reason, so a hand run scoped any other way
-is not comparable to it.
+**THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it was two between R122 and R136.**
+`test/InfoCarrier.Core.FunctionalTests` holds every ADR-009 tier: `InMemory/` is Tier A,
+`Sqlite/` is Tier B, `Firebird/` is Tier C since R153, and `TestUtilities/` is the harness they
+share. It was
+`test/InfoCarrier.Core.TestUtilities`, a project of its own, until R137 folded it in; by then it had
+one consumer. The split existed to keep the `InfoCarrier.Core.Relational` package off Tier A's
+compile line, and there is no such package any more. **The tiers are a namespace now, not a
+project**, so a run of one tier is a `--filter` and the suite's number is one project's.
+
+**TIER C IS EMBEDDED FIREBIRD SINCE R153, AND IT EXISTS FOR ONE CAPABILITY.** SQLite has no
+table-valued function and cannot be given one, and no `APPLY`; together those are the whole of
+`UdfDbFunctionTestBase` that Tier B has to leave red. Firebird has both, and it meets the
+no-installation and no-container bar the way SQLite does: the engine arrives as a NuGet package of
+native assets and one database is one `.fdb` file in the test output. **Only a base that NEEDS a
+table-valued function or `APPLY` belongs here.** The dated amendment to ADR-009 carries the whole
+reading, including why PostgreSQL is the better store on the evidence and was still not chosen.
+
+**`FirebirdLateralQuerySqlGenerator` corrects somebody else's bug and is deleted when they fix
+it.** The Firebird provider emits a bare function after `LATERAL`, which the store will not parse;
+it already wraps a plain *table* as `(SELECT * FROM "T") AS "t"` and simply never added the branch
+for a function. That one defect is what its own suite records as fourteen "Not supported on
+Firebird" skips. The correction lives on the **server** half of the harness, because the server is
+an ordinary EF application and the SQL is its provider's; nothing in `src/` knows about it.
+
+**EVERY CLIENT IS RELATIONAL SINCE R135, ON BOTH TIERS, AND THERE IS NO OPT-IN LEFT.**
+`AddEntityFrameworkInfoCarrier` registers the relational half unconditionally: EF's relational
+conventions on the client model, the relational facade dependencies, and the one
+`IInfoCarrierRelationalQueryRoots` implementation. `AddInfoCarrierRelational()`,
+`AddInfoCarrierRelationalClient()`, `UseRelationalQueryRoots()` and `NoRelationalQueryRoots` are
+**deleted**, and so is R130's half-configuration warning, because a half-configured client cannot
+exist without a switch. One package that ships the relational half cannot save a consumer anything
+by withholding it — the payload carries it either way — so the opt-in bought nothing and could only
+be got wrong. **The tiers are about the backing store and which spec bases it can host, and no
+longer about whether the client is relational**; this file and `architecture.md` said the opposite
+until R135, and `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R135)** with the
+measurement.
+
+**Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
+both and adds the figures. The solution also holds `InfoCarrier.Core.TransportTests`, which is not a
+spec project, so a solution-wide run inflates `Total` past what `test/known-failures.txt` was written
+against. **A run of one tier alone is not comparable to the baseline either**, because the baseline
+covers both.
 
 **Report test results as `Passed: N, Failed: M, Total: T`, read out of the run's own output.** Never
 estimate a count, and never derive one figure from the others.
@@ -56,10 +98,10 @@ estimate a count, and never derive one figure from the others.
 
 | Script | What it is for |
 |---|---|
-| `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. |
+| `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. **It runs every spec test project in its own `projects` list and adds the figures**, so a project missing from that list is missing from every measurement; add one there in the same commit that creates it. |
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
-| `eng/ratchet.sh <results.trx> <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. **It gates on the failing test NAMES as well**, read by `eng/trx-failures.py` and diffed against `test/known-failures.names.txt`: a change that fixes four tests and breaks four others leaves the count untouched. It publishes that delta to `$GITHUB_STEP_SUMMARY`, which the test report action cannot do because it does not know the baseline. |
-| `eng/trx-failures.py <results.trx>` | The failing test names in a TRX, sorted, one per line. What `test/known-failures.names.txt` holds and what `ratchet.sh` diffs. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
+| `eng/ratchet.sh <results.trx> [more.trx ...] <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. **It gates on the failing test NAMES as well**, read by `eng/trx-failures.py` and diffed against `test/known-failures.names.txt`: a change that fixes four tests and breaks four others leaves the count untouched. It publishes that delta to `$GITHUB_STEP_SUMMARY`, which the test report action cannot do because it does not know the baseline. **It takes several TRX and the LAST argument is the baseline**: counters are summed and names unioned into one list, gated against the one baseline pair. One baseline and not one per project, because a test that MOVES between projects would otherwise read as a fix in one and a break in the other. |
+| `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. What `test/known-failures.names.txt` holds and what `ratchet.sh` diffs. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
@@ -106,6 +148,15 @@ reflective, because `WireGrouping` did not look like five warnings.
 
 **And the build itself is a gate.** Warnings are errors when `CI=true`, so before any commit that
 touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
+
+**IT ONLY CHECKS WHAT IT RECOMPILES, AND THAT IS HOW R133 WENT RED ON THE PULL REQUEST.** MSBuild is
+incremental: a project already built by an earlier non-`CI` command is *up to date*, so the
+`CI=true` run skips it and reports `5 Warning(s), 0 Error(s)` without ever applying
+warnings-as-errors to the file you just edited. R133 edited `src/InfoCarrier.Core`, built that
+project alone without `CI=true` while iterating, then ran the gate — which recompiled nothing and
+passed. CI recompiled everything and failed on one `EF1001`. **After editing `src/`, delete that
+project's `obj` and `bin` before the gate**, or trust the gate only when its output shows the
+project being rebuilt.
 **`--configuration Release` is not optional, and leaving it off is how CI went red for ten commits
 without anyone noticing (N12).** The Blazor sample turns the trim analyzer on in Release only, so a
 Debug build cannot produce the diagnostic that fails the server. It takes seconds and it is what the
@@ -121,7 +172,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
   hides `1 Error(s)`, which is how three successive "nothing logged" results were each read as a
   clearance while every run used a stale binary.
 - **"EF ships no InMemory test for this base" means move it to Tier B, not drop it.** ADR-009 has
-  two tiers precisely because InMemory cannot host everything, and a base adopted on the wrong one
+  three tiers precisely because InMemory cannot host everything, and a base adopted on the wrong one
   produces failures that describe the *backing store* rather than this provider. Only "EF ships no
   test for it on any store we have" justifies leaving a base unadopted. The tell: **if adopting a
   base means writing a workaround for a store capability the base assumes, check the tier before
@@ -234,6 +285,32 @@ server's by the backing store, so `FindTypeMapping()` is not one answer but two.
 short-circuits the wire primitives before any mapping is consulted; anything else must be derived
 from the **CLR type alone**, through a service no provider replaces.
 
+**A fact two components read independently can disagree with itself, and the disagreement is silent
+when one component's answer only widens what the other is allowed to do.** R120's finding, and it
+cost a wrong answer rather than a red test. `IInfoCarrierRelationalQueryRoots` says what EF's
+relational raw-SQL query roots are. `ServerBoundaryAnalyzer` read it from the **options**, which it
+must — `ExtensionInfo.GetServiceProviderHashCode()` is `0`, so every client context in a process
+shares one internal service provider and anything per-context has to travel on the options. The
+forward translator read it from **DI**, because it is DI-scoped. A client that set the option but
+not the service then **admitted** a raw-SQL root at the boundary and **dropped its SQL** in the
+translator: the whole table came back, silently, which is the defect R75 closed.
+`InfoCarrierOptionsExtension.RelationalQueryRootsFor` is now the one reader, called once per
+execution in `QueryExecutor` and handed to both. **When a permission and the knowledge it guards
+live on different carriers, check that one reader answers for both.**
+
+**There are TWO shipped packages since 2026-09-03, and `release.yml` names them one by one.**
+`InfoCarrier.Core` and `InfoCarrier.Core.AspNetCore`. The push steps use exact filenames rather than
+a glob, so **a third package would ship nothing until that workflow named it**. Every packable
+project validates against `10.0.0`.
+
+**`InfoCarrier.Core.Relational` was a third package and is not one any more.** D3 is superseded
+(`architecture.md` §6a, 2026-09-03): the relational half lives at
+`src/InfoCarrier.Core/Relational/`, keeps the `InfoCarrier.Core.Relational` **namespace**, and
+`InfoCarrier.Core` carries the `Microsoft.EntityFrameworkCore.Relational` reference. It never
+shipped a stable version, so nothing published had to change. **A future split is a folder move plus
+one `PackageReference` line**, and that is deliberate — the supersession lists the three measurable
+conditions that would call for it.
+
 ## Current state
 
 **M8 is CLOSED (2026-08-24).** Every exit criterion has a resolution: three done (HTTP transport,
@@ -246,7 +323,8 @@ remote cancel signal (W6)**, and it is now the only work left in the whole roadm
 **M7's SQL Server tier is DROPPED (2026-08-24, owner's decision), not deferred.** What is withdrawn
 is a *third test tier* for this repository's suite, never support for the store: the server side is
 an ordinary EF application and runs against whatever provider it references, so requirements §5 is
-unaffected and ADR-009 keeps its two tiers. **The cost is smaller than it first looks and is stated
+unaffected. **The letter C was reused on 2026-09-04 for embedded Firebird** and does not mean SQL
+Server any more (ADR-009's dated amendment); nothing about the drop above changed. **The cost is smaller than it first looks and is stated
 per feature in `roadmap.md`, because a first reading of it lumped four features together and was
 too broad for three of them.** Computed columns, sequences and `rowversion` all reduce, on this
 side of the wire, to mechanisms with direct green coverage: store-generated values
@@ -267,8 +345,14 @@ archived in `docs/plans/v10/archive/implementation-plan-m9-phase-j.md` and is ne
 `docs/plans/v10/implementation-plan.md` holds M8's Phases H and I only.
 
 **M6 is CLOSED (2026-08-11).** Every spec base EF ships that this provider can host is adopted, and
-`InfoCarrierComplianceTest.All_test_bases_must_be_implemented` is what enforces it. That test, not a
-list in this file, is the current answer to "which bases are in".
+`All_test_bases_must_be_implemented` is what enforces it. **There are TWO of those tests since R122,
+one per test project, and both must stay green** — `InfoCarrierComplianceTest` scans the core
+specification assembly against Tier A, and `RelationalInfoCarrierComplianceTest` scans the relational
+one against Tier B, with `GetBaseTestClasses()` overridden so the two do not both claim the core
+bases. **BOTH MISSING LISTS ARE 0 SINCE R124** (2026-09-03), which closed the last one:
+`SqlQueryTestBase` had no subclass anywhere and now has `Sqlite/Query/SqlQueryInfoCarrierTest`.
+Those tests, not a list in this file, are the current answer to "which bases are in", and the answer
+is now "all of them".
 
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
@@ -376,7 +460,18 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**There is no known intermittent.** Two have been closed, and they were closed by opposite routes.
+**There is no known intermittent. Three have been closed, and by three different routes.** The
+third was closed on 2026-09-04 **by reading the source it came from**, which is the cheapest route of
+the three and the one to try first. A SQLite store failed once inside `SqliteConnection.Open()` with
+`ObjectDisposedException: SQLitePCL.sqlite3`. EF's `SqliteDatabaseCreator.Delete` answers a
+file-backed database with **`SqliteConnection.ClearAllPools()`, which is process-wide**, and every
+SQLite store here calls `EnsureDeletedAsync` at initialization, so one store's delete disposes a
+pooled native handle another store is opening. The test connection string now sets `Pooling=false`,
+and with no pool the call has nothing to dispose. **That is proof by construction rather than by
+repetition**, which matters because the failure appeared once in about ten full runs and three clean
+runs would have shown nothing.
+
+**The first two intermittents are closed**, and they were closed by opposite routes.
 C38's was **instrumented into the open**: `ServerSaveChangesExecutor` rethrows an identity conflict
 with the whole request appended, which turned a one-run-in-four failure into two dumps that arrived
 already diagnosed. R76's **never reproduced under instrumentation at all** — five clean full runs —

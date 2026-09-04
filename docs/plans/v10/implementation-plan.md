@@ -3700,6 +3700,1698 @@ re-parents of families already running, because R25–R30 showed that is where t
 
       No gate to run: nothing under `src/` or `test/` changed.
 
+- [x] **R120. `InfoCarrier.Core.Relational` ships, and the seam it needs has exactly one reader.**
+      Level 1 of #97's three. `src/` and `test/` change, so both gates ran, and a public signature
+      changes, so `dotnet pack` ran too.
+
+      **What is built.** A third shipped package, `src/InfoCarrier.Core.Relational`. It holds
+      `InfoCarrierRelationalQueryRoots`, which names `FromSqlQueryRootExpression` and
+      `SqlQueryRootExpression` outright, and `InfoCarrierRelationalFacadeDependencies`, moved out
+      of the test project. `InfoCarrier.Core` gains
+      `Metadata.IInfoCarrierRelationalQueryRoots` with a no-op default that refuses rather than
+      drops. **`RelationalQueryRootShape.cs` is deleted: 276 lines and 10 trim suppressions.**
+      `architecture.md` §6a carries the **D3 amendment 2026-09-02 (R120)**, and **D3 as written is
+      untouched** — the relational reference lives outside `InfoCarrier.Core`.
+
+      **THE FINDING, and it cost a wrong answer rather than a red test.** The prototype gave one
+      fact two carriers. `ServerBoundaryAnalyzer` read the seam from the **options**, which it must:
+      `ExtensionInfo.GetServiceProviderHashCode()` is `0` and `ShouldUseSameServiceProvider` is true
+      for every InfoCarrier options shape, so every client context in a process shares one internal
+      service provider and anything per-context has to travel on the options.
+      `ExpressionToNodeTranslator` read it from **DI**, because it is DI-scoped. A client that set
+      the option but not the service therefore **admitted** a raw-SQL root at the boundary and then
+      **dropped its SQL** in the translator, and the whole table came back — the defect R75 closed.
+      `SqliteSmokeTest.FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated`
+      answered **2 where 1 is correct**.
+
+      **The fix is one reader.** `InfoCarrierOptionsExtension.RelationalQueryRootsFor(context)` is
+      it. `QueryExecutor` calls it once per execution and hands the same object to `QuerySplitter`
+      (hence to the analyzer) and to `ExpressionSerializer.ToNode`. The translator takes it per
+      translation and scopes it as it scopes parameter identity: set at depth 0, untouched in the
+      recursion; the constructor parameter the prototype had is gone. `ExpressionSerializer
+      .CreateForModel` is back to its 10.0.0 shape — the server never forward-translates a query
+      root, so it never needed the seam, and one of the prototype's two compatibility overloads went
+      with it.
+
+      **A second half of the same mistake, found by running the tests.** The prototype resolved the
+      server's implementation from the server `DbContext`'s services. A server context builds its
+      own internal service provider and never sees the application's collection, so that answered
+      "nothing is relational here" for a server that had registered a real one, and
+      `A_FromSql_query_crosses_once_both_sides_grant_it` failed on the rebuild instead of the
+      translation. `InProcessInfoCarrierServer` now resolves it from the application's provider and
+      passes it to `ServerQueryExecutor`, beside the value mappers, the allowed types and the
+      raw-SQL grant, which is where the other three already came from.
+
+      **All 25 `SqliteSmokeTest` tests pass**, including the three the prototype left red.
+
+      **Three registration entry points, and it is not tidiness.** `AddInfoCarrierRelational()` on
+      both halves; `AddInfoCarrierRelationalClient()` on the **client only**, because it also
+      replaces `IDatabaseFacadeDependencies` and a relational server already has EF's own over a
+      live connection; and `InfoCarrierDbContextOptionsBuilder.UseRelationalQueryRoots(...)`,
+      because most clients never build an `IServiceCollection` — `SqliteSmokeTest` is exactly that
+      shape.
+
+      **Gates.** `eng/measure.sh r120 r119-check`: `Passed: 29013, Failed: 141, Total: 29392,
+      Skipped: 238`, **FIXED none, BROKEN none, REASONS unchanged** — the same 141 as `main`, which
+      is the answer this change should give, since the three smoke tests were red only on the
+      prototype. `dotnet pack` clean on all three packages, so the widened `QuerySplitter`,
+      `ServerBoundaryAnalyzer` and `ServerQueryExecutor` constructors and the new
+      `ExpressionSerializer.ToNode` overload are binary-compatible with 10.0.0.
+      `CI=true dotnet build --configuration Release`: `5 Warning(s), 0 Error(s)`.
+
+      **`eng/trim-ratchet.sh`: `ours` 89, `total` 855, and the baseline does NOT move.** The
+      expectation that removing 276 lines of reflection would lower it was wrong, and the reason is
+      worth carrying: **the ten attributes on that file were `UnconditionalSuppressMessage`, so
+      those diagnostics were never in the 89.** Deleting suppressed reflection cannot lower a count
+      that excluded it. Two measurements say so directly, 89 with the file and 89 without, and the
+      publish log carries **no `InfoCarrier.Core.Relational` diagnostic at all** — verified, not
+      assumed. `eng/trim-baseline.txt` records this so the next reader does not go looking for the
+      win here: what went away is ten written arguments a trimmer could not check, replaced by two
+      type names a compiler does.
+
+      **Two costs recorded rather than rediscovered.** `EnablePackageValidation` is on for every
+      packable project, and a brand-new package has no baseline to fetch: restore fails `NU1101`
+      hunting an `InfoCarrier.Core.Relational 10.0.0` that cannot exist, so the new csproj turns it
+      off with a comment saying to turn it on after the first release. And `release.yml` pushes by
+      **exact filename, not a glob** — it now names the third package, in three places, or a
+      release would have shipped nothing of it.
+
+      Level 2 (EF's relational conventions on the client model) and level 3 (a relational model on
+      the client) are untouched and stay open. `roadmap.md`'s deferred row is updated to say level 1
+      is built.
+
+      **One deviation, stated rather than hidden.** Five XML doc comments R119 left stale, on the
+      binary-compatibility overloads, were corrected after `measure.sh` had already built. They are
+      doc comments: no IL changes, and the trim publish and the pack both ran after them.
+
+- [x] **R121. The three measurement tools take several test projects, against one baseline.**
+      `eng/` only: `measure.sh`, `ratchet.sh`, `trx-failures.py`, plus the table rows in
+      `CLAUDE.md`. **No product or test code, and the behaviour of every existing call is
+      unchanged.** Written before the split it exists for, so the split can be measured the day it
+      lands rather than after.
+
+      **What changed.** `ratchet.sh` now reads `<results.trx> [more.trx ...] <baseline-file>` — the
+      LAST argument is the baseline — and sums the `<Counters>` of each TRX while unioning the
+      failing names into one sorted list. `trx-failures.py` takes any number of TRX. `measure.sh`
+      holds a `projects` array, runs `dotnet test` once per entry, adds the figures read out of
+      each run's own summary block, and concatenates the per-project logs for the name and reason
+      extraction. Today that array holds one project, so every number is identical.
+
+      **ONE BASELINE, and that is the decision rather than a detail.** `test/known-failures.txt`
+      and `known-failures.names.txt` stay one pair covering the whole suite. With a pair per
+      project, a test that MOVES between projects reads as a fix in one and a break in the other,
+      and the name diff that makes "fixed 4, broke 4" fail the gate stops working across the
+      boundary — which is exactly the boundary the split is about to create.
+
+      **Summing is the one arithmetic allowed on these counts, and the scripts say so.** Every
+      figure is still read out of a run's own summary or `<Counters>` element; what is added is the
+      same figure from a second run. `passed` is still never derived from `total` and `failed`.
+
+      **Verified directly, because these scripts ARE the gates and a broken one is invisible.**
+      `ratchet.sh` against a real TRX and a baseline matching it: `Passed: 27474, Failed: 99,
+      Total: 27809`, FIXED none, BROKEN none, exit 0 — the single-TRX path unchanged. The same TRX
+      named twice: `Passed: 54948, Failed: 198, Total: 55618`, both counters exactly doubled, the
+      name list unioned to the same 99 names, and the failure gate fires. `trx-failures.py` on one
+      TRX and on the same TRX twice both print 99 names. `measure.sh` was pointed at a fast project
+      listed twice and reported two per-project lines and `TOTAL: 38` for a 19-test project.
+
+      `build.yml` is untouched: its call is two arguments, the last of which is the baseline, which
+      is what the new parser reads.
+
+- [x] **R122. The spec suite splits by backing store, and the compliance gate splits with it.**
+      `test/` and `eng/` and the workflows; no product code, so `eng/measure.sh` is the gate and the
+      trim ratchet has nothing to say.
+
+      **Three test projects where there was one**, EF Core's own layout:
+      `test/InfoCarrier.Core.FunctionalTests` is ADR-009 Tier A over InMemory,
+      `test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B over SQLite, and
+      `test/InfoCarrier.Core.TestUtilities` is the store-neutral harness they share. **Tier A
+      references neither `EFCore.Relational.Specification.Tests` nor `InfoCarrier.Core.Relational`,
+      and neither does the shared harness**, because a reference is transitive. That is the whole
+      purpose: a relational client over an InMemory backend is the disagreement the seam exists to
+      prevent, and it was a per-fixture flag before, which asks politely.
+
+      **The seam the split forced, and it is the interesting part.** The shared harness could not
+      keep naming relational types, so the backend-store delegate and the `relationalClientStore`
+      bool became one `InfoCarrierTier` object. A tier answers four questions for itself: which
+      backend store, which client shell, which client services, which logger factory. Everything
+      relational is overridden in `SqliteInfoCarrierTier`, in the Tier B assembly;
+      `InMemoryInfoCarrierTier` overrides one member and takes the store-neutral defaults for the
+      rest, which is the honest measure of how much of the harness was ever store-specific. The
+      same shape appears twice more: `InfoCarrierBackendTestStore.AddStoreSpecificServices` (the
+      server's `AddInfoCarrierRelational`) and `CreateStoreConnection`, which used to return a bare
+      `SqliteConnection` from the store-neutral base and now throws there.
+
+      **Two things Tier A was carrying that it did not need, both found by the compiler rather than
+      by reading.**
+
+      - **Seven Tier A fixtures implemented `ITestSqlLoggerFactory`**, purely to satisfy
+        `RelationalComplianceTestBase`'s second assertion. Tier A is now checked by the plain
+        `ComplianceTestBase`, which does not ask, and what the property returned was the *client's*
+        log — on a client with no database, empty.
+      - **`SpatialQueryInfoCarrierTest` sat on `SpatialQueryRelationalTestBase`, which declares no
+        tests.** Read before it was decided, as the handoff required: fourteen lines whose whole
+        contribution is a `RelationalQueryAsserter` that calls `TestSqlLoggerFactory.OutputSql()`
+        when an assertion fails, on a client that emits no SQL. It now sits on the core
+        `SpatialQueryTestBase` and **loses nothing**, because the base declared nothing to lose. It
+        is listed in Tier B's `IgnoredTestBases` with that measurement: adopting it there would
+        need SpatiaLite for a base that declares no tests.
+
+      **`ModelBuilding` and `DocumentMappingPinTest` moved to Tier B**, which the compiler decided:
+      the first derives from `RelationalModelBuilderTest` and a stack of `Relational…TestBase`, and
+      the second calls `UseSqlite`.
+
+      **TWO COMPLIANCE TESTS, AND BOTH ARE WHERE THEY SHOULD BE.** `InfoCarrierComplianceTest`
+      scans the core specification assembly against Tier A; `RelationalInfoCarrierComplianceTest`
+      overrides `GetBaseTestClasses()` to scan the relational one against Tier B, so the two do not
+      both claim the core bases — without that override Tier B would report a hundred bases missing
+      that are not missing at all. **Tier A's missing list is 0 and Tier B's is 1**
+      (`SqlQueryTestBase`), which is the same 1 the single test reported before the split.
+
+      **Tier A's `IgnoredTestBases` was generated from the test's own output**, not written by
+      hand: 108 core bases adopted on Tier B, because InMemory cannot host them and the tier that
+      translates is where they run (ADR-009). One reason covers the list and it is a true one; the
+      per-base reasoning is in the archive. An entry is a claim that a subclass exists in the
+      sibling assembly, and the pair of tests is what checks it. The old list, every entry of it,
+      was relational and moved to Tier B — the compiler established that by refusing to resolve a
+      single one of them in Tier A.
+
+      **Gates.** `eng/measure.sh r122 r120`: **`Passed: 29014, Failed: 141, Total: 29393`**, read
+      as `failing 2 of 9151` on Tier A plus `failing 139 of 20242` on Tier B. **`failed` does not
+      move.** FIXED one and BROKEN one, and they are the same failure renamed:
+      `InfoCarrierComplianceTest.All_test_bases_must_be_implemented` became
+      `RelationalInfoCarrierComplianceTest.All_test_bases_must_be_implemented`. REASONS unchanged.
+      `CI=true dotnet build --configuration Release`: `5 Warning(s), 0 Error(s)`.
+
+      **`total` rises 29392 → 29393, a deliberate rise of one, and the cause is arithmetic rather
+      than behaviour.** The compliance gate is two classes now, so
+      `All_test_bases_must_be_implemented` exists twice while
+      `All_query_test_fixtures_must_implement_ITestSqlLoggerFactory` still exists once. Two tests
+      became three. `test/known-failures.txt` carries the note and
+      `test/known-failures.names.txt` carries the rename.
+
+      **`build.yml` runs both projects into one results directory and hands both TRX to the
+      ratchet**, which R121 taught to aggregate. The fast gate gains `SqliteSmokeTest`, which moved
+      to the other project and is the only place the raw-SQL seam runs end to end.
+
+      **One thing the Release build caught that a Debug build would not have.** The culture pin is a
+      `[ModuleInitializer]`, and moving it into the shared library made `CA2255` an error under
+      `CI=true`: *"only intended to be used in application code"*. **The analyzer is right and the
+      hazard is real** — a library's module initializer runs when that library is first loaded,
+      which is not guaranteed to precede the test threads of the assembly that referenced it, and
+      the whole point of the pin is that it runs before any of them. `InvariantCulture.Pin()` is now
+      an ordinary method in the shared harness and each test assembly carries its own three-line
+      `[ModuleInitializer]` that calls it. Re-measured after that change: `FAILING: 141 TOTAL:
+      29393`, FIXED none, BROKEN none, REASONS unchanged, so the pin still does what it did.
+
+      **Both compliance tests are green in the sense that matters**: Tier A's passes outright, and
+      Tier B's carries the one missing base it is supposed to carry. The end state the split was for
+      — two compliance tests, both meaningful, neither able to hide the other's gap — exists.
+
+- [x] **R123. Level 2 scoped and filed, NOT built, and it is blocked on one decision.** Documents
+      only — `architecture.md` §6a **D3 amendment 2026-09-02 (R123)**. **Nothing executable
+      changed.** No gate to run.
+
+      **What was established, and it is the half that costs time.** EF's own
+      `EntityTypeHierarchyMappingConvention` **runs on a client model unchanged**: it takes
+      `RelationalConventionSetBuilderDependencies` and never touches it, and `GetTableName()` needs
+      no relational service either — `GetDefaultTableName` reads model metadata and
+      `GetMaxIdentifierLength()` and nothing else. All three read out of EF's source. So the
+      131-line hand-written copy really can go, and the dependency object it would need can throw on
+      both its members, exactly as `InfoCarrierRelationalFacadeDependencies` does and for the reason
+      ADR-013 records.
+
+      **The blocker is not the conventions. It is which client gets them, and it is R120's finding
+      in its model-building form.** A convention set cannot read a context's options —
+      `ProviderConventionSetBuilderDependencies` exposes `ContextType`, a `Type`, and no
+      `ICurrentDbContext` — so the seam must be registered in DI, and DI is one answer for every
+      client context in the process. **Worse, the model is shared too**: this provider registers no
+      `IModelCacheKeyFactory`, so EF's default keys the model on the context CLR type, and a
+      per-context answer could not be honoured even if the seam could carry one.
+
+      **Two ways forward and they are the owner's to choose**: level 2 is a process-wide statement
+      (`AddInfoCarrierRelational()` means "every client here is relational"), or
+      `IModelCacheKeyFactory` is replaced so the options participate. Starting with the first and
+      needing the second later is a public-API change and a model-cache change at once, so it is
+      not a thing to discover halfway.
+
+      **And the first measurement of level 2 is not a convention.** The relational client services
+      are registered today only where a fixture asked for raw SQL
+      (`InfoCarrierTestStoreFactory.AddProviderServices`, gated on `ArbitrarySqlExecution`). Level 2
+      wants them for every Tier B fixture, which is a large blast radius and should be measured on
+      its own first.
+
+- [x] **R124. `SqlQueryTestBase` adopted — the last specification base with no subclass anywhere,
+      and Tier B's missing list goes to 0.** `test/` only, so `eng/measure.sh` is the whole gate.
+      **`failed` 141 -> 242, `total` 29393 -> 29512**, both deliberate and both noted in
+      `test/known-failures.txt`. FIXED 1
+      (`RelationalInfoCarrierComplianceTest.All_test_bases_must_be_implemented`), BROKEN 102, every
+      one of them in the new class. Read as `failing 2 of 9151` on Tier A -- unchanged -- plus
+      `failing 240 of 20361` on Tier B.
+
+      **The compliance gate is now green on both tiers.** Tier A's missing list was already 0; Tier
+      B's was 1 and is 0. That pair of tests, and not a list in `CLAUDE.md`, is the answer to "which
+      bases are in", and the answer is now "all of them".
+
+      **ADR-013's three-way test was applied before a line was written, and it passes.** The base's
+      1301 lines contain no `UseTransaction`, no `GetDbTransaction()` and no
+      `ExecuteWithStrategyInTransactionAsync`; its one abstract member is `CreateDbParameter`, and
+      every route to a context runs through `Fixture.CreateContext()`. Nothing in it requires the
+      client to be relational. The fixture already carried `arbitrarySqlExecution: true`, so the
+      grant needed no change.
+
+      **The four `Bad_data_error_handling_invalid_cast*` overrides are EF's own**, taken from
+      `SqlQuerySqliteTest`: SQLite is dynamically typed, so there is no invalid cast to make. EF's
+      remaining overrides are `AssertSql` baselines, which have no meaning on this side of the wire,
+      so those tests are left to the base exactly as `FromSqlQueryInfoCarrierTest` leaves them.
+
+      **The harness gains one seam, and it is the product's own.** `SharedTestStoreProperties`
+      gains `AllowedTypes`, wired to `AllowTypes` on the client and `AddInfoCarrierAllowedTypes` on
+      the server, and `NorthwindQueryInfoCarrierSqliteFixture` declares the four `Unmapped*`
+      projection types. **Not gated on `ArbitrarySqlExecution`, unlike the store's parameter type**:
+      a `DbParameter` can only appear in a raw-SQL payload, and a projection DTO cannot, so gating
+      it would state a dependency that is not there.
+
+      **THE MEASUREMENT THAT MATTERS IS THE ONE THAT MOVED NO COUNT.** With the base adopted and
+      nothing declared, the class ran 17 of 119 and 90 of the 102 reds were
+      `not on the type allowlist`. With the four types declared, the class ran **17 of 119 again**
+      -- the identical count -- and every one of those 90 had moved to
+      `Entity type '...' not found in the server model`. A count that did not move and a reasons
+      diff that did: this is the case `measure.sh`'s third level exists for, and reading the count
+      alone would have said the declaration did nothing. It did the whole thing.
+
+      **The control is in the same run.** `SqlQueryRaw_queryable_simple_mapped_type` passed both
+      times, because `CustomerQuery` **is** in the model. The allowlist was never wrong; an ad-hoc
+      entity type simply is not something a model implies.
+
+      **All 102 are classified in `test/known-failures.txt`** -- 90 the server-model gap R125
+      closes, 10 the message-text class `FromSqlQueryTestBase` already carries, 2 the
+      `RelationalTypeMapping` cast ADR-013 records. None is of unknown standing.
+
+- [x] **R125. The server builds the ad-hoc entity type a raw-SQL root names, instead of reporting
+      it missing from a model it was never going to be in.** `src/` change, so both
+      `eng/measure.sh` and `eng/trim-ratchet.sh`. **`failed` 242 -> 222**, `total` unchanged at
+      29512. FIXED 20, BROKEN none. Trim ratchet `ours` 89 <= 89, `total` 855, unchanged.
+      `CI=true dotnet build --configuration Release` reports the expected `5 Warning(s),
+      0 Error(s)`. No public signature moves -- `RebindQueryRoot` is private -- so no pack gate.
+
+      **This repository predicted the fix before it wrote it.** R110 recorded, in the plan, that
+      *"the gap is not getting an ad-hoc entity type across the wire; it is that
+      `ServerQueryExecutor.RebindQueryRoot` resolves through the server's model and the server never
+      builds the matching ad-hoc type"*. That is exactly what this step does, and the prediction was
+      re-derived independently from a stack trace before the entry was found again.
+
+      **`IAdHocMapper` is EF's own public service and the client already uses it.** `Database.SqlQuery<T>`
+      into an unmapped type is answered by an ad-hoc entity type, which never enters
+      `IModel.GetEntityTypes()`; `RelationalDatabaseFacadeExtensions.SqlQuery` builds one on the
+      client through this service, and the server now does the same. Nothing is invented.
+
+      **The two gates are unchanged, and the comment in the code says why that matters.** A CLR type
+      reaches `RebindQueryRoot` only if the server's own `TypeAllowlist` admitted it in
+      `TypeNodeResolver`, which for a type the model does not imply means the application registered
+      it with `AddInfoCarrierAllowedTypes`; and `RequireArbitrarySql` still refuses a raw-SQL root
+      outright unless the server granted execution. The conjunction is *declared type* **and**
+      *raw-SQL grant*, and neither half is relaxed.
+
+      **IT CLOSED 20 OF THE 90, NOT 90, AND THAT IS THE USEFUL PART.** The other 70 moved to a
+      second, distinct defect on the RETURN path: `Type '...UnmappedCustomer' is not on the
+      deserialization allowlist`, raised in `TypeNodeResolver` from `ClientResultMaterializer`. The
+      client refuses to materialize rows of a type its own options declared. **R120's shape a third
+      time** -- the boundary reads the declared types off the options, the materializer reads its
+      allowlist off DI, and the disagreement was silent because the only registered type this suite
+      had before was a `DbParameter`, which is sent and never returned. R126 closes it.
+
+- [x] **R126. The client materializes rows of a type its own options declared, and `QueryExecutor`
+      is now the one reader for both directions.** `src/` change with new public members, so
+      `eng/measure.sh`, `eng/trim-ratchet.sh` **and** `dotnet pack`. **`failed` 222 -> 160**,
+      `total` unchanged at 29512. FIXED 62, BROKEN none. **The reasons diff removes one whole class
+      and adds nothing.** Trim ratchet `ours` 89 <= 89. Pack clean, no `CP0002`: the two new members
+      are additions, not arity changes. `CI=true dotnet build --configuration Release` reports
+      `5 Warning(s), 0 Error(s)`.
+
+      **R120'S SHAPE, A THIRD TIME, AND THE THIRD TIME IS THE ONE THAT GENERALISES.** A permission
+      and the knowledge it guards lived on different carriers. `AllowTypes` travels on the
+      **options**, which `InfoCarrierOptionsExtension.AllowedTypesFor` requires be read per
+      execution and never captured, because `CompileQuery`'s result is cached across every context
+      of one options shape. The result materializer resolves through a **DI-scoped**
+      `TypeNodeResolver` whose allowlist is `TypeAllowlist.ForModel(model)` and knows only what the
+      model implies. So the boundary admitted a declared type and the materializer refused the rows
+      that came back.
+
+      **It was silent for a reason worth naming: the only registered type this suite had before was
+      a `DbParameter`, and a `DbParameter` is SENT and never RETURNED.** The two readers could not
+      disagree out loud until a declared type made the round trip, which
+      `Database.SqlQuery<UnmappedCustomer>` is the first thing in this repository to do. The rule
+      that generalises: **when a fact is read off two carriers, the disagreement stays hidden until
+      something exercises both directions.**
+
+      **The fix keeps the per-execution rule rather than working around it.** `QueryExecutor` reads
+      `AllowedTypesFor` once and hands the same list to the boundary analyzer and, through
+      `ExpressionSerializer.UseExecutionAllowedTypes`, to the resolver.
+      `TypeNodeResolver.UseExecutionAllowedTypes` widens and never narrows, and **its cache now
+      memoizes the resolution and never the permission** — a name resolved while one execution's
+      declared types were in force must not stay admitted for the next execution, whose context may
+      declare nothing, so a cache hit still falls through to the allowlist check.
+
+      **`SqlQueryInfoCarrierTest` is 97 of 119**, from 17 at adoption, across R124 -> R125 -> R126.
+      The 22 still red are classified in `test/known-failures.txt`: 20 are this tier's store
+      (EF's own `NorthwindContext` calls `Ignore(o => o.Freight)` and this tier builds its store
+      from the model, where EF's SQLite suite reads a prebuilt `northwind.db` that has the column
+      regardless — read from EF's source, not inferred), and 2 are ADR-013's `RelationalTypeMapping`
+      cast, which `FromSqlQueryTestBase` already carries as an identical pair.
+
+- [x] **R127. #97 level 2, step one: the relational client is on for the whole of Tier B, and the
+      measurement moved nothing in all three levels.** `test/` only, so `eng/measure.sh` is the
+      whole gate. **`failed` unchanged at 160**, `total` 29512 -> 29514, a deliberate rise of two
+      and both of them green. FIXED none, BROKEN none, **`REASONS: unchanged`**.
+      `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R127)**.
+
+      **The owner's decision is taken and recorded: level 2 is a process-wide statement**, answer
+      (1) of the two R123 set out. `IModelCacheKeyFactory` is therefore **not** replaced, and
+      nothing should add one.
+
+      **What changed.** `SqliteInfoCarrierTier.AddClientServices` registered
+      `AddInfoCarrierRelationalClient()` only where a fixture had asked for raw SQL. That gate was
+      #56 option D's, and it was about `Database.SqlQuery<T>` rather than about the store: the shim
+      alone traded one exception for another, so the two were wanted together. It stops holding once
+      the package also decides how the client's **model** is built, which is a property of the
+      backing store and not of a permission.
+
+      **A NULL RESULT IS THE ONE CASE `CLAUDE.md` SINGLES OUT, AND IT WAS TREATED AS ONE.** A
+      matcher that never fired and a change that did not help look identical from outside, so the
+      code was **established to have run** rather than assumed.
+      `Sqlite/RelationalClientTierPinTest` reads the registration straight out of the collection
+      each tier builds, and it is **red without the change and green with it** — verified by
+      reverting the one file, rebuilding and re-running, not by reasoning. Its second test pins the
+      other direction: **Tier A registers nothing relational**, which is this handoff's stopping
+      rule 4 in test form and is structural rather than conditional, since the override lives in the
+      relational project and `InfoCarrierTier.AddClientServices` adds nothing by default.
+
+      **The null result is itself the finding.** The facade shim and the query-root seam are inert
+      for a client that never uses `Database.SqlQuery<T>` or a raw-SQL root: widening the
+      registration from a handful of fixtures to all 20,363 Tier B tests changed no answer anywhere.
+      So level 2's registration has a blast radius of nil, and whatever the **conventions** change
+      later is attributable to the conventions alone. Measuring this step separately is what buys
+      that, and it is why R123 asked for it.
+
+      **STEP TWO IS BLOCKED ON A DIFFERENT CARRIER PROBLEM AND IS NOT STARTED.**
+      `IProviderConventionSetBuilder` is registered by `AddEntityFrameworkInfoCarrier` through
+      `EntityFrameworkServicesBuilder.TryAdd`, and that call is made by
+      `InfoCarrierOptionsExtension.ApplyServices` into **EF's internal service provider** — not into
+      the application's collection, which is what `AddInfoCarrierRelationalClient` runs on. A client
+      that does not call `UseInternalServiceProvider` therefore cannot have its convention set
+      replaced by a DI call at all, and `SqliteSmokeTest` is exactly that shape. Same question
+      `UseRelationalQueryRoots` answered for level 1, same two honest answers, and it is the owner's
+      to take before any code. The full reading is in the D3 amendment.
+
+      **And when step two is built, `InfoCarrier.Core.Relational` must REPLACE rather than
+      duplicate** (owner's instruction, 2026-09-03): a subclass of `InfoCarrierConventionSetBuilder`
+      that calls the base and swaps EF's relational conventions in for the hand-written ones, with
+      `InfoCarrierHierarchyMappingConvention` deleted in the same commit. Two implementations of one
+      fact in two packages drift silently, which is the failure mode D3 and ADR-012 already record.
+
+- [x] **R128. #97 level 2, step two: the relational package REPLACES the client's convention set
+      builder, and the hand-written hierarchy convention is deleted.** `src/` change, so
+      `eng/measure.sh`, `eng/trim-ratchet.sh` **and** `dotnet pack`. **`failed` unchanged at 160**,
+      `total` 29514 -> 29515. FIXED none, BROKEN none, `REASONS: unchanged`. Trim ratchet `ours`
+      89 <= 89. `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R128)**.
+
+      **The owner chose answer (C) on 2026-09-03**, from four live alternatives: replace
+      `IProviderConventionSetBuilder` with a subclass, rather than `IConventionSetPlugin`,
+      `ModelConfigurationBuilder.Conventions`, or requiring `UseInternalServiceProvider`.
+
+      **R127's "blocked on DI reach" was real but narrower than it read, and this corrects it.**
+      EF's `ServiceProviderFixtureBase` builds its provider from
+      `TestStoreFactory.AddProviderServices(...)` and calls `UseInternalServiceProvider` — read from
+      EF's source. So `AddInfoCarrierRelationalClient` already reaches the convention set for every
+      spec fixture, and no new seam was needed. What is still open is the consumer that builds no
+      collection at all.
+
+      **`InfoCarrierHierarchyMappingConvention` is deleted**: 131 lines, four hand-spelled
+      `Relational:` strings, and the `DocumentMappingPinTest` case that held them against EF's
+      constants. That pin is not replaced by another pin — EF's own
+      `EntityTypeHierarchyMappingConvention` reads EF's constants, so **a rename is a compile error
+      now**, which is strictly stronger than the test was.
+
+      **The relational dependency object is a stub whose 29 members all throw.** The convention
+      holds `RelationalConventionSetBuilderDependencies` and never reads it; the two services it
+      carries are command-side, and D3's charter says this package gives the client metadata and
+      never anything reaching a connection. A throw is louder than a wrong answer.
+
+      **A SECOND NULL RESULT IN A ROW, AND THE NEGATIVE CONTROL IS WHAT MADE IT EVIDENCE.** Removing
+      EF's convention from the new builder, changing nothing else, turns
+      `TPTInheritanceQueryInfoCarrierTest.Using_from_sql_throws` and its TPC sibling **red**;
+      restoring it turns them green. So the convention runs and does work, and the copy it replaced
+      was doing the same work — which is why no count moved. Two permanent pins were added to
+      `RelationalClientTierPinTest`: a single `IProviderConventionSetBuilder` descriptor per tier,
+      the relational subclass on Tier B and the core one on Tier A.
+
+      **`total` moves by one and it is two movements.** Two pin tests added, one pin test deleted.
+
+      **The Release build caught what Debug did not**, twice: a dangling `cref` to the deleted type
+      (`CS1574`) and an unnecessary `using` (`IDE0005`), both errors only under `CI=true` in
+      Release. This is the N12 lesson holding.
+
+      **Pack is clean and that was verified rather than assumed.** Deleting a public type would be a
+      binary break, but `InfoCarrierHierarchyMappingConvention` is **not in the published `10.0.0`**
+      — checked in the baseline package's own XML — so there is nothing for validation to compare it
+      against.
+
+      **What remains of the duplication.** `InfoCarrierValueGenerationConvention` still spells two
+      `Relational:` strings by hand, and `AnnotationDocumentMapping` and `ModelDbFunctions` spell
+      more. One step each, one measurement each, because deleting a string deletes its pin.
+
+- [x] **R129. EF's `RelationalValueGenerationConvention` CANNOT run on a client model. Attempted,
+      measured, REVERTED.** Documents only in the end — the code change was made, measured and
+      backed out, so nothing executable changed and no gate applies. The tree is byte-identical to
+      R128, which `r128b` measured, so the baseline files do not move: `failed=160, total=29515`.
+
+      **The measurement: `failed` 160 -> 720. BROKEN 560, FIXED none.** One cause dominates:
+      **458 × `The property '__synthesizedOrdinal' cannot be configured as 'ValueGeneratedOnUpdate'`.**
+
+      **What it means, and it is the boundary of level 2 rather than a bug in the change.**
+      `__synthesizedOrdinal` is the ordinal property EF synthesizes for a JSON-mapped collection —
+      this repository already knows the name, because `AnnotationDocumentMapping.SynthesizedOrdinal`
+      pins it against `RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName`. EF's
+      relational value-generation convention reaches into relational **model** concepts around that
+      property, and the client does not build a relational model. **That is level 3 leaking into
+      level 2**, and level 3 is out of scope for the reason D3's charter now states.
+
+      **THE RULE THIS PRODUCES, AND IT IS THE PART THAT TRANSFERS.** D3 scoped level 2 as *"register
+      EF's own relational conventions on the client model"*, as though the conventions were one job
+      with one answer. **They are not interchangeable in cost, and the difference is not visible from
+      the outside.** `EntityTypeHierarchyMappingConvention` reads annotations and model metadata only
+      — it ran with no failure at all (R128). `RelationalValueGenerationConvention` derives from a
+      core convention and pulls relational model machinery with it — it broke 560 tests. **Each
+      convention is its own experiment and needs its own full measurement**, which is exactly what
+      taking them one at a time was for.
+
+      **`InfoCarrierValueGenerationConvention` stays, and its doc comment was already right.** It
+      says *"Narrow on purpose"*, and narrow is what makes it work: only a property whose
+      `ValueGenerated` is still `Never`, and only where the caller declared a default. Its two
+      `Relational:` strings and their `DocumentMappingPinTest` case stay with it.
+
+      **A partial run said this was fine and the full run said otherwise.** A filtered check over
+      `DocumentMappingPinTest` and `StoreGenerated*` reported 337 of 337 green, which is true and
+      says nothing: the 458 live in `AdHocJsonQuery*` and the JSON-mapped families, which that
+      filter never touched. Recorded because it is `CLAUDE.md`'s "never state a verdict from partial
+      output" arriving in a new disguise — the partial run was not read as a verdict, but it would
+      have been easy to.
+
+- [x] **R130. A half-configured relational client is told so, and told what to call.** `src/`
+      change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed` unchanged at
+      160**, `total` 29515 -> 29519, a deliberate rise of four and all four green. FIXED none,
+      BROKEN none, `REASONS: unchanged`. Trim `ours` 89 <= 89. Pack clean. Release build
+      `5 Warning(s), 0 Error(s)`.
+
+      **Raised by the owner as a question — "plain ICC should return NotSupported and recommend
+      ICC.R; is that correct, and should tests assert it?"** The answer is yes, and checking it
+      found that **R128 had shipped a silent failure two commits earlier**.
+
+      **Three cases, and they were not alike.** Raw-SQL roots were already right:
+      `NoRelationalQueryRoots` refuses and its message names the package and the call.
+      `Database.SqlQuery<T>` throws EF's own `RelationalNotInUse`, which names nothing of ours and
+      still does not. **The conventions were silent**: a client that registered
+      `AddInfoCarrierRelational()` but not `AddInfoCarrierRelationalClient()` built a model EF's
+      relational conventions never touched, and nothing said so.
+
+      **The consequence is behavioural rather than cosmetic, and it was read rather than assumed.**
+      EF decides "non-TPH" by the absence of a discriminator, so `context.Set<Bird>().FromSqlRaw(...)`
+      — which EF refuses on a TPT root — was **admitted**. That is R128's own negative control
+      (`Using_from_sql_throws`) read properly.
+
+      **IT WARNS AND DOES NOT THROW, AND TWO MEASURED FALSE POSITIVES ARE WHY.** A first version
+      triggered on the configuration alone and broke
+      `OptimisticConcurrencyTestBase.External_model_builder_uses_validation`, which hands over a
+      model built externally with `UseModel` that no convention set can stamp — it replaced EF's own
+      `EntityRequiresKey` message with this one. Narrowing the trigger to configuration **and**
+      symptom fixed that and left a second: `F1FixtureBase` also builds its model externally.
+      **A diagnostic that refuses a legitimate model is worse than the silence it replaces.**
+
+      **The trigger is configuration and symptom, never the shape of the model alone.** A model
+      calling `ToTable` is ordinary on a client whose store is not relational — Tier A builds many —
+      so the model is not evidence by itself. What is evidence is the client's own statement plus a
+      hierarchy that still carries a discriminator while a derived type names its own store object.
+
+      **Three tests, and the third is the one that matters.** Half-configured warns and the message
+      names the fix; both halves does not warn (the control); **a plain client that said nothing does
+      not warn** (the negative control that keeps the guard from being too wide).
+
+      **Two limits are stated in the code rather than left as silence.** A client that says nothing
+      at all cannot be caught — finding out needs the model handshake §6a D2 describes and this
+      repository has not built. And the options-carried route is invisible, because `IModelValidator`
+      is a singleton and that value is per context.
+
+      **Three `Relational:` strings come back into `InfoCarrier.Core`, and they are pinned.** They
+      are a **detector's** strings rather than a fixer's: one that stops matching costs a missed
+      warning and never wrong data, which is why R128 could delete the hierarchy convention's four
+      outright and these three are worth carrying.
+
+      **`total` was almost recorded as 29518**, which is the measurement that preceded the pin test.
+      Two tests were added after that run and the draft note's arithmetic did not add up, which was
+      the tell. The suite was re-measured rather than reasoned about. This is the "read it out of
+      the run, never derive it" rule catching a live mistake.
+
+- [x] **R131. D3 IS REVERTED (owner, 2026-09-03). One package, kept modular.** Documents only —
+      `architecture.md` §6a gains the **D3 SUPERSESSION 2026-09-03 (R131)** and D3's own heading
+      carries the notice. **Nothing executable changed.** No gate.
+
+      **The decision was taken on measurements, and they are recorded in the supersession so nobody
+      re-derives them.** Referencing `EFCore.Relational` costs **+0.62 MB brotli** on the Blazor
+      sample (4.11 -> 4.73), the cost is **unconditional** (a build that references it and calls
+      nothing ships the identical figure, because the trimmer keeps the assembly almost whole at
+      2.079 MB against 2.09 MB on disk), and it drags in **no new packages**. Going without it costs
+      **262 of 20,368** Tier B tests. The owner's judgement: TPT and TPC are often required, and 2 MB
+      is not prohibitive here.
+
+      **The expected gain is in test and annotation code, not in the product.** Naming EF's constants
+      instead of spelling `Relational:` strings deletes the pins that hold those strings honest, and
+      the seams that exist only because two packages had to agree.
+
+      **MODULAR MONOLITH, AND THE SEAM IS THE REQUIREMENT.** The package boundary goes; the
+      configuration seam stays. "My backing store is relational" is still something an application
+      says. A client over a non-relational store must not get relational conventions on its model —
+      ADR-009 Tier A exercises exactly that, and it is stopping rule 4 of this milestone's handoff.
+
+      **Three measurable conditions would reverse it back**, and they are listed in the
+      supersession: Blazor WASM becoming a primary target, a non-relational backing store being
+      adopted, or the relational half growing past what a monolith should carry.
+
+      **Level 3 stays out of scope and the reference does not change that.** B4's
+      `IRelationalTypeMappingSource` problem is store knowledge on the far side of the wire, and
+      `TryAddCoreServices()` still collides with ADR-006.
+
+- [x] **R132. `InfoCarrier.Core.Relational` is folded into `InfoCarrier.Core`, as one module.**
+      `src/` change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed`
+      unchanged at 160, `total` unchanged at 29519.** FIXED none, BROKEN none, `REASONS: unchanged`
+      — the move changes no behaviour, which is what a move should measure. Pack clean, and it now
+      produces **two** packages instead of three.
+
+      **The four files moved intact and git recorded all four as renames.** They live at
+      `src/InfoCarrier.Core/Relational/` and keep the `InfoCarrier.Core.Relational` **namespace**, so
+      a consumer's `using InfoCarrier.Core.Relational;` still compiles and **a future split is a
+      folder move plus one `PackageReference` line**. That is the modular half of the owner's
+      "modular monolith", and it is a requirement rather than tidiness.
+
+      **Nothing published had to change.** The package never shipped a stable version — verified in
+      the `10.0.0` baseline's own XML, which contains none of its types — so there is no break to
+      manage and no `CP0002`.
+
+      **Trim: `ours` unchanged at 89, `total` 855 -> 1134.** The rise is EF Core's own bucket going
+      585 -> 864 because the Blazor publish now ships `Microsoft.EntityFrameworkCore.Relational`.
+      None of those 279 diagnostics is this repository's, which is why only `ours` is gated.
+      `eng/trim-baseline.txt` carries the note.
+
+      **Also updated because they named three packages:** `release.yml` (the `for id in` loop and
+      the third push step), `eng/doc-words.py` (the deleted `PACKAGE.md`), `InfoCarrier.Core.slnx`,
+      the Tier B test project, and two passages in `CLAUDE.md`.
+
+      **What did NOT change, deliberately.** The configuration seam. `AddInfoCarrierRelational`,
+      `AddInfoCarrierRelationalClient` and `UseRelationalQueryRoots` keep their names and their
+      meanings, and Tier A still registers none of them. One package removes the packaging choice,
+      not the configuration one — a client over a non-relational store must still not get relational
+      conventions on its model.
+
+- [x] **R133. The product names EF's constants, and seven pin tests become tautologies.** `src/`
+      change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed` unchanged at
+      160**, `total` 29519 -> 29512, a deliberate fall of seven. FIXED none, BROKEN none,
+      `REASONS: unchanged`. Trim `ours` 89 <= 89. Pack clean. Release build `5 Warning(s),
+      0 Error(s)`. **The first of the two gains the owner expected from reverting D3.**
+
+      **Ten names stop being literals.** Eight annotation names become EF's own constants
+      (`RelationalAnnotationNames.ContainerColumnName`, `.DefaultValue`, `.DefaultValueSql`,
+      `.DbFunctions`, `.TableName`, `.ViewName`, `.MappingStrategy`, and
+      `RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName`), and two type names come
+      from `typeof(...)` instead of being spelled out.
+
+      **THE PUBLIC CONSTANTS KEEP THEIR NAMES, AND THAT WAS CHECKED RATHER THAN ASSUMED.**
+      `AnnotationDocumentMapping` and `InfoCarrierValueGenerationConvention` **are** in the published
+      `10.0.0` — verified in the baseline package's own XML — so deleting their consts would be a
+      binary break. They are redefined as `= RelationalAnnotationNames.X` instead: same public
+      surface, compile-time checked, no `CP0002`. The two type names sit on types that never
+      shipped, so those could become `static readonly` from `typeof(...)`.
+
+      **SEVEN TESTS DELETED, THREE KEPT, AND THE SPLIT IS THE POINT.** CLAUDE.md forbids deleting a
+      test to make a suite green; that is not this. The seven were green and stayed green, and the
+      compiler took over their job — a rename is a build error now, which is stronger than the
+      assertion was. The three that a constant **cannot** do are kept, and the file is renamed
+      `RelationalMetadataAgreementTest` to say what it actually checks:
+
+      | Kept test | Why a constant cannot replace it |
+      |---|---|
+      | `The_db_function_methods_agree_with_EFs_own_GetDbFunctions` | `ModelDbFunctions` reads a `MethodInfo` property **by reflection**, so a change answers "this model maps no functions" instead of failing to compile. 81 tests, silently |
+      | `Every_DbSet_taking_method_EF_declares_there_is_one_the_convention_leaves_alone` | The method set is **derived** from EF, not listed: those on `RelationalQueryableExtensions` whose first parameter is a `DbSet<>`. A new EF overload group fails this test rather than a caller's model build |
+      | `The_walk_agrees_with_EF_for_every_type_including_nested_ones` | It reproduces EF's **ownership-chain walk**. A change in how EF resolves a container breaks only the walk, and only for nested types, which is what B12 was |
+
+      **Also updated:** every doc comment that said "Pinned by `DocumentMappingPinTest`" for a
+      constant the compiler now checks.
+
+- [x] **R135. There is no relational opt-in any more: every client gets the relational half.**
+      `src/` change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`. **`failed`
+      unchanged at 160**, `total` 29512 -> 29509, a deliberate fall of three. FIXED none, BROKEN
+      none, `REASONS: unchanged`. Trim `ours` 89 <= 89. Pack clean. Release build from a forced
+      clean `obj`/`bin`: `0 Error(s)`. `architecture.md` §6a carries the **D3 amendment 2026-09-03
+      (R135)**.
+
+      **The owner's correction, and it follows from R131 rather than modifying it.** R131 reverted
+      D3 to one package but kept the opt-in. One package that already ships the relational half
+      cannot save a consumer anything by withholding it: the 0.62 MB brotli is in the payload
+      whether or not the registration is made. So the opt-in bought nothing and could only be got
+      wrong, which R134's session had just measured — merging the two registration flavours into
+      one broke all 25 `SqliteSmokeTest` cases, because a *server*'s collection has no
+      `IInfoCarrierDocumentMapping` to activate the convention set builder with. **The recorded
+      reason for two flavours was also wrong** — it claimed a server must not receive
+      `InfoCarrierRelationalFacadeDependencies` because its `RelationalConnection` throws — and
+      neither the right reason nor the wrong one matters once there is nothing to register.
+
+      **Deleted.** `AddInfoCarrierRelational()`, `AddInfoCarrierRelationalClient()` and the file
+      that held them; `UseRelationalQueryRoots(...)` with `WithRelationalQueryRoots` and
+      `RelationalQueryRoots` behind it; `NoRelationalQueryRoots`; R130's `Validate` override,
+      `HalfConfiguredMessage`, `RelationalConventionsAnnotation`, three detector constants,
+      `HasUnmappedNonTphHierarchy` and the `StampConvention` that fed it; and
+      `HalfConfiguredRelationalClientTest`. `RelationalClientTierPinTest` now asserts the opposite
+      of what it asserted, which is the point: both tiers register one convention set builder and it
+      is the relational subclass.
+
+      **The three tests in the `total` fall are named, because CLAUDE.md forbids an unexplained
+      one.** `A_client_that_registers_only_the_shared_half_is_warned_and_told_what_to_call`,
+      `A_client_that_registers_the_client_half_is_not_warned`,
+      `A_plain_client_that_has_said_nothing_is_not_warned`. All three tested a diagnostic that has
+      no subject once there is no half-configured state.
+
+      **THE ONE THING THAT MOVED IN 29,509 TESTS, and the first measurement did not survive it.**
+      The run before this one stood at 167 with four `CompiledModelInfoCarrierTest` failures, all on
+      `Difference found in DbContextModelBuilder.cs`. Deleting the stamp fixed one; the other three
+      were a real difference, read out by rewriting the baselines with
+      `EF_TEST_REWRITE_BASELINES=1` and diffing. It is one line per hierarchy root:
+      `runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH")`. EF's own SQL Server
+      baselines carry the same annotation with the value their model implies, so this is the client
+      carrying a fact it previously did not carry at all, derived from the same `OnModelCreating`
+      the server uses. Baselines updated.
+
+      **R120's two-carrier hazard is now closed by construction.** With one implementation and no
+      way to configure another there is one answer, so the boundary analyzer and the forward
+      translator cannot disagree. `QueryExecutor` names `InfoCarrierRelationalQueryRoots.Instance`.
+
+- [x] **R136. The two spec test projects become one, and the tiers become a namespace.** `test/`,
+      `eng/` and CI only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 160, `total` UNCHANGED
+      at 29509.** FIXED none, BROKEN none, `REASONS: unchanged`, and the snapshot is
+      **byte-identical** to R135's -- which is the right measurement for a pure move, because a
+      fully-qualified test name does not mention its project. Release build `0 Error(s)`.
+      `decisions.md` ADR-013 carries the **amendment 2026-09-03 (R136)**.
+
+      **The split had one reason and it is gone.** R122 separated the projects to keep the
+      `InfoCarrier.Core.Relational` package off Tier A's compile line: a reference is transitive, so
+      naming a relational type in the shared harness would have reached Tier A, and a relational
+      client over an InMemory backend was the disagreement to prevent. D3's supersession removed the
+      package, and R135 made every client relational and measured that it changes no answer. Neither
+      half of the reason survives, so the boundary separated nothing.
+
+      **What moved.** 97 files, recorded by git as renames: `Sqlite/`, `TestUtilities/`,
+      `ModelBuilding/`, `RelationalInfoCarrierComplianceTest` and `RelationalMetadataAgreementTest`.
+      One file was deleted rather than moved -- the second `InvariantCultureInitializer`, identical
+      to Tier A's but for its namespace, and a module initializer is per assembly. The merged
+      `.csproj` is Tier A's plus three package references and the SQLite audit suppression.
+      `eng/measure.sh` takes one project, `build.yml` runs one `dotnet test` and passes one TRX, and
+      **both keep their plural shape**: `ratchet.sh` still unions several TRX into one counter set
+      and one name list, because a second backing store would need it again.
+
+      **MERGING FOUND SOMETHING THE BOUNDARY HAD HIDDEN, and this is the part worth carrying.**
+      `RelationalComplianceTestBase.All_query_test_fixtures_must_implement_ITestSqlLoggerFactory`
+      scans the whole target assembly. With one assembly it immediately demanded that Tier A's
+      InMemory query fixtures implement `ITestSqlLoggerFactory` -- which they must not, because they
+      emit no SQL and the interface would claim something false. It is overridden to scan the Tier B
+      namespace only, which is the same correction `GetBaseTestClasses()` already makes in that
+      class and for the same reason: **a compliance test written against one store's assembly has to
+      be told which half of a merged one it answers for.** All three compliance tests are green.
+
+      **`InfoCarrier.Core.TestUtilities` now has exactly one consumer** and its stated reason
+      ("nothing relational may be referenced from here") is dead. It is kept, with the prose
+      corrected to say the separation is a layering choice rather than a barrier. Folding it in is
+      the next boundary that separates nothing, and it is deliberately not done in this step.
+
+- [x] **R137. The shared harness folds into the spec project, and R136's misplaced folder is
+      fixed.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 160, `total`
+      UNCHANGED at 29509**, FIXED none, BROKEN none, `REASONS: unchanged`, snapshot byte-identical.
+      Release build `0 Error(s)`, the five known Razor warnings. `decisions.md` ADR-013's R136
+      amendment records it.
+
+      **`InfoCarrier.Core.TestUtilities` had one consumer after R136**, and its stated reason -- the
+      harness is "neither tier's property" and nothing relational may be named in it -- is a
+      statement about two projects. There are not two. Its 19 files join the 7 that came from Tier B
+      in `test/InfoCarrier.Core.FunctionalTests/TestUtilities/`, 26 in one folder, and the project,
+      its `.csproj` and its solution entry are deleted. The namespace does not move
+      (`InfoCarrier.Core.FunctionalTests.TestUtilities`), so no test name changes and the baseline
+      is untouched.
+
+      **R136 PUT TIER B'S HARNESS ONE FOLDER TOO DEEP AND THE MEASUREMENT COULD NOT SEE IT.**
+      `git mv TestUtilities ../InfoCarrier.Core.FunctionalTests/TestUtilities` moved the directory
+      *into* the existing one, giving `TestUtilities/TestUtilities/`. It compiled, because the SDK
+      globs `**/*.cs`, and it measured identical, because a test's fully-qualified name does not
+      mention its path. **A pure-move measurement proves the moves changed no answer; it does not
+      prove the files landed where they were meant to.** Flattened here.
+
+      **What the folder still says is true.** `InfoCarrierTier` and `InMemoryInfoCarrierTier` are
+      store-neutral; `SqliteInfoCarrierTier` and the SQLite backend store are the per-store answers
+      beside them. That separation is a design, not a boundary, and it survives the fold.
+
+- [x] **R138. The Tier B Northwind store gets the ten `Orders` columns its model ignores.** `test/`
+      only, so `eng/measure.sh` alone. **`failed` FALLS 160 -> 150**, `total` UNCHANGED at 29509.
+      **FIXED ten, BROKEN none**; every one is `SqlQueryInfoCarrierTest`, which goes 97 -> 107 of
+      119. `test/known-failures.txt` and `known-failures.names.txt` both move, as a falling count
+      requires. Release build `0 Error(s)`.
+
+      **The gap.** The core `NorthwindContext` ignores `RequiredDate`, `ShippedDate`, `ShipVia`,
+      `Freight`, `ShipName`, `ShipAddress`, `ShipCity`, `ShipRegion`, `ShipPostalCode` and
+      `ShipCountry`, and the real Northwind schema has all ten. EF's own SQLite suite has both at
+      once because its store is a prebuilt `northwind.db`; this tier builds its store from the
+      model, so it could have one or the other. `SqlQueryTestBase` reads `Orders` with raw SQL into
+      its own `UnmappedOrder`, which names nine of the ten, and failed with
+      `no such column: m.Freight` -- `Freight` only because it is the first the parser reaches.
+
+      **THREE ROUTES WERE MEASURED AND ONLY THE THIRD IS RIGHT.**
+
+      | Route | Result |
+      |---|---|
+      | Map the ten on the server model | `failed` 160 -> **158**. FIXED ten, **BROKEN eight** |
+      | `ALTER TABLE` alone | No change. The columns exist and hold null; the tests compare real values |
+      | `ALTER TABLE` plus an `UPDATE` from `NorthwindData.CreateOrders()` | `failed` 160 -> **150**. FIXED ten, BROKEN none |
+
+      **Why the first route breaks eight, and it is the finding rather than the fix.** This
+      repository is two models. With the property mapped on the server, the server answers a member
+      access the CLIENT's model calls unmapped, so
+      `Average_with_unmapped_property_access_throws_meaningful_exception`,
+      `Collection_select_nav_prop_all_client`, `Collection_where_nav_prop_all_client` and
+      `SelectMany_..._references_non_mapped_properties_...` stop throwing and return data. **The
+      boundary analyzer never asks the client model whether a member is mapped**, and that is
+      invisible while the two models agree -- which they always do, except under that experiment.
+      Recorded in [`findings.md`](findings.md), not fixed here.
+
+      **Shadow properties do not avoid it**, which was also measured: `Property<int?>("ShipVia")`
+      binds to the CLR member whose name it matches, ignored or not, so the server model maps it
+      either way. Raw DDL is the only route that gives the store the column without giving either
+      model the property.
+
+      **`SqliteParameter` and not a bare value**, because a null has to arrive as `DBNull` and EF's
+      raw-SQL path refuses `DBNull.Value` directly with *"no store type mapping for properties of
+      type 'DBNull'"* -- which cost one measurement, read as 103 of 127 where the baseline was 105.
+
+      **THE OTHER EIGHT FREIGHT FAILURES DID NOT VANISH, THEY MOVED**, and only the reasons diff
+      says so. `SQLite Error 1: 'no such column: m0.Freight'` is now
+      `Type 'System.ValueTuple``2[...UnmappedOrder...]'`: the wire type allowlist refusing the tuple
+      a composed raw-SQL query projects. That is the next problem in the same tests and is
+      unaddressed. This is exactly CLAUDE.md's "fixed what it aimed at and uncovered the next
+      problem in the same tests" case, which a fixed/broken list alone cannot tell from a no-op.
+
+- [x] **R139. The unmapped-member defect is pinned in the suite, red on purpose, and the fix is
+      priced.** `test/` only, so `eng/measure.sh` alone. **`failed` RISES 150 -> 151 and `total`
+      29509 -> 29513**, both deliberate and both noted in `test/known-failures.txt`. FIXED none,
+      BROKEN one, and that one is the new pin. Release build `0 Error(s)`.
+
+      **What is pinned.** The client's model is the authority for what is mapped, and nothing
+      enforces it. `UnmappedMemberBoundaryTest` builds the only disagreement this repository can
+      produce: `SqliteSmokeContext` ignores `Shipment.Note` for both sides, and the store's own
+      model customizer maps it on the server alone. Three of the four tests are controls, so the red
+      one cannot pass by accident.
+
+      **THE FIX IS WRITTEN AND MEASURED AND NOT SHIPPED.** It needs BOTH readers to learn the client
+      model -- `ServerBoundaryAnalyzer` so the subtree is not shipped, and `QuerySplitter`'s
+      client-code finder so it is refused rather than evaluated locally -- because the analyzer's
+      verdict alone refuses nothing and the finder never examines a node the analyzer called
+      shippable. With both, the pin passes with EF's own `QueryUnableToTranslateMember` wording, and
+      **`failed` measures 166 against 150**: sixteen spec tests, every one a message difference on a
+      query that already refused. Three narrowings were tried and none helps. The account, the four
+      families and the reason each narrowing fails are in [`findings.md`](findings.md).
+
+      **This is an owner decision and it is recorded as one**, not left as a silent gap: sixteen
+      message-text differences against one query shape that answers where every other provider
+      refuses.
+
+- [x] **R140. The twelve `Employees` columns the Northwind model ignores.** `test/` only, so `eng/measure.sh` alone. **`failed` FALLS 151 -> 149**, `total`
+      UNCHANGED at 29513. FIXED two, BROKEN none. Both baseline files move. Release build
+      `0 Error(s)`.
+
+      R138's route applied to the other table it fits. The core `NorthwindContext` ignores
+      `LastName`, `TitleOfCourtesy`, `BirthDate`, `HireDate`, `Address`, `Region`, `PostalCode`,
+      `HomePhone`, `Extension`, `Photo`, `Notes` and `PhotoPath`, and `SqlQueryTestBase`'s
+      `UnmappedEmployee` names all twelve. `ALTER TABLE` plus an `UPDATE` from
+      `NorthwindData.CreateEmployees()`, so neither model gains a property and the store holds what
+      EF's prebuilt `northwind.db` holds.
+
+      **It surfaced with a different message from the `Orders` half and the same cause.**
+      "The required column 'Address' was not present in the results of a 'FromSql' operation"
+      rather than `no such column`, because the failing query selects named columns where the other
+      selected everything.
+
+      **THE STORE-SHAPE FAMILY IS NOW CLOSED, and that was checked rather than assumed.**
+      `UnmappedProduct` names only `CategoryID`, which the server model has mapped since R97, and
+      `Customers` ignores nothing at all.
+
+- [x] **R141. One allowlist, so one decomposition: the response path stops keeping a second
+      set.** `src/` change, so `eng/measure.sh`, `eng/trim-ratchet.sh` and `dotnet pack`.
+      **`failed` FALLS 149 -> 141**, `total` UNCHANGED at 29513. FIXED eight, BROKEN none; all eight
+      are `SqlQueryInfoCarrierTest`, which reaches **117 of 119**. Trim `ours` 89 <= 89. Pack clean.
+      Release build from a forced clean `obj`/`bin`: `0 Error(s)`.
+
+      **The defect.** The application's registered projection types reached the REQUEST path through
+      `TypeAllowlist.ForModel(model, registeredTypes)`, and the RESPONSE path as a SECOND set that
+      `TypeNodeResolver` consulted beside the allowlist. **A second set cannot be decomposed.** A
+      raw-SQL join projects `ValueTuple<UnmappedCustomer, UnmappedOrder>`; the allowlist admits
+      `ValueTuple<,>` and then asks whether each ARGUMENT is allowed; and the answer lived in the set
+      it could not see. `TypeAllowlist.With` widens the one list instead, and the resolver consults
+      only that.
+
+      **R120's shape and ADR-012's**: a fact two components read independently, where the
+      disagreement only widens what one of them may do, so nothing fails loudly. It was found by
+      following R138's reasons diff, which showed eight failures MOVING from a missing column to
+      this tuple rather than disappearing.
+
+      **It widens no surface, and that was checked against the review rather than asserted.** Every
+      added type is one the application registered explicitly, which `security-review.md` §4c
+      records as the safe shape, and the same types already cleared the request path. The §2
+      conjunction is untouched -- none of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
+      `PropertyInfo`, `Activator`, `Assembly` or `AppDomain` can arrive this way -- and
+      `DeserializationHardeningTest` is green.
+
+- [x] **R142. Tier B builds both models from ONE `OnModelCreating`, as version 1 did and as an
+      application does.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 141,
+      `total` UNCHANGED at 29513.** FIXED none, BROKEN none, `REASONS: unchanged`. Release build
+      `0 Error(s)`.
+
+      **The owner asked who decided the two models should differ, and the answer is that this
+      repository did.** `NorthwindInfoCarrierSqliteServerContext` gives the SERVER the store shape:
+      `ToSqlQuery` for each keyless type, `ToTable("Order Details")`, and `Product.CategoryID`. The
+      client got none of it. That was forced rather than chosen -- before D3's supersession the
+      client had no relational half, so it could not hold `ToTable` or `ToSqlQuery` at all.
+
+      **VERSION 1 NEVER DID THIS, and its harness is the model to copy.** `subrepos/infocarrier-v1`
+      carries ONE `ContextType` and ONE `OnModelCreating` in its `SharedTestStoreProperties`, and
+      its backend store resolves the server context from the same `ContextType` the client uses.
+      There is no second context class anywhere in it. Its two tiers, `InMemory/` and `SqlServer/`,
+      also live in one test project -- the shape R136 restored.
+
+      **So the client now uses the server's context class on both Tier B fixtures**, the Northwind
+      one and the bulk-updates one, and the client's model gains the store shape it would have in a
+      real deployment: `samples/Northwind.Client` and `samples/Northwind.Server` already share
+      `NorthwindContext` from `samples/Northwind.Shared`.
+
+      **TIER A CANNOT FOLLOW, and the reason is a package rather than a preference.** Its inheritance
+      fixture gives the server an InMemory *defining query* for the keyless `AnimalQuery`.
+      `ToInMemoryQuery` needs `Microsoft.EntityFrameworkCore.InMemory`, which the PRODUCT does not
+      reference and a real client therefore cannot call. Relational configuration is different: the
+      product carries it since D3's supersession, so a client can hold it honestly. The line is
+      "what a real client could hold", not "what the test project happens to reference".
+
+      **`serverContextType` keeps its second, unrelated use.** `SeedingInfoCarrierTest` and
+      `WithConstructorsInfoCarrierTest` supply a server context for its CONSTRUCTOR shape, not for
+      its model. That has nothing to do with this and is untouched.
+
+      **What is left disagreeing is one synthetic case**: `Shipment.Note` in
+      `UnmappedMemberBoundaryTest`, which exists to make the two-model defect visible and says so.
+
+- [x] **R143. Every fixture builds both models from ONE `OnModelCreating`, and it turns nothing
+      green.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 141, `total`
+      UNCHANGED at 29513.** FIXED none, BROKEN none, `REASONS: unchanged`. Release build
+      `0 Error(s)`.
+
+      **The owner's question was whether identical models make failures disappear. The measured
+      answer is no.** Not one test changed its answer, on either tier. The remaining four fixtures
+      that supplied a separate server context are converged: Northwind Tier A, the Tier A
+      inheritance fixture, and the constructors fixture, which added a keyless type with
+      `ToInMemoryQuery` on the server alone. The seeding fixture needed nothing -- it already passes
+      the same type as both.
+
+      **What the separate server contexts were for.** Store shape, never a hidden property: a
+      defining query for a keyless type, a table name, and one column. **Nothing in the suite hid a
+      property from the client except the pin added in R139**, which was written to do exactly that.
+
+      **A ONE-OFF FAILURE APPEARED IN THIS STEP'S RUN AND IS AN INTERMITTENT, NOT A REGRESSION.**
+      `AdHocMiscellaneousQuerySqliteInfoCarrierTest.Bool_discriminator_column_works(async: False)`
+      failed with `ObjectDisposedException`. It is Tier B, where the change is Tier A; its class
+      passes alone at 71 of 72; and the suite re-run at the same code state came back at 141 with
+      nothing broken. **The suspect is R136/R137**: the two tiers used to be two processes and are
+      one assembly now, xUnit parallelises collections within an assembly, and no
+      `CollectionBehavior` is declared. It is one observation and it is written up in
+      [`findings.md`](findings.md); `CLAUDE.md`'s "there is no known intermittent" is corrected.
+
+- [x] **R144. The two-model machinery is GONE. One context class per fixture, and no context class
+      is named for a side.** `test/` only, so `eng/measure.sh` alone. **`failed` UNCHANGED at 141,
+      `total` UNCHANGED at 29513.** FIXED none, BROKEN none, `REASONS: unchanged`. Release build
+      `0 Error(s)`.
+
+      **The owner's instruction, and the reasoning behind it.** R142 and R143 converged the fixtures
+      but left the mechanism standing. This removes it. `SharedTestStoreProperties.ServerContextType`
+      is deleted, `InfoCarrierTestStoreFactory.Create`'s `serverContextType` parameter is deleted,
+      and `InfoCarrierBackendTestStore` reads `ContextType` for both sides. The harness now does
+      what version 1's did: **one `ContextType`, one `OnModelCreating`, both halves.**
+
+      **No context class carries `Server` or `Client` in its name any more.** Five were renamed:
+
+      | Was | Is |
+      |---|---|
+      | `NorthwindInfoCarrierServerContext` | `NorthwindInfoCarrierContext` |
+      | `NorthwindInfoCarrierSqliteServerContext` | `NorthwindInfoCarrierSqliteContext` |
+      | `InheritanceInfoCarrierServerContext` | `InheritanceInfoCarrierContext` |
+      | `WithConstructorsInfoCarrierServerContext` | `WithConstructorsInfoCarrierContext` |
+      | `SeedingInfoCarrierServerContext` | `SeedingInfoCarrierOptionsContext` |
+
+      **THE LAST ONE IS NAMED FOR A CONSTRUCTOR SHAPE, AND IT IS THE ONLY SECOND CLASS LEFT.** EF's
+      `SeedingContext` is abstract, takes a `string testId`, and declares no `DbContextOptions`
+      constructor, so nothing the harness registers can derive from it. Its `HasData` seed is
+      therefore written twice. That is a limitation of the base rather than a design of ours, and
+      the test itself catches the two copies drifting, because it asserts the rows.
+
+      **A belief was falsified and the prose that carried it is corrected.** Three fixtures said a
+      defining query "cannot be part of the client's model, which has no store to run it against".
+      The client holds the annotation and never runs it. Converging every fixture changed no answer
+      anywhere in 29,513 tests.
+
+- [x] **R145. The unmapped-member pin is removed, by a scope decision rather than to make the suite
+      green.** `test/` only, so `eng/measure.sh` alone. **`failed` FALLS 141 -> 140** and `total`
+      FALLS 29513 -> 29509, four tests of which three were green. FIXED one, BROKEN none. Both
+      baseline files move.
+
+      **Why it goes.** It could only fail by building a split model on purpose, and the previous
+      step removed split models from the harness on the owner's instruction. A test that pins a
+      configuration the project has declared out of scope does not earn its place. It was added the
+      day before by this same session, so nothing long-standing was removed.
+
+      **THE DISTINCTION FROM A SUPPRESSED TEST MATTERS AND IS STATED IN
+      `test/known-failures.txt`.** CLAUDE.md's rule stops a real gap being hidden. This is the
+      opposite: the gap stays written down, with its price and the condition that reopens it.
+
+      **What it pinned, kept in [`findings.md`](findings.md).** The client's model is the authority
+      for what is mapped, and nothing enforces it: where the server's model maps a property the
+      client ignores, the query is answered rather than refused. It needs a deliberate one-sided
+      `Ignore`, which no realistic application writes. The fix is written and measured at about
+      sixteen spec tests, every one a message difference on a query that already refuses.
+
+- [x] **R146. The intermittent is closed, by reading the source its stack named.** `test/` only, so
+      `eng/measure.sh` alone. **`failed` UNCHANGED at 140, `total` UNCHANGED at 29509.** FIXED none,
+      BROKEN none, `REASONS: unchanged`.
+
+      **The cause.** The failing stack ended inside EF, not inside this repository:
+      `SqliteConnection.Open()` threw `ObjectDisposedException: SQLitePCL.sqlite3` at
+      `sqlite3_create_collation`, so the native handle was already disposed.
+      `SqliteDatabaseCreator.Delete` answers a file-backed database with
+      **`SqliteConnection.ClearAllPools()`, which is process-wide and not per connection string**.
+      Every SQLite store here calls `EnsureDeletedAsync` at initialization, so one store's delete
+      disposes a pooled handle a concurrently initializing store is opening.
+
+      **The fix is `Pooling=false` in the test connection string.** With no pool the call has
+      nothing to dispose, so the exception cannot occur. **Proof by construction, and that is the
+      right kind here**: the failure appeared once in about ten full runs, so the three-run bar this
+      repository uses elsewhere would have shown nothing either way.
+
+      **The earlier suspicion was half right and is corrected in place.** The test-project merge does
+      raise the number of SQLite stores initializing at once in one process, which is why this
+      surfaced now. It is not the defect. The defect is a process-wide pool clear, and it was
+      reachable before the merge too.
+
+      **THE RULE THIS PRODUCES, and it is cheaper than either route used before.** Two earlier
+      intermittents were closed by instrumenting one into the open and by reproducing the other's
+      signature. This one was closed by reading the framework source the failing stack named, in
+      minutes rather than runs. **A stack that ends inside somebody else's code is a question about
+      their code.**
+
+- [x] **R147. The 140 remaining failures are triaged, and two families are understood well enough to
+      price.** Documents only, so no gate.
+
+      **The table is in [`findings.md`](findings.md)** and each row says whether it is verified from
+      a stack or inferred from a reason string. Two families are the whole of the tail's interest.
+
+      **User-defined SQL functions, 33 tests in one class, and the cause is one thing.** An INSTANCE
+      function mapped with `HasDbFunction` has the client's own `DbContext` as its `Object`, and this
+      provider refuses to ship that -- for the reason `ServerBoundaryAnalyzer.CarriesTheClientsContext`
+      records, which is that the server has a context of its own. Inside a projection nothing then
+      refuses the call either, so the client RUNS it: ten of the tests fail with
+      `NotImplementedException` thrown from EF's own `UDFSqlContext.CustomerOrderCountInstance`, a
+      body that exists precisely to prove the call was translated rather than run. The other 23 are
+      refused instead. **A fix is a feature**: rewrite such a call to name the server's context.
+
+      **The `APPLY` family is closed as understood and not a defect.** `AsSplitQuery` is stripped, so
+      a query EF would run as a split query needs `APPLY`, which SQLite refuses. EF never overrides
+      these on its own SQLite suite, because a real split query needs no `APPLY`. **The stripping is
+      not the mistake it looks like**: it was measured as worth 456 tests. Honouring split queries
+      means carrying the hint to the server, which is a protocol change.
+
+      **THE BIGGEST FAMILY IS NOT A DEFECT, and the evidence was already on screen.** 32
+      `GearsOfWar` tests fail because this provider ANSWERS a query EF refuses: EF cannot attribute
+      rows after a `Distinct` that drops the identifier columns. EF's override wraps the CORE base
+      call -- an `AssertQuery` that checks every row -- inside `Assert.ThrowsAsync`, so **"No
+      exception was thrown" means that call ran to completion and its data assertions passed.** A
+      wrong answer looks different, and does so elsewhere in the same tail:
+      `Correlated_collection_with_distinct_3_levels` reports `Assert.Equal() Failure: Values differ`.
+      **The wrong-answer count is unchanged at two.**
+
+      **The rule this produces.** An assertion's failure message says what the code under it did. I
+      was about to spend a suite run re-obtaining what the message already stated.
+
+- [x] **R149. The split-query hint crosses the wire, so the server can honour it.** `src/` change
+      and a **wire-format change** (owner's approval, 2026-09-04), so `eng/measure.sh`,
+      `eng/trim-ratchet.sh` and `dotnet pack`. **`failed` FALLS 140 -> 132**, `total` UNCHANGED at
+      29509. FIXED eight, BROKEN none. Trim `ours` 89 -> 90, recorded in `eng/trim-baseline.txt`.
+      Pack clean.
+
+      **The hint is still stripped from the tree, and that stripping is not the mistake it looks
+      like.** Leaving it in was measured first, on the owner's question: **236 failures of 326**
+      across the three split-query specification classes, because the hint lands in the CLIENT
+      residual where EF's own method returns its source untouched. **None of that says the server
+      should not be told.** `QueryDataRequest.SplitQueryBehavior` carries it beside the tree, and
+      `ServerQueryExecutor.ApplySplitQueryBehavior` re-applies it to the rebuilt query. The field is
+      optional: an older client omits it and the server reads `null`, which is that client's
+      behaviour exactly.
+
+      **Position does not matter, and that is EF's rule.** Its relational preprocessor lifts the
+      marker out of the tree and applies the behaviour to the whole query. Where the outermost node
+      is a scalar -- a query ending in `Count` or `First` -- the hint goes on that operator's source
+      instead.
+
+      **THE CONSTRAINT COST 100 TESTS BEFORE IT WAS GUARDED.** `AsSplitQuery<TEntity>` is
+      `where TEntity : class`, and a server query's element type is very often a `ValueTuple`,
+      because the projection rewriter re-carries client types as tuples. `MakeGenericMethod` answers
+      that with `VerificationException`. Skipping the hint there is honest rather than a workaround:
+      a tuple-projected query is one this provider reshaped, so the hint no longer describes what
+      the caller wrote.
+
+      **EIGHT OVERRIDES OF OURS WERE DELETED WITH IT, and the class remark had predicted it.** It
+      called those four tests, in two classes, "the measured cost of not splitting -- a real split
+      query fetches those collections in a second statement and never asks for `APPLY`". The second
+      statement is real now. EF's own SQLite split classes do not override them either.
+
+      **Two of the three trim warnings the first attempts cost were avoidable and were avoided.**
+      `GetMethod(name)` is invisible to the trimmer and cost two; a delegate over the method is an
+      ordinary reference and costs none. A second `Type.GetInterfaces()` walker cost one; reusing
+      this class's existing `GetElementType` costs none. The remaining IL2060 is the premise the
+      trim baseline has described since it was written.
+
+- [x] **R151. A user-defined function mapped as an instance method reaches the server.** `src/`
+      change and a **wire-format change**, so `eng/measure.sh`, `eng/trim-ratchet.sh` and
+      `dotnet pack`. **`failed` FALLS 132 -> 112**, `total` UNCHANGED at 29509. FIXED twenty, BROKEN
+      none. Trim `ours` UNCHANGED at 90. Pack clean.
+
+      **The defect, and it was not the refusal.** Such a call funcletizes to a receiver holding the
+      live client `DbContext`, which this provider refuses everywhere -- rightly. In a PREDICATE
+      that refusal is correct and still happens. **In a PROJECTION nothing refused it**, because
+      client evaluation in a final projection is legal, so the client RAN the function. EF's
+      specification contexts give those methods a body that throws precisely to prove they were
+      translated rather than run, which is what the suite reported as `NotImplementedException`.
+
+      **The fix carries a role, not an object.** The receiver becomes `ServerContextExpression`
+      before the boundary is drawn and crosses as `NodeKind.ServerContextStub`, which holds a type
+      and nothing else; the server puts its own context there and checks the type rather than
+      trusting it. Narrow by construction: only a method the model maps with `HasDbFunction` is
+      rewritten, so `CarriesTheClientsContext` still refuses every other route.
+
+      **THE MARKER IS REDUCIBLE, AND THAT IS THE PART THAT WAS LEARNED BY MEASURING.** The boundary
+      may leave the call on the client -- EF's own `Scalar_Function_ClientEval_...` tests require
+      exactly that -- so what the client compiles must still be runnable. It reduces to the constant
+      it replaced, which is the old behaviour precisely. Without it the client compiler answers
+      `ArgumentException: must be reducible node`.
+
+      **One pin now asserts the opposite of what it did**, and is renamed
+      `..._is_sent_to_the_server`. The store defines no `TitleIsLong` SQL function, so the server
+      answers `no such function: TitleIsLong` -- a message that can only come from SQL, which is the
+      assertion. The method's body still throws, so a client that ran it would say so by name.
+
+      **WHAT IS LEFT IN THAT CLASS IS A STORE LIMITATION, and it was checked rather than assumed.**
+      EF ships `UdfDbFunctionSqlServerTests` and **no SQLite equivalent**, and SQLite cannot define
+      table-valued functions at all. `no such table: GetTopTwoSellingProducts` is the store saying
+      what it does not have. With the SQL Server tier dropped by the owner's decision, this base has
+      no store here that can host all of it.
+
+- [x] **R152. The store defines the instance-mapped scalar function.** `test/` change, so
+      `eng/measure.sh` alone. **`failed` 112 -> 111**, `total` unchanged at 29509. FIXED one,
+      BROKEN none.
+
+      `UDFSqlContext.StringLength` is mapped with `HasDbFunction` on a non-static method. Until the
+      step above, its receiver held the live client context, which no wire carries, so the client
+      ran the method and never asked the store for anything. The call arrives at the server now,
+      and the server answered `no such function: StringLength`. Defining it on the connection,
+      beside the eight scalars already there, is the whole change.
+
+      **The plan checkbox was written one step late**, which is the thing this file exists to
+      prevent. Recorded here rather than quietly backdated.
+
+- [x] **R153. ADR-009 gains Tier C: embedded Firebird, for the table-valued function.** `test/`
+      and `docs/` change, so `eng/measure.sh` alone. **`failed` UNCHANGED at 111**, `total` rises
+      29509 -> 29513 (the tier's four smoke tests, all green), FIXED none, BROKEN none, REASONS
+      unchanged.
+
+      **The tier exists for one capability.** SQLite has no table-valued function and cannot be
+      given one: `Microsoft.Data.Sqlite` attaches scalar delegates to a connection and exposes no
+      `sqlite3_create_module`, so there are no virtual tables and `SELECT ... FROM SomeFunction()`
+      has no meaning. It has no `APPLY` either. Those two gaps are the whole of
+      `UdfDbFunctionTestBase` Tier B leaves red, and EF ships that base for SQL Server only.
+
+      **PostgreSQL is the better store on the evidence and was not chosen.** Npgsql adopts the base
+      and skips 2 tests where Firebird's provider skips 23. But PostgreSQL is a server process
+      whose binaries are fetched at first run, and the constraint was **no installation and no
+      container**. Firebird meets it the way SQLite does: the engine arrives as a NuGet package of
+      native assets, one database is one `.fdb` file in the test output, and nothing is downloaded
+      during a run. ADR-009's dated amendment carries the full reading.
+
+      **TWO THINGS WERE MEASURED BEFORE ANY OF THIS WAS WRITTEN, and both changed the decision.**
+      A spike outside the repository established, first, that the STORE does everything: a
+      selectable stored procedure takes an argument from the outer table, both as
+      `FROM a, proc(a.col)` and inside a real `LATERAL` derived table. Second, that the 14
+      "Not supported on Firebird" skips in that provider's own suite are **one SQL-generation
+      defect**. `FbQuerySqlGenerator` wraps a plain table as `(SELECT * FROM "T") AS "t"` after
+      `LATERAL`, because Firebird will not take a bare source there, and the branch was never added
+      for a function. `FirebirdLateralQuerySqlGenerator` adds it in eleven lines.
+
+      **The correction is on the SERVER half and nothing in `src/` knows about it.** It could not
+      go on the options: EF refuses `ReplaceService` beside `UseInternalServiceProvider`, which
+      this harness uses, so it is a `RemoveAll` plus an `AddSingleton` on the server's service
+      collection. Delete the file when the fix lands upstream.
+
+      **THE SMOKE TEST CORRECTED A CLASSIFICATION ON ITS FIRST RUN, which is the whole argument for
+      the tier.** R151 above ends "what is left in that class is a store limitation". That is true
+      of seven of the nine and false of two. `QF_Stand_Alone` and `QF_Stand_Alone_Parameter` fail
+      with **"No part of the query can be executed on the server"**: a mapped queryable function
+      used as the ONLY query root is refused by `ServerBoundaryAnalyzer`, which sees a tree of
+      wholly expressible nodes and no query root in it. The correlated form works, because there
+      the root is a `DbSet` and the call is only a node inside it. The fourth smoke test pins the
+      refusal with the assertion it should one day carry written out beside it.
+
+      **The rule this produces: two failures with the same cause in mind can have different causes
+      in fact, and only a store that HAS the capability can tell them apart.** A store gap and a
+      boundary refusal both read as "the table-valued function does not work" until one of them
+      stops being a gap.
+
+- [x] **R154. A mapped queryable function is a query root.** `src/` change, so `eng/measure.sh`
+      and `eng/trim-ratchet.sh`. No public signature moved, so no pack. **`failed` UNCHANGED at
+      111**, `total` unchanged at 29513, FIXED none, BROKEN none. Trim `ours` unchanged at 90.
+
+      **THE COUNT AND BOTH NAME LISTS ARE IDENTICAL AND THE CHANGE IS REAL.** This is the exact
+      case the third level of `eng/measure.sh` exists for. The reasons diff:
+
+      ```
+      -2  No part of the query can be executed on the server: '[ServerContextExpression]...'
+      +1  no such table: GetTopTwoSellingProducts        (5 -> 6)
+      +1  no such table: GetCustomerOrderCountByYear     (3 -> 4)
+      ```
+
+      `QF_Stand_Alone` and `QF_Stand_Alone_Parameter` now reach the store and fail exactly as
+      their nine siblings do. **Eleven tests in that class are blocked by the store alone**, where
+      before it was nine and two.
+
+      **The defect.** EF declares every queryable function as an instance method on the context,
+      `FromExpression(() => GetTopTwoSellingProducts())`, and there is no other shape. So the
+      call's receiver is the client's live `DbContext`, which R151 replaces with a
+      `ServerContextExpression` before the boundary is drawn. Inside a query rooted on a `DbSet`
+      nothing was ever wrong, because the root came from elsewhere. **When the call IS the root**,
+      `IsQueryRoot` found a tree of wholly expressible nodes with no root in it and the query was
+      refused -- a correct answer to the question being asked and the wrong answer to the query.
+
+      **The fix is one clause and needed nothing plumbed in.** `QuerySplitter` creates that marker
+      only for a method the model maps with `HasDbFunction`, so "the receiver is the marker and
+      the call returns an `IQueryable`" already means "a mapped queryable function". No model, no
+      constructor parameter, no wire change. **That also avoided a binary break**: adding an
+      optional parameter to `ServerBoundaryAnalyzer`'s public constructor is source-compatible and
+      `CP0002`, which this repository has been caught by six times.
+
+      **Only the queryable ones.** A mapped scalar function reaches the same marker and is still
+      not a root, which is right: it is a value inside a query, and a query made only of it has
+      nothing to execute.
+
+      `FirebirdSmokeTest` carried this as a pin asserting the refusal; it now asserts the data,
+      and returns it.
+
+- [x] **R155. Tier C finds its own binaries, because the helper that shipped with them cannot.**
+      `test/` change. All four Tier C tests failed on the pull request with "the embedded Firebird
+      binaries are not in the build output", on `ubuntu-24.04`, while passing on Windows.
+
+      **THE BINARIES WERE THERE. THE HELPER WAS LOOKING BESIDE THE WRONG PROCESS.**
+      `FbNativeAssetManager.NativeAssetPath` starts from the process executable, through
+      `GetModuleFileNameW` on Windows and `readlink` on Linux. Under `dotnet test` on Windows the
+      test host is an executable in the output directory, so it lands correctly. On Linux the host
+      is the shared `dotnet` muxer, so it looks in the SDK's directory. It answers `null` either
+      way, and `null` reads as "the package did not copy", which is not what happened.
+
+      **The packages were cleared before the code was.** Both native assets packages were
+      downloaded and their MSBuild targets read: each copies under `IsOSPlatform`, and the Windows
+      build output holds `firebird/win-x64/V5` and no `linux-x64`, which is the copy behaving
+      exactly as written. The layouts differ by more than a name, so the resolver carries both:
+      `win-x64/V5/fbclient.dll` and `linux-x64/V5/lib/libfbclient.so.2`.
+
+      `AppContext.BaseDirectory` is the output directory on both platforms, so the resolver starts
+      there. It also sets `FIREBIRD` to the server root when the environment does not already name
+      one: the client library is only the front door, and the engine plugin, `firebird.conf`, the
+      character-set module and the time-zone data are all found relative to that root. And it
+      lists the directory contents when it fails, so the next reader of a red Tier C is told what
+      is actually present rather than only what was expected.
+
+      **The rule: a helper that resolves paths from the PROCESS is answering a different question
+      from one that resolves them from the ASSEMBLY, and `dotnet test` is where the two diverge.**
+
+- [x] **R156. Name the upstream issue where the correction says it can be deleted.**
+      FirebirdSQL/NETProvider#1277, with the repro, both working SQL forms and the suggested
+      branch. The generator subclass and ADR-009's amendment both said "delete when the fix lands
+      upstream" and neither said where to look. `docs/` and a comment; no gate.
+
+- [x] **R157. `UdfDbFunctionTestBase` moves to Tier C, which is the tier built for it.** `test/`
+      change, so `eng/measure.sh` alone. **`failed` FALLS 111 -> 84**, `total` unchanged at 29513.
+      In the class itself: **34 of 106 failing became 7.**
+
+      **THE REASONS DIFF IS THE EVIDENCE AND IT IS EXACT.** Every store gap disappears and nothing
+      else moves: 14 `APPLY`, 6 `GetTopTwoSellingProducts`, 4 `GetCustomerOrderCountByYear`, 2
+      schema-qualified `IdentityString`, 1 `GetOrdersWithMultipleProducts`; plus one
+      `Assert.Throws` and minus one `Assert.Equal`. The FIXED and BROKEN lists name only this
+      class, 34 leaving and 7 arriving, because the tests changed namespace. **A rename shows up
+      in both lists and in neither count, and only the reasons say which it was.**
+
+      **The fixture creates every routine the base names, which Firebird's own does not.** That
+      provider's `UdfDbFunctionFbTests` omits `GetCustomerOrderCountByYear` and its
+      `OnlyFrom2000` sibling and skips nine tests as "does not have the data". Those are its
+      choices, not the store's limits, so this seed follows the PostgreSQL fixture, which creates
+      all four table-valued ones.
+
+      **Three mappings are re-pointed and each is a real difference between stores.** `IsDate` is
+      mapped `IsBuiltIn()`, so it would be emitted bare and fold to upper case, missing the
+      mixed-case routine. `MyCustomLength` and `StringLength` are mapped to SQL Server's `len`,
+      whose Firebird spelling is `char_length`. `IdentityString` is mapped to schema `dbo`, and
+      Firebird has no schemas before version 6. The Firebird provider's own fixture makes all
+      three.
+
+      **Key generation has to be asked for.** The base assigns no keys and its assertions name
+      `Id == 1`, so the store must generate them; Firebird has no implicit identity, and the
+      provider emits a sequence and a trigger only when a property says so. The annotation is set
+      in `OnModelCreating`, which this harness runs on both sides, and only the server's DDL
+      generator reads it -- the client already knows the key is store-generated, because EF's core
+      convention says so for an integer primary key on any provider.
+
+      **What is left is 6 + 1 and neither part is the store's.** Six are
+      `Scalar_Function_Anonymous_Type_Select_*`: a mapped function in a final projection is
+      answered by the client's own method. One expects a translation failure and gets an answer.
+
+      `SqliteFunctionInterceptor` had one consumer and now has none, so it is deleted. The
+      relational compliance test's namespace filter now covers both relational tiers: its own
+      remark told readers to put a relational fixture under the SQLite namespace, and Tier C made
+      that impossible to follow.
+
+- [x] **R158. A mapped store function crosses even when it reads no row.** `src/` change, so
+      `eng/measure.sh` and `eng/trim-ratchet.sh`. No public signature moved
+      (`ProjectionRewriter` is internal), so no pack. **`failed` FALLS 84 -> 77**, `total`
+      unchanged at 29513, FIXED seven, BROKEN none. Trim `ours` unchanged at 90.
+      **`UdfDbFunctionTestBase` is GREEN**: 105 passed, 1 skipped by EF itself, 0 failed.
+
+      **The defect is one condition and it had survived every store.**
+      `ProjectionRewriter.CollectFragments` lifted a piece of a client-typed projection into the
+      server's tuple only when that piece **read a row**. That is right for `1 + 1`: the client
+      can compute it, and lifting would put a constant on the wire once per row for nothing. It is
+      wrong for a mapped store function with constant arguments. `CustomerOrderCount(1)` reads no
+      row and the client cannot compute it at all -- the CLR method is a declaration, and EF's
+      specification contexts give it a body that **throws**, precisely so that a provider running
+      it locally is caught by name rather than by a wrong number. A closed piece is now lifted
+      when it calls a function the model maps, and for no other reason: the test is "the client
+      cannot", not "the server could", because almost anything closed *could* be lifted and
+      lifting it would cost payload for nothing.
+
+      **THE SEVENTH FAILURE WAS THE SAME DEFECT AND HAD BEEN CLASSIFIED AS THE OPPOSITE.** R157
+      recorded `QF_Select_Correlated_Subquery_In_Anonymous_Nested` as a candidate for "queries this
+      provider answers that other providers reject". It is not. The query asks for lists inside
+      lists over a table-valued function, and EF refuses it on every relational provider, because
+      a function's rows have no key and a collection join cannot then say which parent each child
+      belongs to. This provider kept the mapped call on the client, fetched the collections
+      separately and stitched them together, and so **answered a query EF says has no correct
+      answer**. Sending the call to the server makes the server's own provider refuse it with EF's
+      own message.
+
+      **The rule: "we answer what others refuse" is a claim that has to be checked, and the check
+      is whether the answer could be right.** Here it could not, and the difference was not
+      generosity but client-side work that should never have happened.
+
+      **It also did not force client evaluation off where EF requires it.** Lifting happens inside
+      a projection that is already being split, so the mapped call becomes one tuple slot and the
+      client code wrapping it still runs on the client over the value the store returned. EF's own
+      `Scalar_Function_ClientEval_*` tests stay green.
+
+- [x] **R159. Re-triage the tail at 77.** `test/` text only, recorded in
+      `test/known-failures.txt`. The finding is what is NOT there: no `InfoCarrierServerException`
+      remains, so not one of the 77 is a store limitation and no other base belongs on Tier C.
+
+- [x] **R160. Refuse `Distinct` and set operations over a projection carrying a collection.**
+      `src/` change, so `eng/measure.sh` and `eng/trim-ratchet.sh`; public members were ADDED, so
+      `dotnet pack` as well. **`failed` FALLS 77 -> 55**, FIXED 22, BROKEN none. Trim `ours`
+      unchanged at 90. Pack clean, no `CP0002`.
+
+      **THE REASON IS PORTABILITY, NOT CORRECTNESS, and it is the owner's call rather than a
+      measurement.** The answers this provider gave may well have been right; nothing could check
+      them, because no other provider executes the query -- `website/docs/limitations.md` said so
+      in as many words. What could be checked is that the LINQ ran here and threw everywhere else.
+
+      **The server could not do the refusing, and that was measured before it was designed.** The
+      projection is rewritten before the boundary is drawn, so a `Distinct` above a client-typed
+      projection ends up above the CLIENT-side reassembly and never crosses. Running one of these
+      with `INFOCARRIER_SERVER_SQL=1` gives a single `LEFT JOIN` with **no `DISTINCT` in it**.
+
+      **EF has a different message per operator and the first version used one for both.** It
+      fired correctly on all 36 tests and every one still failed, on `Assert.Equal` against the
+      wrong string. The count said "no change" and I read the count instead of the reason, which
+      is the mistake this repository's measurement discipline exists to prevent.
+
+      **IT IS GATED ON THE BACKING STORE BEING RELATIONAL, and the first version was not.**
+      Refusing everywhere broke **eight** Tier A tests: EF's InMemory provider is not relational,
+      does not refuse these queries, and answers them. The client cannot tell what the server's
+      store is, so it is told once, through
+      `InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore()` -- **knowledge, not
+      permission**, which is R120's distinction, and relational by default because that is the
+      ordinary deployment and a default that costs a wrong answer must be the one you ask for.
+      `QuerySplitter.ServerStoreIsRelational` is an **init property, not a constructor
+      parameter**, because that class shipped in `10.0.0`.
+
+      **The trim ratchet caught a real regression on the way.** The first collection test walked
+      `Type.GetInterfaces()`, reflection over a type the model named, and `ours` went 90 to 91.
+      The non-generic `IEnumerable` answers the same question with no reflection.
+
+      **Still open: 16 tests whose `Distinct` sits INSIDE the collection** rather than above the
+      projection. Widening this guard to reach them risks refusing ordinary queries, so they are a
+      separate shape and a separate measurement.
+
+- [x] **R161. `limitations.md` stops describing the behaviour R160 removed.** `website/` text
+      only, so no measurement gate; the documentation gates instead.
+
+      The page's `Use with caution` section named two shapes and treated them as one family. R160
+      refuses the first (`Distinct` or a set operation applied ABOVE a projection carrying a
+      collection) and leaves the second (a `Distinct` INSIDE the projected collection). The
+      section is now the second shape alone, and it says in one sentence that the first throws, so
+      that a reader who sees two near-identical queries knows which is which. **The example that
+      stayed is the one the failing test names still justify**:
+      `Correlated_collection_with_distinct_3_levels` on Tier A and
+      `Correlated_collection_after_distinct_3_levels_without_original_identifiers` on TPC and TPT
+      are still red, so the nested shape is still answered here and refused everywhere else.
+
+      **`UseNonRelationalServerStore()` is documented as a consequence of the client having no
+      database, in that table, and not as a limitation**, because that is what it is: the client
+      cannot see the server's provider, so it assumes the store is relational. The other home would
+      be `configuration/client.md`, which is at 601 of 620 words with no padding to cut;
+      `api-surface.md` lists no `InfoCarrierDbContextOptionsBuilder` member at all, so a row for
+      this one alone would be the page's only such row. The `limitations` page is where
+      `guide/errors.md` and `guide/querying.md` already send a reader who met a refusal.
+
+      **The measurement block is NOT touched.** It reads `Total tests: 22662, Passed: 22476,
+      Failed: 9, Skipped: 177`, measured against the published `10.0.0`, and this branch's suite
+      is a different suite: 29513 tests and 55 red, most of them newly adopted relational bases
+      that Phase R has not finished. Refreshing the block is release work and needs a run of the
+      released shape, not a run of this branch. R99 and R75 corrected prose on this page the same
+      way and left the block alone.
+
+      Gates: `py eng/doc-words.py --all --budget` (`limitations.md` at 750 of 750, whole site
+      11811 in 23 files, 0 over), `py eng/doc-links.py` (0 broken in 58 files),
+      `eng/docs-serve.sh --build` (`mkdocs build --strict`, clean), `grep -c` for em dashes, en
+      dashes and curly quotes (0). Run through the `humanizer` skill, as any user-facing edit
+      here is.
+
+- [x] **R162. The `Use with caution` section goes entirely, and the guard behind it is not
+      buildable.** `website/` text only in the end; the `src/` attempt was measured and reverted.
+
+      **The owner's call on the documentation, and it corrects R161.** R161 narrowed the section
+      to the nested shape and kept it. It should not have been kept at all: what it described is a
+      RELATIONAL STORE's limitation that this provider does not share, and the page is a statement
+      of *this provider's* limitations. The page already has the right home for a query we answer
+      and others reject, one section down. R161's own example was weak evidence too -- it used a
+      SCALAR projection, `o.Lines.Select(l => l.ProductName).Distinct()`, which no test in the
+      suite pins; every red test in the family projects an anonymous type.
+
+      **The `UseNonRelationalServerStore()` row R161 added stays.** That one is ours, and it is a
+      consequence of the client having no database rather than a limitation.
+
+      **THE GUARD WAS BUILT THREE TIMES AND REVERTED.** `failed` UNCHANGED at 55, `total`
+      UNCHANGED at 29513. Two of the three measured **8 fixed and 8 BROKEN** at an unchanged
+      count, which is exactly the case `eng/measure.sh` prints names for. What EF refuses depends
+      on whether a collection's parent keeps its identifying columns through the `Distinct` and
+      through every projection above it, which is decided during relational translation; this
+      client does not translate. `docs/plans/v10/findings.md` carries the three hypotheses, the
+      pair of EF tests that kills each one, and the two transferable rules -- filter by CLASS not
+      by test name, and read both halves of a matched pair before believing what a name says.
+      `test/known-failures.txt` reclassifies the eight.
+
+      Gates: `py eng/doc-words.py --all --budget` (`limitations.md` at 689 of 750, 0 over),
+      `py eng/doc-links.py` (0 broken in 58 files), `eng/docs-serve.sh --build` clean, 0 em
+      dashes, en dashes or curly quotes.
+
+- [x] **R163. The whole tail re-triaged at 55, and one class reclassified.** `test/` text only,
+      recorded in `test/known-failures.txt`. `failed` and `total` unchanged.
+
+      **Every one of the 55 is paired with ITS OWN message**, extracted from the baseline run's
+      log rather than from the aggregate reason counts, because R84 established that a reason
+      written per TEST survives re-reading and one written per FAMILY does not. Eleven classes,
+      adding to 55.
+
+      **The reclassification is the four raw-SQL type-mapping tests.** This file carried them as a
+      gap to close. EF's base body does
+      `(RelationalTypeMapping)context.GetService<ITypeMappingSource>().FindMapping(typeof(bool))`
+      and then `GenerateSqlLiteral(true)`, so it asks the CLIENT to write a SQL literal.
+      `BoolTypeMapping`'s constructor requires a `storeType` string the client has no basis for,
+      and `RelationalTypeMapping.GenerateNonNullSqlLiteral` formats through
+      `SqlLiteralFormatString`, `{0}` by default, so a generic mapping for `bool` emits `True`,
+      which is valid SQL nowhere. Read out of EF's source, not inferred. They join the
+      `Include_*_connection*` four as a consequence of the client having no database.
+
+      **And eight tests moved out of the collection family they were filed under.**
+      `Correlated_collection_order_by_constant_null_of_non_mapped_type` and
+      `Where_coalesce_with_anonymous_types` have nothing to do with collections or `Distinct`:
+      each writes something SEMANTICALLY EMPTY that a relational provider still refuses to
+      translate, and this provider folds it away. They are the one open decision left in the tail.
+
+- [x] **R164. An ordering key the wire cannot carry is refused, instead of the whole table being
+      fetched.** `src/` change, so `eng/measure.sh` and `eng/trim-ratchet.sh`; no public signature
+      moved, so no pack. **`failed` FALLS 55 -> 51**, FIXED 4, BROKEN none. Trim `ours` unchanged
+      at 90. The reasons diff moves one line by exactly four.
+
+      **THE OWNER'S QUESTION IS WHAT FOUND IT.** These four were filed as a portability nicety:
+      we answer a query other providers refuse. Asked whether the server therefore runs a
+      different LINQ than the caller wrote, a probe on the split answered something worse.
+      `shippable=1`, the shipped subtree is the BARE QUERY ROOT, and the server's SQL log shows
+      one `SELECT` over the whole `Gears UNION ALL Officers` set. The ordering and the projection
+      ran on the client, over every row.
+
+      **The hole: the walk reads an operator's VALUE arguments and never its TYPE arguments.**
+      That is J17/J18's finding for `Cast` and `OfType`, on a different operator.
+      `OrderByDescending(g => (MyDTO)null)` has no method call, no constructed type and no
+      comparison, so `ClientCodeFinder` finds nothing.
+      `ClientEvaluationFinder.RejectUnshippableOrderingKey` now reads the key type of `OrderBy`,
+      `OrderByDescending`, `ThenBy` and `ThenByDescending`, and refuses one the allowlist does not
+      admit -- every primitive and every mapped type is admitted, so a rejected key is one no
+      store could sort by. Both of its sibling's exemptions are kept for its reasons: a generic
+      parameter is not a type yet, and an allowed type could have shipped.
+
+      **Gated on the backing store being relational, and the first version was not.** Refusing
+      everywhere broke the two Tier A copies: EF's in-memory provider is LINQ to objects and sorts
+      by anything. R160's distinction, and `RejectClientEvaluation` now takes the flag.
+
+      **`Where_coalesce_with_anonymous_types` is left open on purpose.** It reads the whole table
+      the same way, but `ClientCodeFinder.VisitNew` exempts a constructed type that HAS value
+      equality, and an anonymous type has one. That exemption is load-bearing:
+      `join o in os on new { a, b } equals new { x, y }` is a composite join key EF translates
+      every day. Separating it from a coalesce inside a predicate is a fourth syntactic rule, and
+      R162 is the record of what those cost.
+
+- [x] **R165. A coalesce over a freshly constructed object is refused, and the second silent
+      full-table read is gone.** `src/` change, so `eng/measure.sh` and `eng/trim-ratchet.sh`; no
+      public signature moved. **`failed` FALLS 51 -> 47**, FIXED 4, BROKEN none. Trim `ours`
+      unchanged at 90. The reasons diff moves one line by exactly four.
+
+      **COUNTING THE EXEMPTION'S USERS IS WHAT MADE THIS SMALL.** R164 left this open because
+      refusing anonymous construction in a row-deciding argument would break composite join keys.
+      Counted rather than feared: EF's specification suites hold **84** `GroupBy(x => new { ... })`
+      composite grouping keys and **12** `equals new` composite join keys. Both are a BARE
+      construction as the whole key selector. Neither is an operand of `??`. So the guard does not
+      need to touch `ClientCodeFinder.VisitNew` at all -- it tests the coalesce.
+
+      **And what it refuses is dead by construction.** `new` never returns null, so
+      `new X() ?? y` is always `new X()`. `RejectDeadCoalesce` cannot refuse a query that does
+      anything. Relational only, for R164's reason.
+
+      **The `GroupBy`/`Join` hole is recorded and NOT closed.** They are blind to their key type
+      the way `OrderBy` was, but R164's rule cannot be applied to them: an ordering key is a
+      scalar in every query that works, a grouping key is legitimately an anonymous type the
+      allowlist rejects. The hole there needs a CONSTANT key of an unmapped type, which no test
+      exercises -- so there is nothing to validate a guard against.
+      `docs/plans/v10/findings.md` carries the general rule the three guards produced.
+
+- [x] **R166. `eng/usage-window.sh` is deleted.** `eng/` and `CLAUDE.md` text only, so no gate.
+      The script reported how much of the usage window was gone by running
+      `claude -p "/usage"`, which starts a session of its own, so asking the question spent the
+      budget the answer was about. Owner's instruction. The concern it served is met by staying at
+      committed, green states instead.
+
+- [x] **R167. The tail re-triaged at 47, and two classes were misfiled.** `test/` text only.
+      Thirteen classes, adding to 47.
+
+      **The four `Bad_data_error_handling_null*` are not a message-text difference.** They sat in
+      that class and the two strings are different DIAGNOSES: EF reports a null read on
+      `Product.Discontinued`, this provider reports `CategoryID` as a missing REQUIRED column. The
+      test's SQL omits four mapped columns, and every one of them is optional -- `CategoryID`,
+      `UnitsOnOrder` and `ReorderLevel` are nullable and `QuantityPerUnit` is a `string` -- so a
+      relational `FromSql` shaper tolerates their absence. Something here treats an optional
+      property as required, which is a requiredness disagreement between two models built by two
+      providers. **Not localised yet**: the failure carries no inner stack, so it does not cross
+      the fault path, and a model dump on both sides is the next step. A `FromSql` selecting a
+      subset of columns fails here and works on EF, so this is a defect and a documentable
+      limitation, not wording.
+
+      **The three `Contains_with_*` are an upstream EF defect surfacing differently.** EF's own
+      relational base carries this provider's exception message in a comment directly above
+      `Assert.ThrowsAsync<KeyNotFoundException>`. Both sides hit the same defect, `Contains` over
+      an owned-JSON nested collection reaching a shadow foreign key with no backing field; EF's
+      pipeline raises `KeyNotFoundException` and this one raises the `InvalidOperationException`
+      EF's comment identifies as the cause. **Do not raise `KeyNotFoundException` to match** --
+      that reproduces another product's bug deliberately.
+
+- [x] **R168. `Product.CategoryID` leaves the server model and arrives as raw DDL instead.**
+      `test/` only, so `eng/measure.sh` alone. **`failed` FALLS 47 -> 43**, FIXED 4, BROKEN none.
+      The reasons diff moves `Assert.Equal() Failure: Strings differ` from 6 to 2.
+
+      **AND IT CORRECTS R167.** That entry read the four `Bad_data_error_handling_null*` as a
+      requiredness disagreement between two models, which would have been a provider defect. It is
+      a harness artefact, and the harness had already written down why:
+      `NorthwindInfoCarrierSqliteContext` re-mapped `Product.CategoryID` -- undoing EF's own
+      `Ignore` -- so the `ProductView` SQL query beside it had a column to read. That put the
+      property in the `Product` shaper's column list, and the spec test's raw SQL names only the
+      six columns EF's model maps.
+
+      **The fix already existed for two other tables.**
+      `NorthwindQueryInfoCarrierSqliteFixture.AddTheColumnsTheModelIgnoresAsync` adds ten `Orders`
+      columns and twelve on `Employees` as raw DDL and seeds them from `NorthwindData`, so the
+      store has them and neither model gets the property. `Products` now gets `CategoryID` the
+      same way, which is the state EF's prebuilt `northwind.db` is in.
+
+      **Which side raised it was measured.** A probe on the client's fault path printed
+      `SERVER FAULT: The required column 'CategoryID' ...` for the four failing tests and
+      `SERVER FAULT: An error occurred while reading a database value ...` for the two passing
+      `SqlQueryInfoCarrierTest` ones: same server, same store, different column lists.
+
+      **One process lesson.** A second `dotnet test` was run against the same project while the
+      measurement was in flight; the measurement's own log ends in `Build FAILED` because of the
+      lock. `total` unchanged at 29513 is what confirms no tests were lost. Do not run a second
+      test process against a project a measurement is using, even for tests that touch no store.
+
+- [x] **R169. The tail re-triaged at 43, one message fix attempted and reverted, and two classes
+      left open as decisions.** `test/` text only; `failed` and `total` unchanged.
+
+      Thirteen classes, every one read from a test body or a measurement rather than from a reason
+      string. **Nine of the thirteen are closed**: blocked by the client having no database, no
+      store type names or no hook to override; closed by R162 as not decidable on the client; or
+      upstream defects in EF that this provider merely surfaces differently.
+
+      **`Table_can_configure_TPT_with_Owned` JOINS the store-type class**, which is now five: all
+      of them want a relational model on the client, and building one needs a store type name per
+      column.
+
+      **The attempt that was reverted.** EF raises
+      `CoreStrings.NonQueryTranslationFailedWithDetails` with
+      `RelationalStrings.InvalidPropertyInSetProperty` for a bulk operation and this provider
+      raises the plain query form. Selecting the non-query wording is easy and **useless alone**:
+      `CoreStrings` ships no detail-less `NonQueryTranslationFailed`, so without the details the
+      two messages are the same string. Producing the details needs the shape of the `SetProperty`
+      selector inside `new ITuple[]{ new Tuple<Delegate, object>(selector, value), ... }`, which
+      was not pinned down. ~90 lines measured as a no-op, so they were reverted.
+
+      **Two classes are left open because they are decisions, not defects**, and both are put to
+      the owner: the client's relational convention set holding exactly one of EF's relational
+      conventions (4 tests), and a server-side warning being unable to reach the client's log
+      (2 tests).
+
+- [x] **R170. The client runs EF's relational fix-up conventions, and only those.**
+      `src/` only, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`. **`failed` FALLS 43 -> 41**,
+      FIXED 2, BROKEN none. Trim ratchet OK at 90 <= 90.
+
+      The owner's answer to the first open question (2026-09-04) was that the client model may be
+      as relational as it needs to be to execute accurately over the wire, and that what must not
+      cross is a concrete store's own annotations. This is that answer, narrowed by measurement.
+
+      **EF's whole relational list was tried first and cost 681 tests: 43 -> 724.** ~560 were JSON
+      queries (`RelationalMapToJsonConvention`), 114 were `EntitySplittingQueryInfoCarrierTest`
+      (`EntitySplittingConvention`, confirmed alone on a second run), the rest compiled-model and
+      bulk-update tests.
+
+      **What survived is one kind of convention.** `PropertyOverridesConvention`,
+      `CheckConstraintConvention` and `StoredProcedureConvention` do not decide anything: they move
+      a relational annotation when EF replaces the entity type or property it hangs off. The client
+      was keeping the stale instance, which is exactly what the assertion said —
+      `Expected: EntityType: Book.Label#BookLabel ... Owned` against
+      `Actual: EntityType: BookLabel Keyless Owned`.
+
+      **The rule, written into the builder so the next reader does not repeat the 724.** A
+      convention that decides a table name, a column name, a JSON container or a value-generation
+      strategy makes a decision the *server* also makes, with a provider this client cannot see.
+      When the two agree it is redundant; when they disagree the client's answer is the wrong one,
+      because the store is the server's. A fix-up convention is free of that, because the caller
+      wrote the same thing on both sides.
+
+      **The other two tests of that class are now priced rather than open.**
+      `Can_use_table_splitting_with_owned_reference` needs the convention that costs 114.
+      `Complex_properties_can_be_configured_by_type` needs EF's `RelationalModelValidator`, whose
+      dependency object carries one service — `IRelationalTypeMappingSource` — so it joins the
+      store-type-names class, which is now 6.
+
+- [x] **R171. A refused bulk operation gets EF's own wording and EF's own details clause.**
+      `src/` only, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`. **`failed` and `total`
+      unchanged at 41 / 29513, and the failing names are byte-identical.** Trim ratchet OK at
+      90 <= 90. It fixes nothing, and it is committed because the message it produces is now EF's
+      down to one bound variable's name.
+
+      **Two changes.** `ExecuteUpdate` and `ExecuteDelete` get `NonQueryTranslationFailed*` rather
+      than `TranslationFailed*`, which differ in their closing sentence — the query form offers
+      `AsEnumerable` and a bulk operation has no such offer. And a `SetProperty` selector that is
+      not a property is reported as `RelationalStrings.InvalidPropertyInSetProperty`, naming the
+      argument, where this provider used to report the method inside it.
+
+      **The setters' shape was measured, not guessed**, which is where R169's reverted attempt
+      stopped: a probe on the refusal path printed
+      `new ITuple[]{ new Tuple<Delegate, object>(e => e.MaybeScalar(e => e.OrderID), (object)10300) }`.
+
+      **`Update_with_invalid_lambda_in_set_property_throws` is still red, over a bound variable's
+      name.** The spec base builds its expected string over
+      `(OrderDetail o) => o.MaybeScalar(e => e.OrderID)`; the caller wrote `e => ...`. The `o` comes
+      from `NavigationExpandingExpressionVisitor.CreateNavigationExpansionExpression`, which renames
+      the query's parameter to `entityType.ShortName()[0].ToString().ToLowerInvariant()` — and
+      renames the *whole* query. This provider refuses before any of EF's pipeline runs (ADR-006).
+
+      **Renaming just the selector would pass the test and make the message disagree with itself**,
+      because the query printed beside it still carries the caller's `od`. Declined on that ground
+      rather than on cost.
+
+- [x] **R172. A server may send the log it raises back with the result, and it is off by default.**
+      `src/` and `test/`, plus a public signature, so **all four gates**: `eng/measure.sh`,
+      `eng/trim-ratchet.sh` (OK at 90 <= 90), `dotnet pack` (clean), and the `CI=true` Release
+      build. **`failed` FALLS 41 -> 39**, FIXED 2, BROKEN none. **The last open class in the tail
+      is closed.**
+
+      The owner's answer to the second open question (2026-09-04) was that sensitive logging over
+      the wire must be opt-in and non-sensitive opt-in behind a different flag. That is the shape
+      shipped: `IInfoCarrierServerLogForwarding` carries a minimum level, default `Warning`, and
+      `IInfoCarrierSensitiveServerLogForwarding` is the second grant. Both are server-side
+      registrations and **no client option turns either on**, which is the same division
+      `IInfoCarrierArbitrarySqlExecution` records.
+
+      **The default level is load-bearing.** EF logs every executed command at `Information`, so a
+      server that lowers the level ships its SQL to every client on every request.
+      `docs/security-review.md` **section 7a** is the full reading.
+
+      **The sensitive gate is all-or-nothing on purpose.** `EnableSensitiveDataLogging` changes
+      what EF's message templates say across the board, so nothing distinguishes the events that
+      carry values from the ones that do not.
+
+      **Feasibility was measured before any of it was built.** A probe on the server's own logger
+      showed it raising `OptionalDependentWithAllNullPropertiesWarning`, and raising the
+      *sensitive* form already, so the harness needed no change for that half.
+
+      **One harness fix that is not about logging at all, and it is the interesting one.**
+      `InfoCarrierTestStore.InitializeAsync` ignored the fixture's `createContext`, so the
+      client's model was built by the first context a *test* created — inside the test — and its
+      model-validation events landed in what the test then read. EF's own providers have one
+      context, so their model is validated during initialization, before the base clears the log.
+      Touching `Model` on one throwaway client context during initialization is the whole fix.
+
+      **Two logger categories never cross**, and that is correctness rather than policy: both
+      halves build a model from the same `OnModelCreating` and each validates its own, so the
+      server's model warnings are the client's own findings attributed to the wrong place. Found by
+      measurement — with them included the `_sensitive` test saw three warnings where it asserts
+      one.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

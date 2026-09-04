@@ -2,12 +2,15 @@
 
 using Microsoft.EntityFrameworkCore.Metadata;
 
+// Internal EF Core API usage. This provider is built on EF Core internals by design (CLAUDE.md),
+// and EF Core's own providers suppress EF1001 the same way at the point of use.
+#pragma warning disable EF1001
+
 namespace InfoCarrier.Core.Metadata;
 
 /// <summary>
 ///     The default <see cref="IInfoCarrierDocumentMapping" />: reads the container annotation EF's
-///     relational providers write, <b>by its string name</b>, so that this package needs no
-///     reference to <c>Microsoft.EntityFrameworkCore.Relational</c>.
+///     relational providers write.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -30,16 +33,18 @@ namespace InfoCarrier.Core.Metadata;
 public sealed class AnnotationDocumentMapping : IInfoCarrierDocumentMapping
 {
     /// <summary>
-    ///     <c>RelationalAnnotationNames.ContainerColumnName</c>. Pinned by
-    ///     <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.ContainerColumnName</c>. EF's own constant, so a rename is a
+    ///     build error.
     /// </summary>
-    public const string ContainerColumnNameAnnotation = "Relational:ContainerColumnName";
+    public const string ContainerColumnNameAnnotation = RelationalAnnotationNames.ContainerColumnName;
 
     /// <summary>
-    ///     <c>RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName</c>. Pinned by
-    ///     <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName</c>. EF's own constant, so a rename is a
+    ///     build error.
     /// </summary>
-    public const string SynthesizedOrdinal = "__synthesizedOrdinal";
+    public const string SynthesizedOrdinal =
+        Microsoft.EntityFrameworkCore.Metadata.Conventions.RelationalKeyDiscoveryConvention
+            .SynthesizedOrdinalPropertyName;
 
     /// <inheritdoc />
     public IEnumerable<string> ContainerAnnotationNames { get; } = [ContainerColumnNameAnnotation];

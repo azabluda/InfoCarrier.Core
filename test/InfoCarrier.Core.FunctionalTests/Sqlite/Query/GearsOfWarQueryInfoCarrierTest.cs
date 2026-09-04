@@ -256,7 +256,7 @@ public class TPTGearsOfWarQueryInfoCarrierFixture : TPTGearsOfWarQueryRelational
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);
@@ -272,7 +272,7 @@ public class TPCGearsOfWarQueryInfoCarrierFixture : TPCGearsOfWarQueryRelational
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);

@@ -28,7 +28,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 /// </remarks>
 public class NonSharedModelUpdatesInfoCarrierTest(NonSharedFixture fixture) : NonSharedModelUpdatesTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

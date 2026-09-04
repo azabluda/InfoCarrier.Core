@@ -20,7 +20,9 @@
 # ORDER MATTERS: InfoCarrier.Core first, then InfoCarrier.Core.AspNetCore, which declares a
 # dependency on it at the same version — nuget.org rejects a package whose dependency does not
 # resolve. (Before M8-22 the order was the other way round, because Abstractions was its own
-# package; it is now merged into InfoCarrier.Core.)
+# package; it is now merged into InfoCarrier.Core. InfoCarrier.Core.Relational was a third package
+# until 2026-09-03 and never shipped a stable version; D3's supersession folded it into
+# InfoCarrier.Core, where it lives under `src/InfoCarrier.Core/Relational/`.)
 name: Release
 
 on:
@@ -146,8 +148,8 @@ jobs:
             reviewer**. Nothing reaches nuget.org until somebody approves it, because a pushed
             version can be unlisted but never withdrawn.
 
-            Approve it and it pushes both packages, `InfoCarrier.Core` first — the second
-            declares a dependency on it at the same version, and nuget.org rejects a package whose
+            Approve it and it pushes all three packages, `InfoCarrier.Core` first: the other two
+            declare a dependency on it at the same version, and nuget.org rejects a package whose
             dependency does not resolve.
 
             Publishing uses **Trusted Publishing**: the job exchanges a GitHub OIDC token for an

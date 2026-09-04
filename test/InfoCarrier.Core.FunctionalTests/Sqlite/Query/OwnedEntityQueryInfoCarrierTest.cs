@@ -28,7 +28,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class OwnedEntityQueryInfoCarrierTest(NonSharedFixture fixture)
     : OwnedEntityQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutputHelper testOutputHelper)
     : EntitySplittingTestBase(fixture, testOutputHelper)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

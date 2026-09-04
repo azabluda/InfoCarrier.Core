@@ -19,6 +19,21 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 /// </remarks>
 public class SqliteSmokeTest
 {
+    /// <remarks>
+    ///     <b>Every server here says its store is relational (#97), because it is SQLite.</b>
+    ///     <c>InfoCarrierBackendTestStore</c> registers this for a fixture that asked for raw SQL,
+    ///     and this class does not go through a fixture: it builds
+    ///     <see cref="SharedTestStoreProperties" /> by hand and never sets
+    ///     <c>ArbitrarySqlExecution</c>, so that registration does not reach it. Stated here rather
+    ///     than in each test that needs it, so the two halves are configured in one place each --
+    ///     the client's is on <see cref="CreateClient" />.
+    ///     <para>
+    ///         <b>It grants nothing.</b> Whether the server will run a string is still
+    ///         <c>AddInfoCarrierArbitrarySqlExecution()</c>, which two tests add and the rest do
+    ///         not; <c>A_FromSql_query_is_refused_...</c> and
+    ///         <c>Granting_it_on_the_client_alone_...</c> pin both refusals with this in place.
+    ///     </para>
+    /// </remarks>
     private static SqliteInfoCarrierBackendTestStore CreateStore(
         Func<IServiceCollection, IServiceCollection>? onAddServices = null)
         => new(
@@ -31,9 +46,17 @@ public class SqliteSmokeTest
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
-                OnAddServices = onAddServices,
+                OnAddServices = services => onAddServices?.Invoke(services) ?? services,
             });
 
+    /// <remarks>
+    ///     <b>Every client here says its backing store is relational (#97), and this class is why
+    ///     that option exists.</b> It builds its client by hand rather than through
+    ///     <c>InfoCarrierTestStoreFactory</c>, so there is no <c>IServiceCollection</c> to call
+    ///     <c>AddInfoCarrierRelationalClient()</c> on — which is the shape most consumer
+    ///     applications have. The instance comes from the caller for the same reason
+    ///     <c>AllowTypes</c>'s types do: <c>InfoCarrier.Core</c> cannot name a relational type.
+    /// </remarks>
     private static SqliteSmokeContext CreateClient(
         SqliteInfoCarrierBackendTestStore store,
         Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptions = null)
@@ -207,34 +230,34 @@ public class SqliteSmokeTest
             await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "al'pha").CountAsync());
     }
 
-    // R89. Being NAMEABLE on the wire is not being SHIPPABLE, and conflating the two removed a
-    // refusal. `QuerySplitter.ClientCodeFinder` refuses a method whose declaring type the
-    // allowlist does not admit; R84 admitted the declaring type of every `HasDbFunction` mapping
-    // so the call could be named, and for a function mapped as an INSTANCE method that type is
-    // the caller's own `DbContext`. The clause then stopped firing while the call stayed
-    // unshippable for a different reason -- its `Object` is a constant holding the live client
+    // unshippable for a different reason -- its `Object` was a constant holding the live client
     // context, which no wire carries.
     //
-    // What that cost was measured, not reasoned about: a boundary probe on
-    // `UdfDbFunctionInfoCarrierTest.Scalar_Function_Where_Correlated_Instance` reported
-    // `shippable=1` -- the bare query root -- and the client filtered the whole table. Across R84
-    // the reasons diff shows 38 `TranslationFailed` refusals disappearing into 18 client
-    // evaluations and 15 "no part of the query can be executed".
+    // THAT REFUSAL IS GONE AND THIS PIN NOW ASSERTS THE OPPOSITE. The receiver of a mapped
+    // instance function is rewritten to `ServerContextExpression` before the boundary is drawn,
+    // crosses as a stub carrying only a type, and the server puts its OWN context there. What that
+    // fixed: in a PROJECTION nothing refused such a call, because client evaluation in a final
+    // projection is legal, so the client RAN the function -- and EF's specification contexts give
+    // those methods a body that throws precisely to prove they were translated rather than run.
     //
-    // `SqliteSmokeContext.TitleIsLong` is mapped with `HasDbFunction`, which is what puts this
-    // context type on the allowlist -- the exact condition, reproduced without depending on the
-    // inherited UDF class. `TitleIsLong` throws, so a regression arrives named in the assertion
-    // message rather than as a green count.
+    // `SqliteSmokeContext.TitleIsLong` is mapped with `HasDbFunction` and the store defines no such
+    // SQL function, so the server answers `no such function: TitleIsLong`. **That message is the
+    // assertion**: it can only come from SQL, so the call was translated. And `TitleIsLong`'s body
+    // throws `NotSupportedException`, so had the client run it instead, this test would say so by
+    // name rather than pass quietly.
+    //
+    // A context reaching the boundary any OTHER way is still refused, by
+    // `ServerBoundaryAnalyzer.CarriesTheClientsContext`. Only a method the model maps is rewritten.
     [ConditionalFact]
-    public async Task A_predicate_calling_a_mapped_function_on_the_client_context_is_refused()
+    public async Task A_predicate_calling_a_mapped_function_on_the_client_context_is_sent_to_the_server()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
         await using SqliteSmokeContext client = CreateClient(store);
 
-        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+        InfoCarrierServerException sent = await Assert.ThrowsAsync<InfoCarrierServerException>(
             () => client.Blogs.CountAsync(b => client.TitleIsLong(b.Title)));
 
-        Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(SqliteSmokeContext.TitleIsLong), sent.Message, StringComparison.Ordinal);
     }
 
     // R91. D7's `RelationalDbFunctionAttributeConvention` row, settled by reading both models.

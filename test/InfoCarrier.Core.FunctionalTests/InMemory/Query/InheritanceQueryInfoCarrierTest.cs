@@ -46,7 +46,7 @@ public class InheritanceQueryInfoCarrierTest(InheritanceQueryInfoCarrierFixture 
             CoreStrings.TranslationFailed(
                 """
                 DbSet<Bird>()
-                    .Select(b => InheritanceInfoCarrierServerContext.MaterializeView(b))
+                    .Select(b => InheritanceInfoCarrierContext.MaterializeView(b))
                     .OrderBy(a => a.CountryId)
                 """),
             message,
@@ -63,17 +63,22 @@ public class FiltersInheritanceQueryInfoCarrierTest(FiltersInheritanceQueryInfoC
 /// <summary>
 ///     The inheritance query fixture, wired to an InMemory backend behind the wire.
 /// </summary>
-public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase, ITestSqlLoggerFactory
+public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase
 {
-    /// <summary>
-    ///     The compliance gate's second assertion (R54). The property is real —
-    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
-    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
-    ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
-    ///     server's statements can actually be read.
-    /// </summary>
-    public TestSqlLoggerFactory TestSqlLoggerFactory
-        => (TestSqlLoggerFactory)ListLoggerFactory;
+    // NO `TestSqlLoggerFactory` AND NO `ITestSqlLoggerFactory`, and losing them is what the
+    // project split bought. Both live in `EFCore.Relational.Specification.Tests`, which Tier A
+    // does not reference. They were here for `RelationalComplianceTestBase`'s second assertion
+    // (R54), and Tier A is now checked by the plain `ComplianceTestBase`, which does not ask.
+    // What the property returned was the CLIENT's log anyway, and this client has no database and
+    // emits no SQL; `ServerSqlLog` is where the server's statements can be read.
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Both sides build from ONE <c>OnModelCreating</c>, which is what version 1 of this
+    ///     provider did and what an application does. See the Tier B Northwind fixture.
+    /// </remarks>
+    protected override Type ContextType
+        => typeof(InheritanceInfoCarrierContext);
 
     private ITestStoreFactory? _testStoreFactory;
 
@@ -86,7 +91,6 @@ public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase, I
             // The keyless `AnimalQuery` is produced by an InMemory defining query, which is how
             // the *store* makes its rows and therefore no part of the client's model — the same
             // split the Northwind fixture makes for its keyless types.
-            serverContextType: typeof(InheritanceInfoCarrierServerContext),
             configureConventions: ConfigureConventions);
 
     /// <summary>
@@ -111,7 +115,7 @@ public class FiltersInheritanceQueryInfoCarrierFixture : InheritanceQueryInfoCar
 ///     The <em>server-side</em> inheritance context: the shared model plus the InMemory defining
 ///     query for the keyless <c>AnimalQuery</c>.
 /// </summary>
-public class InheritanceInfoCarrierServerContext(DbContextOptions options) : InheritanceContext(options)
+public class InheritanceInfoCarrierContext(DbContextOptions options) : InheritanceContext(options)
 {
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

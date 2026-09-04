@@ -2,7 +2,6 @@
 
 using System.Data.Common;
 using InfoCarrier.Core.Common;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,6 +52,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         {
             services = services.AddInfoCarrierArbitrarySqlExecution();
 
+            // Whatever else the store needs on the SERVER once raw SQL is granted. The SQLite
+            // store registers `AddInfoCarrierRelational()` there, which is how the server learns
+            // to REBUILD a raw-SQL query root (#97). This class cannot name that call: it is
+            // shared with Tier A, and naming it would put the relational package on Tier A's
+            // compile line.
+            services = AddStoreSpecificServices(services);
+
             // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type
             // allowlist refuses one by default exactly as ADR-008 constraint 2 requires. R85's seam
             // is what an application uses to admit it; the harness is an application, and it admits
@@ -62,6 +68,25 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             {
                 services = services.AddInfoCarrierAllowedTypes(parameterType);
             }
+        }
+
+        // The SERVER half of log forwarding (R172), and the sensitive grant rather than the plain
+        // one: `TableSplittingTestBase` asserts the sensitive wording in one test and the plain
+        // one in the next, and which it gets is decided by the server context's own
+        // `EnableSensitiveDataLogging` — the grant only says the text may cross. `LogLevel.Warning`
+        // is the default and is what those tests read.
+        if (testStoreProperties.ServerLogForwarding)
+        {
+            services = services.AddInfoCarrierSensitiveServerLogForwarding();
+        }
+
+        // The SERVER half of the projection-DTO seam, and NOT inside the raw-SQL grant above: a
+        // type the model does not imply is refused whether or not the payload carries SQL. This is
+        // the boundary half -- it decides what a PAYLOAD may name -- so it is a fixture's explicit
+        // declaration and never inferred. See `SharedTestStoreProperties.AllowedTypes`.
+        if (AllowedTypes.Length > 0)
+        {
+            services = services.AddInfoCarrierAllowedTypes(AllowedTypes);
         }
 
         services = services
@@ -91,7 +116,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
         services = services
             .AddDbContext(
-                ServerContextType,
+                _testStoreProperties.ContextType,
                 (s, b) => AddProviderOptions(b),
                 ServiceLifetime.Transient,
                 _testStoreProperties.ServerOptionsLifetime ?? ServiceLifetime.Singleton);
@@ -102,12 +127,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // one `AddDbContext` just made and making it unresolvable from the root provider:
         // "cannot resolve scoped service 'DbContext' from root provider", every test in the
         // class failing identically before any of them ran.
-        if (ServerContextType != typeof(DbContext))
+        if (_testStoreProperties.ContextType != typeof(DbContext))
         {
             SharedTestStoreProperties props = _testStoreProperties;
             services = services.AddScoped<DbContext>(sp =>
             {
-                var serverContext = (DbContext)sp.GetRequiredService(ServerContextType);
+                var serverContext = (DbContext)sp.GetRequiredService(props.ContextType);
 
                 // The one place a request's client context and its server context are both in
                 // hand. `CopyDbContextParameters` had been declared and assigned since the
@@ -201,6 +226,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public bool ArbitrarySqlExecution => _testStoreProperties.ArbitrarySqlExecution;
 
     /// <summary>
+    ///     The fixture's declared projection types, for both halves of the seam to read.
+    /// </summary>
+    /// <remarks>
+    ///     Exposed here rather than passed twice, so the client store
+    ///     (<c>InfoCarrierTestStore.ClientOptions</c>) and this server half cannot disagree about
+    ///     what the fixture declared. That is the one-reader rule R120 records.
+    /// </remarks>
+    public Type[] AllowedTypes => _testStoreProperties.AllowedTypes ?? [];
+
+    /// <summary>
     ///     The backing store's <see cref="DbParameter" /> type, when it has one - admitted on both
     ///     sides alongside <see cref="ArbitrarySqlExecution" />.
     /// </summary>
@@ -211,23 +246,52 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public virtual Type? StoreParameterType => null;
 
     /// <summary>
-    ///     An <b>unopened</b> connection carrying the backing store's connection string, for
-    ///     <c>RelationalTestStore</c> to read <c>ConnectionString</c> from. EXPERIMENT (decision 1).
+    ///     Whether this store is relational, which the CLIENT cannot work out for itself.
     /// </summary>
-    public virtual DbConnection CreateStoreConnection() => new SqliteConnection();
+    /// <remarks>
+    ///     <b>Knowledge, not permission.</b> The client has no database and never sees the
+    ///     server's provider, so a rule that is only true of a relational store has to be told.
+    ///     The one rule this carries today is the refusal of <c>Distinct</c> over a projection
+    ///     carrying a collection: every relational provider refuses it, and EF's InMemory provider
+    ///     answers it. Relational by default, because that is the ordinary deployment and a
+    ///     default that costs a wrong answer must be the one you ask for.
+    /// </remarks>
+    public virtual bool ServerStoreIsRelational => true;
+
+    /// <summary>
+    ///     The store's own additions to the <em>server's</em> services, once the fixture has
+    ///     granted raw SQL execution.
+    /// </summary>
+    /// <remarks>
+    ///     Nothing by default, and called only inside that grant, because everything a store adds
+    ///     here today exists to serve a raw-SQL payload. Same seam as
+    ///     <see cref="StoreParameterType" /> above and for the same reason: the store names what
+    ///     this class may not.
+    /// </remarks>
+    protected virtual IServiceCollection AddStoreSpecificServices(IServiceCollection services)
+        => services;
+
+    /// <summary>
+    ///     An <b>unopened</b> connection carrying the backing store's connection string, for
+    ///     <c>RelationalTestStore</c> to read <c>ConnectionString</c> from.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Only a relational store has one, so the base throws rather than inventing one.</b>
+    ///     It used to return a bare <c>SqliteConnection</c> from this class, which named a
+    ///     relational provider in the store-neutral half of the harness. Nothing on the Tier A path
+    ///     calls this: the only caller is <c>RelationalInfoCarrierTestStore</c>, which exists in
+    ///     the relational test project alone.
+    /// </remarks>
+    public virtual DbConnection CreateStoreConnection()
+        => throw new InvalidOperationException(
+            $"'{GetType().Name}' is not a relational store, so it has no connection string. "
+            + "Only a RelationalTestStore asks for one, and only a relational tier creates those.");
 
     /// <summary>
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.
     /// </summary>
     public virtual DbContext CreateDbContext()
-        => (DbContext)ServiceProvider!.GetRequiredService(ServerContextType);
-
-    /// <summary>
-    ///     The context type the server runs, which may add store-specific model configuration
-    ///     the client neither has nor needs (e.g. defining queries for keyless entity types).
-    /// </summary>
-    private Type ServerContextType
-        => _testStoreProperties.ServerContextType ?? _testStoreProperties.ContextType;
+        => (DbContext)ServiceProvider!.GetRequiredService(_testStoreProperties.ContextType);
 
     /// <summary>
     ///     Adds the backend provider services (e.g. InMemory, SqlServer) to the collection.

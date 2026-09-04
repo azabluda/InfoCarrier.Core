@@ -20,7 +20,7 @@ namespace InfoCarrier.Core.Expressions;
 ///         <b>Named by shape rather than by type</b>, exactly as its sibling is:
 ///         <c>SqlQueryRootExpression</c> lives in <c>Microsoft.EntityFrameworkCore.Relational</c>,
 ///         which <c>InfoCarrier.Core</c> deliberately does not reference (<c>architecture.md</c>
-///         section 6a D3, M9 J5). See <see cref="RelationalQueryRootShape" />.
+///         section 6a D3, M9 J5). See <see cref="Metadata.IInfoCarrierRelationalQueryRoots" />.
 ///     </para>
 ///     <para>
 ///         <b>This node is a grant, not a translation</b>, and the grant is the same one its

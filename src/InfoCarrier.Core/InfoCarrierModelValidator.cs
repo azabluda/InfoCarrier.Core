@@ -36,6 +36,7 @@ namespace InfoCarrier.Core;
 ///         from convention and is still validated below.
 ///     </para>
 /// </remarks>
+/// <param name="dependencies">EF's model-validator dependencies.</param>
 public class InfoCarrierModelValidator(ModelValidatorDependencies dependencies)
     : ModelValidator(dependencies)
 {

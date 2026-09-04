@@ -27,6 +27,7 @@ namespace InfoCarrier.Core.Expressions;
 [JsonDerivedType(typeof(QueryRootStubNode), (int)NodeKind.QueryRootStub)]
 [JsonDerivedType(typeof(FromSqlQueryRootStubNode), (int)NodeKind.FromSqlQueryRootStub)]
 [JsonDerivedType(typeof(SqlQueryRootStubNode), (int)NodeKind.SqlQueryRootStub)]
+[JsonDerivedType(typeof(ServerContextStubNode), (int)NodeKind.ServerContextStub)]
 public abstract record ExpressionNode
 {
     /// <summary>

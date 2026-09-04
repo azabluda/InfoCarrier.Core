@@ -1,51 +1,54 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.BulkUpdates;
+using Microsoft.EntityFrameworkCore.ModelBuilding;
+using Microsoft.EntityFrameworkCore.Query.Associations.ComplexProperties;
+using Microsoft.EntityFrameworkCore.Query.Associations.Navigations;
+using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
+using Microsoft.EntityFrameworkCore.Query.Associations;
+using Microsoft.EntityFrameworkCore.Query.Translations.Operators;
+using Microsoft.EntityFrameworkCore.Query.Translations.Temporal;
+using Microsoft.EntityFrameworkCore.Query.Translations;
 using Microsoft.EntityFrameworkCore.Query;
-using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Types;
 using Microsoft.EntityFrameworkCore.Update;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
 /// <summary>
-///     The coverage scoreboard (ADR-004). Fails while any
-///     <c>EFCore.Specification.Tests</c> base class has no InfoCarrier subclass, listing every
-///     one that is missing.
+///     The coverage scoreboard for ADR-009 <b>Tier A</b>: fails while any
+///     <c>EFCore.Specification.Tests</c> base class has no InfoCarrier subclass <em>in this
+///     assembly</em>, listing every one that is missing.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <strong>This test is expected to be red for a long time, and that is its job.</strong>
-///         It converts "adopt the EF Core suite" from an unbounded intention into a generated,
-///         auditable inventory: every base is either implemented or listed in
-///         <see cref="IgnoredTestBases" /> with a stated reason. Nothing can be silently
-///         forgotten.
+///         <strong>There are two of these now, one per test project, and that is the point.</strong>
+///         EF Core has a <c>SqliteComplianceTest</c> and an <c>InMemoryComplianceTest</c> for the
+///         same reason. This one scans the core specification assembly against Tier A;
+///         <c>RelationalInfoCarrierComplianceTest</c> scans the relational one against Tier B.
+///         Between them nothing is unaccounted for, and neither can hide a gap in the other.
 ///     </para>
 ///     <para>
-///         <strong>Two things may be ignored, and they are different axes.</strong> A base
-///         <em>conceptually inapplicable to a remoting provider</em> is the original category and
-///         still the common one. The second, added 2026-09-02, is a base <strong>EF's own
-///         <c>SqliteComplianceTest</c> ignores</strong>: this suite's only relational store is
-///         SQLite (ADR-009 Tier B), so a base the reference provider declares out of scope for
-///         SQLite has no store here to run on either. CLAUDE.md's bar for leaving a base unadopted
-///         is "EF ships no test for it on any store we have", and that is exactly what EF's list
-///         records. Each such entry names EF's reason rather than inventing one.
+///         <strong>It ignores no base for being inapplicable any more, and the whole old list moved
+///         to Tier B.</strong> Every entry on it was a relational base, which this project can no
+///         longer even name: it does not reference <c>EFCore.Relational.Specification.Tests</c>.
+///         The compiler established that, not a reading.
 ///     </para>
 ///     <para>
-///         <strong>Aligning the two lists means aligning what is <em>missing</em>, not deleting
-///         what is adopted.</strong> Five bases EF's SQLite list ignores are implemented here, and
-///         four of those are green: EF ignores the <c>Owned*Projection*</c> family for its own
-///         issue #26708 and <c>TPCRelationshipsQueryTestBase</c> for a test-infrastructure reason,
-///         and neither reaches this provider. Listing an implemented base changes nothing, and
-///         removing its class to match would delete passing coverage.
+///         <strong>What it ignores instead is a CORE base adopted on Tier B</strong>, and each
+///         entry says so. A base that InMemory cannot host runs on the tier that translates
+///         (ADR-009, and CLAUDE.md's rule that "EF ships no InMemory test for this base" means move
+///         it to Tier B rather than drop it). Its class is in the other assembly, so this scan
+///         cannot see it, and the entry here is a pointer rather than an excuse.
 ///     </para>
 ///     <para>
-///         A base that is merely not built yet must stay out of the list so this test keeps
-///         reporting it.
+///         <strong>A base that is merely not built yet must stay out of this list</strong> so this
+///         test keeps reporting it.
 ///     </para>
 /// </remarks>
-public class InfoCarrierComplianceTest : RelationalComplianceTestBase
+public class InfoCarrierComplianceTest : ComplianceTestBase
 {
     /// <inheritdoc />
     protected override Assembly TargetAssembly
@@ -60,122 +63,141 @@ public class InfoCarrierComplianceTest : RelationalComplianceTestBase
     ///     service or an object that does not exist on this side of the wire, and no amount of
     ///     work in this repository would change that.
     /// </remarks>
+    /// <summary>
+    ///     Core specification bases adopted on <b>Tier B</b>, in
+    ///     <c>InfoCarrier.Core.Relational.FunctionalTests</c>, so this assembly holds no subclass
+    ///     of them.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <strong>One reason covers the whole list, and it is a real one.</strong> EF's
+    ///         InMemory provider client-evaluates nearly everything, so a base it cannot host runs
+    ///         on the tier that translates instead (ADR-009, and CLAUDE.md: "EF ships no InMemory
+    ///         test for this base" means move it to Tier B, not drop it). Where a base could go
+    ///         either way, the tier that translates is the one whose green means more. Each of
+    ///         these is <em>implemented and running</em>; nothing here is a gap. The per-base
+    ///         reasoning is in the plan and its archive, not repeated 108 times.
+    ///     </para>
+    ///     <para>
+    ///         <strong>THIS LIST IS NOT A PLACE TO PUT A BASE THAT IS MERELY UNADOPTED.</strong>
+    ///         An entry claims a subclass exists in the sibling assembly, and the claim is checked:
+    ///         <c>RelationalInfoCarrierComplianceTest</c> and this test are green together only
+    ///         while every base is accounted for on exactly one of the two.
+    ///     </para>
+    ///     <para>
+    ///         Generated from this test's own output when the projects were split (R122), not
+    ///         written by hand.
+    ///     </para>
+    /// </remarks>
     protected override ICollection<Type> IgnoredTestBases { get; } =
     [
-        // Migrations run DDL against a database. The client has none. The server is an ordinary
-        // EF application, and EF already tests migrations for the provider it references.
-        typeof(MigrationsInfrastructureTestBase<>),
-        typeof(MigrationsTestBase<>),
-
-        // Asserts the SQL an IMigrationsSqlGenerator emits, resolved from the context's services.
-        typeof(MigrationsSqlGeneratorTestBase),
-
-        // Same shape: CreateSqlGenerator() must return an IUpdateSqlGenerator.
-        typeof(UpdateSqlGeneratorTestBase),
-
-        // Asserts that EntityFrameworkRelationalServicesBuilder.RelationalServices are registered.
-        // InfoCarrier.Core stopped referencing EFCore.Relational in M9 and registers none of them.
-        typeof(RelationalServiceCollectionExtensionsTestBase),
-
-        // Interception of DbCommand, DbConnection and DbTransaction. The client holds no ADO.NET
-        // object to intercept. On the server this is ordinary EF, which EF tests.
-        typeof(CommandInterceptionTestBase),
-        typeof(ConnectionInterceptionTestBase),
-        typeof(TransactionInterceptionTestBase),
-
-        // Resolves IReverseEngineerScaffolder and IMigrationsScaffolder from the provider's
-        // design-time services. Both scaffold from a database, which the client does not have.
-        typeof(DesignTimeTestBase<>),
-
-        // Precompiled queries pregenerate a provider's SQL at build time on the client. This
-        // client compiles no SQL at all: the server generates it per request, after the wire.
-        typeof(PrecompiledQueryRelationalTestBase),
-        typeof(PrecompiledSqlPregenerationQueryRelationalTestBase),
-        typeof(AdHocPrecompiledQueryRelationalTestBase),
-
-        // ---- Added in R45, each read in R41 before it was listed. ----
-
-        // GetDbConnection(), GetDbTransaction(), UseTransaction(DbTransaction) and a
-        // (RelationalTestStore)Fixture.TestStore cast run through all 44 of its tests. The client
-        // has no database and no connection. Same reason as TransactionInterceptionTestBase above.
-        typeof(TransactionTestBase<>),
-
-        // Declares `protected abstract string DummyConnectionString` and
-        // CreateBackingContext(string databaseName), and its three tests swap one connection
-        // string for another inside a DbConnection interceptor. A connection string names a
-        // database; the client has neither.
-        typeof(TwoDatabasesTestBase),
-
-        // Cannot even be closed here: TExtension is constrained to RelationalOptionsExtension and
-        // TBuilder to RelationalDbContextOptionsBuilder<,>. This provider's options extension is
-        // neither, and every one of its nine tests configures MaxBatchSize, CommandTimeout,
-        // UseRelationalNulls, MigrationsAssembly or MigrationsHistoryTable through them.
-        typeof(LoggingRelationalTestBase<,>),
-
-        // Its whole contribution over the core base is GetModelMetadata, overridden as
-        // new RelationalModelMetadata(context.Model, context.Database.GenerateCreateScript()).
-        // GenerateCreateScript is relational-only, and every test routes through it.
-        typeof(ModelBuilding101RelationalTestBase),
-
-        // Asserts GetTableName() on the compiled model, which here is the *client's*. Its eleven
-        // tests build models with ToTable, SplitToTable, sprocs, sequences and check constraints.
-        // M9 removed the relational model from the client; this is that boundary, not a gap.
-        typeof(CompiledModelRelationalTestBase),
-
-        // Same boundary. AssertElementFacets asserts FindRelationalTypeMapping(), IsFixedLength()
-        // and GetStoreType() on the client's model, and the store types it expects are the backing
-        // provider's. R23 measured 104 red of 576 on exactly that assumption and reverted.
-        typeof(JsonTypesRelationalTestBase),
-
-        // ---- Added in R103. THE SECOND CATEGORY: EF's own SqliteComplianceTest ignores these,
-        // ---- and SQLite is the only relational store this suite has (ADR-009 Tier B). Only
-        // ---- SQL Server implements any of the three. The reasons below are EF's, not ours.
-        // ---- The other five bases on EF's list are implemented here and stay implemented; see
-        // ---- the class remarks.
-
-        // ---- Added in R105, each re-read before it was listed and none taken on trust. All three
-        // ---- are the FIRST category: the client is not relational. They had been reported as
-        // ---- missing with no recorded reason, which is the one state this gate is meant to make
-        // ---- impossible.
-
-        // All 136 of its tests run through `TestHelpers.ExecuteWithStrategyInTransactionAsync`,
-        // and the `UseTransaction` they hand it is declared on the test base itself as
-        // `public void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        //     => facade.UseTransaction(transaction.GetDbTransaction());`
-        // -- NON-virtual, so no fixture can replace it with `UseInfoCarrierTransaction`, and
-        // `GetDbTransaction()` needs a relational client. This is ADR-013's own worked example
-        // ("One use costs a test; 136 costs the base"), re-checked against EF 10 rather than
-        // carried over: the count is still 136 of 136 and the method is still non-virtual.
-        typeof(JsonUpdateTestBase<>),
-
-        // `StoreValueGenerationFixtureBase.OnModelCreating` opens with
-        // `context.GetService<ISqlGenerationHelper>()` and builds every computed column from it.
-        // That service lives in `EFCore.Relational`, and this harness runs a fixture's
-        // `OnModelCreating` on BOTH sides, so the client throws before a test runs. Blocked by
-        // the same thing as `SqlQuery<T>` (D8 item 2, R102) and by nothing smaller.
-        typeof(StoreValueGenerationTestBase<>),
-
-        // Its two abstract members are `SetQuerySplittingBehavior` and
-        // `ClearQuerySplittingBehavior`, and EF's SQLite class implements them by configuring a
-        // `RelationalOptionsExtension` on the CLIENT's options builder -- the second by writing a
-        // private field through reflection. A remoting client has no such extension.
-        //
-        // **The reason recorded until now was narrower and wrong.** ADR-013's R77 amendment said
-        // this base "calls CloseConnection() on the cast store", which is true of exactly one test
-        // of ten and would have cost a test rather than the base under R14's rule. The blocker is
-        // the required surface, not that one call. Its subject is moot here as well:
-        // `QuerySplitter`'s `SplitHintStrippingVisitor` removes `AsSplitQuery` on purpose.
-        typeof(AdHocQuerySplittingQueryTestBase),
-
-        // Stored procedures, which SQLite does not have. EF's list carries the same entry.
-        typeof(FromSqlSprocQueryTestBase<>),
-        typeof(StoredProcedureUpdateTestBase),
-
-        // Also stored procedures, despite the name. Its first three tests are
-        // Executes_stored_procedure, _with_parameter and _with_generated_parameter, and every one
-        // of them runs a sproc through Database.ExecuteSqlRaw. EF's list carries it beside the two
-        // above for that reason, and D8 item 2 used to pair it with `SqlQuery<T>` -- which is a
-        // client limitation, where this is a store one (R102).
-        typeof(SqlExecutorTestBase<>),
+        typeof(BuiltInDataTypesTestBase<>),
+        typeof(ComplexTypesTrackingTestBase<>),
+        typeof(ConcurrencyDetectorDisabledTestBase<>),
+        typeof(ConcurrencyDetectorEnabledTestBase<>),
+        typeof(ConcurrencyDetectorTestBase<>),
+        typeof(ConferencePlannerTestBase<>),
+        typeof(ConvertToProviderTypesTestBase<>),
+        typeof(CustomConvertersTestBase<>),
+        typeof(DataAnnotationTestBase<>),
+        typeof(GraphUpdatesTestBase<>),
+        typeof(ProxyGraphUpdatesTestBase<>),
+        typeof(KeysWithConvertersTestBase<>),
+        typeof(LazyLoadProxyTestBase<>),
+        typeof(ManyToManyTrackingTestBase<>),
+        typeof(OptimisticConcurrencyTestBase<,>),
+        typeof(PropertyValuesTestBase<>),
+        typeof(AdHocManyToManyQueryTestBase),
+        typeof(AdHocMiscellaneousQueryTestBase),
+        typeof(OwnedEntityQueryTestBase),
+        typeof(SharedTypeQueryTestBase),
+        typeof(StoreGeneratedFixupTestBase<>),
+        typeof(StoreGeneratedTestBase<>),
+        typeof(UpdatesTestBase<>),
+        typeof(TypeTestBase<,>),
+        typeof(AdHocAdvancedMappingsQueryTestBase),
+        typeof(AdHocComplexTypeQueryTestBase),
+        typeof(AdHocJsonQueryTestBase),
+        typeof(AdHocNavigationsQueryTestBase),
+        typeof(AdHocQueryFiltersQueryTestBase),
+        typeof(ComplexNavigationsCollectionsQueryTestBase<>),
+        typeof(ComplexNavigationsCollectionsSharedTypeQueryTestBase<>),
+        typeof(ComplexNavigationsQueryTestBase<>),
+        typeof(ComplexNavigationsSharedTypeQueryTestBase<>),
+        typeof(ComplexTypeQueryTestBase<>),
+        typeof(CompositeKeysQueryTestBase<>),
+        typeof(FunkyDataQueryTestBase<>),
+        typeof(JsonQueryTestBase<>),
+        typeof(NonSharedPrimitiveCollectionsQueryTestBase),
+        typeof(NorthwindAggregateOperatorsQueryTestBase<>),
+        typeof(NorthwindFunctionsQueryTestBase<>),
+        typeof(NorthwindGroupByQueryTestBase<>),
+        typeof(NorthwindJoinQueryTestBase<>),
+        typeof(NorthwindKeylessEntitiesQueryTestBase<>),
+        typeof(NorthwindMiscellaneousQueryTestBase<>),
+        typeof(NorthwindNavigationsQueryTestBase<>),
+        typeof(NorthwindSelectQueryTestBase<>),
+        typeof(NorthwindSetOperationsQueryTestBase<>),
+        typeof(NorthwindWhereQueryTestBase<>),
+        typeof(OwnedQueryTestBase<>),
+        typeof(PrimitiveCollectionsQueryTestBase<>),
+        typeof(ByteArrayTranslationsTestBase<>),
+        typeof(EnumTranslationsTestBase<>),
+        typeof(GuidTranslationsTestBase<>),
+        typeof(MathTranslationsTestBase<>),
+        typeof(MiscellaneousTranslationsTestBase<>),
+        typeof(StringTranslationsTestBase<>),
+        typeof(DateOnlyTranslationsTestBase<>),
+        typeof(DateTimeOffsetTranslationsTestBase<>),
+        typeof(DateTimeTranslationsTestBase<>),
+        typeof(TimeOnlyTranslationsTestBase<>),
+        typeof(TimeSpanTranslationsTestBase<>),
+        typeof(ArithmeticOperatorTranslationsTestBase<>),
+        typeof(BitwiseOperatorTranslationsTestBase<>),
+        typeof(ComparisonOperatorTranslationsTestBase<>),
+        typeof(LogicalOperatorTranslationsTestBase<>),
+        typeof(MiscellaneousOperatorTranslationsTestBase<>),
+        typeof(AssociationsBulkUpdateTestBase<>),
+        typeof(AssociationsCollectionTestBase<>),
+        typeof(AssociationsMiscellaneousTestBase<>),
+        typeof(AssociationsPrimitiveCollectionTestBase<>),
+        typeof(AssociationsProjectionTestBase<>),
+        typeof(AssociationsSetOperationsTestBase<>),
+        typeof(AssociationsStructuralEqualityTestBase<>),
+        typeof(OwnedNavigationsCollectionTestBase<>),
+        typeof(OwnedNavigationsMiscellaneousTestBase<>),
+        typeof(OwnedNavigationsPrimitiveCollectionTestBase<>),
+        typeof(OwnedNavigationsProjectionTestBase<>),
+        typeof(OwnedNavigationsSetOperationsTestBase<>),
+        typeof(OwnedNavigationsStructuralEqualityTestBase<>),
+        typeof(NavigationsCollectionTestBase<>),
+        typeof(NavigationsIncludeTestBase<>),
+        typeof(NavigationsMiscellaneousTestBase<>),
+        typeof(NavigationsPrimitiveCollectionTestBase<>),
+        typeof(NavigationsProjectionTestBase<>),
+        typeof(NavigationsSetOperationsTestBase<>),
+        typeof(NavigationsStructuralEqualityTestBase<>),
+        typeof(ComplexPropertiesBulkUpdateTestBase<>),
+        typeof(ComplexPropertiesCollectionTestBase<>),
+        typeof(ComplexPropertiesMiscellaneousTestBase<>),
+        typeof(ComplexPropertiesPrimitiveCollectionTestBase<>),
+        typeof(ComplexPropertiesProjectionTestBase<>),
+        typeof(ComplexPropertiesSetOperationsTestBase<>),
+        typeof(ComplexPropertiesStructuralEqualityTestBase<>),
+        typeof(BulkUpdatesTestBase<>),
+        typeof(FiltersInheritanceBulkUpdatesTestBase<>),
+        typeof(InheritanceBulkUpdatesTestBase<>),
+        typeof(NonSharedModelBulkUpdatesTestBase),
+        typeof(NorthwindBulkUpdatesTestBase<>),
+        typeof(ModelBuilderTest.ComplexCollectionTestBase),
+        typeof(ModelBuilderTest.ComplexTypeTestBase),
+        typeof(ModelBuilderTest.ModelBuilderTestBase),
+        typeof(ModelBuilderTest.InheritanceTestBase),
+        typeof(ModelBuilderTest.ManyToManyTestBase),
+        typeof(ModelBuilderTest.ManyToOneTestBase),
+        typeof(ModelBuilderTest.NonRelationshipTestBase),
+        typeof(ModelBuilderTest.OneToManyTestBase),
+        typeof(ModelBuilderTest.OneToOneTestBase),
+        typeof(ModelBuilderTest.OwnedTypesTestBase),
     ];
 }

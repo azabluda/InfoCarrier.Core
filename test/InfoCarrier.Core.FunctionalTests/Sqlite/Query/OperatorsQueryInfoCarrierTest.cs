@@ -27,7 +27,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 /// </remarks>
 public class OperatorsQueryInfoCarrierTest(NonSharedFixture fixture) : OperatorsQueryTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
@@ -57,7 +57,7 @@ public class OperatorsQueryInfoCarrierTest(NonSharedFixture fixture) : Operators
 public class OperatorsProceduralQueryInfoCarrierTest(NonSharedFixture fixture)
     : OperatorsProceduralQueryTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

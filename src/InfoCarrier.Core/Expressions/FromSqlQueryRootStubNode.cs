@@ -13,7 +13,7 @@ namespace InfoCarrier.Core.Expressions;
 ///         deliberately does not reference (<c>architecture.md</c> section 6a D3, M9 J5). What it
 ///         adds to a plain entity root is exactly two things - a SQL string and one argument
 ///         expression - and those are what this node carries. See
-///         <see cref="RelationalQueryRootShape" />.
+///         <see cref="Metadata.IInfoCarrierRelationalQueryRoots" />.
 ///     </para>
 ///     <para>
 ///         <b>This node is a grant, not a translation.</b> A payload carrying one asks the server

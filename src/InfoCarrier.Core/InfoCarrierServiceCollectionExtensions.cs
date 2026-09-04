@@ -44,7 +44,7 @@ public static class InfoCarrierServiceCollectionExtensions
             // The client's model has to agree with the backing store's, and one key shape is
             // decided by the caller's own `ToJson()` rather than by the store — see
             // `InfoCarrierKeyDiscoveryConvention`.
-            .TryAdd<IProviderConventionSetBuilder, InfoCarrierConventionSetBuilder>()
+            .TryAdd<IProviderConventionSetBuilder, Relational.InfoCarrierRelationalConventionSetBuilder>()
 
             // A hierarchy with no discriminator is legal on this client, because the server's
             // provider owns the inheritance mapping and the wire names the concrete type — see
@@ -89,6 +89,22 @@ public static class InfoCarrierServiceCollectionExtensions
         // above are registered here for the same reason — a provider's own service is the
         // application's collection's business, not EF's.
         services.TryAddSingleton<Metadata.IInfoCarrierDocumentMapping, Metadata.AnnotationDocumentMapping>();
+
+        // How to recognise EF's relational raw-SQL query roots (#97). The default knows nothing,
+        // which makes a raw-SQL root refused rather than shipped with its SQL dropped; the
+        // `InfoCarrier.Core.Relational` package replaces it. Registered here for the same reason
+        // as the line above -- a provider's own service is the application's collection's
+        // business, not EF's.
+        services.TryAddSingleton<Metadata.IInfoCarrierRelationalQueryRoots, Relational.InfoCarrierRelationalQueryRoots>();
+
+        // EXPERIMENT (always-on relational): the client facade dependencies that
+        // `AddInfoCarrierRelationalClient()` used to add. `RemoveAll` first on both, so a repeated
+        // call to this method leaves the collection unchanged.
+        services.RemoveAll<IRelationalDatabaseFacadeDependencies>();
+        services.RemoveAll<IDatabaseFacadeDependencies>();
+        services.AddScoped<IRelationalDatabaseFacadeDependencies, Relational.InfoCarrierRelationalFacadeDependencies>();
+        services.AddScoped<IDatabaseFacadeDependencies>(
+            p => p.GetRequiredService<IRelationalDatabaseFacadeDependencies>());
 
         services.TryAddScoped<TypeNodeMapper>();
         services.TryAddScoped<TypeNodeResolver>();
@@ -186,6 +202,84 @@ public static class InfoCarrierServiceCollectionExtensions
     }
 
     private sealed class ArbitrarySqlExecution : IInfoCarrierArbitrarySqlExecution
+    {
+    }
+
+    /// <summary>
+    ///     Grants a <em>server</em> permission to send the log events it raises while executing a
+    ///     request back to the client, and installs the capture that reads them (#97, R172).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Two registrations, because the grant is useless without the capture.</b> The
+    ///         marker is what <c>InProcessInfoCarrierServer</c> checks; the
+    ///         <see cref="ServerLogCapture" /> is an ordinary
+    ///         <see cref="Microsoft.Extensions.Logging.ILoggerProvider" /> added beside whatever
+    ///         the application already logs to, so nothing it had stops working.
+    ///     </para>
+    ///     <para>
+    ///         <b>Read <see cref="IInfoCarrierServerLogForwarding" /> before calling this.</b> A
+    ///         forwarded event is text the server's provider wrote about the server's store, and
+    ///         that is schema disclosure to whoever holds a client. The default
+    ///         <paramref name="minimumLevel" /> is <c>Warning</c> for exactly that reason: EF logs
+    ///         every executed command at <c>Information</c>.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <param name="minimumLevel">
+    ///     The lowest level that crosses. Defaults to
+    ///     <see cref="Microsoft.Extensions.Logging.LogLevel.Warning" />.
+    /// </param>
+    /// <returns>The same collection, so calls can be chained.</returns>
+    public static IServiceCollection AddInfoCarrierServerLogForwarding(
+        this IServiceCollection services,
+        Microsoft.Extensions.Logging.LogLevel minimumLevel = Microsoft.Extensions.Logging.LogLevel.Warning)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IInfoCarrierServerLogForwarding>(new ServerLogForwarding(minimumLevel));
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<Microsoft.Extensions.Logging.ILoggerProvider, ServerLogCapture>());
+
+        return services;
+    }
+
+    /// <summary>
+    ///     Grants a <em>server</em> permission to forward log events even though its own context
+    ///     has <c>EnableSensitiveDataLogging</c> on (#97, R172). Implies
+    ///     <see cref="AddInfoCarrierServerLogForwarding" />.
+    /// </summary>
+    /// <remarks>
+    ///     Without this second grant a server with sensitive logging on forwards <em>nothing</em>,
+    ///     because sensitive logging changes what EF's message templates say across the board and
+    ///     no per-event flag distinguishes the ones that carry values. See
+    ///     <see cref="IInfoCarrierSensitiveServerLogForwarding" />.
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <param name="minimumLevel">
+    ///     The lowest level that crosses. Defaults to
+    ///     <see cref="Microsoft.Extensions.Logging.LogLevel.Warning" />.
+    /// </param>
+    /// <returns>The same collection, so calls can be chained.</returns>
+    public static IServiceCollection AddInfoCarrierSensitiveServerLogForwarding(
+        this IServiceCollection services,
+        Microsoft.Extensions.Logging.LogLevel minimumLevel = Microsoft.Extensions.Logging.LogLevel.Warning)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddInfoCarrierServerLogForwarding(minimumLevel);
+        services.TryAddSingleton<IInfoCarrierSensitiveServerLogForwarding, SensitiveServerLogForwarding>();
+
+        return services;
+    }
+
+    private sealed class ServerLogForwarding(Microsoft.Extensions.Logging.LogLevel minimumLevel)
+        : IInfoCarrierServerLogForwarding
+    {
+        public Microsoft.Extensions.Logging.LogLevel MinimumLevel { get; } = minimumLevel;
+    }
+
+    private sealed class SensitiveServerLogForwarding : IInfoCarrierSensitiveServerLogForwarding
     {
     }
 

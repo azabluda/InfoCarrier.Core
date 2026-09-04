@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +30,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutputHelper testOutputHelper)
     : TPTTableSplittingTestBase(fixture, testOutputHelper)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    // `serverLogForwarding` because two tests in this base read the CLIENT's log for a warning
+    // EF's relational UPDATE pipeline raises on the SERVER. Nothing else in the suite asks for it,
+    // which is why it is per fixture: a forwarded event lands in the same `TestSqlLoggerFactory`
+    // other bases assert `Assert.Empty` on.
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(
+        SqliteInfoCarrierTier.Instance, serverLogForwarding: true);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

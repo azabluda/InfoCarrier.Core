@@ -14,72 +14,50 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 public class InfoCarrierTestStoreFactory : ITestStoreFactory
 {
     /// <summary>
-    ///     A factory for backend stores of a given provider.
+    ///     ADR-009 Tier A: EF's InMemory provider, which is not a relational store.
     /// </summary>
-    public delegate InfoCarrierBackendTestStore InfoCarrierBackendTestStoreFactory(
-        string name,
-        bool shared,
-        SharedTestStoreProperties testStoreProperties);
-
-    /// <summary>
-    ///     The InMemory backend store factory.
-    /// </summary>
-    public static InfoCarrierBackendTestStoreFactory InMemory
-        => (name, shared, props) => new InMemoryInfoCarrierBackendTestStore(name, shared, props);
-
-    /// <summary>
-    ///     The SQLite backend store factory (ADR-009 Tier B, the relational tier).
-    /// </summary>
-    public static InfoCarrierBackendTestStoreFactory Sqlite
-        => (name, shared, props) => new SqliteInfoCarrierBackendTestStore(name, shared, props);
+    /// <remarks>
+    ///     Tier B is <c>SqliteInfoCarrierTier</c>, which lives beside the <c>Sqlite/</c> tests it
+    ///     serves and is named there. It used to be a second static on this class, which meant this
+    ///     store-neutral project referenced a relational provider and so did everything referencing
+    ///     it. See <see cref="InfoCarrierTier" />.
+    /// </remarks>
+    public static InfoCarrierTier InMemory { get; } = new InMemoryInfoCarrierTier();
 
     private readonly Func<SharedTestStoreProperties> _props;
-    private readonly InfoCarrierBackendTestStoreFactory _backendFactory;
+    private readonly InfoCarrierTier _tier;
     private readonly bool _relationalClientStore;
 
     private InfoCarrierTestStoreFactory(
         Func<SharedTestStoreProperties> props,
-        InfoCarrierBackendTestStoreFactory backendFactory,
+        InfoCarrierTier tier,
         bool relationalClientStore = false)
     {
         _props = props;
-        _backendFactory = backendFactory;
+        _tier = tier;
         _relationalClientStore = relationalClientStore;
     }
-
-    /// <summary>
-    ///     The client shell this factory hands out.
-    /// </summary>
-    /// <remarks>
-    ///     A <see cref="RelationalInfoCarrierTestStore" /> only where a fixture asked for one. See
-    ///     that class for why the choice is per fixture rather than global.
-    /// </remarks>
-    private TestStore CreateClientStore(InfoCarrierBackendTestStore backend)
-        => _relationalClientStore
-            ? new RelationalInfoCarrierTestStore(backend)
-            : new InfoCarrierTestStore(backend);
 
     /// <summary>
     ///     Creates a factory for the given backend + fixture properties. Fixtures typically cache
     ///     the result in a field (<c>??=</c>) so it is created once per fixture instance.
     /// </summary>
     public static ITestStoreFactory Create(
-        InfoCarrierBackendTestStoreFactory backendFactory,
+        InfoCarrierTier tier,
         Type contextType,
         Action<ModelBuilder, DbContext>? onModelCreating,
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null,
         Action<DbContext, DbContext>? copyDbContextParameters = null,
-        Type? serverContextType = null,
         Func<IServiceCollection, IServiceCollection>? onAddServices = null,
         Action<ModelConfigurationBuilder>? configureConventions = null,
         ServiceLifetime? serverOptionsLifetime = null,
         bool relationalClientStore = false,
-        bool arbitrarySqlExecution = false)
+        bool arbitrarySqlExecution = false,
+        Type[]? allowedTypes = null)
     {
         var props = new SharedTestStoreProperties
         {
             ContextType = contextType,
-            ServerContextType = serverContextType,
             OnModelCreating = onModelCreating,
             ConfigureConventions = configureConventions,
             OnAddOptions = onAddOptions,
@@ -87,9 +65,10 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             OnAddServices = onAddServices,
             ServerOptionsLifetime = serverOptionsLifetime,
             ArbitrarySqlExecution = arbitrarySqlExecution,
+            AllowedTypes = allowedTypes,
         };
 
-        return new InfoCarrierTestStoreFactory(() => props, backendFactory, relationalClientStore);
+        return new InfoCarrierTestStoreFactory(() => props, tier, relationalClientStore);
     }
 
     /// <summary>
@@ -103,18 +82,24 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     ///     other fixture has one context type for its lifetime and uses the overload above.
     /// </remarks>
     public static ITestStoreFactory CreateDeferred(
-        InfoCarrierBackendTestStoreFactory backendFactory,
+        InfoCarrierTier tier,
         Func<SharedTestStoreProperties> properties,
         bool relationalClientStore = false)
-        => new InfoCarrierTestStoreFactory(properties, backendFactory, relationalClientStore);
+        => new InfoCarrierTestStoreFactory(properties, tier, relationalClientStore);
+
+    /// <summary>
+    ///     The client shell this factory hands out, from the tier that knows what one looks like.
+    /// </summary>
+    private TestStore CreateClientStore(InfoCarrierBackendTestStore backend)
+        => _tier.CreateClientStore(backend, _relationalClientStore);
 
     /// <inheritdoc />
     public virtual TestStore Create(string storeName)
-        => CreateClientStore(_backendFactory(storeName, shared: false, _props()));
+        => CreateClientStore(_tier.CreateBackend(storeName, shared: false, _props()));
 
     /// <inheritdoc />
     public virtual TestStore GetOrCreate(string storeName)
-        => CreateClientStore(_backendFactory(storeName, shared: true, _props()));
+        => CreateClientStore(_tier.CreateBackend(storeName, shared: true, _props()));
 
     /// <inheritdoc />
     /// <remarks>
@@ -132,28 +117,21 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
-        // #56 option D, and gated on the SAME flag as the server's raw-SQL grant rather than on a
-        // flag of its own. `Database.SqlQuery<T>` IS arbitrary SQL execution: without the server
-        // half the call cannot work, so registering the facade shim without it would only trade one
-        // exception for another. The two are wanted together or not at all.
-        if (_props().ArbitrarySqlExecution)
-        {
-            serviceCollection = InfoCarrierRelationalFacadeDependencies
-                .AddInfoCarrierRelationalFacade(serviceCollection);
-        }
-
-        return serviceCollection;
+        // Whatever else the tier's own store needs on the CLIENT. The relational tier registers
+        // `AddInfoCarrierRelationalClient()` here (#56 option D), gated on the same raw-SQL grant
+        // as its server half: `Database.SqlQuery<T>` IS arbitrary SQL execution, so the facade shim
+        // without the server half would only trade one exception for another. This assembly cannot
+        // name that call, which is the point -- see `InfoCarrierTier`.
+        return _tier.AddClientServices(serviceCollection, _props().ArbitrarySqlExecution);
     }
 
     /// <inheritdoc />
     /// <remarks>
-    ///     A <see cref="TestSqlLoggerFactory" /> rather than a bare
-    ///     <see cref="ListLoggerFactory" />, which it derives from. Several spec fixtures expose
-    ///     <c>TestSqlLoggerFactory</c> as a non-virtual property that simply casts this one, and
-    ///     their bases read it — `ComplexCollectionJsonUpdateTestBase.SuspendRecordingEvents()`
-    ///     does, and failed all 18 of its tests on the cast before this. On a client with no
-    ///     database it records no SQL and costs nothing; nothing in this suite asserts SQL.
+    ///     The tier decides. The relational one returns a <c>TestSqlLoggerFactory</c>, because
+    ///     several relational spec fixtures cast to it without asking; the store-neutral default is
+    ///     a plain <see cref="ListLoggerFactory" />. On a client with no database neither records
+    ///     any SQL, and nothing in this suite asserts on it.
     /// </remarks>
     public ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
-        => new TestSqlLoggerFactory(shouldLogCategory);
+        => _tier.CreateListLoggerFactory(shouldLogCategory);
 }

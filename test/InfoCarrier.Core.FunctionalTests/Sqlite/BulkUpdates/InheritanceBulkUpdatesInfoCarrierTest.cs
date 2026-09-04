@@ -157,7 +157,7 @@ public class TPHInheritanceBulkUpdatesInfoCarrierFixture : TPHInheritanceBulkUpd
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);
@@ -177,7 +177,7 @@ public class TPTInheritanceBulkUpdatesInfoCarrierFixture : TPTInheritanceBulkUpd
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);
@@ -206,7 +206,7 @@ public class TPCInheritanceBulkUpdatesInfoCarrierFixture : TPCInheritanceBulkUpd
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);

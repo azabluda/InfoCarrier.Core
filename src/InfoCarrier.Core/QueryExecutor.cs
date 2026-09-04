@@ -36,9 +36,23 @@ internal sealed class QueryExecutor<TElement>
     private readonly IInfoCarrierClient _client;
     private readonly IExpressionSerializer _expressionSerializer;
     private readonly SplitQuery _split;
+    private readonly QuerySplittingBehavior? _splitQueryBehavior;
     private readonly QueryTrackingBehavior _trackingBehavior;
     private readonly ClientResultMaterializer _materializer;
     private readonly bool _threadSafetyChecks;
+
+    /// <summary>
+    ///     How this context recognises EF's relational raw-SQL query roots (#97).
+    /// </summary>
+    /// <remarks>
+    ///     <b>Read once, here, and used by everything that needs it.</b> The boundary analyzer
+    ///     decides whether such a root may cross, and the forward translator carries its SQL when
+    ///     it does; a design where those two read the fact from different places admits the root
+    ///     and then drops its SQL, which is the whole table coming back and the defect R75 closed.
+    ///     So this field is the one source: <c>QuerySplitter</c> gets it below and
+    ///     <see cref="BuildRequest" /> hands it to the serializer.
+    /// </remarks>
+    private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots;
 
     public QueryExecutor(
         QueryContext queryContext,
@@ -49,6 +63,7 @@ internal sealed class QueryExecutor<TElement>
         _queryContext = queryContext;
         _client = client;
         _expressionSerializer = expressionSerializer;
+        _relationalRoots = Relational.InfoCarrierRelationalQueryRoots.Instance;
 
         // Substitute compiled-query parameters as plain constants (research-findings §6).
         Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
@@ -59,12 +74,38 @@ internal sealed class QueryExecutor<TElement>
         // The allowlist is built here rather than taken as null, so the application's own
         // registered types reach the boundary analysis. Read per execution and never captured, for
         // the reason `InfoCarrierDatabase.ClientFor` records.
-        _split = new QuerySplitter(
+        // ONE READER FOR BOTH DIRECTIONS. The boundary analyzer below decides what may be SENT;
+        // the result materializer decides what may be READ BACK, and it resolves through a
+        // DI-scoped `TypeNodeResolver` whose own allowlist knows only the model. Those are the two
+        // carriers R120 warns about, and they disagreed silently here until a declared projection
+        // type came back over the wire: `Database.SqlQuery<UnmappedCustomer>` cleared the boundary
+        // and then failed to materialize its own rows. A `DbParameter` -- the only registered type
+        // this suite had before -- is sent and never returned, which is why nothing showed.
+        IReadOnlyList<Type> allowedTypes = InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context);
+
+        if (expressionSerializer is ExpressionSerializer serializer)
+        {
+            serializer.UseExecutionAllowedTypes(allowedTypes);
+        }
+
+        var splitter = new QuerySplitter(
             queryContext.Context.Model,
-            Expressions.TypeAllowlist.ForModel(
-                queryContext.Context.Model, InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context)),
+            Expressions.TypeAllowlist.ForModel(queryContext.Context.Model, allowedTypes),
             queryContext.QueryLogger,
-            InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context)).Split(substituted);
+            InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context),
+            _relationalRoots)
+        {
+            // Read here and handed in, so one reader answers for the whole execution. That is
+            // R120's rule: a fact two components read independently can disagree with itself.
+            ServerStoreIsRelational =
+                InfoCarrierOptionsExtension.ServerStoreIsRelationalFor(queryContext.Context),
+        };
+
+        _split = splitter.Split(substituted);
+
+        // Read AFTER the split, because the splitter records it while stripping. See
+        // `QueryDataRequest.SplitQueryBehavior` for why the hint travels beside the tree.
+        _splitQueryBehavior = splitter.SplitQueryBehavior;
 
         _trackingBehavior = TrackingBehaviorFinder.Find(
             query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
@@ -112,6 +153,11 @@ internal sealed class QueryExecutor<TElement>
                 .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.Context, _queryContext.CancellationToken)
                 .GetAwaiter()
                 .GetResult();
+
+            // Anything the server logged while running this query, raised on the client's own
+            // logger under the server's category and event id. Empty unless the server has
+            // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
+            ServerLogReplay.Replay(result.ServerLog, _queryContext.Context);
             results.Add(Materialize(serverQuery, result));
         }
 
@@ -203,6 +249,10 @@ internal sealed class QueryExecutor<TElement>
                 throw;
             }
 
+            // Anything the server logged while running this query, raised on the client's own
+            // logger under the server's category and event id. Empty unless the server has
+            // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
+            ServerLogReplay.Replay(result.ServerLog, _queryContext.Context);
             results.Add(Materialize(serverQuery, result));
         }
 
@@ -222,11 +272,21 @@ internal sealed class QueryExecutor<TElement>
 
         return new QueryDataRequest
         {
-            SerializedQuery = SerializeNode(_expressionSerializer.ToNode(serverQuery.Query)),
+            // THE SAME `_relationalRoots` THE BOUNDARY ANALYSIS ABOVE USED, and that is the point
+            // of the field rather than a second lookup here. The analyzer admits a raw-SQL root
+            // only when it recognises one; this translator carries the root's SQL only when it
+            // recognises one. Two lookups can disagree, and when they did the root crossed with
+            // its SQL dropped -- `FromSql_arguments_cross_as_values...` answered 2 where 1 is
+            // correct, silently.
+            SerializedQuery = SerializeNode(
+                ((ExpressionSerializer)_expressionSerializer).ToNode(serverQuery.Query, _relationalRoots)),
             TrackingBehavior = _trackingBehavior,
             IsAsync = async,
             ReturnsSingleResult = serverQuery.ReturnsSingleResult,
             TransactionId = InfoCarrierDatabase.ServerTransactionId(_queryContext.Context),
+
+            // Stripped from the tree by the splitter and carried here instead. See the property.
+            SplitQueryBehavior = _splitQueryBehavior,
         };
     }
 
