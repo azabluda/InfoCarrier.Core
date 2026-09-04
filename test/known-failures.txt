@@ -3326,5 +3326,96 @@
 # unlike R160's family there is no client-side way to stop answering them. Do not re-attempt
 # without a new mechanism; a fourth syntactic rule is not one.
 
+# 2026-09-04 (R163) -- THE WHOLE TAIL RE-TRIAGED AT 55. `failed` and `total` unchanged; no code.
+#
+# Every one of the 55 is paired with ITS OWN error message, read out of the baseline run's log,
+# because R84's batch established that a reason written per TEST holds and a reason written per
+# FAMILY does not. Eleven classes. They add to 55 and the arithmetic is stated so a later reader
+# can check it: 4+4+4+16+5+4+4+9+2+2+1.
+#
+# --- 1. THE CLIENT HAS NO `DbConnection` (4) ---------------------------------------------------
+# 2 `Include_closed_connection_opened_by_it_when_buffering`, 2
+# `Include_does_not_close_user_opened_connection_for_empty_result`. They fail on the harness's own
+# refusal message, which says why in the exception text. ADR-013's amendment names this as the half
+# that must stay refused. Unchanged.
+#
+# --- 2. THE CLIENT'S TYPE MAPPING IS NOT A `RelationalTypeMapping` (4) -- RECLASSIFIED ----------
+# 2 `FromSqlRaw_queryable_simple_projection_composed`, 2
+# `SqlQueryRaw_queryable_simple_projection_composed`.
+# `InvalidCastException : InfoCarrier.Core.InfoCarrierTypeMapping -> RelationalTypeMapping`.
+#
+# THIS FILE CARRIED IT AS A GAP TO CLOSE. IT IS NOT ONE, AND THE EVIDENCE IS IN EF'S OWN SOURCE.
+# The base's body does
+# `(RelationalTypeMapping)context.GetService<ITypeMappingSource>().FindMapping(typeof(bool))` and
+# then `GenerateSqlLiteral(true)`: it asks the CLIENT to write a SQL literal. Two things make that
+# unanswerable rather than unimplemented. `BoolTypeMapping`'s constructor REQUIRES a `storeType`
+# string, the database's own type name, and a client with no database has none to give. And
+# `RelationalTypeMapping.GenerateNonNullSqlLiteral` formats through `SqlLiteralFormatString`, which
+# defaults to `{0}`, so a generic relational mapping for `bool` would emit `True` -- not valid SQL
+# on any store. The literal is the STORE's dialect, and the store is on the other side of the wire.
+# Same class as 1: a consequence of the client having no database, not a defect.
+#
+# --- 3. RELATIONAL-SPECIFIC METHODS ON THE CLIENT FACADE (4) -----------------------------------
+# 2 `ExecuteDelete_throws_for_entity_splitting`, 2 `ExecuteUpdate_works_for_table_sharing`.
+# "Relational-specific methods can only be used when the context is using a relational database
+# provider", raised by `GetFacadeDependencies` before a query is built. D8 item 2. Unchanged.
+#
+# --- 4. WE ANSWER A QUERY RELATIONAL PROVIDERS REFUSE, COLLECTION FAMILY (16) -------------------
+# 4 `Correlated_collection_after_distinct_3_levels_without_original_identifiers`, 4
+# `Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_ex`
+# `pressions`, 4 `Correlated_collection_order_by_constant_null_of_non_mapped_type`, 4
+# `Where_coalesce_with_anonymous_types`. All "No exception was thrown".
+#
+# THE FIRST EIGHT ARE CLOSED AS NOT REFUSABLE HERE -- see the R162 entry above and
+# `docs/plans/v10/findings.md`. THE OTHER EIGHT ARE A DIFFERENT MECHANISM and were filed with them
+# by mistake: neither has anything to do with collections or `Distinct`.
+# `OrderByDescending(s => (MyDTO)null)` sorts by a constant of a type the model does not map, and
+# `(new { Name = g.LeaderNickname } ?? new { Name = g.FullName }) != null` coalesces two freshly
+# constructed objects. Both are SEMANTICALLY EMPTY -- a constant sort key orders nothing, and a
+# `??` between two `new` expressions is never null -- so this provider folds them away and the
+# query that reaches the server is valid. The answers are right. Open, and the decision is whether
+# to refuse them at all.
+#
+# --- 5. WE ANSWER A QUERY RELATIONAL PROVIDERS REFUSE, OTHER (5) --------------------------------
+# `Composition_over_collection_of_complex_mapped_as_scalar`,
+# `Column_collection_equality_inline_collection_with_parameters`,
+# `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query`,
+# `Parameter_collection_in_subquery_and_Convert_as_compiled_query`,
+# `Complex_properties_can_be_configured_by_type`. The first two are named on
+# `website/docs/limitations.md`. Unchanged.
+#
+# --- 6. OWNED JSON STRUCTURAL EQUALITY (4) -----------------------------------------------------
+# `Associate_with_parameter_null` expects `EqualException`, which is EF asserting that a relational
+# provider returns the WRONG rows; this provider returns the right ones, and the page says so. The
+# three `Contains_with_*` expect `KeyNotFoundException` and get another type. Unchanged.
+#
+# --- 7. MODEL BUILDING: TWO CONTEXTS, NOT ONE (4) ----------------------------------------------
+# `Can_configure_owned_type` and `Can_use_sproc_mapping_with_owned_reference` fail `Assert.Same` on
+# an `EntityType`, `Can_use_table_splitting_with_owned_reference` fails `Assert.True`, and
+# `Table_can_configure_TPT_with_Owned` calls `GetRelationalModel` before the model is finalized.
+# `Assert.Same(context, ...)` has no answer in a repository that is two `DbContext` instances.
+# Unchanged.
+#
+# --- 8. EXCEPTION MESSAGE TEXT DIFFERS (9) -----------------------------------------------------
+# 2 `Update_with_invalid_lambda_in_set_property_throws`, `Throws_when_orderby_multiple`,
+# `Warn_when_save_optional_dependent_with_null_values_sensitive`,
+# `Casts_are_removed_from_expression_tree_when_redundant`, 2 `Bad_data_error_handling_null`, 2
+# `Bad_data_error_handling_null_no_tracking`. Every one is `Assert.Contains` or `Assert.Equal` over
+# a message string. Two of them are named on `website/docs/limitations.md`. Unchanged.
+#
+# --- 9. WRONG ANSWER (2) -----------------------------------------------------------------------
+# 2 `Correlated_collection_with_distinct_3_levels`, InMemory only, `Assert.Equal` values differ.
+# C64: the assertion no correct answer can satisfy. Its Tier B twin went green at R160. Unchanged.
+#
+# --- 10. UPSTREAM EF DEFECT (2) ----------------------------------------------------------------
+# 2 `Can_track_entity_with_complex_property_bag_collections(state: Added)`, `ArgumentException:
+# Incorrect number of arguments supplied for call to method 'System.Object get_Item(System.String)'`.
+# J22 priced the route around it and did not take it. dotnet/efcore#36175. Unchanged.
+#
+# --- 11. ONE OF ITS OWN (1) --------------------------------------------------------------------
+# `Warn_when_save_optional_dependent_with_null_values`, "Sequence contains no matching element".
+# The test looks for a warning event that was not raised. Sits beside its `_sensitive` twin in
+# class 8 and fails differently, so it is filed on its own rather than folded in.
+
 failed=55
 total=29513

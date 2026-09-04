@@ -5131,6 +5131,30 @@ re-parents of families already running, because R25–R30 showed that is where t
       `py eng/doc-links.py` (0 broken in 58 files), `eng/docs-serve.sh --build` clean, 0 em
       dashes, en dashes or curly quotes.
 
+- [x] **R163. The whole tail re-triaged at 55, and one class reclassified.** `test/` text only,
+      recorded in `test/known-failures.txt`. `failed` and `total` unchanged.
+
+      **Every one of the 55 is paired with ITS OWN message**, extracted from the baseline run's
+      log rather than from the aggregate reason counts, because R84 established that a reason
+      written per TEST survives re-reading and one written per FAMILY does not. Eleven classes,
+      adding to 55.
+
+      **The reclassification is the four raw-SQL type-mapping tests.** This file carried them as a
+      gap to close. EF's base body does
+      `(RelationalTypeMapping)context.GetService<ITypeMappingSource>().FindMapping(typeof(bool))`
+      and then `GenerateSqlLiteral(true)`, so it asks the CLIENT to write a SQL literal.
+      `BoolTypeMapping`'s constructor requires a `storeType` string the client has no basis for,
+      and `RelationalTypeMapping.GenerateNonNullSqlLiteral` formats through
+      `SqlLiteralFormatString`, `{0}` by default, so a generic mapping for `bool` emits `True`,
+      which is valid SQL nowhere. Read out of EF's source, not inferred. They join the
+      `Include_*_connection*` four as a consequence of the client having no database.
+
+      **And eight tests moved out of the collection family they were filed under.**
+      `Correlated_collection_order_by_constant_null_of_non_mapped_type` and
+      `Where_coalesce_with_anonymous_types` have nothing to do with collections or `Distinct`:
+      each writes something SEMANTICALLY EMPTY that a relational provider still refuses to
+      translate, and this provider folds it away. They are the one open decision left in the tail.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
