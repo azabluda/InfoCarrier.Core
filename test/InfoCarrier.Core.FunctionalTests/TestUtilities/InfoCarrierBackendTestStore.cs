@@ -70,6 +70,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             }
         }
 
+        // The SERVER half of log forwarding (R172), and the sensitive grant rather than the plain
+        // one: `TableSplittingTestBase` asserts the sensitive wording in one test and the plain
+        // one in the next, and which it gets is decided by the server context's own
+        // `EnableSensitiveDataLogging` — the grant only says the text may cross. `LogLevel.Warning`
+        // is the default and is what those tests read.
+        if (testStoreProperties.ServerLogForwarding)
+        {
+            services = services.AddInfoCarrierSensitiveServerLogForwarding();
+        }
+
         // The SERVER half of the projection-DTO seam, and NOT inside the raw-SQL grant above: a
         // type the model does not imply is refused whether or not the payload carries SQL. This is
         // the boundary half -- it decides what a PAYLOAD may name -- so it is a fixture's explicit

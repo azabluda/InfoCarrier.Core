@@ -3737,5 +3737,38 @@
 # (R138's family, sixteen tests) and `Casts_are_removed_from_expression_tree_when_redundant`
 # (printing the whole chain would change every refusal message in the suite).
 
-failed=41
+# 2026-09-04 (R172) -- `failed` FALLS 41 -> 39, `total` unchanged at 29513. FIXED 2, BROKEN none.
+# Both `Warn_when_save_optional_dependent_with_null_values*`. THE LAST OPEN CLASS IN THE TAIL IS
+# CLOSED, and the remaining thirteen classes are every one of them blocked, priced or upstream.
+#
+# A SERVER MAY NOW SEND ITS LOG BACK WITH THE RESULT, and it is off by default. The owner's answer
+# to the second open question (2026-09-04) was that sensitive logging over the wire must be opt-in
+# and non-sensitive opt-in behind a different flag; that is exactly the shape shipped.
+# `IInfoCarrierServerLogForwarding` (level, default `Warning`) and
+# `IInfoCarrierSensitiveServerLogForwarding` are server-side registrations with no client option
+# that turns either on. `docs/security-review.md` section 7a is the reading.
+#
+# WHY THE TESTS COULD NOT SEE THE WARNING. EF raises
+# `OptionalDependentWithAllNullPropertiesWarning` from its relational UPDATE pipeline, which runs
+# on the SERVER, and the tests read the CLIENT's `TestSqlLoggerFactory`. Measured with a probe on
+# the server's own logger rather than assumed: the server raises it, and its SENSITIVE form
+# already follows the fixture, so no harness change was needed for that half.
+#
+# --- AND ONE HARNESS FIX THAT IS NOT ABOUT LOGGING AT ALL --------------------------------------
+# `InfoCarrierTestStore.InitializeAsync` ignored the fixture's `createContext` entirely -- the
+# backend owns the server's -- so THE CLIENT'S MODEL WAS BUILT BY THE FIRST CONTEXT A TEST
+# CREATED, inside the test, and its model-validation events landed in what the test then read.
+# EF's own providers have one context, so their model is validated during initialization and
+# whatever it logs is logged before the base clears the log. The `_sensitive` test asserts a
+# SINGLE warning and saw the client's own `SensitiveDataLoggingEnabledWarning` beside the
+# forwarded one. Touching `Model` on one throwaway client context during initialization is the
+# whole fix, and it is suite-wide: measured at 39 with nothing broken.
+#
+# TWO CATEGORIES NEVER CROSS, and that is correctness rather than policy. Both halves build a
+# model from the same `OnModelCreating` and each validates its own, so the server's model warnings
+# are the client's own findings attributed to the wrong place. `Microsoft.EntityFrameworkCore.Model`
+# and `...Infrastructure` are excluded at the capture, before anything is buffered. Found by
+# measurement: with them included the `_sensitive` test saw three warnings where it asserts one.
+
+failed=39
 total=29513

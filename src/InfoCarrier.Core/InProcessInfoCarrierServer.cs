@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -84,6 +85,25 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private Metadata.IInfoCarrierRelationalQueryRoots? RelationalQueryRoots
         => _serviceProvider.GetService<Metadata.IInfoCarrierRelationalQueryRoots>();
 
+    /// <summary>
+    ///     Whether this server sends the log events it raises back to the client, and from which
+    ///     level (<see cref="IInfoCarrierServerLogForwarding" />, R172).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider, like the four above, and absent unless the application
+    ///     registered it. <b>It discloses the server's own diagnostics</b> — see the interface for
+    ///     what that costs.
+    /// </remarks>
+    private IInfoCarrierServerLogForwarding? LogForwarding
+        => _serviceProvider.GetService<IInfoCarrierServerLogForwarding>();
+
+    /// <summary>
+    ///     Whether this server may forward its log even when the context logs sensitive data
+    ///     (<see cref="IInfoCarrierSensitiveServerLogForwarding" />, R172).
+    /// </summary>
+    private bool SensitiveLogForwardingAllowed
+        => _serviceProvider.GetService<IInfoCarrierSensitiveServerLogForwarding>() is not null;
+
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
@@ -95,7 +115,13 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
             var executor = new ServerQueryExecutor(
                 lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
-            return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+
+            using ServerLogCapture.Scope? capture = BeginLogCapture();
+            QueryDataResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+
+            return CollectedLog(capture, lease.Context) is { } log
+                ? result with { ServerLog = log }
+                : result;
         }
         finally
         {
@@ -114,12 +140,56 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
             var executor = new ServerSaveChangesExecutor(
                 lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
-            return await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+
+            using ServerLogCapture.Scope? capture = BeginLogCapture();
+            SaveChangesResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+
+            return CollectedLog(capture, lease.Context) is { } log
+                ? result with { ServerLog = log }
+                : result;
         }
         finally
         {
             await lease.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    ///     Opens a capture for this request, or <see langword="null" /> when the server has not
+    ///     granted log forwarding.
+    /// </summary>
+    private ServerLogCapture.Scope? BeginLogCapture()
+        => LogForwarding is { } forwarding ? ServerLogCapture.Begin(forwarding.MinimumLevel) : null;
+
+    /// <summary>
+    ///     What a finished request may send back, after the sensitive-logging gate.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The gate is all-or-nothing and that is deliberate.</b>
+    ///         <c>EnableSensitiveDataLogging</c> is not a per-event flag: it changes what EF's
+    ///         message templates say across the board, so an event raised by a context that has it
+    ///         on may carry key, parameter or property values in its text and nothing distinguishes
+    ///         the ones that do. A server whose context logs sensitively therefore forwards
+    ///         everything or nothing, and only the second grant chooses the first.
+    ///     </para>
+    ///     <para>
+    ///         Read off <see cref="CoreOptionsExtension" /> rather than <c>ILoggingOptions</c>:
+    ///         the options extension is public API and says the same thing.
+    ///     </para>
+    /// </remarks>
+    private IReadOnlyList<Common.ServerLogEvent>? CollectedLog(ServerLogCapture.Scope? capture, DbContext context)
+    {
+        if (capture?.Events is not { } events)
+        {
+            return null;
+        }
+
+        bool sensitive = context.GetService<IDbContextOptions>()
+            .FindExtension<CoreOptionsExtension>()
+            ?.IsSensitiveDataLoggingEnabled == true;
+
+        return sensitive && !SensitiveLogForwardingAllowed ? null : events;
     }
 
     /// <inheritdoc />

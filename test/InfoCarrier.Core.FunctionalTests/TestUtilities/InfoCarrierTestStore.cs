@@ -32,10 +32,28 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
         Func<DbContext, Task>? seed = null,
         Func<DbContext, Task>? clean = null)
     {
-        // Ignore the fixture's serviceProvider/createContext — the backend owns the real
-        // server provider and context factory (v1 pattern).
+        // Ignore the fixture's serviceProvider/createContext for the STORE — the backend owns the
+        // real server provider and context factory (v1 pattern).
         await _backend.InitializeAsync(_backend.ServiceProvider, _backend.CreateDbContext, seed, clean)
             .ConfigureAwait(false);
+
+        // BUT BUILD THE CLIENT'S MODEL HERE, which is what `createContext` is used for (R172).
+        // EF's own providers have one context, so initializing the store validates the model and
+        // whatever that logs is logged before the base clears the log. This provider has two, and
+        // only the server's was ever created during initialization — so the client's model was
+        // built by the FIRST context a test created, inside the test, and its model-validation
+        // events landed in what the test then read.
+        //
+        // `Warn_when_save_optional_dependent_with_null_values_sensitive` is where that shows:
+        // it asserts a SINGLE warning, and the client's own `SensitiveDataLoggingEnabledWarning`
+        // arrived beside the one the test caused. Touching `Model` is the whole of the fix — it is
+        // what forces the build and the validation, and the context is disposed immediately.
+        if (createContext is not null)
+        {
+            using DbContext client = createContext();
+            _ = client.Model;
+        }
+
         return this;
     }
 

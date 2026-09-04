@@ -83,6 +83,7 @@ namespace InfoCarrier.Core;
 [JsonSerializable(typeof(SaveChangesResult))]
 [JsonSerializable(typeof(ChangeEntry))]
 [JsonSerializable(typeof(GeneratedValues))]
+[JsonSerializable(typeof(ServerLogEvent))]
 [JsonSerializable(typeof(SavepointRequest))]
 [JsonSerializable(typeof(TransactionResult))]
 [JsonSerializable(typeof(QueryTrackingBehavior))]

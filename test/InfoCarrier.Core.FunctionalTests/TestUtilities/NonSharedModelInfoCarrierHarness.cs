@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -44,10 +44,15 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     Whether both sides grant raw SQL execution (#60). Same opt-in as a shared fixture's, threaded
 ///     through <see cref="Prepare" /> because this harness builds its properties per test.
 /// </param>
+/// <param name="serverLogForwarding">
+///     Whether the server sends the log events it raises back to the client (R172). Same opt-in as
+///     a shared fixture's, and threaded the same way.
+/// </param>
 public sealed class NonSharedModelInfoCarrierHarness(
     InfoCarrierTier backend,
     bool relationalClientStore = false,
-    bool arbitrarySqlExecution = false)
+    bool arbitrarySqlExecution = false,
+    bool serverLogForwarding = false)
 {
     private SharedTestStoreProperties _pending;
     private ITestStoreFactory? _testStoreFactory;
@@ -86,6 +91,7 @@ public sealed class NonSharedModelInfoCarrierHarness(
             CopyDbContextParameters = CopyContextState,
 
             ArbitrarySqlExecution = arbitrarySqlExecution,
+            ServerLogForwarding = serverLogForwarding,
         };
 
     /// <summary>

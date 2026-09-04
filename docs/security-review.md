@@ -410,6 +410,44 @@ it must derive from `Exception`, and it is constructed only through an exception
 supplies the query results themselves. Recorded so the asymmetry is a decision rather than an
 oversight.
 
+### 7a. Amendment 2026-09-04 — the server's log may now travel with the response (R172)
+
+`IInfoCarrierServerLogForwarding` lets a server send the log events it raised while executing a
+request back with the result, and `ServerLogReplay` re-raises them on the client's own logger. This
+is the response direction, so section 7's asymmetry applies: a client already trusts this server for
+the query results. **The new question is the opposite one — what the server discloses to a client
+it may not trust**, which is why the feature is off by default and is a registration rather than an
+option a client can ask for.
+
+**What crosses is a formatted string, and only a string.** A log event's `state` is an arbitrary
+object graph of the *server's* types, which is exactly what ADR-008 constraint 2 keeps off the wire;
+`ServerLogEvent` carries what the server's own formatter produced, plus a level, an event id and a
+category. Nothing on the client resolves a type from any of it, so this adds no new deserialization
+surface — it is stage 6's problem only if a string is, and it is not.
+
+**Three bounds, and each is the server's own choice.**
+
+1. **The grant.** Absent by default. `AddInfoCarrierServerLogForwarding()` is a server-side
+   registration, as `AddInfoCarrierArbitrarySqlExecution()` is, and there is deliberately no client
+   option that turns it on. A client asking for disclosure would be a hole.
+2. **The level.** `Warning` by default, and the default is load-bearing rather than a taste: EF
+   logs **every executed command at `Information`**, so a server that lowers the level is shipping
+   its SQL to every client on every request. That is schema disclosure, and the level is where a
+   deployment decides it.
+3. **Sensitive data is a second grant, and it is all-or-nothing.**
+   `EnableSensitiveDataLogging` is not a per-event flag — it changes what EF's message templates
+   say across the board, so an event raised under it may carry key values, parameter values or
+   property values in its text and **nothing distinguishes the ones that do**. A server whose
+   context has it on therefore forwards everything or nothing, and only
+   `AddInfoCarrierSensitiveServerLogForwarding()` chooses the first.
+
+**Model and context categories never cross**, and that is a correctness rule rather than a security
+one, recorded here because it also narrows what is sent. Both halves of this provider build a model
+from the same `OnModelCreating` and each validates its own, so the server's
+`OptionalDependentWithoutIdentifyingPropertyWarning` is the same finding the client already has,
+attributed to the wrong place. What is left after the exclusion is what the *store* did, which is
+the half a client genuinely cannot see and the whole reason the feature exists.
+
 ## 8. Verdict
 
 **The deserialization path meets ADR-008 constraint 2 as written**, and the three allowlists it

@@ -5354,6 +5354,44 @@ re-parents of families already running, because R25–R30 showed that is where t
       because the query printed beside it still carries the caller's `od`. Declined on that ground
       rather than on cost.
 
+- [x] **R172. A server may send the log it raises back with the result, and it is off by default.**
+      `src/` and `test/`, plus a public signature, so **all four gates**: `eng/measure.sh`,
+      `eng/trim-ratchet.sh` (OK at 90 <= 90), `dotnet pack` (clean), and the `CI=true` Release
+      build. **`failed` FALLS 41 -> 39**, FIXED 2, BROKEN none. **The last open class in the tail
+      is closed.**
+
+      The owner's answer to the second open question (2026-09-04) was that sensitive logging over
+      the wire must be opt-in and non-sensitive opt-in behind a different flag. That is the shape
+      shipped: `IInfoCarrierServerLogForwarding` carries a minimum level, default `Warning`, and
+      `IInfoCarrierSensitiveServerLogForwarding` is the second grant. Both are server-side
+      registrations and **no client option turns either on**, which is the same division
+      `IInfoCarrierArbitrarySqlExecution` records.
+
+      **The default level is load-bearing.** EF logs every executed command at `Information`, so a
+      server that lowers the level ships its SQL to every client on every request.
+      `docs/security-review.md` **section 7a** is the full reading.
+
+      **The sensitive gate is all-or-nothing on purpose.** `EnableSensitiveDataLogging` changes
+      what EF's message templates say across the board, so nothing distinguishes the events that
+      carry values from the ones that do not.
+
+      **Feasibility was measured before any of it was built.** A probe on the server's own logger
+      showed it raising `OptionalDependentWithAllNullPropertiesWarning`, and raising the
+      *sensitive* form already, so the harness needed no change for that half.
+
+      **One harness fix that is not about logging at all, and it is the interesting one.**
+      `InfoCarrierTestStore.InitializeAsync` ignored the fixture's `createContext`, so the
+      client's model was built by the first context a *test* created — inside the test — and its
+      model-validation events landed in what the test then read. EF's own providers have one
+      context, so their model is validated during initialization, before the base clears the log.
+      Touching `Model` on one throwaway client context during initialization is the whole fix.
+
+      **Two logger categories never cross**, and that is correctness rather than policy: both
+      halves build a model from the same `OnModelCreating` and each validates its own, so the
+      server's model warnings are the client's own findings attributed to the wrong place. Found by
+      measurement — with them included the `_sensitive` test saw three warnings where it asserts
+      one.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

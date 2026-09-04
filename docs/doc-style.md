@@ -32,7 +32,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
 | The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy` |
-| Three pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name |
+| Four pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name; `configuration/server`, raised 2026-09-04 when server-side log forwarding shipped and the page had to say what crosses and why sensitive logging is a second grant |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 
 The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own

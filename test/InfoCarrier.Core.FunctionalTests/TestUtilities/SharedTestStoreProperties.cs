@@ -116,6 +116,27 @@ public struct SharedTestStoreProperties
     public bool ArbitrarySqlExecution;
 
     /// <summary>
+    ///     Whether this fixture's server sends the log events it raises back to the client
+    ///     (<c>IInfoCarrierServerLogForwarding</c>, R172).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Per fixture and default off, like the raw-SQL grant above, and for a sharper
+    ///         reason.</b> A forwarded event lands in the client's own logger, which is the same
+    ///         <c>TestSqlLoggerFactory</c> a spec base reads with <c>Assert.Single</c> and
+    ///         <c>Assert.Empty</c>. Granting it suite-wide would put the server's warnings into
+    ///         every such assertion at once.
+    ///     </para>
+    ///     <para>
+    ///         The fixtures that set it get the <b>sensitive</b> grant, because the base that
+    ///         needs forwarding at all — <c>TableSplittingTestBase</c> — has one test that asserts
+    ///         the sensitive wording and one that asserts the plain one, and which it gets is the
+    ///         context's own <c>EnableSensitiveDataLogging</c> rather than the grant's.
+    ///     </para>
+    /// </remarks>
+    public bool ServerLogForwarding;
+
+    /// <summary>
     ///     CLR types this fixture's queries name that its model does not imply (ADR-008
     ///     constraint 2).
     /// </summary>

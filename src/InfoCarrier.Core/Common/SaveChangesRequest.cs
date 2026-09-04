@@ -150,4 +150,15 @@ public sealed record SaveChangesResult
     ///     Store-generated values, keyed back to entries by correlation id.
     /// </summary>
     public required IReadOnlyList<GeneratedValues> GeneratedValues { get; init; }
+
+    /// <summary>
+    ///     What the server logged while saving, or <see langword="null" /> when the server does
+    ///     not forward its log (the default) or logged nothing.
+    /// </summary>
+    /// <remarks>
+    ///     This is the half a caller most often wants: EF raises its write-time warnings from the
+    ///     update pipeline, which runs on the server. See
+    ///     <see cref="IInfoCarrierServerLogForwarding" /> for the grant and what it discloses.
+    /// </remarks>
+    public IReadOnlyList<ServerLogEvent>? ServerLog { get; init; }
 }

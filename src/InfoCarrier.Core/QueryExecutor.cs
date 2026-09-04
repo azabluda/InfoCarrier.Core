@@ -153,6 +153,11 @@ internal sealed class QueryExecutor<TElement>
                 .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.Context, _queryContext.CancellationToken)
                 .GetAwaiter()
                 .GetResult();
+
+            // Anything the server logged while running this query, raised on the client's own
+            // logger under the server's category and event id. Empty unless the server has
+            // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
+            ServerLogReplay.Replay(result.ServerLog, _queryContext.Context);
             results.Add(Materialize(serverQuery, result));
         }
 
@@ -244,6 +249,10 @@ internal sealed class QueryExecutor<TElement>
                 throw;
             }
 
+            // Anything the server logged while running this query, raised on the client's own
+            // logger under the server's category and event id. Empty unless the server has
+            // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
+            ServerLogReplay.Replay(result.ServerLog, _queryContext.Context);
             results.Add(Materialize(serverQuery, result));
         }
 
