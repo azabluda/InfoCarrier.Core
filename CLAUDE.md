@@ -105,7 +105,6 @@ estimate a count, and never derive one figure from the others.
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
-| `eng/usage-window.sh [threshold]` | How much of the current Claude Code usage window is gone, and when it resets. There is no `claude usage` subcommand, so it goes through `claude -p "/usage"`. **It costs usage to run**, because that starts a session of its own, so call it at boundaries rather than on a timer. Exit 1 at or above the threshold, which defaults to 80. **`MSYS_NO_PATHCONV=1` inside it is load-bearing**: Git Bash rewrites a leading `/` into a Windows path, and `/usage` then arrives as an ordinary prompt that starts a full agent session. |
 | `eng/make-icons.py` | Regenerates every shipped icon — the 128px NuGet one and the site's favicon, apple-touch and manifest icons — from `docs/assets/icon-source.png`. Run it when the artwork changes; none of its outputs is ever edited by hand. |
 
 ## Measuring and gating
