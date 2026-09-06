@@ -5,14 +5,15 @@ SQL Server, SQLite and InMemory providers run. This page lists every scenario in
 does not behave the way a normal EF Core provider behaves, so you can judge whether any of them
 affects your application.
 
-It is complete for what the suite covers: if the suite has a scenario and it is not on this page,
-it passes.
+It is complete for what a caller can observe as a limitation. The suite's other failures ask the
+client for something only a database has, assert a refusal this provider does not need to make, or
+are EF Core defects that every provider hits and this one reports with a different exception type.
 
 ```
-Total tests: 22662, Passed: 22476, Failed: 9, Skipped: 177
+Total tests: 29513, Passed: 29236, Failed: 39, Skipped: 238
 ```
 
-Measured against `10.0.0`. The 177 skips are EF Core's own, tests EF itself skips for the
+Measured against `10.0.0`. The 238 skips are EF Core's own, tests EF itself skips for the
 store behind them, not suppressions added here.
 
 ## Not supported
@@ -86,8 +87,7 @@ when porting code or tests.
 ### Exception message text for an untranslatable query
 
 When a query cannot be translated, this provider throws `InvalidOperationException`, exactly as EF
-Core does. The message text may differ in two cases: a method call inside an `ExecuteUpdate`
-property selector, and a cast to a type nothing in your model implements.
+Core does. The message text may differ. Two examples:
 
 ```csharp
 // (a) a method call where ExecuteUpdate expects a property
@@ -105,9 +105,9 @@ EF Core provider.
 
 ### Queries this provider answers that other providers do not
 
-Four other scenarios in EF's suite assert that a provider either rejects the query or returns the
-wrong rows. This provider answers all four correctly. A test suite you port will expect an
-exception, and LINQ that relies on this will not run unchanged elsewhere.
+EF's suite has other scenarios that assert a provider either rejects the query or returns the wrong
+rows. This provider answers them correctly. A test suite you port will expect an exception, and
+LINQ that relies on this will not run unchanged elsewhere. Four of them:
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -160,6 +160,10 @@ var high = 9;
 context.Entities.Where(e => e.Ints == new[] { low, high }).ToList();
 // EF Core providers: throws.   This provider: returns the matching rows.
 ```
+
+A compiled query that puts a collection of parameters in a subquery behaves the same way. EF Core
+has no type mapping to give it and refuses; this provider builds no SQL, so the question never
+arises.
 
 ## Consequences of the client having no database
 

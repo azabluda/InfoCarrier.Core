@@ -357,7 +357,7 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`** (2026-08-18, `n8-minver`).
+**`Total tests: 29513, Passed: 29236, Failed: 39, Skipped: 238`** (2026-09-04, `r172`).
 **All four figures come out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
@@ -369,8 +369,10 @@ because `comm` cannot read a file with comments in it. A commit that lowers the 
 `artifacts/test-results/failures.txt` over the names file, and the ratchet says so in a `::notice::`
 when it sees the count fall.
 
-**All 9 failures are classified and not one is of unknown standing.** They sit in six classes,
-three holding two and three holding one. The tables are in
+**All 39 failures are classified and not one is of unknown standing**, and every class is blocked,
+priced or upstream — there is no open one left. `test/known-failures.txt` carries a dated reading
+per class and is the current answer; the paragraph below and the tables named in it are the history.
+The tables are in
 `docs/plans/v10/archive/implementation-plan-m9-phase-j.md` — A54, A59, A61–A65, B3a–B16 and
 C1–C96 — whose "The residual 13, examined properly" re-derives the whole tail **as it stood at
 thirteen**; J20 and J21 lowered it after that, and `test/known-failures.txt` carries the dated
@@ -382,8 +384,10 @@ assertion no correct answer can satisfy.
 
 **The consumer-facing statement of what is missing is
 [`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep
-true. It names one unsupported scenario, one query to treat with caution, two message-text
-differences, and two queries this provider *answers* that other EF providers reject. It is not the
+true. It names one unsupported scenario, message-text differences on a refused
+query, and queries this provider *answers* that other EF providers reject. **It no longer claims a
+count of any of them**: a count was wrong twice, once because the suite grew under it and once
+because the honest number included a family the owner had decided not to name. It is not the
 only consumer-facing document any more: the whole set (README, `src/*/PACKAGE.md`, `website/`, the
 GitHub release bodies) is governed by **[`docs/doc-style.md`](docs/doc-style.md)**, which is the
 file to read before editing any of them.
