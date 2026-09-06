@@ -5482,6 +5482,39 @@ re-parents of families already running, because R25–R30 showed that is where t
       past their message. The headline — 22463 of 22667 — does not depend on that.
       `artifacts/test-results/v1001-tests-on-todays-src.trx` is the run.
 
+- [x] **R176. The split event names which operators stayed on the client.** `src/` change, so
+      `eng/measure.sh` **and** `eng/trim-ratchet.sh`; public members were added, so
+      `dotnet pack` as well. **`failed` UNCHANGED at 39, `total` 29513 -> 29514**, the rise being the one test this commit adds; failing names byte-identical and the reasons diff empty. FIXED none, BROKEN none. `Total tests: 29514, Passed: 29237, Failed: 39, Skipped: 238`. Trim `ours` 90 <= 90, pack clean.
+
+      **The event said that a split happened and not whether it cost anything.** Those are
+      different facts. A residual that only reshapes rows carried exactly what the caller asked
+      for. One that drops rows means the server sent rows this client threw away, and the answer
+      is correct either way, so the wire is the only symptom. The message now ends with one of two
+      sentences: the operators it kept that remove rows, named and outermost first, or a statement
+      that it kept none.
+
+      **The detector is the one an audit already validated.** R173 walked the residual for the
+      twenty-three `Queryable`/`Enumerable` operators that remove rows over a full suite run and
+      found 301 splits out of 29513 tests. `RowRemovingOperators` is that walk, kept.
+
+      **Walked inside the log guards and never outside them.** The split is decided per execution
+      rather than per compiled query, which the existing site already says in a comment, so the
+      residual crosses as an `Expression` and the walk happens once, after `ShouldLog` and
+      `NeedsEventData` have both been asked and only if one of them said yes.
+
+      **An overload rather than a parameter, and the same event id.** Widening the published
+      `QuerySplit(IDiagnosticsLogger<Query>, int)` would be source-compatible and binary breaking,
+      which is the `CP0002` trap this repository has paid for once. The id is what a caller passes
+      to `ConfigureWarnings` and `LogTo`, and it is unchanged: this is the same event, said better.
+
+      New coverage in `InMemorySmokeTest`: `A_split_that_pages_on_the_client_names_what_stayed_behind`
+      pins the naming half, and the existing projection test now pins the other sentence too, so
+      neither branch can go quiet.
+
+      `website/docs/configuration/client.md` says what the event tells a reader and
+      `api-surface.md` names `InfoCarrierEventId`, which no user-facing page did before. That page
+      moves to the 700 tier; `docs/doc-style.md` and `eng/doc-words.py` move together.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

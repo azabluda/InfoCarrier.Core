@@ -31,7 +31,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
 | A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy`; `guide/querying`, raised 2026-09-04 when the residual audit measured that paging above a rebuilt projection runs on the client |
+| The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy`; `guide/querying`, raised 2026-09-04 when the residual audit measured that paging above a rebuilt projection runs on the client; `configuration/client`, raised 2026-09-07 when the split log event began naming which operators stayed on the client |
 | Four pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name; `configuration/server`, raised 2026-09-04 when server-side log forwarding shipped and the page had to say what crosses and why sensitive logging is a second grant |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 

@@ -60,6 +60,12 @@ unchanged.
 Anything else you catch is EF Core's own: `DbUpdateException`, `DbUpdateConcurrencyException`,
 `InvalidOperationException`. See [Handling errors](guide/errors.md).
 
+## Diagnostics
+
+| Type | Notes |
+|---|---|
+| `InfoCarrierEventId` | Holds `QuerySplit`, the one event this provider raises. Pass it to `LogTo` or `ConfigureWarnings` like any EF Core event id. See [Logging](configuration/client.md#logging). |
+
 ## Wire contracts
 
 In `InfoCarrier.Core.Common`. You meet these only if you write a transport:

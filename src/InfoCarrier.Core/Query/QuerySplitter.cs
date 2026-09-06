@@ -274,7 +274,10 @@ public sealed class QuerySplitter
         // shipped part yields, and this client discards whatever the residual drops, so the bytes
         // that crossed can exceed the rows the caller receives. The answer is correct either way,
         // which is why nothing else says anything.
-        _queryLogger?.QuerySplit(augmented.Count);
+        // The residual goes with the count, so the event can say whether the split cost anything:
+        // a residual that only reshapes rows carried what the caller asked for, and one that
+        // drops them means the server sent more. It is walked inside the log guards, never here.
+        _queryLogger?.QuerySplit(augmented.Count, residualBody);
 
         return new SplitQuery(
             [.. augmented.Select(ToServerQuery)],

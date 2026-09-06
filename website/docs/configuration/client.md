@@ -103,6 +103,12 @@ optionsBuilder
     .LogTo(Console.WriteLine, LogLevel.Information);
 ```
 
+At `Information` this provider adds one event of its own, `InfoCarrierEventId.QuerySplit`, raised
+when part of a query stays on the client. It names how many queries the server ran and which
+operators stayed here. A `Where`, a `Skip` or a `Take` among them means the server sent more rows
+than your query asked for, because they were rebuilt with the projection above them. See
+[Paging](../guide/querying.md#paging).
+
 To see the payloads themselves, decorate the transport. That is what the sample's wire inspector is.
 See [Custom transports](transports.md).
 

@@ -77,6 +77,11 @@ BUDGET = {
     # had. Read for padding first, as doc-style.md requires; the page is already dense and none
     # was found.
     "website/docs/guide/querying.md": 700,
+
+    # Added to the 700 tier 2026-09-07, when the split log event began naming which operators
+    # stayed on the client. The page's logging section could say how to turn logging on and not
+    # what the one provider-specific event tells you, which is the sentence a reader acts on.
+    "website/docs/configuration/client.md": 700,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

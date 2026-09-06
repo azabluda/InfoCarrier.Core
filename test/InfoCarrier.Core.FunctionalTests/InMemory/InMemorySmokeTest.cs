@@ -176,6 +176,50 @@ public class InMemorySmokeTest
         }
 
         Assert.Contains(log, line => line.Contains("Part of the query cannot be sent to the server"));
+
+        // The `Where` ships, so what is left here only reshapes rows. The event says so, and the
+        // test below is the other branch of the same sentence.
+        Assert.Contains(log, line => line.Contains("reshapes rows"));
+    }
+
+    [ConditionalFact]
+    public async Task A_split_that_pages_on_the_client_names_what_stayed_behind()
+    {
+        // THE SPLIT EVENT SAYS WHETHER THE SPLIT COST ANYTHING, not only that one happened.
+        // `Take` above a projection the server cannot run is rebuilt with the projection, so the
+        // server sends every matching row and this client keeps one page. The answer is right and
+        // nothing else reports the cost, which is what the sentence is for.
+        //
+        // The test above already covers the other half of the same event: a residual that only
+        // reshapes rows says so instead, and a query the server runs whole says nothing at all.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using (SmokeContext seed = CreateClient(store))
+        {
+            seed.Blogs.AddRange(
+                new Blog { Id = 1, Title = "alpha" },
+                new Blog { Id = 2, Title = "be" },
+                new Blog { Id = 3, Title = "gamma" });
+            await seed.SaveChangesAsync();
+        }
+
+        var log = new List<string>();
+
+        await using (var context = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>()
+                .UseInfoCarrier(store)
+                .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
+                .Options))
+        {
+            var page = await context.Blogs
+                .Select(b => new { b.Id, Label = ClientOnly.Describe(b.Title) })
+                .Take(2)
+                .ToListAsync();
+
+            Assert.Equal(2, page.Count);
+        }
+
+        Assert.Contains(log, line => line.Contains("remove rows") && line.Contains("Take"));
     }
 
     [ConditionalFact]

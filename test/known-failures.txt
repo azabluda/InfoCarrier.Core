@@ -3810,5 +3810,15 @@
 # `Associate_with_parameter_null`. The guardrail against overriding a spec test exists so that
 # this is not decided quietly, so it is recorded and not taken.
 
+# 2026-09-07 (R176) -- `failed` UNCHANGED at 39, `total` RISES 29513 -> 29514, and the rise is one
+# test this commit adds. Failing NAMES byte-identical and the reasons diff EMPTY. FIXED none,
+# BROKEN none. `Total tests: 29514, Passed: 29237, Failed: 39, Skipped: 238`.
+#
+# THE SPLIT LOG EVENT NOW NAMES WHICH OPERATORS STAYED ON THE CLIENT. The event said that a split
+# happened and not whether it cost anything, which are different facts: a residual that only
+# reshapes rows carried what the caller asked for, and one that drops rows means the server sent
+# rows this client threw away. The detector is R173's audit walk, kept rather than rebuilt.
+# `InMemorySmokeTest.A_split_that_pages_on_the_client_names_what_stayed_behind` is the added test.
+
 failed=39
-total=29513
+total=29514
