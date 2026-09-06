@@ -31,8 +31,8 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
 | A site page | 620 | The default |
 | A site page that points | 400 | `api-surface.md` only |
-| The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy` |
-| Three pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name |
+| The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy`; `guide/querying`, raised 2026-09-04 when the residual audit measured that paging above a rebuilt projection runs on the client |
+| Four pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name; `configuration/server`, raised 2026-09-04 when server-side log forwarding shipped and the page had to say what crosses and why sensitive logging is a second grant |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 
 The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own
@@ -54,6 +54,16 @@ page to defend a number nobody chose on evidence is optimising the ruler.
 The order is the part that survives, and it is not negotiable: **cut the padding a reader named,
 then move the number. Never the reverse.** A budget yields to a missing fact; it never yields to a
 paragraph that could have been shorter.
+
+**RELAXED UNTIL THE RELEASE PASS (owner's decision, 2026-09-04).** Move a budget when a page needs
+the room, without arguing for it first. The whole set gets one thorough read before release, and
+that read is where the numbers are set on evidence; defending them one page at a time until then
+buys nothing and costs the fact the page was trying to carry.
+
+**What this does not relax.** `eng/doc-words.py` still gates, and this table and the script still
+have to agree — a page over its own number is still a red build, so the number moves in the same
+commit as the words. Nor is it licence to pad: the rule above still says a budget yields to a
+missing *fact*. What is suspended is the ceremony, not the standard.
 
 ## Rules
 

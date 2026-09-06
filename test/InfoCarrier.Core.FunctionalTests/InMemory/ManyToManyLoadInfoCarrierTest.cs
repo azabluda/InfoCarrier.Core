@@ -16,17 +16,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 public class ManyToManyLoadInfoCarrierTest(ManyToManyLoadInfoCarrierTest.InfoCarrierFixture fixture)
     : ManyToManyLoadTestBase<ManyToManyLoadInfoCarrierTest.InfoCarrierFixture>(fixture)
 {
-    public class InfoCarrierFixture : ManyToManyLoadFixtureBase, ITestSqlLoggerFactory
+    public class InfoCarrierFixture : ManyToManyLoadFixtureBase
     {
-        /// <summary>
-        ///     The compliance gate's second assertion (R54). The property is real —
-        ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
-        ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
-        ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
-        ///     server's statements can actually be read.
-        /// </summary>
-        public TestSqlLoggerFactory TestSqlLoggerFactory
-            => (TestSqlLoggerFactory)ListLoggerFactory;
+        // NO `TestSqlLoggerFactory`, and losing it is what the project split bought. It lives in
+        // `EFCore.Relational.Specification.Tests`, which Tier A does not reference. It was here for
+        // `RelationalComplianceTestBase`'s second assertion (R54), and Tier A is now checked by the
+        // plain `ComplianceTestBase`, which does not ask. What it returned was the CLIENT's log
+        // anyway, and this client has no database and emits no SQL.
 
         private ITestStoreFactory? _testStoreFactory;
 

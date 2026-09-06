@@ -328,6 +328,7 @@ namespace TestNamespace
                 relationshipCount: 3,
                 storeGeneratedCount: 2));
             runtimeEntityType.AddAnnotation("DiscriminatorMappingComplete", false);
+            runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
 
             Customize(runtimeEntityType);
         }

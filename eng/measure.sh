@@ -12,6 +12,16 @@
 # So this prints the count *and* keeps the failing test names, because the count alone cannot
 # tell "fixed 4, broke 4" from "changed nothing".
 #
+# SEVERAL PROJECTS, ONE MEASUREMENT. `projects` below is the list; the counters are summed and the
+# failing names are merged into one sorted snapshot, exactly as eng/ratchet.sh aggregates the TRX
+# files in CI. One snapshot and not one per project, for the reason ratchet.sh states at length:
+# with a snapshot per project, a test that MOVES between projects reads as a fix in one and a break
+# in the other.
+#
+# THE LIST HOLDS ONE PROJECT TODAY, and it held two between R122 and R136, one per backing store.
+# The plural shape stays because the reason for it has not gone away: the next backing store adds a
+# project here, and the snapshot must still be one list.
+#
 # Usage:
 #   eng/measure.sh <label>              run, snapshot as <label>, print counts
 #   eng/measure.sh <label> <baseline>   also print what <label> fixed and broke vs <baseline>
@@ -31,33 +41,72 @@ log="$out/$label.log"
 snapshot="$out/$label.txt"
 reasons="$out/$label.reasons.txt"
 
+# THE PROJECTS THAT MAKE UP THE SPEC SUITE, and nothing else. Each is measured on its own and the
+# figures are added; a project missing from this list is silently missing from every measurement
+# and from the baseline it is compared with, so add one here in the same commit that creates it.
+#
+# InfoCarrier.Core.TransportTests is deliberately ABSENT. It is not a spec project: it holds this
+# repository's own HTTP-transport tests, it is expected to be green, and folding it in would
+# inflate `total` past what test/known-failures.txt was written against. CLAUDE.md says the same
+# thing about pointing a hand run at the .slnx.
+projects=(
+    "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj"
+)
+
 dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.log" 2>&1 || {
     echo "measure: build failed — see $out/$label.build.log" >&2
     grep -E " error " "$out/$label.build.log" | head -5 >&2
     exit 1
 }
 
+# THE PROJECTS, one `dotnet test` each, never the solution. The solution also holds
+# InfoCarrier.Core.TransportTests, which is not part of this number; and the summary block is
+# parsed per run, so one invocation covering several projects would report only the last one.
+#
 # `|| true`: a red suite is the normal state of this repo (ADR-004), so a non-zero exit from
 # `dotnet test` is data, not an error. A run that never produced a summary line *is* an error,
-# and is caught below.
-# The **project**, not the solution. This script measures the inherited spec suite, which is
-# one project; the summary block is parsed with `tail -n 1`, so a second test project in the
-# solution would silently make every measurement report the wrong run. Phase 1 of M8 adds
-# exactly such a project (InfoCarrier.Core.TransportTests), so this is scoped first and proved
-# neutral before that project exists. eng/ratchet.sh needs no equivalent change: CI has always
-# run `dotnet test $TEST_PROJECT`.
-dotnet test "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj" \
-    --no-build -v n --nologo > "$log" 2>&1 || true
-
+# and is caught below, per project — a crashed host in one project must not be hidden by a clean
+# summary from another.
+#
 # `-v n` is required for the reasons below — the per-failure `Error Message:` detail is simply
 # absent at `-v q`. It also changes the summary from a `Failed! - Failed: N, Total: T` one-liner
 # to a `Total tests: T` block, so that is what is parsed.
-summary=$(grep -E "^Total tests:" "$log" | tail -n 1 || true)
-if [ -z "$summary" ]; then
-    echo "measure: the run produced no summary line — the test host probably crashed." >&2
-    tail -5 "$log" >&2
-    exit 1
-fi
+failed=0
+total=0
+: > "$log"
+
+for project in "${projects[@]}"; do
+    name=$(basename "$project" .csproj)
+    projectLog="$out/$label.$name.log"
+
+    dotnet test "$project" --no-build -v n --nologo > "$projectLog" 2>&1 || true
+
+    summary=$(grep -E "^Total tests:" "$projectLog" | tail -n 1 || true)
+    if [ -z "$summary" ]; then
+        echo "measure: $name produced no summary line — the test host probably crashed." >&2
+        tail -5 "$projectLog" >&2
+        exit 1
+    fi
+
+    # Read out of THIS run's own summary block, then added to the running figure. Adding the same
+    # figure across runs is the only arithmetic allowed on these counts; deriving one of them from
+    # the others is what CLAUDE.md forbids and what has cost three commits here.
+    projectFailed=$(sed -n 's/^ *Failed: *\([0-9]*\).*/\1/p' "$projectLog" | tail -n 1)
+    projectTotal=$(sed -n 's/^Total tests: *\([0-9]*\).*/\1/p' <<< "$summary")
+
+    # A fully green project prints no `Failed:` line at all, which is 0 and not a parse failure.
+    failed=$(( failed + ${projectFailed:-0} ))
+    total=$(( total + projectTotal ))
+
+    if [ "${#projects[@]}" -gt 1 ]; then
+        echo "  $name: failing ${projectFailed:-0} of $projectTotal"
+    fi
+
+    # One combined log, because the name and reason extraction below are line-based greps and a
+    # concatenation of the per-project logs is exactly what they want. The per-project logs stay
+    # on disk beside it, which is where to look when one project is the odd one out.
+    cat "$projectLog" >> "$log"
+done
 
 sed -n 's/^\[xUnit\.net [^]]*\] *\(.*\) \[FAIL\]$/\1/p' "$log" | sort -u > "$snapshot"
 
@@ -71,10 +120,6 @@ sed -n 's/^\[xUnit\.net [^]]*\] *\(.*\) \[FAIL\]$/\1/p' "$log" | sort -u > "$sna
 { grep -A 3 "Error Message:" "$log" || true; } |
     { grep -E "^[[:space:]]+(System|Microsoft|Assert|InfoCarrier|Xunit)" || true; } |
     sed 's/^ *//' | cut -c1-120 | sort | uniq -c | sort -rn > "$reasons"
-
-failed=$(sed -n 's/^ *Failed: *\([0-9]*\).*/\1/p' "$log" | tail -n 1)
-total=$(sed -n 's/^Total tests: *\([0-9]*\).*/\1/p' <<< "$summary")
-failed=${failed:-0}
 
 # The total is guarded for the same reason eng/ratchet.sh guards it: a crashed host reports
 # fewer failures because fewer tests ran, which looks exactly like progress.

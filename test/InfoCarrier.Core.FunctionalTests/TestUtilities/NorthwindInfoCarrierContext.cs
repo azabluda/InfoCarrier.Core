@@ -25,7 +25,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         gets them from the fixture's shared <c>OnModelCreating</c>) and nothing more.
 ///     </para>
 /// </remarks>
-public class NorthwindInfoCarrierServerContext(DbContextOptions options) : NorthwindContext(options)
+public class NorthwindInfoCarrierContext(DbContextOptions options) : NorthwindContext(options)
 {
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

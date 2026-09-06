@@ -81,7 +81,7 @@ public class ProxyGraphUpdatesInfoCarrierTest
 
             protected override ITestStoreFactory TestStoreFactory
                 => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                    InfoCarrierTestStoreFactory.Sqlite,
+                    SqliteInfoCarrierTier.Instance,
                     ContextType,
                     (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                     onAddOptions: AddProxyOptions,

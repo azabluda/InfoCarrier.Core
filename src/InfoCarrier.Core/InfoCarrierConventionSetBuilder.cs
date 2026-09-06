@@ -34,10 +34,15 @@ public class InfoCarrierConventionSetBuilder(
         // the store, the client has to reach it too.
         conventionSet.ModelFinalizingConventions.Add(new InfoCarrierValueGenerationConvention());
 
-        // And the same again for inheritance. Core EF gives every hierarchy a discriminator, and
-        // the convention that takes it back for TPT and TPC is relational. Without this the client
-        // keeps a discriminator the server's model has dropped.
-        conventionSet.ModelFinalizingConventions.Add(new InfoCarrierHierarchyMappingConvention());
+        // INHERITANCE IS THE RELATIONAL PACKAGE'S NOW (#97 level 2, R128). Core EF gives every
+        // hierarchy a discriminator and the convention that takes it back for TPT and TPC is
+        // relational, so this class used to carry a narrower hand-written copy of EF's. It is gone:
+        // `InfoCarrierRelationalConventionSetBuilder` extends this builder and adds EF's own.
+        //
+        // A client whose backing store is relational must therefore register
+        // `AddInfoCarrierRelationalClient()`, which is what level 2 means by a process-wide
+        // statement. A client whose store is NOT relational needs nothing here: its server has no
+        // relational conventions either, so both models keep the discriminator and agree.
 
         // And once more for query filters. Core EF's rewriter turns the `DbSet` a `FromSql*` call
         // reads into an `IQueryable`, which is not what that call's first parameter is, so a filter

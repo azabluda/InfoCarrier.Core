@@ -17,17 +17,19 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
 ///         ours by reason before being borrowed (A63) — see the comment on each.
 ///     </para>
 ///     <para>
-///         <b>The relational base, since R50 — and it needs no SpatiaLite and no store change.</b>
-///         <c>SpatialQueryRelationalTestBase</c> is fourteen lines and adds no tests: its whole
-///         contribution is a <c>RelationalQueryAsserter</c>, which differs from the core one by
-///         calling <c>TestSqlLoggerFactory.OutputSql()</c> when an assertion fails. So the cost
-///         is the <see cref="ITestSqlLoggerFactory" /> member below, the count is unchanged at
-///         <c>Passed: 168, Failed: 0, Total: 168</c>, and this base was priced as needing a
-///         native library on its name rather than its body.
+///         <b>The CORE base, and the relational one was dropped when the test projects split.</b>
+///         R50 had adopted <c>SpatialQueryRelationalTestBase</c> here, and reading what that base
+///         actually contains is what decided it: fourteen lines, <b>no tests of its own</b>, and a
+///         <c>RelationalQueryAsserter</c> whose only difference from the core one is calling
+///         <c>TestSqlLoggerFactory.OutputSql()</c> when an assertion fails. On a client with no
+///         database there is no SQL to output. So the relational base bought nothing here and cost
+///         Tier A a reference to the relational specification assembly, which the split forbids —
+///         a relational client over an InMemory backend is the disagreement the seam exists to
+///         prevent. The test count is unchanged, because the base declared no tests to lose.
 ///     </para>
 /// </remarks>
 public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrierFixture fixture)
-    : SpatialQueryRelationalTestBase<SpatialQueryInfoCarrierTest.InfoCarrierFixture>(fixture)
+    : SpatialQueryTestBase<SpatialQueryInfoCarrierTest.InfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
     /// <remarks>
@@ -61,16 +63,18 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     public override Task GetGeometryN_with_null_argument(bool async)
         => Task.CompletedTask;
 
-    public class InfoCarrierFixture : SpatialQueryFixtureBase, ITestSqlLoggerFactory
+    public class InfoCarrierFixture : SpatialQueryFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
             => "SpatialQueryInfoCarrierTest";
 
-        /// <inheritdoc />
-        public TestSqlLoggerFactory TestSqlLoggerFactory
-            => (TestSqlLoggerFactory)ListLoggerFactory;
+        // NO `TestSqlLoggerFactory`, and losing it is what the project split bought. It lives in
+        // `EFCore.Relational.Specification.Tests`, which Tier A does not reference. It was here for
+        // `RelationalComplianceTestBase`'s second assertion (R54), and Tier A is now checked by the
+        // plain `ComplianceTestBase`, which does not ask. What it returned was the CLIENT's log
+        // anyway, and this client has no database and emits no SQL.
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(

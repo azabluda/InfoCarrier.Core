@@ -79,5 +79,56 @@
 # no reflection and costs no warning. It was rejected: it would stop this loop but not the store
 # command, so the database would keep working for a client that had gone. That is the cost the fix
 # exists to remove.
-ours=89
-total=855
+# 2026-09-02 (R120) — 89 -> 89, AND THE EXPECTATION THAT IT WOULD FALL WAS WRONG. Recorded because
+# the reasoning behind the expectation is the kind that repeats. #97 deleted
+# `RelationalQueryRootShape.cs`: 276 lines that resolved two EF relational expression types by full
+# name, read four properties off them and called `Activator.CreateInstance` twice, under **ten
+# `UnconditionalSuppressMessage` attributes**. Removing that much reflection was expected to lower
+# `ours`.
+#
+# It could not have. Those ten attributes are SUPPRESSIONS: each one already kept its diagnostic out
+# of this count, so the code contributed 0 to the 89 while it existed and contributes 0 now that it
+# is gone. **Deleting suppressed reflection cannot lower a count that never included it.** The two
+# measurements say so directly -- 89 with the file, 89 without it, and nothing else in the change
+# touches the trimmer.
+#
+# THE WIN IS REAL AND THIS FILE IS THE WRONG PLACE TO LOOK FOR IT. What went away is ten written
+# arguments that a trimmer could not check, replaced by two type names in
+# `InfoCarrier.Core.Relational` that a compiler does. That package contributes **no IL diagnostic of
+# its own** -- verified in the publish log, not assumed -- so `ours` is the same 89 spread over one
+# fewer file.
+#
+# THE RULE: a suppression is not a warning. Count the suppressions separately if the goal is to
+# remove unverifiable reflection, because this ratchet will report no progress on it.
+# 2026-09-03 (R132) -- `ours` UNCHANGED at 89, `total` RISES 855 -> 1134, and the rise is NOT this
+# product's. D3 is superseded (architecture.md section 6a, owner's decision): `InfoCarrier.Core` now
+# references `Microsoft.EntityFrameworkCore.Relational`, so the Blazor publish ships that assembly
+# and EF Core's own bucket goes 585 -> 864. Every one of those 279 diagnostics is EF's, in EF's
+# code, and none of them is this repository's to fix -- which is exactly why only `ours` is gated
+# and why this file has said so since it was written.
+#
+# THE PAYLOAD RISES ON PURPOSE AND IT WAS MEASURED FIRST: +0.62 MB brotli on this sample, 4.11 ->
+# 4.73 MB, with the raw total 13.48 -> 15.77 MB. The cost is unconditional -- a build that
+# references the assembly and calls nothing from it ships the identical figure, because the trimmer
+# keeps it almost whole at 2.079 MB against 2.09 MB on disk. The decision weighed that against 262
+# of 20,368 tests lost without it. **This file is not the place that decides it**; the supersession
+# in `architecture.md` is, and it lists the three conditions that would reverse it.
+# 2026-09-04 (R149) -- `ours` 89 -> 90, A DELIBERATE RISE OF ONE, and it is the same premise this
+# file has described since it was written. The split-query hint now travels beside the tree on
+# `QueryDataRequest.SplitQueryBehavior`, and `ServerQueryExecutor.ApplySplitQueryBehavior` re-applies
+# it to the rebuilt query. `AsSplitQuery<TEntity>` is generic and the element type is whatever the
+# caller's model named, so the call dispatches through `MakeGenericMethod`: IL2060, one unique
+# diagnostic, in a method that already sits beside two others of exactly this shape.
+#
+# TWO OF THE THREE WARNINGS IT FIRST COST WERE AVOIDABLE AND WERE AVOIDED, which is the part worth
+# keeping. The first version looked the methods up with `GetMethod(name)`, invisible to the trimmer
+# and worth two IL2xxx on its own; taking them from a delegate over the method instead is an
+# ordinary reference the trimmer sees and says nothing about. The second version added its own
+# `Type.GetInterfaces()` walker and cost an IL2070; reusing this class's existing `GetElementType`,
+# already counted here, costs nothing. So of three, two were avoidable and one is the premise.
+#
+# `total` is unchanged at 1134. It buys eight specification tests: SQLite refuses `APPLY`, and a
+# real split query never asks for it.
+
+ours=90
+total=1134

@@ -36,7 +36,7 @@ public class SharedTypeQueryInfoCarrierTest(NonSharedFixture fixture)
     // the store to `RelationalTestStore` in `Ad_hoc_query_for_shared_type_entity_type_works`, and
     // the query it then builds is a `FromSql` (#60).
     private readonly NonSharedModelInfoCarrierHarness _harness = new(
-        InfoCarrierTestStoreFactory.Sqlite,
+        SqliteInfoCarrierTier.Instance,
         relationalClientStore: true,
         arbitrarySqlExecution: true);
 

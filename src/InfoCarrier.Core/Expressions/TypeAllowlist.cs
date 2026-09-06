@@ -156,6 +156,47 @@ public sealed class TypeAllowlist
         => _allowed = allowed;
 
     /// <summary>
+    ///     A copy of this list that also admits <paramref name="extra" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>ONE LIST, SO ONE DECOMPOSITION.</b> The application's registered projection types
+    ///         (<c>AllowTypes</c> on the client, <c>AddInfoCarrierAllowedTypes</c> on the server)
+    ///         reach the request path through <see cref="ForModel" />, and used to reach the
+    ///         RESPONSE path as a second set that <c>TypeNodeResolver</c> consulted beside this
+    ///         one. A second set cannot be decomposed: a raw-SQL join projects
+    ///         <c>ValueTuple&lt;UnmappedCustomer, UnmappedOrder&gt;</c>, this list admits
+    ///         <c>ValueTuple&lt;,&gt;</c> and asks whether each ARGUMENT is allowed, and the answer
+    ///         came from the other set, which it could not see. Eight
+    ///         <c>SqlQueryTestBase</c> tests failed on exactly that tuple.
+    ///     </para>
+    ///     <para>
+    ///         <b>It widens nothing.</b> Every type here is one the application registered
+    ///         explicitly, which <c>docs/security-review.md</c> §4c records as the safe shape, and
+    ///         the same types already clear the request path. The conjunction §2 depends on is
+    ///         untouched: none of <c>Binder</c>, <c>MethodBase</c>, <c>MethodInfo</c>,
+    ///         <c>ConstructorInfo</c>, <c>PropertyInfo</c>, <c>Activator</c>, <c>Assembly</c> or
+    ///         <c>AppDomain</c> can arrive this way, because a caller registering one of those has
+    ///         already been trusted with the request path.
+    ///     </para>
+    /// </remarks>
+    /// <param name="extra">The application's registered types. Empty returns this instance.</param>
+    /// <returns>This instance when there is nothing to add, otherwise a widened copy.</returns>
+    public TypeAllowlist With(IReadOnlyCollection<Type> extra)
+    {
+        ArgumentNullException.ThrowIfNull(extra);
+
+        if (extra.Count == 0)
+        {
+            return this;
+        }
+
+        var widened = new HashSet<Type>(_allowed);
+        widened.UnionWith(extra);
+        return new TypeAllowlist(widened);
+    }
+
+    /// <summary>
     ///     Builds the allowlist for a model: every entity CLR type, every mapped property type,
     ///     every type <em>declaring</em> a mapped member, and any types the application registers
     ///     explicitly.

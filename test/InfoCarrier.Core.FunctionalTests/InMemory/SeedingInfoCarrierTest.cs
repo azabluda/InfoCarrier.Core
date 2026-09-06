@@ -15,11 +15,10 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 ///         A65 filed this base as blocked: <c>SeedingContext</c> takes a <c>string testId</c> and
 ///         has no <c>DbContextOptions</c> constructor, so the backend cannot build the server's
 ///         copy of it by the usual route. That is true, and it is not the whole picture — the base
-///         hands the <em>client</em> context construction to the derived class
-///         (<c>CreateContextWithEmptyDatabase</c>), so only the <em>server</em> copy needs the
-///         ordinary constructor, and <c>serverContextType</c> exists precisely to supply a
-///         different type there. The two contexts share `OnModelCreating`, which is where the
-///         `HasData` seed lives, so they agree on the thing that matters.
+///         hands the client-side context construction to the derived class
+///         (<c>CreateContextWithEmptyDatabase</c>), so only the harness-built copy needs the
+///         ordinary constructor. <c>SeedingInfoCarrierOptionsContext</c> supplies it. The two
+///         carry the same `HasData` seed, which is the thing that matters.
 ///     </para>
 ///     <para>
 ///         Which is also why the client's <c>EnsureCreated</c> being a no-op is not a problem:
@@ -36,9 +35,8 @@ public class SeedingInfoCarrierTest : SeedingTestBase
     protected override TestStore TestStore
         => _testStore ??= InfoCarrierTestStoreFactory.Create(
                 InfoCarrierTestStoreFactory.InMemory,
-                typeof(SeedingInfoCarrierServerContext),
-                onModelCreating: null,
-                serverContextType: typeof(SeedingInfoCarrierServerContext))
+                typeof(SeedingInfoCarrierOptionsContext),
+                onModelCreating: null)
             .GetOrCreate("SeedingInfoCarrierTest");
 
     /// <inheritdoc />
@@ -52,10 +50,17 @@ public class SeedingInfoCarrierTest : SeedingTestBase
     }
 
     /// <summary>
-    ///     The server's copy: the same seeded model, reachable through the ordinary
-    ///     <c>DbContextOptions</c> constructor the backend builds by.
+    ///     The same seeded model, reachable through the ordinary <c>DbContextOptions</c>
+    ///     constructor the harness builds by.
     /// </summary>
-    public class SeedingInfoCarrierServerContext(DbContextOptions options) : DbContext(options)
+    /// <remarks>
+    ///     <b>A second class for a CONSTRUCTOR SHAPE, not for a second model, and this is the only
+    ///     one left in the suite.</b> EF's <c>SeedingContext</c> is abstract, takes a
+    ///     <c>string testId</c>, and declares no <c>DbContextOptions</c> constructor, so nothing
+    ///     the harness registers can derive from it. The seed below is therefore written twice, and
+    ///     the test itself is what catches the two copies drifting apart: it asserts the rows.
+    /// </remarks>
+    public class SeedingInfoCarrierOptionsContext(DbContextOptions options) : DbContext(options)
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder)
             => modelBuilder.Entity<Seed>().HasData(

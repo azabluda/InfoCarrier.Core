@@ -33,6 +33,30 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="10.0.0" />
+
+    <!--
+      ADR-009 Tier C: Firebird, and it is TEST-ONLY. No shipped project references any of these
+      four, and none of them may ever appear in src/, because this provider references no backing
+      store.
+
+      Firebird is here for what SQLite cannot do at all: table-valued functions, which Firebird
+      spells as selectable stored procedures, and the correlated LATERAL join over one. Those are
+      the whole of UdfDbFunctionTestBase that Tier B has to leave red.
+
+      THE NATIVE BINARIES COME FROM NUGET AND NOTHING IS INSTALLED. FirebirdSql.Data.FirebirdClient
+      carries no `fbclient`, so the engine arrives as two community "native assets" packages that
+      drop Firebird 5.0.3 into the output directory, and NativeAssetManager finds the path at run
+      time. One database is one file, as SQLite's is; there is no server process, and nothing is
+      downloaded during a run. Both platform packages are referenced because CI runs on
+      ubuntu-latest and development happens on Windows.
+
+      THE LAST THREE ARE COMMUNITY PACKAGES CARRYING NATIVE CODE, published by one author, and
+      that is worth knowing rather than discovering. They run only inside this test project.
+    -->
+    <PackageVersion Include="FirebirdSql.EntityFrameworkCore.Firebird" Version="13.0.0" />
+    <PackageVersion Include="FirebirdDb.Embedded.NativeAssetManager" Version="1.0.6" />
+    <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Windows.X64" Version="2.0.6" />
+    <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Linux.X64" Version="2.0.6" />
     <!--
       10.0.9, not 10.0.0. This entry is a TRANSITIVE PIN, not a dependency of the product:
       CentralPackageTransitivePinningEnabled makes it bind every transitive reference in the repo,

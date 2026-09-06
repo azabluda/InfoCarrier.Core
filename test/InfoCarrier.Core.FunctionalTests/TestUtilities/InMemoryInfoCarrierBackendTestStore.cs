@@ -28,6 +28,14 @@ public class InMemoryInfoCarrierBackendTestStore(
 {
 
     /// <inheritdoc />
+    /// <inheritdoc />
+    /// <remarks>
+    ///     ADR-009 Tier A runs over EF's InMemory provider, which is not relational and does not
+    ///     refuse a <c>Distinct</c> over a projection carrying a collection. Enforcing that
+    ///     relational rule here fails eight specification tests over a store that answers them.
+    /// </remarks>
+    public override bool ServerStoreIsRelational => false;
+
     protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
         => serviceCollection
             .AddEntityFrameworkInMemoryDatabase()

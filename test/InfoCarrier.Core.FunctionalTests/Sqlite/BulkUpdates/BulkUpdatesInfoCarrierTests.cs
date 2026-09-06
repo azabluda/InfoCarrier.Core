@@ -49,17 +49,24 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
     : NorthwindBulkUpdatesRelationalFixture<TModelCustomizer>
     where TModelCustomizer : ITestModelCustomizer, new()
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Both sides build from ONE <c>OnModelCreating</c>, which is what an application does and
+    ///     what version 1 of this provider did. See the Northwind Tier B fixture for the reasoning.
+    /// </remarks>
+    protected override Type ContextType
+        => typeof(NorthwindInfoCarrierSqliteContext);
+
     private ITestStoreFactory? _testStoreFactory;
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>
                 ((NorthwindContext)server).TenantPrefix = ((NorthwindContext)client).TenantPrefix,
-            serverContextType: typeof(NorthwindInfoCarrierSqliteServerContext),
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
                 arbitrarySqlExecution: true);
@@ -98,7 +105,7 @@ public class InheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesFi
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.Sqlite,
+            SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             configureConventions: ConfigureConventions);
@@ -232,7 +239,7 @@ public class FiltersInheritanceBulkUpdatesInfoCarrierTest(FiltersInheritanceBulk
 public class NonSharedModelBulkUpdatesInfoCarrierTest(NonSharedFixture fixture)
     : NonSharedModelBulkUpdatesRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

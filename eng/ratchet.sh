@@ -16,60 +16,118 @@
 # <baseline-file> with `.names.txt` in place of `.txt`; the two are one baseline in two files
 # because `comm` cannot read a file with comments in it and the counts file is mostly comments.
 #
-# Usage: eng/ratchet.sh <results.trx> <baseline-file>
+# SEVERAL TRX, ONE BASELINE. The spec suite is split across test projects, one per backend store,
+# and each `dotnet test` writes its own TRX. Every TRX named on the command line is aggregated into
+# a single set of counters and a single sorted name list, which are gated against the one baseline
+# pair. **One baseline and not one per project**, deliberately: with a baseline per project, a test
+# that MOVES between projects reads as a fix in one and a break in the other, and the name diff
+# that makes "fixed 4, broke 4" fail the gate stops working across the boundary. Aggregating first
+# keeps that gate whole.
+#
+# The counters are SUMMED, and that is the one arithmetic this repository allows on them. Each
+# figure is still read out of a run's own <Counters> element; what is added is the same figure from
+# a second run. `passed` is never derived from `total` and `failed`, which is the derivation that
+# has cost three commits here.
+#
+# Usage: eng/ratchet.sh <results.trx> [more.trx ...] <baseline-file>
+#        The LAST argument is the baseline; everything before it is a TRX. A single-TRX call is
+#        unchanged from before this was written.
 
 set -euo pipefail
 
-trx=${1:?usage: ratchet.sh <results.trx> <baseline-file>}
-baseline_file=${2:?usage: ratchet.sh <results.trx> <baseline-file>}
-
-if [ ! -f "$trx" ]; then
-    echo "ratchet: no TRX at '$trx' — the test run produced no results at all." >&2
-    exit 1
+if [ $# -lt 2 ]; then
+    echo "usage: ratchet.sh <results.trx> [more.trx ...] <baseline-file>" >&2
+    exit 2
 fi
 
-counters=$(grep -o '<Counters[^>]*>' "$trx" | head -n 1)
-if [ -z "$counters" ]; then
-    echo "ratchet: '$trx' has no <Counters> element; cannot read the run summary." >&2
+# The last argument, however many TRX precede it.
+baseline_file=${!#}
+trx_files=("${@:1:$#-1}")
+
+for trx in "${trx_files[@]}"; do
+    if [ ! -f "$trx" ]; then
+        echo "ratchet: no TRX at '$trx' — that test run produced no results at all." >&2
+        exit 1
+    fi
+done
+
+if [ ! -f "$baseline_file" ]; then
+    echo "ratchet: no baseline at '$baseline_file'. The last argument is the baseline file." >&2
     exit 1
 fi
 
 # Leading space + trailing '=' keeps 'passed' from matching 'passedButRunAborted'.
-counter() { printf '%s' "$counters" | grep -o " $1=\"[0-9]*\"" | grep -o '[0-9]\+' | head -n 1 || true; }
+counter_in() { printf '%s' "$2" | grep -o " $1=\"[0-9]*\"" | grep -o '[0-9]\+' | head -n 1 || true; }
 baseline() { grep -E "^$1=" "$baseline_file" | head -n 1 | cut -d= -f2 | tr -d '[:space:]' || true; }
 
-total=$(counter total)
-passed=$(counter passed)
-failed=$(counter failed)
+total=0
+passed=0
+failed=0
+executed=0
+executed_known=1
 
-# `executed`, and deliberately NOT a skip count. The console block ends `Skipped: 177`, but the
+# `executed`, and deliberately NOT a skip count. The console block ends `Skipped: 238`, but the
 # TRX's <Counters> reports notExecuted="0" -- VSTest records each xUnit skip as its own
 # outcome="NotExecuted" result and folds none of them into that aggregate. The only route from this
-# element to 177 is `total - executed`, and deriving one figure from another is what this
+# element to 238 is `total - executed`, and deriving one figure from another is what this
 # repository forbids and has paid for three times. So the report shows what the file actually says.
 # Reported, never gated.
-executed=$(counter executed)
-executed=${executed:-?}
+for trx in "${trx_files[@]}"; do
+    counters=$(grep -o '<Counters[^>]*>' "$trx" | head -n 1)
+    if [ -z "$counters" ]; then
+        echo "ratchet: '$trx' has no <Counters> element; cannot read that run's summary." >&2
+        exit 1
+    fi
+
+    trx_total=$(counter_in total "$counters")
+    trx_passed=$(counter_in passed "$counters")
+    trx_failed=$(counter_in failed "$counters")
+
+    for pair in "total:$trx_total" "passed:$trx_passed" "failed:$trx_failed"; do
+        if [ -z "${pair#*:}" ]; then
+            echo "ratchet: could not read '${pair%%:*}' from '$trx'." >&2
+            exit 1
+        fi
+    done
+
+    total=$(( total + trx_total ))
+    passed=$(( passed + trx_passed ))
+    failed=$(( failed + trx_failed ))
+
+    trx_executed=$(counter_in executed "$counters")
+    if [ -z "$trx_executed" ]; then
+        executed_known=0
+    else
+        executed=$(( executed + trx_executed ))
+    fi
+done
+
+if [ "$executed_known" -eq 0 ]; then
+    executed="?"
+fi
 
 baseline_failed=$(baseline failed)
 baseline_total=$(baseline total)
 
-for pair in "total:$total" "passed:$passed" "failed:$failed" \
-            "baseline failed:$baseline_failed" "baseline total:$baseline_total"; do
+for pair in "baseline failed:$baseline_failed" "baseline total:$baseline_total"; do
     if [ -z "${pair#*:}" ]; then
-        echo "ratchet: could not read '${pair%%:*}'. TRX: '$trx', baseline: '$baseline_file'." >&2
+        echo "ratchet: could not read '${pair%%:*}' from baseline '$baseline_file'." >&2
         exit 1
     fi
 done
 
 echo "Passed: ${passed}, Failed: ${failed}, Total: ${total}"
+echo "Read from ${#trx_files[@]} TRX: ${trx_files[*]}"
 echo "Baseline: failed=${baseline_failed}, total=${baseline_total} (${baseline_file})"
 
 # The spec-suite badge in README.md is built from these three numbers, and build.yml reads them
 # from here rather than parsing the TRX a second time: one parser, one place to fix. Written
 # before the gates below, because a run that fails the ratchet still has numbers worth publishing
 # -- the badge is meant to go red with them.
-counters_file="$(dirname "$trx")/counters.env"
+#
+# Beside the FIRST TRX named. CI writes every project's TRX into one results directory, so this is
+# that directory whichever project ran first.
+counters_file="$(dirname "${trx_files[0]}")/counters.env"
 {
     echo "total=${total}"
     echo "passed=${passed}"
@@ -105,8 +163,8 @@ fi
 
 # Beside the TRX, so it is uploaded with it: this file is exactly what the baseline becomes when a
 # fix lowers the count, so updating the baseline is a copy rather than a transcription.
-current_names="$(dirname "$trx")/failures.txt"
-"$python" "$here/trx-failures.py" "$trx" > "$current_names"
+current_names="$(dirname "${trx_files[0]}")/failures.txt"
+"$python" "$here/trx-failures.py" "${trx_files[@]}" > "$current_names"
 
 fixed=$(comm -23 "$names_baseline" "$current_names")
 broken=$(comm -13 "$names_baseline" "$current_names")

@@ -110,6 +110,7 @@ namespace TestNamespace
         public static void CreateAnnotations(RuntimeEntityType runtimeEntityType)
         {
             runtimeEntityType.AddAnnotation("DiscriminatorMappingComplete", false);
+            runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
 
             Customize(runtimeEntityType);
         }

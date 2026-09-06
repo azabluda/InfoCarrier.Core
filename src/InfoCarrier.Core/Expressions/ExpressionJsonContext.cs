@@ -71,6 +71,7 @@ namespace InfoCarrier.Core.Expressions;
 [JsonSerializable(typeof(QueryRootStubNode))]
 [JsonSerializable(typeof(FromSqlQueryRootStubNode))]
 [JsonSerializable(typeof(SqlQueryRootStubNode))]
+[JsonSerializable(typeof(ServerContextStubNode))]
 [JsonSerializable(typeof(TypeNode))]
 [JsonSerializable(typeof(DynamicValueNode))]
 [JsonSerializable(typeof(List<DynamicValueNode>))]

@@ -37,14 +37,37 @@ namespace InfoCarrier.Core;
 ///     <b>This is the security boundary</b>; the client's matching option only decides what it
 ///     sends. Default <c>false</c>, so a server that says nothing refuses.
 /// </param>
+/// <param name="relationalQueryRoots">
+///     How to REBUILD EF's relational raw-SQL query roots (#97) - true when the application
+///     registered <c>AddInfoCarrierRelational()</c> from the <c>InfoCarrier.Core.Relational</c>
+///     package. <b>Knowledge, not permission</b>: the parameter above is the permission, and a
+///     server that has the knowledge and not the grant still refuses. Default
+///     <see langword="null" />, which rebuilds nothing and says so.
+/// </param>
 public class ServerQueryExecutor(
     DbContext context,
     IExpressionSerializer expressionSerializer,
-    bool arbitrarySqlAllowed = false)
+    bool arbitrarySqlAllowed = false,
+    Metadata.IInfoCarrierRelationalQueryRoots? relationalQueryRoots = null)
 {
     private readonly DbContext _context = context;
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
+
+    /// <summary>
+    ///     How to rebuild EF's relational raw-SQL query roots (#97).
+    /// </summary>
+    /// <remarks>
+    ///     <b>A parameter, and NOT resolved from the context.</b> The server's own services live
+    ///     in the application's collection -- the one <c>InProcessInfoCarrierServer</c> was built
+    ///     with -- and not in the context's internal provider, which EF builds for itself. That is
+    ///     already true of the value mappers, the allowed types and the raw-SQL grant beside this
+    ///     one, and reading this seam from the context instead answered
+    ///     <see cref="Relational.InfoCarrierRelationalQueryRoots" /> for a server that had registered a real
+    ///     one.
+    /// </remarks>
+    private readonly Metadata.IInfoCarrierRelationalQueryRoots _relationalQueryRoots
+        = relationalQueryRoots ?? Relational.InfoCarrierRelationalQueryRoots.Instance;
 
     /// <summary>
     ///     Executes the query described by <paramref name="request" /> and returns the wire result.
@@ -54,11 +77,23 @@ public class ServerQueryExecutor(
         // Start of a message exchange: wire reference ids restart at 1.
         ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
 
+        // A payload may name the context as the receiver of a mapped instance function. This is the
+        // context that fills it, and only a server has one to offer.
+        if (_expressionSerializer is ExpressionSerializer serializer)
+        {
+            serializer.UseServerContext(_context);
+        }
+
         try
         {
             // Deserialize + rebind the tree against the server model.
             ExpressionNode node = DeserializeNode(request.SerializedQuery);
             Expression query = Rebind(node);
+
+            // The client stripped `AsSplitQuery`/`AsSingleQuery` before drawing the boundary and
+            // sent what it stripped beside the tree. Put it back, here, where a real relational
+            // provider can act on it.
+            query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
 
             // The query is read for the entity types its rows carry: an owned or shared-type value
             // projected directly has no other name (A56). Read before execution, because it also
@@ -163,7 +198,7 @@ public class ServerQueryExecutor(
         {
             RequireArbitrarySql();
 
-            return RelationalQueryRootShape.CreateSqlQueryRoot(
+            return _relationalQueryRoots.CreateScalarRoot(
                 elementType,
                 sqlQuery.Sql,
                 ((ExpressionSerializer)_expressionSerializer).ToExpression(sqlQuery.Arguments));
@@ -174,9 +209,36 @@ public class ServerQueryExecutor(
         IEntityType? entityType = stub.ElementType.EntityTypeName is not null
             ? _context.Model.FindEntityType(stub.ElementType.EntityTypeName)
             : _context.Model.FindEntityType(elementType);
-        entityType ??= _context.Model.FindEntityType(elementType)
-            ?? throw new InvalidOperationException(
+        entityType ??= _context.Model.FindEntityType(elementType);
+
+        // `Database.SqlQuery<T>` INTO A TYPE THE MODEL DOES NOT MAP (#56), which is the entity-typed
+        // half of the scalar case answered above. EF does not put such a type in the model: it
+        // builds an AD-HOC entity type for it, on demand, through `IAdHocMapper` — the same service
+        // `RelationalDatabaseFacadeExtensions.SqlQuery` uses on the client. So the model lookup
+        // above is correct and still finds nothing, and this is the one root whose entity type has
+        // to be MADE rather than found.
+        //
+        // WHY THIS IS NOT A WIDENING. It sits behind a conjunction of two gates that are already
+        // the ones this file states elsewhere. First, `elementType` reached this method at all only
+        // because the server's OWN `TypeAllowlist` admitted it in `TypeNodeResolver` — a type the
+        // model does not imply gets there only when the application registered it with
+        // `AddInfoCarrierAllowedTypes`, which `IInfoCarrierAllowedTypes` documents as the security
+        // half of that seam. Second, `RequireArbitrarySql` below: a raw-SQL root is refused outright
+        // unless this server granted execution. Neither gate is relaxed and no new one is invented;
+        // what changes is that a payload passing BOTH is now answered instead of being told the
+        // type is missing from a model it was never going to be in.
+        if (entityType is null && stub is FromSqlQueryRootStubNode)
+        {
+            RequireArbitrarySql();
+
+            entityType = _context.GetService<IAdHocMapper>().GetOrAddEntityType(elementType);
+        }
+
+        if (entityType is null)
+        {
+            throw new InvalidOperationException(
                 $"Entity type '{stub.ElementType}' not found in the server model.");
+        }
 
         // The raw-SQL root (#60). Refused unless this server registered the grant, and the check
         // is here rather than at the parse: the node is well-formed either way, and what a server
@@ -189,7 +251,7 @@ public class ServerQueryExecutor(
             // The arguments are rebuilt as an expression and handed to EF, which binds them as
             // DbParameters. They are never spliced into the text: a value in a string has lost
             // its type, and the round trip is the only reason this node carries a tree at all.
-            return RelationalQueryRootShape.CreateFromSqlRoot(
+            return _relationalQueryRoots.CreateEntityRoot(
                 entityType,
                 fromSql.Sql,
                 ((ExpressionSerializer)_expressionSerializer).ToExpression(fromSql.Arguments));
@@ -222,6 +284,88 @@ public class ServerQueryExecutor(
                 + "applied to such a query.");
         }
     }
+
+    /// <summary>
+    ///     Re-applies the split-query hint the client stripped, when this server's store can
+    ///     honour it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Position does not matter, and that is EF's rule rather than a convenience.</b>
+    ///         <c>AsSplitQuery</c> is a marker: EF's relational preprocessor lifts it out of the
+    ///         tree and applies the behaviour to the WHOLE query, wherever the call sat. So
+    ///         wrapping the outermost queryable says the same thing the client said.
+    ///     </para>
+    ///     <para>
+    ///         <b>The outermost node is not always a queryable.</b> A query ending in a terminal
+    ///         operator -- <c>Count</c>, <c>First</c> -- is typed as its scalar result, and
+    ///         <c>AsSplitQuery&lt;T&gt;</c> will not bind to that. Where the operator's source is
+    ///         still a queryable, the hint goes there instead, which is where the caller wrote it.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only where the store is relational.</b> <c>AsSplitQuery</c> means nothing to a
+    ///         non-relational provider, and this provider's whole point is that the server runs
+    ///         whatever provider it references. A hint from a client whose backing store turned out
+    ///         not to be relational is dropped rather than forced.
+    ///     </para>
+    /// </remarks>
+    private Expression ApplySplitQueryBehavior(Expression query, QuerySplittingBehavior? behavior)
+    {
+        if (behavior is null || !_context.Database.IsRelational())
+        {
+            return query;
+        }
+
+        if (HintableElementType(query.Type) is { } elementType)
+        {
+            return Expression.Call(HintMethod(behavior.Value, elementType), query);
+        }
+
+        if (query is MethodCallExpression { Arguments.Count: > 0 } call
+            && HintableElementType(call.Arguments[0].Type) is { } sourceElementType)
+        {
+            Expression[] arguments = [.. call.Arguments];
+            arguments[0] = Expression.Call(HintMethod(behavior.Value, sourceElementType), arguments[0]);
+            return call.Update(call.Object, arguments);
+        }
+
+        return query;
+
+        // `GetElementType` is this class's own walker and is already counted by the trim ratchet;
+        // a second one of the same shape would have added an IL2070 for nothing. It answers the
+        // type itself when the type is not a sequence, which is the "not a queryable" case here.
+        //
+        // The value-type test is the generic constraint: `AsSplitQuery<TEntity>` and
+        // `AsSingleQuery<TEntity>` are `where TEntity : class`, and a server query's element type
+        // is very often a `ValueTuple`, because the projection rewriter re-carries the client's
+        // own types as tuples so the operators above them stay on the server. Handing one to
+        // `MakeGenericMethod` throws `VerificationException: violates the constraint of type
+        // parameter 'TEntity'`, which took 100 of the 326 split-query specification tests before
+        // this guard existed. Skipping is honest rather than a workaround: a tuple-projected query
+        // is one this provider reshaped, so the hint no longer describes what the caller wrote.
+        static Type? HintableElementType(Type type)
+            => GetElementType(type) is { } element && element != type && !element.IsValueType
+                ? element
+                : null;
+
+        static MethodInfo HintMethod(QuerySplittingBehavior behavior, Type elementType)
+            => (behavior == QuerySplittingBehavior.SplitQuery ? AsSplitQueryMethod : AsSingleQueryMethod)
+                .MakeGenericMethod(elementType);
+    }
+
+    // TAKEN FROM A DELEGATE RATHER THAN FROM `GetMethod(name)`, and the trim ratchet is why.
+    // A string lookup is invisible to the trimmer, which answered it with two IL2xxx warnings and
+    // took this product's count from 89 to 91. A delegate over the method is an ordinary reference:
+    // the trimmer sees it, keeps it, and says nothing. The generic argument is only a placeholder
+    // -- `GetGenericMethodDefinition` throws it away -- and `object` is used because both methods
+    // are constrained `where TEntity : class`.
+    private static readonly MethodInfo AsSplitQueryMethod =
+        new Func<IQueryable<object>, IQueryable<object>>(RelationalQueryableExtensions.AsSplitQuery)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo AsSingleQueryMethod =
+        new Func<IQueryable<object>, IQueryable<object>>(RelationalQueryableExtensions.AsSingleQuery)
+            .Method.GetGenericMethodDefinition();
 
     private Task<object?> ExecuteQueryAsync(Expression query, QueryDataRequest request, CancellationToken cancellationToken)
     {
@@ -594,9 +738,9 @@ public class ServerQueryExecutor(
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public ServerQueryExecutor(DbContext context, IExpressionSerializer expressionSerializer)

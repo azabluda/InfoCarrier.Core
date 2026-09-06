@@ -18,7 +18,9 @@ namespace InfoCarrier.Core.Expressions;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="ExpressionToNodeTranslator" /> class.
 /// </remarks>
-public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValueMapper valueMapper) : ExpressionVisitor
+public class ExpressionToNodeTranslator(
+    TypeNodeMapper typeMapper,
+    IDynamicValueMapper valueMapper) : ExpressionVisitor
 {
     private readonly TypeNodeMapper _typeMapper = typeMapper;
     private readonly IDynamicValueMapper _valueMapper = valueMapper;
@@ -31,15 +33,60 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
     private ExpressionNode? _result;
 
     /// <summary>
-    ///     Translates an expression to its node DTO.
+    ///     How to recognise EF's relational raw-SQL query roots (#97), for the translation
+    ///     currently running.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Per translation, and NOT a constructor parameter, because there must be exactly
+    ///         one source of this fact.</b> The value is per <c>DbContext</c>: it is
+    ///         carried on the options, for the reason
+    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRoots</c> records —
+    ///         <c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>, so every InfoCarrier
+    ///         client context in a process shares one internal service provider and a DI-injected
+    ///         answer would be the same for all of them. This class is resolved from that shared
+    ///         provider, so injecting it here gave the boundary analyzer and this translator two
+    ///         different answers: a client that set the option had its raw-SQL root ADMITTED at
+    ///         the boundary and then translated with its SQL DROPPED, which is the whole table
+    ///         coming back and the defect R75 closed.
+    ///     </para>
+    ///     <para>
+    ///         So the one reader is <c>InfoCarrierOptionsExtension.RelationalQueryRootsFor</c>,
+    ///         called once per execution in <c>QueryExecutor</c>, and its answer reaches both the
+    ///         analyzer and this field. Scoped exactly like <c>_parameterIds</c> below — set at
+    ///         depth 0 and left alone in the recursion.
+    ///     </para>
+    /// </remarks>
+    private Metadata.IInfoCarrierRelationalQueryRoots _relationalRoots
+        = Relational.InfoCarrierRelationalQueryRoots.Instance;
+
+    /// <summary>
+    ///     Translates an expression to its node DTO, recognising no relational query root.
     /// </summary>
     public virtual ExpressionNode Translate(Expression expression)
+        => Translate(expression, relationalRoots: null);
+
+    /// <summary>
+    ///     Translates an expression to its node DTO.
+    /// </summary>
+    /// <param name="expression">The tree to translate.</param>
+    /// <param name="relationalRoots">
+    ///     How to recognise EF's relational raw-SQL query roots for this translation, or
+    ///     <see langword="null" /> when nothing has said the backing store is relational. See the
+    ///     remarks on <c>_relationalRoots</c> for why it arrives here rather than in the
+    ///     constructor.
+    /// </param>
+    public virtual ExpressionNode Translate(
+        Expression expression,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots)
     {
         // Translate is both the public entry point and the recursive one, so parameter identity
-        // is reset only at depth 0 — clearing on every call would break identity mid-tree.
+        // is reset only at depth 0 — clearing on every call would break identity mid-tree. The
+        // seam is scoped the same way, so a recursive call cannot lose it half way down a tree.
         if (_depth == 0)
         {
             _parameterIds.Clear();
+            _relationalRoots = relationalRoots ?? Relational.InfoCarrierRelationalQueryRoots.Instance;
         }
 
         _depth++;
@@ -113,7 +160,7 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
             // A raw-SQL queryable captured as a constant - the same root as the extension branch
             // below, reached when the caller closed over the `FromSql` query rather than writing
             // it inline. Its state is carried, not dropped (#60).
-            if (RelationalQueryRootShape.TryRead(
+            if (_relationalRoots.TryReadEntityRoot(
                 queryable.Expression, out string? capturedSql, out Expression? capturedArgument))
             {
                 _result = new FromSqlQueryRootStubNode
@@ -128,7 +175,7 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
 
             // The scalar sibling (#56). `Database.SqlQuery<T>` closed over and captured as a
             // constant, exactly as the entity root above can be.
-            if (RelationalQueryRootShape.TryReadSqlQuery(
+            if (_relationalRoots.TryReadScalarRoot(
                 queryable.Expression, out string? capturedScalarSql, out Expression? capturedScalarArgument))
             {
                 _result = new SqlQueryRootStubNode
@@ -181,6 +228,14 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
     /// <inheritdoc />
     protected override Expression VisitExtension(Expression node)
     {
+        // The receiver of a mapped instance function, put here by `QuerySplitter` in place of the
+        // client's live context. It carries a type and nothing else; the server fills the role.
+        if (node is Query.ServerContextExpression serverContext)
+        {
+            _result = new ServerContextStubNode { Type = _typeMapper.ToTypeNode(serverContext.Type) };
+            return node;
+        }
+
         // EF Core's EntityQueryRootExpression (NodeType Extension) becomes a query-root stub.
         if (node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression root)
         {
@@ -192,7 +247,7 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
             // EF's relational raw-SQL root carries a SQL string and an argument expression that a
             // plain stub has no field for, and dropping them is what silently returned the whole
             // table before R75. `Translate` runs FIRST because it assigns `_result` itself (#60).
-            if (RelationalQueryRootShape.TryRead(root, out string? sql, out Expression? argument))
+            if (_relationalRoots.TryReadEntityRoot(root, out string? sql, out Expression? argument))
             {
                 ExpressionNode arguments = Translate(argument);
                 _result = new FromSqlQueryRootStubNode
@@ -208,7 +263,7 @@ public class ExpressionToNodeTranslator(TypeNodeMapper typeMapper, IDynamicValue
             // The scalar sibling (#56), and it must be tested separately rather than folded into
             // the branch above: `SqlQueryRootExpression` has NO entity type, so the server rebuilds
             // it from the CLR element type instead of resolving one through its model.
-            if (RelationalQueryRootShape.TryReadSqlQuery(root, out string? scalarSql, out Expression? scalarArgument))
+            if (_relationalRoots.TryReadScalarRoot(root, out string? scalarSql, out Expression? scalarArgument))
             {
                 ExpressionNode scalarArguments = Translate(scalarArgument);
                 _result = new SqlQueryRootStubNode

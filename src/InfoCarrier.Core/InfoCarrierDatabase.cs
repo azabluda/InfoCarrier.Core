@@ -240,6 +240,13 @@ public class InfoCarrierDatabase(
                 FailedByOrdinal(exception, sent) ?? Translate([], sent));
         }
 
+        // EF raises its write-time warnings from the update pipeline, which runs on the SERVER, so
+        // a caller holding only the client context never hears them. Same position and same
+        // reasoning as the concurrency exception above: this provider *is* the store as far as the
+        // client context is concerned, and a store's diagnostics belong in the context's log. The
+        // server only sends any when it has granted forwarding, which is off by default.
+        ServerLogReplay.Replay(result.ServerLog, _currentContext.Context);
+
         ApplyGeneratedValues(sent, result, mapper);
         return result.Count;
     }

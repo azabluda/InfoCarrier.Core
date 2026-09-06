@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Globalization;
-using System.Runtime.CompilerServices;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -41,16 +40,28 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         this repo could fix.
 ///     </para>
 ///     <para>
-///         A <see cref="ModuleInitializerAttribute" /> rather than a fixture: it runs before xUnit
-///         creates any test thread, and <see cref="CultureInfo.DefaultThreadCurrentCulture" /> is
-///         inherited by threads that have not set their own — which is every thread in a parallel
-///         xUnit run. A test that deliberately sets a culture still overrides it.
+///         A module initializer rather than a fixture: it runs before xUnit creates any test
+///         thread, and <see cref="CultureInfo.DefaultThreadCurrentCulture" /> is inherited by
+///         threads that have not set their own — which is every thread in a parallel xUnit run. A
+///         test that deliberately sets a culture still overrides it.
+///     </para>
+///     <para>
+///         <b>The attribute is NOT here, and that is deliberate.</b> This assembly is a library
+///         shared by both test projects, and a module initializer in a library runs when that
+///         library's module is first loaded, which is not guaranteed to be before the test threads
+///         of the assembly that referenced it. <c>CA2255</c> says exactly this and it is treated as
+///         an error in CI. So each test assembly carries its own three-line
+///         <c>InvariantCultureInitializer</c> that calls <see cref="Pin" />, where the attribute is
+///         application code and the ordering is guaranteed.
 ///     </para>
 /// </remarks>
-internal static class InvariantCultureInitializer
+public static class InvariantCulture
 {
-    [ModuleInitializer]
-    internal static void PinInvariantCulture()
+    /// <summary>
+    ///     Pins this process to the invariant culture. Called from each test assembly's own module
+    ///     initializer.
+    /// </summary>
+    public static void Pin()
     {
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
         CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;

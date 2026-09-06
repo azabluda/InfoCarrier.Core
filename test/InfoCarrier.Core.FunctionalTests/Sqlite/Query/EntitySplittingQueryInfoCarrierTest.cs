@@ -18,7 +18,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 /// </remarks>
 public class EntitySplittingQueryInfoCarrierTest(NonSharedFixture fixture) : EntitySplittingQueryTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

@@ -37,11 +37,40 @@ public sealed class QuerySplitter
     private const string RelationalQueryableExtensionsFullName
         = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions";
 
-    private static readonly HashSet<string> SplitHints = ["AsSplitQuery", "AsSingleQuery"];
+    private const string AsSplitQueryName = "AsSplitQuery";
+
+    private static readonly HashSet<string> SplitHints = [AsSplitQueryName, "AsSingleQuery"];
+
+    /// <summary>
+    ///     Whether the server's backing store is relational, and so whether relational query rules
+    ///     are enforced here. <see langword="true" /> unless the application said otherwise.
+    /// </summary>
+    /// <remarks>
+    ///     <b>An init property and not a constructor parameter</b>, for the reason the property
+    ///     below records: this class shipped in <c>10.0.0</c>, and adding a parameter to its
+    ///     constructor is a binary break that package validation reports as <c>CP0002</c>. A
+    ///     splitter is built per execution and <see cref="Split" /> is called once on it, so an
+    ///     init property is as well scoped as a parameter would be.
+    /// </remarks>
+    public bool ServerStoreIsRelational { get; init; } = true;
+
+    /// <summary>
+    ///     What the last <see cref="Split" /> found the query asking for, or
+    ///     <see langword="null" /> when it asked for nothing.
+    /// </summary>
+    /// <remarks>
+    ///     <b>A property rather than another value on <c>SplitQuery</c></b>, because
+    ///     <c>SplitQuery</c>'s constructor shipped in <c>10.0.0</c> and adding a parameter to it
+    ///     would be a binary break that package validation reports as <c>CP0002</c>. A splitter is
+    ///     built per execution and <see cref="Split" /> is called once on it, so a property is as
+    ///     well scoped as a return value here.
+    /// </remarks>
+    public QuerySplittingBehavior? SplitQueryBehavior { get; private set; }
 
     private readonly IModel _model;
     private readonly TypeAllowlist _allowlist;
     private readonly bool _arbitrarySqlAllowed;
+    private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots;
     private readonly ServerBoundaryAnalyzer _analyzer;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Query>? _queryLogger;
 
@@ -64,16 +93,24 @@ public sealed class QuerySplitter
     ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />. Default
     ///     <c>false</c>, which is the refusal every caller had before it existed.
     /// </param>
+    /// <param name="relationalRoots">
+    ///     How to recognise EF's relational raw-SQL query roots (#97), or <see langword="null" />
+    ///     when nothing has said the backing store is relational. <b>Knowledge, not permission</b>
+    ///     — the parameter above is the permission, and both are required before a raw-SQL root
+    ///     crosses.
+    /// </param>
     public QuerySplitter(
         IModel model,
         TypeAllowlist? allowlist = null,
         IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger = null,
-        bool arbitrarySqlAllowed = false)
+        bool arbitrarySqlAllowed = false,
+        Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
     {
         _model = model;
         _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
         _arbitrarySqlAllowed = arbitrarySqlAllowed;
-        _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed);
+        _relationalRoots = relationalRoots;
+        _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed, relationalRoots);
         _queryLogger = queryLogger;
     }
 
@@ -136,7 +173,19 @@ public sealed class QuerySplitter
         // `*SplitQueryRelationalTestBase` classes, which insert the hint at every root: 456 of 638
         // failing, 106 of them this provider's own "reads navigation X, but no query sent to the
         // server returned it", and the rest wrong answers.
-        query = new SplitHintStrippingVisitor().Visit(query)!;
+        // An instance-mapped user-defined function keeps its receiver, but the receiver stops
+        // being the client's live context and becomes a marker the server fills. See
+        // `ServerContextExpression`. Before the boundary, because the boundary is what refuses the
+        // constant this replaces.
+        query = new InstanceDbFunctionReceiverVisitor(_model).Visit(query)!;
+
+        // STRIPPED FROM THE TREE AND CARRIED ON THE REQUEST INSTEAD (R149). Everything above is
+        // why it cannot stay in the tree; none of it says the server should not be told. The
+        // server is the half with a relational provider, so it is the half that can honour the
+        // hint, and `QueryDataRequest.SplitQueryBehavior` is how it hears about it.
+        var splitHints = new SplitHintStrippingVisitor();
+        query = splitHints.Visit(query)!;
+        SplitQueryBehavior = splitHints.Behavior;
 
         query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
 
@@ -155,7 +204,13 @@ public sealed class QuerySplitter
         // reassembly *before* looking for the boundary (§3.2). Cutting above such a projection
         // is not merely coarse — it strands navigation reads and correlated subqueries on the
         // client, and it decomposes a `GroupBy` from the aggregate that makes it translatable.
-        query = ProjectionRewriter.Rewrite(query, _analyzer, out IReadOnlySet<Expression> reassemblies, rootRebuild);
+        query = ProjectionRewriter.Rewrite(
+            query,
+            _analyzer,
+            out IReadOnlySet<Expression> reassemblies,
+            out IReadOnlySet<Expression> collectionReassemblies,
+            rootRebuild,
+            _model);
 
         BoundaryAnalysis analysis = _analyzer.Analyze(query);
 
@@ -178,7 +233,11 @@ public sealed class QuerySplitter
         }
 
         RejectOpenFragments(analysis);
-        RejectClientEvaluation(query, analysis, reassemblies, _allowlist);
+        RejectClientEvaluation(query, analysis, reassemblies, _allowlist, ServerStoreIsRelational);
+        if (ServerStoreIsRelational)
+        {
+            RejectIdentityLosingCollectionProjection(query, collectionReassemblies);
+        }
 
         // Substitute each shipped subtree with a parameter the caller binds to its results.
         var parameters = new List<ParameterExpression>(analysis.Shippable.Count);
@@ -240,7 +299,7 @@ public sealed class QuerySplitter
 
         foreach (Expression node in nodes)
         {
-            if (!ServerBoundaryAnalyzer.IsSerializableKind(node, _arbitrarySqlAllowed))
+            if (!ServerBoundaryAnalyzer.IsSerializableKind(node, _arbitrarySqlAllowed, _relationalRoots))
             {
                 return $"'{Abbreviate(node)}' ({node.NodeType}) has no wire representation.";
             }
@@ -582,6 +641,101 @@ public sealed class QuerySplitter
         }
     }
 
+    /// <summary>
+    ///     Refuses <c>Distinct</c> or a set operation applied over a projection that carries a
+    ///     collection, which is what every other relational provider does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This provider could answer it, and answering was the defect.</b> The projection
+    ///         is rewritten before the boundary is drawn, so a <c>Distinct</c> above a
+    ///         client-typed projection ends up above the CLIENT-side reassembly and never reaches
+    ///         the server: the server SQL for such a query contains no <c>DISTINCT</c> at all,
+    ///         which is how this was confirmed rather than reasoned. EF refuses the same query on
+    ///         every other relational provider, because the identifying columns the collection
+    ///         needs do not survive the <c>Distinct</c>.
+    ///     </para>
+    ///     <para>
+    ///         <b>Answering it taught callers to write LINQ that runs nowhere else</b>, and the
+    ///         answer was unverifiable in the bargain: no other provider executes the query, so
+    ///         there is no reference result to compare it against, and this repository's own
+    ///         documentation said so. A query that works here and throws everywhere else is a
+    ///         trap, whatever it returns.
+    ///     </para>
+    ///     <para>
+    ///         <b>The message is EF's own, word for word.</b> A caller who ports this query to
+    ///         another provider has to recognise what they read here, and a suite ported the other
+    ///         way asserts that exact string.
+    ///     </para>
+    /// </remarks>
+    private static void RejectIdentityLosingCollectionProjection(
+        Expression query, IReadOnlySet<Expression> collectionReassemblies)
+    {
+        if (collectionReassemblies.Count > 0)
+        {
+            new IdentityLosingOperatorFinder(collectionReassemblies).Visit(query);
+        }
+    }
+
+    /// <summary>
+    ///     Finds a set operator sitting on a reassembly that carries a collection.
+    /// </summary>
+    private sealed class IdentityLosingOperatorFinder(IReadOnlySet<Expression> collectionReassemblies)
+        : ExpressionVisitor
+    {
+        // EF HAS A DIFFERENT MESSAGE FOR EACH, and using one for both is how the first version of
+        // this guard was measured: it fired correctly on all 36 and every one still failed, on
+        // `Assert.Equal` against the wrong string. `Distinct` erases the identity directly, and
+        // EF says so. The set operators erase it by merging two sources whose rows can no longer
+        // be told apart, and EF calls that a set operation after client evaluation, which is
+        // exactly what this reassembly is.
+        private static readonly Dictionary<string, string> Refusals = new(StringComparer.Ordinal)
+        {
+            [nameof(Queryable.Distinct)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.DistinctOnCollectionNotSupported,
+            [nameof(Queryable.Union)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            [nameof(Queryable.Concat)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            [nameof(Queryable.Intersect)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            [nameof(Queryable.Except)] =
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+        };
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (Refusals.TryGetValue(node.Method.Name, out string? refusal)
+                && node.Arguments.Any(argument => ContainsReassembly(argument, collectionReassemblies)))
+            {
+                throw new InvalidOperationException(refusal);
+            }
+
+            return base.VisitMethodCall(node);
+        }
+
+        private static bool ContainsReassembly(Expression source, IReadOnlySet<Expression> reassemblies)
+        {
+            bool found = false;
+            new Search(reassemblies, () => found = true).Visit(source);
+            return found;
+        }
+
+        private sealed class Search(IReadOnlySet<Expression> reassemblies, Action onFound) : ExpressionVisitor
+        {
+            public override Expression? Visit(Expression? node)
+            {
+                if (node is not null && reassemblies.Contains(node))
+                {
+                    onFound();
+                    return node;
+                }
+
+                return base.Visit(node);
+            }
+        }
+    }
+
     private static void RejectOpenFragments(BoundaryAnalysis analysis)
     {
         if (analysis.OpenFragments.Count == 0)
@@ -622,7 +776,8 @@ public sealed class QuerySplitter
         Expression query,
         BoundaryAnalysis analysis,
         IReadOnlySet<Expression> reassemblies,
-        TypeAllowlist allowlist)
+        TypeAllowlist allowlist,
+        bool serverStoreIsRelational)
     {
         // Everything inside a shipped subtree runs on the server; everything else runs here.
         var serverSide = new HashSet<Expression>(ReferenceEqualityComparer.Instance);
@@ -631,7 +786,8 @@ public sealed class QuerySplitter
             new NodeCollector(serverSide).Visit(subtree);
         }
 
-        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist) is not var (offender, details))
+        if (ClientEvaluationFinder.Find(query, serverSide, reassemblies, allowlist, serverStoreIsRelational)
+            is not var (offender, details))
         {
             return;
         }
@@ -650,11 +806,143 @@ public sealed class QuerySplitter
         // re-reading a failure rather than by reading this code.
         string printed = Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(offender);
 
+        // A BULK OPERATION GETS EF'S OTHER WORDING, and until R171 it got the query one. EF raises
+        // `NonQueryTranslationFailed*` for `ExecuteUpdate` and `ExecuteDelete` and
+        // `TranslationFailed*` for a query, and the two differ in their closing sentence: the
+        // query form offers `AsEnumerable`, which is not on offer for a bulk operation. The spec
+        // suite asserts the difference exactly — `NorthwindBulkUpdatesRelationalTestBase`'s
+        // `AssertTranslationFailed` builds
+        // `CoreStrings.NonQueryTranslationFailedWithDetails("", details)[21..]` and looks for it in
+        // the message, so the closing sentence is inside what it compares.
+        //
+        // ONLY THE `WithDetails` FORM IS SWITCHED, because `CoreStrings` ships no detail-less
+        // `NonQueryTranslationFailed`. That is not a gap to work around: with nothing to add, the
+        // two messages would be the same string anyway.
+        if (serverStoreIsRelational
+            && offender is MethodCallExpression bulk
+            && bulk.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
+            && bulk.Method.Name is nameof(EntityFrameworkQueryableExtensions.ExecuteUpdate)
+                or nameof(EntityFrameworkQueryableExtensions.ExecuteUpdateAsync)
+                or nameof(EntityFrameworkQueryableExtensions.ExecuteDelete)
+                or nameof(EntityFrameworkQueryableExtensions.ExecuteDeleteAsync))
+        {
+            details = InvalidSetPropertySelector(bulk) ?? details;
+
+            if (details is not null)
+            {
+                throw new InvalidOperationException(
+                    Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings
+                        .NonQueryTranslationFailedWithDetails(printed, details));
+            }
+        }
+
         throw new InvalidOperationException(
             details is null
                 ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(printed)
                 : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(
                     printed, details));
+    }
+
+    /// <summary>
+    ///     EF's details clause for an <c>ExecuteUpdate</c> whose <c>SetProperty</c> selector names
+    ///     something other than a property, or <see langword="null" /> when every selector is one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>SetProperty(e =&gt; e.MaybeScalar(x =&gt; x.OrderID), 10300)</c> names a METHOD
+    ///         CALL where <c>ExecuteUpdate</c> requires a property. This provider refused the query
+    ///         already, and said the method could not be translated — true, and not what EF says.
+    ///         EF names the offending lambda, because the caller's mistake is the argument and not
+    ///         the method inside it.
+    ///     </para>
+    ///     <para>
+    ///         <b>The setters arrive as a tuple array, not as a fluent chain</b>, and this was
+    ///         measured rather than assumed (R171, a probe on the refusal path). By the time the
+    ///         split sees the call its second argument is
+    ///         <c>new ITuple[]{ new Tuple&lt;Delegate, object&gt;(e =&gt; …, value), … }</c>, so a
+    ///         selector is the first argument of each constructed tuple. The first one that is not
+    ///         a member chain is reported, because EF reports one.
+    ///     </para>
+    ///     <para>
+    ///         <b>THIS DOES NOT MAKE <c>Update_with_invalid_lambda_in_set_property_throws</c>
+    ///         PASS, AND THE REASON IS A BOUND VARIABLE'S NAME.</b> The spec base compares against
+    ///         <c>RelationalStrings.InvalidPropertyInSetProperty</c> built over
+    ///         <c>(OrderDetail o) =&gt; o.MaybeScalar(e =&gt; e.OrderID)</c>, while the caller wrote
+    ///         <c>e =&gt; e.MaybeScalar(e =&gt; e.OrderID)</c>. The <c>o</c> is EF's:
+    ///         <c>NavigationExpandingExpressionVisitor.CreateNavigationExpansionExpression</c>
+    ///         renames the query's parameter to
+    ///         <c>entityType.ShortName()[0].ToString().ToLowerInvariant()</c>, and it renames the
+    ///         whole query. This provider refuses <em>before</em> any of EF's pipeline runs
+    ///         (ADR-006), so it has the caller's own names and nothing else.
+    ///     </para>
+    ///     <para>
+    ///         Renaming just this selector would satisfy the assertion and make the message
+    ///         disagree with itself — the query printed beside it still says
+    ///         <c>od =&gt; od.OrderID &lt; 10250</c>, because that half is the caller's too. A
+    ///         message that names one lambda's parameter EF's way and the next one the caller's
+    ///         way is worse than one that is consistently the caller's, so the two tests stay red
+    ///         and this stays as it is.
+    ///     </para>
+    /// </remarks>
+    private static string? InvalidSetPropertySelector(MethodCallExpression call)
+    {
+        var tuples = new List<NewExpression>();
+        foreach (Expression argument in call.Arguments)
+        {
+            new TupleCollector(tuples).Visit(argument);
+        }
+
+        foreach (NewExpression tuple in tuples)
+        {
+            if (tuple.Arguments.Count == 0
+                || Unquote(tuple.Arguments[0]) is not LambdaExpression selector
+                || IsMemberChain(selector.Body))
+            {
+                continue;
+            }
+
+            return Microsoft.EntityFrameworkCore.Diagnostics.RelationalStrings.InvalidPropertyInSetProperty(
+                Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(selector));
+        }
+
+        return null;
+
+        static Expression Unquote(Expression node)
+            => node is UnaryExpression { NodeType: ExpressionType.Quote } quote ? quote.Operand : node;
+
+        static bool IsMemberChain(Expression body)
+        {
+            Expression? node = body;
+            while (node is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+            {
+                node = convert.Operand;
+            }
+
+            while (node is MemberExpression member)
+            {
+                node = member.Expression;
+            }
+
+            return node is ParameterExpression;
+        }
+    }
+
+    /// <summary>
+    ///     Collects every constructed tuple in a subtree — the carrier <c>ExecuteUpdate</c>'s
+    ///     setters arrive in.
+    /// </summary>
+    private sealed class TupleCollector(List<NewExpression> found) : ExpressionVisitor
+    {
+        /// <inheritdoc />
+        protected override Expression VisitNew(NewExpression node)
+        {
+            if (typeof(System.Runtime.CompilerServices.ITuple).IsAssignableFrom(node.Type))
+            {
+                found.Add(node);
+            }
+
+            return base.VisitNew(node);
+        }
     }
 
     /// <summary>
@@ -959,15 +1247,77 @@ public sealed class QuerySplitter
         }
     }
 
-    private sealed class SplitHintStrippingVisitor : ExpressionVisitor
+    /// <summary>
+    ///     Replaces the live client context in the receiver position of a mapped instance function
+    ///     with <see cref="ServerContextExpression" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The model decides, not the shape.</b> Only a method the model maps with
+    ///         <c>HasDbFunction</c> is rewritten. A call to any other instance method on the
+    ///         context is left exactly as it was, so it is still refused by
+    ///         <c>ServerBoundaryAnalyzer.CarriesTheClientsContext</c> and the caller still gets EF's
+    ///         own translation failure.
+    ///     </para>
+    ///     <para>
+    ///         <b>`FindDbFunction` is asked with the METHOD, which is how EF stores the mapping.</b>
+    ///         A name comparison would admit an unmapped overload of the same name, and the server
+    ///         would then be asked for SQL that does not exist.
+    ///     </para>
+    /// </remarks>
+    private sealed class InstanceDbFunctionReceiverVisitor(IModel model) : ExpressionVisitor
     {
         protected override Expression VisitMethodCall(MethodCallExpression node)
-            => node.Method.IsStatic
+        {
+            if (node.Object is ConstantExpression { Value: DbContext } receiver
+                && node.Method.DeclaringType is { } declaring
+                && model.FindDbFunction(node.Method) is not null)
+            {
+                return node.Update(
+                    new ServerContextExpression(
+                        receiver.Type == declaring ? receiver.Type : declaring,
+                        receiver.Value!),
+                    Visit(node.Arguments));
+            }
+
+            return base.VisitMethodCall(node);
+        }
+    }
+
+    private sealed class SplitHintStrippingVisitor : ExpressionVisitor
+    {
+        /// <summary>
+        ///     What the query asked for, or <see langword="null" /> when it said nothing.
+        /// </summary>
+        /// <remarks>
+        ///     <b>Stripped from the tree and carried on the request instead.</b> The hint cannot
+        ///     travel inside the tree -- see the call site for the 456 tests that proved it -- but
+        ///     it is the SERVER's business, and the server is the half with a relational provider
+        ///     that can honour it. Recording it here is what lets
+        ///     <c>QueryDataRequest.SplitQueryBehavior</c> carry it.
+        /// </remarks>
+        public QuerySplittingBehavior? Behavior { get; private set; }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (node.Method.IsStatic
                 && node.Arguments.Count == 1
                 && SplitHints.Contains(node.Method.Name)
-                && node.Method.DeclaringType?.FullName == RelationalQueryableExtensionsFullName
-                    ? Visit(node.Arguments[0])
-                    : base.VisitMethodCall(node);
+                && node.Method.DeclaringType?.FullName == RelationalQueryableExtensionsFullName)
+            {
+                // THE INNERMOST HINT WINS, because this walk reaches the outer call first and the
+                // recursion below overwrites what it recorded. That is EF's own rule: its
+                // preprocessor lifts the hint out of the tree and applies it to the whole query,
+                // and where a query carries more than one, the one nearest the root decides.
+                Behavior = node.Method.Name == AsSplitQueryName
+                    ? QuerySplittingBehavior.SplitQuery
+                    : QuerySplittingBehavior.SingleQuery;
+
+                return Visit(node.Arguments[0]);
+            }
+
+            return base.VisitMethodCall(node);
+        }
     }
 
     private sealed class MarkerStrippingVisitor : ExpressionVisitor
@@ -1002,15 +1352,20 @@ public sealed class QuerySplitter
 
         private IReadOnlySet<Expression> _clientProjectedSources = new HashSet<Expression>();
 
+
+        private bool _serverStoreIsRelational = true;
+
         public static (Expression Operator, string? Details)? Find(
             Expression query,
             IReadOnlySet<Expression> serverSide,
             IReadOnlySet<Expression> reassemblies,
-            TypeAllowlist allowlist)
+            TypeAllowlist allowlist,
+            bool serverStoreIsRelational)
         {
             var finder = new ClientEvaluationFinder(serverSide, reassemblies, allowlist)
             {
                 _clientProjectedSources = ClientProjectedSources(reassemblies, allowlist),
+                _serverStoreIsRelational = serverStoreIsRelational,
             };
 
             finder.Visit(query);
@@ -1067,6 +1422,16 @@ public sealed class QuerySplitter
                 if (_found is null)
                 {
                     RejectUnshippableTypeArgument(node);
+                }
+
+                if (_found is null)
+                {
+                    RejectUnshippableOrderingKey(node);
+                }
+
+                if (_found is null)
+                {
+                    RejectDeadCoalesce(node);
                 }
             }
 
@@ -1153,6 +1518,131 @@ public sealed class QuerySplitter
             }
 
             _found = (node, null);
+        }
+
+        /// <summary>
+        ///     Refuses a client-side ordering whose <em>key type</em> is one the wire cannot
+        ///     carry.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The same gap as <see cref="RejectUnshippableTypeArgument" />, on a different
+        ///         operator: the walk above reads an operator's value arguments and never its type
+        ///         arguments.</b> <c>OrderByDescending(g =&gt; (MyDTO)null)</c> carries no method
+        ///         call, no constructed type and no comparison, so
+        ///         <see cref="ClientCodeFinder" /> finds nothing in it and the ordering simply
+        ///         runs in the residual.
+        ///     </para>
+        ///     <para>
+        ///         <b>What it does there is fetch the whole table, and that was measured rather
+        ///         than reasoned.</b> A probe on
+        ///         <c>Correlated_collection_order_by_constant_null_of_non_mapped_type</c> printed
+        ///         <c>shippable=1</c> with the shipped subtree being the bare query root, and the
+        ///         server's own SQL log showed one <c>SELECT</c> over the whole
+        ///         <c>Gears UNION ALL Officers</c> set. The ordering and the projection then ran
+        ///         on the client, over every row. Right answer, catastrophic plan, no diagnostic:
+        ///         the exact failure this class exists to prevent, and the one
+        ///         <c>A_filter_the_server_cannot_run_throws_rather_than_fetching_everything</c>
+        ///         pins for a <c>Where</c>.
+        ///     </para>
+        ///     <para>
+        ///         <b>Ordering only, and not <c>GroupBy</c>.</b> A <c>GroupBy</c> keyed on an
+        ///         anonymous type is perfectly translatable and lands here only because of this
+        ///         provider's type boundary; refusing that is what cost 235 tests once. An
+        ///         ordering key, by contrast, is a scalar in every query that works: the allowlist
+        ///         admits every primitive and every mapped type, so a key it rejects is one no
+        ///         store could sort by.
+        ///     </para>
+        /// </remarks>
+        private void RejectUnshippableOrderingKey(MethodCallExpression node)
+        {
+            // RELATIONAL ONLY, AND THE FIRST VERSION WAS NOT: refusing everywhere broke the two
+            // Tier A `Correlated_collection_order_by_constant_null_of_non_mapped_type`. EF's
+            // in-memory provider is LINQ to objects and sorts by anything, so a key type no store
+            // could sort by is still a key IT can sort by. R160's distinction, and its gate.
+            if (!_serverStoreIsRelational
+                || node.Method.Name is not (nameof(Queryable.OrderBy)
+                    or nameof(Queryable.OrderByDescending)
+                    or nameof(Queryable.ThenBy)
+                    or nameof(Queryable.ThenByDescending))
+                || node.Method.DeclaringType is not { } declaring
+                || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
+                || !node.Method.IsGenericMethod)
+            {
+                return;
+            }
+
+            Type[] typeArguments = node.Method.GetGenericArguments();
+            if (typeArguments.Length != 2)
+            {
+                return;
+            }
+
+            // A generic parameter is not a type yet, and a type the allowlist permits could have
+            // shipped -- so if it is here the boundary fell for some other reason, and that reason
+            // is not this one's to report. Both exemptions are its sibling's, for its reasons.
+            Type key = typeArguments[1];
+            if (key.IsGenericParameter || allowlist.IsAllowed(key))
+            {
+                return;
+            }
+
+            _found = (node, null);
+        }
+
+        /// <summary>
+        ///     Refuses a row-deciding argument that coalesces over a freshly constructed object,
+        ///     which no store can translate and which does nothing.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The same silent full-table read as
+        ///         <see cref="RejectUnshippableOrderingKey" />, reached a different way.</b>
+        ///         <c>where (new { Name = g.LeaderNickname } ?? new { Name = g.FullName }) != null</c>
+        ///         leaves the <c>Where</c> on the client, so the boundary falls to the query root
+        ///         and the server returns every row. Measured, not reasoned: the probe reported
+        ///         <c>shippable=1</c> with the bare root, and the server's SQL log showed one
+        ///         <c>SELECT</c> over the whole table.
+        ///     </para>
+        ///     <para>
+        ///         <b>Why the walk misses it, and why this does not widen the exemption it misses
+        ///         it through.</b> <see cref="ClientCodeFinder.VisitNew" /> refuses a constructed
+        ///         type only when it LACKS value equality, and an anonymous type has structural
+        ///         <c>Equals</c>. That exemption is load-bearing:
+        ///         <c>join o in os on new { a, b } equals new { x, y }</c> is a composite join key
+        ///         EF translates, and <c>GroupBy(x =&gt; new { x.A, x.B })</c> is a composite
+        ///         grouping key. EF's own specification suites hold <b>84</b> of the latter and
+        ///         <b>12</b> of the former, so refusing construction in a row-deciding argument
+        ///         would be the 235-test mistake again.
+        ///     </para>
+        ///     <para>
+        ///         <b>So the test is the coalesce, not the construction.</b> <c>new</c> never
+        ///         returns <see langword="null" />, so <c>new X() ?? y</c> is always
+        ///         <c>new X()</c> and the operator is dead. A composite key is a bare
+        ///         construction and is not an operand of <c>??</c>, so nothing this refuses is
+        ///         code that does anything.
+        ///     </para>
+        ///     <para>
+        ///         <b>Relational only</b>, for <see cref="RejectUnshippableOrderingKey" />'s
+        ///         reason: EF's in-memory provider evaluates this happily, and its copy of the
+        ///         test asserts an answer rather than a refusal.
+        ///     </para>
+        /// </remarks>
+        private void RejectDeadCoalesce(MethodCallExpression node)
+        {
+            if (!_serverStoreIsRelational)
+            {
+                return;
+            }
+
+            foreach (Expression argument in RowDecidingArguments(node))
+            {
+                if (DeadCoalesceFinder.Find(argument))
+                {
+                    _found = (node, null);
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -1307,6 +1797,49 @@ public sealed class QuerySplitter
     ///     EF's details clause, or <see langword="null" /> when the bare message says enough.
     /// </summary>
     private readonly record struct ClientCodeReason(string? Details);
+
+    /// <summary>
+    ///     Finds a <c>??</c> whose left operand is a freshly constructed object.
+    /// </summary>
+    private sealed class DeadCoalesceFinder : ExpressionVisitor
+    {
+        private bool _found;
+
+        public static bool Find(Expression expression)
+        {
+            var finder = new DeadCoalesceFinder();
+            finder.Visit(expression);
+            return finder._found;
+        }
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            if (!_found
+                && node.NodeType == ExpressionType.Coalesce
+                && Unwrap(node.Left) is NewExpression or MemberInitExpression)
+            {
+                _found = true;
+                return node;
+            }
+
+            return _found ? node : base.VisitBinary(node);
+        }
+
+        // A construction may arrive boxed or up-cast, and the conversions have to come off before
+        // the test means anything -- the same reason `ClientCodeFinder.IsNull` strips them.
+        private static Expression Unwrap(Expression node)
+        {
+            while (node is UnaryExpression
+                   {
+                       NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs,
+                   } convert)
+            {
+                node = convert.Operand;
+            }
+
+            return node;
+        }
+    }
 
     private sealed class ClientCodeFinder(TypeAllowlist allowlist, bool methodsOnly = false)
         : ExpressionVisitor
@@ -1664,9 +2197,9 @@ public sealed class QuerySplitter
     ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
     ///     compiler emits one member and the old arity disappears from the assembly, which
     ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps, and the <c>Packages</c>
-    ///     workflow is the only job that checks it — it runs on <c>main</c> alone, which is how
-    ///     six of these reached <c>main</c> unnoticed. Delete when the baseline moves past 10.0.x.
+    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
+    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
+    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
     /// </remarks>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public QuerySplitter(

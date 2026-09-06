@@ -67,6 +67,25 @@ A query tree is kilobytes, and a `SaveChanges` request is no bigger than the gra
 tracked, so a low limit is usually safe. Cap the request bytes at your gateway too; this limit
 catches whatever the gateway lets through.
 
+## Sending the server's log to the client
+
+EF writes its warnings about a query or a save on the server, so a client never sees them.
+Forwarding is off until you grant it. Then they arrive in the client's own logger, under the
+server's category and event id:
+
+```csharp
+builder.Services.AddInfoCarrierServerLogForwarding();   // warnings and above, the default
+```
+
+Pass a `LogLevel` to change it. At `Information` the SQL of every command the server runs goes too,
+which tells a client your schema.
+
+A server whose context enables sensitive data logging forwards nothing until you also call
+`AddInfoCarrierSensitiveServerLogForwarding()`. That setting changes what EF's messages say
+everywhere, so no rule can pick out the ones carrying values.
+
+Model and context events never cross. Both halves build a model, and each logs its own.
+
 ## Context lifetime
 
 `InProcessInfoCarrierServer` takes a fresh scope per request, so every request gets a clean change

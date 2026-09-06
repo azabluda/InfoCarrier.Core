@@ -75,6 +75,26 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         {
             DataSource = _path,
             Cache = SqliteCacheMode.Private,
+
+            // POOLING OFF, AND THIS CLOSES AN INTERMITTENT RATHER THAN TIDYING SOMETHING.
+            // `InitializeAsync` below calls `EnsureDeletedAsync`, and EF's
+            // `SqliteDatabaseCreator.Delete` answers a file-backed database with
+            // `SqliteConnection.ClearAllPools()` -- **process-wide**, not for this connection
+            // string. It disposes every pooled native handle in the process, including one that a
+            // concurrently initializing store is in the middle of opening, and that store then
+            // fails inside `SqliteConnection.Open()` at `sqlite3_create_collation` with
+            // `ObjectDisposedException: SQLitePCL.sqlite3`.
+            //
+            // Every SQLite store here deletes its file at initialization, so every one of them
+            // fires that process-wide clear. xUnit runs test collections in parallel, and the two
+            // ADR-009 tiers share one process since the test projects merged, so several stores
+            // initialize at once. With no pool there is nothing for the clear to dispose.
+            //
+            // Observed once, as `AdHocMiscellaneousQuerySqliteInfoCarrierTest`
+            // `.Bool_discriminator_column_works(async: False)`. The mechanism is read from EF's own
+            // source and the failing stack rather than from a reproduction: a failure seen once
+            // cannot be shown to have stopped.
+            Pooling = false,
         }.ToString();
     }
 

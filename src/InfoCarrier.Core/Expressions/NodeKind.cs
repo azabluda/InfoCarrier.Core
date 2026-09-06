@@ -73,4 +73,27 @@ public enum NodeKind
     ///     entity type for the server to resolve. Same grant, same default refusal.
     /// </summary>
     SqlQueryRootStub = 16,
+
+    /// <summary>
+    ///     The receiver of a user-defined function mapped as an INSTANCE method on the context
+    ///     (<c>HasDbFunction</c> over a non-static method). Rebound server-side to the SERVER's
+    ///     context.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The one thing a client context legitimately means on the far side.</b> Such a
+    ///         call funcletizes to a receiver holding the live client <c>DbContext</c>, which no
+    ///         wire carries and which this provider refuses everywhere else: it is an object graph
+    ///         with a change tracker and a service provider, and the server has one of its own. But
+    ///         in this position the receiver is not data. It says "the context", and on the server
+    ///         "the context" is the server's.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only in this position.</b> A context reaching the boundary any other way is still
+    ///         refused, by <c>ServerBoundaryAnalyzer.CarriesTheClientsContext</c>. The rewrite that
+    ///         produces this node runs before the boundary is drawn and matches only a receiver
+    ///         whose method the model maps as a function.
+    ///     </para>
+    /// </remarks>
+    ServerContextStub = 17,
 }

@@ -94,7 +94,7 @@ public class NullSemanticsQueryInfoCarrierTest(NullSemanticsQueryInfoCarrierTest
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.Sqlite,
+                SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 onAddOptions: ApplyRelationalNulls,

@@ -31,7 +31,7 @@ namespace InfoCarrier.Core.Metadata;
 ///         and <c>model.GetDbFunctions()</c> cannot be called. The annotation holds a dictionary
 ///         whose values expose a public <c>MethodInfo</c>, which is reached through the
 ///         non-generic <see cref="IDictionary" /> and one property lookup.
-///         <c>DocumentMappingPinTest</c> pins both the annotation name <em>and</em> the result
+///         <c>RelationalMetadataAgreementTest</c> checks the result
 ///         against EF's own <c>GetDbFunctions()</c>, so a rename or a reshape is a red test rather
 ///         than a silent behaviour change.
 ///     </para>
@@ -45,9 +45,9 @@ namespace InfoCarrier.Core.Metadata;
 public static class ModelDbFunctions
 {
     /// <summary>
-    ///     <c>RelationalAnnotationNames.DbFunctions</c>. Pinned by <c>DocumentMappingPinTest</c>.
+    ///     <c>RelationalAnnotationNames.DbFunctions</c>. EF's own constant, so a rename is a build error.
     /// </summary>
-    public const string DbFunctionsAnnotation = "Relational:DbFunctions";
+    public const string DbFunctionsAnnotation = RelationalAnnotationNames.DbFunctions;
 
     private const string MethodInfoProperty = "MethodInfo";
 
@@ -96,7 +96,7 @@ public static class ModelDbFunctions
     ///     <c>IReadOnlyDbFunction.MethodInfo</c> <em>explicitly</em> — so a public property lookup
     ///     on the concrete type finds nothing and answers "this model maps no functions". The
     ///     model this provider actually sees is always the finalized one, so the concrete-class
-    ///     route worked on no model at all. <c>DocumentMappingPinTest</c> is what caught it, by
+    ///     route worked on no model at all. <c>RelationalMetadataAgreementTest</c> caught it, by
     ///     comparing against EF's own <c>GetDbFunctions()</c> rather than asserting a count.
     /// </remarks>
     [UnconditionalSuppressMessage(

@@ -24,6 +24,19 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+
+    <!--
+      THE RELATIONAL HALF LIVES IN `Relational/` AND THIS IS ITS REFERENCE (D3 superseded
+      2026-09-03). It was a separate package until then. The measurements behind the reversal are in
+      `docs/architecture.md` §6a: +0.62 MB brotli on a Blazor client, unconditional, no new package
+      dependencies, against 262 of 20,368 tests lost without it.
+
+      A FUTURE SPLIT IS A FOLDER MOVE. Everything that needs this reference is under `Relational/`
+      and keeps the `InfoCarrier.Core.Relational` namespace, so extracting it again means moving one
+      directory and this one line. The supersession lists the three measurable conditions that would
+      call for that.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
   </ItemGroup>
 
 </Project>

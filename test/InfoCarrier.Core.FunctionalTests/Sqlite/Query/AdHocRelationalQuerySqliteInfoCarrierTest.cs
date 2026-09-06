@@ -36,7 +36,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class AdHocManyToManyQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocManyToManyQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
@@ -66,7 +66,7 @@ public class AdHocManyToManyQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
 public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocQueryFiltersQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
@@ -126,7 +126,7 @@ public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixtur
 public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocAdvancedMappingsQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
@@ -185,7 +185,7 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
 public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocNavigationsQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.Sqlite);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory

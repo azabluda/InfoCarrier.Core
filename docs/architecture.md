@@ -300,6 +300,14 @@ compares the client model with the server model directly.
 
 ### D3 — why does `InfoCarrier.Core` reference `Microsoft.EntityFrameworkCore.Relational`?
 
+> **SUPERSEDED 2026-09-03 by the owner. D3 IS REVERTED.** `InfoCarrier.Core` references
+> `Microsoft.EntityFrameworkCore.Relational` again, and `InfoCarrier.Core.Relational` is folded back
+> into it. **Everything below stays as the record of why the split was made and what it measured**,
+> because the split may be wanted again and the measurements are the reason it would be. Read the
+> **supersession amendment 2026-09-03 (R131)** at the end of this entry first; it states the new
+> shape and the conditions that would reverse it back.
+
+
 **Raised 2026-08-11. Ideally the reference should not be there. Recorded with the facts so the
 investigation starts from evidence rather than from the question. No action now.**
 
@@ -422,6 +430,19 @@ ADR-006**: it registers `IDatabase → RelationalDatabase`, and this provider ca
 relational" cannot mean calling that builder**, and EF publishes no seam that splits its metadata
 half from its command half.
 
+**THE CHARTER, stated by the owner 2026-09-03, and it governs all three levels below.**
+`InfoCarrier.Core.Relational` exists so the client can **see the relational annotations** and
+**name the useful relational types**. It must **never** hand the client a `DbConnection`, or
+anything standing for one. The client has no database; a member that returned a connection would
+let a caller reach past the wire to the server's store, and a green from that path says nothing
+about this provider. Anything this package adds is metadata, annotations or CLR type identity, and a
+relational member with no meaning on a connectionless client **throws** rather than answering
+plausibly — a throw is louder than a wrong answer. That is already how
+`InfoCarrierRelationalFacadeDependencies` is built (`RelationalConnection`, `RawSqlCommandBuilder`
+and `CommandLogger` all throw) and how the harness's `RelationalInfoCarrierTestStore` refuses
+`Connection`. **This is also the sentence that puts level 3 out of scope**: a relational model on
+the client needs store knowledge, and store knowledge is the one thing on the far side of the wire.
+
 **Three levels, and only the third is risky.** Level 1 references the package and supplies today's
 string answers behind seams — most of the deletion, almost no risk. Level 2 registers EF's own
 relational conventions on the client model. **Level 3, a relational model on the client
@@ -438,6 +459,322 @@ the flag per fixture makes the same bases run both ways, and the difference is t
 **R114 already proved the registration shape.** An `IRelationalDatabaseFacadeDependencies` supplied
 from outside `InfoCarrier.Core` satisfied EF's type test and took `failed` 143 → 141 with D3
 untouched. That class is the first member this package would hold.
+
+#### D3 amendment 2026-09-02 (R120) — level 1 is built, and the seam it needed has exactly one reader
+
+**`src/InfoCarrier.Core.Relational` now exists and ships.** It holds
+`InfoCarrierRelationalQueryRoots`, which names `FromSqlQueryRootExpression` and
+`SqlQueryRootExpression` outright, and `InfoCarrierRelationalFacadeDependencies`, moved out of the
+test project. `RelationalQueryRootShape.cs` is deleted: **276 lines and 10 trim suppressions**, and
+the trim count fell with them. **D3 as written is still untouched** — `InfoCarrier.Core` references
+nothing relational, and the seam it exposes is
+`InfoCarrier.Core.Metadata.IInfoCarrierRelationalQueryRoots` with a no-op default.
+
+**The finding is the constraint, and it cost a wrong answer to see.** The prototype gave the same
+fact two carriers. `ServerBoundaryAnalyzer` read the seam from the **options**, which it must:
+`ExtensionInfo.GetServiceProviderHashCode()` is `0` and `ShouldUseSameServiceProvider` is true for
+every InfoCarrier options shape, so every client context in a process shares one internal service
+provider and anything per-context has to travel on the options. `ExpressionToNodeTranslator` read it
+from **DI**, because it is DI-scoped. A client that set the option but not the service therefore
+**admitted** a raw-SQL root at the boundary and then **dropped its SQL** in the translator — the
+whole table came back, which is the defect R75 closed.
+`FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated` answered **2 where 1 is
+correct**, and a red test would have been the better outcome.
+
+**The rule that generalises, and it is not about relational at all.** *A fact two components read
+independently is a fact that can disagree with itself, and the disagreement is silent when one
+component's answer only widens what the other is allowed to do.* Permission and knowledge were split
+across two carriers here, and the boundary check held while the thing it guarded stopped being
+carried.
+
+**The shape of the fix.** `InfoCarrierOptionsExtension.RelationalQueryRootsFor(context)` is the one
+reader. `QueryExecutor` calls it once per execution and hands the same object to `QuerySplitter`
+(hence to the analyzer) and to `ExpressionSerializer.ToNode`. The translator takes it per
+translation and scopes it exactly as it scopes parameter identity: set at depth 0, untouched in the
+recursion. Nothing else resolves it.
+
+**The server half is a separate provider and asks separately.** `InProcessInfoCarrierServer` resolves
+it from the application's collection and passes it to `ServerQueryExecutor`, beside the value
+mappers, the allowed types and the raw-SQL grant. **Not from the context**: the server context builds
+its own internal service provider and never sees the application's collection, so a lookup through
+the context answered "nothing is relational here" for a server that had registered a real
+implementation.
+
+**Three registration entry points, and that is not untidiness.**
+
+| Call | Where | Why it is separate |
+|---|---|---|
+| `AddInfoCarrierRelational()` | both halves | the query roots, and nothing else |
+| `AddInfoCarrierRelationalClient()` | **client only** | also replaces `IDatabaseFacadeDependencies`, which `Database.SqlQuery<T>` type-tests. A relational *server* already has EF's own, and that one owns a live connection |
+| `InfoCarrierDbContextOptionsBuilder.UseRelationalQueryRoots(...)` | client, no DI | most clients never build an `IServiceCollection`; they only call `UseInfoCarrier`. `SqliteSmokeTest` is exactly that shape |
+
+**One further cost, measured.** `EnablePackageValidation` is set for every packable project in
+`Directory.Build.props`, and a brand-new package has no baseline: restore fails with `NU1101`
+hunting an `InfoCarrier.Core.Relational 10.0.0` that cannot exist. The new csproj sets
+`<EnablePackageValidation>false</EnablePackageValidation>` with a comment saying to turn it on after
+the first release.
+
+#### D3 amendment 2026-09-02 (R123) — level 2 is scoped, and it is blocked on ONE decision that is the owner's
+
+**Nothing was built. This entry is the expensive half of level 2 done in advance, so the next
+attempt does not re-derive it.** Level 2 is "register EF's own relational conventions on the client
+model", so that `ToTable`, `ToJson`, TPT/TPC and `EntityTypeHierarchyMappingConvention` are EF's
+rather than this repository's 131-line copy.
+
+**Good news first: the convention itself runs on a client model, and that was read from EF's source
+rather than assumed.**
+
+| Question | Answer | How |
+|---|---|---|
+| Does `EntityTypeHierarchyMappingConvention` need relational *services*? | **No.** It takes `RelationalConventionSetBuilderDependencies` and never touches it in `ProcessModelFinalizing` | read `EFCore.Relational/Metadata/Conventions/EntityTypeHierarchyMappingConvention.cs` end to end |
+| What is in that dependency object, then? | `IRelationalAnnotationProvider` and `IUpdateSqlGenerator`, neither of which the client has | read `RelationalConventionSetBuilderDependencies` |
+| Does `GetTableName()` need one? | **No.** `GetDefaultTableName` reads model metadata and `Model.GetMaxIdentifierLength()`, and nothing else | read `RelationalEntityTypeExtensions` |
+
+So the convention can be constructed from the relational package with a dependency object whose two
+members throw, exactly as `InfoCarrierRelationalFacadeDependencies` already does for its three
+relational members and for the reason ADR-013 records: **the callers that want them are not the
+callers that want the rest**, and a throw is louder than a wrong answer if EF ever changes that.
+
+**THE BLOCKER, and it is not the conventions.** It is *which client gets them*, and it is R120's
+one-reader problem in its model-building form.
+
+- **A convention set cannot read a context's options.** `ProviderConventionSetBuilderDependencies`
+  exposes `ContextType` — a `Type` — and no `ICurrentDbContext`. So the seam cannot travel on the
+  options the way `IInfoCarrierRelationalQueryRoots` does; it has to be registered in DI.
+- **DI is one answer for every client context in the process**, because
+  `ExtensionInfo.GetServiceProviderHashCode()` is `0`. That is the fact R120 was about.
+- **And the model itself is shared.** This provider registers no `IModelCacheKeyFactory`, so EF's
+  default is in force and it keys the model on the context CLR type. Two contexts of the same type,
+  one configured relational and one not, get **one model** — so even a per-context answer could not
+  be honoured without replacing that factory.
+
+**Two ways forward, and choosing between them is a decision rather than a step.**
+
+1. **Level 2 is a process-wide statement.** `AddInfoCarrierRelational()` on the client's service
+   collection means "every InfoCarrier client in this process has a relational backing store". Cheap,
+   honest for the overwhelming majority of applications, and it makes the relational conventions a
+   property of the deployment rather than of the context. What it gives up is the mixed process.
+2. **Replace `IModelCacheKeyFactory`** so the options participate in the key, and carry the seam on
+   the options as level 1 does. Correct in the mixed process, and it costs a model per options shape
+   plus a new public service this provider did not have.
+
+**Do not start level 2 without answering that.** Starting with (1) and discovering (2) later is a
+public-API change and a model-cache change at once.
+
+**One more thing measured while scoping, because it changes the test plan.** The relational client
+services are registered today only where a fixture asked for **raw SQL**
+(`InfoCarrierTestStoreFactory.AddProviderServices`, gated on `ArbitrarySqlExecution`). Level 2 wants
+them wherever the backing store is relational, which is every Tier B fixture. So the first
+measurement of level 2 is not the conventions at all: it is **turning the relational client on for
+the whole of Tier B**, which is a large blast radius and should be measured on its own before a
+single convention moves.
+
+#### D3 amendment 2026-09-03 (R127) — level 2 step one is done, and the next step is a DI reach problem
+
+**The owner's decision is taken: level 2 is a process-wide statement**, answer (1) of the two the
+R123 amendment set out. Registering `InfoCarrier.Core.Relational` in a client's services says that
+the clients built from that collection have a relational backing store. **`IModelCacheKeyFactory` is
+therefore NOT replaced**, and nothing should add one.
+
+**Step one is done and it is not a convention.** The relational client services were registered only
+where a fixture asked for raw SQL; they are now registered for **every** Tier B fixture, which is
+what "the backing store is relational" means on this tier. The R123 amendment asked for that blast
+radius to be measured on its own, and it was.
+
+**THE MEASUREMENT MOVED NOTHING, IN ALL THREE LEVELS.** `failed` 160 both sides, the failing-test
+name list byte-identical, and `REASONS: unchanged`. That is the case `CLAUDE.md` warns about — a
+matcher that never fired looks exactly like a change that did not help — so the code was
+**established to have run** rather than assumed. `Sqlite/RelationalClientTierPinTest` reads the
+registration out of the collection each tier builds: it is **red without the change and green with
+it**, verified by reverting the one file and re-running. It also pins the other direction, that Tier
+A registers nothing relational, which is stopping rule 4 in test form.
+
+**What the null result actually tells us, and it is worth having.** The facade shim and the
+query-root seam are inert for a client that never uses `Database.SqlQuery<T>` or a raw-SQL root.
+Widening the registration from a handful of fixtures to all of Tier B changed no answer anywhere in
+20,361 tests. So the blast radius of level 2's *registration* is nil, and whatever the conventions
+change later will be attributable to the conventions alone. That is exactly what measuring this step
+separately was for.
+
+**THE NEXT STEP HITS A DIFFERENT CARRIER PROBLEM, and it should be read before it is started.** The
+conventions live behind `IProviderConventionSetBuilder`, which `InfoCarrier.Core` registers through
+`EntityFrameworkServicesBuilder.TryAdd` inside `AddEntityFrameworkInfoCarrier` — and that call is
+made by `InfoCarrierOptionsExtension.ApplyServices`, into **EF's internal service provider**, not
+into the application's collection. `AddInfoCarrierRelationalClient` runs on the application's
+collection. So a client that does not call `UseInternalServiceProvider` cannot have the convention
+set replaced by a DI call at all, and `SqliteSmokeTest` is exactly that shape. **This is the same
+question `UseRelationalQueryRoots` answered for level 1**, and the honest answers are the same two:
+an options-carried seam that `InfoCarrierConventionSetBuilder` reads, or an explicit statement that
+level 2 needs an internal service provider. It has to be decided before code, for the reason R123
+gives.
+
+**And when it is built, ICC.R must REPLACE rather than duplicate.** The shape is a subclass of
+`InfoCarrierConventionSetBuilder` in `InfoCarrier.Core.Relational` that calls the base and then
+swaps EF's relational conventions in for the three hand-written ones
+(`InfoCarrierHierarchyMappingConvention`, `InfoCarrierValueGenerationConvention`, and the
+`Relational:` annotation strings behind them), with the hand-written files deleted in the same
+commit. Two implementations of one fact in two packages drift silently, which is the failure mode
+this document already records in D3 and ADR-012.
+
+#### D3 amendment 2026-09-03 (R128) — level 2 step two is BUILT, by replacement, and answer (C)
+
+**The owner chose (C) on 2026-09-03**: `InfoCarrier.Core.Relational` **replaces**
+`IProviderConventionSetBuilder` with a subclass of `InfoCarrierConventionSetBuilder`. Not
+`IConventionSetPlugin`, not `ModelConfigurationBuilder.Conventions`, and not a documented
+requirement for `UseInternalServiceProvider`.
+
+**The DI reach problem the R127 amendment described was real but narrower than it read.** Every EF
+spec fixture goes through `ServiceProviderFixtureBase`, which builds its provider from
+`TestStoreFactory.AddProviderServices(...)` and calls `UseInternalServiceProvider` — read from EF's
+source. So `AddInfoCarrierRelationalClient` reaches the client's convention set for the **whole
+suite** with no new seam. What is still open is a consumer that builds no collection at all;
+`SqliteSmokeTest` is that shape, and it is unaffected today because nothing it does needs a
+relational convention.
+
+**What was built.** `InfoCarrierRelationalConventionSetBuilder` extends the core builder, calls
+`base.CreateConventionSet()`, and adds EF's own `EntityTypeHierarchyMappingConvention`.
+`AddInfoCarrierRelationalClient` does `RemoveAll<IProviderConventionSetBuilder>()` and registers it
+Scoped, which is the lifetime EF declares. **`InfoCarrierHierarchyMappingConvention` is deleted** —
+131 lines, four hand-spelled `Relational:` strings, and the pin test that held them.
+
+**The relational dependency object is a stub whose every member throws, and that is the charter in
+code.** `EntityTypeHierarchyMappingConvention` takes `RelationalConventionSetBuilderDependencies`
+and never touches it. The two services that object carries — an `IRelationalAnnotationProvider` and
+an `IUpdateSqlGenerator` — are command-side, and this package does not give the client command-side
+anything. All 29 members throw with a message saying so. If EF ever starts reading them, the model
+build fails loudly instead of answering plausibly and wrongly.
+
+**A SECOND NULL RESULT, AND A NEGATIVE CONTROL IS WHAT MADE IT EVIDENCE.** `failed` 160 both sides,
+identical names, `REASONS: unchanged`. Removing EF's convention from the new builder and changing
+nothing else turns `TPTInheritanceQueryInfoCarrierTest.Using_from_sql_throws` and its TPC sibling
+red; restoring it turns them green. So the convention runs and does work, and the hand-written copy
+was doing the same work — which is exactly why no count moved. **The pins are permanent**:
+`RelationalClientTierPinTest` asserts a single `IProviderConventionSetBuilder` descriptor per tier,
+naming the relational subclass on Tier B and the core one on Tier A. The count is half the
+assertion, because a `RemoveAll` that stopped working would leave both and the last would win.
+
+**What is left of the duplication, and it is the next step rather than this one.**
+`InfoCarrierValueGenerationConvention` still spells two `Relational:` strings by hand, and
+`AnnotationDocumentMapping` and `ModelDbFunctions` spell more. Each is a separate step with its own
+measurement, because deleting a string deletes its pin.
+
+#### D3 amendment 2026-09-03 (R129) — the conventions are not one job, and one of them cannot run here
+
+**`RelationalValueGenerationConvention` was tried and backed out: `failed` 160 -> 720, 560 broken,
+458 of them one message.** `The property '__synthesizedOrdinal' cannot be configured as
+'ValueGeneratedOnUpdate'`. That property is the ordinal EF synthesizes for a JSON-mapped collection,
+and EF's relational value generation reaches into relational **model** machinery around it that this
+client does not build. **Level 3 leaking into level 2.**
+
+**So level 2 is per convention, not per package.** This document scoped it as "register EF's own
+relational conventions", which reads as one job with one answer. It is not.
+`EntityTypeHierarchyMappingConvention` reads annotations and model metadata and runs here with no
+failure; `RelationalValueGenerationConvention` derives from a core convention and drags the
+relational model with it. **From outside they look alike. Each is its own experiment and needs its
+own full measurement.**
+
+`InfoCarrierValueGenerationConvention` therefore stays, with its two `Relational:` strings and their
+pin. Its own comment already said why it works: *"Narrow on purpose."*
+
+#### D3 SUPERSESSION 2026-09-03 (R131) — one package, kept modular, and the conditions to split again
+
+**The owner's decision, taken on the measurements below rather than on preference.** A single
+`InfoCarrier.Core` package carries the relational half. The judgement is that **TPT and TPC are often
+required** and **2 MB is not prohibitive** for the applications this provider is for.
+
+**What the split was measured to cost and to buy, so a future reader does not re-derive it.**
+
+| Question | Measured answer |
+|---|---|
+| Browser payload of referencing `EFCore.Relational` | **+0.62 MB brotli**, 4.11 -> 4.73 MB on the Northwind Blazor sample; raw 13.48 -> 15.77 MB |
+| Is the cost conditional on use? | **No.** A build that references it and calls nothing ships the identical 4.73 MB. The trimmer keeps the assembly almost whole: 2.079 MB published against 2.09 MB on disk |
+| Does it drag in new packages? | **No.** All four of its dependencies already arrive with `Microsoft.EntityFrameworkCore` |
+| What does a client without it lose? | **262 of 20,368** Tier B tests: 137 `FromSql*` roots, 97 `Database.SqlQuery<T>`, 6 TPT/TPC, plus collateral |
+| How does it fail? | The first two **loudly**. TPT/TPC **partly silently**, and a fully plain client gets no warning at all |
+
+**THE EXPECTED GAIN IS IN THE TEST AND ANNOTATION CODE, NOT IN THE PRODUCT.** Naming EF's constants
+instead of spelling `Relational:` strings deletes the pins that exist only to hold those strings
+honest, and the seams that exist only because two packages had to agree. Nothing about query
+execution changes.
+
+**MODULAR MONOLITH: THE SEAM STAYS, THE PACKAGE BOUNDARY GOES.** This is the part that makes a future
+split cheap, and it is a requirement rather than a nicety.
+
+- The relational half keeps its own files and its own types. It is not dissolved into the classes
+  around it.
+- **The opt-in stays.** "My backing store is relational" is still something an application says, not
+  something the package assumes. A client over a non-relational store must not get relational
+  conventions on its model, which is what ADR-009 Tier A exercises and what stopping rule 4 of the
+  R124 handoff protects. One package removes the *packaging* choice, not the *configuration* one.
+- The registration seam (`AddInfoCarrierRelational` / `AddInfoCarrierRelationalClient`) and the
+  options seam (`UseRelationalQueryRoots`) keep their shapes and their names.
+
+**What would reverse this decision back.** Any one of these, and each is measurable rather than a
+matter of taste:
+
+1. **Blazor WebAssembly becomes a primary target** and 0.62 MB brotli starts to matter.
+2. **A non-relational backing store is adopted** (Cosmos, a document store), making the relational
+   half dead weight for a real deployment rather than a hypothetical one.
+3. **The relational half grows** past what a monolith should carry, for instance if level 3 is ever
+   attempted.
+
+**Level 3 is still out of scope, and the reference does not change that.** A relational model on the
+client needs an `IRelationalTypeMappingSource`, which is store knowledge on the far side of the wire
+(B4, 106 failures). Referencing the package does not supply it, and
+`EntityFrameworkRelationalServicesBuilder.TryAddCoreServices()` still collides with ADR-006. **The
+charter above still holds too**: this code reads relational annotations and names relational types,
+and never gives the client a `DbConnection`.
+
+#### D3 amendment 2026-09-03 (R135) — the opt-in goes too, and every client gets the relational half
+
+**The supersession above kept the opt-in, and the owner corrected that on 2026-09-03.** R131 wrote
+"the opt-in stays: my backing store is relational is still something an application says". That does
+not survive its own reasoning. One package that references `Microsoft.EntityFrameworkCore.Relational`
+and ships the relational half cannot save a consumer anything by withholding it — the 0.62 MB is in
+the payload whether or not the registration is made, and the trimmer keeps the assembly almost whole
+either way. An opt-in that buys nothing is not a choice; it is a way to get half a client.
+
+**So `AddEntityFrameworkInfoCarrier` registers the relational half unconditionally**, and there is
+nothing left for an application to say. What that deleted:
+
+| Deleted | Was |
+|---|---|
+| `AddInfoCarrierRelational()`, `AddInfoCarrierRelationalClient()` | The two registration flavours. A server needed the first and a client both; getting it wrong was silent |
+| `InfoCarrierDbContextOptionsBuilder.UseRelationalQueryRoots(...)` | The options route for a client with no `IServiceCollection`, plus `WithRelationalQueryRoots` and `RelationalQueryRoots` behind it |
+| `NoRelationalQueryRoots` | The no-op default. There is one implementation now and every client gets it |
+| R130's half-configuration warning | Its `StampConvention`, its three detector constants, and its three tests. A half-configured client cannot exist without a switch |
+
+**Measured, and it changes no answer.** `failed` **160**, unchanged. FIXED none, BROKEN none,
+`REASONS: unchanged`. `total` 29512 -> 29509, and the three are named above: R130's three warning
+tests. Trim `ours` 89 <= 89. Pack clean — every deleted member was added on this branch, so nothing
+in the published `10.0.0` lost a signature, and `InfoCarrierModelValidator`'s constructor went back
+to the one-parameter shape `10.0.0` ships. Release build `0 Error(s)`.
+
+**The one thing in 29,509 tests that did move, and why it is right.** Tier A now builds its client
+model with EF's relational conventions over an InMemory backend — the thing the R127 and R128
+amendments treated as the disagreement to prevent. Every hierarchy root in the compiled-model
+baselines gains one line:
+
+```csharp
+runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
+```
+
+EF's own SQL Server baselines carry the same annotation, with the value *their* model implies (`TPT`
+for the same entity, because that test maps it per type). The value follows the model, and the client
+model is built from the same `OnModelCreating` the server uses. So this is the client agreeing with
+the server about a fact it previously did not carry at all, which is what level 2 is for. The
+baselines are updated to match.
+
+**R120's two-carrier hazard is closed by construction rather than by discipline.** That finding —
+a permission and the knowledge it guards travelling on different carriers, agreeing only if one
+reader answers for both — had `IInfoCarrierRelationalQueryRoots` readable from the options *and*
+from DI, with `RelationalQueryRootsFor` as the single reader holding them together. With one
+implementation and no way to configure another, there is one answer and nothing to reconcile.
+`QueryExecutor` names `InfoCarrierRelationalQueryRoots.Instance` directly.
+
+**What ADR-009's two tiers are about now.** The backing store, and which specification bases each
+tier can host. **Not** whether the client is relational, which is what the R127 and R128 amendments
+and the two test projects' own comments said. Every client is relational.
 
 ### D5 — the query boundary does not ask the backend what it can translate
 

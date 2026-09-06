@@ -60,6 +60,23 @@ BUDGET = {
     # two kinds of write now follow different rules. The signposting sentence the addition
     # introduced was cut first, which is the order doc-style.md fixes; that recovered 10 of 45.
     "website/docs/multi-tenancy.md": 700,
+
+    # Added to the 750 tier 2026-09-04, when server-side log forwarding shipped. The page went
+    # over because it gained a fact it did not have: a server may now send the log events it
+    # raises back to the client, and that is a disclosure decision, so the section has to say what
+    # crosses, what the level costs, and why sensitive logging is a second grant rather than a
+    # filter. The page was read for padding first, as doc-style.md requires, and none was found --
+    # every paragraph already answers a question a reader arrives with. Same tier as `security`
+    # and `guide/errors`, and for the same reason: the page carries a security boundary.
+    "website/docs/configuration/server.md": 750,
+
+    # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
+    # argued. R173 instrumented the residual across a full suite run: when the client has to
+    # rebuild a projection, the `Skip` and `Take` above it are rebuilt with it, so paging does not
+    # reduce what crosses the wire. The page teaches paging and could not say so in the words it
+    # had. Read for padding first, as doc-style.md requires; the page is already dense and none
+    # was found.
+    "website/docs/guide/querying.md": 700,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

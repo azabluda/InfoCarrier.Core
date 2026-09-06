@@ -261,6 +261,52 @@ retained for Tier C.
 
 **Supersedes.** The Docker-only backend strategy in [`ci-cd.md`](ci-cd.md).
 
+### Amendment 2026-09-04 — Tier C is dropped as SQL Server and re-created as embedded Firebird
+
+**The SQL Server tier above is dropped, not deferred** (2026-08-24, owner's decision;
+[`plans/v10/roadmap.md`](plans/v10/roadmap.md), M7). What was withdrawn is a third *test tier* for
+this repository, never support for the store: the server side is an ordinary EF application and
+runs against whatever provider it references.
+
+**Tier C now means embedded Firebird, and the letter is reused deliberately.** Do not read a
+pre-2026-09-04 "Tier C" as this one; the row in the table above is the old meaning and is dead.
+
+**Why a third tier exists again.** One capability, and it is the only one that justifies the cost.
+SQLite has **no table-valued function and cannot be given one**: `Microsoft.Data.Sqlite` attaches
+scalar delegates to a connection and exposes no `sqlite3_create_module`, so there are no virtual
+tables and `SELECT ... FROM SomeFunction(...)` has no meaning. SQLite also has no `APPLY`. Between
+them those two gaps are the whole of `UdfDbFunctionTestBase` that Tier B leaves red, and EF ships
+that base for SQL Server only. Firebird has both: a *selectable stored procedure* is queried
+exactly as a table-valued function is, and `LATERAL` has been in the engine since version 4.
+
+**Why Firebird and not PostgreSQL.** PostgreSQL is the stronger store for this base on the
+evidence — Npgsql adopts it and skips 2 tests, where Firebird's own provider skips 23 — but it is
+a server process whose binaries are fetched at first run. **The constraint was no installation and
+no container**, and Firebird meets it the way SQLite does: the engine arrives as a NuGet package of
+native assets, one database is one file in the test output directory, and nothing is downloaded
+during a run. The trade was measured, not assumed.
+
+**Two things were measured before this was built, and both changed the decision.**
+
+1. **The store does everything, including what Firebird's own EF provider marks unsupported.**
+   A selectable procedure can be called with an argument from the outer table, both as
+   `FROM a, proc(a.col)` and inside a real `LATERAL` derived table.
+2. **The 14 "Not supported on Firebird" skips in that provider's suite are one SQL-generation
+   defect**, not a store limit. `FbQuerySqlGenerator` wraps a plain table as
+   `(SELECT * FROM "T") AS "t"` after `LATERAL`, because Firebird will not take a bare source
+   there, and the same branch was never added for a function. `FirebirdLateralQuerySqlGenerator`
+   in the test harness adds it, on the **server** half only. **Reported upstream as
+   [FirebirdSQL/NETProvider#1277](https://github.com/FirebirdSQL/NETProvider/issues/1277) on
+   2026-09-04**, with the repro and the suggested branch; delete the file when that lands.
+
+**Scope, and it is narrow.** A base belongs to exactly one tier. Only a base that *needs* a
+table-valued function or `APPLY` belongs here; everything else stays where its green already means
+something. Running a base on two tiers is duplication, not coverage.
+
+**Consequences.** The three community packages that carry the Firebird binaries are test-only and
+must never appear in `src/`. `eng/measure.sh` needs no change, because the tiers are namespaces in
+one project.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot
@@ -557,3 +603,55 @@ fixture may want the first without the second.
 **One base it must not be pointed at.** `AdHocQuerySplittingQueryTestBase` calls `CloseConnection()`
 on the cast store, so it needs a live connection. What it tests — a connection dropping mid
 split-query — has no meaning across this wire, and a green there would be manufactured.
+
+**Amended 2026-09-03 (R136) — the two spec projects are one again, and the grant is unconditional.**
+`test/InfoCarrier.Core.FunctionalTests` holds both tiers, `InMemory/` and `Sqlite/`. The R122
+amendment below is superseded in its enforcement and unchanged in its substance: what it protected
+was a compile-line separation that mattered while `InfoCarrier.Core.Relational` was a package, and
+D3's supersession removed the package. Since R135 every client registers the relational half
+unconditionally, so the thing the boundary prevented is now the ordinary case and was measured to
+change no answer. **The reference this ADR grants therefore belongs to the one spec project.** The
+tiers are still real and still about the backing store; they are a namespace rather than an
+assembly. `RelationalInfoCarrierComplianceTest` narrows its two assembly-wide scans to the Tier B
+namespace, because a compliance test written against one store's assembly has to be told which half
+of a merged one it answers for. **R137 folded `test/InfoCarrier.Core.TestUtilities` in as well**,
+for the same reason at one remove: with one spec project it had one consumer, and "the harness is
+neither tier's property" stops being a statement about projects. It is `TestUtilities/` now.
+
+**Amended 2026-09-02 (R122) — "the test project" is now one of three, and only one of them may.**
+The spec suite split by backing store, as EF Core's own does:
+`test/InfoCarrier.Core.FunctionalTests` is Tier A over InMemory,
+`test/InfoCarrier.Core.Relational.FunctionalTests` is Tier B over SQLite, and
+`test/InfoCarrier.Core.TestUtilities` is the store-neutral harness they share. **The reference this
+ADR grants belongs to the Tier B project alone.** Tier A references neither
+`EFCore.Relational.Specification.Tests` nor the `InfoCarrier.Core.Relational` package, and neither
+does the shared harness, because a reference is transitive.
+
+**The decision is unchanged and so is every adoption. What changed is enforcement.** The flags this
+ADR describes — `relationalClientStore`, and the raw-SQL grant beside it — were per fixture, which
+asks politely: nothing stopped a Tier A fixture from setting one, and a relational client over an
+InMemory backend is the disagreement the seam exists to prevent (`architecture.md` §6a **D3**). A
+project boundary does not ask. The flags remain, because they still answer a per-fixture question
+inside Tier B; what they can no longer do is cross the tier.
+
+**Two things it cost, both measured rather than argued.**
+
+- **Seven Tier A fixtures implemented `ITestSqlLoggerFactory` and none of them needed to.** The
+  interface exists in the relational specification assembly and was implemented solely to satisfy
+  `RelationalComplianceTestBase`'s second assertion. Tier A is now checked by the plain
+  `ComplianceTestBase`, which does not ask, and what the property returned was the *client's* log —
+  on a client with no database, empty. Tier B's fixtures still implement it, and its assertion is
+  green.
+- **`SpatialQueryInfoCarrierTest` gave up `SpatialQueryRelationalTestBase` for the core base, and
+  lost no test doing it.** That base is fourteen lines and **declares no tests**: its whole
+  contribution is a `RelationalQueryAsserter` that calls `TestSqlLoggerFactory.OutputSql()` when an
+  assertion fails, on a client that emits no SQL. It is listed in Tier B's `IgnoredTestBases` with
+  that measurement, because adopting it there would need SpatiaLite for nothing it declares.
+
+**The compliance gate is now two tests and both must be green.** `InfoCarrierComplianceTest` scans
+the core specification assembly against Tier A; `RelationalInfoCarrierComplianceTest` overrides
+`GetBaseTestClasses()` to scan the relational one against Tier B, so the two do not both claim the
+core bases. Tier A's list of ignored bases names the **108 core bases adopted on Tier B**, generated
+from the test's own output rather than written by hand, and an entry there is a claim that a
+subclass exists in the sibling assembly. Missing: **0 on Tier A, 1 on Tier B** (`SqlQueryTestBase`),
+which is the same 1 the single test reported before the split.

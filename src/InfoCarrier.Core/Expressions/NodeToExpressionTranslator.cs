@@ -29,6 +29,19 @@ public class NodeToExpressionTranslator(
     private readonly TypeNodeResolver _typeResolver = typeResolver;
     private readonly IDynamicValueMapper _valueMapper = valueMapper;
     private readonly Func<QueryRootStubNode, Type, Expression> _queryRootFactory = queryRootFactory;
+
+    /// <summary>
+    ///     Supplies the context that fills a <see cref="ServerContextStubNode" />, or
+    ///     <see langword="null" /> when nothing has offered one.
+    /// </summary>
+    /// <remarks>
+    ///     <b>An init property rather than a constructor parameter</b>, because this class's
+    ///     constructor shipped in <c>10.0.0</c> and adding a parameter to it would be a binary
+    ///     break that package validation reports as <c>CP0002</c>. It is set by
+    ///     <c>ExpressionSerializer</c>, which the server tells about its context once per
+    ///     execution.
+    /// </remarks>
+    public virtual Func<Type, Expression>? ServerContextFactory { get; init; }
     // Keyed by ParameterNode.Id, never by name — see ParameterNode.Id for why.
     private readonly Dictionary<int, ParameterExpression> _parameters = [];
 
@@ -59,8 +72,34 @@ public class NodeToExpressionTranslator(
             ListInitNode n => TranslateListInit(n),
             InvocationNode n => TranslateInvocation(n),
             QueryRootStubNode n => _queryRootFactory(n, _typeResolver.Resolve(n.ElementType)),
+            ServerContextStubNode n => TranslateServerContext(n),
             _ => throw new NotSupportedException($"Unsupported node kind: {node.Kind}."),
         };
+
+    /// <summary>
+    ///     Puts this server's own context where the client's stood.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The declared type is checked rather than trusted.</b> The method being called is
+    ///     declared on the client's context type, so the server's context must be assignable to it
+    ///     or the rebuilt call cannot bind. Saying so by name is better than failing inside
+    ///     reflection, and it is the honest report when two halves were built from different
+    ///     context classes.
+    /// </remarks>
+    private Expression TranslateServerContext(ServerContextStubNode node)
+    {
+        Type declared = _typeResolver.Resolve(node.Type);
+
+        if (ServerContextFactory is not { } factory)
+        {
+            throw new InvalidOperationException(
+                $"The payload names the context type '{declared}' as the receiver of a mapped "
+                + "function, but this side has no context to put there. Only a server executing a "
+                + "query can resolve that node.");
+        }
+
+        return factory(declared);
+    }
 
     private Expression TranslateConstant(ConstantNode node)
     {
