@@ -116,6 +116,19 @@ await strategy.ExecuteAsync(async () =>
 });
 ```
 
+This provider ships no retrying strategy. `CreateExecutionStrategy()` returns EF Core's default,
+which runs your work once and gives up on the first failure. Write the shape above anyway: it is
+what a retrying strategy needs, and it is where one goes when you have it.
+
+To supply one, replace `IExecutionStrategyFactory` in EF's internal service provider. The
+`optionsBuilder.ExecutionStrategy(...)` overload you may know from SQL Server is a relational
+option, and a client's options are not relational. See
+[the internal service provider](../configuration/client.md#the-internal-service-provider).
+
+A retry re-runs everything inside the block, the `BeginTransaction` included, so the work has to be
+repeatable. Read [Handling errors](errors.md) first: a request that failed in transport leaves the
+outcome unknown, so retrying a `SaveChanges` can write the same row twice.
+
 ## What is not available
 
 `IDbContextTransaction.GetDbTransaction()` and anything else that hands you a `DbTransaction` are

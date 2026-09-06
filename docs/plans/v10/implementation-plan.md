@@ -5560,6 +5560,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       its own, and that half is a decision rather than a gap, because its events go under EF's
       `Microsoft.EntityFrameworkCore.Query` as every EF provider's do.
 
+- [x] **V2. The retries section said nothing about retries, and the answer is that there are
+      none.** `test/` and `website/` only, and no `src/` file changed, so the spec suite was not
+      re-measured: `InfoCarrier.Core.FunctionalTests` compiles nothing this touches.
+      `InfoCarrier.Core.TransportTests` 22 of 22 (21 before).
+
+      **A reader of the transactions page asked whether the strategy it tells them to create
+      retries anything.** It does not. This provider registers no `IExecutionStrategyFactory`, so
+      EF's own answers, and EF's own hands back a `NonRetryingExecutionStrategy`. The page showed
+      the `CreateExecutionStrategy().ExecuteAsync(...)` shape under a heading with the word
+      "retries" in it and left the reader to assume the wrapper was doing something.
+
+      **The worse half is the remedy that does not exist.** A reader who wants retries reaches for
+      `optionsBuilder.ExecutionStrategy(...)`, which is where SQL Server's `EnableRetryOnFailure`
+      lives. That overload is **relational**
+      (`RelationalOptionsExtension.WithExecutionStrategyFactory`) and a client's options are not
+      relational, so it is not there to call. The route that works is replacing the service in EF's
+      internal service provider, which `configuration/client.md` already documents, and the page
+      now points at it.
+
+      **Asserted rather than read.** `ExecutionStrategyTest.The_shipped_execution_strategy_does_not_retry`
+      builds a client context and checks `RetriesOnFailure`, so a change in EF's default fails a
+      test instead of quietly making the page wrong. The page also now warns that a retry re-runs
+      the `BeginTransaction` with everything else, and sends the reader to the errors page first,
+      because a transport failure leaves the outcome unknown and a blind retry of a `SaveChanges`
+      can write the same row twice. That last hazard is the idempotency gap, still open.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

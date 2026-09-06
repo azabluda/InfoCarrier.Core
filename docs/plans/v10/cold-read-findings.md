@@ -169,6 +169,16 @@ them, you can only predict them by reading. The wording is fixed; the diagnostic
 in a section headed "Execution strategies and retries" and never says whether this provider ships a
 retrying strategy. If the default does not retry, that snippet teaches a no-op.
 
+> **FIXED 2026-09-07, and the reader's suspicion was right.** It does not retry. This provider
+> registers no `IExecutionStrategyFactory`, so EF's own `ExecutionStrategyFactory` answers and it
+> hands back a `NonRetryingExecutionStrategy`. Worse than the page not saying so: the
+> `optionsBuilder.ExecutionStrategy(...)` overload a reader would reach for is a **relational**
+> option (`RelationalOptionsExtension.WithExecutionStrategyFactory`), and a client's options are
+> not relational, so the obvious remedy does not exist either. The page now says both, and points
+> at replacing the service in EF's internal service provider, which is the route that works.
+> `ExecutionStrategyTest.The_shipped_execution_strategy_does_not_retry` asserts it rather than
+> trusting the reading, so a change in EF's default fails a test instead of making the page wrong.
+
 **Client and server version skew.** The envelope carries a `ProtocolVersion` and the server answers
 a mismatch with `400`. There is no stated compatibility policy. A desktop fleet is never all on one
 build, and two readers raised it independently.
