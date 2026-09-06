@@ -55,6 +55,16 @@ The order is the part that survives, and it is not negotiable: **cut the padding
 then move the number. Never the reverse.** A budget yields to a missing fact; it never yields to a
 paragraph that could have been shorter.
 
+**RELAXED UNTIL THE RELEASE PASS (owner's decision, 2026-09-04).** Move a budget when a page needs
+the room, without arguing for it first. The whole set gets one thorough read before release, and
+that read is where the numbers are set on evidence; defending them one page at a time until then
+buys nothing and costs the fact the page was trying to carry.
+
+**What this does not relax.** `eng/doc-words.py` still gates, and this table and the script still
+have to agree — a page over its own number is still a red build, so the number moves in the same
+commit as the words. Nor is it licence to pad: the rule above still says a budget yields to a
+missing *fact*. What is suspended is the ceremony, not the standard.
+
 ## Rules
 
 1. **The first sentence is an identity sentence, and it uses `is`.** "`InfoCarrier.Core` is an
