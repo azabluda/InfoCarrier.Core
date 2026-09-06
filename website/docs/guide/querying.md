@@ -134,7 +134,8 @@ server's own rights. The server's query filters are not in such a query.
 ## Round trips and result size
 
 Every materialized query is a request, so a loop that queries per item makes one request per item.
-Compose the query instead, or fetch what you need with `Include`.
+Compose the query instead, or fetch what you need with `Include`. To count what a screen actually
+costs, see [Counting round trips](../configuration/client.md#counting-round-trips).
 
 Requests towards the server have a default size limit; answers coming back have none, because the
 library has no basis for capping how large an answer your own query may have. To set one, see

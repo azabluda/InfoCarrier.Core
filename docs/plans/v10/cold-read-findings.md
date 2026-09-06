@@ -131,7 +131,9 @@ Raised by the same two readers, not yet checked in source:
 
 ## 2. Gaps that are product work, not writing
 
-Each was raised by a reader with a concrete task it blocked. None is fixed.
+Each was raised by a reader with a concrete task it blocked. **One is fixed since, and it is
+marked below; the rest are not.** The list is kept as the readers wrote it, with the fix noted
+against the item rather than the item deleted, so that what was found stays findable.
 
 **Idempotency of a retried unit of work.** `errors.md` says a transport failure means "the data is
 unknown, not wrong, and retrying may work". Retrying a `SaveChanges` whose outcome is unknown
@@ -153,6 +155,15 @@ a shared registry or a token that carries its instance is unbuilt.
 runtime. Two readers wanted to answer "how many requests does this screen cost" and neither could.
 `index.md` says round trips are "a round trip you can see", and one reader checked: you cannot see
 them, you can only predict them by reading. The wording is fixed; the diagnostics are not.
+
+> **FIXED 2026-09-07.** A `Meter` named `InfoCarrier.Core` publishes
+> `infocarrier.client.round_trips` and `infocarrier.client.round_trip.duration`, tagged by
+> operation and, on a failure, by exception type. It is measured in the one method every operation
+> funnels through, so a tenth operation cannot forget to be counted, and nothing is measured while
+> nothing is listening. `configuration/client.md` has the section a reader with this question
+> lands on. **What is still not there is a logger category of this provider's own**: its events go
+> under EF's `Microsoft.EntityFrameworkCore.Query`, which is the convention every EF provider
+> follows, so that half is a decision rather than a gap.
 
 **Does the shipped execution strategy retry?** `transactions.md` shows `CreateExecutionStrategy()`
 in a section headed "Execution strategies and retries" and never says whether this provider ships a

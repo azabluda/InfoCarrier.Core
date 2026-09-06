@@ -112,6 +112,23 @@ than your query asked for, because they were rebuilt with the projection above t
 To see the payloads themselves, decorate the transport. That is what the sample's wire inspector is.
 See [Custom transports](transports.md).
 
+## Counting round trips
+
+The cost of this provider is round trips. To count them in a running application, listen to the
+meter named `InfoCarrier.Core`:
+
+```bash
+dotnet-counters monitor --process-id <pid> --counters InfoCarrier.Core
+```
+
+It publishes two instruments. `infocarrier.client.round_trips` counts every request that finished,
+successful or failed. `infocarrier.client.round_trip.duration` records how long each one took, in
+seconds. Both carry the operation as a tag, so you can tell a query from a save, and a request that
+failed also carries `error.type`.
+
+Any OpenTelemetry exporter reads the same meter with `AddMeter("InfoCarrier.Core")`. Nothing is
+measured while nothing is listening.
+
 ## The internal service provider
 
 Build EF's internal service provider yourself for two things: to register a

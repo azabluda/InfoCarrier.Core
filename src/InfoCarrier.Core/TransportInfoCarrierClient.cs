@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Diagnostics;
 using InfoCarrier.Core.Common;
 
 namespace InfoCarrier.Core;
@@ -81,6 +82,42 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             InfoCarrierOperation.SupportsSavepoints, transactionId, cancellationToken).ConfigureAwait(false);
 
     private async Task<TResponse> RoundTripAsync<TRequest, TResponse>(
+        InfoCarrierOperation operation,
+        TRequest request,
+        CancellationToken cancellationToken)
+    {
+        // THE ONE PLACE A ROUND TRIP HAPPENS, which is why the measurement is here and not at the
+        // nine call sites above: a tenth operation cannot forget to be counted. `Enabled` is asked
+        // first so that an application which never named the meter does not even take a timestamp,
+        // and asked again at the end so that a listener attaching mid-flight does not report a
+        // duration measured from zero.
+        bool measured = InfoCarrierMetrics.Enabled;
+        long startedAt = measured ? Stopwatch.GetTimestamp() : 0L;
+        string? errorType = null;
+
+        try
+        {
+            return await SendAsync<TRequest, TResponse>(operation, request, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            // A failed round trip cost a round trip. Counting only the successes would understate
+            // exactly the case a reader is investigating.
+            errorType = exception.GetType().FullName;
+            throw;
+        }
+        finally
+        {
+            if (measured && InfoCarrierMetrics.Enabled)
+            {
+                InfoCarrierMetrics.RoundTripCompleted(
+                    operation, Stopwatch.GetElapsedTime(startedAt), errorType);
+            }
+        }
+    }
+
+    private async Task<TResponse> SendAsync<TRequest, TResponse>(
         InfoCarrierOperation operation,
         TRequest request,
         CancellationToken cancellationToken)

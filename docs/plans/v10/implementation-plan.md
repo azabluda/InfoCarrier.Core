@@ -5515,6 +5515,51 @@ re-parents of families already running, because R25–R30 showed that is where t
       `api-surface.md` names `InfoCarrierEventId`, which no user-facing page did before. That page
       moves to the 700 tier; `docs/doc-style.md` and `eng/doc-words.py` move together.
 
+## Phase V — the post-v10 agenda
+
+**Not a milestone.** Every milestone closed on 2026-08-24. What is left is the list under
+"Deferred, tracked, not forgotten" in `roadmap.md` and the product gaps in
+`cold-read-findings.md` §2, taken one at a time.
+
+- [x] **V1. A round trip can be counted at runtime.** `src/` change, so `eng/measure.sh` **and**
+      `eng/trim-ratchet.sh`; public members were added, so `dotnet pack` as well. **`failed` and `total` UNCHANGED at 39 / 29514**, failing names byte-identical and the reasons diff empty. `Total tests: 29514, Passed: 29237, Failed: 39, Skipped: 238`. Trim `ours` 90 <= 90, pack clean, `InfoCarrier.Core.TransportTests` 21 of 21 (19 before).
+
+      **The question had no answer and two people asked it.** Two cold readers of the
+      documentation wanted "how many requests does this screen cost". The cost of this provider is
+      round trips, and the only way to count them was to read the query and predict them. The
+      index page said a round trip is "a round trip you can see", and one reader checked that it
+      is not.
+
+      **A `Meter`, not a log event, and the reason is where the round trip happens.**
+      `InfoCarrierMetrics` publishes `infocarrier.client.round_trips` and
+      `infocarrier.client.round_trip.duration` under the meter name `InfoCarrier.Core`, tagged by
+      operation and, on a failure, by `error.type` as OpenTelemetry spells it. A log event would
+      need an `IDiagnosticsLogger` at the boundary, and the boundary is
+      `TransportInfoCarrierClient`, which the application constructs itself and EF's service
+      provider never sees. A meter needs no wiring at all: name it to `dotnet-counters`, to an
+      OpenTelemetry exporter or to a `MeterListener`.
+
+      **Measured in the one method all nine operations funnel through**, so a tenth cannot forget
+      to be counted, and a FAILED round trip is counted too, because counting only the successes
+      would understate exactly the case a reader is investigating. Nothing is measured while
+      nothing is listening: `Enabled` is asked before the timestamp is taken and again before the
+      measurement is recorded, so a listener attaching mid-flight cannot report a duration
+      measured from zero.
+
+      **Two tests in `InfoCarrier.Core.TransportTests`, not in the spec project**, so the spec
+      baseline does not move: `eng/measure.sh` runs `InfoCarrier.Core.FunctionalTests` alone. They
+      sit in a collection with `DisableParallelization` because the meter is process-wide and a
+      listener would otherwise see round trips made by whatever class ran beside it. That is a
+      flake avoided by construction rather than found later.
+
+      `website/docs/configuration/client.md` has the section a reader with the question lands on,
+      `guide/querying.md` points at it from the paragraph about request counts, and
+      `api-surface.md` names the type. That page moves to the 750 tier; `docs/doc-style.md` and
+      `eng/doc-words.py` move with it. `roadmap.md` and `cold-read-findings.md` §2 both record the
+      gap as closed, and both say what is NOT closed: this provider still has no logger category of
+      its own, and that half is a decision rather than a gap, because its events go under EF's
+      `Microsoft.EntityFrameworkCore.Query` as every EF provider's do.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

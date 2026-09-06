@@ -78,10 +78,13 @@ BUDGET = {
     # was found.
     "website/docs/guide/querying.md": 700,
 
-    # Added to the 700 tier 2026-09-07, when the split log event began naming which operators
-    # stayed on the client. The page's logging section could say how to turn logging on and not
-    # what the one provider-specific event tells you, which is the sentence a reader acts on.
-    "website/docs/configuration/client.md": 700,
+    # 700 on 2026-09-07 when the split log event began naming which operators stayed on the
+    # client, and 750 the same day when the round-trip meter shipped. The page gained two facts a
+    # reader acts on and no padding was found to pay for either: its logging section could say how
+    # to turn logging on and not what the one provider-specific event tells you, and the question
+    # two cold readers could not answer ("how many requests does this screen cost") had no home
+    # anywhere on the site.
+    "website/docs/configuration/client.md": 750,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers
