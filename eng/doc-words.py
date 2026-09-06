@@ -69,6 +69,14 @@ BUDGET = {
     # every paragraph already answers a question a reader arrives with. Same tier as `security`
     # and `guide/errors`, and for the same reason: the page carries a security boundary.
     "website/docs/configuration/server.md": 750,
+
+    # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
+    # argued. R173 instrumented the residual across a full suite run: when the client has to
+    # rebuild a projection, the `Skip` and `Take` above it are rebuilt with it, so paging does not
+    # reduce what crosses the wire. The page teaches paging and could not say so in the words it
+    # had. Read for padding first, as doc-style.md requires; the page is already dense and none
+    # was found.
+    "website/docs/guide/querying.md": 700,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

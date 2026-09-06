@@ -69,15 +69,16 @@ catches whatever the gateway lets through.
 
 ## Sending the server's log to the client
 
-EF writes its warnings about a save on the server, so a client never sees them. Grant forwarding and
-they arrive in the client's own logger, under the server's category and event id:
+EF writes its warnings about a query or a save on the server, so a client never sees them.
+Forwarding is off until you grant it. Then they arrive in the client's own logger, under the
+server's category and event id:
 
 ```csharp
-builder.Services.AddInfoCarrierServerLogForwarding();
+builder.Services.AddInfoCarrierServerLogForwarding();   // warnings and above, the default
 ```
 
-Warnings and above cross. Lower the level and every executed command goes with them, which tells a
-client your schema.
+Pass a `LogLevel` to change it. At `Information` the SQL of every command the server runs goes too,
+which tells a client your schema.
 
 A server whose context enables sensitive data logging forwards nothing until you also call
 `AddInfoCarrierSensitiveServerLogForwarding()`. That setting changes what EF's messages say
