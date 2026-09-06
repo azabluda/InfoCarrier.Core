@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
 using Microsoft.Extensions.Logging;
@@ -70,7 +70,7 @@ public sealed class ServerLogCapture : ILoggerProvider
         ///     the wire at all.
         /// </remarks>
         public IReadOnlyList<ServerLogEvent>? Events
-            => _sink.Events.Count == 0 ? null : _sink.Events;
+            => _sink.Snapshot() is { Count: > 0 } collected ? collected : null;
 
         /// <inheritdoc />
         public void Dispose()
@@ -79,9 +79,36 @@ public sealed class ServerLogCapture : ILoggerProvider
 
     private sealed class Sink(LogLevel minimumLevel)
     {
+        private readonly List<ServerLogEvent> _events = [];
+
         public LogLevel MinimumLevel { get; } = minimumLevel;
 
-        public List<ServerLogEvent> Events { get; } = [];
+        /// <summary>
+        ///     What has been collected so far, as a snapshot.
+        /// </summary>
+        /// <remarks>
+        ///     <b>Locked, because an <see cref="AsyncLocal{T}" /> flows into every task the
+        ///     request starts.</b> One request's work is sequential today, so this races only if
+        ///     something under it logs from two flows at once — and a <see cref="List{T}" /> torn
+        ///     by a concurrent <c>Add</c> fails as a lost entry or an index exception a long way
+        ///     from the cause. The lock is uncontended on the ordinary path and costs nothing
+        ///     there.
+        /// </remarks>
+        public IReadOnlyList<ServerLogEvent> Snapshot()
+        {
+            lock (_events)
+            {
+                return _events.Count == 0 ? [] : _events.ToArray();
+            }
+        }
+
+        public void Add(ServerLogEvent forwarded)
+        {
+            lock (_events)
+            {
+                _events.Add(forwarded);
+            }
+        }
     }
 
     /// <summary>
@@ -144,7 +171,7 @@ public sealed class ServerLogCapture : ILoggerProvider
                 return;
             }
 
-            sink.Events.Add(
+            sink.Add(
                 new ServerLogEvent
                 {
                     Level = (int)logLevel,

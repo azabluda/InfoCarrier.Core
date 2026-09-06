@@ -5392,6 +5392,32 @@ re-parents of families already running, because R25–R30 showed that is where t
       measurement — with them included the `_sensitive` test saw three warnings where it asserts
       one.
 
+- [x] **R173. The residual is audited across the whole suite, and the capture sink is locked.**
+      `src/` only, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`. **`failed` and `total`
+      unchanged at 39 / 29513**, failing names byte-identical.
+
+      **The audit.** Two silent full-table reads were closed this session by asking what the server
+      received for one query. That does not scale and it cannot prove absence, so the question was
+      turned into an invariant instead: **a residual may reshape rows and must not remove them**,
+      and one temporary visitor at `Split`'s return tested it over a full run. **301 splits out of
+      29513 tests leave a row-removing operator behind, and every one falls into a class that
+      already has a decision** — an operator above a reassembled projection (the accepted split
+      cost), a `Contains` over a captured local sequence the wire cannot name (14, already tried and
+      reverted), and a predicate over a freshly constructed object on a non-relational server (6,
+      R164 and R165). **There is no third hole of the kind R164 and R165 closed.**
+      `docs/plans/v10/findings.md` carries the table and the method.
+
+      **One defect found by re-reading R172's own code, not by a test.** `ServerLogCapture`'s sink
+      was a bare `List<T>`, and an `AsyncLocal` flows into every task the request starts — so two
+      flows logging at once would tear it, as a lost entry or an index exception a long way from
+      the cause. Locked. Uncontended on the ordinary path.
+
+      **And one thing left open rather than answered.** The largest class above is not a defect but
+      it is a consumer-visible cost no document names: paging and filtering above a reassembled
+      projection are reassembled with it, so `Skip` and `Take` do not reduce what crosses.
+      `website/docs/limitations.md` says "Page it", which is true and, in that case, not enough.
+      Whether `QuerySplit` should name what stayed behind is a design question for the owner.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

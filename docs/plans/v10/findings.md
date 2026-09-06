@@ -9,6 +9,46 @@ classification that was never re-checked, a count that did not move, a price pai
 obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
 `archive/`.
 
+## What the residual still drops, measured across the whole suite (R173, 2026-09-04)
+
+Two silent full-table reads were found and closed in one session by asking what the server actually
+received. That raised the obvious next question -- **how many more are there** -- and the honest way
+to answer it is not to reason about operators one at a time. It is to state the invariant and test
+it.
+
+**The invariant.** A split ships part of the query and runs the rest here. If the part that runs
+here only *reshapes* rows, the wire carried exactly what the caller asked for. If it *removes* rows,
+the server sent rows the client threw away, and the caller cannot see that it happened.
+
+**The probe.** One temporary visitor at `QuerySplitter.Split`'s non-pass-through return, walking the
+residual for the twenty-three `Queryable`/`Enumerable` operators that remove rows, logging the
+operator names and the query. One full suite run: **39 failing of 29513, unchanged, so the probe
+changed nothing**, and **301 splits out of the whole run left a row-removing operator behind**.
+
+**Every one of the 301 falls into a class that already has a decision.**
+
+| Class | What it looks like | Standing |
+|---|---|---|
+| An operator above a reassembled projection | `Select(… ValueTuple …)` ships, the client rebuilds the caller's type, and the `Where` / `Distinct` / `Skip` / `Take` above it stays here | The accepted cost of a split, and `Split` says so in a comment at the `QuerySplit` log site |
+| `Contains` over a captured local sequence the wire cannot name (14) | `Where(c => value(Enumerable+OrderedIterator…).Contains(c.CustomerID))` | Already tried and reverted: `CollectionExpressionNormalizer` carries the comment, and rewriting one to an array cost `Contains_with_local_ordered_enumerable_inline` |
+| A predicate over a freshly constructed object, on a non-relational server (6) | `Where(g => (new { Name = g.LeaderNickname } ?? new { … }) != null)` | R164 and R165 refuse these, and only when the server's store is relational -- refusing everywhere broke two Tier A tests |
+
+**So the answer is that there is no third silent full-table read of the kind R164 and R165 closed.**
+What is left is one accepted design cost and two recorded decisions.
+
+**The part worth carrying is the method, not the count.** The two holes that were found this session
+were found by asking what the server received for one query. That does not scale and it does not
+prove absence. An invariant plus one instrumented suite run does both, in about ten minutes, and it
+is available for any question of the form "how often does this happen".
+
+**What it also turned up, and what is left open.** The largest class is not a defect, but it is a
+consumer-visible cost that no document names: when a projection has to be reassembled here, the
+paging and filtering *above* it are reassembled with it, so `Skip` and `Take` do not reduce what
+crosses the wire. `website/docs/limitations.md` says "Page it" about a large result set, which is
+true and, in that case, not enough. Whether the `QuerySplit` event should name what stayed behind --
+it currently reports only how many server queries a split produced -- is a design question and is
+recorded rather than answered.
+
 ## When a syntactic guard is safe, and when it is not (R162/R164/R165, 2026-09-04)
 
 Three guards were attempted in one session against the same background: this provider answers
