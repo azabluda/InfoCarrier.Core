@@ -5418,6 +5418,70 @@ re-parents of families already running, because R25–R30 showed that is where t
       `website/docs/limitations.md` says "Page it", which is true and, in that case, not enough.
       Whether `QuerySplit` should name what stayed behind is a design question for the owner.
 
+- [x] **R174. The whole tail re-derived from primary sources at 39, and one class reclassified.**
+      `test/` and `docs/` text only, so no gate. `failed` and `total` unchanged at 39 / 29513.
+
+      **Every one of the thirteen classes was read again from EF's own source or from a
+      measurement already on file**, rather than from the reason string beside it. Twelve stand as
+      written. Three gained evidence they did not have, and one of those changes which wall the
+      class is blocked by.
+
+      **The three `Contains_*` are blocked, and EF's own base is misleading about why.**
+      `OwnedJsonStructuralEqualityRelationalTestBase` carries a comment above each assert naming
+      the message, and **the comments are swapped relative to the asserts**: the "The given key …
+      was not present in the dictionary" comment (which is a `KeyNotFoundException`'s own message)
+      sits above `Assert.ThrowsAsync<InvalidOperationException>`, and the "No backing field could
+      be found for property …" comment above `Assert.ThrowsAsync<KeyNotFoundException>`. This
+      provider raises the no-backing-field `InvalidOperationException` for **all four**, which is
+      why `Contains_with_inline` is green here and the other three are red: on that one test the
+      two products collide on the same exception type by coincidence. R167's verdict is unchanged
+      and is now better founded — matching the other three means raising `KeyNotFoundException` on
+      purpose, which reproduces another product's bug.
+
+      **`Complex_properties_can_be_configured_by_type` is filed under the store type names and the
+      cheaper wall is a convention.** `RelationalStrings.ComplexCollectionNotMappedToJson` is only
+      meaningful where a complex collection *can* be JSON-mapped, and what maps one is
+      `RelationalMapToJsonConvention` — which R170 measured at about 560 tests when it was added to
+      this client. Without it every complex collection in the client model is un-mapped, so the
+      check would fire on all of them rather than on this test's one. **Inferred from R170's
+      measurement rather than measured**, and it is the reason to stop before the store types are
+      even reached.
+
+      **The four `Include_*_connection*` were re-read and the store is not the obstacle.** The
+      standing reason is that the test store exposes no `DbConnection`, which is where the failure
+      surfaces. Both bodies then call `context.Database.GetDbConnection()` on the **client**
+      context and assert its `ConnectionState`, so handing back the backend's connection from the
+      fixture — which does exist, it is the SQLite file — would move the failure one line and not
+      fix it.
+
+      **Nothing in the tail is now reducible without a decision.** Three decisions would move it,
+      worth 4, 1 and 1 tests, and thirteen more turn on whether a spec test this provider answers
+      correctly may be overridden to say so. They are recorded for the owner and none was taken.
+
+- [x] **R175. What 10.0.1's own suite scores against today's product code, measured.**
+      A throwaway worktree, nothing committed to `src/` or `test/`. Asked as a curiosity and the
+      answer corrected an inference of mine.
+
+      **`Passed: 22463, Failed: 27, Total: 22667`, skipped 177.** The total and the skip count are
+      byte-identical to what `v10.0.1` recorded for itself, so the old suite ran intact: the tag's
+      `test/` tree over today's `src/`, which compiles with **0 errors** — the four `.csproj` are
+      the same four, and the public API deleted at R135 was never used by the tag's tests.
+
+      **10.0.1 scored 9 failures against its own code and today's code scores 27 against it.** Of
+      the tag's 9, **8 still fail** and `Collection_enum_as_string_Contains` now passes. The 19 new
+      ones are not a regression and the messages say so: 16 are this provider **refusing** a query
+      it used to answer on the client, or **answering** one the old test expected it to refuse, and
+      3 are compiled-model baseline **files** in the tag's `test/` tree that no longer match the
+      model today. `Value_conversion_on_enum_collection_contains` was checked one level deeper:
+      today's class overrides it to assert the refusal, with a comment saying passing was the wrong
+      answer, so the probe's red is the recorded decision seen from the other side.
+
+      **The measurement's limit, and it is not small.** The harness is half the experiment. The
+      tag's `test/` wires its own fixtures and stores, so a difference between the two runs can
+      come from the harness as easily as from `src/`, and ten of the nineteen were not attributed
+      past their message. The headline — 22463 of 22667 — does not depend on that.
+      `artifacts/test-results/v1001-tests-on-todays-src.trx` is the run.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

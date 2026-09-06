@@ -3770,5 +3770,45 @@
 # and `...Infrastructure` are excluded at the capture, before anything is buffered. Found by
 # measurement: with them included the `_sensitive` test saw three warnings where it asserts one.
 
+# 2026-09-07 (R174) -- `failed` AND `total` UNCHANGED at 39 / 29513, names byte-identical. Every
+# class was read again from EF's own source or from a measurement already on file. Twelve stand.
+# Three gained evidence, and one of those is blocked by a different wall than this file said.
+#
+# --- THE THREE `Contains_*`: EF'S OWN BASE IS MISLEADING ABOUT WHY -----------------------------
+# `OwnedJsonStructuralEqualityRelationalTestBase` comments each assert with the message it
+# expects, and THE COMMENTS ARE SWAPPED RELATIVE TO THE ASSERTS. "The given key ... was not
+# present in the dictionary" -- which is a `KeyNotFoundException`'s own message -- sits above
+# `Assert.ThrowsAsync<InvalidOperationException>`, and "No backing field could be found for
+# property ..." above `Assert.ThrowsAsync<KeyNotFoundException>`. THIS PROVIDER RAISES THE
+# NO-BACKING-FIELD `InvalidOperationException` FOR ALL FOUR, which is exactly why
+# `Contains_with_inline` is green here and the other three are red: on that one test the two
+# products collide on the same exception type by coincidence, not by agreement. R167's verdict is
+# unchanged -- matching the three means raising `KeyNotFoundException` on purpose.
+#
+# --- `Complex_properties_can_be_configured_by_type` IS BLOCKED EARLIER THAN THE STORE TYPES -----
+# R170 moved it into the store-type-names class. There is a cheaper wall in front of that one.
+# `RelationalStrings.ComplexCollectionNotMappedToJson` can only tell a JSON-mapped complex
+# collection from an un-mapped one, and what maps one on a relational model is
+# `RelationalMapToJsonConvention` -- the convention R170 MEASURED at about 560 tests when it was
+# added to this client. Without it every complex collection in the client model is un-mapped, so
+# the check would fire on all of them instead of on this test's one. INFERRED from R170's
+# measurement, not measured on its own.
+#
+# --- THE FOUR `Include_*_connection*`: THE TEST STORE IS NOT THE OBSTACLE ----------------------
+# The failure surfaces as this test store refusing to expose a `DbConnection`, which reads as a
+# harness limit that a harness change could lift. It cannot. Both bodies call
+# `context.Database.GetDbConnection()` ON THE CLIENT CONTEXT at their second line and assert its
+# `ConnectionState`. Handing back the backend's connection -- which exists, it is the SQLite file
+# -- moves the failure one line.
+#
+# --- WHAT IS LEFT IS DECISIONS, NOT WORK ------------------------------------------------------
+# Three would move the count, worth 4, 1 and 1: writing a SQL literal on a client that has no
+# store, building a relational model on one, and paying `EntitySplittingConvention`'s 114.
+# THIRTEEN MORE TURN ON ONE QUESTION -- whether a spec test this provider ANSWERS CORRECTLY may
+# carry an override saying so. That is a third of the tail: the 8 `Correlated_collection_*` on TPC
+# and TPT, the 2 `Parameter_collection_in_subquery_*`, the 2 named on `limitations.md`, and
+# `Associate_with_parameter_null`. The guardrail against overriding a spec test exists so that
+# this is not decided quietly, so it is recorded and not taken.
+
 failed=39
 total=29513
