@@ -5789,6 +5789,85 @@ re-parents of families already running, because R25–R30 showed that is where t
       key (step S3), and narrowing it for an owned type used in structural equality is a change to
       the wire's parameter handling with its own blast radius.
 
+- [x] **V8. An owned entity travels as a parameter, and the three `Contains_*` plus one more go
+      green.** `src/` only, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`. **`failed` FALLS
+      34 -> 30**, FIXED 4, BROKEN none. `Total tests: 29516, Passed: 29248, Failed: 30,
+      Skipped: 238`. Trim ratchet OK at 90 <= 90; `CI=true` Release build `0 Error(s)`; the 22
+      transport tests green. No public signature changed, so no pack gate.
+
+      **The previous entry was wrong about the mechanism, and EF's issue tracker is what settled
+      it.** V7 concluded that the far side materializes the captured owned instance as an entity.
+      Nothing materializes it. [dotnet/efcore#36400](https://github.com/dotnet/efcore/issues/36400)
+      carries this provider's exact exception together with its stack:
+
+      ```
+      InvalidOperationException: No backing field could be found for property '...RelatedEntityId'
+        at RelationalSqlTranslatingExpressionVisitor.CreatePropertyAccessExpression
+        at RelationalSqlTranslatingExpressionVisitor...<TryRewriteStructuralTypeEquality>b__2
+      ```
+
+      The message comes from **EF's translator on the server**, rewriting structural equality. V7
+      named a mechanism without reading a stack for it, which is the standing rule in a new place:
+      an evidenced hypothesis can be right about the evidence and wrong about the mechanism.
+
+      **The real difference is inline versus parameter.** #36400 fails on both forms, and EF's two
+      paths fail differently — the inline form with `InvalidOperationException`, the parameter form
+      with `KeyNotFoundException`, which is what
+      `OwnedJsonStructuralEqualityRelationalTestBase` records. This provider sent the caller's
+      captured variable **inline**, so all four tests took EF's inline branch. That is why
+      `Contains_with_inline` was green and the other three were red: a collision on one exception
+      type, not an agreement.
+
+      **One clause, and it could never have matched.** `QueryExecutor`'s substitution asks
+      `FindRuntimeEntityType(parameterType)`, which looks an entity type up **by CLR type** — and an
+      owned entity type is named for its ownership path,
+      `RootEntity.RequiredAssociate#AssociateType.NestedCollection#NestedAssociateType`. The lookup
+      returns null for `NestedAssociateType`; the mapped-property clause declines too, because an
+      owned navigation is neither a property nor a complex property; the value falls through to a
+      plain constant. `IsOwnedEntityType` is the new reader, cached per model the way
+      `IsMappedPropertyType` is. The box itself is B22's, unchanged.
+
+      **The fourth face of one divergence**, after collections (B22/C88), a null collection (J19)
+      and a mapped scalar (J21).
+
+      **And it adopts an upstream wrong answer, deliberately.**
+      `Associate_with_parameter_null` is the fourth test fixed and the one to read twice. It is
+      [dotnet/efcore#36401](https://github.com/dotnet/efcore/issues/36401): an owned JSON entity
+      compared to a **parameterized** null translates to `WHERE 0 = 1` instead of `IS NULL`, so EF
+      returns the wrong rows and its own base asserts an `EqualException`. This provider returned
+      the right rows until now, by the accident of sending the parameter inline. It now returns
+      EF's. Taken because answering better than EF by accident is still divergence, because the
+      same accident cost the three `Contains_*`, and because it makes every parameterized query a
+      distinct statement in the server's compiled-query cache — issue #59's argument.
+      `website/docs/limitations.md` loses the entry that claimed the better answer.
+
+      **One standing note is wrong about its own layer, and it is corrected here.**
+      `test/known-failures.txt` called the four of class 3 —
+      `ExecuteDelete_throws_for_entity_splitting` and `ExecuteUpdate_works_for_table_sharing` —
+      *"raised by `GetFacadeDependencies` before a query is built"*. The stack says
+      `DbContextTransactionExtensions.GetDbTransaction`, called from the spec base's own
+      `UseTransaction(DatabaseFacade, IDbContextTransaction)` inside
+      `ExecuteWithStrategyInTransactionAsync`. **The four never reach the operation they are named
+      for**, so they say nothing about whether `ExecuteUpdate` works for table sharing. The helper
+      is `public` and **not** virtual on both bases, so it cannot be overridden; ADR-013's
+      amendment covers exactly this, and the bases stay adopted because their other tests do not
+      route through it.
+
+      **And the same reading produced `docs/upstream-defects.md`, which lands with this step.**
+
+      **A diagnosis is not a report, and this repository could not tell the two apart.** Five
+      defects were traced to a named method in a named file, written up in `test/known-failures.txt`
+      or in this plan, and left there. `docs/upstream-defects.md` is now that list: §1 is what
+      nobody has sent, §2 is what an issue number already covers. Each entry says **what it blocks
+      here**, because a defect that blocks nothing wants a report rather than a workaround.
+
+      **One citation was wrong, and it was in a consumer-facing page.**
+      `website/docs/limitations.md` and `test/known-failures.txt` both attributed the property-bag
+      materializer defect to `dotnet/efcore#36175`. That issue is *"Support notification change
+      tracking for complex types"*, a Backlog **feature request**; EF's SQL Server suite cites it
+      when disabling a neighbouring test, which is corroboration and not a report. The page loses
+      the citation.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

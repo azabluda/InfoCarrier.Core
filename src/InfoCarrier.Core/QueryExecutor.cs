@@ -929,6 +929,30 @@ internal sealed class QueryExecutor<TElement>
                 return Expression.Convert(Boxed(value, value.GetType()), typeof(object));
             }
 
+            // **An OWNED entity is boxed too, and the clause above could never reach it.**
+            // `FindRuntimeEntityType` looks an entity type up by CLR type, and an owned type is not
+            // named for its CLR type: it is named for its ownership path,
+            // `RootEntity.RequiredAssociate#AssociateType.NestedCollection#NestedAssociateType`.
+            // So the lookup returns null for `NestedAssociateType`, the entity clause declined, the
+            // mapped-property clause declined too — an owned navigation is neither a property nor a
+            // complex property — and the value reached the server as an INLINE CONSTANT where the
+            // caller had written a captured variable.
+            //
+            // That is observable, and it is what separates this provider from EF on three tests.
+            // `Where(e => e.RequiredAssociate.NestedCollection.Contains(nested))` fails on both
+            // products, because comparing a nested owned entity to a value is
+            // dotnet/efcore#36400 — but EF's two paths fail DIFFERENTLY, and its own
+            // `OwnedJsonStructuralEqualityRelationalTestBase` records both: the inline form raises
+            // `InvalidOperationException` from `TryRewriteStructuralTypeEquality`, and the
+            // parameter form raises `KeyNotFoundException`. Sending a parameter inline therefore
+            // put every one of the four on the inline branch — which is why `Contains_with_inline`
+            // is green here and the other three are red, on a coincidence rather than on agreement.
+            //
+            // **This is the FOURTH face of one divergence**, after collections (B22/C88), a null
+            // collection (J19) and a mapped scalar (J21): ADR-006 captures downstream of EF's
+            // parameter extraction, so every clause here exists to restore a decision the wire
+            // discarded. Nothing new crosses the wire — the box changes the shape of the node that
+            // holds the value, not the node.
             IEntityType? entityType = parameterType == typeof(object)
                 ? null
                 : _queryContext.Context.Model.FindRuntimeEntityType(parameterType);
@@ -940,6 +964,7 @@ internal sealed class QueryExecutor<TElement>
                         && PrimitiveCoercion.IsWirePrimitive(value.GetType()))
                     || (parameterType != typeof(object)
                         && (entityType is not null
+                            || IsOwnedEntityType(_queryContext.Context.Model, parameterType)
                             || IsMappedPropertyType(_queryContext.Context.Model, parameterType)))))
             {
                 return Boxed(value, parameterType);
@@ -1001,6 +1026,40 @@ internal sealed class QueryExecutor<TElement>
         }
 
         private static readonly ConditionalWeakTable<IModel, HashSet<Type>> MappedPropertyTypes = new();
+
+        /// <summary>
+        ///     Whether the model has an <em>owned</em> entity type with this CLR type — an
+        ///     <c>OwnsOne</c> or <c>OwnsMany</c> target.
+        /// </summary>
+        /// <remarks>
+        ///     This exists because the model's by-CLR-type lookup cannot answer it: an owned entity
+        ///     type is named for its ownership path, so <c>FindRuntimeEntityType</c> returns null
+        ///     for the very type the caller wrote. Cached per model in a
+        ///     <see cref="ConditionalWeakTable{TKey,TValue}" /> for the reasons
+        ///     <see cref="IsMappedPropertyType" /> is.
+        /// </remarks>
+        private static bool IsOwnedEntityType(IModel model, Type type)
+            => OwnedEntityTypes.GetValue(model, static m => CollectOwned(m)).Contains(type);
+
+        /// <summary>
+        ///     Every CLR type the model maps as an owned entity type.
+        /// </summary>
+        private static HashSet<Type> CollectOwned(IModel model)
+        {
+            HashSet<Type> types = [];
+
+            foreach (IEntityType entityType in model.GetEntityTypes())
+            {
+                if (entityType.IsOwned())
+                {
+                    types.Add(entityType.ClrType);
+                }
+            }
+
+            return types;
+        }
+
+        private static readonly ConditionalWeakTable<IModel, HashSet<Type>> OwnedEntityTypes = new();
 
         /// <summary>
         ///     A collection parameter in the shape EF's own funcletizer lifts back into a

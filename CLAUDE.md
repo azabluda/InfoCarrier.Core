@@ -45,7 +45,7 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
-dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 19 tests, separate project
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 22 tests, separate project, NOT in measure.sh
 ```
 
 **THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it was two between R122 and R136.**
@@ -86,10 +86,13 @@ until R135, and `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R1
 measurement.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
-both and adds the figures. The solution also holds `InfoCarrier.Core.TransportTests`, which is not a
-spec project, so a solution-wide run inflates `Total` past what `test/known-failures.txt` was written
-against. **A run of one tier alone is not comparable to the baseline either**, because the baseline
-covers both.
+every project in its own `projects` list and adds the figures. **That list holds the spec project
+alone, and `InfoCarrier.Core.TransportTests` is deliberately absent** — it is this repository's own
+HTTP-transport suite, expected green, and folding it in would inflate `Total` past what
+`test/known-failures.txt` was written against, which is also why a solution-wide run is wrong. **So
+a `src/` change needs the transport line above as well as `measure.sh`**; the script says so in its
+own comment. **A run of one tier alone is not comparable to the baseline either**, because the
+baseline covers every tier.
 
 **Report test results as `Passed: N, Failed: M, Total: T`, read out of the run's own output.** Never
 estimate a count, and never derive one figure from the others.
@@ -218,6 +221,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
 | `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why.** Warnings are errors **in CI only** — `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` reproduces it — the configuration matters. **That command reports `5 Warning(s), 0 Error(s)`, and green is not zero here**: the five are `IL2110`/`IL2111` from the framework's own Razor output in `samples/Northwind.Client`, downgraded from error to warning on purpose so the trim ratchet can still count them. Debug reports `0 Warning(s)`, which is why "the build is clean" stood uncorrected for five milestones. Read before adding any `NoWarn`. |
 | `docs/plans/v10/cold-read-findings.md` | **What seven readers with no context found in the user-facing docs**, and what is still open. §1 holds the `IgnoreQueryFilters` design question: the marker crosses the wire and the server honours it, so a global query filter is **not** an authorization boundary today. Read before touching the security or tenancy prose. |
 | `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
+| `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers, so a comment naming a number can be checked against what it says. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
 in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
@@ -357,7 +361,7 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 29516, Passed: 29244, Failed: 34, Skipped: 238`** (2026-09-07, `r180`).
+**`Total tests: 29516, Passed: 29248, Failed: 30, Skipped: 238`** (2026-09-07, `v8`).
 **All four figures come out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
@@ -369,7 +373,7 @@ because `comm` cannot read a file with comments in it. A commit that lowers the 
 `artifacts/test-results/failures.txt` over the names file, and the ratchet says so in a `::notice::`
 when it sees the count fall.
 
-**All 34 failures are classified and not one is of unknown standing**, and every class is blocked,
+**All 30 failures are classified and not one is of unknown standing**, and every class is blocked,
 priced or upstream — there is no open one left. `test/known-failures.txt` carries a dated reading
 per class and is the current answer; the paragraph below and the tables named in it are the history.
 The tables are in

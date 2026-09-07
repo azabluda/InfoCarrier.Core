@@ -4008,5 +4008,69 @@
 # key (step S3), and narrowing it for an owned type used in structural equality is a change to the
 # wire's parameter handling with its own blast radius.
 
-failed=34
+# 2026-09-07 (V8) -- `failed` FALLS 34 -> 30, `total` unchanged at 29516. FIXED 4, BROKEN none.
+# `Total tests: 29516, Passed: 29248, Failed: 30, Skipped: 238`. The reasons diff loses one whole
+# line -- the 3 `Exception type was not an exact match` -- and drops `No exception was thrown` from
+# 14 to 13. `OwnedJsonStructuralEqualityQueryInfoCarrierTest` is 15 of 15.
+#
+# **THIS REVERSES THE V7 ENTRY ABOVE, WHICH WAS RIGHT ABOUT THE MEASUREMENT AND WRONG ABOUT THE
+# MECHANISM.** V7 concluded that the far side MATERIALIZES the captured owned instance as an
+# entity, and priced a change to the wire's parameter handling against it. Nothing materializes it.
+#
+# --- WHAT SETTLED IT WAS EF'S OWN ISSUE TRACKER, NOT ANOTHER PROBE -----------------------------
+# dotnet/efcore#36400, "Can't compare nested owned entities to inline/parameter", carries the exact
+# exception this provider raises AND its stack:
+#   InvalidOperationException: No backing field could be found for property '...RelatedEntityId'
+#     at RelationalSqlTranslatingExpressionVisitor.CreatePropertyAccessExpression
+#     at RelationalSqlTranslatingExpressionVisitor.<>c__DisplayClass57_0.<TryRewriteStructuralTypeEquality>b__2
+# So the message comes from EF'S TRANSLATOR ON THE SERVER while rewriting structural equality, and
+# it is EF's own known defect. It is not this provider's materializer, which V7 named without
+# reading a stack for it. **A hypothesis that explains the evidence can still name the wrong
+# mechanism** -- the same rule findings.md already carries, in a new place.
+#
+# --- THE REAL DIFFERENCE IS INLINE VERSUS PARAMETER, AND IT IS ONE CLAUSE -----------------------
+# #36400 fails on BOTH forms and EF's two paths fail DIFFERENTLY, which is what
+# `OwnedJsonStructuralEqualityRelationalTestBase` records: the inline form raises
+# `InvalidOperationException`, the parameter form `KeyNotFoundException`. This provider sent the
+# caller's captured variable INLINE, so all four tests took the inline branch -- which is exactly
+# why `Contains_with_inline` was green here and the other three were red. A coincidence, not an
+# agreement, and this file said as much at R174 without knowing why.
+#
+# The clause is `QueryExecutor`'s substitution: `FindRuntimeEntityType(parameterType)` looks an
+# entity type up BY CLR TYPE, and an owned entity type is named for its ownership path
+# (`RootEntity.RequiredAssociate#AssociateType.NestedCollection#NestedAssociateType`), so the
+# lookup returns null for `NestedAssociateType`. The mapped-property clause declined too -- an
+# owned navigation is neither a property nor a complex property -- and the value fell through to a
+# plain constant. `IsOwnedEntityType` is the added reader; the box is B22's, unchanged.
+#
+# **THE FOURTH FACE OF ONE DIVERGENCE**, after collections (B22/C88), a null collection (J19) and a
+# mapped scalar (J21). ADR-006 captures downstream of EF's parameter extraction, so every clause
+# there exists to restore a decision the wire discarded.
+#
+# --- AND IT ADOPTS AN UPSTREAM WRONG ANSWER, DELIBERATELY --------------------------------------
+# `Associate_with_parameter_null` is the fourth test fixed and it is the one to read twice. It is
+# dotnet/efcore#36401: an owned JSON entity compared to a PARAMETERIZED null translates to
+# `WHERE 0 = 1` instead of `IS NULL`, so EF returns the wrong rows and its own base asserts an
+# `EqualException`. Until now this provider returned the RIGHT rows, by the accident of sending the
+# parameter inline; it now returns EF's. That is a real behaviour change for one narrow shape, and
+# it is taken because answering better than EF by accident is still divergence, and because the
+# same accident cost the three `Contains_*` and makes every parameterized query a distinct
+# statement in the server's compiled-query cache (issue #59's argument).
+# `website/docs/limitations.md` loses the entry that claimed the better answer.
+#
+# --- WHAT IS LEFT, AND ONE STANDING NOTE IS WRONG ABOUT ITS OWN LAYER --------------------------
+# The 4 of class 3 are `ExecuteDelete_throws_for_entity_splitting` and
+# `ExecuteUpdate_works_for_table_sharing`. This file called them "raised by `GetFacadeDependencies`
+# before a query is built". The stack says otherwise: it is
+# `DbContextTransactionExtensions.GetDbTransaction`, called from the spec base's own
+# `UseTransaction(DatabaseFacade, IDbContextTransaction)` helper inside
+# `ExecuteWithStrategyInTransactionAsync`. **So the four say nothing about `ExecuteUpdate` or
+# `ExecuteDelete` at all** -- they never reach the operation they are named for. The helper is
+# `public` and NOT virtual on both bases, so it cannot be overridden; ADR-013's amendment covers
+# exactly this and the bases stay adopted, because their other tests do not route through it.
+#
+# `docs/upstream-defects.md` is added in the same commit and carries every defect of somebody
+# else's that this repository has diagnosed, with which ones have been reported.
+
+failed=30
 total=29516

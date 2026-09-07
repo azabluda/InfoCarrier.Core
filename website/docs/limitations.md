@@ -10,7 +10,7 @@ client for something only a database has, assert a refusal this provider does no
 are EF Core defects that every provider hits and this one reports with a different exception type.
 
 ```
-Total tests: 29513, Passed: 29236, Failed: 39, Skipped: 238
+Total tests: 29516, Passed: 29248, Failed: 30, Skipped: 238
 ```
 
 Measured against `10.0.0`. The 238 skips are EF Core's own, tests EF itself skips for the
@@ -76,8 +76,7 @@ Nested complex types and complex collections are fine, as long as the type is a 
 dictionary.
 
 The cause is a defect in EF Core's own materializer, reached because this provider rebuilds entities
-on the server from the values sent over the wire. Tracked upstream as
-[dotnet/efcore#36175](https://github.com/dotnet/efcore/issues/36175).
+on the server from the values sent over the wire.
 
 ## Differences that are not limitations
 
@@ -107,7 +106,7 @@ EF Core provider.
 
 EF's suite has other scenarios that assert a provider either rejects the query or returns the wrong
 rows. This provider answers them correctly. A test suite you port will expect an exception, and
-LINQ that relies on this will not run unchanged elsewhere. Four of them:
+LINQ that relies on this will not run unchanged elsewhere. Three of them:
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -138,16 +137,6 @@ context.RootEntities
         .Contains(associates[1]))
     .ToList();
 // EF Core providers: throws.   This provider: returns the matching rows.
-```
-
-Comparing an owned JSON entity against a null parameter:
-
-```csharp
-modelBuilder.Entity<RootEntity>().OwnsOne(e => e.Associate, b => b.ToJson());
-
-Associate? absent = null;
-context.RootEntities.Where(e => e.Associate == absent).ToList();
-// EF Core providers: return the wrong rows.   This provider: returns the right ones.
 ```
 
 Comparing a column collection against an inline collection of parameters, which relational
