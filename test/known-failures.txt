@@ -4195,5 +4195,40 @@
 # `Composition_over_...` above; 1 `Complex_properties_can_be_configured_by_type`, a check this
 # client never runs.
 
+# 2026-09-07 (V13) -- `failed` AND `total` UNCHANGED at 19 / 29516. NO CODE, NO TEST RUN. All
+# nineteen were read again against EF'S OWN SUITES, which is CLAUDE.md's standing check and has
+# found six wrong classifications before. **Eighteen stand. One claim is wrong, and it is a claim
+# this file and the archive both made.**
+#
+# --- HOW THEY WERE CHECKED --------------------------------------------------------------------
+# `subrepos/efcore` loaded into the MCP server with the four spec/functional test projects, and
+# each failing test name looked up as a SYMBOL rather than as text. What the lookup answers is
+# "which EF classes override this", which is the question -- an override of EF's own is a
+# workaround to adopt, and its absence means there is nothing to adopt.
+#
+#   * `Throws_when_orderby_multiple`, `Casts_are_removed_from_expression_tree_when_redundant`,
+#     `Can_use_table_splitting_with_owned_reference`, `Include_closed_connection_*`,
+#     `Include_does_not_close_user_opened_connection_*` -- ONE definition each, no provider
+#     override anywhere. Nothing to adopt; the standing readings hold.
+#   * `Update_with_invalid_lambda_in_set_property_throws` -- SQLite overrides it only to add an
+#     `AssertExecuteUpdateSql()` after calling base. Nothing behavioural. Message text stands.
+#   * `Correlated_collection_with_distinct_3_levels` -- EF's InMemory class asserts
+#     `InMemoryStrings.DistinctOnSubqueryNotSupported`. That is a workaround for a limitation this
+#     provider does not have, which is exactly what C64 deleted and why. Stands.
+#
+# --- THE ONE CORRECTION, AND IT MAKES THE CASE STRONGER ---------------------------------------
+# For `Can_track_entity_with_complex_property_bag_collections`, J22 recorded that "EF's SQL Server
+# suite does disable the test outright (`=> Task.CompletedTask`, Issue #36175), which is the
+# corroboration", and this file repeated it. **THE CORROBORATION DOES NOT EXIST.** Every one of the
+# ~30 `#36175` overrides in `ComplexTypesTrackingSqlServerTest.cs` sits in
+# `ComplexTypesTrackingProxiesSqlServerTest`, whose fixture sets `UseChangeTrackingProxies()`. The
+# PLAIN `ComplexTypesTrackingSqlServerTest` carries no overrides at all, so EF's SQL Server suite
+# RUNS this test and it PASSES there.
+#
+# So EF passes on its own store, no EF suite reaches the branch, and the one issue number ever
+# attached to it describes a different feature under a different fixture. **A classification is not
+# evidence and age is not evidence, in the one place where the classification was a quotation.**
+# `docs/upstream-defects.md` section 1.1 carries the reading.
+
 failed=19
 total=29516

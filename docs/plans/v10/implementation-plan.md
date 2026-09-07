@@ -5996,6 +5996,40 @@ re-parents of families already running, because R25–R30 showed that is where t
       helper, 4 message text, 2 the property-bag materializer, 2 C64's pair, 1 entity splitting,
       1 the companion case above, 1 the check this client never runs.
 
+- [x] **V13. The rule from V10 and V11 written down, and all nineteen re-checked against EF's own
+      suites.** Docs only; no gate, no test run. `failed` and `total` unchanged at 19 / 29516.
+
+      **The rule.** `findings.md` gains *"A relational service on the client needs its companions,
+      and the companions are what we refuse"*, with both measurements and both stack messages, and
+      `CLAUDE.md`'s rule list gains the one-line form. **It is not R170 restated.** R170 is about
+      what a convention *decides*; this is about what a service *assumes*. Neither
+      `EntitySplittingConvention` nor `RelationalModelValidator` decides anything the server owns,
+      and both still failed. The tell is different too: R170's is visible by reading the
+      convention, and this one is invisible until the run, because the missing neighbour is named
+      nowhere in the service you added.
+
+      **The re-check.** `subrepos/efcore` loaded into the MCP server, every failing test name
+      looked up as a symbol rather than as text, because the question is *which EF classes override
+      this* — an override of EF's own is a workaround to adopt, and its absence means there is
+      nothing to adopt. **Eighteen stand.**
+
+      **One claim is wrong, and both this plan's archive and `known-failures.txt` made it.** J22
+      recorded that EF's SQL Server suite disables
+      `Can_track_entity_with_complex_property_bag_collections` outright under issue #36175, *"which
+      is the corroboration"*. Every one of the ~30 `#36175` overrides in that file sits in
+      **`ComplexTypesTrackingProxiesSqlServerTest`**, whose fixture sets
+      `UseChangeTrackingProxies()`. The plain `ComplexTypesTrackingSqlServerTest` carries **no
+      overrides at all** — EF runs this test on SQL Server and it passes.
+
+      **Which makes the case stronger.** EF passes on its own store because EF never materializes
+      the entity from a value buffer; no EF suite reaches the branch; and the one issue number ever
+      attached to it describes a different feature under a different fixture.
+      `docs/upstream-defects.md` §1.1 is corrected.
+
+      **A classification is not evidence and age is not evidence — in the one place where the
+      classification was a direct quotation from EF's own source.** That is what made it feel
+      checked.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

@@ -959,3 +959,69 @@ run, no overrides (A79). A80 deleted a workaround for a store capability by movi
 needed it rather than by writing around it, which is where the "check the tier before writing the
 workaround" tell comes from. And three Northwind bases ran on both tiers, green on both — 906 tests
 of pure duplication (A81), which is what "exactly one tier" is protecting against.
+
+### A relational service on the client needs its companions, and the companions are what we refuse
+
+**Measured twice, on 2026-09-07, with two different services, and the second run is what turned it
+from an anecdote into a rule.** Both experiments took one part of EF's relational model-building
+group, gave it to the client alone, and were reverted.
+
+| Step | Service added | `failed` |
+|---|---|---|
+| V10 | `EntitySplittingConvention` | 30 → 149 |
+| V11 | `RelationalModelValidator` | 30 → 4037 |
+
+**Neither failed on what it was supposed to do.** Each failed because EF's parts do not stand
+alone: in `RelationalConventionSetBuilder.CreateConventionSet` they sit in one list, and each of
+them assumes the others ran.
+
+**V10, in full.** `SplitToTable("MeterReadingDetails", …)` puts some of a class's columns in a
+second table. EF then adds a linking foreign key between the two tables. Another member of the
+group — `RelationalKeyDiscoveryConvention`, which EF installs with
+`Replace<KeyDiscoveryConvention>` — is what reconciles that key. **This client cannot vacate that
+slot**: `InfoCarrierConventionSetBuilder` puts its own key discovery there so the client agrees
+with the document-mapping seam. So the linking key stands alone, core model validation calls it
+redundant, and the spec fixture makes warnings throw:
+
+```
+An error was generated for warning 'RedundantForeignKeyWarning':
+The foreign key {'Id'} on entity type 'MeterReading' targets itself.
+```
+
+122 failures carried that one message.
+
+**V11, in full, and it has two layers.** The first is a cast, and 3968 of the 4037 are it:
+
+```
+InvalidCastException: Unable to cast 'InfoCarrier.Core.InfoCarrierLoggingDefinitions'
+                      to 'Microsoft.EntityFrameworkCore.Diagnostics.RelationalLoggingDefinitions'
+   at RelationalResources.LogBoolWithDefaultWarning(IDiagnosticsLogger logger)
+```
+
+The relational validator writes its warnings through EF's *relational* logging definitions and this
+client supplies core ones. **That layer is fixable** — as an additive sibling, the way V5 did the
+type mapping source, because `InfoCarrierLoggingDefinitions` is published and re-basing it is
+`CP0007`. The second layer is not:
+
+```
+The foreign keys {'VehicleName'} on 'FuelTank' and {'VehicleName'} on 'CombustionEngine'
+  are both mapped to …
+'Operator.VehicleName' and 'Operator.Name' are both mapped to column 'Name' in 'Vehicles', but …
+```
+
+Those are table-sharing rules. Making them pass needs `SharedTableConvention`, which **decides a
+column name** — the storage decision the server owns and R170's rule refuses. So the validator
+would reject legitimate models even with the cast fixed, and fixing only the cast buys zero green
+tests.
+
+**The rule.** *Do not give the client one relational service alone. Read the list it sits in
+first. If that list holds a service which decides a name or a storage shape, the whole group is
+closed, and the single service will fail on the absence of its neighbour rather than on its own
+merits.*
+
+**Why this is not just R170 restated.** R170's rule is about what a convention *decides*, and it
+already explains why `RelationalMapToJsonConvention` and `SharedTableConvention` stay out. This one
+is about what a service *assumes*: neither `EntitySplittingConvention` nor `RelationalModelValidator`
+decides anything the server owns, and both still fail. **The tell is different too.** R170's is
+visible by reading the convention; this one is invisible until the run, because the missing
+neighbour is named nowhere in the service you added.

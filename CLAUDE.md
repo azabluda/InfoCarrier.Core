@@ -453,6 +453,12 @@ they are these:
   you actually wanted.
 - **Two failures of the same shape are one defect until measured otherwise.**
 - **An evidenced hypothesis can be right about the evidence and wrong about the mechanism.**
+- **A relational service on the client needs its companions, and the companions are what this
+  client refuses.** Measured twice on 2026-09-07 with two different services, `EntitySplittingConvention`
+  (30 -> 149) and `RelationalModelValidator` (30 -> 4037). Neither failed on its own merits; each
+  failed on the absence of a neighbour in EF's own list — a key discovery this client cannot vacate,
+  and a shared-table convention that decides column names. **Read the list a service sits in before
+  adding it alone**; the missing neighbour is named nowhere in the service itself.
 
 The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF
 Core's own `SqliteTestStore` is. Do not move it back to `Mode=Memory;Cache=Shared`: that makes

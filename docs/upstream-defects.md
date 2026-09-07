@@ -42,12 +42,21 @@ spec tests, both parameterizations of
 The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor binding, which
 was priced in M9 and declined.
 
-**`dotnet/efcore#36175` does not track this, and both files here say it does.** That issue is
-*"Support notification change tracking for complex types"* — a Backlog **feature request** opened by
-a member in June 2025. EF's SQL Server suite cites it when disabling a neighbouring test, which is
-corroboration that the shape is unsupported there and is not a report of this branch. Read on
-2026-09-07. `test/known-failures.txt` and `limitations.md` are corrected in the same step that
-created this file.
+**`dotnet/efcore#36175` does not track this, and the corroboration this repository claimed for it
+does not exist either.** That issue is *"Support notification change tracking for complex types"* —
+a Backlog **feature request** opened by a member in June 2025, read on 2026-09-07.
+
+**What the archive said, and why it is wrong.** M9's J22 recorded that *"EF's SQL Server suite does
+disable the test outright (`=> Task.CompletedTask`, Issue #36175), which is the corroboration"*.
+Checked in full on 2026-09-07: every one of the ~30 `#36175` overrides in
+`ComplexTypesTrackingSqlServerTest.cs` sits in **`ComplexTypesTrackingProxiesSqlServerTest`**, whose
+fixture sets `UseChangeTrackingProxies()`. **The plain `ComplexTypesTrackingSqlServerTest` carries no
+overrides at all**, so EF's SQL Server suite *runs* `Can_track_entity_with_complex_property_bag_collections`
+and it passes there.
+
+**That makes the case stronger, not weaker.** EF passes this test on its own store, because EF never
+materializes the entity from a value buffer. No EF suite reaches the branch, no EF issue describes
+it, and the one number attached to it describes a different feature under a different fixture.
 
 **To report:** a model with `ComplexCollection` over `List<Dictionary<string, object>>` whose
 declared members include one primitive collection, plus a materialization from a value buffer. The
