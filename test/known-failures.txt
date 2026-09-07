@@ -4230,5 +4230,55 @@
 # evidence and age is not evidence, in the one place where the classification was a quotation.**
 # `docs/upstream-defects.md` section 1.1 carries the reading.
 
+# 2026-09-07 (V14) -- `failed` AND `total` UNCHANGED at 19 / 29516. NO CODE. **THE CLASS NAME
+# "EXCEPTION MESSAGE TEXT DIFFERS" IS WRONG FOR ONE OF ITS MEMBERS, AND THE OWNER'S QUESTION IS
+# WHAT FOUND IT.** The question was: is this class really only about text, or is it about whether
+# an expression is SENT to the server?
+#
+# --- MEASURED, ON THE FAULT PATH ---------------------------------------------------------------
+# A probe ran three queries against the Northwind Tier B fixture and asked, for each refusal,
+# whether `exception.Data["InfoCarrier.ServerStackTrace"]` is set -- which is set only when the
+# fault crossed the wire:
+#
+#   Where(c => c.IsLondon)                              CAME_FROM_SERVER = True
+#   OrderBy(c => c.IsLondon)                            CAME_FROM_SERVER = True
+#   OrderBy(c => c.IsLondon).ThenBy(c => ClientMethod)  CAME_FROM_SERVER = False
+#
+# `Customer.IsLondon` is UNMAPPED. **So an access to an unmapped member is shipped to the server,
+# and the server is what refuses it.** EF Core refuses both of the first two IN PROCESS, before it
+# opens a connection.
+#
+# --- WHAT THAT MEANS FOR THE CLASS ------------------------------------------------------------
+# `Throws_when_orderby` and `Throws_when_where_subquery_correlated` are GREEN, and they are green
+# BECAUSE the query travels and the server answers with EF's own wording. `Throws_when_orderby_multiple`
+# is red only because its SECOND operator is client code, which the client does refuse locally --
+# so it names the client method and never asks the server about the member.
+#
+# **The red test is therefore a symptom and its green siblings are the finding.** The mechanism is
+# R138's, restated: `ServerBoundaryAnalyzer` never asks the client model whether a member is
+# mapped. Three consequences, and only the first is visible in this suite:
+#
+#   1. A query EF refuses in process costs a full round trip here. Correctness is unaffected --
+#      the server refuses -- but the failure is slower and the server sees a request it will reject.
+#   2. If the two models ever DISAGREE about what is mapped, the client ships and the server
+#      ANSWERS. R138 measured exactly that with a deliberately split model: eight tests stopped
+#      throwing and returned data.
+#   3. A narrower client model is therefore not a boundary of any kind today. R138 already records
+#      the condition that reopens it -- "if this provider ever offers a narrower client model as a
+#      feature, the guard becomes a prerequisite" -- and the guard is written and priced at 16.
+#
+# **This suite cannot see 2 or 3**, because the owner removed split models from the harness on
+# 2026-09-04: one context class per fixture, both halves from one `OnModelCreating`. That decision
+# stands; what changes here is only that the class stops being described as a text difference.
+#
+# --- THE CLASS IS RENAMED ----------------------------------------------------------------------
+# `Throws_when_orderby_multiple` moves out of "exception message text differs" and is filed as
+# **the visible edge of the unmapped-member boundary gap (R138)**, priced at 16. The other three
+# members of the old class stay where they are and were re-derived in the same session: two
+# `Update_with_invalid_lambda_in_set_property_throws` differ by ONE bound variable's name that EF
+# invents inside its own pipeline, and `Casts_are_removed_from_expression_tree_when_redundant`
+# differs because EF prints the node above the failure after running its own normalizer. Both would
+# need this provider to run the pipeline it refuses in front of (ADR-006).
+
 failed=19
 total=29516

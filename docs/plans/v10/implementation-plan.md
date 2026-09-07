@@ -6030,6 +6030,52 @@ re-parents of families already running, because R25–R30 showed that is where t
       classification was a direct quotation from EF's own source.** That is what made it feel
       checked.
 
+- [x] **V14. "Message text differs" was the wrong name for one of its members, and the owner's
+      question is what found it.** No code; `failed` and `total` unchanged at 19 / 29516.
+
+      **The question.** *Is this class really only about text, or is it about whether an expression
+      is sent to the server?*
+
+      **Measured on the fault path**, by asking whether `exception.Data["InfoCarrier.ServerStackTrace"]`
+      is set — which happens only when the fault crossed the wire:
+
+      | Query | Came from the server |
+      |---|---|
+      | `Where(c => c.IsLondon)` | **yes** |
+      | `OrderBy(c => c.IsLondon)` | **yes** |
+      | `OrderBy(c => c.IsLondon).ThenBy(c => ClientMethod(c))` | no |
+
+      `Customer.IsLondon` is unmapped. **So an access to an unmapped member is shipped, and the
+      server is what refuses it.** EF Core refuses the first two in process, before it opens a
+      connection.
+
+      **The red test is a symptom; its green siblings are the finding.** `Throws_when_orderby` and
+      `Throws_when_where_subquery_correlated` pass *because* the query travels and the server
+      answers with EF's own wording. `Throws_when_orderby_multiple` is red only because its second
+      operator is client code, which the client does refuse locally — so it names the method and
+      never asks the server about the member.
+
+      **The mechanism is R138's**: `ServerBoundaryAnalyzer` never asks the client model whether a
+      member is mapped. Three consequences, and this suite can see only the first.
+
+      1. A query EF refuses in process costs a full round trip here. Correctness is unaffected, the
+         failure is slower, and the server sees a request it will reject.
+      2. If the two models ever disagree about what is mapped, the client ships and the server
+         **answers**. R138 measured exactly that with a deliberately split model: eight tests
+         stopped throwing and returned data.
+      3. A narrower client model is therefore not a boundary of any kind today. R138 records the
+         condition that reopens it, and the guard is written and priced at 16 tests.
+
+      **The suite cannot see 2 or 3**, because split models were removed from the harness on
+      2026-09-04 — one context class per fixture, both halves from one `OnModelCreating`. That
+      decision stands. What changes is only the label.
+
+      **The other three members of the old class were re-derived in the same session and stay.**
+      The two `Update_with_invalid_lambda_in_set_property_throws` differ by one bound variable's
+      name that EF invents inside its own pipeline; `Casts_are_removed_from_expression_tree_when_redundant`
+      differs because EF prints the node above the failure, after running its own normalizer. Both
+      would need this provider to run the pipeline it deliberately refuses in front of (ADR-006).
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
