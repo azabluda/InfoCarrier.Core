@@ -3967,5 +3967,46 @@
 # translation refusals of its own and no store types, so it disagrees with a relational store about
 # almost nothing. Issue #51 is the tier that would answer it properly and it stays open.
 
+# 2026-09-07 (V7) -- `failed` AND `total` UNCHANGED at 34 / 29516. NO CODE CHANGED. The three
+# `Contains_*` are RECLASSIFIED on a measurement, and they are no longer a pure upstream
+# write-off.
+#
+# --- THE MEASUREMENT: SAME STORE, SAME EF, SAME MODEL, DIFFERENT EXCEPTION --------------------
+# `InfoCarrierBackendTestStore.CreateDbContext()` hands back an ORDINARY EF context on the same
+# SQLite file the wire talks to. The same LINQ was run twice, once through it and once through
+# this provider:
+#
+#   SERVER (plain EF)  KeyNotFoundException: The given key 'Property:
+#                      RootEntity.RequiredAssociate#AssociateType.NestedCollection#NestedAssociateType
+#                      .__synthesizedOrdinal (no field, int) Shadow Required PK ...' was not
+#                      present in the dictionary.
+#
+#   CLIENT (the wire)  InvalidOperationException: No backing field could be found for property
+#                      'RootEntity.RequiredAssociate#AssociateType.NestedCollection#NestedAssociateType
+#                      .AssociateTypeRootEntityId' and the property does not have a getter.
+#
+# THE SERVER'S ANSWER IS THE ONE EF'S OWN TEST EXPECTS. So the tree this provider sends is not the
+# tree EF's pipeline builds, and the two trip over the same upstream area at DIFFERENT shadow
+# properties: EF at the collection's synthesized ordinal, this provider at the owned type's
+# FOREIGN KEY.
+#
+# --- WHAT THE DIFFERENCE IS, AND IT IS OURS ---------------------------------------------------
+# The query is `Where(e => e.RequiredAssociate.NestedCollection.Contains(nested))` where `nested`
+# is a DETACHED, HAND-CONSTRUCTED `NestedAssociateType` the caller built as a VALUE to compare
+# structurally. `NestedAssociateType` is an owned entity type in the model, so the wire treats the
+# captured instance as an ENTITY and the far side materializes it -- which asks for every property
+# including the shadow foreign key, and a detached instance has no field for it. EF never
+# materializes that parameter at all.
+#
+# So the classification changes: NOT "an upstream defect this provider surfaces differently" but
+# "this provider materializes a captured owned-type instance as an entity where the caller meant a
+# value, and so reaches a different upstream defect". Both products still refuse the query, so it
+# is not a wrong answer. **Matching EF means doing LESS, not more**, and if the parameter stopped
+# being materialized these three would land on EF's `KeyNotFoundException` and go green.
+#
+# NOT ATTEMPTED HERE. The entity-reference path exists because `Where(b => b == blog)` needs the
+# key (step S3), and narrowing it for an owned type used in structural equality is a change to the
+# wire's parameter handling with its own blast radius.
+
 failed=34
 total=29516

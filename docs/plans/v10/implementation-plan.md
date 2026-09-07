@@ -5757,6 +5757,38 @@ re-parents of families already running, because R25–R30 showed that is where t
       value argument is stronger: the question is now whether a client carrying relational metadata
       still serves a store that has no tables.
 
+- [x] **V7. The three `Contains_*` re-classified on a measurement, and they are not a pure upstream
+      write-off.** No code changed; `failed` and `total` unchanged at 34 / 29516.
+
+      **The comparison the previous entry called for, done.**
+      `InfoCarrierBackendTestStore.CreateDbContext()` hands back an ordinary EF context on the same
+      SQLite file the wire talks to, so the same LINQ can be run twice with only this provider as
+      the variable:
+
+      ```
+      SERVER (plain EF)  KeyNotFoundException: ... NestedAssociateType.__synthesizedOrdinal ...
+      CLIENT (the wire)  InvalidOperationException: No backing field ... AssociateTypeRootEntityId
+      ```
+
+      **The server's answer is the one EF's own test expects.** So the tree this provider sends is
+      not the tree EF's pipeline builds, and the two trip over the same upstream area at different
+      shadow properties: EF at the collection's synthesized ordinal, this provider at the owned
+      type's foreign key.
+
+      **The difference is ours and it is a specific one.** The query is
+      `Where(e => e.RequiredAssociate.NestedCollection.Contains(nested))`, where `nested` is a
+      detached, hand-constructed instance the caller built as a **value** to compare structurally.
+      `NestedAssociateType` is an owned entity type in the model, so the wire treats the captured
+      instance as an **entity** and the far side materializes it, asking for every property
+      including the shadow foreign key, which a detached instance has no field for. EF never
+      materializes that parameter.
+
+      **Matching EF therefore means doing less, not more.** If the parameter stopped being
+      materialized, these three would land on EF's own `KeyNotFoundException` and go green. Not
+      attempted here: the entity-reference path exists because `Where(b => b == blog)` needs the
+      key (step S3), and narrowing it for an owned type used in structural equality is a change to
+      the wire's parameter handling with its own blast radius.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
