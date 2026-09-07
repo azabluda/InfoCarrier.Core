@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -128,6 +129,76 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     /// <inheritdoc cref="Inline_collection_index_Column" />
     public override Task Inline_collection_List_value_index_Column()
         => AssertStoreRefuses(base.Inline_collection_List_value_index_Column);
+
+    /// <summary>
+    ///     Three queries EF's relational base asserts a refusal for, and this provider answers.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>These are not EF's overrides, and they assert MORE rather than less.</b>
+    ///         <c>PrimitiveCollectionsQueryRelationalTestBase</c> wraps each in a
+    ///         translation-failure assertion, because a relational provider has no type mapping to
+    ///         give an inline collection of parameters, nor to a compiled query's parameter inside
+    ///         a subquery. <b>EF's own comment on the second says so outright</b> — <i>"We should
+    ///         apply the default type mapping to the parameter, but need to figure out the exact
+    ///         rules when to do this"</i> — which makes it unfinished work on EF's side rather than
+    ///         a limitation this provider ought to reproduce. This client builds no SQL, so the
+    ///         question never arises.
+    ///     </para>
+    ///     <para>
+    ///         <b>Why this is not the override CLAUDE.md forbids.</b> That guardrail is about
+    ///         suppressing a red test — a <c>[Skip]</c>, a deletion, or an assertion weakened until
+    ///         it passes. Each of these replaces <em>"must throw"</em> with <em>"must return
+    ///         exactly these rows"</em>, which is the stronger statement: it fails if the answer
+    ///         ever becomes wrong, where the refusal assertion would keep failing whatever the rows
+    ///         were. <b>The query bodies are EF's own, copied</b>, because C# cannot call a
+    ///         grandparent's implementation and the relational base sits between. The copy is the
+    ///         real cost: an edit to EF's base will not reach it. See
+    ///         <c>docs/plans/v10/implementation-plan.md</c> V12.
+    ///     </para>
+    /// </remarks>
+    public override Task Column_collection_equality_inline_collection_with_parameters()
+    {
+        (int i, int j) = (1, 10);
+
+        return AssertQuery(
+            ss => ss.Set<PrimitiveCollectionsEntity>().Where(c => c.Ints == new[] { i, j }),
+            ss => ss.Set<PrimitiveCollectionsEntity>().Where(c => c.Ints.SequenceEqual(new[] { i, j })));
+    }
+
+    /// <inheritdoc cref="Column_collection_equality_inline_collection_with_parameters" />
+    public override void Parameter_collection_in_subquery_and_Convert_as_compiled_query()
+    {
+        var query = EF.CompileQuery(
+            (PrimitiveCollectionsContext context, object[] parameters)
+                => context.Set<PrimitiveCollectionsEntity>().Where(p => p.String == (string)parameters[0]));
+
+        using PrimitiveCollectionsContext context = Fixture.CreateContext();
+
+        // EF's core body ends at `.ToList()` and asserts nothing about the rows. Asserting them is
+        // the whole point of taking the override, so the predicate is checked here.
+        Assert.All(query(context, ["foo"]).ToList(), e => Assert.Equal("foo", e.String));
+    }
+
+    /// <inheritdoc cref="Column_collection_equality_inline_collection_with_parameters" />
+    public override async Task Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query()
+    {
+        var compiledQuery = EF.CompileQuery(
+            (PrimitiveCollectionsContext context, int[] ints1, int[] ints2)
+                => context.Set<PrimitiveCollectionsEntity>().Where(p => ints1.Skip(1).Union(ints2).Count() == 3));
+
+        await using PrimitiveCollectionsContext context = Fixture.CreateContext();
+
+        int[] ints1 = [10, 111];
+        int[] ints2 = [7, 42];
+
+        // `{10, 111}.Skip(1)` is `{111}`, unioned with `{7, 42}` is three distinct values, so the
+        // predicate is true for every row. EF's core body only calls `.ToList()`; the count is
+        // asserted here against the same set read without the predicate.
+        Assert.Equal(
+            context.Set<PrimitiveCollectionsEntity>().Count(),
+            compiledQuery(context, ints1, ints2).ToList().Count);
+    }
 
     /// <summary>
     ///     The same refusal EF asserts, described the way a <em>remoting</em> client can see it

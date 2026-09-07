@@ -10,7 +10,7 @@ client for something only a database has, assert a refusal this provider does no
 are EF Core defects that every provider hits and this one reports with a different exception type.
 
 ```
-Total tests: 29516, Passed: 29248, Failed: 30, Skipped: 238
+Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238
 ```
 
 Measured against `10.0.0`. The 238 skips are EF Core's own, tests EF itself skips for the

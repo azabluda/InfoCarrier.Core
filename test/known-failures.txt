@@ -4110,5 +4110,90 @@
 # answer is better; a check is ABSENT. **That class is TWELVE, not thirteen**, and this one is a
 # missing validation on its own.
 
-failed=30
+# 2026-09-07 (V11) -- `failed` AND `total` UNCHANGED at 30 / 29516. NO CODE KEPT. EF's
+# `RelationalModelValidator` was registered on the client, measured and REVERTED.
+#
+# --- WHY IT WAS ASKED ------------------------------------------------------------------------
+# R170 named ONE thing this needed and the client did not have: `RelationalModelValidatorDependencies`
+# carries a single service, `IRelationalTypeMappingSource`, and V5 gave the client one. It was the
+# last INFERENCE-ONLY block in the tail -- R174 reasoned about it rather than measuring it -- and
+# the target was `Complex_properties_can_be_configured_by_type`.
+#
+# --- MEASURED: 30 -> 4037 --------------------------------------------------------------------
+# `Total tests: 29516, Passed: 25241, Failed: 4037, Skipped: 238`.
+#
+# --- AND THE WALL HAS TWO LAYERS, WHICH IS THE PART WORTH KEEPING -----------------------------
+# LAYER 1, 3968 of the 4037, is ONE cast:
+#
+#   InvalidCastException: Unable to cast 'InfoCarrier.Core.InfoCarrierLoggingDefinitions' to
+#   'Microsoft.EntityFrameworkCore.Diagnostics.RelationalLoggingDefinitions'
+#     at RelationalResources.LogBoolWithDefaultWarning(IDiagnosticsLogger logger)
+#
+# The relational validator logs through EF's RELATIONAL logging definitions and this client's are
+# core ones. Fixable in principle, and only in the additive-sibling shape V5 used, because
+# `InfoCarrierLoggingDefinitions` is PUBLISHED and re-basing it is `CP0007`.
+#
+# LAYER 2 sits behind it and is NOT fixable the same way. The remainder are real relational
+# validations the client's model cannot pass:
+#
+#   The foreign keys {'VehicleName'} on 'FuelTank' and {'VehicleName'} on 'CombustionEngine' are
+#   both mapped to ...
+#   'Operator.VehicleName' and 'Operator.Name' are both mapped to column 'Name' in 'Vehicles' ...
+#
+# Those are TABLE-SHARING rules. They need `SharedTableConvention`, which decides a column name --
+# the storage decision the server owns, and the class R170's rule refuses. **So the validator would
+# reject legitimate models even with the cast fixed.**
+#
+# --- THE PAIR V10 + V11 IS ONE RULE ------------------------------------------------------------
+# Both experiments took a relational service onto the client and both failed the same way: the
+# service needs COMPANIONS, and the companions are conventions this client refuses for a stated
+# reason. That is now the answer to "why not just add the relational X", and it is measured twice.
+
+# 2026-09-07 (V12) -- `failed` FALLS 30 -> 19, `total` unchanged at 29516. FIXED 11, BROKEN none.
+# `Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238`. The reasons diff loses
+# `No exception was thrown` from 13 to 2. `test/` only.
+#
+# --- ELEVEN SPEC TESTS NOW ASSERT THE ANSWER INSTEAD OF A REFUSAL -----------------------------
+# The owner's decision, 2026-09-07. Every one is a query EF's RELATIONAL base asserts must be
+# refused and this provider answers correctly. The override does not remove the assertion: it
+# replaces `Assert.Throws` with EF's own CORE assertion, which is `AssertQuery` checking every row
+# against the in-memory expected result. **That is the stronger statement of the two** -- it fails
+# if the answer ever becomes wrong, where the refusal assertion fails whatever the rows are.
+#
+#   * 8 in `TPT`/`TPC GearsOfWarQueryInfoCarrierTest`:
+#     `Correlated_collection_after_distinct_3_levels_without_original_identifiers` and
+#     `Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions`.
+#     `Distinct` drops the columns that say which owner a projected collection element belongs to,
+#     and a relational provider must attribute rows after a join. This provider builds no join.
+#   * 3 in `PrimitiveCollectionsQuerySqliteInfoCarrierTest`:
+#     `Column_collection_equality_inline_collection_with_parameters` and the two
+#     `Parameter_collection_in_subquery_*_as_compiled_query`. EF has no type mapping to give an
+#     inline collection of parameters. **EF's own comment on the second says the rule is
+#     unfinished**: "We should apply the default type mapping to the parameter, but need to figure
+#     out the exact rules when to do this."
+#
+# **THE QUERY BODIES ARE EF'S OWN, COPIED, AND THAT IS THE COST.** C# cannot call a grandparent's
+# implementation and the relational base sits between, so an edit to EF's base will not reach
+# these. Both classes were run alone first and are fully green: 188/191 and 2346/2354.
+#
+# --- WHAT WAS DELIBERATELY NOT DONE, AND IT IS TWO THINGS -------------------------------------
+# 1. `Composition_over_collection_of_complex_mapped_as_scalar` is the twelfth of the class and is
+#    LEFT RED. It already has a companion, `..._returns_the_right_answer`, added in J2, which
+#    seeds two dashboards with no two integers alike so four distinct wrong answers are
+#    distinguishable. **Where a companion is available it is the better pattern**, because the spec
+#    test keeps reporting and an upstream change would still be visible. It was not available for
+#    the eleven above: EF's core `AssertQuery` is the best assertion there is and overriding is the
+#    only way to reach it.
+# 2. `Correlated_collection_with_distinct_3_levels` (Tier A) stays red. C64 proved its assertion
+#    cannot be satisfied by ANY answer, so an override there would be green because the assertion
+#    is broken. `docs/upstream-defects.md` section 1.4.
+#
+# --- THE TAIL IS NINETEEN ---------------------------------------------------------------------
+# 4 the client has no `DbConnection`; 4 the spec base's own non-virtual transaction helper; 4
+# message text; 2 the property-bag materializer (upstream); 2 `Correlated_collection_with_distinct_3_levels`
+# (upstream test defect); 1 entity splitting needs a companion convention; 1
+# `Composition_over_...` above; 1 `Complex_properties_can_be_configured_by_type`, a check this
+# client never runs.
+
+failed=19
 total=29516

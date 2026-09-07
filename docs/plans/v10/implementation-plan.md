@@ -5915,6 +5915,87 @@ re-parents of families already running, because R25–R30 showed that is where t
       validation**, not a better answer, and the "we answer correctly" class is **twelve**, not
       thirteen.
 
+- [x] **V11. EF's relational model validator on the client: built, measured and REVERTED, and the
+      wall has two layers.** No code kept. `failed` and `total` unchanged at 30 / 29516 after the
+      revert.
+
+      **Why it was asked.** R170 named exactly one thing this needed and the client did not have —
+      `RelationalModelValidatorDependencies` carries a single service, `IRelationalTypeMappingSource`
+      — and V5 gave the client one. It was the **last inference-only block in the tail**: R174
+      reasoned about it rather than measuring it, and a classification is not evidence. The target
+      was `Complex_properties_can_be_configured_by_type`.
+
+      **Measured: `failed` 30 → 4037.**
+      `Total tests: 29516, Passed: 25241, Failed: 4037, Skipped: 238`.
+
+      **Layer one is one cast, and 3968 of the 4037 are it:**
+
+      ```
+      InvalidCastException: Unable to cast 'InfoCarrier.Core.InfoCarrierLoggingDefinitions'
+                            to 'Microsoft.EntityFrameworkCore.Diagnostics.RelationalLoggingDefinitions'
+         at RelationalResources.LogBoolWithDefaultWarning(IDiagnosticsLogger logger)
+      ```
+
+      The relational validator logs through EF's *relational* logging definitions and this client's
+      are core ones. Fixable in principle, and only as an additive sibling the way V5 did the type
+      mapping source, because `InfoCarrierLoggingDefinitions` is published and re-basing it is
+      `CP0007`.
+
+      **Layer two is behind it and is not fixable that way.** The rest are real relational
+      validations the client's model cannot pass — `The foreign keys {'VehicleName'} on 'FuelTank'
+      and {'VehicleName'} on 'CombustionEngine' are both mapped to…`, `'Operator.VehicleName' and
+      'Operator.Name' are both mapped to column 'Name' in 'Vehicles'…`. Those are **table-sharing**
+      rules, and they need `SharedTableConvention`, which decides a column name: the storage
+      decision the server owns and the class R170's rule refuses. **So the validator would reject
+      legitimate models even with the cast fixed.**
+
+      **V10 and V11 are one rule, measured twice.** Both took a relational service onto the client
+      and both failed the same way: the service needs companions, and the companions are the
+      conventions this client refuses for a stated reason. That is now the answer to "why not just
+      add the relational X".
+
+- [x] **V12. Eleven spec tests assert the answer instead of a refusal.** `test/` only, so
+      `eng/measure.sh` alone. **`failed` FALLS 30 → 19**, FIXED 11, BROKEN none.
+      `Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238`. `CI=true` Release build
+      `0 Error(s)`.
+
+      **The owner's decision, 2026-09-07**, taken after the twelve were listed with their exact
+      query bodies. Every one is a query EF's **relational** base asserts must be refused and this
+      provider answers correctly.
+
+      **The override does not remove an assertion — it replaces a weaker one with a stronger one.**
+      `Assert.Throws` becomes EF's own **core** `AssertQuery`, which checks every row against the
+      in-memory expected result. That fails if the answer ever becomes wrong; the refusal assertion
+      fails whatever the rows are. This is why it is not the thing CLAUDE.md's guardrail forbids,
+      which is a `[Skip]`, a deletion, or an assertion weakened until it passes.
+
+      | Where | What |
+      |---|---|
+      | TPT and TPC `GearsOfWarQueryInfoCarrierTest`, 8 tests | `Distinct` drops the columns that say which owner a projected collection element belongs to, and a relational provider has to attribute rows after a join. This provider builds no join |
+      | `PrimitiveCollectionsQuerySqliteInfoCarrierTest`, 3 tests | EF has no type mapping to give an inline collection of parameters. **EF's own comment says the rule is unfinished**: *"We should apply the default type mapping to the parameter, but need to figure out the exact rules when to do this"* |
+
+      **The query bodies are EF's own, copied, and that is the cost.** C# cannot call a
+      grandparent's implementation and the relational base sits between, so an edit to EF's base
+      will not reach these. Both classes were run alone before the suite and are fully green:
+      188 of 191 and 2346 of 2354.
+
+      **Two things were deliberately not done.**
+
+      1. `Composition_over_collection_of_complex_mapped_as_scalar` is the twelfth of the class and
+         is **left red**. It already has a companion — `..._returns_the_right_answer`, added in J2,
+         seeding two dashboards with no two integers alike so that four distinct wrong answers are
+         distinguishable. **Where a companion is available it is the better pattern**: the spec test
+         keeps reporting, so an upstream change would still be visible. It was not available for the
+         eleven above, because EF's core `AssertQuery` is the best assertion there is and overriding
+         is the only way to reach it.
+      2. `Correlated_collection_with_distinct_3_levels` on Tier A stays red. C64 proved its
+         assertion cannot be satisfied by any answer, so an override there would be green **because
+         the assertion is broken**. `docs/upstream-defects.md` §1.4.
+
+      **The tail is nineteen**: 4 no `DbConnection`, 4 the spec base's own non-virtual transaction
+      helper, 4 message text, 2 the property-bag materializer, 2 C64's pair, 1 entity splitting,
+      1 the companion case above, 1 the check this client never runs.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

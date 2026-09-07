@@ -361,7 +361,7 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 29516, Passed: 29248, Failed: 30, Skipped: 238`** (2026-09-07, `v8`).
+**`Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238`** (2026-09-07, `v12`).
 **All four figures come out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
@@ -373,7 +373,7 @@ because `comm` cannot read a file with comments in it. A commit that lowers the 
 `artifacts/test-results/failures.txt` over the names file, and the ratchet says so in a `::notice::`
 when it sees the count fall.
 
-**All 30 failures are classified and not one is of unknown standing**, and every class is blocked,
+**All 19 failures are classified and not one is of unknown standing**, and every class is blocked,
 priced or upstream — there is no open one left. `test/known-failures.txt` carries a dated reading
 per class and is the current answer; the paragraph below and the tables named in it are the history.
 The tables are in

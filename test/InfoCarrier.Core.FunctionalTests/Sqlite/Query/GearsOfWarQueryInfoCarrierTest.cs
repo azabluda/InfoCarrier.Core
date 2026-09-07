@@ -1,9 +1,10 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
+using Microsoft.EntityFrameworkCore.TestModels.GearsOfWarModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -33,14 +34,21 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         cause.
 ///     </para>
 ///     <para>
-///         <b>The nine failures EF does NOT override are left red, and they are a family this
-///         repository already knows.</b> Every one fails with "no exception was thrown": the base
+///         <b>Two more overrides per class were added in V12, and they are NOT EF's.</b> Both
+///         classes used to leave a family red with "no exception was thrown": the relational base
 ///         asserts that a correlated collection with <c>Distinct</c> must be refused, and this
-///         provider answers it, because the projection split reassembles on the client. That is
-///         the "queries this provider answers where other providers refuse" section of
-///         <c>website/docs/limitations.md</c>, and one of them,
-///         <c>Correlated_collection_with_distinct_3_levels</c>, is C64 - already a known failure
-///         whose assertion no correct answer can satisfy.
+///         provider answers it, because the projection split reassembles on the client. Those two
+///         now carry EF's <em>core</em> assertion instead — <c>AssertQuery</c>, row by row —
+///         which is a stronger statement than the refusal it displaces, not a weaker one. See the
+///         remarks on
+///         <see cref="TPTGearsOfWarQueryInfoCarrierTest.Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />.
+///     </para>
+///     <para>
+///         <b>The sibling <c>Correlated_collection_with_distinct_3_levels</c> is deliberately NOT
+///         treated this way</b>, and it lives in <c>GearsOfWarQueryInfoCarrierTest</c> on Tier A.
+///         C64 proved its assertion cannot be satisfied by any answer, so an override there would
+///         be green because the assertion is broken. <c>docs/upstream-defects.md</c> §1.4 carries
+///         it.
 ///     </para>
 /// </remarks>
 public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTestBase<TPTGearsOfWarQueryInfoCarrierFixture>
@@ -132,6 +140,118 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     /// </remarks>
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
+
+    /// <summary>
+    ///     Two queries EF's relational base asserts a refusal for, and this provider answers.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Not EF's overrides, and they assert MORE rather than less.</b>
+    ///         <c>GearsOfWarQueryRelationalTestBase</c> asserts
+    ///         <c>RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin</c> for
+    ///         both, because <c>Distinct</c> drops the columns that say which owner a projected
+    ///         collection element belongs to, and a relational provider has to attribute rows after
+    ///         a join. <b>This provider never builds that join</b>: the server returns rows and the
+    ///         projection is reassembled on the client, so the query is answered and the rows are
+    ///         right.
+    ///     </para>
+    ///     <para>
+    ///         <b>Why this is not the override CLAUDE.md forbids.</b> That guardrail is about
+    ///         suppressing a red test. Each of these replaces <em>"must throw"</em> with
+    ///         <em>"must return exactly these rows"</em> — EF's core <c>AssertQuery</c>, checking
+    ///         every row against the in-memory expected result — which fails if the answer ever
+    ///         becomes wrong, where the refusal assertion would keep failing whatever the rows
+    ///         were. <b>The query bodies are EF's own, copied</b>, because C# cannot call a
+    ///         grandparent's implementation and the relational base sits between. The copy is the
+    ///         real cost: an edit to EF's base will not reach it.
+    ///     </para>
+    ///     <para>
+    ///         <b>Note what this does NOT do.</b> The sibling
+    ///         <c>Correlated_collection_with_distinct_3_levels</c> stays red, and deliberately: C64
+    ///         proved its assertion cannot be satisfied by <em>any</em> answer, so an override there
+    ///         would be green because the assertion is broken. See
+    ///         <c>docs/upstream-defects.md</c> §1.4 and <c>implementation-plan.md</c> V12.
+    ///     </para>
+    /// </remarks>
+    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
+        bool async)
+        => AssertQuery(
+            async,
+            ss => ss.Set<Gear>()
+                .Select(g => new
+                {
+                    Key = g.Nickname,
+                    Subquery = g.Weapons
+                        .Select(w => new { w.Name, w.IsAutomatic, w.OwnerFullName!.Length })
+                        .Distinct().ToList()
+                }),
+            elementSorter: e => e.Key,
+            elementAsserter: (e, a) =>
+            {
+                Assert.Equal(e.Key, a.Key);
+                AssertCollection(
+                    e.Subquery,
+                    a.Subquery,
+                    elementSorter: ee => ee.Name,
+                    elementAsserter: (ee, aa) =>
+                    {
+                        Assert.Equal(ee.Name, aa.Name);
+                        Assert.Equal(ee.IsAutomatic, aa.IsAutomatic);
+                        Assert.Equal(ee.Length, aa.Length);
+                    });
+            });
+
+    /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
+    public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
+        => AssertQuery(
+            async,
+            ss => ss.Set<Squad>()
+                .Select(s => new { s.Name.Length })
+                .Distinct()
+                .Select(x => new
+                {
+                    x.Length,
+                    Subquery1 = (from g in ss.Set<Gear>()
+                                 where g.Nickname.Length == x.Length
+                                 select new { g.HasSoulPatch, g.CityOfBirthName })
+                        .Distinct()
+                        .Select(xx => new
+                        {
+                            xx.HasSoulPatch,
+                            Subquery2 = (from w in ss.Set<Weapon>()
+                                         where w.OwnerFullName == xx.CityOfBirthName
+                                         select new
+                                         {
+                                             w.Id,
+                                             x.Length,
+                                             xx.HasSoulPatch
+                                         }).ToList()
+                        })
+                        .ToList()
+                }),
+            elementSorter: e => e.Length,
+            elementAsserter: (e, a) =>
+            {
+                Assert.Equal(e.Length, a.Length);
+                AssertCollection(
+                    e.Subquery1,
+                    a.Subquery1,
+                    elementSorter: ee => ee.HasSoulPatch,
+                    elementAsserter: (ee, aa) =>
+                    {
+                        Assert.Equal(ee.HasSoulPatch, aa.HasSoulPatch);
+                        AssertCollection(
+                            ee.Subquery2,
+                            aa.Subquery2,
+                            elementSorter: eee => eee.Id,
+                            elementAsserter: (eee, aaa) =>
+                            {
+                                Assert.Equal(eee.Id, aaa.Id);
+                                Assert.Equal(eee.Length, aaa.Length);
+                                Assert.Equal(eee.HasSoulPatch, aaa.HasSoulPatch);
+                            });
+                    });
+            });
 }
 
 /// <inheritdoc cref="TPTGearsOfWarQueryInfoCarrierTest" />
@@ -224,6 +344,91 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
     /// </remarks>
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
+
+    /// <summary>
+    ///     TPC's copy of the two overrides described on <see cref="TPTGearsOfWarQueryInfoCarrierTest" />:
+    ///     EF's relational base asserts a refusal, this provider answers, and the assertion is
+    ///     replaced by EF's own row-by-row one rather than removed.
+    /// </summary>
+    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
+        bool async)
+        => AssertQuery(
+            async,
+            ss => ss.Set<Gear>()
+                .Select(g => new
+                {
+                    Key = g.Nickname,
+                    Subquery = g.Weapons
+                        .Select(w => new { w.Name, w.IsAutomatic, w.OwnerFullName!.Length })
+                        .Distinct().ToList()
+                }),
+            elementSorter: e => e.Key,
+            elementAsserter: (e, a) =>
+            {
+                Assert.Equal(e.Key, a.Key);
+                AssertCollection(
+                    e.Subquery,
+                    a.Subquery,
+                    elementSorter: ee => ee.Name,
+                    elementAsserter: (ee, aa) =>
+                    {
+                        Assert.Equal(ee.Name, aa.Name);
+                        Assert.Equal(ee.IsAutomatic, aa.IsAutomatic);
+                        Assert.Equal(ee.Length, aa.Length);
+                    });
+            });
+
+    /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
+    public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
+        => AssertQuery(
+            async,
+            ss => ss.Set<Squad>()
+                .Select(s => new { s.Name.Length })
+                .Distinct()
+                .Select(x => new
+                {
+                    x.Length,
+                    Subquery1 = (from g in ss.Set<Gear>()
+                                 where g.Nickname.Length == x.Length
+                                 select new { g.HasSoulPatch, g.CityOfBirthName })
+                        .Distinct()
+                        .Select(xx => new
+                        {
+                            xx.HasSoulPatch,
+                            Subquery2 = (from w in ss.Set<Weapon>()
+                                         where w.OwnerFullName == xx.CityOfBirthName
+                                         select new
+                                         {
+                                             w.Id,
+                                             x.Length,
+                                             xx.HasSoulPatch
+                                         }).ToList()
+                        })
+                        .ToList()
+                }),
+            elementSorter: e => e.Length,
+            elementAsserter: (e, a) =>
+            {
+                Assert.Equal(e.Length, a.Length);
+                AssertCollection(
+                    e.Subquery1,
+                    a.Subquery1,
+                    elementSorter: ee => ee.HasSoulPatch,
+                    elementAsserter: (ee, aa) =>
+                    {
+                        Assert.Equal(ee.HasSoulPatch, aa.HasSoulPatch);
+                        AssertCollection(
+                            ee.Subquery2,
+                            aa.Subquery2,
+                            elementSorter: eee => eee.Id,
+                            elementAsserter: (eee, aaa) =>
+                            {
+                                Assert.Equal(eee.Id, aaa.Id);
+                                Assert.Equal(eee.Length, aaa.Length);
+                                Assert.Equal(eee.HasSoulPatch, aaa.HasSoulPatch);
+                            });
+                    });
+            });
 }
 
 /// <summary>
