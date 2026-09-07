@@ -5630,6 +5630,54 @@ re-parents of families already running, because R25–R30 showed that is where t
       a relational **model** on the client rather than a relational type mapping, and the second is
       blocked in front of that by `RelationalMapToJsonConvention`'s measured ~560.
 
+- [x] **V4. Three classes attacked, one built and reverted, and all three re-derived.** `test/`
+      text only in the end; `failed` and `total` unchanged at 35 / 29514. **NO CODE KEPT.**
+
+      **A relational model on the client was BUILT rather than re-priced, because the standing
+      reason had expired.** That reason was "the client has no store type names", and the previous
+      step made the mapping relational, so the objection no longer applied.
+      `InfoCarrierTypeMappingSource` became a `RelationalTypeMappingSource` and EF's relational
+      model services were hand-wired: the annotation provider, the three row-value factories, the
+      two dependency objects and `RelationalModelRuntimeInitializer`, each read out of that
+      initializer's own source rather than guessed.
+
+      **It works, and the model is still wrong.** `GetRelationalModel()` stops throwing and returns
+      nine tables. A probe dumped the client model beside it and the answer is one line:
+
+      ```
+      Animal | table=Animal | mappings=0
+      Cat    | table=Animal | mappings=0
+      Dog    | table=Animal | mappings=0
+      ```
+
+      The test wants `Animals`, `Pets`, `Cats`, `Dogs` — TPT — and the client's model is TPH with
+      singular names and **no table mappings on any entity type**. Forcing the relational model
+      before reading the mappings changes nothing, so it is not laziness.
+
+      **The wall is the deciding conventions, which R170 already measured at 681 for the whole
+      list.** `TableNameFromDbSetConvention` was added alone as a probe and moved nothing; the
+      `[Table]` attributes need `TableAttributeConvention` and the TPT split needs more.
+      **So the obstacle was never the store type names and is not the type mapping either: a
+      client that must not DECIDE a table name cannot build a relational model that says which
+      table anything is in.** That is a better sentence than the one it replaces, and it is the
+      whole return on the attempt. Reverted whole.
+
+      **The connection pair was recorded at the wrong layer.** The failure surfaces as the test
+      store refusing a `DbConnection`, which reads like a harness limit a harness change could
+      lift. Both bodies then call `context.Database.GetDbConnection()` on the **client** context,
+      and `InfoCarrierRelationalFacadeDependencies.RelationalConnection` — what that call resolves
+      — throws by design, with the reason in its own remarks. Exposing the backend's connection
+      moves the failure from line 1 to line 3.
+
+      **And the three `Contains_*` gained a fact that makes them a candidate.** EF's own SQLite
+      class expects `KeyNotFoundException` and this provider produces `InvalidOperationException`.
+      The exception arrives through the fault path, so **the server raised it, and the server is an
+      ordinary EF application on the same store EF's own suite uses**. Same EF, same store,
+      different exception: the tree this provider sends is not the tree EF's own pipeline builds,
+      and the two trip over the same upstream defect in different places. It is still not a defect
+      — both products refuse the query — but it is no longer a pure upstream write-off. The route
+      is to diff the two trees, and the payoff is a different exception rather than an answer.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

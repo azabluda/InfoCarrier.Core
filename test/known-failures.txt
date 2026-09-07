@@ -3857,5 +3857,54 @@
 # unchanged: they want a relational MODEL on the client, not a relational type mapping, and the
 # second is blocked in front of that by `RelationalMapToJsonConvention`'s measured ~560.
 
+# 2026-09-07 (V4) -- `failed` AND `total` UNCHANGED at 35 / 29514. NO CODE KEPT. Three classes were
+# attacked on the owner's instruction and all three are re-derived from measurement rather than
+# from the standing note. The `Table_can_configure_TPT_with_Owned` attempt was built, measured and
+# REVERTED.
+#
+# --- 1. A RELATIONAL MODEL ON THE CLIENT: BUILT, AND IT IS NOT ENOUGH (1 test) -----------------
+# The standing reason was "the client has no store type names". THAT REASON IS NOW OBSOLETE: the
+# mapping is relational since the previous entry. So the thing was built rather than re-priced.
+# `InfoCarrierTypeMappingSource` was made a `RelationalTypeMappingSource`, and EF's relational
+# model services were hand-wired -- the annotation provider, the three row-value factories, the
+# two dependency objects, and `RelationalModelRuntimeInitializer` -- read out of
+# `RelationalModelRuntimeInitializer` rather than guessed.
+#
+# IT WORKS, AND THE MODEL IS STILL WRONG. `GetRelationalModel()` stops throwing and returns NINE
+# TABLES. A probe dumped the client model beside it:
+#   Animal | table=Animal | mappings=0
+#   Cat    | table=Animal | mappings=0
+#   Dog    | table=Animal | mappings=0
+# The test wants `Animals`, `Pets`, `Cats`, `Dogs` -- TPT -- and the client's model is TPH with
+# singular names and NO TABLE MAPPINGS ON ANY ENTITY TYPE. Forcing the relational model before
+# reading the mappings changes nothing, so it is not a laziness problem.
+#
+# WHAT IS MISSING IS THE DECIDING CONVENTIONS, which is exactly the class the R170 entry above
+# measured at 681 tests for the whole list. `TableNameFromDbSetConvention` was added alone as a
+# probe and moved nothing. `[Table]` attributes need `TableAttributeConvention`, and the TPT split
+# needs more. **So the wall is not the type mapping and never was the store type names either: it
+# is that a client which must not DECIDE a table name cannot build a relational model that says
+# which table anything is in.** Reverted whole; nothing kept.
+#
+# --- 2. THE TWO `Include_*_connection*` PAIRS: THE LAYER WAS WRONG IN THE NOTE (4 tests) --------
+# The failure surfaces as the test store refusing a `DbConnection`, which reads like a harness
+# limit. It is not. Both bodies then call `context.Database.GetDbConnection()` on the CLIENT
+# context, and `InfoCarrierRelationalFacadeDependencies.RelationalConnection` -- which is what
+# that call resolves -- THROWS BY DESIGN, with the reason in its own remarks. So exposing the
+# backend's connection from the fixture moves the failure from line 1 to line 3. Blocked in the
+# product, not in the harness, and now recorded at the layer that decides it.
+#
+# --- 3. THE THREE `Contains_*`: A SHARPER STATEMENT, AND ONE NEW FACT (3 tests) ----------------
+# EF's own SQLite class expects `KeyNotFoundException` and this provider produces
+# `InvalidOperationException`. THE NEW FACT IS THAT OUR SERVER IS EF ON SQLITE: the exception
+# arrives through the fault path, so the SERVER raised it, and the server is an ordinary EF
+# application on the same store EF's own suite uses. Same store and same EF, different exception,
+# therefore THE TREE THIS PROVIDER SENDS IS NOT THE TREE EF'S OWN PIPELINE BUILDS, and the two
+# trip over the same upstream defect at different places.
+#
+# That makes the three a real candidate rather than a pure upstream write-off, and it does NOT
+# make them a defect: both products refuse the query. The route is to diff the two expression
+# trees, and the payoff is a different exception type rather than an answer. Not taken here.
+
 failed=35
 total=29514
