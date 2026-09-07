@@ -4072,5 +4072,43 @@
 # `docs/upstream-defects.md` is added in the same commit and carries every defect of somebody
 # else's that this repository has diagnosed, with which ones have been reported.
 
+# 2026-09-07 (V10) -- `failed` AND `total` UNCHANGED at 30 / 29516. NO CODE KEPT. The
+# `EntitySplittingConvention` price was re-measured against a client that now has a relational
+# model, and the experiment was REVERTED.
+#
+# --- WHY IT WAS RE-ASKED --------------------------------------------------------------------
+# R170 priced this convention at 114 broken on 2026-09-04, before the client had a relational
+# model. V5 then established that R170's rule has an exception: a convention reading the CALLER'S
+# OWN CODE cannot make the two halves disagree, because both halves compile it. `SplitToTable` is
+# written in the caller's `OnModelCreating`, exactly like `[Table]` and the `DbSet` name.
+#
+# --- MEASURED: 30 -> 149, FIXED 1, BROKEN 120 ------------------------------------------------
+# `Total tests: 29516, Passed: 29129, Failed: 149, Skipped: 238` (`v10` against `v8`). The one
+# fixed is `Can_use_table_splitting_with_owned_reference`, the test the experiment aimed at.
+#
+# --- AND THE REASON IS NEW, WHICH IS WHAT THE RUN BOUGHT --------------------------------------
+# 122 of the failures carry ONE message, which R170's entry never recorded:
+#
+#   An error was generated for warning 'RedundantForeignKeyWarning': The foreign key {'Id'} on
+#   entity type 'MeterReading' targets itself.
+#
+# Entity splitting adds a linking foreign key between the main table and the fragment. In EF's own
+# `RelationalConventionSetBuilder` this convention sits beside `SharedTableConvention` and a
+# `Replace<KeyDiscoveryConvention>` with `RelationalKeyDiscoveryConvention`. **This builder cannot
+# give up the key-discovery slot** -- `InfoCarrierConventionSetBuilder` puts its own there so key
+# discovery agrees with the document-mapping seam. Without a reconciling key discovery the linking
+# key stands alone, core model validation calls it redundant, and the spec fixture makes warnings
+# throw. **So it is not the storage-decision rule that blocks this: it is a missing companion in a
+# slot this client cannot vacate.** Blocked for a stated reason rather than for a price.
+#
+# --- ONE CLASSIFICATION CORRECTED ------------------------------------------------------------
+# `Complex_properties_can_be_configured_by_type` has been counted with the "we answer a query
+# relational providers refuse" class since R163. IT DOES NOT BELONG THERE. EF's override is two
+# lines -- `Assert.Throws<InvalidOperationException>` over the base, under the comment "Complex
+# collections must be mapped to JSON" -- and this client never runs that check at all, having
+# neither `RelationalMapToJsonConvention` nor a relational model validator. Nothing about our
+# answer is better; a check is ABSENT. **That class is TWELVE, not thirteen**, and this one is a
+# missing validation on its own.
+
 failed=30
 total=29516

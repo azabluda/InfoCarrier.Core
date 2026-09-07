@@ -5868,6 +5868,53 @@ re-parents of families already running, because R25–R30 showed that is where t
       when disabling a neighbouring test, which is corroboration and not a report. The page loses
       the citation.
 
+- [x] **V10. The entity-splitting convention re-priced against a client that now has a relational
+      model. The price stands, it is higher, and the reason is new.** Built, measured and
+      **REVERTED**; only a comment and this record are kept. `failed` and `total` unchanged at
+      30 / 29516 after the revert.
+
+      **Why it was worth re-asking.** R170 priced `EntitySplittingConvention` at 114 broken on
+      2026-09-04. The client gained a relational model on 2026-09-07 (V5), and V5 established that
+      R170's rule has an exception: a convention that reads the **caller's own code** cannot make
+      the two halves disagree, because both halves compile that code. `SplitToTable` is written in
+      the caller's `OnModelCreating`, exactly like `[Table]` and the `DbSet` name. So the standing
+      price was measured against a different client, and a classification is not evidence.
+
+      **Measured: `failed` 30 → 149. FIXED 1, BROKEN 120.**
+      `Total tests: 29516, Passed: 29129, Failed: 149, Skipped: 238` (`v10` against `v8`). The one
+      fixed is `Can_use_table_splitting_with_owned_reference`, which is what the experiment aimed
+      at.
+
+      **The reason is one message on 122 failures, and R170 never recorded it:**
+
+      ```
+      An error was generated for warning 'RedundantForeignKeyWarning':
+      The foreign key {'Id'} on entity type 'MeterReading' targets itself.
+      ```
+
+      **So it is not the rule below that blocks it — it is a missing companion.** Entity splitting
+      adds a linking foreign key between the main table and the fragment. In EF's own
+      `RelationalConventionSetBuilder` this convention sits beside `SharedTableConvention` and a
+      `Replace<KeyDiscoveryConvention>` with `RelationalKeyDiscoveryConvention`. **This builder
+      cannot give up the key-discovery slot**: `InfoCarrierConventionSetBuilder` puts its own there
+      so that key discovery agrees with the document-mapping seam, and replacing it would undo that
+      silently. Without a reconciling key discovery the linking key stands alone and core model
+      validation calls it redundant — and the spec fixture configures warnings to throw.
+
+      **Blocked for a stated reason rather than for a price**, which is the upgrade this step
+      bought. The comment in the builder now carries it, so the next reader re-asking the question
+      starts from the mechanism.
+
+      **And one classification is corrected.**
+      `Complex_properties_can_be_configured_by_type` has been filed with the twelve
+      "queries this provider answers that other providers refuse". **It does not belong there.**
+      EF's override is two lines — `Assert.Throws<InvalidOperationException>` over the base, with
+      the comment *"Complex collections must be mapped to JSON"* — and this client never runs that
+      check, because it has neither `RelationalMapToJsonConvention` nor a relational model
+      validator. Nothing about our answer is better; a check is simply absent. It is a **missing
+      validation**, not a better answer, and the "we answer correctly" class is **twelve**, not
+      thirteen.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

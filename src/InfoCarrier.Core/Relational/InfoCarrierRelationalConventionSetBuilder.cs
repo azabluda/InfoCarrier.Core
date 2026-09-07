@@ -111,6 +111,24 @@ public class InfoCarrierRelationalConventionSetBuilder(
         //     confirmed to be the whole of that on its own;
         //   * the rest were compiled-model and bulk-update tests.
         //
+        // `EntitySplittingConvention` WAS RE-PRICED ON 2026-09-07 (V10) AFTER THE CLIENT GAINED A
+        // RELATIONAL MODEL, because R170's price predated it and `SplitToTable` is written in the
+        // caller's own `OnModelCreating` -- which is the V5 exception to the rule below. **The
+        // price is still real and it is slightly higher: 30 -> 149, fixed 1, broke 120.** What is
+        // new is the reason, which R170 never recorded:
+        //
+        //     An error was generated for warning 'RedundantForeignKeyWarning': The foreign key
+        //     {'Id'} on entity type 'MeterReading' targets itself.
+        //
+        // 122 failures carry that one message. Entity splitting adds a linking foreign key between
+        // the main table and the fragment, and in EF's own set this convention sits beside
+        // `SharedTableConvention` and a `Replace<KeyDiscoveryConvention>`. **This builder cannot
+        // give up the key-discovery slot** -- `InfoCarrierConventionSetBuilder` puts its own there
+        // so key discovery agrees with the document-mapping seam -- so the linking key is never
+        // reconciled and core model validation calls it redundant. **Blocked for a stated reason
+        // now rather than for a price**, and the one test it would fix is
+        // `Can_use_table_splitting_with_owned_reference`.
+        //
         // THE SHAPE OF THE MISTAKE GENERALISES. A convention that decides a table name, a column
         // name, a JSON container or a value-generation strategy makes a decision the SERVER also
         // makes, with a provider this client cannot see. When the two agree the convention is
