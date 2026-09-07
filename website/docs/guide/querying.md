@@ -123,6 +123,11 @@ Relational-only APIs are not part of this provider: `Database.ExecuteSqlRaw`, `G
 migrations and `EnsureCreated`. Schema management belongs on the server, where the real provider is.
 Expose it as a server-side operation of your own.
 
+The model is a different matter. The client builds EF Core's relational model, so `GetTableName()`
+and `Model.GetRelationalModel()` answer, and tooling that reads them works against a client context.
+They read your own `[Table]` attributes and `DbSet` names, which both halves compile, so the two
+models agree. Nothing the client computes from them reaches the server.
+
 `FromSql` works, but only where the server opts in. The server calls
 `services.AddInfoCarrierArbitrarySqlExecution()` and the client `o.AllowArbitrarySqlExecution()`.
 Without both, the query is refused like any untranslatable one.

@@ -76,7 +76,11 @@ BUDGET = {
     # reduce what crosses the wire. The page teaches paging and could not say so in the words it
     # had. Read for padding first, as doc-style.md requires; the page is already dense and none
     # was found.
-    "website/docs/guide/querying.md": 700,
+    # 750 on 2026-09-07: the page told readers that relational APIs are not part of this
+    # provider, and since V5 the client builds EF Core's relational model, so `GetTableName()` and
+    # `GetRelationalModel()` answer. The command half of that sentence is still true and the model
+    # half was not, which is a reader-visible wrong statement rather than padding.
+    "website/docs/guide/querying.md": 750,
 
     # 700 on 2026-09-07 when the split log event began naming which operators stayed on the
     # client, and 750 the same day when the round-trip meter shipped. The page gained two facts a
