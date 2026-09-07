@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
@@ -83,6 +84,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 converter: new ValueConverter<CompiledModelTestBase.ManyTypesId, int>(
                     int (CompiledModelTestBase.ManyTypesId v) => v.Id,
                     CompiledModelTestBase.ManyTypesId (int v) => new CompiledModelTestBase.ManyTypesId(v)),
@@ -139,6 +142,8 @@ namespace TestNamespace
                     bool (bool v1, bool v2) => v1 == v2,
                     int (bool v) => ((object)v).GetHashCode(),
                     bool (bool v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "boolean"),
                 clrType: typeof(bool),
                 jsonValueReaderWriter: JsonBoolReaderWriter.Instance);
 
@@ -186,6 +191,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<bool>(new JsonCollectionOfStructsReaderWriter<bool[], bool>(
                     JsonBoolReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<bool[], bool>(
@@ -203,6 +210,8 @@ namespace TestNamespace
                         bool (bool v1, bool v2) => v1 == v2,
                         int (bool v) => ((object)v).GetHashCode(),
                         bool (bool v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "boolean"),
                     clrType: typeof(bool),
                     jsonValueReaderWriter: JsonBoolReaderWriter.Instance));
             var boolArrayElementType = boolArray.SetElementType(typeof(bool));
@@ -252,6 +261,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<bool[]>(new JsonCollectionOfReferencesReaderWriter<bool[][], bool[]>(
                     new JsonCollectionOfStructsReaderWriter<bool[], bool>(
                         JsonBoolReaderWriter.Instance))),
@@ -271,6 +282,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<bool>(new JsonCollectionOfStructsReaderWriter<bool[], bool>(
                         JsonBoolReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<bool[], bool>(
@@ -288,6 +301,8 @@ namespace TestNamespace
                             bool (bool v1, bool v2) => v1 == v2,
                             int (bool v) => ((object)v).GetHashCode(),
                             bool (bool v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "boolean"),
                         clrType: typeof(bool),
                         jsonValueReaderWriter: JsonBoolReaderWriter.Instance)));
             var boolNestedCollectionElementType = boolNestedCollection.SetElementType(typeof(bool[]));
@@ -337,6 +352,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<bool>(new JsonCollectionOfStructsReaderWriter<List<bool>, bool>(
                     JsonBoolReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<bool>, bool>(
@@ -354,6 +371,8 @@ namespace TestNamespace
                         bool (bool v1, bool v2) => v1 == v2,
                         int (bool v) => ((object)v).GetHashCode(),
                         bool (bool v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "boolean"),
                     clrType: typeof(bool),
                     jsonValueReaderWriter: JsonBoolReaderWriter.Instance));
             var boolReadOnlyCollectionElementType = boolReadOnlyCollection.SetElementType(typeof(bool));
@@ -403,6 +422,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 1),
                 converter: new ValueConverter<bool, string>(
                     string (bool v) => ((string)((v ? "B" : "A"))),
                     bool (string v) => !(string.IsNullOrEmpty(v)) && ((int)(v.ToUpperInvariant()[0])) == ((int)("B".ToUpperInvariant()[0]))),
@@ -457,6 +479,8 @@ namespace TestNamespace
                     bool (byte v1, byte v2) => v1 == v2,
                     int (byte v) => ((int)(v)),
                     byte (byte v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 converter: new ValueConverter<bool, byte>(
                     byte (bool v) => ((byte)((v ? 1 : 0))),
                     bool (byte v) => v == 1),
@@ -512,6 +536,8 @@ namespace TestNamespace
                     bool (short v1, short v2) => v1 == v2,
                     int (short v) => ((int)(v)),
                     short (short v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 converter: new ValueConverter<bool, short>(
                     short (bool v) => ((short)((v ? 1 : 0))),
                     bool (short v) => v == 1),
@@ -566,6 +592,8 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary"),
                 clrType: typeof(byte[]),
                 jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance);
 
@@ -613,6 +641,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte[]>(new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
                     JsonByteArrayReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
@@ -630,6 +660,8 @@ namespace TestNamespace
                         bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                         int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                         byte[] (byte[] source) => source.ToArray()),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "binary"),
                     clrType: typeof(byte[]),
                     jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance));
             var bytesArrayElementType = bytesArray.SetElementType(typeof(byte[]));
@@ -679,6 +711,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte[][]>(new JsonCollectionOfReferencesReaderWriter<byte[][][], byte[][]>(
                     new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
                         JsonByteArrayReaderWriter.Instance))),
@@ -698,6 +732,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<byte[]>(new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
                         JsonByteArrayReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
@@ -715,6 +751,8 @@ namespace TestNamespace
                             bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                             int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                             byte[] (byte[] source) => source.ToArray()),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "binary"),
                         clrType: typeof(byte[]),
                         jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance)));
             var bytesNestedCollectionElementType = bytesNestedCollection.SetElementType(typeof(byte[][]));
@@ -766,6 +804,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<byte[], string>(
                     string (byte[] v) => Convert.ToBase64String(v),
                     byte[] (string v) => Convert.FromBase64String(v)),
@@ -820,6 +860,8 @@ namespace TestNamespace
                     bool (decimal v1, decimal v2) => v1 == v2,
                     int (decimal v) => ((object)v).GetHashCode(),
                     decimal (decimal v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "decimal"),
                 converter: new ValueConverter<int, decimal>(
                     decimal (int v) => ((decimal)(v)),
                     int (decimal v) => ((int)(v))),
@@ -875,6 +917,8 @@ namespace TestNamespace
                     bool (char v1, char v2) => v1 == v2,
                     int (char v) => ((int)(v)),
                     char (char v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "char"),
                 clrType: typeof(char),
                 jsonValueReaderWriter: JsonCharReaderWriter.Instance);
 
@@ -922,6 +966,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<char>(new JsonCollectionOfStructsReaderWriter<char[], char>(
                     JsonCharReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<char[], char>(
@@ -939,6 +985,8 @@ namespace TestNamespace
                         bool (char v1, char v2) => v1 == v2,
                         int (char v) => ((int)(v)),
                         char (char v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "char"),
                     clrType: typeof(char),
                     jsonValueReaderWriter: JsonCharReaderWriter.Instance));
             var charArrayElementType = charArray.SetElementType(typeof(char));
@@ -988,6 +1036,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<char[]>(new JsonCollectionOfReferencesReaderWriter<char[][], char[]>(
                     new JsonCollectionOfStructsReaderWriter<char[], char>(
                         JsonCharReaderWriter.Instance))),
@@ -1007,6 +1057,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<char>(new JsonCollectionOfStructsReaderWriter<char[], char>(
                         JsonCharReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<char[], char>(
@@ -1024,6 +1076,8 @@ namespace TestNamespace
                             bool (char v1, char v2) => v1 == v2,
                             int (char v) => ((int)(v)),
                             char (char v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "char"),
                         clrType: typeof(char),
                         jsonValueReaderWriter: JsonCharReaderWriter.Instance)));
             var charNestedCollectionElementType = charNestedCollection.SetElementType(typeof(char[]));
@@ -1074,6 +1128,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 1),
                 converter: new ValueConverter<char, string>(
                     string (char v) => string.Format(CultureInfo.InvariantCulture, "{0}", ((object)(v))),
                     char (string v) => (v.Length < 1 ? '\0' : v[0])),
@@ -1129,6 +1186,8 @@ namespace TestNamespace
                     bool (DateOnly v1, DateOnly v2) => v1.Equals(v2),
                     int (DateOnly v) => ((object)v).GetHashCode(),
                     DateOnly (DateOnly v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "date"),
                 clrType: typeof(DateOnly),
                 jsonValueReaderWriter: JsonDateOnlyReaderWriter.Instance);
 
@@ -1176,6 +1235,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<DateOnly>(new JsonCollectionOfStructsReaderWriter<DateOnly[], DateOnly>(
                     JsonDateOnlyReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<DateOnly[], DateOnly>(
@@ -1193,6 +1254,8 @@ namespace TestNamespace
                         bool (DateOnly v1, DateOnly v2) => v1.Equals(v2),
                         int (DateOnly v) => ((object)v).GetHashCode(),
                         DateOnly (DateOnly v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "date"),
                     clrType: typeof(DateOnly),
                     jsonValueReaderWriter: JsonDateOnlyReaderWriter.Instance));
             var dateOnlyArrayElementType = dateOnlyArray.SetElementType(typeof(DateOnly));
@@ -1243,6 +1306,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 10),
                 converter: new ValueConverter<DateOnly, string>(
                     string (DateOnly v) => v.ToString("yyyy\\-MM\\-dd"),
                     DateOnly (string v) => DateOnly.Parse(v, CultureInfo.InvariantCulture, DateTimeStyles.None)),
@@ -1298,6 +1364,8 @@ namespace TestNamespace
                     bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                     int (DateTime v) => ((object)v).GetHashCode(),
                     DateTime (DateTime v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "datetime"),
                 clrType: typeof(DateTime),
                 jsonValueReaderWriter: JsonDateTimeReaderWriter.Instance);
 
@@ -1345,6 +1413,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<DateTime>(new JsonCollectionOfStructsReaderWriter<DateTime[], DateTime>(
                     JsonDateTimeReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<DateTime[], DateTime>(
@@ -1362,6 +1432,8 @@ namespace TestNamespace
                         bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                         int (DateTime v) => ((object)v).GetHashCode(),
                         DateTime (DateTime v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "datetime"),
                     clrType: typeof(DateTime),
                     jsonValueReaderWriter: JsonDateTimeReaderWriter.Instance));
             var dateTimeArrayElementType = dateTimeArray.SetElementType(typeof(DateTime));
@@ -1412,6 +1484,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 converter: new ValueConverter<DateTimeOffset, long>(
                     long (DateTimeOffset v) => DateTimeOffsetToBinaryConverter.ToLong(v),
                     DateTimeOffset (long v) => DateTimeOffsetToBinaryConverter.ToDateTimeOffset(v)),
@@ -1467,6 +1541,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 12),
                 converter: new ValueConverter<DateTimeOffset, byte[]>(
                     byte[] (DateTimeOffset v) => DateTimeOffsetToBytesConverter.ToBytes(v),
                     DateTimeOffset (byte[] v) => DateTimeOffsetToBytesConverter.FromBytes(v)),
@@ -1522,6 +1599,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 48),
                 converter: new ValueConverter<DateTimeOffset, string>(
                     string (DateTimeOffset v) => v.ToString("yyyy\\-MM\\-dd HH\\:mm\\:ss.FFFFFFFzzz"),
                     DateTimeOffset (string v) => DateTimeOffset.Parse(v, CultureInfo.InvariantCulture)),
@@ -1577,6 +1657,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 converter: new ValueConverter<DateTime, long>(
                     long (DateTime v) => v.ToBinary(),
                     DateTime (long v) => DateTime.FromBinary(v)),
@@ -1632,6 +1714,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 48),
                 converter: new ValueConverter<DateTime, string>(
                     string (DateTime v) => v.ToString("yyyy\\-MM\\-dd HH\\:mm\\:ss.FFFFFFF"),
                     DateTime (string v) => DateTime.Parse(v, CultureInfo.InvariantCulture)),
@@ -1687,6 +1772,8 @@ namespace TestNamespace
                     bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                     int (DateTime v) => ((object)v).GetHashCode(),
                     DateTime (DateTime v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "datetime"),
                 clrType: typeof(DateTime),
                 jsonValueReaderWriter: JsonDateTimeReaderWriter.Instance);
 
@@ -1735,6 +1822,8 @@ namespace TestNamespace
                     bool (decimal v1, decimal v2) => v1 == v2,
                     int (decimal v) => ((object)v).GetHashCode(),
                     decimal (decimal v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "decimal"),
                 clrType: typeof(decimal),
                 jsonValueReaderWriter: JsonDecimalReaderWriter.Instance);
 
@@ -1782,6 +1871,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<decimal>(new JsonCollectionOfStructsReaderWriter<decimal[], decimal>(
                     JsonDecimalReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<decimal[], decimal>(
@@ -1799,6 +1890,8 @@ namespace TestNamespace
                         bool (decimal v1, decimal v2) => v1 == v2,
                         int (decimal v) => ((object)v).GetHashCode(),
                         decimal (decimal v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "decimal"),
                     clrType: typeof(decimal),
                     jsonValueReaderWriter: JsonDecimalReaderWriter.Instance));
             var decimalArrayElementType = decimalArray.SetElementType(typeof(decimal));
@@ -1849,6 +1942,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 16),
                 converter: new ValueConverter<decimal, byte[]>(
                     byte[] (decimal v) => NumberToBytesConverter<decimal>.DecimalToBytes(v),
                     decimal (byte[] v) => (v == null ? 0M : NumberToBytesConverter<decimal>.BytesToDecimal(v))),
@@ -1904,6 +2000,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 64),
                 converter: new ValueConverter<decimal, string>(
                     string (decimal v) => string.Format(CultureInfo.InvariantCulture, "{0}", ((object)(v))),
                     decimal (string v) => decimal.Parse(v, NumberStyles.Any, CultureInfo.InvariantCulture)),
@@ -1959,6 +2058,8 @@ namespace TestNamespace
                     bool (double v1, double v2) => v1.Equals(v2),
                     int (double v) => ((object)v).GetHashCode(),
                     double (double v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "double"),
                 clrType: typeof(double),
                 jsonValueReaderWriter: JsonDoubleReaderWriter.Instance);
 
@@ -2006,6 +2107,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<double>(new JsonCollectionOfStructsReaderWriter<double[], double>(
                     JsonDoubleReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<double[], double>(
@@ -2023,6 +2126,8 @@ namespace TestNamespace
                         bool (double v1, double v2) => v1.Equals(v2),
                         int (double v) => ((object)v).GetHashCode(),
                         double (double v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "double"),
                     clrType: typeof(double),
                     jsonValueReaderWriter: JsonDoubleReaderWriter.Instance));
             var doubleArrayElementType = doubleArray.SetElementType(typeof(double));
@@ -2073,6 +2178,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 8),
                 converter: new ValueConverter<double, byte[]>(
                     byte[] (double v) => NumberToBytesConverter<double>.ReverseLong(BitConverter.GetBytes(v)),
                     double (byte[] v) => (v == null ? 0D : BitConverter.ToDouble(NumberToBytesConverter<double>.ReverseLong(v), 0))),
@@ -2128,6 +2236,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 64),
                 converter: new ValueConverter<double, string>(
                     string (double v) => string.Format(CultureInfo.InvariantCulture, "{0:R}", ((object)(v))),
                     double (string v) => double.Parse(v, NumberStyles.Any, CultureInfo.InvariantCulture)),
@@ -2183,6 +2294,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(CompiledModelTestBase.Enum16),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance);
 
@@ -2230,6 +2343,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum16[], CompiledModelTestBase.Enum16>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum16[], CompiledModelTestBase.Enum16>(
@@ -2247,6 +2362,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.Enum16),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance));
             var enum16ArrayElementType = enum16Array.SetElementType(typeof(CompiledModelTestBase.Enum16));
@@ -2297,6 +2414,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.Enum16, string>(
                     string (CompiledModelTestBase.Enum16 v) => ((object)v).ToString(),
                     CompiledModelTestBase.Enum16 (string v) => StringEnumConverter<CompiledModelTestBase.Enum16, string, CompiledModelTestBase.Enum16>.ConvertToEnum(v)),
@@ -2351,6 +2470,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum16[], CompiledModelTestBase.Enum16>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum16, string>(
                         JsonStringReaderWriter.Instance,
@@ -2376,6 +2497,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum16, string>(
                         string (CompiledModelTestBase.Enum16 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum16 (string v) => StringEnumConverter<CompiledModelTestBase.Enum16, string, CompiledModelTestBase.Enum16>.ConvertToEnum(v)),
@@ -2432,6 +2555,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum16>, CompiledModelTestBase.Enum16>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum16, string>(
                         JsonStringReaderWriter.Instance,
@@ -2457,6 +2582,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum16, string>(
                         string (CompiledModelTestBase.Enum16 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum16 (string v) => StringEnumConverter<CompiledModelTestBase.Enum16, string, CompiledModelTestBase.Enum16>.ConvertToEnum(v)),
@@ -2513,6 +2640,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum16>, CompiledModelTestBase.Enum16>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum16>, CompiledModelTestBase.Enum16>(
@@ -2530,6 +2659,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.Enum16),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance));
             var enum16CollectionElementType = enum16Collection.SetElementType(typeof(CompiledModelTestBase.Enum16));
@@ -2580,6 +2711,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.Enum32),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance);
 
@@ -2627,6 +2760,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum32[], CompiledModelTestBase.Enum32>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum32[], CompiledModelTestBase.Enum32>(
@@ -2644,6 +2779,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.Enum32),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance));
             var enum32ArrayElementType = enum32Array.SetElementType(typeof(CompiledModelTestBase.Enum32));
@@ -2694,6 +2831,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.Enum32, string>(
                     string (CompiledModelTestBase.Enum32 v) => ((object)v).ToString(),
                     CompiledModelTestBase.Enum32 (string v) => StringEnumConverter<CompiledModelTestBase.Enum32, string, CompiledModelTestBase.Enum32>.ConvertToEnum(v)),
@@ -2748,6 +2887,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum32[], CompiledModelTestBase.Enum32>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum32, string>(
                         JsonStringReaderWriter.Instance,
@@ -2773,6 +2914,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum32, string>(
                         string (CompiledModelTestBase.Enum32 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum32 (string v) => StringEnumConverter<CompiledModelTestBase.Enum32, string, CompiledModelTestBase.Enum32>.ConvertToEnum(v)),
@@ -2829,6 +2972,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum32, string>(
                         JsonStringReaderWriter.Instance,
@@ -2854,6 +2999,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum32, string>(
                         string (CompiledModelTestBase.Enum32 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum32 (string v) => StringEnumConverter<CompiledModelTestBase.Enum32, string, CompiledModelTestBase.Enum32>.ConvertToEnum(v)),
@@ -2910,6 +3057,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
@@ -2927,6 +3076,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.Enum32),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance));
             var enum32CollectionElementType = enum32Collection.SetElementType(typeof(CompiledModelTestBase.Enum32));
@@ -2976,6 +3127,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<List<CompiledModelTestBase.Enum32>[]>(new JsonCollectionOfReferencesReaderWriter<List<CompiledModelTestBase.Enum32>[][], List<CompiledModelTestBase.Enum32>[]>(
                     new JsonCollectionOfReferencesReaderWriter<List<CompiledModelTestBase.Enum32>[], List<CompiledModelTestBase.Enum32>>(
                         new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
@@ -2997,6 +3150,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<List<CompiledModelTestBase.Enum32>>(new JsonCollectionOfReferencesReaderWriter<List<CompiledModelTestBase.Enum32>[], List<CompiledModelTestBase.Enum32>>(
                         new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
                             JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance))),
@@ -3016,6 +3171,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
                             JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                         jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum32>, CompiledModelTestBase.Enum32>(
@@ -3033,6 +3190,8 @@ namespace TestNamespace
                                 bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                                 int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                                 CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "int"),
                             clrType: typeof(CompiledModelTestBase.Enum32),
                             jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance))));
             var enum32NestedCollectionElementType = enum32NestedCollection.SetElementType(typeof(List<CompiledModelTestBase.Enum32>[]));
@@ -3083,6 +3242,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(CompiledModelTestBase.Enum64),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance);
 
@@ -3130,6 +3291,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum64[], CompiledModelTestBase.Enum64>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum64[], CompiledModelTestBase.Enum64>(
@@ -3147,6 +3310,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.Enum64),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance));
             var enum64ArrayElementType = enum64Array.SetElementType(typeof(CompiledModelTestBase.Enum64));
@@ -3197,6 +3362,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.Enum64, string>(
                     string (CompiledModelTestBase.Enum64 v) => ((object)v).ToString(),
                     CompiledModelTestBase.Enum64 (string v) => StringEnumConverter<CompiledModelTestBase.Enum64, string, CompiledModelTestBase.Enum64>.ConvertToEnum(v)),
@@ -3251,6 +3418,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum64[], CompiledModelTestBase.Enum64>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum64, string>(
                         JsonStringReaderWriter.Instance,
@@ -3276,6 +3445,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum64, string>(
                         string (CompiledModelTestBase.Enum64 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum64 (string v) => StringEnumConverter<CompiledModelTestBase.Enum64, string, CompiledModelTestBase.Enum64>.ConvertToEnum(v)),
@@ -3332,6 +3503,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum64>, CompiledModelTestBase.Enum64>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum64, string>(
                         JsonStringReaderWriter.Instance,
@@ -3357,6 +3530,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum64, string>(
                         string (CompiledModelTestBase.Enum64 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum64 (string v) => StringEnumConverter<CompiledModelTestBase.Enum64, string, CompiledModelTestBase.Enum64>.ConvertToEnum(v)),
@@ -3413,6 +3588,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum64>, CompiledModelTestBase.Enum64>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum64>, CompiledModelTestBase.Enum64>(
@@ -3430,6 +3607,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.Enum64),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance));
             var enum64CollectionElementType = enum64Collection.SetElementType(typeof(CompiledModelTestBase.Enum64));
@@ -3480,6 +3659,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(CompiledModelTestBase.Enum8),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance);
 
@@ -3527,6 +3708,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum8[], CompiledModelTestBase.Enum8>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum8[], CompiledModelTestBase.Enum8>(
@@ -3544,6 +3727,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.Enum8),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance));
             var enum8ArrayElementType = enum8Array.SetElementType(typeof(CompiledModelTestBase.Enum8));
@@ -3594,6 +3779,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.Enum8, string>(
                     string (CompiledModelTestBase.Enum8 v) => ((object)v).ToString(),
                     CompiledModelTestBase.Enum8 (string v) => StringEnumConverter<CompiledModelTestBase.Enum8, string, CompiledModelTestBase.Enum8>.ConvertToEnum(v)),
@@ -3648,6 +3835,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum8[], CompiledModelTestBase.Enum8>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum8, string>(
                         JsonStringReaderWriter.Instance,
@@ -3673,6 +3862,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum8, string>(
                         string (CompiledModelTestBase.Enum8 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum8 (string v) => StringEnumConverter<CompiledModelTestBase.Enum8, string, CompiledModelTestBase.Enum8>.ConvertToEnum(v)),
@@ -3729,6 +3920,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum8>, CompiledModelTestBase.Enum8>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.Enum8, string>(
                         JsonStringReaderWriter.Instance,
@@ -3754,6 +3947,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.Enum8, string>(
                         string (CompiledModelTestBase.Enum8 v) => ((object)v).ToString(),
                         CompiledModelTestBase.Enum8 (string v) => StringEnumConverter<CompiledModelTestBase.Enum8, string, CompiledModelTestBase.Enum8>.ConvertToEnum(v)),
@@ -3810,6 +4005,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum8>, CompiledModelTestBase.Enum8>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.Enum8>, CompiledModelTestBase.Enum8>(
@@ -3827,6 +4024,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.Enum8),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance));
             var enum8CollectionElementType = enum8Collection.SetElementType(typeof(CompiledModelTestBase.Enum8));
@@ -3876,6 +4075,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8[]>(new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.Enum8[][], CompiledModelTestBase.Enum8[]>(
                     new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum8[], CompiledModelTestBase.Enum8>(
                         JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance))),
@@ -3895,6 +4096,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum8[], CompiledModelTestBase.Enum8>(
                         JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.Enum8[], CompiledModelTestBase.Enum8>(
@@ -3912,6 +4115,8 @@ namespace TestNamespace
                             bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                             int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                             CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "tinyint"),
                         clrType: typeof(CompiledModelTestBase.Enum8),
                         jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)));
             var enum8NestedCollectionElementType = enum8NestedCollection.SetElementType(typeof(CompiledModelTestBase.Enum8[]));
@@ -3962,6 +4167,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 converter: new ValueConverter<CompiledModelTestBase.Enum32, int>(
                     int (CompiledModelTestBase.Enum32 value) => ((int)(value)),
                     CompiledModelTestBase.Enum32 (int value) => ((CompiledModelTestBase.Enum32)(value))),
@@ -4017,6 +4224,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.Enum32, string>(
                     string (CompiledModelTestBase.Enum32 v) => ((object)v).ToString(),
                     CompiledModelTestBase.Enum32 (string v) => StringEnumConverter<CompiledModelTestBase.Enum32, string, CompiledModelTestBase.Enum32>.ConvertToEnum(v)),
@@ -4072,6 +4281,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(CompiledModelTestBase.EnumU16),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance);
 
@@ -4119,6 +4330,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU16[], CompiledModelTestBase.EnumU16>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU16[], CompiledModelTestBase.EnumU16>(
@@ -4136,6 +4349,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.EnumU16),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance));
             var enumU16ArrayElementType = enumU16Array.SetElementType(typeof(CompiledModelTestBase.EnumU16));
@@ -4186,6 +4401,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.EnumU16, string>(
                     string (CompiledModelTestBase.EnumU16 v) => ((object)v).ToString(),
                     CompiledModelTestBase.EnumU16 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU16, string, CompiledModelTestBase.EnumU16>.ConvertToEnum(v)),
@@ -4240,6 +4457,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU16[], CompiledModelTestBase.EnumU16>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU16, string>(
                         JsonStringReaderWriter.Instance,
@@ -4265,6 +4484,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU16, string>(
                         string (CompiledModelTestBase.EnumU16 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU16 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU16, string, CompiledModelTestBase.EnumU16>.ConvertToEnum(v)),
@@ -4321,6 +4542,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU16>, CompiledModelTestBase.EnumU16>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU16, string>(
                         JsonStringReaderWriter.Instance,
@@ -4346,6 +4569,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU16, string>(
                         string (CompiledModelTestBase.EnumU16 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU16 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU16, string, CompiledModelTestBase.EnumU16>.ConvertToEnum(v)),
@@ -4402,6 +4627,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU16>, CompiledModelTestBase.EnumU16>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU16>, CompiledModelTestBase.EnumU16>(
@@ -4419,6 +4646,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.EnumU16),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance));
             var enumU16CollectionElementType = enumU16Collection.SetElementType(typeof(CompiledModelTestBase.EnumU16));
@@ -4469,6 +4698,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.EnumU32),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance);
 
@@ -4516,6 +4747,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU32[], CompiledModelTestBase.EnumU32>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU32[], CompiledModelTestBase.EnumU32>(
@@ -4533,6 +4766,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.EnumU32),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance));
             var enumU32ArrayElementType = enumU32Array.SetElementType(typeof(CompiledModelTestBase.EnumU32));
@@ -4583,6 +4818,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.EnumU32, string>(
                     string (CompiledModelTestBase.EnumU32 v) => ((object)v).ToString(),
                     CompiledModelTestBase.EnumU32 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU32, string, CompiledModelTestBase.EnumU32>.ConvertToEnum(v)),
@@ -4637,6 +4874,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU32[], CompiledModelTestBase.EnumU32>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU32, string>(
                         JsonStringReaderWriter.Instance,
@@ -4662,6 +4901,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU32, string>(
                         string (CompiledModelTestBase.EnumU32 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU32 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU32, string, CompiledModelTestBase.EnumU32>.ConvertToEnum(v)),
@@ -4718,6 +4959,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU32>, CompiledModelTestBase.EnumU32>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU32, string>(
                         JsonStringReaderWriter.Instance,
@@ -4743,6 +4986,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU32, string>(
                         string (CompiledModelTestBase.EnumU32 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU32 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU32, string, CompiledModelTestBase.EnumU32>.ConvertToEnum(v)),
@@ -4799,6 +5044,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU32>, CompiledModelTestBase.EnumU32>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU32>, CompiledModelTestBase.EnumU32>(
@@ -4816,6 +5063,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.EnumU32),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance));
             var enumU32CollectionElementType = enumU32Collection.SetElementType(typeof(CompiledModelTestBase.EnumU32));
@@ -4866,6 +5115,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(CompiledModelTestBase.EnumU64),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance);
 
@@ -4913,6 +5164,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU64[], CompiledModelTestBase.EnumU64>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU64[], CompiledModelTestBase.EnumU64>(
@@ -4930,6 +5183,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.EnumU64),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance));
             var enumU64ArrayElementType = enumU64Array.SetElementType(typeof(CompiledModelTestBase.EnumU64));
@@ -4980,6 +5235,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.EnumU64, string>(
                     string (CompiledModelTestBase.EnumU64 v) => ((object)v).ToString(),
                     CompiledModelTestBase.EnumU64 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU64, string, CompiledModelTestBase.EnumU64>.ConvertToEnum(v)),
@@ -5034,6 +5291,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU64[], CompiledModelTestBase.EnumU64>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU64, string>(
                         JsonStringReaderWriter.Instance,
@@ -5059,6 +5318,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU64, string>(
                         string (CompiledModelTestBase.EnumU64 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU64 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU64, string, CompiledModelTestBase.EnumU64>.ConvertToEnum(v)),
@@ -5115,6 +5376,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU64>, CompiledModelTestBase.EnumU64>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU64, string>(
                         JsonStringReaderWriter.Instance,
@@ -5140,6 +5403,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU64, string>(
                         string (CompiledModelTestBase.EnumU64 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU64 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU64, string, CompiledModelTestBase.EnumU64>.ConvertToEnum(v)),
@@ -5196,6 +5461,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU64>, CompiledModelTestBase.EnumU64>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU64>, CompiledModelTestBase.EnumU64>(
@@ -5213,6 +5480,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.EnumU64),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance));
             var enumU64CollectionElementType = enumU64Collection.SetElementType(typeof(CompiledModelTestBase.EnumU64));
@@ -5262,6 +5531,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64[]>(new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.EnumU64[][], CompiledModelTestBase.EnumU64[]>(
                     new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU64[], CompiledModelTestBase.EnumU64>(
                         JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance))),
@@ -5281,6 +5552,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU64[], CompiledModelTestBase.EnumU64>(
                         JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU64[], CompiledModelTestBase.EnumU64>(
@@ -5298,6 +5571,8 @@ namespace TestNamespace
                             bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                             int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                             CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "bigint"),
                         clrType: typeof(CompiledModelTestBase.EnumU64),
                         jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)));
             var enumU64NestedCollectionElementType = enumU64NestedCollection.SetElementType(typeof(CompiledModelTestBase.EnumU64[]));
@@ -5348,6 +5623,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(CompiledModelTestBase.EnumU8),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance);
 
@@ -5395,6 +5672,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU8[], CompiledModelTestBase.EnumU8>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU8[], CompiledModelTestBase.EnumU8>(
@@ -5412,6 +5691,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.EnumU8),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance));
             var enumU8ArrayElementType = enumU8Array.SetElementType(typeof(CompiledModelTestBase.EnumU8));
@@ -5462,6 +5743,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<CompiledModelTestBase.EnumU8, string>(
                     string (CompiledModelTestBase.EnumU8 v) => ((object)v).ToString(),
                     CompiledModelTestBase.EnumU8 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU8, string, CompiledModelTestBase.EnumU8>.ConvertToEnum(v)),
@@ -5516,6 +5799,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8>(new JsonCollectionOfStructsReaderWriter<CompiledModelTestBase.EnumU8[], CompiledModelTestBase.EnumU8>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU8, string>(
                         JsonStringReaderWriter.Instance,
@@ -5541,6 +5826,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU8, string>(
                         string (CompiledModelTestBase.EnumU8 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU8 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU8, string, CompiledModelTestBase.EnumU8>.ConvertToEnum(v)),
@@ -5597,6 +5884,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU8>, CompiledModelTestBase.EnumU8>(
                     new JsonConvertedValueReaderWriter<CompiledModelTestBase.EnumU8, string>(
                         JsonStringReaderWriter.Instance,
@@ -5622,6 +5911,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<CompiledModelTestBase.EnumU8, string>(
                         string (CompiledModelTestBase.EnumU8 v) => ((object)v).ToString(),
                         CompiledModelTestBase.EnumU8 (string v) => StringEnumConverter<CompiledModelTestBase.EnumU8, string, CompiledModelTestBase.EnumU8>.ConvertToEnum(v)),
@@ -5678,6 +5969,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8>(new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU8>, CompiledModelTestBase.EnumU8>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<CompiledModelTestBase.EnumU8>, CompiledModelTestBase.EnumU8>(
@@ -5695,6 +5988,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.EnumU8),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance));
             var enumU8CollectionElementType = enumU8Collection.SetElementType(typeof(CompiledModelTestBase.EnumU8));
@@ -5745,6 +6040,8 @@ namespace TestNamespace
                     bool (float v1, float v2) => v1.Equals(v2),
                     int (float v) => ((object)v).GetHashCode(),
                     float (float v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "float"),
                 clrType: typeof(float),
                 jsonValueReaderWriter: JsonFloatReaderWriter.Instance);
 
@@ -5792,6 +6089,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<float>(new JsonCollectionOfStructsReaderWriter<float[], float>(
                     JsonFloatReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<float[], float>(
@@ -5809,6 +6108,8 @@ namespace TestNamespace
                         bool (float v1, float v2) => v1.Equals(v2),
                         int (float v) => ((object)v).GetHashCode(),
                         float (float v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "float"),
                     clrType: typeof(float),
                     jsonValueReaderWriter: JsonFloatReaderWriter.Instance));
             var floatArrayElementType = floatArray.SetElementType(typeof(float));
@@ -5859,6 +6160,8 @@ namespace TestNamespace
                     bool (Guid v1, Guid v2) => v1 == v2,
                     int (Guid v) => ((object)v).GetHashCode(),
                     Guid (Guid v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "guid"),
                 clrType: typeof(Guid),
                 jsonValueReaderWriter: JsonGuidReaderWriter.Instance);
 
@@ -5906,6 +6209,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<Guid>(new JsonCollectionOfStructsReaderWriter<Guid[], Guid>(
                     JsonGuidReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<Guid[], Guid>(
@@ -5923,6 +6228,8 @@ namespace TestNamespace
                         bool (Guid v1, Guid v2) => v1 == v2,
                         int (Guid v) => ((object)v).GetHashCode(),
                         Guid (Guid v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "guid"),
                     clrType: typeof(Guid),
                     jsonValueReaderWriter: JsonGuidReaderWriter.Instance));
             var guidArrayElementType = guidArray.SetElementType(typeof(Guid));
@@ -5972,6 +6279,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<Guid[][]>(new JsonCollectionOfReferencesReaderWriter<List<Guid[][]>, Guid[][]>(
                     new JsonCollectionOfReferencesReaderWriter<Guid[][], Guid[]>(
                         new JsonCollectionOfStructsReaderWriter<Guid[], Guid>(
@@ -5993,6 +6302,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<Guid[]>(new JsonCollectionOfReferencesReaderWriter<Guid[][], Guid[]>(
                         new JsonCollectionOfStructsReaderWriter<Guid[], Guid>(
                             JsonGuidReaderWriter.Instance))),
@@ -6012,6 +6323,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<Guid>(new JsonCollectionOfStructsReaderWriter<Guid[], Guid>(
                             JsonGuidReaderWriter.Instance)),
                         jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<Guid[], Guid>(
@@ -6029,6 +6342,8 @@ namespace TestNamespace
                                 bool (Guid v1, Guid v2) => v1 == v2,
                                 int (Guid v) => ((object)v).GetHashCode(),
                                 Guid (Guid v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "guid"),
                             clrType: typeof(Guid),
                             jsonValueReaderWriter: JsonGuidReaderWriter.Instance))));
             var guidNestedCollectionElementType = guidNestedCollection.SetElementType(typeof(Guid[][]));
@@ -6079,6 +6394,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 16),
                 converter: new ValueConverter<Guid, byte[]>(
                     byte[] (Guid v) => v.ToByteArray(),
                     Guid (byte[] v) => new Guid(v)),
@@ -6134,6 +6452,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 36),
                 converter: new ValueConverter<Guid, string>(
                     string (Guid v) => v.ToString("D"),
                     Guid (string v) => new Guid(v)),
@@ -6188,6 +6509,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 45),
                 converter: new ValueConverter<IPAddress, string>(
                     string (IPAddress v) => ((object)v).ToString(),
                     IPAddress (string v) => IPAddress.Parse(v)),
@@ -6241,6 +6565,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<IPAddress>(new JsonCollectionOfReferencesReaderWriter<IPAddress[], IPAddress>(
                     new JsonConvertedValueReaderWriter<IPAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -6266,6 +6592,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 45),
                     converter: new ValueConverter<IPAddress, string>(
                         string (IPAddress v) => ((object)v).ToString(),
                         IPAddress (string v) => IPAddress.Parse(v)),
@@ -6321,6 +6650,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<IPAddress>(new JsonCollectionOfReferencesReaderWriter<List<IPAddress>, IPAddress>(
                     new JsonConvertedValueReaderWriter<IPAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -6346,6 +6677,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 45),
                     converter: new ValueConverter<IPAddress, string>(
                         string (IPAddress v) => ((object)v).ToString(),
                         IPAddress (string v) => IPAddress.Parse(v)),
@@ -6403,6 +6737,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 16),
                 converter: new ValueConverter<IPAddress, byte[]>(
                     byte[] (IPAddress v) => v.GetAddressBytes(),
                     IPAddress (byte[] v) => new IPAddress(v)),
@@ -6457,6 +6794,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 45),
                 converter: new ValueConverter<IPAddress, string>(
                     string (IPAddress v) => ((object)v).ToString(),
                     IPAddress (string v) => IPAddress.Parse(v)),
@@ -6511,6 +6851,8 @@ namespace TestNamespace
                     bool (short v1, short v2) => v1 == v2,
                     int (short v) => ((int)(v)),
                     short (short v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(short),
                 jsonValueReaderWriter: JsonInt16ReaderWriter.Instance);
 
@@ -6558,6 +6900,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<short>(new JsonCollectionOfStructsReaderWriter<short[], short>(
                     JsonInt16ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<short[], short>(
@@ -6575,6 +6919,8 @@ namespace TestNamespace
                         bool (short v1, short v2) => v1 == v2,
                         int (short v) => ((int)(v)),
                         short (short v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(short),
                     jsonValueReaderWriter: JsonInt16ReaderWriter.Instance));
             var int16ArrayElementType = int16Array.SetElementType(typeof(short));
@@ -6625,6 +6971,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(int),
                 jsonValueReaderWriter: JsonInt32ReaderWriter.Instance);
 
@@ -6672,6 +7020,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<int>(new JsonCollectionOfStructsReaderWriter<int[], int>(
                     JsonInt32ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<int[], int>(
@@ -6689,6 +7039,8 @@ namespace TestNamespace
                         bool (int v1, int v2) => v1 == v2,
                         int (int v) => v,
                         int (int v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(int),
                     jsonValueReaderWriter: JsonInt32ReaderWriter.Instance));
             var int32ArrayElementType = int32Array.SetElementType(typeof(int));
@@ -6738,6 +7090,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<int[]>(new JsonCollectionOfReferencesReaderWriter<int[][], int[]>(
                     new JsonCollectionOfStructsReaderWriter<int[], int>(
                         JsonInt32ReaderWriter.Instance))),
@@ -6757,6 +7111,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<int>(new JsonCollectionOfStructsReaderWriter<int[], int>(
                         JsonInt32ReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<int[], int>(
@@ -6774,6 +7130,8 @@ namespace TestNamespace
                             bool (int v1, int v2) => v1 == v2,
                             int (int v) => v,
                             int (int v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "int"),
                         clrType: typeof(int),
                         jsonValueReaderWriter: JsonInt32ReaderWriter.Instance)));
             var int32NestedCollectionElementType = int32NestedCollection.SetElementType(typeof(int[]));
@@ -6823,6 +7181,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<int>(new JsonCollectionOfStructsReaderWriter<List<int>, int>(
                     JsonInt32ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<int>, int>(
@@ -6840,6 +7200,8 @@ namespace TestNamespace
                         bool (int v1, int v2) => v1 == v2,
                         int (int v) => v,
                         int (int v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(int),
                     jsonValueReaderWriter: JsonInt32ReaderWriter.Instance));
             var int32ReadOnlyCollectionElementType = int32ReadOnlyCollection.SetElementType(typeof(int));
@@ -6890,6 +7252,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(long),
                 jsonValueReaderWriter: JsonInt64ReaderWriter.Instance);
 
@@ -6937,6 +7301,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<long>(new JsonCollectionOfStructsReaderWriter<long[], long>(
                     JsonInt64ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<long[], long>(
@@ -6954,6 +7320,8 @@ namespace TestNamespace
                         bool (long v1, long v2) => v1 == v2,
                         int (long v) => ((object)v).GetHashCode(),
                         long (long v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(long),
                     jsonValueReaderWriter: JsonInt64ReaderWriter.Instance));
             var int64ArrayElementType = int64Array.SetElementType(typeof(long));
@@ -7003,6 +7371,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<IList<long[]>>(new JsonCollectionOfReferencesReaderWriter<IList<long[]>[], IList<long[]>>(
                     new JsonCollectionOfReferencesReaderWriter<List<long[]>, long[]>(
                         new JsonCollectionOfStructsReaderWriter<long[], long>(
@@ -7024,6 +7394,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<long[]>(new JsonCollectionOfReferencesReaderWriter<List<long[]>, long[]>(
                         new JsonCollectionOfStructsReaderWriter<long[], long>(
                             JsonInt64ReaderWriter.Instance))),
@@ -7043,6 +7415,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<long>(new JsonCollectionOfStructsReaderWriter<long[], long>(
                             JsonInt64ReaderWriter.Instance)),
                         jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<long[], long>(
@@ -7060,6 +7434,8 @@ namespace TestNamespace
                                 bool (long v1, long v2) => v1 == v2,
                                 int (long v) => ((object)v).GetHashCode(),
                                 long (long v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "bigint"),
                             clrType: typeof(long),
                             jsonValueReaderWriter: JsonInt64ReaderWriter.Instance))));
             var int64NestedCollectionElementType = int64NestedCollection.SetElementType(typeof(IList<long[]>));
@@ -7110,6 +7486,8 @@ namespace TestNamespace
                     bool (sbyte v1, sbyte v2) => v1 == v2,
                     int (sbyte v) => ((int)(v)),
                     sbyte (sbyte v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(sbyte),
                 jsonValueReaderWriter: JsonSByteReaderWriter.Instance);
 
@@ -7157,6 +7535,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<sbyte>(new JsonCollectionOfStructsReaderWriter<sbyte[], sbyte>(
                     JsonSByteReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<sbyte[], sbyte>(
@@ -7174,6 +7554,8 @@ namespace TestNamespace
                         bool (sbyte v1, sbyte v2) => v1 == v2,
                         int (sbyte v) => ((int)(v)),
                         sbyte (sbyte v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(sbyte),
                     jsonValueReaderWriter: JsonSByteReaderWriter.Instance));
             var int8ArrayElementType = int8Array.SetElementType(typeof(sbyte));
@@ -7223,6 +7605,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<sbyte[][]>(new JsonCollectionOfReferencesReaderWriter<sbyte[][][], sbyte[][]>(
                     new JsonCollectionOfReferencesReaderWriter<sbyte[][], sbyte[]>(
                         new JsonCollectionOfStructsReaderWriter<sbyte[], sbyte>(
@@ -7244,6 +7628,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<sbyte[]>(new JsonCollectionOfReferencesReaderWriter<sbyte[][], sbyte[]>(
                         new JsonCollectionOfStructsReaderWriter<sbyte[], sbyte>(
                             JsonSByteReaderWriter.Instance))),
@@ -7263,6 +7649,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<sbyte>(new JsonCollectionOfStructsReaderWriter<sbyte[], sbyte>(
                             JsonSByteReaderWriter.Instance)),
                         jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<sbyte[], sbyte>(
@@ -7280,6 +7668,8 @@ namespace TestNamespace
                                 bool (sbyte v1, sbyte v2) => v1 == v2,
                                 int (sbyte v) => ((int)(v)),
                                 sbyte (sbyte v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "tinyint"),
                             clrType: typeof(sbyte),
                             jsonValueReaderWriter: JsonSByteReaderWriter.Instance))));
             var int8NestedCollectionElementType = int8NestedCollection.SetElementType(typeof(sbyte[][]));
@@ -7330,6 +7720,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 4),
                 converter: new ValueConverter<int, byte[]>(
                     byte[] (int v) => NumberToBytesConverter<int>.ReverseInt(BitConverter.GetBytes(v)),
                     int (byte[] v) => (v == null ? 0 : BitConverter.ToInt32(NumberToBytesConverter<int>.ReverseInt((v.Length == 0 ? new byte[4] : v)), 0))),
@@ -7385,6 +7778,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 64),
                 converter: new ValueConverter<int, string>(
                     string (int v) => string.Format(CultureInfo.InvariantCulture, "{0}", ((object)(v))),
                     int (string v) => int.Parse(v, NumberStyles.Any, CultureInfo.InvariantCulture)),
@@ -7441,6 +7837,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<int?, string>(
                     string (int? v) => (v == null ? null : ((object)v).ToString()),
                     int? (string v) => (v == null || v == "<null>" ? null : ((int? )(int.Parse(v)))),
@@ -7497,6 +7895,8 @@ namespace TestNamespace
                     bool (bool v1, bool v2) => v1 == v2,
                     int (bool v) => ((object)v).GetHashCode(),
                     bool (bool v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "boolean"),
                 clrType: typeof(bool),
                 jsonValueReaderWriter: JsonBoolReaderWriter.Instance);
             nullableBool.SetComparer(new NullableValueComparer<bool>(nullableBool.TypeMapping.Comparer));
@@ -7546,6 +7946,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<bool?>(new JsonCollectionOfNullableStructsReaderWriter<bool?[], bool>(
                     JsonBoolReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<bool?[], bool>(
@@ -7563,6 +7965,8 @@ namespace TestNamespace
                         bool (bool v1, bool v2) => v1 == v2,
                         int (bool v) => ((object)v).GetHashCode(),
                         bool (bool v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "boolean"),
                     clrType: typeof(bool),
                     jsonValueReaderWriter: JsonBoolReaderWriter.Instance));
             var nullableBoolArrayElementType = nullableBoolArray.SetElementType(typeof(bool?),
@@ -7615,6 +8019,8 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary"),
                 clrType: typeof(byte[]),
                 jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance);
 
@@ -7662,6 +8068,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte[]>(new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
                     JsonByteArrayReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
@@ -7679,6 +8087,8 @@ namespace TestNamespace
                         bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                         int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                         byte[] (byte[] source) => source.ToArray()),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "binary"),
                     clrType: typeof(byte[]),
                     jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance));
             var nullableBytesArrayElementType = nullableBytesArray.SetElementType(typeof(byte[]),
@@ -7729,6 +8139,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte[][]>(new JsonCollectionOfReferencesReaderWriter<byte[][][], byte[][]>(
                     new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
                         JsonByteArrayReaderWriter.Instance))),
@@ -7748,6 +8160,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<byte[]>(new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
                         JsonByteArrayReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<byte[][], byte[]>(
@@ -7765,6 +8179,8 @@ namespace TestNamespace
                             bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                             int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                             byte[] (byte[] source) => source.ToArray()),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "binary"),
                         clrType: typeof(byte[]),
                         jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance)));
             var nullableBytesNestedCollectionElementType = nullableBytesNestedCollection.SetElementType(typeof(byte[][]));
@@ -7815,6 +8231,8 @@ namespace TestNamespace
                     bool (char v1, char v2) => v1 == v2,
                     int (char v) => ((int)(v)),
                     char (char v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "char"),
                 clrType: typeof(char),
                 jsonValueReaderWriter: JsonCharReaderWriter.Instance);
             nullableChar.SetComparer(new NullableValueComparer<char>(nullableChar.TypeMapping.Comparer));
@@ -7864,6 +8282,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<char?>(new JsonCollectionOfNullableStructsReaderWriter<char?[], char>(
                     JsonCharReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<char?[], char>(
@@ -7881,6 +8301,8 @@ namespace TestNamespace
                         bool (char v1, char v2) => v1 == v2,
                         int (char v) => ((int)(v)),
                         char (char v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "char"),
                     clrType: typeof(char),
                     jsonValueReaderWriter: JsonCharReaderWriter.Instance));
             var nullableCharArrayElementType = nullableCharArray.SetElementType(typeof(char?),
@@ -7933,6 +8355,8 @@ namespace TestNamespace
                     bool (DateOnly v1, DateOnly v2) => v1.Equals(v2),
                     int (DateOnly v) => ((object)v).GetHashCode(),
                     DateOnly (DateOnly v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "date"),
                 clrType: typeof(DateOnly),
                 jsonValueReaderWriter: JsonDateOnlyReaderWriter.Instance);
             nullableDateOnly.SetComparer(new NullableValueComparer<DateOnly>(nullableDateOnly.TypeMapping.Comparer));
@@ -7982,6 +8406,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<DateOnly?>(new JsonCollectionOfNullableStructsReaderWriter<DateOnly?[], DateOnly>(
                     JsonDateOnlyReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<DateOnly?[], DateOnly>(
@@ -7999,6 +8425,8 @@ namespace TestNamespace
                         bool (DateOnly v1, DateOnly v2) => v1.Equals(v2),
                         int (DateOnly v) => ((object)v).GetHashCode(),
                         DateOnly (DateOnly v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "date"),
                     clrType: typeof(DateOnly),
                     jsonValueReaderWriter: JsonDateOnlyReaderWriter.Instance));
             var nullableDateOnlyArrayElementType = nullableDateOnlyArray.SetElementType(typeof(DateOnly?),
@@ -8051,6 +8479,8 @@ namespace TestNamespace
                     bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                     int (DateTime v) => ((object)v).GetHashCode(),
                     DateTime (DateTime v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "datetime"),
                 clrType: typeof(DateTime),
                 jsonValueReaderWriter: JsonDateTimeReaderWriter.Instance);
             nullableDateTime.SetComparer(new NullableValueComparer<DateTime>(nullableDateTime.TypeMapping.Comparer));
@@ -8100,6 +8530,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<DateTime?>(new JsonCollectionOfNullableStructsReaderWriter<DateTime?[], DateTime>(
                     JsonDateTimeReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<DateTime?[], DateTime>(
@@ -8117,6 +8549,8 @@ namespace TestNamespace
                         bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                         int (DateTime v) => ((object)v).GetHashCode(),
                         DateTime (DateTime v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "datetime"),
                     clrType: typeof(DateTime),
                     jsonValueReaderWriter: JsonDateTimeReaderWriter.Instance));
             var nullableDateTimeArrayElementType = nullableDateTimeArray.SetElementType(typeof(DateTime?),
@@ -8169,6 +8603,8 @@ namespace TestNamespace
                     bool (decimal v1, decimal v2) => v1 == v2,
                     int (decimal v) => ((object)v).GetHashCode(),
                     decimal (decimal v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "decimal"),
                 clrType: typeof(decimal),
                 jsonValueReaderWriter: JsonDecimalReaderWriter.Instance);
             nullableDecimal.SetComparer(new NullableValueComparer<decimal>(nullableDecimal.TypeMapping.Comparer));
@@ -8218,6 +8654,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<decimal?>(new JsonCollectionOfNullableStructsReaderWriter<decimal?[], decimal>(
                     JsonDecimalReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<decimal?[], decimal>(
@@ -8235,6 +8673,8 @@ namespace TestNamespace
                         bool (decimal v1, decimal v2) => v1 == v2,
                         int (decimal v) => ((object)v).GetHashCode(),
                         decimal (decimal v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "decimal"),
                     clrType: typeof(decimal),
                     jsonValueReaderWriter: JsonDecimalReaderWriter.Instance));
             var nullableDecimalArrayElementType = nullableDecimalArray.SetElementType(typeof(decimal?),
@@ -8287,6 +8727,8 @@ namespace TestNamespace
                     bool (double v1, double v2) => v1.Equals(v2),
                     int (double v) => ((object)v).GetHashCode(),
                     double (double v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "double"),
                 clrType: typeof(double),
                 jsonValueReaderWriter: JsonDoubleReaderWriter.Instance);
             nullableDouble.SetComparer(new NullableValueComparer<double>(nullableDouble.TypeMapping.Comparer));
@@ -8336,6 +8778,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<double?>(new JsonCollectionOfNullableStructsReaderWriter<double?[], double>(
                     JsonDoubleReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<double?[], double>(
@@ -8353,6 +8797,8 @@ namespace TestNamespace
                         bool (double v1, double v2) => v1.Equals(v2),
                         int (double v) => ((object)v).GetHashCode(),
                         double (double v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "double"),
                     clrType: typeof(double),
                     jsonValueReaderWriter: JsonDoubleReaderWriter.Instance));
             var nullableDoubleArrayElementType = nullableDoubleArray.SetElementType(typeof(double?),
@@ -8405,6 +8851,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(CompiledModelTestBase.Enum16),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance);
             nullableEnum16.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum16>(nullableEnum16.TypeMapping.Comparer));
@@ -8454,6 +8902,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum16?[], CompiledModelTestBase.Enum16>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum16?[], CompiledModelTestBase.Enum16>(
@@ -8471,6 +8921,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.Enum16),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance));
             var nullableEnum16ArrayElementType = nullableEnum16Array.SetElementType(typeof(CompiledModelTestBase.Enum16?),
@@ -8523,6 +8975,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(CompiledModelTestBase.Enum16),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance);
             nullableEnum16AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum16>(nullableEnum16AsString.TypeMapping.Comparer));
@@ -8572,6 +9026,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum16?[], CompiledModelTestBase.Enum16>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum16?[], CompiledModelTestBase.Enum16>(
@@ -8589,6 +9045,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.Enum16),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance));
             var nullableEnum16AsStringArrayElementType = nullableEnum16AsStringArray.SetElementType(typeof(CompiledModelTestBase.Enum16?),
@@ -8640,6 +9098,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum16?>, CompiledModelTestBase.Enum16>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum16?>, CompiledModelTestBase.Enum16>(
@@ -8657,6 +9117,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.Enum16),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance));
             var nullableEnum16AsStringCollectionElementType = nullableEnum16AsStringCollection.SetElementType(typeof(CompiledModelTestBase.Enum16?),
@@ -8708,6 +9170,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum16?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum16?>, CompiledModelTestBase.Enum16>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum16?>, CompiledModelTestBase.Enum16>(
@@ -8725,6 +9189,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum16 v1, CompiledModelTestBase.Enum16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum16 (CompiledModelTestBase.Enum16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.Enum16),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum16>.Instance));
             var nullableEnum16CollectionElementType = nullableEnum16Collection.SetElementType(typeof(CompiledModelTestBase.Enum16?),
@@ -8777,6 +9243,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.Enum32),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance);
             nullableEnum32.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum32>(nullableEnum32.TypeMapping.Comparer));
@@ -8826,6 +9294,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
@@ -8843,6 +9313,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.Enum32),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance));
             var nullableEnum32ArrayElementType = nullableEnum32Array.SetElementType(typeof(CompiledModelTestBase.Enum32?),
@@ -8895,6 +9367,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.Enum32),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance);
             nullableEnum32AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum32>(nullableEnum32AsString.TypeMapping.Comparer));
@@ -8944,6 +9418,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
@@ -8961,6 +9437,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.Enum32),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance));
             var nullableEnum32AsStringArrayElementType = nullableEnum32AsStringArray.SetElementType(typeof(CompiledModelTestBase.Enum32?),
@@ -9012,6 +9490,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum32?>, CompiledModelTestBase.Enum32>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum32?>, CompiledModelTestBase.Enum32>(
@@ -9029,6 +9509,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.Enum32),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance));
             var nullableEnum32AsStringCollectionElementType = nullableEnum32AsStringCollection.SetElementType(typeof(CompiledModelTestBase.Enum32?),
@@ -9080,6 +9562,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum32?>, CompiledModelTestBase.Enum32>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum32?>, CompiledModelTestBase.Enum32>(
@@ -9097,6 +9581,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.Enum32),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance));
             var nullableEnum32CollectionElementType = nullableEnum32Collection.SetElementType(typeof(CompiledModelTestBase.Enum32?),
@@ -9148,6 +9634,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?[][]>(new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.Enum32?[][][], CompiledModelTestBase.Enum32?[][]>(
                     new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.Enum32?[][], CompiledModelTestBase.Enum32?[]>(
                         new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
@@ -9169,6 +9657,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?[]>(new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.Enum32?[][], CompiledModelTestBase.Enum32?[]>(
                         new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
                             JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance))),
@@ -9188,6 +9678,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum32?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
                             JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance)),
                         jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum32?[], CompiledModelTestBase.Enum32>(
@@ -9205,6 +9697,8 @@ namespace TestNamespace
                                 bool (CompiledModelTestBase.Enum32 v1, CompiledModelTestBase.Enum32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                                 int (CompiledModelTestBase.Enum32 v) => ((object)v).GetHashCode(),
                                 CompiledModelTestBase.Enum32 (CompiledModelTestBase.Enum32 v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "int"),
                             clrType: typeof(CompiledModelTestBase.Enum32),
                             jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum32>.Instance))));
             var nullableEnum32NestedCollectionElementType = nullableEnum32NestedCollection.SetElementType(typeof(CompiledModelTestBase.Enum32?[][]));
@@ -9255,6 +9749,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(CompiledModelTestBase.Enum64),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance);
             nullableEnum64.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum64>(nullableEnum64.TypeMapping.Comparer));
@@ -9304,6 +9800,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum64?[], CompiledModelTestBase.Enum64>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum64?[], CompiledModelTestBase.Enum64>(
@@ -9321,6 +9819,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.Enum64),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance));
             var nullableEnum64ArrayElementType = nullableEnum64Array.SetElementType(typeof(CompiledModelTestBase.Enum64?),
@@ -9373,6 +9873,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(CompiledModelTestBase.Enum64),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance);
             nullableEnum64AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum64>(nullableEnum64AsString.TypeMapping.Comparer));
@@ -9422,6 +9924,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum64?[], CompiledModelTestBase.Enum64>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum64?[], CompiledModelTestBase.Enum64>(
@@ -9439,6 +9943,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.Enum64),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance));
             var nullableEnum64AsStringArrayElementType = nullableEnum64AsStringArray.SetElementType(typeof(CompiledModelTestBase.Enum64?),
@@ -9490,6 +9996,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum64?>, CompiledModelTestBase.Enum64>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum64?>, CompiledModelTestBase.Enum64>(
@@ -9507,6 +10015,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.Enum64),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance));
             var nullableEnum64AsStringCollectionElementType = nullableEnum64AsStringCollection.SetElementType(typeof(CompiledModelTestBase.Enum64?),
@@ -9558,6 +10068,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum64?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum64?>, CompiledModelTestBase.Enum64>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum64?>, CompiledModelTestBase.Enum64>(
@@ -9575,6 +10087,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum64 v1, CompiledModelTestBase.Enum64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum64 (CompiledModelTestBase.Enum64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.Enum64),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum64>.Instance));
             var nullableEnum64CollectionElementType = nullableEnum64Collection.SetElementType(typeof(CompiledModelTestBase.Enum64?),
@@ -9627,6 +10141,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(CompiledModelTestBase.Enum8),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance);
             nullableEnum8.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum8>(nullableEnum8.TypeMapping.Comparer));
@@ -9676,6 +10192,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
@@ -9693,6 +10211,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.Enum8),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance));
             var nullableEnum8ArrayElementType = nullableEnum8Array.SetElementType(typeof(CompiledModelTestBase.Enum8?),
@@ -9745,6 +10265,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(CompiledModelTestBase.Enum8),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance);
             nullableEnum8AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.Enum8>(nullableEnum8AsString.TypeMapping.Comparer));
@@ -9794,6 +10316,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
@@ -9811,6 +10335,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.Enum8),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance));
             var nullableEnum8AsStringArrayElementType = nullableEnum8AsStringArray.SetElementType(typeof(CompiledModelTestBase.Enum8?),
@@ -9862,6 +10388,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum8?>, CompiledModelTestBase.Enum8>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum8?>, CompiledModelTestBase.Enum8>(
@@ -9879,6 +10407,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.Enum8),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance));
             var nullableEnum8AsStringCollectionElementType = nullableEnum8AsStringCollection.SetElementType(typeof(CompiledModelTestBase.Enum8?),
@@ -9930,6 +10460,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum8?>, CompiledModelTestBase.Enum8>(
                     JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.Enum8?>, CompiledModelTestBase.Enum8>(
@@ -9947,6 +10479,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.Enum8),
                     jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance));
             var nullableEnum8CollectionElementType = nullableEnum8Collection.SetElementType(typeof(CompiledModelTestBase.Enum8?),
@@ -9998,6 +10532,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8?[]>(new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.Enum8?[][], CompiledModelTestBase.Enum8?[]>(
                     new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
                         JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance))),
@@ -10017,6 +10553,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<CompiledModelTestBase.Enum8?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
                         JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.Enum8?[], CompiledModelTestBase.Enum8>(
@@ -10034,6 +10572,8 @@ namespace TestNamespace
                             bool (CompiledModelTestBase.Enum8 v1, CompiledModelTestBase.Enum8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                             int (CompiledModelTestBase.Enum8 v) => ((object)v).GetHashCode(),
                             CompiledModelTestBase.Enum8 (CompiledModelTestBase.Enum8 v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "tinyint"),
                         clrType: typeof(CompiledModelTestBase.Enum8),
                         jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum8>.Instance)));
             var nullableEnum8NestedCollectionElementType = nullableEnum8NestedCollection.SetElementType(typeof(CompiledModelTestBase.Enum8?[]));
@@ -10084,6 +10624,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(CompiledModelTestBase.EnumU16),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance);
             nullableEnumU16.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU16>(nullableEnumU16.TypeMapping.Comparer));
@@ -10133,6 +10675,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU16?[], CompiledModelTestBase.EnumU16>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU16?[], CompiledModelTestBase.EnumU16>(
@@ -10150,6 +10694,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.EnumU16),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance));
             var nullableEnumU16ArrayElementType = nullableEnumU16Array.SetElementType(typeof(CompiledModelTestBase.EnumU16?),
@@ -10202,6 +10748,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(CompiledModelTestBase.EnumU16),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance);
             nullableEnumU16AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU16>(nullableEnumU16AsString.TypeMapping.Comparer));
@@ -10251,6 +10799,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU16?[], CompiledModelTestBase.EnumU16>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU16?[], CompiledModelTestBase.EnumU16>(
@@ -10268,6 +10818,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.EnumU16),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance));
             var nullableEnumU16AsStringArrayElementType = nullableEnumU16AsStringArray.SetElementType(typeof(CompiledModelTestBase.EnumU16?),
@@ -10319,6 +10871,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU16?>, CompiledModelTestBase.EnumU16>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU16?>, CompiledModelTestBase.EnumU16>(
@@ -10336,6 +10890,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.EnumU16),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance));
             var nullableEnumU16AsStringCollectionElementType = nullableEnumU16AsStringCollection.SetElementType(typeof(CompiledModelTestBase.EnumU16?),
@@ -10387,6 +10943,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU16?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU16?>, CompiledModelTestBase.EnumU16>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU16?>, CompiledModelTestBase.EnumU16>(
@@ -10404,6 +10962,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU16 v1, CompiledModelTestBase.EnumU16 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU16 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU16 (CompiledModelTestBase.EnumU16 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(CompiledModelTestBase.EnumU16),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU16>.Instance));
             var nullableEnumU16CollectionElementType = nullableEnumU16Collection.SetElementType(typeof(CompiledModelTestBase.EnumU16?),
@@ -10456,6 +11016,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.EnumU32),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance);
             nullableEnumU32.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU32>(nullableEnumU32.TypeMapping.Comparer));
@@ -10505,6 +11067,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU32?[], CompiledModelTestBase.EnumU32>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU32?[], CompiledModelTestBase.EnumU32>(
@@ -10522,6 +11086,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.EnumU32),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance));
             var nullableEnumU32ArrayElementType = nullableEnumU32Array.SetElementType(typeof(CompiledModelTestBase.EnumU32?),
@@ -10574,6 +11140,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.EnumU32),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance);
             nullableEnumU32AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU32>(nullableEnumU32AsString.TypeMapping.Comparer));
@@ -10623,6 +11191,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU32?[], CompiledModelTestBase.EnumU32>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU32?[], CompiledModelTestBase.EnumU32>(
@@ -10640,6 +11210,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.EnumU32),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance));
             var nullableEnumU32AsStringArrayElementType = nullableEnumU32AsStringArray.SetElementType(typeof(CompiledModelTestBase.EnumU32?),
@@ -10691,6 +11263,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU32?>, CompiledModelTestBase.EnumU32>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU32?>, CompiledModelTestBase.EnumU32>(
@@ -10708,6 +11282,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.EnumU32),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance));
             var nullableEnumU32AsStringCollectionElementType = nullableEnumU32AsStringCollection.SetElementType(typeof(CompiledModelTestBase.EnumU32?),
@@ -10759,6 +11335,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU32?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU32?>, CompiledModelTestBase.EnumU32>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU32?>, CompiledModelTestBase.EnumU32>(
@@ -10776,6 +11354,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(CompiledModelTestBase.EnumU32),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU32>.Instance));
             var nullableEnumU32CollectionElementType = nullableEnumU32Collection.SetElementType(typeof(CompiledModelTestBase.EnumU32?),
@@ -10828,6 +11408,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(CompiledModelTestBase.EnumU64),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance);
             nullableEnumU64.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU64>(nullableEnumU64.TypeMapping.Comparer));
@@ -10877,6 +11459,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
@@ -10894,6 +11478,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.EnumU64),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance));
             var nullableEnumU64ArrayElementType = nullableEnumU64Array.SetElementType(typeof(CompiledModelTestBase.EnumU64?),
@@ -10946,6 +11532,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(CompiledModelTestBase.EnumU64),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance);
             nullableEnumU64AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU64>(nullableEnumU64AsString.TypeMapping.Comparer));
@@ -10995,6 +11583,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
@@ -11012,6 +11602,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.EnumU64),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance));
             var nullableEnumU64AsStringArrayElementType = nullableEnumU64AsStringArray.SetElementType(typeof(CompiledModelTestBase.EnumU64?),
@@ -11063,6 +11655,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU64?>, CompiledModelTestBase.EnumU64>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU64?>, CompiledModelTestBase.EnumU64>(
@@ -11080,6 +11674,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.EnumU64),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance));
             var nullableEnumU64AsStringCollectionElementType = nullableEnumU64AsStringCollection.SetElementType(typeof(CompiledModelTestBase.EnumU64?),
@@ -11131,6 +11727,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU64?>, CompiledModelTestBase.EnumU64>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU64?>, CompiledModelTestBase.EnumU64>(
@@ -11148,6 +11746,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(CompiledModelTestBase.EnumU64),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance));
             var nullableEnumU64CollectionElementType = nullableEnumU64Collection.SetElementType(typeof(CompiledModelTestBase.EnumU64?),
@@ -11199,6 +11799,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64?[]>(new JsonCollectionOfReferencesReaderWriter<CompiledModelTestBase.EnumU64?[][], CompiledModelTestBase.EnumU64?[]>(
                     new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
                         JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance))),
@@ -11218,6 +11820,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU64?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
                         JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU64?[], CompiledModelTestBase.EnumU64>(
@@ -11235,6 +11839,8 @@ namespace TestNamespace
                             bool (CompiledModelTestBase.EnumU64 v1, CompiledModelTestBase.EnumU64 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                             int (CompiledModelTestBase.EnumU64 v) => ((object)v).GetHashCode(),
                             CompiledModelTestBase.EnumU64 (CompiledModelTestBase.EnumU64 v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "bigint"),
                         clrType: typeof(CompiledModelTestBase.EnumU64),
                         jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU64>.Instance)));
             var nullableEnumU64NestedCollectionElementType = nullableEnumU64NestedCollection.SetElementType(typeof(CompiledModelTestBase.EnumU64?[]));
@@ -11285,6 +11891,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(CompiledModelTestBase.EnumU8),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance);
             nullableEnumU8.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU8>(nullableEnumU8.TypeMapping.Comparer));
@@ -11334,6 +11942,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU8?[], CompiledModelTestBase.EnumU8>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU8?[], CompiledModelTestBase.EnumU8>(
@@ -11351,6 +11961,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.EnumU8),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance));
             var nullableEnumU8ArrayElementType = nullableEnumU8Array.SetElementType(typeof(CompiledModelTestBase.EnumU8?),
@@ -11403,6 +12015,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(CompiledModelTestBase.EnumU8),
                 jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance);
             nullableEnumU8AsString.SetComparer(new NullableValueComparer<CompiledModelTestBase.EnumU8>(nullableEnumU8AsString.TypeMapping.Comparer));
@@ -11452,6 +12066,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8?>(new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU8?[], CompiledModelTestBase.EnumU8>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<CompiledModelTestBase.EnumU8?[], CompiledModelTestBase.EnumU8>(
@@ -11469,6 +12085,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.EnumU8),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance));
             var nullableEnumU8AsStringArrayElementType = nullableEnumU8AsStringArray.SetElementType(typeof(CompiledModelTestBase.EnumU8?),
@@ -11520,6 +12138,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU8?>, CompiledModelTestBase.EnumU8>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU8?>, CompiledModelTestBase.EnumU8>(
@@ -11537,6 +12157,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.EnumU8),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance));
             var nullableEnumU8AsStringCollectionElementType = nullableEnumU8AsStringCollection.SetElementType(typeof(CompiledModelTestBase.EnumU8?),
@@ -11588,6 +12210,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<CompiledModelTestBase.EnumU8?>(new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU8?>, CompiledModelTestBase.EnumU8>(
                     JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<List<CompiledModelTestBase.EnumU8?>, CompiledModelTestBase.EnumU8>(
@@ -11605,6 +12229,8 @@ namespace TestNamespace
                         bool (CompiledModelTestBase.EnumU8 v1, CompiledModelTestBase.EnumU8 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                         int (CompiledModelTestBase.EnumU8 v) => ((object)v).GetHashCode(),
                         CompiledModelTestBase.EnumU8 (CompiledModelTestBase.EnumU8 v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(CompiledModelTestBase.EnumU8),
                     jsonValueReaderWriter: JsonUnsignedEnumReaderWriter<CompiledModelTestBase.EnumU8>.Instance));
             var nullableEnumU8CollectionElementType = nullableEnumU8Collection.SetElementType(typeof(CompiledModelTestBase.EnumU8?),
@@ -11657,6 +12283,8 @@ namespace TestNamespace
                     bool (float v1, float v2) => v1.Equals(v2),
                     int (float v) => ((object)v).GetHashCode(),
                     float (float v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "float"),
                 clrType: typeof(float),
                 jsonValueReaderWriter: JsonFloatReaderWriter.Instance);
             nullableFloat.SetComparer(new NullableValueComparer<float>(nullableFloat.TypeMapping.Comparer));
@@ -11706,6 +12334,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<float?>(new JsonCollectionOfNullableStructsReaderWriter<float?[], float>(
                     JsonFloatReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<float?[], float>(
@@ -11723,6 +12353,8 @@ namespace TestNamespace
                         bool (float v1, float v2) => v1.Equals(v2),
                         int (float v) => ((object)v).GetHashCode(),
                         float (float v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "float"),
                     clrType: typeof(float),
                     jsonValueReaderWriter: JsonFloatReaderWriter.Instance));
             var nullableFloatArrayElementType = nullableFloatArray.SetElementType(typeof(float?),
@@ -11775,6 +12407,8 @@ namespace TestNamespace
                     bool (Guid v1, Guid v2) => v1 == v2,
                     int (Guid v) => ((object)v).GetHashCode(),
                     Guid (Guid v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "guid"),
                 clrType: typeof(Guid),
                 jsonValueReaderWriter: JsonGuidReaderWriter.Instance);
             nullableGuid.SetComparer(new NullableValueComparer<Guid>(nullableGuid.TypeMapping.Comparer));
@@ -11824,6 +12458,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<Guid?>(new JsonCollectionOfNullableStructsReaderWriter<Guid?[], Guid>(
                     JsonGuidReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<Guid?[], Guid>(
@@ -11841,6 +12477,8 @@ namespace TestNamespace
                         bool (Guid v1, Guid v2) => v1 == v2,
                         int (Guid v) => ((object)v).GetHashCode(),
                         Guid (Guid v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "guid"),
                     clrType: typeof(Guid),
                     jsonValueReaderWriter: JsonGuidReaderWriter.Instance));
             var nullableGuidArrayElementType = nullableGuidArray.SetElementType(typeof(Guid?),
@@ -11892,6 +12530,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<Guid?[]>(new JsonCollectionOfReferencesReaderWriter<Guid?[][], Guid?[]>(
                     new JsonCollectionOfNullableStructsReaderWriter<Guid?[], Guid>(
                         JsonGuidReaderWriter.Instance))),
@@ -11911,6 +12551,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<Guid?>(new JsonCollectionOfNullableStructsReaderWriter<Guid?[], Guid>(
                         JsonGuidReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<Guid?[], Guid>(
@@ -11928,6 +12570,8 @@ namespace TestNamespace
                             bool (Guid v1, Guid v2) => v1 == v2,
                             int (Guid v) => ((object)v).GetHashCode(),
                             Guid (Guid v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "guid"),
                         clrType: typeof(Guid),
                         jsonValueReaderWriter: JsonGuidReaderWriter.Instance)));
             var nullableGuidNestedCollectionElementType = nullableGuidNestedCollection.SetElementType(typeof(Guid?[]));
@@ -11978,6 +12622,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 45),
                 converter: new ValueConverter<IPAddress, string>(
                     string (IPAddress v) => ((object)v).ToString(),
                     IPAddress (string v) => IPAddress.Parse(v)),
@@ -12031,6 +12678,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<IPAddress>(new JsonCollectionOfReferencesReaderWriter<IPAddress[], IPAddress>(
                     new JsonConvertedValueReaderWriter<IPAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -12056,6 +12705,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 45),
                     converter: new ValueConverter<IPAddress, string>(
                         string (IPAddress v) => ((object)v).ToString(),
                         IPAddress (string v) => IPAddress.Parse(v)),
@@ -12113,6 +12765,8 @@ namespace TestNamespace
                     bool (short v1, short v2) => v1 == v2,
                     int (short v) => ((int)(v)),
                     short (short v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(short),
                 jsonValueReaderWriter: JsonInt16ReaderWriter.Instance);
             nullableInt16.SetComparer(new NullableValueComparer<short>(nullableInt16.TypeMapping.Comparer));
@@ -12162,6 +12816,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<short?>(new JsonCollectionOfNullableStructsReaderWriter<short?[], short>(
                     JsonInt16ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<short?[], short>(
@@ -12179,6 +12835,8 @@ namespace TestNamespace
                         bool (short v1, short v2) => v1 == v2,
                         int (short v) => ((int)(v)),
                         short (short v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(short),
                     jsonValueReaderWriter: JsonInt16ReaderWriter.Instance));
             var nullableInt16ArrayElementType = nullableInt16Array.SetElementType(typeof(short?),
@@ -12231,6 +12889,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(int),
                 jsonValueReaderWriter: JsonInt32ReaderWriter.Instance);
             nullableInt32.SetComparer(new NullableValueComparer<int>(nullableInt32.TypeMapping.Comparer));
@@ -12280,6 +12940,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<int?>(new JsonCollectionOfNullableStructsReaderWriter<int?[], int>(
                     JsonInt32ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<int?[], int>(
@@ -12297,6 +12959,8 @@ namespace TestNamespace
                         bool (int v1, int v2) => v1 == v2,
                         int (int v) => v,
                         int (int v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(int),
                     jsonValueReaderWriter: JsonInt32ReaderWriter.Instance));
             var nullableInt32ArrayElementType = nullableInt32Array.SetElementType(typeof(int?),
@@ -12348,6 +13012,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<int?[]>(new JsonCollectionOfReferencesReaderWriter<int?[][], int?[]>(
                     new JsonCollectionOfNullableStructsReaderWriter<int?[], int>(
                         JsonInt32ReaderWriter.Instance))),
@@ -12367,6 +13033,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<int?>(new JsonCollectionOfNullableStructsReaderWriter<int?[], int>(
                         JsonInt32ReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<int?[], int>(
@@ -12384,6 +13052,8 @@ namespace TestNamespace
                             bool (int v1, int v2) => v1 == v2,
                             int (int v) => v,
                             int (int v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "int"),
                         clrType: typeof(int),
                         jsonValueReaderWriter: JsonInt32ReaderWriter.Instance)));
             var nullableInt32NestedCollectionElementType = nullableInt32NestedCollection.SetElementType(typeof(int?[]));
@@ -12434,6 +13104,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(long),
                 jsonValueReaderWriter: JsonInt64ReaderWriter.Instance);
             nullableInt64.SetComparer(new NullableValueComparer<long>(nullableInt64.TypeMapping.Comparer));
@@ -12483,6 +13155,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<long?>(new JsonCollectionOfNullableStructsReaderWriter<long?[], long>(
                     JsonInt64ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<long?[], long>(
@@ -12500,6 +13174,8 @@ namespace TestNamespace
                         bool (long v1, long v2) => v1 == v2,
                         int (long v) => ((object)v).GetHashCode(),
                         long (long v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(long),
                     jsonValueReaderWriter: JsonInt64ReaderWriter.Instance));
             var nullableInt64ArrayElementType = nullableInt64Array.SetElementType(typeof(long?),
@@ -12551,6 +13227,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<long?[][]>(new JsonCollectionOfReferencesReaderWriter<List<long?[][]>, long?[][]>(
                     new JsonCollectionOfReferencesReaderWriter<long?[][], long?[]>(
                         new JsonCollectionOfNullableStructsReaderWriter<long?[], long>(
@@ -12572,6 +13250,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<long?[]>(new JsonCollectionOfReferencesReaderWriter<long?[][], long?[]>(
                         new JsonCollectionOfNullableStructsReaderWriter<long?[], long>(
                             JsonInt64ReaderWriter.Instance))),
@@ -12591,6 +13271,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<long?>(new JsonCollectionOfNullableStructsReaderWriter<long?[], long>(
                             JsonInt64ReaderWriter.Instance)),
                         jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<long?[], long>(
@@ -12608,6 +13290,8 @@ namespace TestNamespace
                                 bool (long v1, long v2) => v1 == v2,
                                 int (long v) => ((object)v).GetHashCode(),
                                 long (long v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "bigint"),
                             clrType: typeof(long),
                             jsonValueReaderWriter: JsonInt64ReaderWriter.Instance))));
             var nullableInt64NestedCollectionElementType = nullableInt64NestedCollection.SetElementType(typeof(long?[][]));
@@ -12658,6 +13342,8 @@ namespace TestNamespace
                     bool (sbyte v1, sbyte v2) => v1 == v2,
                     int (sbyte v) => ((int)(v)),
                     sbyte (sbyte v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(sbyte),
                 jsonValueReaderWriter: JsonSByteReaderWriter.Instance);
             nullableInt8.SetComparer(new NullableValueComparer<sbyte>(nullableInt8.TypeMapping.Comparer));
@@ -12707,6 +13393,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<sbyte?>(new JsonCollectionOfNullableStructsReaderWriter<sbyte?[], sbyte>(
                     JsonSByteReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<sbyte?[], sbyte>(
@@ -12724,6 +13412,8 @@ namespace TestNamespace
                         bool (sbyte v1, sbyte v2) => v1 == v2,
                         int (sbyte v) => ((int)(v)),
                         sbyte (sbyte v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(sbyte),
                     jsonValueReaderWriter: JsonSByteReaderWriter.Instance));
             var nullableInt8ArrayElementType = nullableInt8Array.SetElementType(typeof(sbyte?),
@@ -12776,6 +13466,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 20),
                 converter: new ValueConverter<PhysicalAddress, string>(
                     string (PhysicalAddress v) => ((object)v).ToString(),
                     PhysicalAddress (string v) => PhysicalAddress.Parse(v)),
@@ -12829,6 +13522,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<PhysicalAddress>(new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[], PhysicalAddress>(
                     new JsonConvertedValueReaderWriter<PhysicalAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -12854,6 +13549,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 20),
                     converter: new ValueConverter<PhysicalAddress, string>(
                         string (PhysicalAddress v) => ((object)v).ToString(),
                         PhysicalAddress (string v) => PhysicalAddress.Parse(v)),
@@ -12910,6 +13608,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<PhysicalAddress[][]>(new JsonCollectionOfReferencesReaderWriter<List<PhysicalAddress[][]>, PhysicalAddress[][]>(
                     new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[][], PhysicalAddress[]>(
                         new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[], PhysicalAddress>(
@@ -12939,6 +13639,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<PhysicalAddress[]>(new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[][], PhysicalAddress[]>(
                         new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[], PhysicalAddress>(
                             new JsonConvertedValueReaderWriter<PhysicalAddress, string>(
@@ -12966,6 +13668,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         converter: new CollectionToJsonStringConverter<PhysicalAddress>(new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[], PhysicalAddress>(
                             new JsonConvertedValueReaderWriter<PhysicalAddress, string>(
                                 JsonStringReaderWriter.Instance,
@@ -12991,6 +13695,9 @@ namespace TestNamespace
                                 bool (string v1, string v2) => v1 == v2,
                                 int (string v) => ((object)v).GetHashCode(),
                                 string (string v) => v),
+                            mappingInfo: new RelationalTypeMappingInfo(
+                                storeTypeName: "text",
+                                size: 20),
                             converter: new ValueConverter<PhysicalAddress, string>(
                                 string (PhysicalAddress v) => ((object)v).ToString(),
                                 PhysicalAddress (string v) => PhysicalAddress.Parse(v)),
@@ -13047,6 +13754,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 clrType: typeof(string),
                 jsonValueReaderWriter: JsonStringReaderWriter.Instance);
 
@@ -13094,6 +13803,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<string[], string>(
                     JsonStringReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<string[], string>(
@@ -13111,6 +13822,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     clrType: typeof(string),
                     jsonValueReaderWriter: JsonStringReaderWriter.Instance));
             var nullableStringArrayElementType = nullableStringArray.SetElementType(typeof(string),
@@ -13161,6 +13874,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string[]>(new JsonCollectionOfReferencesReaderWriter<string[][], string[]>(
                     new JsonCollectionOfReferencesReaderWriter<string[], string>(
                         JsonStringReaderWriter.Instance))),
@@ -13180,6 +13895,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<string[], string>(
                         JsonStringReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<string[], string>(
@@ -13197,6 +13914,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         clrType: typeof(string),
                         jsonValueReaderWriter: JsonStringReaderWriter.Instance)));
             var nullableStringNestedCollectionElementType = nullableStringNestedCollection.SetElementType(typeof(string[]));
@@ -13247,6 +13966,8 @@ namespace TestNamespace
                     bool (TimeOnly v1, TimeOnly v2) => v1.Equals(v2),
                     int (TimeOnly v) => ((object)v).GetHashCode(),
                     TimeOnly (TimeOnly v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "time"),
                 clrType: typeof(TimeOnly),
                 jsonValueReaderWriter: JsonTimeOnlyReaderWriter.Instance);
             nullableTimeOnly.SetComparer(new NullableValueComparer<TimeOnly>(nullableTimeOnly.TypeMapping.Comparer));
@@ -13296,6 +14017,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<TimeOnly?>(new JsonCollectionOfNullableStructsReaderWriter<TimeOnly?[], TimeOnly>(
                     JsonTimeOnlyReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<TimeOnly?[], TimeOnly>(
@@ -13313,6 +14036,8 @@ namespace TestNamespace
                         bool (TimeOnly v1, TimeOnly v2) => v1.Equals(v2),
                         int (TimeOnly v) => ((object)v).GetHashCode(),
                         TimeOnly (TimeOnly v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "time"),
                     clrType: typeof(TimeOnly),
                     jsonValueReaderWriter: JsonTimeOnlyReaderWriter.Instance));
             var nullableTimeOnlyArrayElementType = nullableTimeOnlyArray.SetElementType(typeof(TimeOnly?),
@@ -13365,6 +14090,8 @@ namespace TestNamespace
                     bool (TimeSpan v1, TimeSpan v2) => v1.Equals(v2),
                     int (TimeSpan v) => ((object)v).GetHashCode(),
                     TimeSpan (TimeSpan v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "time"),
                 clrType: typeof(TimeSpan),
                 jsonValueReaderWriter: JsonTimeSpanReaderWriter.Instance);
             nullableTimeSpan.SetComparer(new NullableValueComparer<TimeSpan>(nullableTimeSpan.TypeMapping.Comparer));
@@ -13414,6 +14141,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<TimeSpan?>(new JsonCollectionOfNullableStructsReaderWriter<TimeSpan?[], TimeSpan>(
                     JsonTimeSpanReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<TimeSpan?[], TimeSpan>(
@@ -13431,6 +14160,8 @@ namespace TestNamespace
                         bool (TimeSpan v1, TimeSpan v2) => v1.Equals(v2),
                         int (TimeSpan v) => ((object)v).GetHashCode(),
                         TimeSpan (TimeSpan v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "time"),
                     clrType: typeof(TimeSpan),
                     jsonValueReaderWriter: JsonTimeSpanReaderWriter.Instance));
             var nullableTimeSpanArrayElementType = nullableTimeSpanArray.SetElementType(typeof(TimeSpan?),
@@ -13483,6 +14214,8 @@ namespace TestNamespace
                     bool (ushort v1, ushort v2) => v1 == v2,
                     int (ushort v) => ((int)(v)),
                     ushort (ushort v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(ushort),
                 jsonValueReaderWriter: JsonUInt16ReaderWriter.Instance);
             nullableUInt16.SetComparer(new NullableValueComparer<ushort>(nullableUInt16.TypeMapping.Comparer));
@@ -13532,6 +14265,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<ushort?>(new JsonCollectionOfNullableStructsReaderWriter<ushort?[], ushort>(
                     JsonUInt16ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<ushort?[], ushort>(
@@ -13549,6 +14284,8 @@ namespace TestNamespace
                         bool (ushort v1, ushort v2) => v1 == v2,
                         int (ushort v) => ((int)(v)),
                         ushort (ushort v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(ushort),
                     jsonValueReaderWriter: JsonUInt16ReaderWriter.Instance));
             var nullableUInt16ArrayElementType = nullableUInt16Array.SetElementType(typeof(ushort?),
@@ -13601,6 +14338,8 @@ namespace TestNamespace
                     bool (uint v1, uint v2) => v1 == v2,
                     int (uint v) => ((int)(v)),
                     uint (uint v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(uint),
                 jsonValueReaderWriter: JsonUInt32ReaderWriter.Instance);
             nullableUInt32.SetComparer(new NullableValueComparer<uint>(nullableUInt32.TypeMapping.Comparer));
@@ -13650,6 +14389,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<uint?>(new JsonCollectionOfNullableStructsReaderWriter<uint?[], uint>(
                     JsonUInt32ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<uint?[], uint>(
@@ -13667,6 +14408,8 @@ namespace TestNamespace
                         bool (uint v1, uint v2) => v1 == v2,
                         int (uint v) => ((int)(v)),
                         uint (uint v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(uint),
                     jsonValueReaderWriter: JsonUInt32ReaderWriter.Instance));
             var nullableUInt32ArrayElementType = nullableUInt32Array.SetElementType(typeof(uint?),
@@ -13719,6 +14462,8 @@ namespace TestNamespace
                     bool (ulong v1, ulong v2) => v1 == v2,
                     int (ulong v) => ((object)v).GetHashCode(),
                     ulong (ulong v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(ulong),
                 jsonValueReaderWriter: JsonUInt64ReaderWriter.Instance);
             nullableUInt64.SetComparer(new NullableValueComparer<ulong>(nullableUInt64.TypeMapping.Comparer));
@@ -13768,6 +14513,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<ulong?>(new JsonCollectionOfNullableStructsReaderWriter<ulong?[], ulong>(
                     JsonUInt64ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<ulong?[], ulong>(
@@ -13785,6 +14532,8 @@ namespace TestNamespace
                         bool (ulong v1, ulong v2) => v1 == v2,
                         int (ulong v) => ((object)v).GetHashCode(),
                         ulong (ulong v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(ulong),
                     jsonValueReaderWriter: JsonUInt64ReaderWriter.Instance));
             var nullableUInt64ArrayElementType = nullableUInt64Array.SetElementType(typeof(ulong?),
@@ -13837,6 +14586,8 @@ namespace TestNamespace
                     bool (byte v1, byte v2) => v1 == v2,
                     int (byte v) => ((int)(v)),
                     byte (byte v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(byte),
                 jsonValueReaderWriter: JsonByteReaderWriter.Instance);
             nullableUInt8.SetComparer(new NullableValueComparer<byte>(nullableUInt8.TypeMapping.Comparer));
@@ -13886,6 +14637,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte?>(new JsonCollectionOfNullableStructsReaderWriter<byte?[], byte>(
                     JsonByteReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<byte?[], byte>(
@@ -13903,6 +14656,8 @@ namespace TestNamespace
                         bool (byte v1, byte v2) => v1 == v2,
                         int (byte v) => ((int)(v)),
                         byte (byte v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(byte),
                     jsonValueReaderWriter: JsonByteReaderWriter.Instance));
             var nullableUInt8ArrayElementType = nullableUInt8Array.SetElementType(typeof(byte?),
@@ -13954,6 +14709,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte?[]>(new JsonCollectionOfReferencesReaderWriter<byte?[][], byte?[]>(
                     new JsonCollectionOfNullableStructsReaderWriter<byte?[], byte>(
                         JsonByteReaderWriter.Instance))),
@@ -13973,6 +14730,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<byte?>(new JsonCollectionOfNullableStructsReaderWriter<byte?[], byte>(
                         JsonByteReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfNullableStructsReaderWriter<byte?[], byte>(
@@ -13990,6 +14749,8 @@ namespace TestNamespace
                             bool (byte v1, byte v2) => v1 == v2,
                             int (byte v) => ((int)(v)),
                             byte (byte v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "tinyint"),
                         clrType: typeof(byte),
                         jsonValueReaderWriter: JsonByteReaderWriter.Instance)));
             var nullableUInt8NestedCollectionElementType = nullableUInt8NestedCollection.SetElementType(typeof(byte?[]));
@@ -14040,6 +14801,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<Uri, string>(
                     string (Uri v) => ((object)v).ToString(),
                     Uri (string v) => new Uri(v, UriKind.RelativeOrAbsolute)),
@@ -14093,6 +14856,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<Uri>(new JsonCollectionOfReferencesReaderWriter<Uri[], Uri>(
                     new JsonConvertedValueReaderWriter<Uri, string>(
                         JsonStringReaderWriter.Instance,
@@ -14118,6 +14883,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<Uri, string>(
                         string (Uri v) => ((object)v).ToString(),
                         Uri (string v) => new Uri(v, UriKind.RelativeOrAbsolute)),
@@ -14174,6 +14941,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 20),
                 converter: new ValueConverter<PhysicalAddress, string>(
                     string (PhysicalAddress v) => ((object)v).ToString(),
                     PhysicalAddress (string v) => PhysicalAddress.Parse(v)),
@@ -14227,6 +14997,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<PhysicalAddress>(new JsonCollectionOfReferencesReaderWriter<PhysicalAddress[], PhysicalAddress>(
                     new JsonConvertedValueReaderWriter<PhysicalAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -14252,6 +15024,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 20),
                     converter: new ValueConverter<PhysicalAddress, string>(
                         string (PhysicalAddress v) => ((object)v).ToString(),
                         PhysicalAddress (string v) => PhysicalAddress.Parse(v)),
@@ -14308,6 +15083,9 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary",
+                    size: 8),
                 converter: new ValueConverter<PhysicalAddress, byte[]>(
                     byte[] (PhysicalAddress v) => v.GetAddressBytes(),
                     PhysicalAddress (byte[] v) => new PhysicalAddress(v)),
@@ -14362,6 +15140,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 20),
                 converter: new ValueConverter<PhysicalAddress, string>(
                     string (PhysicalAddress v) => ((object)v).ToString(),
                     PhysicalAddress (string v) => PhysicalAddress.Parse(v)),
@@ -14415,6 +15196,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 clrType: typeof(string),
                 jsonValueReaderWriter: JsonStringReaderWriter.Instance);
 
@@ -14462,6 +15245,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<string[], string>(
                     JsonStringReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<string[], string>(
@@ -14479,6 +15264,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     clrType: typeof(string),
                     jsonValueReaderWriter: JsonStringReaderWriter.Instance));
             var stringArrayElementType = stringArray.SetElementType(typeof(string));
@@ -14528,6 +15315,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string[]>(new JsonCollectionOfReferencesReaderWriter<string[][], string[]>(
                     new JsonCollectionOfReferencesReaderWriter<string[], string>(
                         JsonStringReaderWriter.Instance))),
@@ -14547,6 +15336,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<string[], string>(
                         JsonStringReaderWriter.Instance)),
                     jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<string[], string>(
@@ -14564,6 +15355,8 @@ namespace TestNamespace
                             bool (string v1, string v2) => v1 == v2,
                             int (string v) => ((object)v).GetHashCode(),
                             string (string v) => v),
+                        mappingInfo: new RelationalTypeMappingInfo(
+                            storeTypeName: "text"),
                         clrType: typeof(string),
                         jsonValueReaderWriter: JsonStringReaderWriter.Instance)));
             var stringNestedCollectionElementType = stringNestedCollection.SetElementType(typeof(string[]));
@@ -14613,6 +15406,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<List<string>, string>(
                     JsonStringReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<List<string>, string>(
@@ -14630,6 +15425,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     clrType: typeof(string),
                     jsonValueReaderWriter: JsonStringReaderWriter.Instance));
             var stringReadOnlyCollectionElementType = stringReadOnlyCollection.SetElementType(typeof(string));
@@ -14680,6 +15477,8 @@ namespace TestNamespace
                     bool (bool v1, bool v2) => v1 == v2,
                     int (bool v) => ((object)v).GetHashCode(),
                     bool (bool v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "boolean"),
                 converter: new ValueConverter<string, bool>(
                     bool (string v) => Convert.ToBoolean(v),
                     string (bool v) => Convert.ToString(v)),
@@ -14734,6 +15533,8 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary"),
                 converter: new ValueConverter<string, byte[]>(
                     byte[] (string v) => Encoding.GetEncoding(12000).GetBytes(v),
                     string (byte[] v) => Encoding.GetEncoding(12000).GetString(v)),
@@ -14788,6 +15589,9 @@ namespace TestNamespace
                     bool (char v1, char v2) => v1 == v2,
                     int (char v) => ((int)(v)),
                     char (char v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "char",
+                    size: 1),
                 converter: new ValueConverter<string, char>(
                     char (string v) => (v.Length < 1 ? '\0' : v[0]),
                     string (char v) => string.Format(CultureInfo.InvariantCulture, "{0}", ((object)(v)))),
@@ -14842,6 +15646,9 @@ namespace TestNamespace
                     bool (DateOnly v1, DateOnly v2) => v1.Equals(v2),
                     int (DateOnly v) => ((object)v).GetHashCode(),
                     DateOnly (DateOnly v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "date",
+                    size: 10),
                 converter: new ValueConverter<string, DateOnly>(
                     DateOnly (string v) => DateOnly.Parse(v, CultureInfo.InvariantCulture, DateTimeStyles.None),
                     string (DateOnly v) => v.ToString("yyyy\\-MM\\-dd")),
@@ -14896,6 +15703,9 @@ namespace TestNamespace
                     bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                     int (DateTime v) => ((object)v).GetHashCode(),
                     DateTime (DateTime v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "datetime",
+                    size: 48),
                 converter: new ValueConverter<string, DateTime>(
                     DateTime (string v) => DateTime.Parse(v, CultureInfo.InvariantCulture),
                     string (DateTime v) => v.ToString("yyyy\\-MM\\-dd HH\\:mm\\:ss.FFFFFFF")),
@@ -14950,6 +15760,9 @@ namespace TestNamespace
                     bool (DateTimeOffset v1, DateTimeOffset v2) => v1.EqualsExact(v2),
                     int (DateTimeOffset v) => ((object)v).GetHashCode(),
                     DateTimeOffset (DateTimeOffset v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "datetimeoffset",
+                    size: 48),
                 converter: new ValueConverter<string, DateTimeOffset>(
                     DateTimeOffset (string v) => DateTimeOffset.Parse(v, CultureInfo.InvariantCulture),
                     string (DateTimeOffset v) => v.ToString("yyyy\\-MM\\-dd HH\\:mm\\:ss.FFFFFFFzzz")),
@@ -15004,6 +15817,9 @@ namespace TestNamespace
                     bool (decimal v1, decimal v2) => v1 == v2,
                     int (decimal v) => ((object)v).GetHashCode(),
                     decimal (decimal v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "decimal",
+                    size: 64),
                 converter: new ValueConverter<string, decimal>(
                     decimal (string v) => decimal.Parse(v, NumberStyles.Any, CultureInfo.InvariantCulture),
                     string (decimal v) => string.Format(CultureInfo.InvariantCulture, "{0}", ((object)(v)))),
@@ -15058,6 +15874,9 @@ namespace TestNamespace
                     bool (double v1, double v2) => v1.Equals(v2),
                     int (double v) => ((object)v).GetHashCode(),
                     double (double v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "double",
+                    size: 64),
                 converter: new ValueConverter<string, double>(
                     double (string v) => double.Parse(v, NumberStyles.Any, CultureInfo.InvariantCulture),
                     string (double v) => string.Format(CultureInfo.InvariantCulture, "{0:R}", ((object)(v)))),
@@ -15112,6 +15931,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.EnumU32 v1, CompiledModelTestBase.EnumU32 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.EnumU32 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.EnumU32 (CompiledModelTestBase.EnumU32 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 converter: new ValueConverter<string, CompiledModelTestBase.EnumU32>(
                     CompiledModelTestBase.EnumU32 (string v) => StringEnumConverter<string, CompiledModelTestBase.EnumU32, CompiledModelTestBase.EnumU32>.ConvertToEnum(v),
                     string (CompiledModelTestBase.EnumU32 v) => ((object)v).ToString()),
@@ -15165,6 +15986,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 clrType: typeof(string),
                 jsonValueReaderWriter: JsonStringReaderWriter.Instance);
 
@@ -15213,6 +16036,9 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int",
+                    size: 64),
                 converter: new ValueConverter<string, int>(
                     int (string v) => int.Parse(v, NumberStyles.Any, CultureInfo.InvariantCulture),
                     string (int v) => string.Format(CultureInfo.InvariantCulture, "{0}", ((object)(v)))),
@@ -15267,6 +16093,9 @@ namespace TestNamespace
                     bool (TimeOnly v1, TimeOnly v2) => v1.Equals(v2),
                     int (TimeOnly v) => ((object)v).GetHashCode(),
                     TimeOnly (TimeOnly v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "time",
+                    size: 48),
                 converter: new ValueConverter<string, TimeOnly>(
                     TimeOnly (string v) => TimeOnly.Parse(v, CultureInfo.InvariantCulture, DateTimeStyles.None),
                     string (TimeOnly v) => (v.Ticks % 10000000L == 0L ? string.Format(CultureInfo.InvariantCulture, "{0:HH\\:mm\\:ss}", ((object)(v))) : v.ToString("o"))),
@@ -15321,6 +16150,9 @@ namespace TestNamespace
                     bool (TimeSpan v1, TimeSpan v2) => v1.Equals(v2),
                     int (TimeSpan v) => ((object)v).GetHashCode(),
                     TimeSpan (TimeSpan v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "time",
+                    size: 48),
                 converter: new ValueConverter<string, TimeSpan>(
                     TimeSpan (string v) => TimeSpan.Parse(v, CultureInfo.InvariantCulture),
                     string (TimeSpan v) => v.ToString("c")),
@@ -15375,6 +16207,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<string, string>(
                     string (string v) => ((object)new Uri(v, UriKind.RelativeOrAbsolute)).ToString(),
                     string (string v) => ((object)new Uri(v, UriKind.RelativeOrAbsolute)).ToString()),
@@ -15429,6 +16263,8 @@ namespace TestNamespace
                     bool (TimeOnly v1, TimeOnly v2) => v1.Equals(v2),
                     int (TimeOnly v) => ((object)v).GetHashCode(),
                     TimeOnly (TimeOnly v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "time"),
                 clrType: typeof(TimeOnly),
                 jsonValueReaderWriter: JsonTimeOnlyReaderWriter.Instance);
 
@@ -15476,6 +16312,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<TimeOnly>(new JsonCollectionOfStructsReaderWriter<TimeOnly[], TimeOnly>(
                     JsonTimeOnlyReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<TimeOnly[], TimeOnly>(
@@ -15493,6 +16331,8 @@ namespace TestNamespace
                         bool (TimeOnly v1, TimeOnly v2) => v1.Equals(v2),
                         int (TimeOnly v) => ((object)v).GetHashCode(),
                         TimeOnly (TimeOnly v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "time"),
                     clrType: typeof(TimeOnly),
                     jsonValueReaderWriter: JsonTimeOnlyReaderWriter.Instance));
             var timeOnlyArrayElementType = timeOnlyArray.SetElementType(typeof(TimeOnly));
@@ -15543,6 +16383,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 48),
                 converter: new ValueConverter<TimeOnly, string>(
                     string (TimeOnly v) => (v.Ticks % 10000000L == 0L ? string.Format(CultureInfo.InvariantCulture, "{0:HH\\:mm\\:ss}", ((object)(v))) : v.ToString("o")),
                     TimeOnly (string v) => TimeOnly.Parse(v, CultureInfo.InvariantCulture, DateTimeStyles.None)),
@@ -15598,6 +16441,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 converter: new ValueConverter<TimeOnly, long>(
                     long (TimeOnly v) => v.Ticks,
                     TimeOnly (long v) => new TimeOnly(v)),
@@ -15653,6 +16498,8 @@ namespace TestNamespace
                     bool (TimeSpan v1, TimeSpan v2) => v1.Equals(v2),
                     int (TimeSpan v) => ((object)v).GetHashCode(),
                     TimeSpan (TimeSpan v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "time"),
                 clrType: typeof(TimeSpan),
                 jsonValueReaderWriter: JsonTimeSpanReaderWriter.Instance);
 
@@ -15700,6 +16547,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<TimeSpan>(new JsonCollectionOfStructsReaderWriter<TimeSpan[], TimeSpan>(
                     JsonTimeSpanReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<TimeSpan[], TimeSpan>(
@@ -15717,6 +16566,8 @@ namespace TestNamespace
                         bool (TimeSpan v1, TimeSpan v2) => v1.Equals(v2),
                         int (TimeSpan v) => ((object)v).GetHashCode(),
                         TimeSpan (TimeSpan v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "time"),
                     clrType: typeof(TimeSpan),
                     jsonValueReaderWriter: JsonTimeSpanReaderWriter.Instance));
             var timeSpanArrayElementType = timeSpanArray.SetElementType(typeof(TimeSpan));
@@ -15767,6 +16618,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 48),
                 converter: new ValueConverter<TimeSpan, string>(
                     string (TimeSpan v) => v.ToString("c"),
                     TimeSpan (string v) => TimeSpan.Parse(v, CultureInfo.InvariantCulture)),
@@ -15822,6 +16676,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 converter: new ValueConverter<TimeSpan, long>(
                     long (TimeSpan v) => v.Ticks,
                     TimeSpan (long v) => new TimeSpan(v)),
@@ -15877,6 +16733,8 @@ namespace TestNamespace
                     bool (ushort v1, ushort v2) => v1 == v2,
                     int (ushort v) => ((int)(v)),
                     ushort (ushort v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "smallint"),
                 clrType: typeof(ushort),
                 jsonValueReaderWriter: JsonUInt16ReaderWriter.Instance);
 
@@ -15924,6 +16782,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<ushort>(new JsonCollectionOfStructsReaderWriter<ushort[], ushort>(
                     JsonUInt16ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<ushort[], ushort>(
@@ -15941,6 +16801,8 @@ namespace TestNamespace
                         bool (ushort v1, ushort v2) => v1 == v2,
                         int (ushort v) => ((int)(v)),
                         ushort (ushort v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(ushort),
                     jsonValueReaderWriter: JsonUInt16ReaderWriter.Instance));
             var uInt16ArrayElementType = uInt16Array.SetElementType(typeof(ushort));
@@ -15991,6 +16853,8 @@ namespace TestNamespace
                     bool (uint v1, uint v2) => v1 == v2,
                     int (uint v) => ((int)(v)),
                     uint (uint v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(uint),
                 jsonValueReaderWriter: JsonUInt32ReaderWriter.Instance);
 
@@ -16038,6 +16902,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<uint>(new JsonCollectionOfStructsReaderWriter<uint[], uint>(
                     JsonUInt32ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<uint[], uint>(
@@ -16055,6 +16921,8 @@ namespace TestNamespace
                         bool (uint v1, uint v2) => v1 == v2,
                         int (uint v) => ((int)(v)),
                         uint (uint v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "int"),
                     clrType: typeof(uint),
                     jsonValueReaderWriter: JsonUInt32ReaderWriter.Instance));
             var uInt32ArrayElementType = uInt32Array.SetElementType(typeof(uint));
@@ -16105,6 +16973,8 @@ namespace TestNamespace
                     bool (ulong v1, ulong v2) => v1 == v2,
                     int (ulong v) => ((object)v).GetHashCode(),
                     ulong (ulong v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(ulong),
                 jsonValueReaderWriter: JsonUInt64ReaderWriter.Instance);
 
@@ -16152,6 +17022,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<ulong>(new JsonCollectionOfStructsReaderWriter<ulong[], ulong>(
                     JsonUInt64ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<ulong[], ulong>(
@@ -16169,6 +17041,8 @@ namespace TestNamespace
                         bool (ulong v1, ulong v2) => v1 == v2,
                         int (ulong v) => ((object)v).GetHashCode(),
                         ulong (ulong v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "bigint"),
                     clrType: typeof(ulong),
                     jsonValueReaderWriter: JsonUInt64ReaderWriter.Instance));
             var uInt64ArrayElementType = uInt64Array.SetElementType(typeof(ulong));
@@ -16219,6 +17093,8 @@ namespace TestNamespace
                     bool (byte v1, byte v2) => v1 == v2,
                     int (byte v) => ((int)(v)),
                     byte (byte v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(byte),
                 jsonValueReaderWriter: JsonByteReaderWriter.Instance);
 
@@ -16266,6 +17142,8 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary"),
                 clrType: typeof(byte[]),
                 jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance);
 
@@ -16313,6 +17191,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte[]>(new JsonCollectionOfReferencesReaderWriter<List<byte[]>, byte[]>(
                     JsonByteArrayReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<List<byte[]>, byte[]>(
@@ -16330,6 +17210,8 @@ namespace TestNamespace
                         bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                         int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                         byte[] (byte[] source) => source.ToArray()),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "binary"),
                     clrType: typeof(byte[]),
                     jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance));
             var uInt8NestedCollectionElementType = uInt8NestedCollection.SetElementType(typeof(byte[]));
@@ -16379,6 +17261,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte>(new JsonCollectionOfStructsReaderWriter<List<byte>, byte>(
                     JsonByteReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<byte>, byte>(
@@ -16396,6 +17280,8 @@ namespace TestNamespace
                         bool (byte v1, byte v2) => v1 == v2,
                         int (byte v) => ((int)(v)),
                         byte (byte v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(byte),
                     jsonValueReaderWriter: JsonByteReaderWriter.Instance));
             var uInt8ReadOnlyCollectionElementType = uInt8ReadOnlyCollection.SetElementType(typeof(byte));
@@ -16445,6 +17331,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<Uri, string>(
                     string (Uri v) => ((object)v).ToString(),
                     Uri (string v) => new Uri(v, UriKind.RelativeOrAbsolute)),
@@ -16498,6 +17386,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<Uri>(new JsonCollectionOfReferencesReaderWriter<Uri[], Uri>(
                     new JsonConvertedValueReaderWriter<Uri, string>(
                         JsonStringReaderWriter.Instance,
@@ -16523,6 +17413,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     converter: new ValueConverter<Uri, string>(
                         string (Uri v) => ((object)v).ToString(),
                         Uri (string v) => new Uri(v, UriKind.RelativeOrAbsolute)),
@@ -16579,6 +17471,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new ValueConverter<Uri, string>(
                     string (Uri v) => ((object)v).ToString(),
                     Uri (string v) => new Uri(v, UriKind.RelativeOrAbsolute)),
@@ -16908,6 +17802,12 @@ namespace TestNamespace
                 shadowCount: 0,
                 relationshipCount: 1,
                 storeGeneratedCount: 1));
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "ManyTypes");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

@@ -18,21 +18,42 @@ public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependen
 
     /// <inheritdoc />
     protected override CoreTypeMapping? FindMapping(in TypeMappingInfo mappingInfo)
+        => FindInfoCarrierMapping(mappingInfo.ClrType, mappingInfo.ElementTypeMapping, Dependencies)
+            ?? base.FindMapping(mappingInfo);
+
+    /// <summary>
+    ///     The one decision about which CLR types this client maps as scalars, shared with
+    ///     <c>InfoCarrierRelationalTypeMappingSource</c>.
+    /// </summary>
+    /// <remarks>
+    ///     <b>One implementation, two hosts.</b> EF's relational mapping source does not derive
+    ///     from <see cref="TypeMappingSource" />, so a client that must satisfy
+    ///     <c>IRelationalTypeMappingSource</c> needs a second class. A second COPY of this logic
+    ///     would drift, and the drift would be silent, which is the owner's standing rule for
+    ///     this package. So the decision lives here and both sources call it.
+    /// </remarks>
+    /// <param name="clrType">The CLR type being asked about, or null.</param>
+    /// <param name="elementTypeMapping">The element mapping, when the ask is for a collection.</param>
+    /// <param name="dependencies">The core dependencies, for the JSON reader/writer source.</param>
+    /// <returns>The mapping, or null to let the caller's base decide.</returns>
+    internal static InfoCarrierTypeMapping? FindInfoCarrierMapping(
+        Type? clrType,
+        CoreTypeMapping? elementTypeMapping,
+        TypeMappingSourceDependencies dependencies)
     {
         // Map CLR primitives (scalar value types, string, byte[]) so the client model builds
         // and change tracking works. No store-specific conversion — the server owns the real
         // store mapping.
-        Type? clrType = mappingInfo.ClrType;
         if (clrType is null)
         {
-            return base.FindMapping(mappingInfo);
+            return null;
         }
 
         JsonValueReaderWriter? jsonValueReaderWriter =
-            Dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType);
+            dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType);
 
         if (clrType == typeof(string)
-            || (clrType == typeof(byte[]) && mappingInfo.ElementTypeMapping == null))
+            || (clrType == typeof(byte[]) && elementTypeMapping == null))
         {
             return new InfoCarrierTypeMapping(clrType, jsonValueReaderWriter: jsonValueReaderWriter);
         }
@@ -53,7 +74,7 @@ public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependen
         // source to be classified as a property.
         if (clrType.IsValueType
             && (jsonValueReaderWriter is not null
-                || Dependencies.JsonValueReaderWriterSource.FindReaderWriter(
+                || dependencies.JsonValueReaderWriterSource.FindReaderWriter(
                     Nullable.GetUnderlyingType(clrType) ?? clrType) is not null))
         {
             return new InfoCarrierTypeMapping(clrType, jsonValueReaderWriter: jsonValueReaderWriter);
@@ -74,10 +95,10 @@ public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependen
                 clrType,
                 comparer,
                 comparer,
-                Dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType));
+                dependencies.JsonValueReaderWriterSource.FindReaderWriter(clrType));
         }
 
-        return base.FindMapping(mappingInfo);
+        return null;
     }
 
     private static bool IsGeometry(Type clrType)

@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 
 #pragma warning disable 219, 612, 618
@@ -76,6 +77,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 clrType: typeof(string),
                 jsonValueReaderWriter: JsonStringReaderWriter.Instance);
 
@@ -109,6 +112,8 @@ namespace TestNamespace
                     bool (decimal v1, decimal v2) => v1 == v2,
                     int (decimal v) => ((object)v).GetHashCode(),
                     decimal (decimal v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "decimal"),
                 clrType: typeof(decimal),
                 jsonValueReaderWriter: JsonDecimalReaderWriter.Instance);
 
@@ -153,6 +158,12 @@ namespace TestNamespace
                 shadowCount: 4,
                 relationshipCount: 3,
                 storeGeneratedCount: 2));
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "DependentBase<byte?>");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

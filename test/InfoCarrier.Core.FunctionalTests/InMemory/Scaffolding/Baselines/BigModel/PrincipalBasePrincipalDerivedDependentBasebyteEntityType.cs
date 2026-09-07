@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 
 #pragma warning disable 219, 612, 618
@@ -103,6 +104,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(long),
                 jsonValueReaderWriter: JsonInt64ReaderWriter.Instance);
             derivedsId.SetCurrentValueComparer(new EntryCurrentValueComparer<long>(derivedsId));
@@ -175,6 +178,8 @@ namespace TestNamespace
                     bool (Guid v1, Guid v2) => v1 == v2,
                     int (Guid v) => ((object)v).GetHashCode(),
                     Guid (Guid v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "guid"),
                 clrType: typeof(Guid),
                 jsonValueReaderWriter: JsonGuidReaderWriter.Instance);
             derivedsAlternateId.SetCurrentValueComparer(new EntryCurrentValueComparer<Guid>(derivedsAlternateId));
@@ -247,6 +252,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(long),
                 jsonValueReaderWriter: JsonInt64ReaderWriter.Instance);
             principalsId.SetCurrentValueComparer(new EntryCurrentValueComparer<long>(principalsId));
@@ -319,6 +326,8 @@ namespace TestNamespace
                     bool (Guid v1, Guid v2) => v1 == v2,
                     int (Guid v) => ((object)v).GetHashCode(),
                     Guid (Guid v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "guid"),
                 clrType: typeof(Guid),
                 jsonValueReaderWriter: JsonGuidReaderWriter.Instance);
             principalsAlternateId.SetCurrentValueComparer(new EntryCurrentValueComparer<Guid>(principalsAlternateId));
@@ -367,6 +376,8 @@ namespace TestNamespace
                     bool (byte[] v1, byte[] v2) => StructuralComparisons.StructuralEqualityComparer.Equals(((object)(v1)), ((object)(v2))),
                     int (byte[] v) => StructuralComparisons.StructuralEqualityComparer.GetHashCode(((object)(v))),
                     byte[] (byte[] source) => source.ToArray()),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "binary"),
                 clrType: typeof(byte[]),
                 jsonValueReaderWriter: JsonByteArrayReaderWriter.Instance);
 
@@ -441,6 +452,12 @@ namespace TestNamespace
                 shadowCount: 0,
                 relationshipCount: 4,
                 storeGeneratedCount: 4));
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "PrincipalBasePrincipalDerived<DependentBase<byte?>>");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 
 #pragma warning disable 219, 612, 618
@@ -74,6 +75,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(int),
                 jsonValueReaderWriter: JsonInt32ReaderWriter.Instance);
             id.SetCurrentValueComparer(new EntryCurrentValueComparer<int>(id));
@@ -123,6 +126,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 clrType: typeof(string),
                 jsonValueReaderWriter: JsonStringReaderWriter.Instance);
 
@@ -169,6 +174,12 @@ namespace TestNamespace
                 shadowCount: 0,
                 relationshipCount: 1,
                 storeGeneratedCount: 0));
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "DependentDerived<int>");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

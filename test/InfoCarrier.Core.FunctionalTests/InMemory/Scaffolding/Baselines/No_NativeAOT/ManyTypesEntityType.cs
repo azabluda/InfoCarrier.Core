@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -86,6 +87,9 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text",
+                    size: 1),
                 converter: new ValueConverter<bool, string>(
                     string (bool v) => ((string)((v ? "B" : "A"))),
                     bool (string v) => !(string.IsNullOrEmpty(v)) && ((int)(v.ToUpperInvariant()[0])) == ((int)("B".ToUpperInvariant()[0]))),
@@ -2008,6 +2012,12 @@ namespace TestNamespace
 
         public static void CreateAnnotations(RuntimeEntityType runtimeEntityType)
         {
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "ManyTypes");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

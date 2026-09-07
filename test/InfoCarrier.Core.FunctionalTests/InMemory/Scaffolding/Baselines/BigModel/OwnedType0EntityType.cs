@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -63,6 +64,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(long),
                 jsonValueReaderWriter: JsonInt64ReaderWriter.Instance);
             principalDerivedId.SetCurrentValueComparer(new EntryCurrentValueComparer<long>(principalDerivedId));
@@ -96,6 +99,8 @@ namespace TestNamespace
                     bool (Guid v1, Guid v2) => v1 == v2,
                     int (Guid v) => ((object)v).GetHashCode(),
                     Guid (Guid v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "guid"),
                 clrType: typeof(Guid),
                 jsonValueReaderWriter: JsonGuidReaderWriter.Instance);
             principalDerivedAlternateId.SetCurrentValueComparer(new EntryCurrentValueComparer<Guid>(principalDerivedAlternateId));
@@ -130,6 +135,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(int),
                 jsonValueReaderWriter: JsonInt32ReaderWriter.Instance);
             id.SetCurrentValueComparer(new EntryCurrentValueComparer<int>(id));
@@ -179,6 +186,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 clrType: typeof(string),
                 jsonValueReaderWriter: JsonStringReaderWriter.Instance);
 
@@ -227,6 +236,8 @@ namespace TestNamespace
                     bool (int v1, int v2) => v1 == v2,
                     int (int v) => v,
                     int (int v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(int),
                 jsonValueReaderWriter: JsonInt32ReaderWriter.Instance);
 
@@ -275,6 +286,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<IPAddress>(new JsonCollectionOfReferencesReaderWriter<IPAddress[], IPAddress>(
                     new JsonConvertedValueReaderWriter<IPAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -300,6 +313,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 45),
                     converter: new ValueConverter<IPAddress, string>(
                         string (IPAddress v) => ((object)v).ToString(),
                         IPAddress (string v) => IPAddress.Parse(v)),
@@ -356,6 +372,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<List<string>, string>(
                     JsonStringReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<List<string>, string>(
@@ -373,6 +391,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     clrType: typeof(string),
                     jsonValueReaderWriter: JsonStringReaderWriter.Instance));
             var refTypeEnumerableElementType = refTypeEnumerable.SetElementType(typeof(string));
@@ -423,6 +443,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<string>(new JsonCollectionOfReferencesReaderWriter<List<string>, string>(
                     JsonStringReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfReferencesReaderWriter<List<string>, string>(
@@ -440,6 +462,8 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text"),
                     clrType: typeof(string),
                     jsonValueReaderWriter: JsonStringReaderWriter.Instance));
             var refTypeIListElementType = refTypeIList.SetElementType(typeof(string));
@@ -490,6 +514,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<IPAddress>(new JsonCollectionOfReferencesReaderWriter<List<IPAddress>, IPAddress>(
                     new JsonConvertedValueReaderWriter<IPAddress, string>(
                         JsonStringReaderWriter.Instance,
@@ -515,6 +541,9 @@ namespace TestNamespace
                         bool (string v1, string v2) => v1 == v2,
                         int (string v) => ((object)v).GetHashCode(),
                         string (string v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "text",
+                        size: 45),
                     converter: new ValueConverter<IPAddress, string>(
                         string (IPAddress v) => ((object)v).ToString(),
                         IPAddress (string v) => IPAddress.Parse(v)),
@@ -571,6 +600,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<DateTime>(new JsonCollectionOfStructsReaderWriter<DateTime[], DateTime>(
                     JsonDateTimeReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<DateTime[], DateTime>(
@@ -588,6 +619,8 @@ namespace TestNamespace
                         bool (DateTime v1, DateTime v2) => v1.Equals(v2),
                         int (DateTime v) => ((object)v).GetHashCode(),
                         DateTime (DateTime v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "datetime"),
                     clrType: typeof(DateTime),
                     jsonValueReaderWriter: JsonDateTimeReaderWriter.Instance));
             var valueTypeArrayElementType = valueTypeArray.SetElementType(typeof(DateTime));
@@ -638,6 +671,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte>(new JsonCollectionOfStructsReaderWriter<List<byte>, byte>(
                     JsonByteReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<byte>, byte>(
@@ -655,6 +690,8 @@ namespace TestNamespace
                         bool (byte v1, byte v2) => v1 == v2,
                         int (byte v) => ((int)(v)),
                         byte (byte v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(byte),
                     jsonValueReaderWriter: JsonByteReaderWriter.Instance));
             var valueTypeEnumerableElementType = valueTypeEnumerable.SetElementType(typeof(byte));
@@ -705,6 +742,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<byte>(new JsonCollectionOfStructsReaderWriter<List<byte>, byte>(
                     JsonByteReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<byte>, byte>(
@@ -722,6 +761,8 @@ namespace TestNamespace
                         bool (byte v1, byte v2) => v1 == v2,
                         int (byte v) => ((int)(v)),
                         byte (byte v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "tinyint"),
                     clrType: typeof(byte),
                     jsonValueReaderWriter: JsonByteReaderWriter.Instance));
             var valueTypeIListElementType = valueTypeIList.SetElementType(typeof(byte));
@@ -772,6 +813,8 @@ namespace TestNamespace
                     bool (string v1, string v2) => v1 == v2,
                     int (string v) => ((object)v).GetHashCode(),
                     string (string v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "text"),
                 converter: new CollectionToJsonStringConverter<short>(new JsonCollectionOfStructsReaderWriter<List<short>, short>(
                     JsonInt16ReaderWriter.Instance)),
                 jsonValueReaderWriter: new JsonCollectionOfStructsReaderWriter<List<short>, short>(
@@ -789,6 +832,8 @@ namespace TestNamespace
                         bool (short v1, short v2) => v1 == v2,
                         int (short v) => ((int)(v)),
                         short (short v) => v),
+                    mappingInfo: new RelationalTypeMappingInfo(
+                        storeTypeName: "smallint"),
                     clrType: typeof(short),
                     jsonValueReaderWriter: JsonInt16ReaderWriter.Instance));
             var valueTypeListElementType = valueTypeList.SetElementType(typeof(short));
@@ -910,6 +955,12 @@ namespace TestNamespace
                 shadowCount: 3,
                 relationshipCount: 3,
                 storeGeneratedCount: 3));
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "PrincipalBase_ManyOwned");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

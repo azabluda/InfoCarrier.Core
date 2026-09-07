@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Scaffolding;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
 
@@ -65,6 +66,8 @@ namespace TestNamespace
                     bool (long v1, long v2) => v1 == v2,
                     int (long v) => ((object)v).GetHashCode(),
                     long (long v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "bigint"),
                 clrType: typeof(long),
                 jsonValueReaderWriter: JsonInt64ReaderWriter.Instance);
             principalId.SetCurrentValueComparer(new EntryCurrentValueComparer<long>(principalId));
@@ -98,6 +101,8 @@ namespace TestNamespace
                     bool (Guid v1, Guid v2) => v1 == v2,
                     int (Guid v) => ((object)v).GetHashCode(),
                     Guid (Guid v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "guid"),
                 clrType: typeof(Guid),
                 jsonValueReaderWriter: JsonGuidReaderWriter.Instance);
             principalAlternateId.SetCurrentValueComparer(new EntryCurrentValueComparer<Guid>(principalAlternateId));
@@ -132,6 +137,8 @@ namespace TestNamespace
                     bool (CompiledModelTestBase.Enum1 v1, CompiledModelTestBase.Enum1 v2) => object.Equals(((object)(v1)), ((object)(v2))),
                     int (CompiledModelTestBase.Enum1 v) => ((object)v).GetHashCode(),
                     CompiledModelTestBase.Enum1 (CompiledModelTestBase.Enum1 v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "int"),
                 clrType: typeof(CompiledModelTestBase.Enum1),
                 jsonValueReaderWriter: JsonSignedEnumReaderWriter<CompiledModelTestBase.Enum1>.Instance);
 
@@ -180,6 +187,8 @@ namespace TestNamespace
                     bool (byte v1, byte v2) => v1 == v2,
                     int (byte v) => ((int)(v)),
                     byte (byte v) => v),
+                mappingInfo: new RelationalTypeMappingInfo(
+                    storeTypeName: "tinyint"),
                 clrType: typeof(byte),
                 jsonValueReaderWriter: JsonByteReaderWriter.Instance);
             id.SetComparer(new NullableValueComparer<byte>(id.TypeMapping.Comparer));
@@ -328,7 +337,13 @@ namespace TestNamespace
                 relationshipCount: 3,
                 storeGeneratedCount: 2));
             runtimeEntityType.AddAnnotation("DiscriminatorMappingComplete", false);
+            runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
             runtimeEntityType.AddAnnotation("Relational:MappingStrategy", "TPH");
+            runtimeEntityType.AddAnnotation("Relational:Schema", null);
+            runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
+            runtimeEntityType.AddAnnotation("Relational:TableName", "DependentBase<byte?>");
+            runtimeEntityType.AddAnnotation("Relational:ViewName", null);
+            runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 
             Customize(runtimeEntityType);
         }

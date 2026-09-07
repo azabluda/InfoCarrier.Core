@@ -38,8 +38,11 @@ namespace InfoCarrier.Core.Relational;
 ///         and the four registered here <b>never touch it</b> — read from EF's source in R123, and
 ///         measured again in R170, where a full spec run built every one of these models without
 ///         reaching a stub member. The two things that object carries, an
-///         <c>IRelationalAnnotationProvider</c> and an <c>IUpdateSqlGenerator</c>, are command-side
-///         services a client with no database cannot have. That is this package's charter
+///         <c>IRelationalAnnotationProvider</c> and an <c>IUpdateSqlGenerator</c>, were both read
+///         that way. <b>ONE OF THE TWO IS REAL NOW:</b> the annotation provider supplies
+///         <em>annotations</em>, which is exactly this package's charter, and a relational model
+///         on the client needs it, so EF's own <c>RelationalAnnotationProvider</c> fills that slot.
+///         <c>IUpdateSqlGenerator</c> is command-side and its stub still throws. That is this package's charter
 ///         (<c>architecture.md</c> §6a D3): annotations and type identity, never a connection or
 ///         anything standing for one. So every member of both stubs throws. If EF ever starts
 ///         calling one, this fails loudly at model build instead of answering plausibly and
@@ -79,6 +82,25 @@ public class InfoCarrierRelationalConventionSetBuilder(
         // model has dropped. It was the only entry here between R123 and R170.
         conventionSet.Add(new EntityTypeHierarchyMappingConvention(Dependencies, RelationalDependencies));
 
+        // THE TABLE NAMES, AND THEY ARE AN EXCEPTION TO THE RULE BELOW RATHER THAN A BREACH OF IT.
+        // That rule refuses a convention that decides something the SERVER also decides with a
+        // provider this client cannot see. These two decide nothing: `[Table("Cats")]` and the
+        // `DbSet` name are written in the CALLER'S OWN CODE, which both halves compile, so the two
+        // models cannot disagree about them. Without these the client never runs the step that
+        // turns the attribute into model data, so it never sees the attribute at all and every
+        // type keeps its base table -- TPH on a client whose server is TPT.
+        conventionSet.Add(new RelationalTableAttributeConvention(Dependencies, RelationalDependencies));
+        conventionSet.Add(new TableNameFromDbSetConvention(Dependencies, RelationalDependencies));
+
+        // AND THE MODEL HAS TO SURVIVE THE RUNTIME CONVERSION. EF builds the relational model over
+        // the DESIGN-TIME model; the client then converts to a runtime model, and without this
+        // replacement the table mappings do not come with it. The symptom is precise and
+        // misleading: `GetRelationalModel()` answers with the right tables -- `Animals` mapped
+        // [Animal, Pet, Cat, Dog] -- while every entity type's `Relational:TableMappings` runtime
+        // annotation is null, because the annotated instances are the design-time ones.
+        conventionSet.Replace<RuntimeModelConvention>(
+            new RelationalRuntimeModelConvention(Dependencies, RelationalDependencies));
+
         // EF'S WHOLE RELATIONAL LIST WAS TRIED HERE FIRST AND IT COST 681 TESTS (R170, measured:
         // 43 -> 724). Read `RelationalConventionSetBuilder.CreateConventionSet` beside this method
         // for what is missing, and do not add an entry back without measuring it alone. What the
@@ -105,8 +127,11 @@ public class InfoCarrierRelationalConventionSetBuilder(
         // discovery has to agree with the document-mapping seam, and the filter rewriter has to
         // leave a `FromSql` root alone. Replacing them with EF's would undo that silently.
         //
-        // `RuntimeModelConvention` is left alone for the same shape of reason: EF's relational one
-        // writes the store schema into the compiled model, and this client has no schema to write.
+        // `RuntimeModelConvention` WAS left alone on the reasoning that EF's relational one writes
+        // the store schema into the compiled model and this client has no schema to write. That was
+        // wrong twice over: what it writes carries EF's NEUTRAL store type names and nothing any
+        // database owns, and without it the client's relational model does not survive the runtime
+        // conversion at all. It is replaced above.
         return conventionSet;
     }
 
@@ -118,7 +143,7 @@ public class InfoCarrierRelationalConventionSetBuilder(
     ///     with no database. See the class remarks for why a stub is sound and why it throws.
     /// </remarks>
     protected virtual RelationalConventionSetBuilderDependencies RelationalDependencies { get; }
-        = new(new NoAnnotationProvider(), new NoUpdateSqlGenerator());
+        = new(new RelationalAnnotationProvider(new RelationalAnnotationProviderDependencies()), new NoUpdateSqlGenerator());
 
     private static InvalidOperationException NoDatabase(string member)
         => new(

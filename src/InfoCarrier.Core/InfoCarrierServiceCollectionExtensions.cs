@@ -1,11 +1,18 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+// This provider registers EF's own relational model-building services on a client that has no
+// database, and three of them (the row-value factories) are internal. EF Core's own providers
+// suppress EF1001 per file for the same reason; see CLAUDE.md.
+#pragma warning disable EF1001 // Internal EF Core API usage.
+
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Update.Internal;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -31,7 +38,7 @@ public static class InfoCarrierServiceCollectionExtensions
             .TryAdd<LoggingDefinitions, InfoCarrierLoggingDefinitions>()
             .TryAdd<IDatabase, InfoCarrierDatabase>()
             .TryAdd<IQueryContextFactory, InfoCarrierQueryContextFactory>()
-            .TryAdd<ITypeMappingSource, InfoCarrierTypeMappingSource>()
+            .TryAdd<ITypeMappingSource, Relational.InfoCarrierRelationalTypeMappingSource>()
             .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
             .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
             .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
@@ -105,6 +112,34 @@ public static class InfoCarrierServiceCollectionExtensions
         services.AddScoped<IRelationalDatabaseFacadeDependencies, Relational.InfoCarrierRelationalFacadeDependencies>();
         services.AddScoped<IDatabaseFacadeDependencies>(
             p => p.GetRequiredService<IRelationalDatabaseFacadeDependencies>());
+
+        // A RELATIONAL MODEL ON THE CLIENT, hand-wired rather than taken wholesale.
+        // `EntityFrameworkRelationalServicesBuilder` would bring a connection, a migrator, a SQL
+        // generator and a database creator with it, none of which a client without a database can
+        // supply. What `GetRelationalModel()` needs is this much and no more, read out of
+        // `RelationalModelRuntimeInitializer` rather than guessed.
+        //
+        // NOT through `EntityFrameworkServicesBuilder`, which validates every `TryAdd` against
+        // EF's CORE service list and answers a relational contract with *"This is not a service
+        // defined by Entity Framework"* -- 97 `DataAnnotation` tests in one run, before the
+        // fixture could build a single model.
+        //
+        // The SAME instance answers `ITypeMappingSource` and `IRelationalTypeMappingSource`. EF's
+        // relational model building casts one to the other and would fail on two objects; more to
+        // the point, two sources could disagree about one property, which is the class of defect
+        // this repository has paid for before.
+        services.TryAddSingleton(
+            p => (IRelationalTypeMappingSource)p.GetRequiredService<ITypeMappingSource>());
+        services.TryAddSingleton<RelationalTypeMappingSourceDependencies>();
+        services.TryAddSingleton<IRelationalAnnotationProvider, RelationalAnnotationProvider>();
+        services.TryAddSingleton<RelationalAnnotationProviderDependencies>();
+        services.TryAddSingleton<IRowKeyValueFactoryFactory, RowKeyValueFactoryFactory>();
+        services.TryAddSingleton<IRowForeignKeyValueFactoryFactory, RowForeignKeyValueFactoryFactory>();
+        services.TryAddSingleton<IRowIndexValueFactoryFactory, RowIndexValueFactoryFactory>();
+        services.TryAddSingleton<RelationalModelDependencies>();
+        services.TryAddSingleton<RelationalModelRuntimeInitializerDependencies>();
+        services.RemoveAll<IModelRuntimeInitializer>();
+        services.AddSingleton<IModelRuntimeInitializer, RelationalModelRuntimeInitializer>();
 
         services.TryAddScoped<TypeNodeMapper>();
         services.TryAddScoped<TypeNodeResolver>();

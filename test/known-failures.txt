@@ -3906,5 +3906,47 @@
 # make them a defect: both products refuse the query. The route is to diff the two expression
 # trees, and the payoff is a different exception type rather than an answer. Not taken here.
 
-failed=35
+# 2026-09-07 (V5) -- `failed` FALLS 35 -> 34, `total` unchanged at 29514. FIXED 1, BROKEN none.
+# `Total tests: 29514, Passed: 29242, Failed: 34, Skipped: 238`. The reasons diff loses exactly one
+# line, the `GetRelationalModel` one. **THIS REVERSES THE V4 ENTRY ABOVE, WHICH WAS WRONG.**
+#
+# --- THE OWNER'S QUESTION IS WHAT FOUND IT ----------------------------------------------------
+# V4 concluded that a client which must not DECIDE a table name cannot build a relational model.
+# The owner asked the obvious question back: *aren't we using the exact same models on both
+# sides?* Yes -- the same `DbContext` and the same `OnModelCreating`. A model is not only
+# `OnModelCreating`, though: the rest is the CONVENTION SET, and that comes from the provider.
+#
+# SO R170'S RULE DOES NOT APPLY TO THESE TWO CONVENTIONS. That rule refuses a convention that
+# decides something the SERVER decides with a provider the client cannot see.
+# `RelationalTableAttributeConvention` reads `[Table("Cats")]` and `TableNameFromDbSetConvention`
+# reads the `DbSet` name -- both from the CALLER'S OWN CODE, which both halves have. They cannot
+# disagree. That is a different case from `RelationalMapToJsonConvention` (~560) and
+# `EntitySplittingConvention` (114), which choose a storage shape the store owns.
+#
+# --- FOUR LAYERS, EACH FOUND BY PROBING RATHER THAN BY REASONING ------------------------------
+# 1. The attribute convention alone turned `Animal|Cat|Dog|Pet` into `Animals|Cats|Dogs|Pets`.
+# 2. The relational model was being built over the DESIGN-TIME model and dropped when the client
+#    converted to a runtime model: the tables were right (`Animals` mapped [Animal, Pet, Cat, Dog])
+#    and `entityType.FindRuntimeAnnotationValue("Relational:TableMappings")` was NULL on the
+#    instances the test holds. EF replaces `RuntimeModelConvention` with
+#    `RelationalRuntimeModelConvention` to carry it across; this client did not.
+# 3. That made EF call the convention builder's STUB annotation provider, which throws by design.
+#    Its own remarks predicted exactly this. EF's `RelationalAnnotationProvider` supplies
+#    ANNOTATIONS, which is this package's charter; `IUpdateSqlGenerator` still throws.
+# 4. The compiled-model generator then met a `RelationalModelDependencies` runtime annotation the
+#    CORE code generator cannot scaffold. EF's relational one strips it, which is why every
+#    relational provider registers it, so the design-time services now do.
+#
+# --- AND THE PACK GATE EARNED ITS KEEP TWICE --------------------------------------------------
+# Re-basing the PUBLISHED `InfoCarrierTypeMappingSource` onto `RelationalTypeMappingSource` is a
+# binary break -- `CP0007` plus a lost constructor -- because EF's relational source does not
+# derive from `TypeMappingSource`. So `InfoCarrierRelationalTypeMappingSource` is an additive
+# sibling and the mapping decision is SHARED, not copied. The first pack "passed" only because the
+# build had failed and it validated a stale binary, which is the trap CLAUDE.md names.
+#
+# The compiled-model baselines were regenerated with `EF_TEST_REWRITE_BASELINES=1`, EF's own
+# mechanism: the generated model now carries a `CreateRelationalModel()`, with EF's neutral store
+# type names (`"text"`) and nothing any database owns.
+
+failed=34
 total=29514

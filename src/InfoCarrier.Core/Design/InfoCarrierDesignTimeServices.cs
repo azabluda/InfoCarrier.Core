@@ -1,7 +1,14 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+// EF's design-time code generators live in a `Design.Internal` namespace, and a provider that
+// wants the relational one has to name it. EF Core's own providers suppress EF1001 per file
+// for exactly this registration; see CLAUDE.md.
+#pragma warning disable EF1001 // Internal EF Core API usage.
+
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Design.Internal;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 [assembly: DesignTimeProviderServices("InfoCarrier.Core.Design.InfoCarrierDesignTimeServices")]
 
@@ -52,5 +59,15 @@ public class InfoCarrierDesignTimeServices : IDesignTimeServices
 
         new EntityFrameworkDesignServicesBuilder(serviceCollection)
             .TryAddCoreServices();
+
+        // THE RELATIONAL CODE GENERATOR, because the client model now carries relational runtime
+        // annotations. `RelationalModelRuntimeInitializer` puts a `RelationalModelDependencies` on
+        // the model, and the CORE generator meets it as an unknown object and refuses: *"Cannot
+        // scaffold C# literals of type 'RelationalModelDependencies'"*. EF's relational generator
+        // strips exactly those annotations before generating, which is why every relational
+        // provider registers it. Its dependency object is parameterless.
+        serviceCollection.TryAddSingleton<RelationalCSharpRuntimeAnnotationCodeGeneratorDependencies>();
+        serviceCollection.RemoveAll<ICSharpRuntimeAnnotationCodeGenerator>();
+        serviceCollection.AddSingleton<ICSharpRuntimeAnnotationCodeGenerator, RelationalCSharpRuntimeAnnotationCodeGenerator>();
     }
 }

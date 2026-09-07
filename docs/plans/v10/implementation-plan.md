@@ -5678,6 +5678,55 @@ re-parents of families already running, because R25–R30 showed that is where t
       — both products refuse the query — but it is no longer a pure upstream write-off. The route
       is to diff the two trees, and the payoff is a different exception rather than an answer.
 
+- [x] **V5. A relational model on the client, and the owner's question is what found it.** `src/`
+      change, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`; public API was added, so
+      `dotnet pack` as well. **`failed` FALLS 35 -> 34**, `total` unchanged at 29514. FIXED 1,
+      BROKEN none. `Total tests: 29514, Passed: 29242, Failed: 34, Skipped: 238`. Trim `ours`
+      90 <= 90. **This reverses V4 above, which was wrong.**
+
+      **V4 concluded that a client which must not decide a table name cannot build a relational
+      model. The owner asked the obvious question back:** *aren't we using the exact same models on
+      both sides?* Yes: the same `DbContext` and the same `OnModelCreating`. **A model is not only
+      `OnModelCreating`** — the rest is the convention set, and that comes from the provider. The
+      client never ran the step that turns a `[Table]` attribute into model data, so it never saw
+      the attributes at all.
+
+      **R170's rule does not apply to these two conventions, and that is the correction.** The rule
+      refuses a convention that decides something the server also decides with a provider the
+      client cannot see. `RelationalTableAttributeConvention` reads `[Table("Cats")]` and
+      `TableNameFromDbSetConvention` reads the `DbSet` name — both from **the caller's own code**,
+      which both halves have, so they cannot disagree. That is a different case from
+      `RelationalMapToJsonConvention` (~560) and `EntitySplittingConvention` (114), which choose a
+      storage shape the store owns.
+
+      **Four layers, each found by probing rather than by reasoning.**
+
+      1. The attribute convention alone turned `Animal|Cat|Dog|Pet` into `Animals|Cats|Dogs|Pets`.
+      2. The relational model was built over the **design-time** model and dropped when the client
+         converted to a runtime model. The tables were right — `Animals` mapped
+         `[Animal, Pet, Cat, Dog]` — and `FindRuntimeAnnotationValue("Relational:TableMappings")`
+         was **null** on the entity types the test holds. EF replaces `RuntimeModelConvention` with
+         `RelationalRuntimeModelConvention` to carry it across; this client did not.
+      3. That made EF call the convention builder's stub annotation provider, which throws by
+         design — and its own remarks predicted exactly this case. EF's `RelationalAnnotationProvider`
+         supplies **annotations**, which is this package's charter; `IUpdateSqlGenerator` still throws.
+      4. The compiled-model generator then met a `RelationalModelDependencies` runtime annotation
+         the **core** code generator cannot scaffold. EF's relational one strips it, which is why
+         every relational provider registers it, so the design-time services now do.
+
+      **The pack gate earned its keep twice.** Re-basing the published
+      `InfoCarrierTypeMappingSource` onto `RelationalTypeMappingSource` is a binary break —
+      `CP0007` plus a lost constructor — because EF's relational source does not derive from
+      `TypeMappingSource`. `InfoCarrierRelationalTypeMappingSource` is therefore an additive
+      sibling, and the mapping decision is **shared rather than copied**, which is the owner's
+      standing rule for this package. And the first pack "passed" only because the build had failed
+      and it validated a stale binary — the trap CLAUDE.md names, met in the wild.
+
+      Compiled-model baselines regenerated with `EF_TEST_REWRITE_BASELINES=1`, EF's own mechanism.
+      The generated model now carries a `CreateRelationalModel()`, with EF's neutral store type
+      names and nothing any database owns. **This is issue #97's level 3**, which the roadmap
+      carried as future scope and a decision.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379
