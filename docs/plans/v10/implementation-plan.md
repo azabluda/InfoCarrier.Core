@@ -5586,6 +5586,50 @@ re-parents of families already running, because R25–R30 showed that is where t
       because a transport failure leaves the outcome unknown and a blind retry of a `SaveChanges`
       can write the same row twice. That last hazard is the idempotency gap, still open.
 
+- [x] **V3. The client's type mapping is relational, and the raw-SQL four go green.** `src/`
+      change, so `eng/measure.sh` **and** `eng/trim-ratchet.sh`; a public type's base class moved,
+      so `dotnet pack` as well and it is clean. **`failed` FALLS 39 -> 35**, `total` unchanged at
+      29514. FIXED 4, BROKEN none. `Total tests: 29514, Passed: 29241, Failed: 35, Skipped: 238`.
+      Trim `ours` 90 <= 90. The reasons diff loses one whole line and nothing else moves.
+
+      **THE FOUR NEEDED TWO INDEPENDENT FIXES AND NEITHER MOVED THEM ALONE**, which is the part
+      worth carrying: the class had been priced twice as "the client has no store type names", and
+      that was true and was not the whole obstacle.
+
+      **First, the mapping.** EF's base does
+      `(RelationalTypeMapping)context.GetService<ITypeMappingSource>().FindMapping(typeof(bool))`
+      and then `GenerateSqlLiteral(true)`. `InfoCarrierTypeMapping` now derives from
+      `RelationalTypeMapping`, so the cast lands. Its store type name **and** its literal syntax
+      come from EF's own neutral table — the 21 `Default` instances declared in
+      `EFCore.Relational` rather than in any provider. That matters twice over: `BoolTypeMapping`
+      writes `1` where the generic `{0}` format writes `True`, which is valid SQL almost nowhere;
+      and because those defaults belong to no database, nothing store-specific enters a shared
+      model, which is the condition the owner set on 2026-09-04.
+
+      **Second, and this is the one that was hiding, `Products` was missing two columns.** The
+      test's SQL reads `("UnitsInStock" + "UnitsOnOrder") < "ReorderLevel"` and the fixture had
+      added only `CategoryID`. **SQLite does not reject an unknown identifier in double quotes** —
+      it falls back to reading it as a string literal, for compatibility with software that quoted
+      strings that way. The predicate became `(UnitsInStock + 'UnitsOnOrder') < 'ReorderLevel'`,
+      the text numified to 0, and an INTEGER sorts below TEXT in SQLite's type ordering, so it was
+      TRUE for every row. The query returned all 69 undiscontinued products where 2 were expected.
+      **A store that answers the wrong number looks exactly like a store that answers**, and the
+      only thing that settled it was opening the `.db` and reading `PRAGMA table_info`.
+
+      **The compiled model broke on the first fix and is green again.** A generated model names
+      `RelationalTypeMapping` now, and `CompiledModelTestBase`'s reference list stops at
+      `Microsoft.EntityFrameworkCore`, so the scaffolded source failed to compile with `CS0012`
+      and a `CS0122` cascade that read like a protection-level problem and was not.
+      `CompiledModelRelationalTestBase` adds exactly that reference for exactly that reason, so
+      the override adopts EF's own answer rather than inventing one. **Four fixed and four broken
+      at an unchanged count was the intermediate state**, and it is the case `eng/measure.sh`
+      prints names for.
+
+      **What is left of the class is two, and they are a different question.**
+      `Table_can_configure_TPT_with_Owned` and `Complex_properties_can_be_configured_by_type` want
+      a relational **model** on the client rather than a relational type mapping, and the second is
+      blocked in front of that by `RelationalMapToJsonConvention`'s measured ~560.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

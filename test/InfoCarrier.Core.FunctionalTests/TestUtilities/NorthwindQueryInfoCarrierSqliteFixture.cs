@@ -223,16 +223,39 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
         // it in the shaper's required column list and broke the four
         // `Bad_data_error_handling_null` tests: their raw SQL names the six columns EF's own
         // model maps and nothing more.
-        await context.Database.ExecuteSqlRawAsync(
-            @"ALTER TABLE ""Products"" ADD COLUMN ""CategoryID"" INTEGER");
+        // `UnitsOnOrder` and `ReorderLevel` join it, and the way they were missing is worth
+        // keeping: SQLite does NOT reject an unknown identifier in double quotes. It falls back to
+        // reading it as a string literal, for compatibility with software that quoted strings that
+        // way. So `("UnitsInStock" + "UnitsOnOrder") < "ReorderLevel"` did not fail with "no such
+        // column": it became `(UnitsInStock + 'UnitsOnOrder') < 'ReorderLevel'`, the text numified
+        // to 0, and an INTEGER compares below TEXT in SQLite's type ordering, so the predicate was
+        // TRUE for every row. `SqlQueryRaw_queryable_simple_projection_composed` and its `FromSql`
+        // twin got all 69 undiscontinued products where two were expected, and the store looked
+        // like it was answering the query.
+        foreach (string statement in (string[])
+                 [
+                     @"ALTER TABLE ""Products"" ADD COLUMN ""CategoryID"" INTEGER",
+                     @"ALTER TABLE ""Products"" ADD COLUMN ""UnitsOnOrder"" INTEGER",
+                     @"ALTER TABLE ""Products"" ADD COLUMN ""ReorderLevel"" INTEGER",
+                 ])
+        {
+            await context.Database.ExecuteSqlRawAsync(statement);
+        }
 
         foreach (Product product in NorthwindData.CreateProducts())
         {
             await context.Database.ExecuteSqlRawAsync(
                 """
-                UPDATE "Products" SET "CategoryID" = @CategoryID WHERE "ProductID" = @ProductID
+                UPDATE "Products" SET "CategoryID" = @CategoryID,
+                    "UnitsOnOrder" = @UnitsOnOrder, "ReorderLevel" = @ReorderLevel
+                WHERE "ProductID" = @ProductID
                 """,
                 Parameter("CategoryID", product.CategoryID),
+
+                // `ushort?`, and SQLite has no parameter type for it, exactly as `Employee`'s
+                // `uint` key below has none.
+                Parameter("UnitsOnOrder", product.UnitsOnOrder is { } onOrder ? (long)onOrder : null),
+                Parameter("ReorderLevel", product.ReorderLevel is { } reorder ? (long)reorder : null),
                 Parameter("ProductID", product.ProductID));
         }
 

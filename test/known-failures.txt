@@ -3820,5 +3820,42 @@
 # rows this client threw away. The detector is R173's audit walk, kept rather than rebuilt.
 # `InMemorySmokeTest.A_split_that_pages_on_the_client_names_what_stayed_behind` is the added test.
 
-failed=39
+# 2026-09-07 (V3) -- `failed` FALLS 39 -> 35, `total` unchanged at 29514. FIXED 4, BROKEN none.
+# `Total tests: 29514, Passed: 29241, Failed: 35, Skipped: 238`. The reasons diff loses one whole
+# line, the four `InvalidCastException`, and nothing else moves.
+#
+# --- CLASS 2 IS NOW 2, NOT 6, AND IT TOOK TWO INDEPENDENT FIXES --------------------------------
+# The four are 2 `FromSqlRaw_queryable_simple_projection_composed` and 2
+# `SqlQueryRaw_queryable_simple_projection_composed`. NEITHER FIX ALONE MOVED THEM.
+#
+# 1. THE CLIENT'S TYPE MAPPING IS RELATIONAL NOW. EF's base does
+#    `(RelationalTypeMapping)context.GetService<ITypeMappingSource>().FindMapping(typeof(bool))`
+#    and then `GenerateSqlLiteral(true)`. `InfoCarrierTypeMapping` derives from
+#    `RelationalTypeMapping`, and its store type name AND its literal syntax are taken from EF's
+#    OWN neutral table -- the 21 `Default` instances in `EFCore.Relational` (`BoolTypeMapping`
+#    writes `1`, not the generic format's `True`). Those live in no provider, so nothing
+#    store-specific enters the shared model; that is the owner's condition, stated 2026-09-04.
+#
+# 2. `Products` WAS MISSING TWO COLUMNS AND SQLITE HID IT. The test's SQL reads
+#    `("UnitsInStock" + "UnitsOnOrder") < "ReorderLevel"`, and the fixture had added only
+#    `CategoryID`. **SQLite does not reject an unknown identifier in double quotes**: it reads it
+#    as a string literal, for compatibility with software that quoted strings that way. So the
+#    predicate became `(UnitsInStock + 'UnitsOnOrder') < 'ReorderLevel'`, the text numified to 0,
+#    and an INTEGER sorts below TEXT in SQLite's type ordering -- TRUE for every row. The test
+#    returned all 69 undiscontinued products where 2 were expected, and the store looked like it
+#    was answering the query. Found by opening the `.db` file and reading `PRAGMA table_info`.
+#
+# --- AND ONE HARNESS CHANGE THAT IS NOT ABOUT THESE TESTS AT ALL -------------------------------
+# The compiled model broke on the first fix and is green again. A generated model now names
+# `RelationalTypeMapping`, and `CompiledModelTestBase`'s reference list stops at
+# `Microsoft.EntityFrameworkCore`, so the scaffolded source failed to compile: `CS0012`, with a
+# `CS0122` cascade behind it that read like a protection-level problem and was not.
+# `CompiledModelRelationalTestBase` adds exactly that reference for exactly that reason.
+#
+# --- WHAT IS LEFT OF THE CLASS ----------------------------------------------------------------
+# `Table_can_configure_TPT_with_Owned` and `Complex_properties_can_be_configured_by_type`, both
+# unchanged: they want a relational MODEL on the client, not a relational type mapping, and the
+# second is blocked in front of that by `RelationalMapToJsonConvention`'s measured ~560.
+
+failed=35
 total=29514

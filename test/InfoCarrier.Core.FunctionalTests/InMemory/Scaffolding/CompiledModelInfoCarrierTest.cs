@@ -38,6 +38,7 @@ public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledMo
     protected override TestHelpers TestHelpers
         => InfoCarrierTestHelpers.Instance;
 
+
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
@@ -101,6 +102,15 @@ public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledMo
     {
         base.AddReferences(build);
         build.References.Add(BuildReference.ByName("InfoCarrier.Core"));
+
+        // AND THE ASSEMBLY THAT DECLARES `RelationalTypeMapping`, because the generated model
+        // names it. Every property in this client's model carries an `InfoCarrierTypeMapping`,
+        // and that is a relational mapping: the client is relational on both tiers, and EF's own
+        // specification tests cast what the mapping source returns to `RelationalTypeMapping` and
+        // ask it for a SQL literal. The core base's list stops at `Microsoft.EntityFrameworkCore`.
+        // `CompiledModelRelationalTestBase` adds exactly this reference for exactly this reason;
+        // this class cannot inherit it, because the base it inherits is the core one.
+        build.References.Add(BuildReference.ByName("Microsoft.EntityFrameworkCore.Relational"));
         return build;
     }
 }
