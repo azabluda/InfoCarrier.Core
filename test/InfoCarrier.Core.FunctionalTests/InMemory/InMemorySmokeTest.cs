@@ -283,6 +283,77 @@ public class InMemorySmokeTest
         Assert.Contains("could not be translated", thrown.Message);
     }
 
+    [ConditionalFact]
+    public async Task A_non_relational_server_is_served_end_to_end()
+    {
+        // PINS THAT THIS PROVIDER IS NOT RELATIONAL-ONLY, which is a claim the suite otherwise
+        // only makes by implication. Every client is relational since R135 and builds a relational
+        // MODEL since V5: table names on every entity type, whatever store sits behind it. Nothing
+        // in the product reads them -- `GetTableName()` has one caller in this repository and it
+        // is an assertion, `GetRelationalModel()` has none -- and this test is what turns that
+        // reading into a gate.
+        //
+        // The backing store here is EF's InMemory provider, which is genuinely not relational, and
+        // the option says so. WEAK EVIDENCE ON PURPOSE, and issue #51 says why: InMemory has no
+        // nested-document shape and no translation refusals of its own, so it disagrees with a
+        // relational store about almost nothing. A document-store tier is what would answer the
+        // question properly. This is the cheap half.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using var context = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>()
+                .UseInfoCarrier(store, o => o.UseNonRelationalServerStore())
+                .Options);
+
+        context.Blogs.AddRange(
+            new Blog { Id = 1, Title = "alpha" },
+            new Blog { Id = 2, Title = "beta" });
+        await context.SaveChangesAsync();
+
+        List<Blog> matched = await context.Blogs
+            .Where(b => b.Title!.StartsWith("a"))
+            .OrderBy(b => b.Id)
+            .ToListAsync();
+
+        Assert.Equal("alpha", Assert.Single(matched).Title);
+
+        Blog toChange = await context.Blogs.SingleAsync(b => b.Id == 2);
+        toChange.Title = "changed";
+        await context.SaveChangesAsync();
+
+        await using SmokeContext reader = CreateClient(store);
+        Assert.Equal("changed", (await reader.Blogs.SingleAsync(b => b.Id == 2)).Title);
+    }
+
+    [ConditionalFact]
+    public async Task Ordinary_use_never_builds_the_relational_model()
+    {
+        // THE OTHER HALF OF THE CLAIM ABOVE, and the one that would catch a regression. Since V5
+        // the client CAN build a relational model, and EF puts a lazy factory on every model to do
+        // it. If some future code path started forcing that factory, the cost would land on every
+        // query against every store, including one with no tables at all. Nothing forces it today.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using var context = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>()
+                .UseInfoCarrier(store, o => o.UseNonRelationalServerStore())
+                .Options);
+
+        context.Blogs.Add(new Blog { Id = 1, Title = "alpha" });
+        await context.SaveChangesAsync();
+        Assert.Single(await context.Blogs.Where(b => b.Title == "alpha").ToListAsync());
+
+        // The factory is there, and its result is not.
+        Assert.NotNull(context.Model.FindRuntimeAnnotation("Relational:RelationalModelFactory"));
+        Assert.Null(context.Model.FindRuntimeAnnotation("Relational:RelationalModel"));
+
+        // And asking for it works, which is what V5 added. The table name is the caller's own
+        // `DbSet` name, so both halves derive it from the same source.
+        Assert.Contains(
+            context.Model.GetRelationalModel().Tables,
+            t => t.Name == "Blogs");
+    }
+
     private static InMemoryInfoCarrierBackendTestStore CreateStore()
         => new(
             Guid.NewGuid().ToString(),

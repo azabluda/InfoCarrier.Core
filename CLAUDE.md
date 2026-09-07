@@ -357,7 +357,7 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 29514, Passed: 29242, Failed: 34, Skipped: 238`** (2026-09-07, `r179`).
+**`Total tests: 29516, Passed: 29244, Failed: 34, Skipped: 238`** (2026-09-07, `r180`).
 **All four figures come out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records

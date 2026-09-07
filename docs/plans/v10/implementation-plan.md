@@ -5727,6 +5727,36 @@ re-parents of families already running, because R25–R30 showed that is where t
       names and nothing any database owns. **This is issue #97's level 3**, which the roadmap
       carried as future scope and a decision.
 
+- [x] **V6. The non-relational client is pinned, and two GitHub issues are put right.** `test/`
+      only, so `eng/measure.sh`. **`failed` unchanged at 34**, `total` 29514 -> 29516 for the two
+      tests this adds; names byte-identical, reasons diff empty.
+      `Total tests: 29516, Passed: 29244, Failed: 34, Skipped: 238`.
+
+      **The owner asked whether the relational work had quietly made this provider
+      relational-only.** It had not, and the answer was a reading rather than a gate: nothing in
+      `src/` consults a table name — `GetTableName()` has one caller in the repository and it is a
+      test assertion, `GetRelationalModel()` has none — and the whole InMemory tier stayed green
+      through V5 with nothing broken. `InMemorySmokeTest` now pins both halves.
+      `Ordinary_use_never_builds_the_relational_model` is the one that would catch a regression: it
+      asserts the lazy factory annotation is present and its **result is not**, after a full query
+      and save. If some future path started forcing it, the cost would land on every query against
+      every store, including one with no tables.
+
+      **It is the cheap half and it is weak evidence on purpose.** InMemory is genuinely not
+      relational, which is how the `Distinct`-over-collection refusal came to be gated at all. It
+      has no nested-document shape, no translation refusals of its own and no store types, so it
+      disagrees with a relational store about almost nothing.
+
+      **[#96](https://github.com/azabluda/InfoCarrier.Core/issues/96) is closed**, answered by Tier
+      C: Firebird has the table-valued function and `APPLY` SQLite lacks, and none of the 55
+      failures it was opened about remains. **[#51](https://github.com/azabluda/InfoCarrier.Core/issues/51)
+      is corrected**: its "why this is cheap" argument said `InfoCarrier.Core` no longer references
+      `EFCore.Relational`, which was superseded on 2026-09-03. The reference is back, the client
+      now builds a relational model unconditionally, and that cannot be switched off per context
+      because `GetServiceProviderHashCode()` returns `0`. The cheapness argument is gone and the
+      value argument is stronger: the question is now whether a client carrying relational metadata
+      still serves a store that has no tables.
+
 ## Phase S — the query parameters still inlined as SQL literals (#62)
 
 **Not a milestone.** #59 fixed two shapes of one defect and a sweep counted what survived: 379

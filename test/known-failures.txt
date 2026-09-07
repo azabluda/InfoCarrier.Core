@@ -3948,5 +3948,24 @@
 # mechanism: the generated model now carries a `CreateRelationalModel()`, with EF's neutral store
 # type names (`"text"`) and nothing any database owns.
 
+# 2026-09-07 (V6) -- `failed` UNCHANGED at 34, `total` RISES 29514 -> 29516, the rise being two
+# tests this commit adds. Names byte-identical and the reasons diff EMPTY.
+# `Total tests: 29516, Passed: 29244, Failed: 34, Skipped: 238`.
+#
+# THE OWNER ASKED WHETHER THE RELATIONAL WORK QUIETLY MADE THIS PROVIDER RELATIONAL-ONLY. It did
+# not, and the answer was a reading rather than a gate until now: nothing in `src/` consults a
+# table name (`GetTableName()` has ONE caller in this repository and it is a test assertion,
+# `GetRelationalModel()` has none), and the whole InMemory tier stayed green through V5 with 0
+# broken. `InMemorySmokeTest` now pins both halves --
+# `A_non_relational_server_is_served_end_to_end` and
+# `Ordinary_use_never_builds_the_relational_model`, the second asserting that the lazy factory
+# annotation is present and its RESULT is not after a full query and save.
+#
+# **IT IS THE CHEAP HALF AND IT IS WEAK EVIDENCE ON PURPOSE.** InMemory is genuinely not
+# relational, so it catches a relational rule applied everywhere -- that is how the
+# `Distinct`-over-collection refusal came to be gated. It has no nested-document shape, no
+# translation refusals of its own and no store types, so it disagrees with a relational store about
+# almost nothing. Issue #51 is the tier that would answer it properly and it stays open.
+
 failed=34
-total=29514
+total=29516
