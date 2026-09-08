@@ -98,10 +98,14 @@
       An untagged commit builds as the next patch with a height — `10.0.1-alpha.0.7` — which is
       unique, ordered, and exactly what an internal CI feed wants.
 
-      `MinVerMinimumMajorMinor` is 10.0 because the major.minor tracks Entity Framework Core's,
-      which is the convention every EF provider follows and the fastest way for a reader to know
-      which EF a package targets. It also keeps a repository with no release tag yet inside the
-      10.0 line rather than starting at 0.0.
+      `MinVerMinimumMajorMinor` is 10.0 because the MAJOR tracks Entity Framework Core's, which is
+      the convention every EF provider follows and the fastest way for a reader to know which EF a
+      package targets. It also keeps a repository with no release tag yet inside the 10.0 line
+      rather than starting at 0.0. It is a FLOOR, so 10.1 and above pass it unchanged.
+
+      THE MINOR IS OURS AND THE MAJOR IS EF CORE'S, amended 2026-09-09 by the owner. This comment
+      said major.minor tracked EF Core until then, which left nowhere to put a release that adds
+      public API inside one EF Core minor. `docs/versioning.md` carries the whole reading.
 
       10.0.0 CARRIES NO SUFFIX. A stable version is a promise not to break the public surface,
       and that promise is made as of that release.
@@ -187,10 +191,10 @@
       that described a break against the version it replaces. It was 10.0.0-preview.1 until
       2026-08-25 and moved once 10.0.0 was downloadable from nuget.org, which is the
       constraint: validation fetches the baseline package, so it cannot name one that is not
-      published yet.
+      published yet. Moved to 10.0.1 on 2026-09-09, in the 10.1.0 release preparation.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>10.0.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>10.0.1</PackageValidationBaselineVersion>
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>

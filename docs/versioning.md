@@ -1,4 +1,4 @@
-# Versioning and releasing
+﻿# Versioning and releasing
 
 How a version number is decided, where it is stored, and how each of the three feeds gets one.
 
@@ -8,12 +8,12 @@ How a version number is decided, where it is stored, and how each of the three f
 build time and hands the number to MSBuild.
 
 ```bash
-git tag -a v10.0.1 -m "InfoCarrier.Core 10.0.1"
-git push origin v10.0.1
+git tag -a v10.1.0 -m "InfoCarrier.Core 10.1.0"
+git push origin v10.1.0
 ```
 
-That tag produces `InfoCarrier.Core 10.0.1` and
-`InfoCarrier.Core.AspNetCore 10.0.1`, and nothing else has to be edited, remembered or
+That tag produces `InfoCarrier.Core 10.1.0` and
+`InfoCarrier.Core.AspNetCore 10.1.0`, and nothing else has to be edited, remembered or
 kept in step.
 
 ## Why not a property in `Directory.Build.props`
@@ -43,9 +43,22 @@ Remove the disagreement and the gate has nothing to do.
 
 | Part | Rule |
 |---|---|
-| `MAJOR.MINOR` | **Tracks Entity Framework Core.** `10.0.x` targets EF Core 10.0. Every EF provider follows this, and it is the fastest way for a reader to know what a package is for. `MinVerMinimumMajorMinor` holds the floor. |
+| `MAJOR` | **Tracks Entity Framework Core.** `10.x.y` targets EF Core 10. Every EF provider follows this, and it is the fastest way for a reader to know what a package is for. `MinVerMinimumMajorMinor` holds the floor. |
+| `MINOR` | Ours. Bump it when the public surface grows, or when the package gains a dependency. |
 | `PATCH` | Ours. Bump it for a fix that changes no contract. |
 | `-preview.N`, `-rc.N` | **Keep the dot.** SemVer compares dot-separated identifiers, so `preview.10` sorts above `preview.9`. Written `preview10`, they compare as text and sort backwards. |
+
+**AMENDED 2026-09-09, and the amendment is the owner's.** This table read `MAJOR.MINOR` *tracks
+Entity Framework Core* until then, with `PATCH` as the only part this repository owned. That leaves
+nowhere to put a release that adds public API inside one EF Core minor, and `10.1.0` is exactly
+that: it adds three client options, two server registrations and a dependency on
+`Microsoft.EntityFrameworkCore.Relational`, on EF Core 10.0. Calling it a patch would make `PATCH`
+mean two different things; calling it a major would claim an EF Core this package does not target.
+So the minor is ours and the major is EF Core's, which is what SemVer says anyway.
+
+**What a reader loses, stated rather than glossed.** `10.1` no longer implies EF Core 10.1. The
+major still implies EF Core 10, and the package's own `Microsoft.EntityFrameworkCore` dependency
+carries the exact floor, which is where a resolver looks.
 
 `10.0.0` carries no suffix. A stable version is a promise not to break the public surface, and
 that promise is made as of that release. Do not restate the reason for a suffix in a user-facing
@@ -230,8 +243,8 @@ nuget.org first — which matters here, because neither does.
 
 1. Land the work. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both ratchets green.
 2. Update `website/docs/limitations.md` if the failure set moved.
-3. Tag: `git tag -a v10.0.1 -m "InfoCarrier.Core 10.0.1"`.
-4. Push the tag: `git push origin v10.0.1`.
+3. Tag: `git tag -a v10.1.0 -m "InfoCarrier.Core 10.1.0"`.
+4. Push the tag: `git push origin v10.1.0`.
 5. Watch `release.yml`. It runs both gates, packs, and creates the Release.
 6. Approve `publish-nuget` when you mean it.
 7. **Apply the release body, because the workflow does not.** `release.yml` creates the Release

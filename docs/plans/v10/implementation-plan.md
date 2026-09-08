@@ -6276,3 +6276,12 @@ owner asked for, the user-facing pages, and the release notes.
       `10.0.0-preview.1` row is corrected to `10.0.1`, which is what actually shipped last on that
       line.
 
+- [x] **Y3. The minor is ours and the major is EF Core's (owner's decision, 2026-09-09).**
+      `docs/versioning.md` read *`MAJOR.MINOR` tracks Entity Framework Core* with `PATCH` as the
+      only part this repository owned, which leaves nowhere to put a release that adds public API
+      inside one EF Core minor. `10.1.0` is exactly that. The table, its dated amendment and the
+      `Directory.Build.props` comment move together.
+      `PackageValidationBaselineVersion` moves `10.0.0` -> `10.0.1`, and
+      `dotnet pack --no-build -c Release` is clean against it, which is also the proof that nothing
+      in the public surface was removed.
+
