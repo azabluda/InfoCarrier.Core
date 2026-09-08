@@ -64,6 +64,26 @@ Where EF Core itself would refuse a query, this provider refuses it too, with th
 supported contract on any EF Core provider, and a couple of messages here are worded differently
 from other providers'. See [Limitations](../limitations.md).
 
+### Rules that come from the server's store
+
+The client never sees the server's provider, so it assumes the store is relational and refuses
+three queries that every relational provider refuses:
+
+| Query | Why |
+|---|---|
+| An `OrderBy` key of a type the wire cannot carry | No store can sort by it, and answering here means sorting the whole table on the client |
+| `new Layout() ?? fallback` in a predicate or an ordering | The same, and the coalesce does nothing, because `new` never returns null |
+| `Distinct`, `Union`, `Concat`, `Except` or `Intersect` over a projection that carries a collection | The columns that identify a row do not survive it |
+
+If your server's store is not relational, say so once and the three go away:
+
+```csharp
+optionsBuilder.UseInfoCarrier(client, o => o.UseNonRelationalServerStore());
+```
+
+That tells the client something it cannot work out for itself. It does not make the query work
+against a relational server; it only removes the refusal here.
+
 ## Tracking
 
 Change tracking works as it does with any provider, identity map and navigation fix-up included.
@@ -128,13 +148,18 @@ and `Model.GetRelationalModel()` answer, and tooling that reads them works again
 They read your own `[Table]` attributes and `DbSet` names, which both halves compile, so the two
 models agree. Nothing the client computes from them reaches the server.
 
-`FromSql` works, but only where the server opts in. The server calls
+`FromSql` and `Database.SqlQuery<T>` work, but only where the server opts in. The server calls
 `services.AddInfoCarrierArbitrarySqlExecution()` and the client `o.AllowArbitrarySqlExecution()`.
 Without both, the query is refused like any untranslatable one.
 
 Grant it with care. One command text runs every statement in it, and an uncomposed `FromSql` reaches
 the database unchanged, so a caller who has the grant can run any SQL the database allows, with the
 server's own rights. The server's query filters are not in such a query.
+
+`EF.Functions.Like`, `EF.Constant` and `EF.Parameter` cross the wire, and so do the functions you
+map yourself with `HasDbFunction`. A store's own family, such as `SqliteDbFunctionsExtensions`, is
+a type this package cannot name, so name it on both halves: `AddInfoCarrierAllowedTypes(...)` on
+the server, `o.AllowTypes(...)` on the client.
 
 ## Round trips and result size
 

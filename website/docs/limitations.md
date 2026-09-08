@@ -13,7 +13,7 @@ are EF Core defects that every provider hits and this one reports with a differe
 Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238
 ```
 
-Measured against `10.0.0`. The 238 skips are EF Core's own, tests EF itself skips for the
+Measured against `10.1.0`. The 238 skips are EF Core's own, tests EF itself skips for the
 store behind them, not suppressions added here.
 
 ## Not supported
@@ -162,7 +162,7 @@ These are not defects. They follow from where the client sits.
 |---|---|
 | Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
-| The client never sees the server's provider, so it assumes a relational store and refuses what relational providers refuse. `UseInfoCarrier(client, o => o.UseNonRelationalServerStore())` says otherwise | |
+| The client never sees the server's provider, so it assumes a relational store and refuses three queries relational providers refuse. `UseInfoCarrier(client, o => o.UseNonRelationalServerStore())` says otherwise | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |
 | Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming is a separate question, and it works. | [Blazor WebAssembly](platforms/blazor-webassembly.md#trimming) |
@@ -174,5 +174,5 @@ The number of failing tests is gated in continuous integration, so it cannot gro
 noticed. When an entry is fixed, or a new one appears, this page changes with it.
 
 What the suite measures bounds what this page can promise. A conformance suite says nothing about
-performance, payload size or concurrency under load, and nothing about the relational APIs this
-provider does not have. A scenario it never exercises is outside what this page claims at the top.
+performance, payload size or concurrency under load. A scenario it never exercises is outside what
+this page claims at the top.

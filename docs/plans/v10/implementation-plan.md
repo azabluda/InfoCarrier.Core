@@ -6285,3 +6285,15 @@ owner asked for, the user-facing pages, and the release notes.
       `dotnet pack --no-build -c Release` is clean against it, which is also the proof that nothing
       in the public surface was removed.
 
+- [x] **Y4. The relational half stated for a consumer, on nine pages.** `index` and `README` for
+      what works; `guide/querying` for the three refusals, the switch and how a store's own
+      `EF.Functions` family is named on both halves; `configuration/client` for the second
+      `UseInfoCarrier` argument; `configuration/server` for the two grants; `security` for the
+      widening `AddInfoCarrierAllowedTypes` opens, which `configuration/server` now sends a reader
+      there about and which the page did not mention; `api-surface` for four missing public
+      members; `limitations` for the version it is measured against; `getting-started/installation`
+      for the `PackageReference` version. The suite figures on `index` were two releases stale.
+      Budgets moved in the same commit, in both `docs/doc-style.md` and `eng/doc-words.py`. The
+      humanizer pass ran on the result, `mkdocs build --strict` is clean, `eng/doc-links.py`
+      reports 0 broken in 61 files, and no changed page contains a dash.
+

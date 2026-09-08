@@ -10,6 +10,26 @@ optionsBuilder.UseInfoCarrier(client);
 Everything else on `DbContextOptionsBuilder` is EF Core's and works as usual: logging,
 `EnableSensitiveDataLogging`, `ConfigureWarnings`, query-tracking behaviour, proxies.
 
+## What the client is told about the server
+
+A second argument carries the three things the client cannot work out for itself, because it never
+sees the server's provider:
+
+```csharp
+optionsBuilder.UseInfoCarrier(client, o => o
+    .AllowTypes(typeof(SqlServerDbFunctionsExtensions))
+    .AllowArbitrarySqlExecution()
+    .UseNonRelationalServerStore());
+```
+
+| Call | What it says |
+|---|---|
+| `AllowTypes(...)` | These CLR types may appear in a query beyond the ones the model implies. The usual reason is the `EF.Functions` family your server's provider declares. Register the same types on the server. |
+| `AllowArbitrarySqlExecution()` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server has to grant it too, and only the server's half is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
+| `UseNonRelationalServerStore()` | The server's store is not a relational database, so three relational query rules do not apply. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
+
+Leave all three alone unless one of those sentences is true of your deployment.
+
 ## The three objects
 
 ```csharp

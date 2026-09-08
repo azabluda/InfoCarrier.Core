@@ -90,6 +90,11 @@ the rest. `SaveChanges` including many-to-many graphs. Explicit and lazy loading
 savepoints, `ExecuteUpdate` and `ExecuteDelete`, complex types, JSON-mapped collections, spatial
 types and compiled models.
 
+Where the server's store is relational, which is the usual case, the client knows it. The three
+inheritance mappings, table and entity splitting, `EF.Functions`, your own `HasDbFunction`
+mappings and `AsSplitQuery` all round trip, and `FromSql` runs where the server grants it. See
+[Release notes 10.1](release-notes/10.1.md).
+
 Lazy loading costs one round trip for every navigation you touch, a different price here than
 against a local database. [Loading related data](guide/loading-related-data.md) compares the three
 ways to load. In a browser client it does not work at all, for a reason that is the browser's: see
@@ -99,12 +104,12 @@ The provider runs Microsoft's own EF Core specification suite, the same suite th
 SQLite and InMemory providers run:
 
 ```
-Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177
+Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238
 ```
 
-Every one of the nine is written up on the [limitations](limitations.md) page in terms of the code
-that triggers it. The 177 skips are EF Core's own: tests EF itself skips for the store behind
-them.
+The failures a caller can observe are written up on the [limitations](limitations.md) page in terms
+of the code that triggers them. The 238 skips are EF Core's own: tests EF itself skips for the
+store behind them.
 
 ## Security
 

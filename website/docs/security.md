@@ -27,6 +27,11 @@ server's `DbContext`, so the entity types in your shared model are the whole of 
 compose over. That surface is a boundary until a server grants `FromSql`, because raw SQL names its
 own tables. A query filter is not one either, for the reason below.
 
+`AddInfoCarrierAllowedTypes(...)` widens that surface by the types you name, and the usual reason
+to need it is your provider's `EF.Functions` family. Read §2 of the review before you name anything
+else: the boundary holds as a conjunction, and `Binder`, `MethodInfo` and `Activator` each break it
+on their own, none of them looking dangerous alone.
+
 ## What is yours
 
 !!! danger "Authentication and authorization are out of scope"

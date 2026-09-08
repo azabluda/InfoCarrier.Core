@@ -24,7 +24,10 @@ BUDGET = {
 
     # api-surface.md points at things rather than teaching them, so it keeps the tighter figure
     # the package readmes came from.
-    "website/docs/api-surface.md": 400,
+    # 460 on 2026-09-09, for four more rows in the wiring table: the second `UseInfoCarrier`
+    # overload and the three server-side registrations a caller can now make. A reference page
+    # that omits a public member is wrong rather than short.
+    "website/docs/api-surface.md": 460,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
@@ -47,7 +50,11 @@ BUDGET = {
     # that is a signal about their structure rather than about the number: the security story is
     # told in four places across three pages and each patch has grown one of them. Revisit when
     # that is restructured, not before. See docs/plans/v10/cold-read-findings.md.
-    "website/docs/security.md": 750,
+    # 800 on 2026-09-09. `configuration/server` now tells a reader to read this page before
+    # naming a type in `AddInfoCarrierAllowedTypes`, and the page did not mention that seam at
+    # all, so the instruction pointed at nothing. A widening seam a server can open has to be
+    # named on the page that describes the boundary it widens.
+    "website/docs/security.md": 800,
     "website/docs/guide/errors.md": 750,
 
     # PROVISIONAL, 2026-08-31. Raised from 700 for the reason the tier exists: the page names
@@ -75,7 +82,11 @@ BUDGET = {
     # filter. The page was read for padding first, as doc-style.md requires, and none was found --
     # every paragraph already answers a question a reader arrives with. Same tier as `security`
     # and `guide/errors`, and for the same reason: the page carries a security boundary.
-    "website/docs/configuration/server.md": 750,
+    # 880 on 2026-09-09, for the two grants that were shipped and undocumented:
+    # `AddInfoCarrierAllowedTypes` and `AddInfoCarrierArbitrarySqlExecution`. Both are the
+    # server's decision alone and both widen what a client may send, which is the one class of
+    # fact this page must not leave to IntelliSense.
+    "website/docs/configuration/server.md": 880,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to
@@ -87,7 +98,13 @@ BUDGET = {
     # provider, and since V5 the client builds EF Core's relational model, so `GetTableName()` and
     # `GetRelationalModel()` answer. The command half of that sentence is still true and the model
     # half was not, which is a reader-visible wrong statement rather than padding.
-    "website/docs/guide/querying.md": 750,
+    # 950 on 2026-09-09, for the 10.1 release. The page is where "what runs where" is taught, and
+    # three facts a reader acts on had no home: the three queries the client refuses because it
+    # assumes a relational store, the switch that turns them off, and that `EF.Functions` and a
+    # caller's own `HasDbFunction` mappings cross while a store's own family has to be named on
+    # both halves. The first of those is a behaviour change from 10.0, so a reader who does not
+    # find it here finds it as an exception. Read for padding first; the page is dense already.
+    "website/docs/guide/querying.md": 950,
 
     # 700 on 2026-09-07 when the split log event began naming which operators stayed on the
     # client, and 750 the same day when the round-trip meter shipped. The page gained two facts a
@@ -95,7 +112,10 @@ BUDGET = {
     # to turn logging on and not what the one provider-specific event tells you, and the question
     # two cold readers could not answer ("how many requests does this screen cost") had no home
     # anywhere on the site.
-    "website/docs/configuration/client.md": 750,
+    # 900 on 2026-09-09, for the second `UseInfoCarrier` argument. The three calls it carries are
+    # the only client-side configuration this provider has beyond the transport, and each of them
+    # states a fact about the server that the client cannot work out for itself.
+    "website/docs/configuration/client.md": 900,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

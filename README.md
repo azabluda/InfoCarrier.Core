@@ -79,6 +79,11 @@ complex types, JSON-mapped owned collections, spatial types, compiled models, an
 [Blazor WebAssembly](https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/)
 published trimmed.
 
+Where the server's store is relational, the client knows it. The three inheritance mappings, table
+and entity splitting, `EF.Functions` and your own `HasDbFunction` mappings all round trip, and
+`FromSql` runs where the server grants it. See the
+[10.1 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/10.1/).
+
 An HTTP transport ships in the package. To use gRPC, a message bus, or a direct call in the same
 process, write one small class. `IInfoCarrierTransport` has one method.
 
@@ -95,7 +100,7 @@ If you encounter a bug, have a question, or would like to request a feature,
 use a [draft security advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new)
 instead, as [SECURITY.md](SECURITY.md) describes.
 
-Fixes go to the `10.0` line. The `1.0` to `3.1` line last shipped on 2021-05-07 and gets none.
+Fixes go to the `10.x` line. The `1.0` to `3.1` line last shipped on 2021-05-07 and gets none.
 
 ## Credits
 

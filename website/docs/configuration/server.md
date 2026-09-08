@@ -67,6 +67,26 @@ A query tree is kilobytes, and a `SaveChanges` request is no bigger than the gra
 tracked, so a low limit is usually safe. Cap the request bytes at your gateway too; this limit
 catches whatever the gateway lets through.
 
+## Granting what the model does not imply
+
+Two more registrations widen what a client may send. Both deny by default, and both are the
+server's decision alone.
+
+```csharp
+builder.Services.AddInfoCarrierAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
+builder.Services.AddInfoCarrierArbitrarySqlExecution();
+```
+
+The first admits CLR types a payload may name beyond the ones your model implies. The usual reason
+is the `EF.Functions` family your provider declares, which your server can name with `typeof` and
+the client's package cannot. Register the same types on the client. Read [Security](../security.md)
+before you admit anything else.
+
+The second lets a client send `FromSql` and `Database.SqlQuery<T>`. Read the name literally: one
+command text runs every statement in it, and such a query does not go through `OnModelCreating`, so
+your query filters are not in it. What limits the caller is the rights of the database account your
+connection string uses.
+
 ## Sending the server's log to the client
 
 EF writes its warnings about a query or a save on the server, so a client never sees them.

@@ -41,8 +41,8 @@ same code, which is what makes the wire format meaningful. See
 
     ```xml
     <ItemGroup>
-      <PackageReference Include="InfoCarrier.Core" Version="10.0.0" />
-      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.0.0" />
+      <PackageReference Include="InfoCarrier.Core" Version="10.1.0" />
+      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.1.0" />
     </ItemGroup>
     ```
 
