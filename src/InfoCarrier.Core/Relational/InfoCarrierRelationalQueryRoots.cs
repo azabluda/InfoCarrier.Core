@@ -17,17 +17,21 @@ namespace InfoCarrier.Core.Relational;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>This class is the whole argument for the package.</b> The implementation it replaces
-///         did the same job with reflection, because <c>InfoCarrier.Core</c> may not reference
-///         <c>Microsoft.EntityFrameworkCore.Relational</c> (<c>architecture.md</c> §6a <b>D3</b>):
-///         two types resolved by full name against every loaded assembly, four
-///         <c>GetProperty</c> reads, two <c>Activator.CreateInstance</c> calls, and <b>ten
+///         <b>This class is the whole argument for referencing the relational package.</b> The
+///         implementation it replaces did the same job with reflection, because
+///         <c>InfoCarrier.Core</c> could not then name
+///         <c>Microsoft.EntityFrameworkCore.Relational</c>: two types resolved by full name
+///         against every loaded assembly, four <c>GetProperty</c> reads, two
+///         <c>Activator.CreateInstance</c> calls, and <b>ten
 ///         <c>UnconditionalSuppressMessage</c> attributes</b> arguing that the members survive
 ///         trimming. All of it is gone; what is left is the four lines a compiler can check.
 ///     </para>
 ///     <para>
-///         <b>D3 is untouched.</b> The reference lives here, in a package an application adds only
-///         when its backing store is relational, so a non-relational backend stays possible.
+///         <b>A non-relational backend stays possible, and nothing here is what would stop it.</b>
+///         This type is asked whether a node is one of EF's raw-SQL query roots, and a query that
+///         holds none never reaches it. See
+///         <c>InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore</c> for the rules a
+///         client does relax when the server's store is not a database of tables.
 ///     </para>
 ///     <para>
 ///         <b>The exact types, not a base.</b> Every query root that carries state beyond its

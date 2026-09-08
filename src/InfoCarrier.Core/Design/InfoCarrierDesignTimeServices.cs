@@ -39,13 +39,13 @@ namespace InfoCarrier.Core.Design;
 ///         the attribute rather than the other way round.
 ///     </para>
 ///     <para>
-///         <b>Core's annotation code generator, not the relational one.</b> This provider
-///         references <c>Microsoft.EntityFrameworkCore.Relational</c> — for the metadata
-///         vocabulary a backing store's model uses — but the client is never a relational context
-///         (ADR-013), so its model carries no relational annotations to generate.
-///         <c>TryAddCoreServices</c> supplies <c>CSharpRuntimeAnnotationCodeGenerator</c> and that
-///         is the right one. Nothing provider-specific is overridden because this provider adds no
-///         runtime annotation of its own; if it ever does, that override goes here.
+///         <b>EF's relational annotation code generator, and this paragraph said the opposite
+///         until 2026-09-09.</b> It read <em>core's generator, not the relational one</em>, on the
+///         reasoning that the client is never a relational context (ADR-013) so its model carries
+///         no relational annotations. The client model has carried them since it began building a
+///         relational model, and the registration below has been the relational one since. Nothing
+///         provider-specific is overridden beyond that, because this provider adds no runtime
+///         annotation of its own; if it ever does, that override goes here.
 ///     </para>
 /// </remarks>
 public class InfoCarrierDesignTimeServices : IDesignTimeServices

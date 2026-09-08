@@ -97,16 +97,17 @@ public static class InfoCarrierServiceCollectionExtensions
         // application's collection's business, not EF's.
         services.TryAddSingleton<Metadata.IInfoCarrierDocumentMapping, Metadata.AnnotationDocumentMapping>();
 
-        // How to recognise EF's relational raw-SQL query roots (#97). The default knows nothing,
-        // which makes a raw-SQL root refused rather than shipped with its SQL dropped; the
-        // `InfoCarrier.Core.Relational` package replaces it. Registered here for the same reason
+        // How to recognise EF's relational raw-SQL query roots (#97). One implementation, and it
+        // names EF's two types outright; before the relational reference came back it did the same
+        // job by reflection. Registered here rather than through EF's builder for the same reason
         // as the line above -- a provider's own service is the application's collection's
-        // business, not EF's.
+        // business, not EF's -- and `TryAdd`, so an application can still put its own in the slot.
         services.TryAddSingleton<Metadata.IInfoCarrierRelationalQueryRoots, Relational.InfoCarrierRelationalQueryRoots>();
 
-        // EXPERIMENT (always-on relational): the client facade dependencies that
-        // `AddInfoCarrierRelationalClient()` used to add. `RemoveAll` first on both, so a repeated
-        // call to this method leaves the collection unchanged.
+        // THE CLIENT'S FACADE DEPENDENCIES, which `Database.SqlQuery<T>` type-tests for before it
+        // builds anything. `AddInfoCarrierRelationalClient()` used to add them and there is no
+        // opt-in left (R135), so they go in unconditionally. `RemoveAll` first on both, so a
+        // repeated call to this method leaves the collection unchanged.
         services.RemoveAll<IRelationalDatabaseFacadeDependencies>();
         services.RemoveAll<IDatabaseFacadeDependencies>();
         services.AddScoped<IRelationalDatabaseFacadeDependencies, Relational.InfoCarrierRelationalFacadeDependencies>();

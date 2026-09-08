@@ -85,13 +85,39 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     ///         are only true of the first.
     ///     </para>
     ///     <para>
-    ///         <b>It guards one thing: refusing a <c>Distinct</c> or set operation over a
-    ///         projection that carries a collection.</b> Every relational provider refuses that
-    ///         query, so refusing it here keeps LINQ written against this provider portable.
-    ///         EF's InMemory provider does not refuse it, and enforcing a relational rule over a
-    ///         non-relational store would fail a query the store can answer -- measured, at eight
-    ///         specification tests.
+    ///         <b>It guards four things, and each of the first three was made conditional because
+    ///         enforcing it over EF's InMemory provider failed a query that store can answer.</b>
+    ///         Every relational provider refuses all three, so refusing them by default keeps LINQ
+    ///         written against this provider portable.
     ///     </para>
+    ///     <list type="number">
+    ///         <item>
+    ///             <description>
+    ///                 A <c>Distinct</c> or set operation over a projection that carries a
+    ///                 collection, whose identifying columns do not survive it. Measured at eight
+    ///                 specification tests.
+    ///             </description>
+    ///         </item>
+    ///         <item>
+    ///             <description>
+    ///                 An ordering key of a type the wire cannot carry, which would otherwise be
+    ///                 answered by fetching the whole table and sorting it here (R160, R164).
+    ///             </description>
+    ///         </item>
+    ///         <item>
+    ///             <description>
+    ///                 A coalesce over a freshly constructed object in a row-deciding position,
+    ///                 which no store translates and which does nothing (R165).
+    ///             </description>
+    ///         </item>
+    ///         <item>
+    ///             <description>
+    ///                 The wording of a refused <c>ExecuteUpdate</c> or <c>ExecuteDelete</c>: EF
+    ///                 raises <c>NonQueryTranslationFailedWithDetails</c> for a bulk operation and
+    ///                 the query form otherwise, and the spec suite asserts the difference (R171).
+    ///             </description>
+    ///         </item>
+    ///     </list>
     ///     <para>
     ///         <b>The default is the relational one on purpose.</b> A server whose store is not
     ///         relational is the rare deployment, and the default that costs a wrong answer must

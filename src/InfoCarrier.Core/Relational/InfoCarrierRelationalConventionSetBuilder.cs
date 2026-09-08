@@ -1,7 +1,6 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
@@ -21,10 +20,9 @@ namespace InfoCarrier.Core.Relational;
 ///         <b>It EXTENDS the core builder rather than standing beside it.</b>
 ///         <see cref="InfoCarrierConventionSetBuilder" /> stays the one builder; this subclass
 ///         takes its set and adds the relational conventions EF already ships. That is the owner's
-///         rule for this package, stated 2026-09-03: <c>InfoCarrier.Core.Relational</c> overwrites
-///         or extends <c>InfoCarrier.Core</c>'s DI services and never carries a near-copy beside
-///         one. Two implementations of a single fact in two packages drift, and the drift is
-///         silent.
+///         rule for the relational half, stated 2026-09-03: it overwrites or extends the core
+///         half's DI services and never carries a near-copy beside one. Two implementations of a
+///         single fact drift, and the drift is silent.
 ///     </para>
 ///     <para>
 ///         <b>What it deletes.</b> <c>InfoCarrierHierarchyMappingConvention</c> — 131 hand-written
@@ -42,10 +40,10 @@ namespace InfoCarrier.Core.Relational;
 ///         that way. <b>ONE OF THE TWO IS REAL NOW:</b> the annotation provider supplies
 ///         <em>annotations</em>, which is exactly this package's charter, and a relational model
 ///         on the client needs it, so EF's own <c>RelationalAnnotationProvider</c> fills that slot.
-///         <c>IUpdateSqlGenerator</c> is command-side and its stub still throws. That is this package's charter
-///         (<c>architecture.md</c> §6a D3): annotations and type identity, never a connection or
-///         anything standing for one. So every member of both stubs throws. If EF ever starts
-///         calling one, this fails loudly at model build instead of answering plausibly and
+///         <c>IUpdateSqlGenerator</c> is command-side and its stub still throws. That is the
+///         relational half's charter (<c>architecture.md</c> §6a D3): annotations and type
+///         identity, never a connection or anything standing for one. If EF ever starts calling
+///         the stub, this fails loudly at model build instead of answering plausibly and
 ///         wrongly — the same reasoning ADR-013 records for
 ///         <see cref="InfoCarrierRelationalFacadeDependencies" />'s three throwing members.
 ///     </para>
@@ -166,78 +164,9 @@ public class InfoCarrierRelationalConventionSetBuilder(
     private static InvalidOperationException NoDatabase(string member)
         => new(
             $"The InfoCarrier client has no database of its own, so '{member}' has no value here. "
-            + "InfoCarrier.Core.Relational supplies relational METADATA to the client model and "
-            + "nothing that reaches a connection. A caller arriving here wants the SERVER's "
-            + "command pipeline, which does not cross the wire.");
-
-    /// <summary>
-    ///     The annotation provider a client with no database does not have. Every member throws.
-    /// </summary>
-    /// <remarks>
-    ///     It exists only to fill <see cref="RelationalConventionSetBuilderDependencies" />, which
-    ///     <see cref="EntityTypeHierarchyMappingConvention" /> holds and never reads. Every member
-    ///     here answers about the <em>store's</em> schema — tables, columns, sequences, triggers —
-    ///     which is the far side of the wire. See the class remarks.
-    /// </remarks>
-    private sealed class NoAnnotationProvider : IRelationalAnnotationProvider
-    {
-        public IEnumerable<IAnnotation> For(IRelationalModel value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ITable value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IColumn value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IView value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IViewColumn value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ISqlQuery value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ISqlQueryColumn value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IStoreFunction value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IStoreFunctionParameter value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IFunctionColumn value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IStoreStoredProcedure value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IStoreStoredProcedureParameter value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IStoreStoredProcedureResultColumn value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IUniqueConstraint value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ITableIndex value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(IForeignKeyConstraint value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ISequence value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ICheckConstraint value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-
-        public IEnumerable<IAnnotation> For(ITrigger value, bool designTime)
-            => throw NoDatabase(nameof(IRelationalAnnotationProvider));
-    }
+            + "This provider gives the client model relational METADATA and nothing that reaches "
+            + "a connection. A caller arriving here wants the SERVER's command pipeline, which "
+            + "does not cross the wire.");
 
     /// <summary>
     ///     The update SQL generator a client with no database does not have. Every member throws.

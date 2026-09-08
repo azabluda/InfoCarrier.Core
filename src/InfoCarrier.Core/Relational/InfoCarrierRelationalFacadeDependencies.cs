@@ -24,15 +24,13 @@ namespace InfoCarrier.Core.Relational;
 ///         or a shape cannot satisfy it; only an object that really implements the interface can.
 ///     </para>
 ///     <para>
-///         <b><c>InfoCarrier.Core</c> still references nothing relational, and
-///         <c>architecture.md</c> §6a D3 stands as written.</b> <see cref="DatabaseFacade" />
+///         <b>It is replaceable from outside the package.</b> <see cref="DatabaseFacade" />
 ///         resolves its dependencies with
-///         <c>context.GetService&lt;IDatabaseFacadeDependencies&gt;()</c>, so the registration is
-///         replaceable from outside the package — and the harness is an application, exactly as it
-///         is for R85's <c>AddInfoCarrierAllowedTypes</c> and R95's
-///         <c>AddInfoCarrierArbitrarySqlExecution</c>. <b>This package is that application's
-///         shipped half</b> (#97): it references the relational package so no consumer has to
-///         write this class by hand.
+///         <c>context.GetService&lt;IDatabaseFacadeDependencies&gt;()</c>, so an application can
+///         put its own object in this slot, exactly as it can for R85's
+///         <c>AddInfoCarrierAllowedTypes</c> and R95's <c>AddInfoCarrierArbitrarySqlExecution</c>.
+///         <b><c>InfoCarrier.Core</c> ships this one</b> (#97), so no consumer has to write it by
+///         hand.
 ///     </para>
 ///     <para>
 ///         <b>The three relational members throw, and nothing on this path calls them.</b>

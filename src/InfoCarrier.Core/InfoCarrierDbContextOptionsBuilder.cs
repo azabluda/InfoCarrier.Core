@@ -114,11 +114,14 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     ///         knows and says so once.
     ///     </para>
     ///     <para>
-    ///         <b>It changes one behaviour.</b> By default this provider refuses a <c>Distinct</c>
-    ///         or set operation applied over a projection that carries a collection, because every
-    ///         relational provider refuses that query and LINQ written here should run elsewhere
-    ///         unchanged. A non-relational store answers it, and refusing would fail a query the
-    ///         store supports.
+    ///         <b>It lifts three refusals.</b> By default this provider refuses a <c>Distinct</c>
+    ///         or set operation over a projection that carries a collection, an ordering key of a
+    ///         type the wire cannot carry, and a coalesce over a freshly constructed object in a
+    ///         row-deciding position. Every relational provider refuses all three, so refusing
+    ///         them keeps LINQ written here portable. A non-relational store answers them, and
+    ///         refusing would fail a query the store supports.
+    ///         <see cref="InfoCarrierOptionsExtension.ServerStoreIsRelational" /> lists them with
+    ///         what each one costs.
     ///     </para>
     ///     <para>
     ///         <b>Call it only when the server really is not relational.</b> Calling it against a

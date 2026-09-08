@@ -6297,3 +6297,28 @@ owner asked for, the user-facing pages, and the release notes.
       humanizer pass ran on the result, `mkdocs build --strict` is clean, `eng/doc-links.py`
       reports 0 broken in 61 files, and no changed page contains a dash.
 
+- [x] **Y5. Six doc comments corrected, and a stub nothing referenced deleted.** `src/` change, so
+      both gates. XML documentation ships in the package and shows in IntelliSense, so a remark
+      that contradicts its own code is a defect a consumer can read. What was wrong:
+
+      | Where | Said | Truth |
+      |---|---|---|
+      | `InfoCarrierRelationalQueryRoots` | `InfoCarrier.Core` may not reference the relational package; the reference lives in a package an application adds | It does reference it, and there is no such package |
+      | `InfoCarrierRelationalFacadeDependencies` | `InfoCarrier.Core` still references nothing relational | Same |
+      | `InfoCarrierRelationalConventionSetBuilder` | the owner's rule for *this package*; its `NoDatabase` **exception text** named `InfoCarrier.Core.Relational` | A consumer can see that exception text |
+      | `InfoCarrierDesignTimeServices` | *Core's annotation code generator, not the relational one* | The code two paragraphs below registers the relational one |
+      | `InfoCarrierOptionsExtension.ServerStoreIsRelational` and `UseNonRelationalServerStore` | it guards one thing | Four, listed in Y1 |
+      | `QuerySplitter` | the hints are named as strings because the package cannot reference `EFCore.Relational`, and are stripped because this provider cannot honour them | The reference is back, and R149 carries the hint on the request so the server honours it |
+
+      `NoAnnotationProvider` had no references: V5 put EF's real `RelationalAnnotationProvider` in
+      that slot and left the stub behind. Deleting it made one `using` unnecessary, which
+      `CI=true dotnet build -c Release` caught as `IDE0005` and which is the gate working.
+      Release build back to `5 Warning(s), 0 Error(s)`, the five being the framework's own Razor
+      output. Trim ratchet `ours` 90 <= 90.
+
+      **NOT corrected, because they are outside what the owner scoped to this pass**, and both are
+      real: `architecture.md` §6a D3 still says level 3 is out of scope and that a relational model
+      on the client needs store knowledge the client cannot have, which V5 built; and `CLAUDE.md`
+      still calls TPT/TPC "the one real gap" with "no TPT or TPC test class at any tier" (there are
+      four) and still names `InfoCarrierOptionsExtension.RelationalQueryRootsFor`, which no longer
+      exists.

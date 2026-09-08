@@ -31,9 +31,11 @@ public sealed class QuerySplitter
         nameof(EntityFrameworkQueryableExtensions.IgnoreAutoIncludes),
     ];
 
-    // The two relational query hints, which this provider cannot honour and strips outright --
-    // see `SplitHintStrippingVisitor` below. Named as strings because `InfoCarrier.Core` does not
-    // reference `EFCore.Relational` (M9), so `RelationalQueryableExtensions` is not a type here.
+    // The two relational query hints. This provider issues no statements, so it strips them from
+    // the tree and carries the answer on the request instead, for the server to honour -- see
+    // `SplitHintStrippingVisitor` below and R149. Named as strings rather than with `nameof`
+    // because they were written when `InfoCarrier.Core` could not reference `EFCore.Relational`;
+    // the reference is back, and naming the type here would buy nothing but a longer line.
     private const string RelationalQueryableExtensionsFullName
         = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions";
 
