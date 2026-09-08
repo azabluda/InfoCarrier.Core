@@ -1,4 +1,4 @@
-# Architecture — InfoCarrier.Core v2
+﻿# Architecture — InfoCarrier.Core v2
 
 Status: **PRE-IMPLEMENTATION (structure + strategy defined; internal seams provisional)**
 · Decisions: [`decisions.md`](decisions.md) · Serializer: [`expression-serialization.md`](expression-serialization.md)
@@ -306,6 +306,12 @@ compares the client model with the server model directly.
 > because the split may be wanted again and the measurements are the reason it would be. Read the
 > **supersession amendment 2026-09-03 (R131)** at the end of this entry first; it states the new
 > shape and the conditions that would reverse it back.
+>
+> **AND READ THE V5 AMENDMENT AFTER IT, 2026-09-07.** Everything below that says level 3 is out of
+> scope, and everything that says a relational model on the client needs store knowledge the client
+> cannot have, is HISTORY. Level 3 is built: `GetRelationalModel()` answers on a client context.
+> The sentences are left in place because the reasoning they were wrong about is worth reading, and
+> the amendment says which word was wrong.
 
 
 **Raised 2026-08-11. Ideally the reference should not be there. Recorded with the facts so the
@@ -775,6 +781,55 @@ implementation and no way to configure another, there is one answer and nothing 
 **What ADR-009's two tiers are about now.** The backing store, and which specification bases each
 tier can host. **Not** whether the client is relational, which is what the R127 and R128 amendments
 and the two test projects' own comments said. Every client is relational.
+
+#### D3 amendment 2026-09-07 (V5) — LEVEL 3 IS BUILT, and the sentence that ruled it out was wrong about one word
+
+**The supersession above says level 3 is out of scope because "a relational model on the client
+needs an `IRelationalTypeMappingSource`, which is store knowledge on the far side of the wire (B4,
+106 failures)". The client has had one since V5, and `GetRelationalModel()` answers.** The owner's
+question is what found it: *do both sides not use the exact same model?* They do. A model is not
+only `OnModelCreating`, though; the rest is the convention set, and that comes from the provider.
+
+**The error is one word. `IRelationalTypeMappingSource` is EF's SURFACE, not a store's knowledge.**
+`InfoCarrierRelationalTypeMappingSource` satisfies the interface and returns an
+`InfoCarrierTypeMapping` for every scalar, whose store type name comes from EF's own neutral table
+and names no database. What the interface buys is that EF's relational model building can cast
+`ITypeMappingSource` to it, which is all that building a relational model here requires. **B4's rule
+is untouched, and it is what makes this sound**: the mapping is derived from the CLR type alone,
+through `InfoCarrierTypeMappingSource.FindInfoCarrierMapping`, which both sources call so the two
+cannot drift. The SAME INSTANCE answers both interfaces, so two sources cannot disagree about one
+property either.
+
+**The other half of that sentence stayed true, and it is why the wiring is by hand.**
+`EntityFrameworkRelationalServicesBuilder.TryAddCoreServices()` still collides with ADR-006, so
+`AddEntityFrameworkInfoCarrier` registers the ten services `RelationalModelRuntimeInitializer`
+actually needs, read out of EF's source rather than guessed. No connection, migrator, SQL generator
+or database creator comes with them.
+
+**A second class rather than a re-based one, because `InfoCarrierTypeMappingSource` shipped in
+`10.0.0`.** `RelationalTypeMappingSource` does not derive from `TypeMappingSource`, so re-basing the
+published class is a `CP0002` the pack gate refuses, and a source break for anyone who subclassed
+it. The published class stays and the relational one is an additive sibling.
+
+**What it cost.** `failed` 35 -> 34, `total` unchanged at 29514. Four more layers had to be found by
+probing, and each is recorded in V5: the relational model was built over the design-time model and
+dropped at the runtime conversion, so `RuntimeModelConvention` is replaced with EF's relational one;
+that made EF call the convention builder's stub annotation provider, so EF's real
+`RelationalAnnotationProvider` fills that slot while the `IUpdateSqlGenerator` stub still throws;
+and the compiled-model generator met a relational annotation the core code generator cannot
+scaffold, so the design-time services register EF's relational one.
+
+**Reversal condition 3 is therefore met on its own terms and reverses nothing.** It reads "the
+relational half grows past what a monolith should carry, for instance if level 3 is ever attempted".
+Level 3 was attempted, and the growth is ten registrations and one 41-line class. That is not what
+the condition was written about. Conditions 1 and 2 are unchanged and are the ones still worth
+watching.
+
+**The charter holds, and it is gated rather than asserted.** This code reads relational annotations
+and names relational types, and never gives the client a `DbConnection`.
+`InMemorySmokeTest.Ordinary_use_never_builds_the_relational_model` asserts that the lazy factory
+annotation is present and its result is not, so nobody who does not ask for a relational model pays
+for one. `A_non_relational_server_is_served_end_to_end` is the other half.
 
 ### D5 — the query boundary does not ask the backend what it can translate
 

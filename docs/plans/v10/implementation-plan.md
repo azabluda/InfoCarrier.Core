@@ -6316,9 +6316,49 @@ owner asked for, the user-facing pages, and the release notes.
       Release build back to `5 Warning(s), 0 Error(s)`, the five being the framework's own Razor
       output. Trim ratchet `ours` 90 <= 90.
 
-      **NOT corrected, because they are outside what the owner scoped to this pass**, and both are
-      real: `architecture.md` §6a D3 still says level 3 is out of scope and that a relational model
-      on the client needs store knowledge the client cannot have, which V5 built; and `CLAUDE.md`
-      still calls TPT/TPC "the one real gap" with "no TPT or TPC test class at any tier" (there are
-      four) and still names `InfoCarrierOptionsExtension.RelationalQueryRootsFor`, which no longer
-      exists.
+      Two more were found and were outside this step's scope; the owner scoped them in, and Y6
+      is where they are corrected.
+
+- [x] **Y6. `architecture.md` D3 and `CLAUDE.md` brought up to date with reality.** Documents only,
+      so neither gate. Three claims that the shipped code contradicts.
+
+      **D3 said level 3 was out of scope, and V5 built it.** The sentence it rested on is
+      *"a relational model on the client needs an `IRelationalTypeMappingSource`, which is store
+      knowledge on the far side of the wire (B4, 106 failures)"*. **The error is one word.**
+      `IRelationalTypeMappingSource` is EF's SURFACE, not a store's knowledge:
+      `InfoCarrierRelationalTypeMappingSource` satisfies the interface and returns an
+      `InfoCarrierTypeMapping` for every scalar, whose store type name comes from EF's own neutral
+      table and names no database. What the interface buys is that EF's relational model building
+      can cast `ITypeMappingSource` to it. **B4's rule is untouched and is what makes it sound**:
+      the mapping is derived from the CLR type alone, through one shared
+      `FindInfoCarrierMapping`, and the same instance answers both interfaces so two sources
+      cannot disagree about one property.
+
+      The other half of that sentence stayed true and is why the wiring is by hand:
+      `EntityFrameworkRelationalServicesBuilder.TryAddCoreServices()` still collides with ADR-006.
+      Reversal condition 3 ("the relational half grows ... if level 3 is ever attempted") is met on
+      its own terms and reverses nothing: the growth is ten registrations and one 41-line class.
+      Conditions 1 and 2 are the ones still worth watching. The earlier level-3 sentences are LEFT
+      IN PLACE as history, with a pointer in D3's own header note, because the reasoning they were
+      wrong about is worth reading.
+
+      **`CLAUDE.md` called TPT/TPC "the one real gap" with "no TPT or TPC test class at any tier".**
+      Tier B has four, adopted across R5-R12, plus TPT and TPC variants of Gears of War, bulk
+      updates, relationships and many-to-many. The reason the gap was real is closed too: it changes
+      the model, and since R135 the client carries the server's `Relational:MappingStrategy` rather
+      than core EF's guess. **The user-facing rule is NARROWED rather than broken**: a document may
+      now say the three inheritance mappings round trip, because Tier B is a real relational store
+      and the coverage is direct; it still may not claim anything about SQL Server, which this suite
+      does not run, and that is unchanged for computed columns, sequences and `rowversion`.
+
+      **`CLAUDE.md` named `InfoCarrierOptionsExtension.RelationalQueryRootsFor` as R120's one
+      reader.** It does not exist: R135 deleted the option, so there is one implementation and
+      `QueryExecutor` holds `InfoCarrierRelationalQueryRoots.Instance` directly. **R120's rule
+      outlived its example, and its live instance is a different pair** -- what may be SENT
+      (`AllowedTypesFor`) against what may be READ BACK (the DI-scoped `TypeNodeResolver`). Those
+      disagreed silently until `Database.SqlQuery<UnmappedCustomer>` cleared the boundary and then
+      failed to materialize its own rows.
+
+      **And the plan-contents line was stale**: it read "now holds M5's one remaining criterion"
+      long after that criterion landed. The plan is issue-driven and holds Phases Q, R, S, T, U, V
+      and Y.

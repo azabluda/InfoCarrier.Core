@@ -297,10 +297,22 @@ must — `ExtensionInfo.GetServiceProviderHashCode()` is `0`, so every client co
 shares one internal service provider and anything per-context has to travel on the options. The
 forward translator read it from **DI**, because it is DI-scoped. A client that set the option but
 not the service then **admitted** a raw-SQL root at the boundary and **dropped its SQL** in the
-translator: the whole table came back, silently, which is the defect R75 closed.
-`InfoCarrierOptionsExtension.RelationalQueryRootsFor` is now the one reader, called once per
-execution in `QueryExecutor` and handed to both. **When a permission and the knowledge it guards
-live on different carriers, check that one reader answers for both.**
+translator: the whole table came back, silently, which is the defect R75 closed. **When a permission
+and the knowledge it guards live on different carriers, check that one reader answers for both.**
+
+**That original instance is closed by construction and the fix it once named is GONE.**
+`RelationalQueryRootsFor` does not exist: R135 deleted the option, so there is one implementation
+and nothing to reconcile, and `QueryExecutor` holds
+`Relational.InfoCarrierRelationalQueryRoots.Instance` directly.
+
+**The rule outlived it, and its live instance is a different pair.** What may be **SENT** is decided
+by `InfoCarrierOptionsExtension.AllowedTypesFor`, read per execution in `QueryExecutor`; what may be
+**READ BACK** is decided by the DI-scoped `TypeNodeResolver`, whose own allowlist knows only the
+model. Those two disagreed silently until a declared projection type came back over the wire:
+`Database.SqlQuery<UnmappedCustomer>` cleared the boundary and then failed to materialize its own
+rows. `QueryExecutor` now hands the same list to both directions. **A `DbParameter` is sent and
+never returned, which is why the older registered type showed nothing** — a one-way fact cannot
+expose a two-reader disagreement.
 
 **There are TWO shipped packages since 2026-09-03, and `release.yml` names them one by one.**
 `InfoCarrier.Core` and `InfoCarrier.Core.AspNetCore`. The push steps use exact filenames rather than
@@ -321,8 +333,15 @@ conditions that would call for it.
 sample apps, packaging), two out of scope for v10 (gRPC and streaming; the compiled-query cache),
 and requirements §4.5 answered in two halves (trimming verified, Native AOT not supported). Task
 detail is archived in `docs/plans/v10/archive/implementation-plan-m8-phases-h-n.md` and is never
-edited again. **`docs/plans/v10/implementation-plan.md` now holds M5's one remaining criterion, the
-remote cancel signal (W6)**, and it is now the only work left in the whole roadmap.
+edited again. M5's last criterion, the remote cancel signal (W6), landed the same day.
+
+**Every milestone is closed, so `docs/plans/v10/implementation-plan.md` is ISSUE-DRIVEN and not
+milestone-driven** (corrected 2026-09-09; it read "now holds M5's one remaining criterion" long
+after that criterion landed). It holds Phases Q, R, S, T, U, V and Y, each naming the GitHub issue
+it serves, and which release a phase lands in is decided on the issue rather than in the plan.
+**Phase Y is the 10.1 release preparation.** The letter is Y and not W because **W1 to W6 are M5's
+requirement labels**, used throughout `roadmap.md` and the archives; a Phase W would have collided
+in the one document where both are read.
 
 **M7's SQL Server tier is DROPPED (2026-08-24, owner's decision), not deferred.** What is withdrawn
 is a *third test tier* for this repository's suite, never support for the store: the server side is
@@ -334,11 +353,23 @@ too broad for three of them.** Computed columns, sequences and `rowversion` all 
 side of the wire, to mechanisms with direct green coverage: store-generated values
 (`StoreGeneratedTestBase`, including `OnAddOrUpdate`) and concurrency tokens (67 pass). What is
 untested about those three is the *store's* behaviour, which is an ordinary EF concern on the
-server and never crosses this wire. **TPT/TPC is the one real gap**: it changes the model, and this
-provider builds a model on the client too, and no TPT or TPC test class exists here at any tier.
-**No user-facing document may claim any of the four works** — green coverage of a mechanism is not
-a claim about a store this suite never runs. A non-relational backend tier
-is recorded as future scope with nothing committed.
+server and never crosses this wire.
+
+**TPT/TPC WAS "the one real gap" AND IS NOT ONE ANY MORE (corrected 2026-09-09).** This paragraph
+read *"no TPT or TPC test class exists here at any tier"* until then, and by then Tier B had four:
+`TPTInheritanceQueryInfoCarrierTest`, `TPCInheritanceQueryInfoCarrierTest`,
+`TPHInheritanceQueryInfoCarrierTest` and `TPTTableSplittingInfoCarrierTest`, adopted across R5-R12,
+plus TPT and TPC variants of Gears of War, bulk updates, relationships and many-to-many. The reason
+the gap was real is also closed: it changes the *model*, and since R135 the client carries the
+server's mapping strategy rather than core EF's guess (`Relational:MappingStrategy` on every
+hierarchy root, in the compiled-model baselines).
+
+**So the rule below is NARROWED rather than broken, and the narrowing is deliberate.** *A
+user-facing document may say the three inheritance mappings round trip*, because Tier B is a real
+relational store and the coverage is direct rather than a mechanism proxy. **It still may not claim
+anything about SQL Server**, which this suite does not run, and that is unchanged for computed
+columns, sequences and `rowversion`, whose coverage really is by mechanism. A non-relational backend
+tier is recorded as future scope with nothing committed.
 
 **M9 is CLOSED (2026-08-17).** The paragraph below was written while M8 was still open.
 **M9 is CLOSED (2026-08-17). M8 is NOT.** M9 met its four exit criteria: the document-mapping seam
