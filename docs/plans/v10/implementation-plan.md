@@ -6225,3 +6225,48 @@ key for it. What identifies it is its **ordinal in the sent batch**, which the s
       and `eng/trim-ratchet.sh` (`ours` 89 ≤ 89). Local runs: the two pinned tests pass, the 19
       TransportTests pass, and `OptimisticConcurrency` / `StoreGeneratedFixup` / `GraphUpdates`
       (1763/1769) are unchanged; a full run OOMs this box, so the CI Spec ratchet confirms.
+
+## Phase Y — preparing the 10.1 release
+
+**Not a milestone.** The 255 commits since `v10.0.1` made a relational backing store a first-class
+case, and none of it was stated for a consumer. This phase is the release preparation: the audit the
+owner asked for, the user-facing pages, and the release notes.
+
+- [x] **Y1. The non-relational path audited, and it is not degraded.** No code change. Full suite
+      on a clean tree: `Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238`, byte-identical
+      to `test/known-failures.names.txt` (FIXED none, BROKEN none). `InfoCarrier.Core.TransportTests`
+      22 of 22.
+
+      **The owner's question was whether the relational work had quietly made this provider
+      relational-only.** V6 answered it once and called its own evidence weak on purpose. This is
+      the wider pass, and the answer is the same.
+
+      Four kinds of evidence, and none of them is the count alone:
+
+      1. **Nothing in `src/` reads a relational name**, which the compiler answers rather than a
+         text search. `GetTableName()` has one caller and it is a test assertion;
+         `Model.GetRelationalModel()` has one and it is a test assertion; `GetColumnName()` has
+         none. No hand-spelled `Relational:` annotation literal survives in `src/` since R133.
+      2. **The relational model is lazy and nothing forces it.**
+         `Ordinary_use_never_builds_the_relational_model` asserts the factory annotation is present
+         and its result is not.
+      3. **The relational query rules are behind `UseNonRelationalServerStore()`, and there are
+         FOUR of them rather than the one both doc comments claimed**:
+         `RejectIdentityLosingCollectionProjection`, `RejectUnshippableOrderingKey`,
+         `RejectDeadCoalesce`, and the bulk-operation refusal wording (R171). Each of the first
+         three was made conditional *because* enforcing it unconditionally failed Tier A tests, so
+         the non-relational tier is what keeps them honest rather than an afterthought.
+      4. **8,777 InMemory tests pass and 2 fail**, and both are C64's
+         `Correlated_collection_with_distinct_3_levels`, whose assertion no correct answer can
+         satisfy.
+
+      **The one real cost is payload, not capability, and it was already measured.**
+      `Microsoft.EntityFrameworkCore.Relational` is +0.62 MB brotli on the Blazor sample,
+      unconditional, with no new package dependency (`architecture.md` §6a, D3 supersession). A
+      deployment whose server is not relational pays it and gets nothing back. That is reversal
+      condition 2 in the supersession, and it stands as written.
+
+      **The weakness in the evidence is unchanged and stated rather than glossed.** The only
+      non-relational store in the suite is EF's InMemory provider, which has no document shape, no
+      store types and no refusals of its own. Issue #51 is what would answer the question properly.
+
