@@ -32,6 +32,13 @@ BUDGET = {
     "website/docs/release-notes/10.0.md": 700,
     "website/docs/platforms/blazor-webassembly.md": 700,
 
+    # 800 on 2026-09-09, when the page was written. A release-notes page is one subject per
+    # release, and this release has more subjects in it than 10.0 did: raw SQL, store functions,
+    # three inheritance mappings, the relational model on the client, and three queries that used
+    # to answer and now throw. The last of those is the one a reader has to act on, so it carries
+    # a table of the three shapes rather than a sentence naming none of them.
+    "website/docs/release-notes/10.1.md": 800,
+
     # Added to the 700 tier 2026-08-24, after a verification read. Each covers a whole subject
     # rather than one task: the security model, and the entire failure taxonomy. Both gained
     # facts that were verified in source and that a reader had asked for by name, and the padding

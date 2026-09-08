@@ -6270,3 +6270,9 @@ owner asked for, the user-facing pages, and the release notes.
       non-relational store in the suite is EF's InMemory provider, which has no document shape, no
       store types and no refusals of its own. Issue #51 is what would answer the question properly.
 
+- [x] **Y2. The 10.1 release notes, the release body and the changelog row.**
+      `website/docs/release-notes/10.1.md` is new at an 800-word budget, in the nav, and
+      `docs/release-bodies/v10.1.0.md` holds the GitHub body. The changelog's stale
+      `10.0.0-preview.1` row is corrected to `10.0.1`, which is what actually shipped last on that
+      line.
+

@@ -5,7 +5,8 @@ A second copy of release notes goes stale, and the copy people find first is the
 
 | Version | Date | Notes |
 |---|---|---|
-| `10.0.0-preview.1` | 2026-08-18 | [10.0 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/10.0/) |
+| `10.1.0` | 2026-09-09 | [10.1 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/10.1/) |
+| `10.0.1` | 2026-08-27 | [10.0 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/10.0/) |
 | `3.1.1` | 2021-05-07 | [Releases](https://github.com/azabluda/InfoCarrier.Core/releases) |
 | `3.1.0` | 2020-12-31 | [Releases](https://github.com/azabluda/InfoCarrier.Core/releases) |
 | `1.0.0` | 2017-06-20 | [Releases](https://github.com/azabluda/InfoCarrier.Core/releases) |

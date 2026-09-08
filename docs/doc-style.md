@@ -1,4 +1,4 @@
-# Documentation style
+﻿# Documentation style
 
 The rules for every document written for someone outside this repository: the README, the two
 package readmes under `src/`, the site under `website/`, the GitHub release bodies, and the package
@@ -33,6 +33,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | A site page that points | 400 | `api-surface.md` only |
 | The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy` |
 | Four pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name; `configuration/server`, raised 2026-09-04 when server-side log forwarding shipped and the page had to say what crosses and why sensitive logging is a second grant; `configuration/client`, raised 2026-09-07 for the split event's new detail and the round-trip meter; `guide/querying`, raised 2026-09-04 when the residual audit measured that paging above a rebuilt projection runs on the client and again 2026-09-07 when the client began answering EF's relational model API |
+| One page | 800 | `release-notes/10.1`, set 2026-09-09 when it was written. It carries more subjects than `10.0` did, and one of them is a behaviour change a reader has to act on, which costs a table naming the three query shapes rather than a sentence naming none |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 
 The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own
