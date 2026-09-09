@@ -4280,5 +4280,11 @@
 # differs because EF prints the node above the failure after running its own normalizer. Both would
 # need this provider to run the pipeline it refuses in front of (ADR-006).
 
+# 2026-09-09 (Z1) — total 29516 -> 29534, and `failed` is unmoved at 19. The rise is
+# `InMemory/TransactionTimeoutTest`, 18 tests for #54's idle timeout: six facts and three
+# theories covering the matrix of operations against a token the server no longer holds. No spec
+# test moved in either direction (FIXED none, BROKEN none, REASONS unchanged), which is the
+# result that matters, because Z1 changed what `EndAsync` does with a commit for an unheld token.
+
 failed=19
-total=29516
+total=29534

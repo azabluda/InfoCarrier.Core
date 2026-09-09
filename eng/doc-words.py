@@ -27,7 +27,10 @@ BUDGET = {
     # 460 on 2026-09-09, for four more rows in the wiring table: the second `UseInfoCarrier`
     # overload and the three server-side registrations a caller can now make. A reference page
     # that omits a public member is wrong rather than short.
-    "website/docs/api-surface.md": 460,
+    # 470 on 2026-09-09, for one row: `AddInfoCarrierServerTransactionTimeout`. A reference page
+    # that omits a public member is wrong rather than short, and the row was already cut to the
+    # shortest sentence that says where it goes and what it does.
+    "website/docs/api-surface.md": 470,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
@@ -58,7 +61,13 @@ BUDGET = {
     # naming a type in `AddInfoCarrierAllowedTypes`, and the page did not mention that seam at
     # all, so the instruction pointed at nothing. A widening seam a server can open has to be
     # named on the page that describes the boundary it widens.
-    "website/docs/security.md": 800,
+    # 840 on 2026-09-09, and this is a correction rather than an addition. The page said a
+    # transaction token lets its holder "commit or roll it back", which understates it: a holder
+    # also QUERIES AND SAVES inside that transaction, because `Acquire` hands back the opener's
+    # own context and connection. It also said nothing reaps an abandoned transaction, which #54
+    # made false. Padding was cut first and paid for half of it -- the page already has a section
+    # telling a reader to authenticate the transport, so the paragraph repeating that went.
+    "website/docs/security.md": 840,
     "website/docs/guide/errors.md": 750,
 
     # PROVISIONAL, 2026-08-31. Raised from 700 for the reason the tier exists: the page names
@@ -95,7 +104,15 @@ BUDGET = {
     # `AddInfoCarrierAllowedTypes` and `AddInfoCarrierArbitrarySqlExecution`. Both are the
     # server's decision alone and both widen what a client may send, which is the one class of
     # fact this page must not leave to IntelliSense.
-    "website/docs/configuration/server.md": 880,
+    # 960 on 2026-09-09, for #54's idle timeout: a third server-side grant, and the only one that
+    # changes what an existing deployment does if it is switched on. The section carries seven
+    # facts a reader acts on -- why an abandoned transaction costs anything, the registration, that
+    # it is off by default, that the clock measures idleness rather than age, that an eviction
+    # rolls back and logs, that a later commit then FAILS rather than reporting success, and that a
+    # rollback still stays silent so `using` behaves. The sixth is a data-loss hazard, so it is the
+    # one that may not be dropped. Read for padding first: the section was cut by a third before
+    # this number moved.
+    "website/docs/configuration/server.md": 960,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to
@@ -114,6 +131,12 @@ BUDGET = {
     # both halves. The first of those is a behaviour change from 10.0, so a reader who does not
     # find it here finds it as an exception. Read for padding first; the page is dense already.
     "website/docs/guide/querying.md": 950,
+
+    # 640 on 2026-09-09. The page teaches transactions and therefore owns the warning that a
+    # server holds one open until the client ends it. #54 gave that warning a resolution, so the
+    # admonition gained the two sentences that say who decides the timeout and where to configure
+    # it. Kept to two by moving every other fact about the timeout to the server page.
+    "website/docs/guide/transactions.md": 640,
 
     # 700 on 2026-09-07 when the split log event began naming which operators stayed on the
     # client, and 750 the same day when the round-trip meter shipped. The page gained two facts a

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core;
 
@@ -24,7 +25,8 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="InProcessInfoCarrierServer" /> class.
 /// </remarks>
-public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider) : IInfoCarrierServer
+public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
+    : IInfoCarrierServer, IAsyncDisposable
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
 
@@ -32,6 +34,23 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     The transactions this server is holding open, by token (wire-protocol W3).
     /// </summary>
     private readonly ConcurrentDictionary<string, OpenTransaction> _transactions = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     The timer that sweeps idle transactions, or <see langword="null" /> when no timeout is
+    ///     registered or none has been begun yet.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Created on the first <see cref="BeginTransactionAsync" /> rather than in the
+    ///     constructor</b>, so a server that never opens a transaction never starts a timer, and a
+    ///     server with no timeout registered never creates one at all. Guarded by
+    ///     <see cref="_lifecycle" /> because two concurrent first transactions would otherwise
+    ///     create two.
+    /// </remarks>
+    private ITimer? _sweepTimer;
+
+    private readonly object _lifecycle = new();
+
+    private bool _disposed;
 
     /// <summary>
     ///     The server half of the application's value-mapper chain
@@ -112,6 +131,36 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     /// </summary>
     private bool SensitiveLogForwardingAllowed
         => _serviceProvider.GetService<IInfoCarrierSensitiveServerLogForwarding>() is not null;
+
+    /// <summary>
+    ///     How long a transaction may go untouched before this server rolls it back
+    ///     (<see cref="IInfoCarrierServerTransactionTimeout" />, #54).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider, like the five above, and absent unless the application
+    ///     registered it. <b>Absent means never evict</b>, which is how every version up to
+    ///     10.1.0 behaved and is what makes this opt-in.
+    /// </remarks>
+    private IInfoCarrierServerTransactionTimeout? TransactionTimeout
+        => _serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
+
+    /// <summary>
+    ///     The clock the idle timeout is measured against.
+    /// </summary>
+    /// <remarks>
+    ///     <b>From the root provider, defaulting to the real one</b>, which is the same shape as
+    ///     every other optional service here and is what lets a test drive eviction without
+    ///     sleeping. <c>FakeTimeProvider.Advance</c> fires a <c>CreateTimer</c> callback synchronously on
+    ///     the calling thread, so a test asserts immediately after advancing.
+    ///     <para>
+    ///         <b><c>CreateTimer</c> and not <c>PeriodicTimer</c>, and the difference is measured.</b> A
+    ///         <c>PeriodicTimer</c> loop is released by <c>Advance</c> too, but on a background task, so a
+    ///         test would have to wait for the loop body and that is a race. A timer callback runs
+    ///         inline.
+    ///     </para>
+    /// </remarks>
+    private TimeProvider Clock
+        => _serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
 
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
@@ -214,7 +263,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     <para>
     ///         Whether the transaction is <em>real</em> is the store's business, not this
     ///         server's. A provider that does not do transactions — EF's InMemory one — raises
-    ///         its own `TransactionIgnoredWarning` and hands back a stub, and relaying that is
+    ///         its own <c>TransactionIgnoredWarning</c> and hands back a stub, and relaying that is
     ///         the honest answer: the client asked the store for a transaction and the store
     ///         said no. The alternative, which this replaces, was the *client* pretending on the
     ///         store's behalf.
@@ -231,7 +280,17 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
                 .ConfigureAwait(false);
 
             string token = Guid.NewGuid().ToString("N");
-            _transactions[token] = new OpenTransaction(scope, context, transaction);
+            var open = new OpenTransaction(scope, context, transaction);
+            open.Touch(Clock);
+            _transactions[token] = open;
+
+            // BOTH SWEEPS, and this is the inline one. The timer below covers a server that goes
+            // quiet, which is the abandoned-client case exactly; this covers the case where the
+            // timer has not been armed yet and costs one pass over a dictionary that is normally
+            // empty.
+            ArmSweepTimer();
+            SweepIdle();
+
             return new TransactionResult { TransactionId = token };
         }
         catch
@@ -269,11 +328,19 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
 
-        return _transactions.TryGetValue(transactionId, out OpenTransaction? open)
-            ? open
-            : throw new InvalidOperationException(
+        if (!_transactions.TryGetValue(transactionId, out OpenTransaction? open))
+        {
+            throw new InvalidOperationException(
                 $"Transaction '{transactionId}' is not open on this server. It was committed, "
                     + "rolled back, or belongs to a different server.");
+        }
+
+        // THE ONE PLACE LIVENESS IS REFRESHED, and it is the one place because every request
+        // naming a token arrives here: `Acquire` calls it for a query and a save, and the four
+        // savepoint operations call it directly. So the idle timeout of #54 measures IDLENESS
+        // rather than age, and a long unit of work that keeps talking is never evicted.
+        open.Touch(Clock);
+        return open;
     }
 
     private async Task EndAsync(string transactionId, bool commit, CancellationToken cancellationToken)
@@ -282,9 +349,35 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 
         if (!_transactions.TryRemove(transactionId, out OpenTransaction? open))
         {
-            // Already ended, or never this server's. Not an error: a client that rolls back on
-            // disposal after an explicit commit is following the ordinary `using` pattern, and
-            // EF's own transaction objects tolerate exactly that.
+            // A ROLLBACK naming a token this server does not hold is not an error, and the reason
+            // is stronger than convention: `InfoCarrierTransaction.DisposeAsync` calls
+            // `RollbackAsync` UNCONDITIONALLY, including after a successful commit. So the
+            // implicit end of every `using` block is a rollback for a token this server has
+            // already removed. Refusing it would make every committed transaction throw on
+            // disposal.
+            //
+            // A COMMIT IS NOT THE SAME, AND TREATING IT THE SAME WAS A HAZARD (#54). Once a server
+            // can evict an abandoned transaction it has ALREADY ROLLED THAT WORK BACK, so a commit
+            // arriving afterwards is a client asking to commit writes that no longer exist.
+            // Returning quietly reports success for them:
+            //
+            //     Begin -> SaveChanges -> (idle past the timeout: evicted and rolled back)
+            //           -> Commit -> "succeeded", and nothing was written.
+            //
+            // The reasoning that first allowed the silence to stand claimed such a client would
+            // meet the refusal at its next request. IT DOES NOT: commit is the one operation that
+            // never looks the token up, and the work happened BEFORE the idle period rather than
+            // after it. A wrong answer is worse than an exception, so a commit throws.
+            if (commit)
+            {
+                throw new InvalidOperationException(
+                    $"Transaction '{transactionId}' is not open on this server, so it cannot be "
+                        + "committed. It was already committed or rolled back, it belongs to a "
+                        + "different server, or this server rolled it back because no request "
+                        + "named it for longer than its configured idle timeout. Any work done "
+                        + "inside it has been discarded.");
+            }
+
             return;
         }
 
@@ -335,7 +428,192 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         return new Lease(open.Context, ownedScope: null);
     }
 
-    private sealed record OpenTransaction(AsyncServiceScope Scope, DbContext Context, IDbContextTransaction Transaction);
+    private sealed record OpenTransaction(AsyncServiceScope Scope, DbContext Context, IDbContextTransaction Transaction)
+    {
+        private long _lastUsedTicks;
+
+        /// <summary>
+        ///     Records that a request has just named this transaction.
+        /// </summary>
+        /// <remarks>
+        ///     A plain volatile write of a tick count. There is no lock because there is nothing to
+        ///     lose: two concurrent requests both writing "now" leave the entry alive either way,
+        ///     which is the only property the sweep reads it for.
+        /// </remarks>
+        public void Touch(TimeProvider clock)
+            => Volatile.Write(ref _lastUsedTicks, clock.GetUtcNow().UtcTicks);
+
+        /// <summary>
+        ///     Whether nothing has named this transaction for <paramref name="idleTimeout" />.
+        /// </summary>
+        public bool IsIdleFor(TimeProvider clock, TimeSpan idleTimeout)
+            => clock.GetUtcNow().UtcTicks - Volatile.Read(ref _lastUsedTicks) >= idleTimeout.Ticks;
+    }
+
+    /// <summary>
+    ///     Starts the sweep timer, once, if a timeout is registered.
+    /// </summary>
+    private void ArmSweepTimer()
+    {
+        if (TransactionTimeout is not { } timeout)
+        {
+            return;
+        }
+
+        lock (_lifecycle)
+        {
+            if (_sweepTimer is not null || _disposed)
+            {
+                return;
+            }
+
+            // A QUARTER OF THE TIMEOUT, so the worst case a transaction outlives its deadline by is
+            // a quarter of it rather than all of it. Cheap: the callback walks a dictionary that
+            // holds one entry per open transaction, and a server with none does nothing.
+            TimeSpan period = timeout.IdleTimeout / 4;
+
+            _sweepTimer = Clock.CreateTimer(_ => SweepIdle(), state: null, period, period);
+        }
+    }
+
+    /// <summary>
+    ///     Rolls back and discards every transaction no client has touched for the configured
+    ///     idle timeout (#54).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b><c>TryRemove</c> is the whole race guard, and it already was one.</b> Whoever
+    ///         removes an entry owns rolling it back and disposing it. A sweep racing an ordinary
+    ///         <c>EndAsync</c> either wins or loses and finds nothing, and either way exactly one
+    ///         of them rolls the transaction back.
+    ///     </para>
+    ///     <para>
+    ///         <b>What the loser is told depends on which end it was, and that asymmetry is
+    ///         deliberate.</b> A rollback that finds the entry gone returns silently, because the
+    ///         implicit end of a <c>using</c> block is a rollback for a token this server may
+    ///         already have removed. A COMMIT that finds it gone throws, because this sweep has
+    ///         already rolled that work back and reporting success for it would be a wrong answer.
+    ///         <c>EndAsync</c> carries the full reading.
+    ///     </para>
+    ///     <para>
+    ///         <b>The rollback is not awaited</b>, because this runs on a timer callback and, when
+    ///         called inline, on a caller's request. The removal is what makes the token dead, and
+    ///         that part is synchronous.
+    ///     </para>
+    /// </remarks>
+    private void SweepIdle()
+    {
+        if (_disposed || TransactionTimeout is not { } timeout)
+        {
+            return;
+        }
+
+        TimeProvider clock = Clock;
+
+        foreach (KeyValuePair<string, OpenTransaction> entry in _transactions)
+        {
+            if (!entry.Value.IsIdleFor(clock, timeout.IdleTimeout)
+                || !_transactions.TryRemove(entry.Key, out OpenTransaction? evicted))
+            {
+                continue;
+            }
+
+            LogEviction(evicted, entry.Key, timeout.IdleTimeout);
+            _ = DiscardAsync(evicted);
+        }
+    }
+
+    /// <summary>
+    ///     Rolls an evicted transaction back and releases everything it pinned.
+    /// </summary>
+    /// <remarks>
+    ///     Every failure is swallowed deliberately: this runs unobserved, the caller that would
+    ///     have cared is gone by definition, and a store that refuses the rollback of a connection
+    ///     that is about to be disposed has nothing left to tell anyone.
+    /// </remarks>
+    private static async Task DiscardAsync(OpenTransaction evicted)
+    {
+        try
+        {
+            await evicted.Transaction.RollbackAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Intentionally ignored; see the remarks.
+        }
+
+        try
+        {
+            await evicted.Transaction.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await evicted.Scope.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Says on the server's own log that a transaction was evicted.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The client is told nothing new</b>, by decision: a later request naming the token
+    ///     gets the same message it gets for a transaction that was committed or rolled back,
+    ///     because that is what happened to it. The distinction lives here, and
+    ///     <c>AddInfoCarrierServerLogForwarding</c> carries it to the client where a deployment has
+    ///     granted that as well. <b>The token is logged and nothing else</b>: it is a random
+    ///     <c>Guid</c> this server minted, so it names no user and no row.
+    ///     <para>
+    ///         <b>The logger comes from the EVICTED TRANSACTION'S OWN SCOPE, not from the root
+    ///         provider</b>, and that is not a stylistic choice. <c>ILoggerFactory</c> can be registered
+    ///         scoped, and resolving a scoped service from the root is the defect
+    ///         <c>BuildServiceProvider(validateScopes: true)</c> exists to catch. It caught this one.
+    ///         The scope is alive here by construction: <c>DiscardAsync</c> disposes it after this
+    ///         returns.
+    ///     </para>
+    /// </remarks>
+    private static void LogEviction(OpenTransaction evicted, string token, TimeSpan idleTimeout)
+        => evicted.Scope.ServiceProvider.GetService<ILoggerFactory>()
+            ?.CreateLogger<InProcessInfoCarrierServer>()
+            .LogWarning(
+                "InfoCarrier rolled back transaction {TransactionId}: no request named it for {IdleTimeout}. "
+                + "The client that began it did not commit, roll back, or dispose. "
+                + "See AddInfoCarrierServerTransactionTimeout.",
+                token,
+                idleTimeout);
+
+    /// <summary>
+    ///     Stops the sweep and releases every transaction still open.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Added in 10.2.0, and additive: this class shipped without it.</b> A sealed class
+    ///     gaining an interface breaks no consumer, and the documented server registers this as a
+    ///     singleton, so the DI container already owns the teardown that now has something to do.
+    ///     Rolling the survivors back is the honest end state: the process is going away, and a
+    ///     transaction nobody will ever commit should not be left to a connection's finalizer.
+    /// </remarks>
+    public async ValueTask DisposeAsync()
+    {
+        lock (_lifecycle)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+        }
+
+        _sweepTimer?.Dispose();
+        _sweepTimer = null;
+
+        foreach (string token in _transactions.Keys)
+        {
+            if (_transactions.TryRemove(token, out OpenTransaction? open))
+            {
+                await DiscardAsync(open).ConfigureAwait(false);
+            }
+        }
+    }
 
     /// <summary>
     ///     One request's context, plus the scope to dispose afterwards — but only if this request

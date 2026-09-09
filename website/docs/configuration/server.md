@@ -117,6 +117,22 @@ The exception is a transaction, and it is the one case where server state outliv
 that minted the token, so a load-balanced deployment needs session affinity for the life of a
 transaction. [Transactions](../guide/transactions.md) has that and what an abandoned one costs.
 
+## Evicting an abandoned transaction
+
+A client that vanishes mid-transaction leaves the server holding a context and a connection; its
+own `DisposeAsync` cannot help, because the process is gone. Tell the server how long to wait.
+
+```csharp
+builder.Services.AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10));
+```
+
+**Off until you call this**, so upgrading changes nothing. Every request naming the token refreshes
+the clock, so the value bounds idleness rather than duration.
+
+An eviction rolls the transaction back and logs at `Warning`. **A later commit then fails rather
+than reporting success**, because the work is gone. A rollback stays silent, so disposing after a
+commit still behaves.
+
 ## Where the checks go
 
 A global query filter on the server's model applies to every query by default, which is what you

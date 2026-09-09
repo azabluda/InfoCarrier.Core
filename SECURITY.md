@@ -26,8 +26,8 @@ vulnerability.
   `ExecuteDelete`, and authenticating it is the application's job.
 - A global query filter used as an authorization boundary. `IgnoreQueryFilters` crosses the wire and
   the server honours it. The documented control is a query interceptor on the server.
-- A transaction token used by a caller who did not open that transaction. The server does not bind a
-  token to its creator.
+- A transaction token used by a caller who did not open that transaction. The server does not bind
+  a token to its creator, so a holder can query and save inside that transaction as well as end it.
 - Expensive queries from an authenticated caller. Cap them where the caller cannot reach: a rate
   limit, a statement timeout, or a query interceptor.
 

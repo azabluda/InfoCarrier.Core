@@ -6675,3 +6675,98 @@ owner asked for, the user-facing pages, and the release notes.
       breaking change. **#99 "Adopt EF Core 11" now gates `11.0.0`**, with the pins enumerated and
       the schedule risk named: Tier C runs on a community-maintained Firebird provider that nothing
       here can make ship.
+
+## Phase Z — the server-held transaction lifetime (#54)
+
+**Not a milestone, and not part of the 10.1 release.** #54 names three separable properties and
+this phase closes the first: a server may now be told to roll back a transaction no client has
+touched for a configured period. **The other two are untouched and neither is affected by this.**
+Binding a token to its creator (the security half) needs caller identity on the envelope, which
+makes it a protocol change and puts it with the version-skew policy; the registry is still
+process-local, so a load-balanced deployment still needs session affinity for a transaction's life.
+The issue is milestoned `10.2.0`.
+
+- [x] **Z1. An opt-in idle timeout, and the commit hazard it exposed.**
+      `dotnet test --filter TransactionTimeoutTest`: **Passed: 18, Failed: 0, Total: 18**.
+      Full suite `y16` against `rel6`: **FAILING 19, TOTAL 29534**, FIXED none, BROKEN none,
+      REASONS unchanged. `InfoCarrier.Core.TransportTests` 22 of 22. `CI=true` Release build
+      5 warnings 0 errors (the five are the Razor ones `build-warnings.md` names).
+      `trim-ratchet.sh` OK at 90 <= 90. `dotnet pack` clean against the `10.0.0` baseline.
+
+      **What it protects against is a client that never runs again.** The registry is a
+      `ConcurrentDictionary` that only `EndAsync` removes from, so an open transaction pins a DI
+      scope, a `DbContext` and a store connection until the process exits, and once it has written
+      it holds the store's write lock. `InfoCarrierTransaction.DisposeAsync` covers every ordinary
+      path including an exception; it cannot cover a closed tab, a dropped network or a crashed
+      process.
+
+      **Two public members**, both server-side: `IInfoCarrierServerTransactionTimeout` and
+      `AddInfoCarrierServerTransactionTimeout(TimeSpan)`. `TryAddSingleton`, matching
+      `AddInfoCarrierServerLogForwarding`, which is the sibling grant that also carries a value.
+      **Off unless registered**, which is the owner's decision: turning eviction on by default
+      would change what a working deployment does, because a transaction held open across a slow
+      user step would begin rolling back where it previously did not.
+
+      **ZERO NEW CONSTRUCTORS, and the first design had two.** `TimeProvider` is resolved from the
+      root provider like the five optional services already beside it, defaulting to
+      `TimeProvider.System`. A constructor parameter would have been a second way to configure one
+      thing.
+
+      **`CreateTimer` and not `PeriodicTimer`, and the probe that settled it reversed its own first
+      answer.** The first measurement suggested a hand-rolled `GetUtcNow()`-only `TimeProvider`
+      drives a `PeriodicTimer`; it does not, and the probe was green by accident because a 50 ms
+      period elapsed on the REAL clock inside a 300 ms wait. Re-measured with a 30 s period and a
+      500 ms window: hand-rolled false, `FakeTimeProvider` true, `CreateTimer` fired zero times on
+      the hand-rolled one. `Microsoft.Extensions.TimeProvider.Testing` is therefore a test
+      dependency, and `Directory.Packages.props` carries the reading so nobody repeats the probe.
+
+      **THE HAZARD, and it is the part of this step worth reading.** The server has always
+      tolerated an `EndAsync` for a token it does not hold, because
+      `InfoCarrierTransaction.DisposeAsync` calls `RollbackAsync` UNCONDITIONALLY, including after
+      a successful commit, so the implicit end of every `using` block is a rollback for a token the
+      server has already removed. Extending that tolerance to a COMMIT is silent data loss the
+      moment eviction exists:
+
+          Begin -> SaveChanges -> (idle past the timeout: evicted and rolled back)
+                -> Commit -> "succeeded", and nothing was written.
+
+      **The argument that first excused it was checked and is false.** It claimed such a client
+      would meet the refusal at its next request. It does not: commit is the one operation that
+      never looks the token up, and the work happened BEFORE the idle period rather than after it.
+      So `EndAsync` now splits: a commit for an unheld token throws and names all four reasons a
+      token can be unheld; a rollback stays silent. That needs no record of ended tokens, because
+      the pattern the tolerance exists for ends with a rollback and never with a second commit.
+
+      **The tests were written before the code was made to satisfy them**, at the owner's
+      direction, and as a matrix rather than case by case: seven operations against an evicted
+      token, and four ways a token stops being held against the two operations that differ.
+
+      **One of them found an asymmetry that is NOT a defect, and the reasoning is recorded in the
+      test.** Four of the seven operations throw SYNCHRONOUSLY, because the savepoint members are
+      expression-bodied and `Open` throws before a task exists; a save, a commit and a rollback
+      hand back a faulted task. `Assert.ThrowsAsync` catches the second either way and the first
+      only when it does the calling, which is why the theory passes a lambda. It is invisible to
+      every caller: `InfoCarrierEnvelopeServer.ExecuteAsync` is one async method wrapping the whole
+      operation switch, so its state machine captures a synchronous throw exactly as it captures a
+      faulted task and both reach the client as the same error envelope.
+
+      **`BuildServiceProvider(validateScopes: true)` caught a real bug in this step**, which is the
+      argument for using it in a test that builds a provider at all. Eviction logging first
+      resolved `ILoggerFactory` from the root provider; it can be registered scoped. The logger now
+      comes from the evicted transaction's own scope, which is alive by construction because
+      `DiscardAsync` disposes it afterwards.
+
+      **`website/docs/security.md` was corrected rather than extended, and it was wrong in this
+      provider's favour.** #54 records its own documentation half as CLOSED, naming this page and
+      `SECURITY.md` as stating the token-binding gap. They stated it and they understated it: the
+      page said a transaction token lets its holder "commit or roll it back".
+      A holder also QUERIES AND SAVES inside that transaction: `Acquire` hands back the opener's
+      own `DbContext`, on the opener's connection, inside the opener's transaction. Ending someone
+      else's transaction is the smaller half. The page also said nothing reaps an abandoned
+      transaction, which this step made false. `SECURITY.md`'s scope list carries the same
+      correction.
+
+      **Four doc budgets moved, in the order `doc-style.md` fixes and not the reverse.** The
+      additions were cut by a third first, which recovered 106 words of the 234; the rest is fact.
+      `configuration/server` 880 to 960, `security` 800 to 840, `guide/transactions` 620 to 640,
+      `api-surface` 460 to 470, each with its reason in `eng/doc-words.py` beside the number.

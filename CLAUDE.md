@@ -354,11 +354,13 @@ edited again. M5's last criterion, the remote cancel signal (W6), landed the sam
 
 **Every milestone is closed, so `docs/plans/v10/implementation-plan.md` is ISSUE-DRIVEN and not
 milestone-driven** (corrected 2026-09-09; it read "now holds M5's one remaining criterion" long
-after that criterion landed). It holds Phases Q, R, S, T, U, V and Y, each naming the GitHub issue
-it serves, and which release a phase lands in is decided on the issue rather than in the plan.
+after that criterion landed). It holds Phases Q, R, S, T, U, V, Y and Z, each naming the GitHub
+issue it serves, and which release a phase lands in is decided on the issue rather than in the plan.
 **Phase Y is the 10.1 release preparation.** The letter is Y and not W because **W1 to W6 are M5's
 requirement labels**, used throughout `roadmap.md` and the archives; a Phase W would have collided
-in the one document where both are read.
+in the one document where both are read. **Phase Z is #54's idle timeout for a server-held
+transaction**, the first of that issue's three separable properties and the first work after the
+10.1 release; X was free too and Z was taken because it reads as following Y.
 
 **M7's SQL Server tier is DROPPED (2026-08-24, owner's decision), not deferred.** What is withdrawn
 is a *third test tier* for this repository's suite, never support for the store: the server side is

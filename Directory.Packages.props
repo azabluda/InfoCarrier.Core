@@ -98,5 +98,20 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="System.Text.Json" Version="10.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+
+    <!--
+      TEST-ONLY, and it buys determinism rather than convenience. `FakeTimeProvider.Advance` fires
+      every timer callback that has come due, SYNCHRONOUSLY on the calling thread, which is what
+      lets the transaction-eviction tests assert a timeout without sleeping. Measured before it was
+      added: one `Advance(50s)` over a 10s period fires six times, and `PeriodicTimer` built over
+      the fake releases `WaitForNextTickAsync` on the same call.
+
+      A HAND-ROLLED `TimeProvider` IS NOT A SUBSTITUTE, and the probe that established it is
+      worth not repeating. Overriding `GetUtcNow()` alone leaves timers on the SYSTEM clock,
+      because that is what the base `TimeProvider.CreateTimer` uses, so a test written against
+      one passes only when the real period happens to elapse inside the assertion's wait. That is a
+      test green by accident, which is the failure mode this repository treats as a defect.
+    -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
   </ItemGroup>
 </Project>

@@ -326,6 +326,45 @@ public static class InfoCarrierServiceCollectionExtensions
     }
 
     /// <summary>
+    ///     Makes a <em>server</em> roll back and discard a transaction no client has touched for
+    ///     <paramref name="idleTimeout" /> (#54).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Off unless you call this</b>, and <see cref="IInfoCarrierServerTransactionTimeout" />
+    ///         records why the default is the one that changes nothing. A server that says nothing
+    ///         holds an open transaction, and the DI scope, <c>DbContext</c> and store connection
+    ///         it pins, until the process exits.
+    ///     </para>
+    ///     <para>
+    ///         <b>Choose a value longer than the slowest unit of work you expect a client to hold
+    ///         a transaction across</b>, including a user thinking. Anything a client still needs
+    ///         is refreshed by its own next request, so the number bounds abandonment rather than
+    ///         duration.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <param name="idleTimeout">How long a transaction may go untouched. Must be positive.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierServerTransactionTimeout(
+        this IServiceCollection services,
+        TimeSpan idleTimeout)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(idleTimeout, TimeSpan.Zero);
+
+        services.TryAddSingleton<IInfoCarrierServerTransactionTimeout>(
+            new ServerTransactionTimeout(idleTimeout));
+
+        return services;
+    }
+
+    private sealed class ServerTransactionTimeout(TimeSpan idleTimeout) : IInfoCarrierServerTransactionTimeout
+    {
+        public TimeSpan IdleTimeout { get; } = idleTimeout;
+    }
+
+    /// <summary>
     ///     Registers the value mappers this provider ships for BCL types the wire cannot walk
     ///     (ADR-012, amended 2026-08-11).
     /// </summary>
