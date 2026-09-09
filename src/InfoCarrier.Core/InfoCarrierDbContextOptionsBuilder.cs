@@ -121,7 +121,9 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     ///         them keeps LINQ written here portable. A non-relational store answers them, and
     ///         refusing would fail a query the store supports.
     ///         <see cref="InfoCarrierOptionsExtension.ServerStoreIsRelational" /> lists them with
-    ///         what each one costs.
+    ///         what each one costs, and a FOURTH entry that is not a refusal and is why that list
+    ///         is longer than this sentence: the wording of a refused <c>ExecuteUpdate</c> or
+    ///         <c>ExecuteDelete</c>, which EF phrases differently for a bulk operation.
     ///     </para>
     ///     <para>
     ///         <b>Call it only when the server really is not relational.</b> Calling it against a
