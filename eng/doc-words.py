@@ -58,7 +58,12 @@ BUDGET = {
     # naming a type in `AddInfoCarrierAllowedTypes`, and the page did not mention that seam at
     # all, so the instruction pointed at nothing. A widening seam a server can open has to be
     # named on the page that describes the boundary it widens.
-    "website/docs/security.md": 800,
+    # 820 on 2026-09-09, on the 10.1 release branch, and it is a correction rather than an
+    # addition. The page said a transaction token lets its holder "commit or roll it back", which
+    # understates it: a holder also QUERIES AND SAVES inside that transaction, because `Acquire`
+    # hands back the opener's own context and connection. Padding was cut first and paid for a
+    # third of it, the page's danger admonition already saying no identity travels in the envelope.
+    "website/docs/security.md": 820,
     "website/docs/guide/errors.md": 750,
 
     # PROVISIONAL, 2026-08-31. Raised from 700 for the reason the tier exists: the page names

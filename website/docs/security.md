@@ -88,8 +88,9 @@ The endpoint is not a read-only API. `SaveChanges` and `ExecuteDelete` are part 
 expose it to the public internet without authentication.
 
 A transaction token is a bearer token. The server does not bind it to the caller who opened the
-transaction, so anyone holding one can commit or roll it back. Nothing reaps an abandoned one
-either; [Transactions](guide/transactions.md) covers that.
+transaction, so anyone holding one can **query and save inside that transaction**, on its context
+and its connection, and then commit it. Ending someone else's transaction is the smaller half.
+Nothing reaps an abandoned one either; [Transactions](guide/transactions.md) covers that.
 
 ## Transport security
 
