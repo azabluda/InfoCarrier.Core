@@ -234,6 +234,23 @@ code change that quietly contradicts it. ADR-001 (greenfield serializer, no Remo
 dependency), ADR-004 (inherit `EFCore.Specification.Tests`), and ADR-006 (raw capture at
 `IDatabase.CompileQuery`) are the ones most likely to be violated by accident.
 
+**AND A REVERSAL IS THE MOMENT TO SWEEP FOR THE COMMENTS THAT ARGUED FOR IT, IN THE SAME COMMIT.**
+A comment recording a decision goes stale exactly when that decision is reversed, which is the one
+moment nobody re-reads it: the work is in the code, and the prose that justified the old shape sits
+somewhere else entirely. **Measured on this repository, and the number is why this rule exists.**
+R135 and the D3 supersession reversed one premise — that `InfoCarrier.Core` does not reference
+`EFCore.Relational` — and left **twenty-four** comments asserting it. Six were found in Y5 and two
+in Y11, both times by accident while doing something else; a deliberate sweep in Y12 found the other
+fourteen, six days later and one release too late. **XML doc comments ship in the package and show
+in IntelliSense**, so a consumer reads them.
+
+So: grep for the reversed API's name, the deleted type's name and the claim's own words, across
+`src/` **and** `test/`, before the reversal commits. Two rules make the result worth having.
+**Correct the reason, do not delete the paragraph** — most of these decisions are still right for a
+different reason, and the new reason is the valuable half. And **quote what it used to say with the
+date**, because the next reader needs to know the reasoning changed rather than that it was always
+this.
+
 ## Guardrails
 
 **Never edit anything under `subrepos/`.** Those are git-ignored reference clones of

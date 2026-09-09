@@ -6611,3 +6611,31 @@ owner asked for, the user-facing pages, and the release notes.
       **The build gate earned its keep for the third time this phase.** Deleting
       `AddClientServices` left `using Microsoft.Extensions.DependencyInjection;` unnecessary in
       `InfoCarrierTier.cs`, which `IDE0005` failed under `CI=true` before it could reach the server.
+
+- [x] **Y14. A reversal is the moment to sweep, written into the reversal rules.** `CLAUDE.md`
+      only, so neither gate.
+
+      **The rule is written from a measurement rather than from a feeling.** R135 and the D3
+      supersession reversed one premise, that `InfoCarrier.Core` does not reference
+      `EFCore.Relational`, and left **twenty-four** comments asserting it. Six surfaced in Y5 and
+      two in Y11, both times by accident while doing something else; the deliberate sweep in Y12
+      found the remaining fourteen, six days after the reversal and one release later than it
+      should have been. XML doc comments ship in the package and show in IntelliSense, so a
+      consumer reads them.
+
+      **Why the moment is the reversal and not a later audit.** A comment recording a decision goes
+      stale exactly when that decision is reversed, and that is the one moment nobody re-reads it:
+      the work is in the code, and the prose that justified the old shape sits somewhere else
+      entirely. Nothing in the change itself points at it, which is why two separate accidental
+      finds still left fourteen behind.
+
+      **Two rules make the sweep worth doing rather than merely done.** *Correct the reason, do not
+      delete the paragraph*: most of these decisions were still right for a different reason, and
+      the new reason is the valuable half. A wire node names its shape because an EF expression type
+      cannot travel on a wire; the evaluatable-expression filter is needed because this provider
+      does not build through `EntityFrameworkRelationalServicesBuilder`. And *quote what it used to
+      say, with the date*, because the next reader needs to know the reasoning changed rather than
+      that it was always this.
+
+      Placed under the LOCKED-ADR reversal rule in `CLAUDE.md`, which is the only other place that
+      says what a reversal obliges.
