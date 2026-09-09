@@ -38,11 +38,19 @@ namespace InfoCarrier.Core;
 ///     sends. Default <c>false</c>, so a server that says nothing refuses.
 /// </param>
 /// <param name="relationalQueryRoots">
-///     How to REBUILD EF's relational raw-SQL query roots (#97) - true when the application
-///     registered <c>AddInfoCarrierRelational()</c> from the <c>InfoCarrier.Core.Relational</c>
-///     package. <b>Knowledge, not permission</b>: the parameter above is the permission, and a
-///     server that has the knowledge and not the grant still refuses. Default
-///     <see langword="null" />, which rebuilds nothing and says so.
+///     How to REBUILD EF's relational raw-SQL query roots (#97). <b>Knowledge, not
+///     permission</b>: the parameter above is the permission, and a server that has the knowledge
+///     and not the grant still refuses. Default <see langword="null" />, which falls back to the
+///     one shipped implementation rather than to nothing.
+///     <para>
+///         <b>Corrected 2026-09-09, and it contradicted the line below it.</b> This said the
+///         parameter is supplied "when the application registered <c>AddInfoCarrierRelational()</c>
+///         from the <c>InfoCarrier.Core.Relational</c> package", and that null "rebuilds nothing
+///         and says so". R135 deleted that method and there is no such package, and the field
+///         below has coalesced null to <see cref="Relational.InfoCarrierRelationalQueryRoots" />
+///         since it was written. Nothing is weakened by that: refusing is
+///         <paramref name="arbitrarySqlAllowed" />'s job and it still defaults to false.
+///     </para>
 /// </param>
 public class ServerQueryExecutor(
     DbContext context,

@@ -6483,3 +6483,37 @@ owner asked for, the user-facing pages, and the release notes.
 
       **Two budgets moved and both are recorded with the fact that moved them.** The twenty pages
       this phase had not touched are now read, so Y4's stated remainder is closed.
+
+- [x] **Y11. Two more doc comments of Y5's kind, and where a breaking change goes.** `src/` XML
+      comments and `docs/` only. Release build `5 Warning(s), 0 Error(s)`, trim `ours` 90 <= 90,
+      pack clean. **The spec suite was NOT re-run and that is deliberate**: the `src/` change is two
+      XML doc comments, which compile into the documentation file and cannot reach IL. The build
+      gate is the one that could have failed here, because a bad `cref` is `CS1574` and an error in
+      CI, and it passed. CI's spec-ratchet confirms on the push.
+
+      **Both were found by answering the owner's question rather than by looking for them**, which
+      is the second time in this phase that verifying a claim has turned one up.
+
+      **The question was whether a multi-tenant deployment has to opt OUT of `FromSql`.** It does
+      not, and the premise is worth recording because it is the opposite way round:
+      `InProcessInfoCarrierServer.ArbitrarySqlAllowed` is
+      `GetService<IInfoCarrierArbitrarySqlExecution>() is not null`, the executor's parameter
+      defaults to `false`, and `RequireArbitrarySql()` throws on all three raw-SQL paths. **A
+      server that does nothing refuses**, and `multi-tenancy.md` says so in opt-in words.
+
+      Reading that path turned up two comments naming `AddInfoCarrierRelational()` and the
+      `InfoCarrier.Core.Relational` package, both deleted by R135.
+      **`ServerQueryExecutor`'s parameter doc also contradicted the line below it**: it said a
+      `null` "rebuilds nothing and says so", where the field has coalesced `null` to
+      `InfoCarrierRelationalQueryRoots.Instance` since it was written. Nothing is weakened by the
+      fallback, and the correction says why: refusing is the grant's job, and the grant still
+      defaults to false.
+
+      **`docs/versioning.md` gains "Where a breaking change goes", which Y3 needed and did not
+      write.** The owner asked whether a bump as large as `10.0.1` to `10.1.0` licenses dropping a
+      shipped API. It does not, and not as a matter of taste: a minor is a promise of
+      *compatibility* rather than a measure of size, and `EnablePackageValidation` fails the pack on
+      a removed member regardless. **The awkward half is Y3's own doing and the section states it
+      rather than hiding it**: with the major tracking EF Core, this package has no number that says
+      "we broke something and EF did not", so `[Obsolete]` in a minor and removal in the major that
+      follows EF Core's is the only route. `IInfoCarrierDocumentMapping` is the worked case.

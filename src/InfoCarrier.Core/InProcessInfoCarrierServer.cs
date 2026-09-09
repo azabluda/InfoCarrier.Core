@@ -74,9 +74,18 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     (<see cref="Metadata.IInfoCarrierRelationalQueryRoots" />, #97).
     /// </summary>
     /// <remarks>
-    ///     From the root provider, like the three above, and absent unless the application
-    ///     registered <c>AddInfoCarrierRelational()</c> from the
-    ///     <c>InfoCarrier.Core.Relational</c> package. <b>This provider, and not the context's:</b>
+    ///     From the root provider, like the three above. <b>Usually absent, and that is not a
+    ///     gap</b>: a server application registers the endpoint and its own context, not
+    ///     <c>AddEntityFrameworkInfoCarrier</c>, so nothing puts this in its collection.
+    ///     <see cref="ServerQueryExecutor" /> falls back to the one shipped implementation, so the
+    ///     server can always rebuild a raw-SQL root it is permitted to execute. Registering one
+    ///     here replaces that fallback.
+    ///     <para>
+    ///         <b>Corrected 2026-09-09.</b> This said "absent unless the application registered
+    ///         <c>AddInfoCarrierRelational()</c> from the <c>InfoCarrier.Core.Relational</c>
+    ///         package". R135 deleted that method and there is no such package.
+    ///     </para>
+    ///     <b>This provider, and not the context's:</b>
     ///     the context builds its own internal service provider and never sees the application's
     ///     collection, so a lookup through the context answers <c>null</c> for a server that has
     ///     registered one. <b>It grants nothing</b> — <see cref="ArbitrarySqlAllowed" /> above is

@@ -60,6 +60,34 @@ So the minor is ours and the major is EF Core's, which is what SemVer says anywa
 major still implies EF Core 10, and the package's own `Microsoft.EntityFrameworkCore` dependency
 carries the exact floor, which is where a resolver looks.
 
+## Where a breaking change goes, and why a bigger minor is not the place
+
+**A minor may not remove a shipped API, however much it adds.** `10.0.1` to `10.1.0` is a large
+release by content and that is beside the point: under SemVer a minor is a promise of
+*compatibility*, not a measure of size, so the question "is this bump big enough to drop something"
+has no version in which the answer is yes. It is also not a matter of judgement here.
+`EnablePackageValidation` is on and `PackageValidationBaselineVersion` names the last stable, so
+`dotnet pack` downloads it, compares assemblies and **fails the build** on a removed or re-arity'd
+member. `ServerQueryExecutor` carries a two-argument constructor overload for exactly this reason,
+with the reasoning in its own remarks.
+
+**And the awkward part, which the amendment above created and should not hide: this package has no
+slot for a break inside an EF Core generation.** The major is Entity Framework Core's, so `11.0.0`
+means EF Core 11 and nothing else. There is no number that says "we broke something and EF did
+not".
+
+**So the route is `[Obsolete]`, and it is the only one.** Mark the member in a minor, keep it
+working, say what to use instead, and remove it in the major that follows EF Core's own. That is
+what EF Core does, and it is what the `10.0.0` compatibility overloads already practise.
+
+The worked case is `IInfoCarrierDocumentMapping`, asked and answered on 2026-09-09. With the
+relational reference back, `AnnotationDocumentMapping` could call `GetContainerColumnName()`
+directly and the seam could go. It stays: both types shipped in `10.0.0` and
+`InfoCarrierDatabase`'s public constructor takes the interface, so removal is a `CP0001`/`CP0002`
+the gate refuses. Its own argument survives too, and that is the stronger half: the question is
+store-shaped, and a document store recognises an ordinal key by the property's shape rather than by
+this annotation.
+
 `10.0.0` carries no suffix. A stable version is a promise not to break the public surface, and
 that promise is made as of that release. Do not restate the reason for a suffix in a user-facing
 document: `Directory.Build.props` records what the last attempt cost.
