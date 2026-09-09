@@ -409,6 +409,13 @@ from pushing the tag to the approval gate; the real `v10.1.0` release took eleve
 - CI on the release line: all four jobs green (docs gates, fast gate, spec suite, spec ratchet).
 - `packages.yml` did NOT publish a candidate, and reported success anyway. That is the defect
   above, found only by reading the push step's own output rather than the job's conclusion.
+  **Rehearsed a second time after the fix, against this document rather than from memory.** The
+  release line published `10.1.1-hotfix.0.9` cleanly at a height where `main` already owned
+  `10.1.1-alpha.0.9`, which is the case that used to fail silently; re-running that same workflow
+  answered `409 (Conflict)` and ended RED, which is the intended cost of dropping
+  `--skip-duplicate`.
+- **A prerelease identifier cannot leak into a release.** The same commit, tagged `v10.1.1`, built
+  exactly `10.1.1`, because identifiers apply only above a tag.
 - MinVer at the tag resolved to exactly `10.1.1`, and `release.yml`'s filename check found all four
   expected files.
 - The GitHub Release was created with `isPrerelease: false` and was flagged **Latest**, which is
@@ -426,6 +433,15 @@ irreversible step stops and waits for a person.
    nothing. It must not be documentation only, or `packages.yml` skips the push by design.
 3. **Push, and read the PUSH STEP'S OUTPUT rather than the job's conclusion.** That is not
    pedantry: the conflict described above was invisible in the tick and plain in the log.
+
+   ```bash
+   gh run view <run-id> --log | grep -E "\tPush\t" | sed 's/.*Z //'
+   ```
+
+   **Filter on the STEP, not on words.** Grepping the whole log for `warn` or `conflict` returns
+   the five Razor trimming warnings every build emits, which is what the first attempt at this
+   produced and is exactly where somebody under pressure gives up and trusts the tick. What you
+   want to see is `Your package was pushed.` once per package.
 4. **Tag and push the tag.** `release.yml` runs the gates, packs, verifies the filenames against
    the tag, and creates the Release. Budget about twelve minutes to the gate.
 5. **Reject `publish-nuget`.** The run ends as a failure, which is the correct outcome of a
