@@ -87,12 +87,18 @@ internal identifiers, catch and rewrite them at the server boundary.
 The endpoint is not a read-only API. `SaveChanges` and `ExecuteDelete` are part of it, so do not
 expose it to the public internet without authentication.
 
-A transaction token is a bearer token. The server does not bind it to the caller who opened the
-transaction, so anyone holding one can **query and save inside that transaction**, on its context
-and its connection, and then commit it. Ending
-someone else's transaction is the smaller half. An idle timeout bounds how long a stolen token is
-useful without closing the hole; see
-[Evicting an abandoned transaction](configuration/server.md#evicting-an-abandoned-transaction).
+A transaction token is a bearer token, and by default it is the only credential. Anyone holding
+one can **query and save inside that transaction**, on its context and its connection, and then
+commit it. Ending someone else's transaction is the smaller half.
+
+Bind it to the caller who opened it. This needs an authenticated transport and no client change:
+
+```csharp
+builder.Services.AddInfoCarrierHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
+```
+
+See [Binding a transaction to its caller](configuration/server.md#binding-a-transaction-to-its-caller)
+and [Evicting an abandoned transaction](configuration/server.md#evicting-an-abandoned-transaction).
 
 ## Transport security
 

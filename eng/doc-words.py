@@ -30,7 +30,11 @@ BUDGET = {
     # 470 on 2026-09-09, for one row: `AddInfoCarrierServerTransactionTimeout`. A reference page
     # that omits a public member is wrong rather than short, and the row was already cut to the
     # shortest sentence that says where it goes and what it does.
-    "website/docs/api-surface.md": 470,
+    # 490 on 2026-09-10, for one row: `AddInfoCarrierHttpCallerIdentity`. It is the first entry
+    # from the ASP.NET Core package rather than the core one, so the row has to say which package
+    # it comes from as well as what it does. A reference page that omits a public member is wrong
+    # rather than short, and the row was cut to the shortest sentence that carries both.
+    "website/docs/api-surface.md": 490,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
@@ -112,7 +116,18 @@ BUDGET = {
     # rollback still stays silent so `using` behaves. The sixth is a data-loss hazard, so it is the
     # one that may not be dropped. Read for padding first: the section was cut by a third before
     # this number moved.
-    "website/docs/configuration/server.md": 960,
+    # 1090 on 2026-09-10, for #54 part 2: a FOURTH server-side grant, and the one that closes a
+    # security gap rather than a resource one. The section carries what a reader has to decide
+    # rather than what the API looks like: that a token is a bearer credential and its holder can
+    # query and save INSIDE the transaction rather than only end it, that binding is off until
+    # asked for, that it is a second lock and does nothing without an authenticated transport, and
+    # that the deployment chooses the claim because only it knows which value survives a token
+    # refresh. Read for padding first, and a third of the draft went.
+    #
+    # THIS PAGE IS NOW THE LONGEST ON THE SITE AND THAT IS A SIGNAL ABOUT ITS STRUCTURE. It is a
+    # reference for every server-side decision, and there are six of them now. Revisit whether the
+    # grants want a page of their own before raising this again.
+    "website/docs/configuration/server.md": 1090,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to

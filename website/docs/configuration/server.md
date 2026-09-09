@@ -133,6 +133,26 @@ An eviction rolls the transaction back and logs at `Warning`. **A later commit t
 than reporting success**, because the work is gone. A rollback stays silent, so disposing after a
 commit still behaves.
 
+## Binding a transaction to its caller
+
+The token that names a transaction is a bearer credential: whoever holds it can query and save
+inside that transaction, not merely end it. Tell the server who a caller is, and it refuses a token
+opened by somebody else.
+
+```csharp
+builder.Services.AddInfoCarrierHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
+```
+
+**Off until you call this, and it is a second lock rather than the first.** Without
+`RequireAuthorization` on the endpoint every caller is anonymous, and every anonymous caller
+matches.
+
+**Choose a value that stays the same for as long as a transaction lives**, because a caller whose
+value changes mid-transaction loses its own work. You pick it: a subject id, a login name and a
+tenant claim behave differently under a token refresh.
+
+Nothing changes on the wire, so an existing client needs no rebuild.
+
 ## Where the checks go
 
 A global query filter on the server's model applies to every query by default, which is what you

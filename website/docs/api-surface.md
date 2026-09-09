@@ -14,6 +14,7 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | `IServiceCollection.AddInfoCarrierAllowedTypes(params Type[])` | On the server. Admits CLR types a payload may name beyond the ones the model implies. |
 | `IServiceCollection.AddInfoCarrierArbitrarySqlExecution()` | On the server. Lets a client send `FromSql` and `Database.SqlQuery<T>`. |
 | `IServiceCollection.AddInfoCarrierServerTransactionTimeout(TimeSpan)` | On the server. Rolls back a transaction left idle that long. Off unless called. |
+| `IServiceCollection.AddInfoCarrierHttpCallerIdentity(Func<HttpContext, string?>)` | On the server, from `InfoCarrier.Core.AspNetCore`. Refuses a token opened by a different caller. Off unless called. |
 | `IServiceCollection.AddInfoCarrierServerLogForwarding(LogLevel)` | On the server. Sends the log events it raises back with the result. `AddInfoCarrierSensitiveServerLogForwarding` is the second grant a context with sensitive logging needs. |
 | `IServiceCollection.AddInfoCarrierStandardValueMappers()` | Registers the value mappers for `IPAddress` and `Uri`. Automatic on the client; call it on the server yourself. |
 | `IServiceCollection.AddEntityFrameworkInfoCarrier()` | Registers the provider's EF services. Only needed when you build EF's internal service provider yourself. |

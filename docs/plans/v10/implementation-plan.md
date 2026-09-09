@@ -6819,3 +6819,73 @@ The issue is milestoned `10.2.0`.
       that always blamed routing would move the wrong diagnosis rather than remove it, so a token
       this instance really did mint and really did end must still be answered with its own history,
       and a token naming no instance at all must not be blamed on routing either.
+
+- [x] **Z3. A transaction is bound to the caller that opened it (#54, part 2), and it needed no
+      protocol change.**
+      `dotnet test --filter TransactionOwnerTest`: **Passed: 11, Failed: 0, Total: 11**.
+      `InfoCarrier.Core.TransportTests` **26 of 26**, four of them new.
+      Full suite `z3` against `z2`: **FAILING 19, TOTAL 29552**, FIXED none, BROKEN none,
+      REASONS unchanged. `CI=true` Release build 5 warnings 0 errors. `trim-ratchet.sh` OK at
+      90 <= 90. `dotnet pack` clean: both additions are additive, so no `CP0002`.
+
+      **THE ISSUE'S OWN REASONING WAS WHAT KEPT THIS PARKED, and it was wrong.** #54 recorded that
+      closing part 2 "needs caller identity on the envelope, which makes it a protocol change, so
+      it belongs with the version-skew policy rather than a patch". That is true only for a
+      transport with no ambient identity. **`MapInfoCarrier` receives `HttpContext`**, so on any
+      deployment doing what the security page already tells it to do:
+
+          app.MapInfoCarrier().RequireAuthorization("DataAccess");
+
+      the caller is established before the envelope is even deserialized. The identity simply never
+      travelled the two calls into `InProcessInfoCarrierServer`. **The identity is OBSERVED rather
+      than ASSERTED**, so the envelope is untouched and an old client works against a server that
+      turns this on. The issue body and its status section are corrected.
+
+      **THE DESIGN QUESTION I THOUGHT WAS HARD DISSOLVED.** Which claim identifies a caller looked
+      like a decision the library had to make, and a subject id, a login name and a tenant claim
+      are all defensible and behave differently under a token refresh. It does not have to choose:
+      `AddInfoCarrierHttpCallerIdentity(Func<HttpContext, string?>)` asks the deployment. The core
+      package sees only `IInfoCarrierServerCallerIdentity`, one property, no ASP.NET Core types.
+
+      **A singleton answering a per-request question**, which is the seam worth naming.
+      `InProcessInfoCarrierServer` must be a singleton, because the registry outlives any one
+      request. `IHttpContextAccessor` holds the context in async-local storage, so it follows the
+      call rather than the object. `HttpCallerIdentityTest.It_follows_the_request_rather_than_the_object`
+      pins it: if the answer were cached the first caller would own every later transaction.
+
+      **Four decisions that are not obvious from the API, each with a test:**
+
+      1. **The refusal does not name the owner.** The caller being refused is by definition holding
+         a token it did not open; telling it whose transaction it found would turn a stolen token
+         into a way of enumerating users.
+      2. **Ownership is checked BEFORE liveness is refreshed.** Otherwise a stolen token would keep
+         a victim's connection alive past the idle timeout that exists to release it, and the
+         attacker would be using part 1 against its own purpose.
+      3. **Ownership is checked BEFORE `TryRemove` in `EndAsync`.** Checking after would let a
+         stranger's rejected commit take the entry with it, destroying the work while reporting a
+         refusal.
+      4. **A rollback by a stranger is REFUSED, where a rollback for an absent token stays
+         SILENT.** Z1 made the absent case silent because `InfoCarrierTransaction.DisposeAsync`
+         sends one unconditionally, so the implicit end of every `using` would otherwise throw.
+         That reasoning does not reach this case: the server holds the transaction, it belongs to
+         somebody else, and destroying their work is precisely the attack.
+
+      **A null caller binds like any other value.** A transaction opened while the delegate returns
+      null is usable only while it returns null again. That separates an authenticated caller from
+      an anonymous one and does NOT separate two anonymous callers, because nothing distinguishes
+      them. **So this is a second lock and not the first**: without an authenticated transport
+      every caller answers null, every null matches, and the token is the only credential again.
+      Said in the API docs, on the server page, and pinned by
+      `An_unauthenticated_request_names_nobody`.
+
+      **Off unless registered**, the same shape as the timeout, and for a sharper reason: a
+      deployment whose identity is not stable across requests would otherwise start failing
+      transactions in the middle rather than at the start.
+
+      **Written test-first: eight of eleven were red** before the code existed. The three that
+      passed from the start describe 10.1.0's behaviour and are the guard against breaking it.
+
+      **`configuration/server.md` is now the longest page on the site at 1082 words**, holding six
+      server-side decisions. The budget moved to 1090 with the reason recorded, and the comment
+      says what the number cannot: revisit whether the grants want a page of their own before
+      raising it again.

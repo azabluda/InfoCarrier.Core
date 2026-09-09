@@ -166,6 +166,13 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     registered it. <b>Absent means never evict</b>, which is how every version up to
     ///     10.1.0 behaved and is what makes this opt-in.
     /// </remarks>
+    private IInfoCarrierServerCallerIdentity? CallerIdentity
+        => _serviceProvider.GetService<IInfoCarrierServerCallerIdentity>();
+
+    /// <summary>
+    ///     How long a transaction may go untouched before this server rolls it back
+    ///     (<see cref="IInfoCarrierServerTransactionTimeout" />, #54).
+    /// </summary>
     private IInfoCarrierServerTransactionTimeout? TransactionTimeout
         => _serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
 
@@ -308,7 +315,10 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             // token has always been an opaque string this server mints and the client echoes back
             // verbatim, so what is INSIDE it is this server's business alone.
             string token = $"{_instanceId}.{Guid.NewGuid():N}";
-            var open = new OpenTransaction(scope, context, transaction);
+            // WHO OPENED IT, read once and compared on every later request (#54, part 2). It is
+            // null when no identity is registered, and that null is never compared, because the
+            // comparison itself is skipped when the service is absent.
+            var open = new OpenTransaction(scope, context, transaction, CallerIdentity?.CurrentCallerId);
             open.Touch(Clock);
             _transactions[token] = open;
 
@@ -384,6 +394,36 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             : ended;
     }
 
+    /// <summary>
+    ///     Refuses a request whose caller did not open this transaction (#54, part 2).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Nothing happens unless a server registered
+    ///         <see cref="IInfoCarrierServerCallerIdentity" /></b>, so an existing deployment is
+    ///         unaffected and the token remains the only credential until somebody says otherwise.
+    ///     </para>
+    ///     <para>
+    ///         <b>THE OWNER IS NOT NAMED IN THE MESSAGE, and that is deliberate.</b> The caller
+    ///         being refused is, by definition, holding a token it did not open. Telling it whose
+    ///         transaction it found would turn a stolen token into a way of enumerating users, so
+    ///         the refusal says only that the caller differs.
+    ///     </para>
+    /// </remarks>
+    private void RequireCaller(OpenTransaction open, string transactionId)
+    {
+        if (CallerIdentity is not { } identity
+            || string.Equals(open.Owner, identity.CurrentCallerId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Transaction '{transactionId}' was opened by a different caller, so this caller may "
+                + "not use it. This server binds a transaction to the caller that opened it, "
+                + "because the token alone is a bearer credential.");
+    }
+
     private OpenTransaction Open(string transactionId)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
@@ -398,6 +438,11 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
                         + "opened here."));
         }
 
+        // OWNERSHIP BEFORE LIVENESS, and the order carries weight: a caller that may not use this
+        // transaction must not be able to keep it alive either, or a stolen token would hold a
+        // victim's connection open past the idle timeout that exists to release it.
+        RequireCaller(open, transactionId);
+
         // THE ONE PLACE LIVENESS IS REFRESHED, and it is the one place because every request
         // naming a token arrives here: `Acquire` calls it for a query and a save, and the four
         // savepoint operations call it directly. So the idle timeout of #54 measures IDLENESS
@@ -409,6 +454,15 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private async Task EndAsync(string transactionId, bool commit, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
+
+        // LOOK BEFORE REMOVING. `TryRemove` is what ends a transaction, so checking ownership
+        // after it would let a stranger's rejected commit take the entry with it and destroy the
+        // work anyway. A racing end between these two lines is harmless: `TryRemove` then fails
+        // and the not-open path below answers.
+        if (_transactions.TryGetValue(transactionId, out OpenTransaction? held))
+        {
+            RequireCaller(held, transactionId);
+        }
 
         if (!_transactions.TryRemove(transactionId, out OpenTransaction? open))
         {
@@ -493,7 +547,11 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         return new Lease(open.Context, ownedScope: null);
     }
 
-    private sealed record OpenTransaction(AsyncServiceScope Scope, DbContext Context, IDbContextTransaction Transaction)
+    private sealed record OpenTransaction(
+        AsyncServiceScope Scope,
+        DbContext Context,
+        IDbContextTransaction Transaction,
+        string? Owner)
     {
         private long _lastUsedTicks;
 
