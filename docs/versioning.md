@@ -384,24 +384,61 @@ shipped. Merging up resolves it immediately. That is why the merge is a numbered
 release and not tidying done afterwards, and it is worth saying because a rushed hotfix is exactly
 when the merge gets postponed.
 
-**A rehearsal leaves versions behind on the internal feed.** The rehearsal's own build published
-`10.1.1-alpha.0.7`, and resetting the branch means the next real commit is height 7 as well.
-`packages.yml` pushes with `--skip-duplicate`, so nothing fails; the feed just keeps serving the
-REHEARSAL artifact under that number. Delete the rehearsal versions from GitHub Packages afterwards,
-which that feed allows and nuget.org would not.
+**TWO LINES COUNTING FROM ONE TAG COLLIDE, and the rehearsal found it by failing silently.**
+MinVer numbers a prerelease by height above the nearest tag. `main` and `release/10.1` both count
+from `v10.1.0`, so a height the release line reaches has usually been published by `main` already.
+It recurs rather than happening once: after a hotfix ships and is merged up, both lines count from
+the NEW tag and start colliding again from height 1.
+
+Both release-line publishes during the rehearsal answered
+`Conflict ... has already been pushed`, were downgraded to a warning by `--skip-duplicate`, and the
+job went green. **Nothing was published and the tick said otherwise.** `--skip-duplicate` is gone
+and each line now carries its own prerelease identifier, `alpha` for `main` and `hotfix` for a
+release line, so the two cannot occupy the same number: the same commit reads `10.1.1-alpha.0.7` or
+`10.1.1-hotfix.0.7` depending on where it is built, and both sort below `10.1.1`.
+
+**A duplicate is now a red job**, which is the answer wanted for the case that remains: re-running
+a workflow for a commit whose version is already on the feed. There is nothing to do about it and
+something to know.
 
 ### What the rehearsal proved
 
-Everything except the irreversible step, which stopped by itself:
+Everything except the irreversible step, which stopped by itself. Budget about **twelve minutes**
+from pushing the tag to the approval gate; the real `v10.1.0` release took eleven.
 
 - CI on the release line: all four jobs green (docs gates, fast gate, spec suite, spec ratchet).
-- `packages.yml` published a candidate from the branch, installable before any tag existed.
+- `packages.yml` did NOT publish a candidate, and reported success anyway. That is the defect
+  above, found only by reading the push step's own output rather than the job's conclusion.
 - MinVer at the tag resolved to exactly `10.1.1`, and `release.yml`'s filename check found all four
   expected files.
 - The GitHub Release was created with `isPrerelease: false` and was flagged **Latest**, which is
   right while the newest tag is also the newest line, and is the trap named above when it is not.
 - `publish-nuget` stopped and waited for a reviewer. Rejecting it ended the run as a failure with
   nothing pushed to nuget.org.
+
+### How to rehearse it again
+
+Worth doing after any change to the release path. Everything below is reversible; the one
+irreversible step stops and waits for a person.
+
+1. **Record the anchors you will reset to.** `git rev-parse main release/10.1`.
+2. **Commit a stand-in fix on the release line.** A comment in a `.cs` file is enough and risks
+   nothing. It must not be documentation only, or `packages.yml` skips the push by design.
+3. **Push, and read the PUSH STEP'S OUTPUT rather than the job's conclusion.** That is not
+   pedantry: the conflict described above was invisible in the tick and plain in the log.
+4. **Tag and push the tag.** `release.yml` runs the gates, packs, verifies the filenames against
+   the tag, and creates the Release. Budget about twelve minutes to the gate.
+5. **Reject `publish-nuget`.** The run ends as a failure, which is the correct outcome of a
+   rehearsal, and nothing reaches nuget.org. Confirm on the package page if you want to see it.
+6. **Measure whatever you came for.** Version questions are answerable locally and need no push:
+   `dotnet msbuild src/InfoCarrier.Core/InfoCarrier.Core.csproj -t:MinVer -getProperty:MinVerVersion`,
+   including on a throwaway merge, which is how the table above was produced without `main` ever
+   being force-pushed. **`-t:MinVer` is required**: `-getProperty:Version` on its own answers
+   `1.0.0`, because MinVer sets the version in a target and `-getProperty` evaluates before targets
+   run.
+7. **Clean up.** `gh release delete <tag> --yes --cleanup-tag` (which also removes the local tag),
+   `git push origin :refs/tags/<tag>`, then reset the branch and `git push --force-with-lease`.
+   Verify with `git log --all --oneline --grep=REHEARSAL` and a tag listing.
 
 ## What has bitten us
 

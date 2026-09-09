@@ -47,6 +47,20 @@ jobs:
     name: Pack and publish to GitHub Packages
     runs-on: ubuntu-latest
 
+    # TWO BRANCHES COUNTING FROM ONE TAG PRODUCE THE SAME VERSION, and until 2026-09-09 that was
+    # impossible because only `main` published here. MinVer numbers a prerelease by HEIGHT above
+    # the nearest tag, and `main` and `release/10.1` both count from `v10.1.0`, so each height the
+    # release line reaches has usually been published by `main` already. The collision is not a
+    # one-off either: after a hotfix ships and is merged up, BOTH branches count from the new tag
+    # and start colliding again from height 1.
+    #
+    # A DIFFERENT PRERELEASE IDENTIFIER PER LINE IS THE FIX, and it is set as an environment
+    # variable rather than a `-p:` on one step because MSBuild reads the environment as
+    # properties, so `build` and `pack` cannot disagree about what the assembly and the package
+    # say. `alpha` sorts below `hotfix`, and both sort below the release they precede.
+    env:
+      MinVerDefaultPreReleaseIdentifiers: ${{ github.ref == 'refs/heads/main' && 'alpha.0' || 'hotfix.0' }}
+
     steps:
       # Full history, because MinVer reads the version off the git tags. On a shallow clone every
       # build would publish the same default version and overwrite the last one.
@@ -80,11 +94,22 @@ jobs:
         run: ls -1 artifacts/pack
 
       # A glob is safe HERE, unlike on nuget.org: GitHub Packages resolves a dependency within the
-      # same feed, so the two packages may arrive in either order. `--skip-duplicate` keeps a
-      # re-run of the same commit from failing, since its version is identical.
+      # same feed, so the two packages may arrive in either order.
+      #
+      # `--skip-duplicate` WAS SET HERE AND IS DELIBERATELY GONE, 2026-09-09. Its stated reason was
+      # that a re-run of the same commit publishes an identical version, which is true. What it
+      # also did, once release lines began publishing, was turn a REAL collision into a warning
+      # under a green tick: two branches at the same height produced the same version, the second
+      # push answered `Conflict`, and the feed silently kept serving the FIRST branch's artifact
+      # under that number. Both release-branch publishes on the day this was found did exactly
+      # that, and the job reported success both times.
+      #
+      # The `env:` above removes the collision. What remains is the re-run case, and a red job is
+      # the honest answer to it: the version is already published, so there is nothing to do and
+      # something to know. A wrong artifact behind a green tick is the failure this repository
+      # treats as worse than a broken build.
       - name: Push
         run: >
           dotnet nuget push "artifacts/pack/*.nupkg"
           --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
           --api-key ${{ secrets.GITHUB_TOKEN }}
-          --skip-duplicate
