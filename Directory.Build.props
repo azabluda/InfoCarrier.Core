@@ -196,6 +196,15 @@
       RAISING IT IS THE LAST STEP OF A RELEASE, NOT THE FIRST: the baseline has to be downloadable
       before the gate can use it, so it moves after the publish job succeeds rather than with the
       tag.
+
+      A RELEASE BRANCH CUT FROM THE TAG MISSES THAT RAISE, AND `release/10.1` CARRIED THE WRONG
+      BASELINE UNTIL 2026-09-09. It follows from the rule above rather than contradicting it: the
+      raise lands on `main` after the tag, so a branch cut AT the tag inherits the PREVIOUS value.
+      A patch built from such a branch is then validated against the release before the one it
+      patches, and that is a hole rather than a lag: a change DELETING an API the patched release
+      introduced passes, because the older baseline never had that API for CP0002 to compare
+      against. The gate stays green and the break ships. CHECK THIS VALUE WHEN CUTTING A RELEASE
+      BRANCH.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageValidationBaselineVersion>10.1.0</PackageValidationBaselineVersion>
