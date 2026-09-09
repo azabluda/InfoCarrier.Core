@@ -2,9 +2,16 @@ name: Build & Test
 
 on:
   push:
-    # `main` is the only trunk. The v1 line lives on `release/3.1` and carries its own (AppVeyor)
-    # build; a workflow that lives only on this branch cannot run on that one anyway, so naming
-    # it here would be dead configuration.
+    # `main` is the only trunk. Two kinds of branch are deliberately absent from this list.
+    #
+    # The v1 line lives on `release/2.2` and `release/3.1` and carries its own (AppVeyor) build;
+    # this workflow does not exist on those branches, so naming them would be dead configuration.
+    #
+    # `release/10.1` DOES have a copy of this file, cut from `main` with the tag, and is still not
+    # named here: pushes to it run no build. That is a deliberate, reversible economy while the
+    # branch carries documentation only -- the spec-ratchet job takes up to ninety minutes, and
+    # nothing on that branch has changed the assembly. ADD `release/**` HERE BEFORE THE FIRST CODE
+    # FIX LANDS ON IT, which is the moment a 10.1.x patch becomes real.
     branches: [main]
   pull_request:
     branches: [main]

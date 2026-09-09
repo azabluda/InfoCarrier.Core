@@ -336,6 +336,21 @@ expose a two-reader disagreement.
 a glob, so **a third package would ship nothing until that workflow named it**. Every packable
 project validates against `10.0.0`.
 
+**THE SITE PUBLISHES FROM `release/10.1`, NOT FROM `main`, SINCE 2026-09-09.** `main` runs ahead
+of nuget.org, and an unversioned site built from it tells every reader to call APIs their package
+does not contain. That is not hypothetical: Z1 put a 10.2.0 server timeout in front of 10.1.0
+readers and deleted a sentence that was true of their version for being false on `main`.
+
+**So the branch model is maintenance branches, and fixes ORIGINATE ON THE RELEASE BRANCH and are
+MERGED UP** (the Symfony and Linux direction, chosen 2026-09-09 over .NET's fix-main-then-backport).
+A correction to what the shipped release does is a commit on `release/10.1`, merged into `main`;
+`main` is for the next minor. `release/2.2` and `release/3.1` are the v1 line and predate this.
+
+**`build.yml` and `packages.yml` still trigger on `main` alone, which is a deliberate economy and
+not an oversight.** While the release branch carries documentation only, its pushes need no
+90-minute ratchet and produce no new assembly. **Add `release/**` to `build.yml` before the first
+code fix lands there**; its own comment says so at the point of change.
+
 **`InfoCarrier.Core.Relational` was a third package and is not one any more.** D3 is superseded
 (`architecture.md` §6a, 2026-09-03): the relational half lives at
 `src/InfoCarrier.Core/Relational/`, keeps the `InfoCarrier.Core.Relational` **namespace**, and

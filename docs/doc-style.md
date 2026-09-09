@@ -101,6 +101,15 @@ missing *fact*. What is suspended is the ceremony, not the standard.
    project intends to ship may not be mentioned at all. Roadmaps in user documentation become
    promises, and they go stale between releases.
 
+   **"Today" means "in the newest published package", not "on `main`", and reading it the other
+   way is what put a 10.2.0 API in front of 10.1.0 readers on 2026-09-09.** Describing an
+   unreleased capability in the present tense is worse than naming it as a plan, because a plan
+   only disappoints while a present-tense instruction does not compile. **The site now publishes
+   from `release/10.1` rather than from `main`, so this is structural rather than a matter of
+   care**, and prose about the next minor may sit on `main` unpublished until that branch is cut.
+   What still needs care is the other half: a correction to what the SHIPPED release does belongs
+   on the release branch, or nobody reading the site ever sees it.
+
 7. **"The client has no database" appears once per document**, in the opening paragraph. It is the
    premise of the product, not the pitch. Repeating it reads as a sales claim rather than a fact.
 

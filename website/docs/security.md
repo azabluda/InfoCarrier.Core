@@ -87,9 +87,9 @@ internal identifiers, catch and rewrite them at the server boundary.
 The endpoint is not a read-only API. `SaveChanges` and `ExecuteDelete` are part of it, so do not
 expose it to the public internet without authentication.
 
-A transaction token is a bearer token, and the only credential the envelope carries. The server
-does not bind it to the caller who opened the transaction, so anyone holding one can **query and
-save inside that transaction**, on its context and its connection, and then commit it. Ending
+A transaction token is a bearer token. The server does not bind it to the caller who opened the
+transaction, so anyone holding one can **query and save inside that transaction**, on its context
+and its connection, and then commit it. Ending
 someone else's transaction is the smaller half. An idle timeout bounds how long a stolen token is
 useful without closing the hole; see
 [Evicting an abandoned transaction](configuration/server.md#evicting-an-abandoned-transaction).
