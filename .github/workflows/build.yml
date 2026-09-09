@@ -2,12 +2,21 @@ name: Build & Test
 
 on:
   push:
-    # `main` is the only trunk. The v1 line lives on `release/3.1` and carries its own (AppVeyor)
-    # build; a workflow that lives only on this branch cannot run on that one anyway, so naming
-    # it here would be dead configuration.
-    branches: [main]
+    # `main` AND EVERY RELEASE LINE. A release branch carries hotfixes for a version people are
+    # already running, so it needs the same gates the trunk does. Without them the first sign of
+    # a broken patch is the release workflow failing on the tag, which is the worst moment to
+    # find out: the fix is urgent by definition and the person applying it is under pressure.
+    #
+    # The v1 lines on `release/2.2` and `release/3.1` are unaffected. This workflow does not exist
+    # on those branches, and a workflow is read from the branch being pushed, so naming them here
+    # costs nothing and runs nothing.
+    #
+    # THE SPEC-SUITE BADGE STAYS `main`-ONLY, and its own step still says so. A badge is a claim
+    # about the trunk; letting a release branch republish it would make the README describe
+    # whichever branch happened to build last.
+    branches: [main, 'release/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
 
 env:
   DOTNET_VERSION: '10.0.x'
