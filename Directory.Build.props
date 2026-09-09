@@ -191,10 +191,14 @@
       that described a break against the version it replaces. It was 10.0.0-preview.1 until
       2026-08-25 and moved once 10.0.0 was downloadable from nuget.org, which is the
       constraint: validation fetches the baseline package, so it cannot name one that is not
-      published yet. Moved to 10.0.1 on 2026-09-09, in the 10.1.0 release preparation.
+      published yet. Moved to 10.0.1 on 2026-09-09, in the 10.1.0 release preparation, and to
+      10.1.0 the same day once that release was live on nuget.org and its `.nupkg` fetched 200.
+      RAISING IT IS THE LAST STEP OF A RELEASE, NOT THE FIRST: the baseline has to be downloadable
+      before the gate can use it, so it moves after the publish job succeeds rather than with the
+      tag.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>10.0.1</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>10.1.0</PackageValidationBaselineVersion>
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>

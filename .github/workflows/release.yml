@@ -148,9 +148,9 @@ jobs:
             reviewer**. Nothing reaches nuget.org until somebody approves it, because a pushed
             version can be unlisted but never withdrawn.
 
-            Approve it and it pushes all three packages, `InfoCarrier.Core` first: the other two
-            declare a dependency on it at the same version, and nuget.org rejects a package whose
-            dependency does not resolve.
+            Approve it and it pushes both packages, `InfoCarrier.Core` first:
+            `InfoCarrier.Core.AspNetCore` declares a dependency on it at the same version, and
+            nuget.org rejects a package whose dependency does not resolve.
 
             Publishing uses **Trusted Publishing**: the job exchanges a GitHub OIDC token for an
             API key valid for one hour. No publishing secret is stored in this repository.

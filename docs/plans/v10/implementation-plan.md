@@ -6639,3 +6639,39 @@ owner asked for, the user-facing pages, and the release notes.
 
       Placed under the LOCKED-ADR reversal rule in `CLAUDE.md`, which is the only other place that
       says what a reversal obliges.
+
+- [x] **Y15. The release is closed out: the pack baseline moves to `10.1.0`, and `release.yml`
+      stops claiming three packages.** No `src/` change, so no suite run. `CI=true` Release build
+      `5 Warning(s), 0 Error(s)`; `dotnet pack` clean against the NEW baseline, which is the gate
+      that matters here because it downloads `10.1.0` from nuget.org and compares assemblies.
+
+      **`10.1.0` IS LIVE, AND THAT WAS CHECKED RATHER THAN ASSUMED.** Both packages list it in
+      nuget.org's flat-container index and `infocarrier.core.10.1.0.nupkg` fetches `HTTP 200`. The
+      publish job's own log shows four `Your package was pushed.` lines from two
+      `dotnet nuget push` commands, after a `Successfully exchanged OIDC token for NuGet API key`.
+      **The approval gate held**: `gh api .../environments/nuget-org` shows a non-empty
+      `protection_rules` naming a required reviewer, and the publish job started 69 seconds after
+      packing finished. `versioning.md` documents the failure mode where that gate is silently
+      absent, so it is worth checking on every release rather than trusting the UI.
+
+      **`PackageValidationBaselineVersion` 10.0.1 -> 10.1.0, and the comment now says WHEN.**
+      Raising it is the LAST step of a release rather than the first: validation downloads the
+      baseline, so it cannot name a version that is not published yet. It moved with the tag in Y3,
+      to `10.0.1`, which was correct then; it moves again now that `10.1.0` is downloadable. MinVer
+      confirms the tag is seen, producing `10.1.1-alpha.0.1` on the next commit.
+
+      **`release.yml`'s generated body said it "pushes all three packages ... the other two declare
+      a dependency on it".** There are two, and there have been since `InfoCarrier.Core.Abstractions`
+      was merged away in M8-22. The sentence is cosmetic, because step 7 of the release overwrites
+      the body with `docs/release-bodies/<tag>.md` anyway, but it was the only untrue sentence left
+      in the release path and it is what a reader sees between the tag and the body being applied.
+
+      **Milestones were reorganised in the same session, and the record was materially wrong.** The
+      `10.1.0` milestone claimed 2 issues; nine shipped in it. #60 was closed and delivered while
+      filed under `11.0.0`, so that milestone advertised a completed feature it never contained.
+      `10.0.0` was empty and is deleted; `10.0.1` and `10.1.0` are closed. **A `10.2.0` milestone is
+      new**, because `11.0.0` had been doing double duty as the next major and the parking lot:
+      EF Core 11 is expected around November 2026 and #48, #50, #52 and #54 need neither it nor a
+      breaking change. **#99 "Adopt EF Core 11" now gates `11.0.0`**, with the pins enumerated and
+      the schedule risk named: Tier C runs on a community-maintained Firebird provider that nothing
+      here can make ship.
