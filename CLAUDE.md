@@ -336,6 +336,13 @@ expose a two-reader disagreement.
 a glob, so **a third package would ship nothing until that workflow named it**. Every packable
 project validates against `10.0.0`.
 
+**PUBLISHING THE SITE IS AN EXPLICIT ACT: `gh workflow run Docs --ref release/10.1`.** The
+`deploy` job requires `workflow_dispatch` and a `refs/heads/release/` ref, so no push publishes
+anything and `main` cannot publish at all. A push still BUILDS, which keeps `--strict` gating every
+commit and every pull request. **The branch dispatched from is the choice of what to publish**, so
+a new minor needs no edit to the workflow: cut `release/10.2` and dispatch on it. The site can
+therefore go stale, and that is the accepted trade.
+
 **THE SITE PUBLISHES FROM `release/10.1`, NOT FROM `main`, SINCE 2026-09-09.** `main` runs ahead
 of nuget.org, and an unversioned site built from it tells every reader to call APIs their package
 does not contain. That is not hypothetical: Z1 put a 10.2.0 server timeout in front of 10.1.0
