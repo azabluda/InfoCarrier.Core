@@ -15,18 +15,33 @@
 # requests too, where nothing is deployed.
 name: Docs
 
+# THE SITE PUBLISHES FROM THE CURRENT RELEASE LINE, NOT FROM `main`, AND THAT IS THE WHOLE POINT
+# OF THIS BLOCK. `main` runs ahead of what is on nuget.org: the moment a feature lands there, an
+# unversioned site built from `main` starts telling every reader to call an API their package does
+# not contain. It happened -- 10.1.0 readers were shown a server-side transaction timeout that
+# ships in 10.2.0, and a sentence true of their version was deleted for being false on `main`.
+#
+# So `main` BUILDS and does not DEPLOY, which keeps `--strict` as a gate on every pull request,
+# and the release branch is what the world sees. A documentation fix for the shipped release is
+# therefore a change on `release/10.1`, which is where such a fix belongs anyway; it reaches `main`
+# when the branch is merged up.
+#
+# UPDATE THE BRANCH NAME IN THE `deploy` JOB'S `if` WHEN A NEW MINOR SHIPS. It is one line, it
+# belongs to the release checklist, and a stale value is visible rather than silent: the site
+# simply stops updating.
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
     paths:
       - 'website/**'
       - '.github/workflows/docs.yml'
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
     paths:
       - 'website/**'
       - '.github/workflows/docs.yml'
   # So the site can be republished without a content change -- after enabling Pages, for instance.
+  # Dispatch it ON THE RELEASE BRANCH; a dispatch from `main` builds and deploys nothing.
   workflow_dispatch:
 
 # Read the repository; write Pages and the OIDC token deploy-pages authenticates with.
@@ -71,7 +86,9 @@ jobs:
   deploy:
     name: Deploy
     # Never from a pull request: a fork's branch must not be able to publish to this site.
-    if: github.event_name != 'pull_request'
+    # Never from `main` either, and the header says why. The branch is written out here rather
+    # than held in an `env:` because a workflow-level `env` is not in scope for a job-level `if`.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release/10.1'
     needs: build
     runs-on: ubuntu-latest
 
