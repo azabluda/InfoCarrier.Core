@@ -5,10 +5,20 @@
 # a documentation typo must not queue behind a 22,000-test suite. Nothing here touches the
 # solution, the ratchets or the baselines.
 #
-# ONE-TIME SETUP, and this workflow cannot do it for you: in the repository's
-# Settings -> Pages, set Source to "GitHub Actions". Until that is done the `deploy` job fails on
-# `configure-pages` while `build` keeps passing, which is the right way round -- the content is
-# still verified.
+# ONE-TIME SETUP, and this workflow cannot do it for you. TWO settings, and the second is the one
+# that is easy to miss because it only bites once the site stops publishing from the default
+# branch:
+#
+#   1. Settings -> Pages, set Source to "GitHub Actions". Until that is done the `deploy` job fails
+#      on `configure-pages` while `build` keeps passing, which is the right way round -- the
+#      content is still verified.
+#
+#   2. Settings -> Environments -> github-pages -> Deployment branches: ADD `release/*`. Enabling
+#      Pages creates that environment with a policy naming the default branch and nothing else, so
+#      the first deploy from a release branch is rejected before it runs a step:
+#      `Branch "release/10.1" is not allowed to deploy to github-pages due to environment
+#      protection rules.` The build still passes, so the failure is a red `deploy` job and a site
+#      that silently stops updating. Measured on 2026-09-09, the day the site moved off `main`.
 #
 # THE GATE IS `--strict`. A link to a page that does not exist, or a page missing from the nav,
 # fails the build. That is the only automated check a documentation site has, so it runs on pull
