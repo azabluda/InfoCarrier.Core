@@ -20,7 +20,12 @@ name: Packages
 
 on:
   push:
-    branches: [main]
+    # Release lines publish here too, and that is the point of an internal feed: a hotfix should
+    # be installable BEFORE it is tagged, because a tag is irreversible on nuget.org and this is
+    # the last place a candidate can be tried. MinVer numbers them off the release tag, so
+    # `release/10.1` produces 10.1.1-alpha.0.N, which orders correctly against the 10.1.0 it
+    # patches and against `main`'s 10.2.0-alpha line.
+    branches: [main, 'release/**']
     paths-ignore:
       # A documentation change produces an identical assembly, so publishing a new version for one
       # would be noise on the feed. The site has its own workflow.

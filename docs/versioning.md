@@ -165,7 +165,7 @@ deliberate: releasing both together means the newest of each always agree.)
 
 | Feed | Trigger | Gate |
 |---|---|---|
-| **GitHub Packages** | every push to `main` that touches code | automatic, `packages.yml` |
+| **GitHub Packages** | every push to `main` or a release line that touches code | automatic, `packages.yml` |
 | **GitHub Release** | a `v*` tag | automatic, `release.yml` |
 | **nuget.org** | a `v*` tag | **a human approves the `nuget-org` environment** |
 
@@ -267,22 +267,109 @@ nuget.org first — which matters here, because neither does.
     permanent. This repository is public, so the policy should be active immediately — but check
     the status in the nuget.org UI if a push is refused.
 
+## Which branch does a change belong on?
+
+One question, asked before the work rather than after it.
+
+| The change | Branch | Reaches `main` by |
+|---|---|---|
+| A fix for the version people are running | `release/10.1` | merging up |
+| Anything for the next minor | `main` | it is already there |
+| A correction to what the SHIPPED docs say | `release/10.1` | merging up |
+| Documentation for an unreleased feature | `main` | it is already there |
+
+**Fixes originate on the release branch and are merged up**, the direction Symfony and Linux use,
+chosen 2026-09-09 over .NET's fix-`main`-then-backport. The reason is that nothing can then be on a
+release branch and forgotten: `git merge release/10.1` on `main` either fast-forwards or conflicts,
+and neither outcome is silent. The cost is that a fix for both lines starts on the older one.
+
+```
+v10.1.0 (tag)
+   |
+   +-- release/10.1 ---- hotfix ---- v10.1.1 (tag) ----+
+   |                                                    | merge up
+main ------ 10.2 work --------------------------------- + ---- v10.2.0
+```
+
+`release/2.2` and `release/3.1` are the v1 line and predate all of this. Neither `build.yml` nor
+`packages.yml` exists on them, and a workflow is read from the branch being pushed, so nothing here
+touches them.
+
 ## Releasing, start to finish
 
-1. Land the work. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both ratchets green.
+Both procedures below end at the same place, so the shared tail is written once.
+
+### A hotfix on a release line
+
+1. `git checkout release/10.1 && git pull`.
+2. Make the fix. **Confirm the pack baseline is the version you are patching**, not the one before
+   it: `grep PackageValidationBaselineVersion Directory.Build.props` must read `10.1.0` on the
+   `10.1` line. The trap is in `Directory.Build.props`'s own comment and in the list below.
+3. Gates. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both
+   ratchets green, `dotnet pack` clean.
+4. Push. **CI runs on release lines since 2026-09-09**, so the branch is gated exactly like the
+   trunk, and `packages.yml` puts `10.1.1-alpha.0.N` on the internal feed. Install that and try it:
+   it is the last point before a version becomes permanent.
+5. Tag on **this branch**: `git tag -a v10.1.1 -m "InfoCarrier.Core 10.1.1"` then
+   `git push origin v10.1.1`. `release.yml` triggers on `v*` from any branch and carries its own
+   build, tests and both ratchets, so it does not depend on `build.yml` having run.
+6. Continue at **After either**.
+
+### A minor from `main`
+
+1. Land the work on `main`, gates green.
 2. Update `website/docs/limitations.md` if the failure set moved.
-3. Tag: `git tag -a v10.1.0 -m "InfoCarrier.Core 10.1.0"`.
-4. Push the tag: `git push origin v10.1.0`.
-5. Watch `release.yml`. It runs both gates, packs, and creates the Release.
-6. Approve `publish-nuget` when you mean it.
-7. **Apply the release body, because the workflow does not.** `release.yml` creates the Release
-   with GitHub's generated notes plus a paragraph about the reviewer gate, and that is not the
-   body this repository wrote: `gh release edit <tag> --notes-file docs/release-bodies/<tag>.md`.
-   Archive a body being replaced as `<tag>.superseded-<date>.md` first, because GitHub keeps no
-   history of one. Skipping this is not visible from the repository, which is how the published
-   `v10.0.0-preview.1` body drifted from its copy here.
-8. Update any version a document names by hand: the `PackageReference` and Central Package
-   Management examples on the site, and the counts on the limitations and release-notes pages.
+3. Tag on `main`: `git tag -a v10.2.0 -m "InfoCarrier.Core 10.2.0"`, `git push origin v10.2.0`.
+4. Continue at **After either**, and then cut the new line: `git checkout -b release/10.2 v10.2.0`
+   and push it. **Raise `PackageValidationBaselineVersion` to `10.2.0` on that branch too**, for
+   the reason in the list below.
+5. Publish the site from the new branch, and change the `deploy` job's `if` in `docs.yml` only if
+   you narrow it; as written it accepts any `refs/heads/release/` ref, so nothing needs editing.
+
+### After either
+
+6. Watch `release.yml`. It runs the gates, packs, verifies the filenames against the tag, and
+   creates the GitHub Release.
+7. **Approve `publish-nuget` when you mean it.** It waits for a reviewer, because a pushed version
+   can be unlisted but never withdrawn. It pushes `InfoCarrier.Core` first, then
+   `InfoCarrier.Core.AspNetCore`, which depends on it at the same version.
+8. **Apply the release body, because the workflow does not.** `gh release edit <tag> --notes-file
+   docs/release-bodies/<tag>.md`. Archive a body being replaced as `<tag>.superseded-<date>.md`
+   first, because GitHub keeps no history of one. Skipping this is invisible from the repository,
+   which is how the published `v10.0.0-preview.1` body drifted from its copy here.
+9. **Raise `PackageValidationBaselineVersion` to the version just published**, on every branch that
+   will build against it. This is the LAST step and not the first: validation downloads the
+   baseline package, so it cannot name one that is not on nuget.org yet.
+10. **Publish the site, which no push does.**
+    `gh workflow run Docs --ref release/10.1`, using the line you want readers to see. Confirm
+    `Deploy: success` rather than `skipped` in `gh run list --workflow Docs --limit 1`.
+11. Update any version a document names by hand: the `PackageReference` and Central Package
+    Management examples on the site, and the counts on the limitations and release-notes pages.
+12. If the fix was on a release line, merge it up: `git checkout main && git merge release/10.1`.
 
 The `dotnet add package` commands name no version, so they need no edit. They did until `10.0.0`,
 because the newest stable was then `3.1.1` and an unversioned install silently resolved to it.
+
+## What has bitten us
+
+Each of these cost something real, and none is visible from the code.
+
+- **A release branch cut from the tag inherits the PREVIOUS pack baseline**, because raising it is
+  the last step of a release. `release/10.1` carried `10.0.1` until 2026-09-09. That is a hole and
+  not a lag: a patch deleting an API the patched release introduced would pass validation, because
+  the older baseline never had that API for `CP0002` to compare against. Green gate, shipped break.
+- **Merging a release line up can silently discard the fix.** Where a page differs between branches
+  because the versions genuinely differ, `git checkout --ours` keeps `main`'s wording and drops
+  your correction with it. Resolve those by hand. `git diff origin/release/10.1 origin/main --
+  <file>` before you start; empty output means the merge is clean.
+- **Nothing publishes the site automatically.** A push to a release line builds the docs and
+  deploys nothing, by design. Forgetting step 10 leaves readers on the previous content with no
+  error anywhere.
+- **The `github-pages` environment only allows branches it is told about.** Enabling Pages names
+  the default branch and nothing else, so the first deploy from a release line is rejected before
+  it runs a step. `release/*` was added on 2026-09-09; a new pattern is needed only if release
+  branches are ever named differently.
+- **The GitHub Release is marked latest by GitHub's own rule.** `release.yml` does not set
+  `make_latest`, which is correct while the newest tag is also the newest line. **Patching an old
+  line after a newer minor exists would advertise the patch as current**, so check the Release
+  afterwards the first time that happens.
