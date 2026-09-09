@@ -6362,3 +6362,43 @@ owner asked for, the user-facing pages, and the release notes.
       **And the plan-contents line was stale**: it read "now holds M5's one remaining criterion"
       long after that criterion landed. The plan is issue-driven and holds Phases Q, R, S, T, U, V
       and Y.
+
+- [x] **Y7. The nineteen read against `limitations.md`, and the page was wrong about one query.**
+      `test/` and documents only. No spec run needed for the finding; the evidence is a class with
+      no overrides that is fully green.
+
+      **The page claimed three queries this provider answers where other providers refuse. The
+      second is no longer one of them.** It described filtering a complex collection and then
+      calling `Contains`, and said *"EF Core providers: throws. This provider: returns the matching
+      rows."* That was true when S7 added it. **All six `*StructuralEqualityQueryInfoCarrierTest`
+      classes are bare -- not one override between them -- and 92 of 92 pass**, which is only
+      possible if this provider does exactly what EF's own bases assert. The entry is deleted and
+      the count drops to two.
+
+      **What made it stale is on record and the record's own instruction was not carried out.** V8
+      changed the parameter path for a captured owned entity and its entry says
+      *"`website/docs/limitations.md` loses the entry that claimed the better answer"*. That line
+      was written and not acted on. **A note to a future reader is not a change**, which is the
+      rule this cost, and it is why a release pass has to re-derive a user-facing claim from a test
+      result rather than from the file that records the claim.
+
+      **The other two entries were re-derived and both stand.**
+      `Composition_over_collection_of_complex_mapped_as_scalar` is still red, which is itself the
+      proof that this provider still answers where EF's base asserts a throw. The inline collection
+      of parameters, and the compiled-query form beside it, are three of the eleven V12 overrode to
+      assert the ANSWER rather than the refusal, so they still diverge and the override is what
+      keeps reporting it.
+
+      **Everything else in the nineteen is already stated or is correctly absent.** Four ask the
+      client for a `DbConnection`, four never reach the operation they are named for because the
+      spec base's own non-virtual `UseTransaction` helper calls `GetDbTransaction`, three are
+      message text, two are the property-bag materializer (named on the page), two are an upstream
+      test defect whose assertion no answer satisfies, one is the unmapped-member boundary gap
+      (R138), one needs `EntitySplittingConvention` and its missing companion, and one is a model
+      check this client never runs.
+
+      **The mechanical half of the release docs read is done across all 25 consumer documents**: 0
+      en or em dashes, 0 curly quotes, at most one admonition per page, 0 over budget, 0 broken
+      links in 61 files, `mkdocs build --strict` clean. **The prose read of the pages this phase did
+      NOT touch is still outstanding** and is the honest remainder: 20 pages have had a mechanical
+      pass and no reading this time.

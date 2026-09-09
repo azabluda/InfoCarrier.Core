@@ -106,7 +106,7 @@ EF Core provider.
 
 EF's suite has other scenarios that assert a provider either rejects the query or returns the wrong
 rows. This provider answers them correctly. A test suite you port will expect an exception, and
-LINQ that relies on this will not run unchanged elsewhere. Three of them:
+LINQ that relies on this will not run unchanged elsewhere. Two of them:
 
 Composing LINQ over a collection stored through a value converter:
 
@@ -122,21 +122,6 @@ context.Dashboards
     .Select(d => new { d.Name, Heights = d.Layouts.Select(l => l.Height).ToList() })
     .ToList();
 // EF Core providers: throws.   This provider: returns the rows.
-```
-
-Filtering a complex collection, then `Contains`:
-
-```csharp
-modelBuilder.Entity<RootEntity>()
-    .ComplexCollection(e => e.AssociateCollection);   // stored by table splitting
-
-var associates = LoadAssociates();
-context.RootEntities
-    .Where(e => e.AssociateCollection
-        .Where(a => a.Id > associates[0].Id)
-        .Contains(associates[1]))
-    .ToList();
-// EF Core providers: throws.   This provider: returns the matching rows.
 ```
 
 Comparing a column collection against an inline collection of parameters, which relational
