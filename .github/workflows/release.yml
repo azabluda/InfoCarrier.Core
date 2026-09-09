@@ -132,6 +132,27 @@ jobs:
           name: packages
           path: artifacts/pack/*
 
+      # WHICH LINE IS NEWEST, COMPUTED RATHER THAN ASSUMED. GitHub flags a newly published
+      # release as Latest by default. That is right while the newest tag is also the newest line,
+      # and wrong the first time an older line is patched: a 10.1.x hotfix shipped after 10.2.0
+      # would advertise itself as the current version on the repository's landing page and in the
+      # API's `releases/latest`.
+      #
+      # `git tag --list 'v*'` deliberately excludes the v1-era tags, which carry no `v` prefix
+      # (`3.1.1`, `2.2.7`), because those are a different product generation and must never win
+      # this comparison. Prerelease tags are excluded too: a prerelease is never Latest anyway,
+      # and letting one define the newest line would suppress the Latest flag on the stable
+      # release that follows it.
+      - name: Decide whether this tag is the newest line
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: latest
+        run: |
+          this="${GITHUB_REF_NAME#v}"
+          highest=$(git tag --list 'v*' | sed 's/^v//' | grep -v -- '-' | sort -V | tail -1)
+          if [ "$this" = "$highest" ]; then make=true; else make=false; fi
+          echo "this=$this highest=$highest make_latest=$make"
+          echo "make_latest=$make" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
@@ -143,6 +164,8 @@ jobs:
           # A pre-release tag marks the Release as a pre-release, so the repository's landing
           # page does not advertise it as the current version.
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # And a stable tag on an OLDER line is not Latest either. See the step above.
+          make_latest: ${{ steps.latest.outputs.make_latest }}
           body: |
             Packages are attached, and the `publish-nuget` job of this run is **waiting for a
             reviewer**. Nothing reaches nuget.org until somebody approves it, because a pushed
