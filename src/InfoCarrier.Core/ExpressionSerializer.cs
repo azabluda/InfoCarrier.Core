@@ -67,10 +67,16 @@ public class ExpressionSerializer(
     ///         asking.</b> It is registered <c>Scoped</c>, but every InfoCarrier client context in
     ///         a process shares one internal service provider
     ///         (<c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>), so a DI-injected
-    ///         answer would be one answer for all of them. The value is per context and travels on
-    ///         the options; <c>QueryExecutor</c> reads it once per execution through
-    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRootsFor</c> and hands the same object
-    ///         to the boundary analyzer and to this method. One reader, so the two cannot disagree.
+    ///         answer would be one answer for all of them. <c>QueryExecutor</c> reads the seam once
+    ///         per execution and hands the same object to the boundary analyzer and to this method.
+    ///         One reader, so the two cannot disagree.
+    ///     </para>
+    ///     <para>
+    ///         <b>Corrected 2026-09-09.</b> This said the value "is per context and travels on the
+    ///         options", read through
+    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRootsFor</c>. R135 deleted that
+    ///         option and that method; there is one implementation and nothing per context to
+    ///         carry. The per-call shape stays, because the reason above is unchanged.
     ///     </para>
     ///     <para>
     ///         Not on <see cref="IExpressionSerializer" />: the interface is a wire seam an
@@ -79,8 +85,9 @@ public class ExpressionSerializer(
     /// </remarks>
     /// <param name="expression">The tree to translate.</param>
     /// <param name="relationalRoots">
-    ///     The seam, or <see langword="null" /> when nothing has said the backing store is
-    ///     relational.
+    ///     The seam, or <see langword="null" /> to recognise no relational query root at all.
+    ///     A caller that passes null gets a translation in which a raw-SQL root is not recognised;
+    ///     it is not a statement about the backing store, which R135 left nothing to say.
     /// </param>
     /// <returns>The node DTO.</returns>
     public virtual ExpressionNode ToNode(

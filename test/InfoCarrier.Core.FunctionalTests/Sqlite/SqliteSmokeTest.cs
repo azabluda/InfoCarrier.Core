@@ -50,12 +50,18 @@ public class SqliteSmokeTest
             });
 
     /// <remarks>
-    ///     <b>Every client here says its backing store is relational (#97), and this class is why
-    ///     that option exists.</b> It builds its client by hand rather than through
-    ///     <c>InfoCarrierTestStoreFactory</c>, so there is no <c>IServiceCollection</c> to call
-    ///     <c>AddInfoCarrierRelationalClient()</c> on — which is the shape most consumer
-    ///     applications have. The instance comes from the caller for the same reason
-    ///     <c>AllowTypes</c>'s types do: <c>InfoCarrier.Core</c> cannot name a relational type.
+    ///     <b>This class builds its client by hand rather than through
+    ///     <c>InfoCarrierTestStoreFactory</c></b>, which is the shape most consumer applications
+    ///     have: no <c>IServiceCollection</c> of its own to register anything on.
+    ///     <para>
+    ///         <b>Corrected 2026-09-09.</b> This said there is no collection "to call
+    ///         <c>AddInfoCarrierRelationalClient()</c> on", and that
+    ///         <c>InfoCarrier.Core</c> cannot name a relational type. Neither holds: R135 deleted
+    ///         that call and made the relational half unconditional, and the package has
+    ///         referenced <c>Microsoft.EntityFrameworkCore.Relational</c> since 2026-09-03. The
+    ///         instance still comes from the caller, for <c>AllowTypes</c>'s reason rather than
+    ///         this one: it is the SERVER's provider type, which no client can name.
+    ///     </para>
     /// </remarks>
     private static SqliteSmokeContext CreateClient(
         SqliteInfoCarrierBackendTestStore store,

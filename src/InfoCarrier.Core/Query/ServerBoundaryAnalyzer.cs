@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using InfoCarrier.Core.Expressions;
@@ -100,9 +100,14 @@ public sealed class ServerBoundaryAnalyzer(
             // the subclass instead sends it down `QuerySplitter.RejectClientEvaluation`, which
             // raises EF's own `TranslationFailed` — the answer every other provider gives for a
             // construct it cannot translate. The subclasses are recognised through the
-            // `IInfoCarrierRelationalQueryRoots` seam rather than named here, because
-            // `FromSqlQueryRootExpression` lives in `EFCore.Relational`, which this assembly does
-            // not reference (M9, D3).
+            // `IInfoCarrierRelationalQueryRoots` seam rather than named here.
+            //
+            // THE REASON HAS CHANGED AND THE SEAM HAS NOT (corrected 2026-09-09). This said
+            // `FromSqlQueryRootExpression` lives in `EFCore.Relational`, "which this assembly does
+            // not reference (M9, D3)", and the reference came back on 2026-09-03. The seam stays
+            // for R120's reason instead: this analyzer decides what may be SENT and the forward
+            // translator decides how it is written, and one reader has to answer for both or the
+            // two disagree silently. `QueryExecutor` is that reader.
             { } root when root.GetType() == typeof(Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression)
                 => true,
 

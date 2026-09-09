@@ -1,4 +1,10 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+// The document-mapping seam is [Obsolete] as of 10.1.0 and is still registered by default, so
+// this provider goes on using it until the major that removes it. Suppressed per FILE, which is
+// how EF1001 is handled here and for the same reason: a NEW use elsewhere still warns.
+// See docs/versioning.md, "Where a breaking change goes".
+#pragma warning disable CS0618 // Type or member is obsolete.
 
 // This provider registers EF's own relational model-building services on a client that has no
 // database, and three of them (the row-value factories) are internal. EF Core's own providers

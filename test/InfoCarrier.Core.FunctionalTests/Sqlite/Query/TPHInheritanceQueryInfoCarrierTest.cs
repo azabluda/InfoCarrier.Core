@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -23,11 +23,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         itself, as <c>InheritanceQuerySqliteTest</c>. Two bases, one tier each.
 ///     </para>
 ///     <para>
-///         <b>Why it earns its place next to the other two.</b> TPT and TPC are the mappings
-///         <c>InfoCarrierHierarchyMappingConvention</c> strips a discriminator for. TPH is the one
-///         it must leave alone, and the narrowing that decides between them is the part of that
-///         convention most likely to be wrong. This base is the direct assertion of the half that
-///         must not change.
+///         <b>Why it earns its place next to the other two.</b> TPT and TPC are the mappings a
+///         discriminator is stripped for; TPH is the one it must be left alone for, and the
+///         narrowing that decides between them is the part most likely to be wrong. This base is
+///         the direct assertion of the half that must not change. R128 replaced this repository's
+///         hand-written <c>InfoCarrierHierarchyMappingConvention</c> with EF's own
+///         <c>EntityTypeHierarchyMappingConvention</c>, so what is under test is now EF's
+///         narrowing rather than a copy of it, and this assertion matters no less for that.
 ///     </para>
 ///     <para>
 ///         The <c>UseTransaction</c> override is required: this base inherits

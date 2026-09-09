@@ -52,11 +52,15 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         {
             services = services.AddInfoCarrierArbitrarySqlExecution();
 
-            // Whatever else the store needs on the SERVER once raw SQL is granted. The SQLite
-            // store registers `AddInfoCarrierRelational()` there, which is how the server learns
-            // to REBUILD a raw-SQL query root (#97). This class cannot name that call: it is
-            // shared with Tier A, and naming it would put the relational package on Tier A's
-            // compile line.
+            // Whatever else the store needs on the SERVER once raw SQL is granted.
+            //
+            // NOTHING OVERRIDES THIS TODAY (corrected 2026-09-09). The comment here said the
+            // SQLite store registers `AddInfoCarrierRelational()`, "which is how the server learns
+            // to REBUILD a raw-SQL query root (#97)", and that this class could not name the call
+            // because it is shared with Tier A. R135 deleted the method: `ServerQueryExecutor`
+            // falls back to the one shipped `InfoCarrierRelationalQueryRoots`, so a server needs to
+            // register nothing to rebuild a root it is permitted to execute. The seam is kept
+            // because a future store may need it, and it is a candidate for deletion if none does.
             services = AddStoreSpecificServices(services);
 
             // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type

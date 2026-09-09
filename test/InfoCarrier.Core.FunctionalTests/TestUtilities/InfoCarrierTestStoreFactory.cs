@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -117,11 +117,13 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
-        // Whatever else the tier's own store needs on the CLIENT. The relational tier registers
-        // `AddInfoCarrierRelationalClient()` here (#56 option D), gated on the same raw-SQL grant
-        // as its server half: `Database.SqlQuery<T>` IS arbitrary SQL execution, so the facade shim
-        // without the server half would only trade one exception for another. This assembly cannot
-        // name that call, which is the point -- see `InfoCarrierTier`.
+        // Whatever else the tier's own store needs on the CLIENT.
+        //
+        // NO TIER OVERRIDES THIS TODAY (corrected 2026-09-09). It said the relational tier
+        // registers `AddInfoCarrierRelationalClient()` here (#56 option D). R135 deleted that call
+        // and `AddEntityFrameworkInfoCarrier()` above registers the facade dependencies for every
+        // client, so there is nothing left for a tier to add. The grant argument is still passed,
+        // because the seam's shape is what a future tier would need.
         return _tier.AddClientServices(serviceCollection, _props().ArbitrarySqlExecution);
     }
 

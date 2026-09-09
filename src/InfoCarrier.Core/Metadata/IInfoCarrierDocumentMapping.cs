@@ -32,6 +32,13 @@ namespace InfoCarrier.Core.Metadata;
 ///         differently.
 ///     </para>
 /// </remarks>
+[Obsolete(
+    "Use EF Core's own relational metadata instead. "
+    + "IReadOnlyTypeBase.GetContainerColumnName() answers the same question, and "
+    + "RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName is the ordinal name. "
+    + "This seam exists because InfoCarrier.Core could not reference "
+    + "Microsoft.EntityFrameworkCore.Relational, which it has referenced since 10.1.0. "
+    + "It still works and is still registered by default.")]
 public interface IInfoCarrierDocumentMapping
 {
     /// <summary>

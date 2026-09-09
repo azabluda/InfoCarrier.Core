@@ -6517,3 +6517,59 @@ owner asked for, the user-facing pages, and the release notes.
       rather than hiding it**: with the major tracking EF Core, this package has no number that says
       "we broke something and EF did not", so `[Obsolete]` in a minor and removal in the major that
       follows EF Core's is the only route. `IInfoCarrierDocumentMapping` is the worked case.
+
+- [x] **Y12. The document-mapping seam is deprecated, and the stale-reference sweep the owner
+      asked for.** `src/` and `test/` change, so both gates plus pack. `failed` and `total`
+      unchanged at 19 / 29516, names byte-identical, `REASONS: unchanged`. Trim `ours` 90 <= 90,
+      pack clean with four packages and no `CP` warning, release build `5 Warning(s), 0 Error(s)`.
+
+      **The `[Obsolete]` is the owner's decision, taken against the recommendation recorded in
+      Y9**, which was to keep the seam un-deprecated because its store-shaped argument survives and
+      #51 depends on it. Both halves of that still hold, which is why the message **does not name a
+      removal version**: an `[Obsolete]` string is a public promise, and whether this actually goes
+      in the next major depends on #51 rather than on this decision. It names the replacement
+      (`GetContainerColumnName()` and `RelationalKeyDiscoveryConvention.SynthesizedOrdinalPropertyName`)
+      and says the seam still works and is still registered by default.
+
+      **The use sites were enumerated by the compiler rather than by reading**, which is the only
+      way to be sure: `CI=true` makes `CS0618` an error, so the build listed exactly **7 sites in 5
+      `src/` files, plus 1 in a test**. Each is suppressed per FILE with a reason, the way EF1001 is
+      handled here and for its reason: a NEW use elsewhere still warns.
+
+      **The test suppression is the one worth reading.** `RelationalMetadataAgreementTest` walks
+      every type with `AnnotationDocumentMapping` and asserts the answer equals EF's own
+      `GetContainerColumnName()`. That equality is what would justify deleting the seam in a later
+      major, so the test has to outlive the deprecation rather than be deprecated with it.
+
+      **THE SWEEP FOUND FOURTEEN MORE, WHICH IS AN ORDER OF MAGNITUDE MORE THAN Y5 AND Y11 FOUND
+      BY ACCIDENT.** Eight in `src/` repeat one dead premise -- that `InfoCarrier.Core` does not
+      reference `EFCore.Relational`: `FromSqlQueryRootStubNode`, `SqlQueryRootStubNode`,
+      `TypeAllowlist`, `InfoCarrierValueGenerationConvention`, `ModelDbFunctions`,
+      `InfoCarrierEvaluatableExpressionFilter`, `InfoCarrierQueryFilterRewritingConvention` and
+      `ServerBoundaryAnalyzer`. Two more named `InfoCarrierOptionsExtension.RelationalQueryRootsFor`
+      and said the seam travels on the options, which R135 ended. Six are in `test/`, one of which
+      is correct history and was left alone.
+
+      **Each correction keeps the reason that survives and replaces the one that expired**, because
+      most of these decisions are still right for a different reason. The wire-node stubs name their
+      shape because an EF expression type cannot travel on a wire, not because of a reference. The
+      evaluatable-expression filter is still needed because this provider does not build through
+      `EntityFrameworkRelationalServicesBuilder`, not because the reference is gone.
+      `ServerBoundaryAnalyzer` keeps the seam for R120's one-reader rule.
+
+      **Two findings inside the sweep are worth more than the comments.**
+
+      1. **`TypeAllowlist` says two operation hosts "cannot be named with `typeof`", and they can
+         now.** NOT changed, and the comment says why: this is a security allowlist, so `typeof`
+         would change what the set CONTAINS rather than only how it is spelled. That is a measured
+         change and not a sweep's business.
+      2. **Two test-harness seams are dead.** `InfoCarrierTier.AddClientServices` and
+         `InfoCarrierBackendTestStore.AddStoreSpecificServices` exist only to register the calls
+         R135 deleted, and `find_references` confirms **nothing overrides either**. The comments now
+         say so; deleting the seams is the owner's call and is filed rather than taken.
+
+      **What the sweep says about the method.** Y5 found six of these, Y11 two, both while doing
+      something else. A deliberate pass over one dead premise found fourteen. **A comment that
+      records a decision goes stale exactly when the decision is reversed, which is the moment
+      nobody is reading it** -- so the reversal itself is the trigger for the sweep, and R135 and
+      the D3 supersession should each have carried one.

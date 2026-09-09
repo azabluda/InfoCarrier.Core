@@ -1,4 +1,10 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+// The document-mapping seam is [Obsolete] as of 10.1.0 and is still registered by default, so
+// this provider goes on using it until the major that removes it. Suppressed per FILE, which is
+// how EF1001 is handled here and for the same reason: a NEW use elsewhere still warns.
+// See docs/versioning.md, "Where a breaking change goes".
+#pragma warning disable CS0618 // Type or member is obsolete.
 
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
@@ -39,10 +45,14 @@ public class InfoCarrierConventionSetBuilder(
         // relational, so this class used to carry a narrower hand-written copy of EF's. It is gone:
         // `InfoCarrierRelationalConventionSetBuilder` extends this builder and adds EF's own.
         //
-        // A client whose backing store is relational must therefore register
-        // `AddInfoCarrierRelationalClient()`, which is what level 2 means by a process-wide
-        // statement. A client whose store is NOT relational needs nothing here: its server has no
-        // relational conventions either, so both models keep the discriminator and agree.
+        // THERE IS NOTHING FOR A CLIENT TO REGISTER (corrected 2026-09-09). This said a client
+        // whose backing store is relational "must therefore register
+        // `AddInfoCarrierRelationalClient()`". R135 deleted that method and the opt-in with it:
+        // `AddEntityFrameworkInfoCarrier` puts `InfoCarrierRelationalConventionSetBuilder` in the
+        // `IProviderConventionSetBuilder` slot for every client, so the subclass below always runs
+        // and this base is never the one EF resolves. A client over a NON-relational store gets the
+        // same conventions and agrees with its server anyway, because the four the subclass adds
+        // read the caller's own code rather than deciding anything a store decides.
 
         // And once more for query filters. Core EF's rewriter turns the `DbSet` a `FromSql*` call
         // reads into an `IQueryable`, which is not what that call's first parameter is, so a filter

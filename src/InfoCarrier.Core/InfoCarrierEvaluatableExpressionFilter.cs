@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -23,10 +23,17 @@ namespace InfoCarrier.Core;
 ///     </para>
 ///     <para>
 ///         <b>This is a port of one clause of <c>RelationalEvaluatableExpressionFilter</c>.</b> That
-///         class is what every relational provider gets, and this client is not one — M9 removed the
-///         reference to <c>Microsoft.EntityFrameworkCore.Relational</c>, so EF registers the plain
-///         core <see cref="EvaluatableExpressionFilter" />, which knows only the <em>core</em>
+///         class is what a provider built through <c>EntityFrameworkRelationalServicesBuilder</c>
+///         gets, and this one is not: it hand-wires the relational services a client without a
+///         database can supply, so EF registers the plain core
+///         <see cref="EvaluatableExpressionFilter" />, which knows only the <em>core</em>
 ///         <c>DbFunctionsExtensions</c>. The relational host was therefore invisible to it.
+///     </para>
+///     <para>
+///         <b>Corrected 2026-09-09.</b> The reason above used to read "M9 removed the reference to
+///         <c>Microsoft.EntityFrameworkCore.Relational</c>". The reference came back on
+///         2026-09-03 and this filter is still needed, which is the point: what decides the
+///         registration is the services builder, not the reference.
 ///     </para>
 ///     <para>
 ///         <b>Taken from the type itself since R133, so a rename is a build error.</b>

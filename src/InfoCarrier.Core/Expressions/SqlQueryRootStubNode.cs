@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -17,10 +17,12 @@ namespace InfoCarrier.Core.Expressions;
 ///         <c>ServerQueryExecutor.RebindQueryRoot</c> must answer it before it looks one up.
 ///     </para>
 ///     <para>
-///         <b>Named by shape rather than by type</b>, exactly as its sibling is:
-///         <c>SqlQueryRootExpression</c> lives in <c>Microsoft.EntityFrameworkCore.Relational</c>,
-///         which <c>InfoCarrier.Core</c> deliberately does not reference (<c>architecture.md</c>
-///         section 6a D3, M9 J5). See <see cref="Metadata.IInfoCarrierRelationalQueryRoots" />.
+///         <b>Named by shape rather than by type</b>, exactly as its sibling is, and for the
+///         sibling's reason: this is a serializable wire node, and <c>SqlQueryRootExpression</c>
+///         is an EF expression type that cannot travel on a wire. The note saying
+///         <c>InfoCarrier.Core</c> "deliberately does not reference"
+///         <c>Microsoft.EntityFrameworkCore.Relational</c> is corrected 2026-09-09: it has since
+///         2026-09-03. See <see cref="Metadata.IInfoCarrierRelationalQueryRoots" />.
 ///     </para>
 ///     <para>
 ///         <b>This node is a grant, not a translation</b>, and the grant is the same one its

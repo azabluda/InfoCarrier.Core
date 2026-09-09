@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Data.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
@@ -22,8 +22,9 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         <c>UnmappedProduct</c> and <c>UnmappedEmployee</c>, which take EF down its ad-hoc
 ///         entity-type path. Both halves ride the same wire node, <c>SqlQueryRootStubNode</c>, and
 ///         the same raw-SQL grant the fixture already carries
-///         (<c>arbitrarySqlExecution: true</c>, which also turns on
-///         <c>AddInfoCarrierRelationalClient()</c> and admits the store's parameter type).
+///         (<c>arbitrarySqlExecution: true</c>, which admits the store's parameter type). It used
+///         to turn on <c>AddInfoCarrierRelationalClient()</c> as well; R135 deleted that call and
+///         every client gets the relational half unconditionally.
 ///     </para>
 ///     <para>
 ///         <b>ADR-013's gate question is answered in the negative, and it was read rather than

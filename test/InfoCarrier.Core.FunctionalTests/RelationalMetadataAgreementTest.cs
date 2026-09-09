@@ -10,6 +10,12 @@ using Xunit;
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
 #pragma warning disable EF1001
 
+// `AnnotationDocumentMapping` is [Obsolete] as of 10.1.0, and this file is the one place where
+// naming it is the POINT rather than a use: the test below walks every type with it and asserts
+// the answer equals EF's own `GetContainerColumnName()`. That equality is what would justify
+// deleting the seam in a later major, so the test has to outlive the deprecation.
+#pragma warning disable CS0618 // Type or member is obsolete.
+
 namespace InfoCarrier.Core.FunctionalTests;
 
 /// <summary>

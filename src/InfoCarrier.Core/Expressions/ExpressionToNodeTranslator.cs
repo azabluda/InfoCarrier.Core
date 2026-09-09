@@ -39,22 +39,25 @@ public class ExpressionToNodeTranslator(
     /// <remarks>
     ///     <para>
     ///         <b>Per translation, and NOT a constructor parameter, because there must be exactly
-    ///         one source of this fact.</b> The value is per <c>DbContext</c>: it is
-    ///         carried on the options, for the reason
-    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRoots</c> records —
-    ///         <c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>, so every InfoCarrier
-    ///         client context in a process shares one internal service provider and a DI-injected
-    ///         answer would be the same for all of them. This class is resolved from that shared
-    ///         provider, so injecting it here gave the boundary analyzer and this translator two
-    ///         different answers: a client that set the option had its raw-SQL root ADMITTED at
-    ///         the boundary and then translated with its SQL DROPPED, which is the whole table
-    ///         coming back and the defect R75 closed.
+    ///         one source of this fact.</b> This class is resolved from the internal service
+    ///         provider that every InfoCarrier client context in a process shares
+    ///         (<c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>), so injecting the
+    ///         seam here once gave the boundary analyzer and this translator two different
+    ///         answers. A raw-SQL root was ADMITTED at the boundary and then translated with its
+    ///         SQL DROPPED, which is the whole table coming back and the defect R75 closed.
+    ///         <c>QueryExecutor</c> reads it once per execution and hands the same object to both.
+    ///         Scoped exactly like <c>_parameterIds</c> below: set at depth 0 and left alone in the
+    ///         recursion.
     ///     </para>
     ///     <para>
-    ///         So the one reader is <c>InfoCarrierOptionsExtension.RelationalQueryRootsFor</c>,
-    ///         called once per execution in <c>QueryExecutor</c>, and its answer reaches both the
-    ///         analyzer and this field. Scoped exactly like <c>_parameterIds</c> below — set at
-    ///         depth 0 and left alone in the recursion.
+    ///         <b>Corrected 2026-09-09.</b> This named
+    ///         <c>InfoCarrierOptionsExtension.RelationalQueryRoots</c> and
+    ///         <c>RelationalQueryRootsFor</c>, and said the value is per <c>DbContext</c> and
+    ///         travels on the options. R135 deleted the option: there is one implementation, no
+    ///         way to configure another, and nothing per context left to reconcile. <b>The hazard
+    ///         the paragraph above records is closed by construction now, and it is kept because
+    ///         the rule generalises</b>: when a permission and the knowledge it guards live on
+    ///         different carriers, check that one reader answers for both.
     ///     </para>
     /// </remarks>
     private Metadata.IInfoCarrierRelationalQueryRoots _relationalRoots

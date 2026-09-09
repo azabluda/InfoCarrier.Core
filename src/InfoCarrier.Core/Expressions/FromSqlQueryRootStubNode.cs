@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -8,9 +8,12 @@ namespace InfoCarrier.Core.Expressions;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Named by shape rather than by type.</b> <c>FromSqlQueryRootExpression</c> lives in
-///         <c>Microsoft.EntityFrameworkCore.Relational</c>, which <c>InfoCarrier.Core</c>
-///         deliberately does not reference (<c>architecture.md</c> section 6a D3, M9 J5). What it
+///         <b>Named by shape rather than by type, and the reason is the wire rather than a
+///         missing reference (corrected 2026-09-09).</b> This said
+///         <c>Microsoft.EntityFrameworkCore.Relational</c> is a package <c>InfoCarrier.Core</c>
+///         "deliberately does not reference"; it has referenced it since 2026-09-03. The shape is
+///         right anyway: this is a serializable wire node, and an EF expression type cannot travel
+///         on a wire whatever this assembly references. What <c>FromSqlQueryRootExpression</c>
 ///         adds to a plain entity root is exactly two things - a SQL string and one argument
 ///         expression - and those are what this node carries. See
 ///         <see cref="Metadata.IInfoCarrierRelationalQueryRoots" />.

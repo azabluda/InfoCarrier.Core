@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Collections;
 using System.Collections.Concurrent;
@@ -84,9 +84,16 @@ public sealed class TypeAllowlist
         typeof(System.Text.RegularExpressions.Regex),
     ];
 
-    // Operation hosts that live in `EFCore.Relational`, which this assembly does not reference
-    // (M9), so they cannot be named with `typeof`. Matched by full name AND assembly instead --
-    // the same by-name route `ServerBoundaryAnalyzer` takes for `FromSqlQueryRootExpression`.
+    // Operation hosts that live in `EFCore.Relational`. Matched by full name AND assembly rather
+    // than by `typeof`.
+    //
+    // THE REASON RECORDED HERE HAS EXPIRED (corrected 2026-09-09). It read "which this assembly
+    // does not reference (M9), so they cannot be named with `typeof`". The reference came back on
+    // 2026-09-03 and both classes CAN be named now. The by-name match is left as it is on purpose:
+    // this is a security allowlist, so `typeof` would change what the set contains rather than
+    // only how it is spelled, and that is a measured change and not a sweep's business. It is the
+    // one place the 2026-09-09 sweep found where naming EF's type is now possible and was not
+    // done.
     //
     //   RelationalDbFunctionsExtensions -> EF.Functions.Collate / Least / Greatest
     //   EFExtensions                    -> EF.Constant / EF.Parameter / EF.MultipleParameters

@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
@@ -24,10 +24,13 @@ namespace InfoCarrier.Core;
 ///     <para>
 ///         <b>EF Core Relational does not have the problem because it replaces the convention.</b>
 ///         <c>RelationalQueryFilterRewritingConvention</c> recognises the three <c>FromSql*</c>
-///         methods and folds the whole call into a <c>FromSqlQueryRootExpression</c>. That type
-///         lives in <c>Microsoft.EntityFrameworkCore.Relational</c>, which this package does not
-///         reference (M9, J5), and reaching it by reflection would be building a relational query
-///         root on a client that has no store.
+///         methods and folds the whole call into a <c>FromSqlQueryRootExpression</c>. Building one
+///         here would be building a relational query root on a client that has no store, which is
+///         the paragraph below's point and does not depend on what this package references. The
+///         note saying it "does not reference" <c>Microsoft.EntityFrameworkCore.Relational</c>
+///         (M9, J5) is corrected 2026-09-09: it has since 2026-09-03, and
+///         <see cref="Relational.InfoCarrierRelationalConventionSetBuilder" /> still declines to
+///         replace this convention, for the reason it records in its own list.
 ///     </para>
 ///     <para>
 ///         <b>Leaving the call alone is the right answer here, not merely the cheap one</b>, and it
@@ -53,8 +56,8 @@ namespace InfoCarrier.Core;
 ///     <para>
 ///         <b>The list used to name a third, and R128 removed it.</b>
 ///         <c>InfoCarrierHierarchyMappingConvention</c> spelled four <c>Relational:</c> strings by
-///         hand; it is deleted, and <c>InfoCarrier.Core.Relational</c> supplies EF's own
-///         <c>EntityTypeHierarchyMappingConvention</c> instead, which reads EF's constants. Those
+///         hand; it is deleted, and <see cref="Relational.InfoCarrierRelationalConventionSetBuilder" />
+///         adds EF's own <c>EntityTypeHierarchyMappingConvention</c> instead, which reads EF's constants. Those
 ///         four are a compile error now rather than a pinned string, which is the direction the
 ///         rest of this list is meant to travel in.
 ///     </para>

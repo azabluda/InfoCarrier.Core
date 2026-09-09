@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
@@ -26,9 +26,13 @@ namespace InfoCarrier.Core.Metadata;
 ///         connected to the same cause.
 ///     </para>
 ///     <para>
-///         <b>Read by string, as M9 J5 decided.</b> <c>InfoCarrier.Core</c> does not reference
-///         <c>Microsoft.EntityFrameworkCore.Relational</c>, so <c>IDbFunction</c> cannot be named
-///         and <c>model.GetDbFunctions()</c> cannot be called. The annotation holds a dictionary
+///         <b>Read by string, and the reason has expired (corrected 2026-09-09).</b> This said
+///         <c>InfoCarrier.Core</c> does not reference
+///         <c>Microsoft.EntityFrameworkCore.Relational</c>, "so <c>IDbFunction</c> cannot be named
+///         and <c>model.GetDbFunctions()</c> cannot be called". Both can be, since 2026-09-03.
+///         The annotation route is left in place because it works and its result is checked
+///         against EF's own <c>GetDbFunctions()</c> below; replacing it is a measured change
+///         rather than a comment fix. The annotation holds a dictionary
 ///         whose values expose a public <c>MethodInfo</c>, which is reached through the
 ///         non-generic <see cref="IDictionary" /> and one property lookup.
 ///         <c>RelationalMetadataAgreementTest</c> checks the result

@@ -1,4 +1,4 @@
-// Licensed under the MIT license. See license.txt file in the project root for license information.
+﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -29,10 +29,14 @@ namespace InfoCarrier.Core;
 ///         provider's in the stack.
 ///     </para>
 ///     <para>
-///         <b>Read by string name, as J5 decided.</b> `InfoCarrier.Core` does not reference
-///         `Microsoft.EntityFrameworkCore.Relational`, so the annotation is named rather than
-///         imported — and pinned by a test that asserts the strings still equal EF's constants,
-///         which is the whole price of that decision and is paid in one place.
+///         <b>Read from EF's own constants, and this paragraph said the opposite (corrected
+///         2026-09-09).</b> It read "read by string name, as J5 decided", because
+///         `InfoCarrier.Core` did not then reference
+///         `Microsoft.EntityFrameworkCore.Relational`, and it described a pin test asserting the
+///         strings still equal EF's constants. R133 replaced the strings with
+///         `RelationalAnnotationNames.DefaultValue` and
+///         `RelationalAnnotationNames.DefaultValueSql`, declared below, so a rename in EF is a
+///         build error and the pin test is gone.
 ///     </para>
 ///     <para>
 ///         <b>Narrow on purpose.</b> Only a property whose <c>ValueGenerated</c> is still
