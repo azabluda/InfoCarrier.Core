@@ -221,6 +221,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
 | `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why.** Warnings are errors **in CI only** — `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` reproduces it — the configuration matters. **That command reports `5 Warning(s), 0 Error(s)`, and green is not zero here**: the five are `IL2110`/`IL2111` from the framework's own Razor output in `samples/Northwind.Client`, downgraded from error to warning on purpose so the trim ratchet can still count them. Debug reports `0 Warning(s)`, which is why "the build is clean" stood uncorrected for five milestones. Read before adding any `NoWarn`. |
 | `docs/plans/v10/cold-read-findings.md` | **What seven readers with no context found in the user-facing docs**, and what is still open. §1 holds the `IgnoreQueryFilters` design question: the marker crosses the wire and the server honours it, so a global query filter is **not** an authorization boundary today. Read before touching the security or tenancy prose. |
 | `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
+| `docs/versioning.md` | **How a version is decided and how a release is shipped**, including the hotfix path off a release line. Two procedures with a shared tail, and a "what has bitten us" list: the pack baseline a branch cut from a tag inherits, the merge resolution that silently drops a fix, the site that no push republishes, and the `github-pages` environment refusing a branch it was not told about. **Read it before tagging**, and before cutting a release branch. |
 | `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers, so a comment naming a number can be checked against what it says. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
@@ -353,10 +354,15 @@ MERGED UP** (the Symfony and Linux direction, chosen 2026-09-09 over .NET's fix-
 A correction to what the shipped release does is a commit on `release/10.1`, merged into `main`;
 `main` is for the next minor. `release/2.2` and `release/3.1` are the v1 line and predate this.
 
-**`build.yml` and `packages.yml` still trigger on `main` alone, which is a deliberate economy and
-not an oversight.** While the release branch carries documentation only, its pushes need no
-90-minute ratchet and produce no new assembly. **Add `release/**` to `build.yml` before the first
-code fix lands there**; its own comment says so at the point of change.
+**`build.yml` and `packages.yml` RUN ON `release/**` SINCE 2026-09-09**, so a release line is
+gated exactly like the trunk and publishes a candidate to the internal feed before any tag makes a
+version permanent. They were `main`-only for part of that day, as a deliberate economy while the
+branch carried documentation; the economy was dropped on the argument that a hotfix is urgent by
+definition, so the first exercise of an unexercised path would happen under pressure. **The
+spec-suite badge is still `main`-only**, because a badge is a claim about the trunk.
+
+**`docs/versioning.md` IS THE RELEASE PROCEDURE**, in two variants sharing a tail, plus the traps
+that are invisible from the code. Read it before tagging anything.
 
 **`InfoCarrier.Core.Relational` was a third package and is not one any more.** D3 is superseded
 (`architecture.md` §6a, 2026-09-03): the relational half lives at
