@@ -475,7 +475,10 @@ Each of these cost something real, and none is visible from the code.
   the default branch and nothing else, so the first deploy from a release line is rejected before
   it runs a step. `release/*` was added on 2026-09-09; a new pattern is needed only if release
   branches are ever named differently.
-- **The GitHub Release is marked latest by GitHub's own rule.** `release.yml` does not set
-  `make_latest`, which is correct while the newest tag is also the newest line. **Patching an old
-  line after a newer minor exists would advertise the patch as current**, so check the Release
-  afterwards the first time that happens.
+- **The GitHub Release used to be marked Latest by GitHub's own rule, and now is not.** GitHub
+  flags a newly published release as Latest by default, which is right while the newest tag is
+  also the newest line and wrong the first time an older line is patched: a 10.1.x hotfix shipped
+  after 10.2.0 would have advertised itself as current on the landing page and in
+  `releases/latest`. `release.yml` now computes it, marking Latest only when the tag is the
+  highest stable `v*` version in the repository. The v1-era tags carry no `v` prefix and are
+  excluded by construction.
