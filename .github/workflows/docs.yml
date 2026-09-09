@@ -36,9 +36,15 @@ name: Docs
 # therefore a change on `release/10.1`, which is where such a fix belongs anyway; it reaches `main`
 # when the branch is merged up.
 #
-# UPDATE THE BRANCH NAME IN THE `deploy` JOB'S `if` WHEN A NEW MINOR SHIPS. It is one line, it
-# belongs to the release checklist, and a stale value is visible rather than silent: the site
-# simply stops updating.
+# PUBLISHING IS AN EXPLICIT ACT. A push to a release branch BUILDS and does not deploy: the site
+# changes when a human runs this workflow and not as a side effect of committing. So a stale site
+# is possible, and that is the accepted trade -- a documentation fix reaches readers when it is
+# ready rather than when it is typed, and publishing the wrong thing takes a decision.
+#
+# NOTHING HERE NAMES A VERSION, which is deliberate. The branch you dispatch from IS the choice of
+# what to publish, so a new minor needs no edit to this file: cut `release/10.2` and dispatch on
+# it. Dispatching on an older line republishes that line's docs over the site, which is a real way
+# to get this wrong and is now a thing somebody chose rather than a thing a push did.
 on:
   push:
     branches: [main, 'release/**']
@@ -50,8 +56,9 @@ on:
     paths:
       - 'website/**'
       - '.github/workflows/docs.yml'
-  # So the site can be republished without a content change -- after enabling Pages, for instance.
-  # Dispatch it ON THE RELEASE BRANCH; a dispatch from `main` builds and deploys nothing.
+  # THE ONLY EVENT THAT PUBLISHES. Run it from the Actions tab, or `gh workflow run Docs --ref
+  # release/10.1`. A dispatch from `main` still builds and deploys nothing, because `main` runs
+  # ahead of what is on nuget.org.
   workflow_dispatch:
 
 # Read the repository; write Pages and the OIDC token deploy-pages authenticates with.
@@ -95,10 +102,11 @@ jobs:
 
   deploy:
     name: Deploy
-    # Never from a pull request: a fork's branch must not be able to publish to this site.
-    # Never from `main` either, and the header says why. The branch is written out here rather
-    # than held in an `env:` because a workflow-level `env` is not in scope for a job-level `if`.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release/10.1'
+    # ONLY a manual dispatch, and only from a release line. The first half is what makes
+    # publishing explicit; the second is what keeps `main`, which runs ahead of nuget.org, off the
+    # site even when somebody dispatches it there by mistake. A pull request cannot reach either
+    # condition, so a fork's branch still cannot publish.
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/release/')
     needs: build
     runs-on: ubuntu-latest
 
