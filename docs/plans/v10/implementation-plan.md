@@ -6770,3 +6770,52 @@ The issue is milestoned `10.2.0`.
       additions were cut by a third first, which recovered 106 words of the 234; the rest is fact.
       `configuration/server` 880 to 960, `security` 800 to 840, `guide/transactions` 620 to 640,
       `api-surface` 460 to 470, each with its reason in `eng/doc-words.py` beside the number.
+
+- [x] **Z2. A token names the instance that minted it, so a misrouted request says so (#54, part 3).**
+      `dotnet test --filter TransactionTokenTest`: **Passed: 7, Failed: 0, Total: 7**, and 35 of 35
+      with the timeout and smoke classes beside it. Full suite `z2` against `y16`: **FAILING 19,
+      TOTAL 29541**, FIXED none, BROKEN none, REASONS unchanged.
+      `InfoCarrier.Core.TransportTests` 22 of 22. `CI=true` Release build 5 warnings 0 errors.
+      `trim-ratchet.sh` OK at 90 <= 90. `dotnet pack` clean.
+
+      **THE DEFECT IS A WRONG DIAGNOSIS, NOT A WRONG RESULT**, which is why this closes with a
+      message change rather than a mechanism. `_transactions` is a field of one
+      `InProcessInfoCarrierServer`, so a token resolves only on the process holding it. Behind a
+      load balancer:
+
+          Begin           -> instance A, which mints a token and holds the scope and connection
+          SaveChanges     -> instance B, which has never heard of it
+
+      Refusing that is correct. What was wrong is what B said: *"is not open on this server. It was
+      committed, rolled back, or belongs to a different server."* Three causes in one sentence, and
+      a reader takes the first and goes looking for a bug in their own code.
+
+      **A token now carries its instance**, `a1b2c3d4.<guid>`, and a server that does not recognise
+      the instance says so, names both, and points at session affinity. The ended message keeps the
+      causes that are really the caller's history and loses *"belongs to a different server"*,
+      because that case is now diagnosed rather than listed.
+
+      **A RESTART READS CORRECTLY TOO, and that came free.** The id is new per server object, so a
+      restarted process is a different instance and a token minted before it is reported as such
+      rather than as work that ended. That is the truth: the transaction died with the process.
+      Before this, every in-flight token after a deployment looked like a commit the caller had
+      forgotten making.
+
+      **WHAT IT DOES NOT DO, stated because the issue asks for more than this.** It does not route
+      anything: a live store connection cannot move between processes, so session affinity is
+      still required and `guide/transactions.md` still says so. It does not share the registry.
+      Part 2, binding a token to its creator, is untouched and still needs caller identity on the
+      envelope.
+
+      **The wire format is unchanged, which is the whole reason this was cheap.** The token has
+      always been an opaque string the server mints and the client echoes back verbatim, so what is
+      inside it is the server's business. That is what separates part 3 from part 2: one is a
+      string this server already owned, the other is a new field on the envelope and therefore a
+      version-skew question.
+
+      **Written test-first, and three of the seven were red for the right reasons** before the
+      code existed: the token had no instance part, and neither refusal mentioned an instance. The
+      four that passed from the start are the controls, and they are the point of the shape: a fix
+      that always blamed routing would move the wrong diagnosis rather than remove it, so a token
+      this instance really did mint and really did end must still be answered with its own history,
+      and a token naming no instance at all must not be blamed on routing either.

@@ -38,7 +38,7 @@ request, because each is an operation the server has to perform. If the second s
 
     **The token only resolves on the server instance that minted it.** The registry is
     process-local, so a load-balanced deployment needs session affinity for the life of a
-    transaction.
+    transaction. A restart is a different instance; the refusal says so.
 
 ## Savepoints
 

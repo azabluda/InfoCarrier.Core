@@ -36,6 +36,31 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private readonly ConcurrentDictionary<string, OpenTransaction> _transactions = new(StringComparer.Ordinal);
 
     /// <summary>
+    ///     Identifies THIS server object, and is carried inside every token it mints (#54, part 3).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>It exists to make one failure diagnosable, and it fixes nothing else.</b> The
+    ///         registry above is a field, so a token resolves only on the process holding it.
+    ///         Behind a load balancer a client can open a transaction on one instance and save on
+    ///         another, and refusing that is correct; what was wrong is that the refusal read
+    ///         "committed, rolled back, or belongs to a different server", and a reader takes the
+    ///         first branch and looks for a bug in their own code.
+    ///     </para>
+    ///     <para>
+    ///         <b>New per object, deliberately, so a RESTART reads correctly too.</b> A restarted
+    ///         process is a new instance, so a token minted before it is reported as another
+    ///         instance's rather than as work that ended. That is the truth: the transaction it
+    ///         named died with the process that held it.
+    ///     </para>
+    ///     <para>
+    ///         <b>It names no machine, user or row</b>, being random per object, so putting it in
+    ///         a message discloses nothing a token did not already.
+    ///     </para>
+    /// </remarks>
+    private readonly string _instanceId = Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>
     ///     The timer that sweeps idle transactions, or <see langword="null" /> when no timeout is
     ///     registered or none has been begun yet.
     /// </summary>
@@ -279,7 +304,10 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
                 .BeginTransactionAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            string token = Guid.NewGuid().ToString("N");
+            // THE WIRE FORMAT IS UNCHANGED, which is what separates this from #54's part 2. The
+            // token has always been an opaque string this server mints and the client echoes back
+            // verbatim, so what is INSIDE it is this server's business alone.
+            string token = $"{_instanceId}.{Guid.NewGuid():N}";
             var open = new OpenTransaction(scope, context, transaction);
             open.Touch(Clock);
             _transactions[token] = open;
@@ -324,6 +352,38 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
         => Task.FromResult(Open(transactionId).Transaction.SupportsSavepoints);
 
+    /// <summary>
+    ///     The instance named by a token, or <see langword="null" /> when it names none.
+    /// </summary>
+    private static string? MintedBy(string transactionId)
+    {
+        int separator = transactionId.IndexOf('.', StringComparison.Ordinal);
+        return separator > 0 ? transactionId[..separator] : null;
+    }
+
+    /// <summary>
+    ///     Why a token is not open here, said as precisely as this server can say it.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The routing case is separated from the ended case because they need different
+    ///     actions.</b> An ended transaction is the caller's own history and there is nothing to
+    ///     configure; a misrouted one is a deployment fact, and the reader has to reach for
+    ///     session affinity rather than for their own code. Listing both causes in one sentence,
+    ///     which is what this used to do, reliably sent readers to the wrong one.
+    /// </remarks>
+    private string NotOpenHere(string transactionId, string ended)
+    {
+        string? mintedBy = MintedBy(transactionId);
+
+        return mintedBy is not null && !string.Equals(mintedBy, _instanceId, StringComparison.Ordinal)
+            ? $"Transaction '{transactionId}' was opened on a different server instance "
+                + $"('{mintedBy}'), and this instance is '{_instanceId}'. The registry of open "
+                + "transactions is per process, so it does not move between instances and a "
+                + "load-balanced deployment needs session affinity for the life of a "
+                + "transaction. A restarted process is a different instance too."
+            : ended;
+    }
+
     private OpenTransaction Open(string transactionId)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
@@ -331,8 +391,11 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         if (!_transactions.TryGetValue(transactionId, out OpenTransaction? open))
         {
             throw new InvalidOperationException(
-                $"Transaction '{transactionId}' is not open on this server. It was committed, "
-                    + "rolled back, or belongs to a different server.");
+                NotOpenHere(
+                    transactionId,
+                    $"Transaction '{transactionId}' is not open on this server. It was committed, "
+                        + "rolled back, evicted after its configured idle timeout, or never "
+                        + "opened here."));
         }
 
         // THE ONE PLACE LIVENESS IS REFRESHED, and it is the one place because every request
@@ -371,11 +434,13 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             if (commit)
             {
                 throw new InvalidOperationException(
-                    $"Transaction '{transactionId}' is not open on this server, so it cannot be "
-                        + "committed. It was already committed or rolled back, it belongs to a "
-                        + "different server, or this server rolled it back because no request "
-                        + "named it for longer than its configured idle timeout. Any work done "
-                        + "inside it has been discarded.");
+                    NotOpenHere(
+                        transactionId,
+                        $"Transaction '{transactionId}' is not open on this server, so it cannot "
+                            + "be committed. It was already committed or rolled back, it was "
+                            + "never opened here, or this server rolled it back because no "
+                            + "request named it for longer than its configured idle timeout. Any "
+                            + "work done inside it has been discarded."));
             }
 
             return;

@@ -4286,5 +4286,11 @@
 # test moved in either direction (FIXED none, BROKEN none, REASONS unchanged), which is the
 # result that matters, because Z1 changed what `EndAsync` does with a commit for an unheld token.
 
+# 2026-09-10 (Z2) — total 29534 -> 29541, and `failed` is unmoved at 19. The rise is
+# `InMemory/TransactionTokenTest`, seven tests for #54 part 3: a token now names the server
+# instance that minted it, so a request that reaches the wrong instance is told that rather than
+# being told the transaction was committed. No spec test moved in either direction, which is what
+# matters, because the change rewords two refusals the suite reads.
+
 failed=19
-total=29534
+total=29541
