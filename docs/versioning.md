@@ -346,9 +346,62 @@ Both procedures below end at the same place, so the shared tail is written once.
 11. Update any version a document names by hand: the `PackageReference` and Central Package
     Management examples on the site, and the counts on the limitations and release-notes pages.
 12. If the fix was on a release line, merge it up: `git checkout main && git merge release/10.1`.
+    **This is part of the release, not tidying afterwards.** Until it lands, `main` builds a
+    version that NuGet orders BELOW the one you just shipped; the table above measures it.
 
 The `dotnet add package` commands name no version, so they need no edit. They did until `10.0.0`,
 because the newest stable was then `3.1.1` and an unversioned install silently resolved to it.
+
+## What the numbers do around a hotfix
+
+Measured on 2026-09-09 by rehearsing one end to end on `release/10.1`, tag included, and deleting
+it afterwards. Read it when you are mid-hotfix and wondering what the next number will be.
+
+| Point | Branch | Version |
+|---|---|---|
+| before the fix | `release/10.1` | `10.1.1-alpha.0.6` |
+| the fix | `release/10.1` | `10.1.1-alpha.0.7` |
+| **at tag `v10.1.1`** | `release/10.1` | **`10.1.1`** |
+| next commit after shipping | `release/10.1` | `10.1.2-alpha.0.1` |
+| **shipped, not yet merged up** | `main` | **`10.1.1-alpha.0.11`** |
+| after merging up | `main` | `10.1.2-alpha.0.1` |
+| next commit | `main` | `10.1.2-alpha.0.2` |
+| at tag `v10.2.0` | `main` | `10.2.0` |
+
+**`main` DOES change when a tagged hotfix is merged into it, and that is correct.** MinVer takes the
+greatest tag reachable from `HEAD`, so `v10.1.1` becoming reachable moves `main` from `10.1.1-alpha`
+to `10.1.2-alpha`. Nothing is lost: the numbers stay ordered, and tagging `v10.2.0` still produces
+exactly `10.2.0`.
+
+**A prerelease number never predicts the next release.** `MinVerAutoIncrement` is left at its
+default, so `main` sits on `10.1.2-alpha.*` while heading for `10.2.0`. The tag decides the version;
+the alpha stream only has to be ordered and unique.
+
+**THE WINDOW BEFORE THE MERGE IS THE ONE TO KNOW ABOUT.** While the fix is shipped and not yet
+merged, `main` builds `10.1.1-alpha.0.11`, and NuGet orders that BELOW the published `10.1.1`.
+Anyone tracking `main` on the internal feed then sees builds that look older than the fix that just
+shipped. Merging up resolves it immediately. That is why the merge is a numbered step of the
+release and not tidying done afterwards, and it is worth saying because a rushed hotfix is exactly
+when the merge gets postponed.
+
+**A rehearsal leaves versions behind on the internal feed.** The rehearsal's own build published
+`10.1.1-alpha.0.7`, and resetting the branch means the next real commit is height 7 as well.
+`packages.yml` pushes with `--skip-duplicate`, so nothing fails; the feed just keeps serving the
+REHEARSAL artifact under that number. Delete the rehearsal versions from GitHub Packages afterwards,
+which that feed allows and nuget.org would not.
+
+### What the rehearsal proved
+
+Everything except the irreversible step, which stopped by itself:
+
+- CI on the release line: all four jobs green (docs gates, fast gate, spec suite, spec ratchet).
+- `packages.yml` published a candidate from the branch, installable before any tag existed.
+- MinVer at the tag resolved to exactly `10.1.1`, and `release.yml`'s filename check found all four
+  expected files.
+- The GitHub Release was created with `isPrerelease: false` and was flagged **Latest**, which is
+  right while the newest tag is also the newest line, and is the trap named above when it is not.
+- `publish-nuget` stopped and waited for a reviewer. Rejecting it ended the run as a failure with
+  nothing pushed to nuget.org.
 
 ## What has bitten us
 
