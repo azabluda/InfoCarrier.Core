@@ -117,14 +117,13 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
-        // Whatever else the tier's own store needs on the CLIENT.
-        //
-        // NO TIER OVERRIDES THIS TODAY (corrected 2026-09-09). It said the relational tier
-        // registers `AddInfoCarrierRelationalClient()` here (#56 option D). R135 deleted that call
-        // and `AddEntityFrameworkInfoCarrier()` above registers the facade dependencies for every
-        // client, so there is nothing left for a tier to add. The grant argument is still passed,
-        // because the seam's shape is what a future tier would need.
-        return _tier.AddClientServices(serviceCollection, _props().ArbitrarySqlExecution);
+        // THERE IS NO PER-TIER CLIENT SEAM, and there has not been one worth keeping since R135.
+        // `InfoCarrierTier.AddClientServices` used to sit here so the relational tier could call
+        // `AddInfoCarrierRelationalClient()`. That call is gone, `AddEntityFrameworkInfoCarrier()`
+        // above registers the facade dependencies for every client, and no tier ever overrode the
+        // seam. Deleted 2026-09-09 rather than left as an empty extension point: an abstraction
+        // nothing implements reads as a decision somebody made, and this one had been reversed.
+        return serviceCollection;
     }
 
     /// <inheritdoc />

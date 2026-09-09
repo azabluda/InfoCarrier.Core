@@ -1,7 +1,6 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -47,20 +46,6 @@ public abstract class InfoCarrierTier
         InfoCarrierBackendTestStore backend,
         bool relationalClientStore)
         => new InfoCarrierTestStore(backend);
-
-    /// <summary>
-    ///     The tier's own additions to the <em>client's</em> provider services.
-    /// </summary>
-    /// <remarks>
-    ///     Nothing by default, and nothing overrides it (corrected 2026-09-09). This said the
-    ///     relational tier registers <c>AddInfoCarrierRelationalClient()</c> here, gated on the
-    ///     raw-SQL grant. R135 deleted that call and made the relational half unconditional, so
-    ///     the seam is now an empty extension point rather than a live one.
-    /// </remarks>
-    public virtual IServiceCollection AddClientServices(
-        IServiceCollection services,
-        bool arbitrarySqlExecution)
-        => services;
 
     /// <summary>
     ///     The logger factory a fixture observes.

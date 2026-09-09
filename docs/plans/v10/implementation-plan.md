@@ -6573,3 +6573,41 @@ owner asked for, the user-facing pages, and the release notes.
       records a decision goes stale exactly when the decision is reversed, which is the moment
       nobody is reading it** -- so the reversal itself is the trigger for the sweep, and R135 and
       the D3 supersession should each have carried one.
+
+- [x] **Y13. The two relational operation hosts are named with `typeof`, and the two dead harness
+      seams are deleted.** `src/` and `test/` change, so both gates plus pack. `failed` and `total`
+      unchanged at 19 / 29516, names byte-identical, `REASONS: unchanged`. Trim `ours` 90 <= 90,
+      pack clean with four packages, release build `0 Error(s)`. Net 29 lines lighter.
+
+      **`typeof` SETTLED A QUESTION THAT READING COULD NOT.** Y12 left the by-name match alone and
+      recorded why: `typeof` changes what the set CONTAINS rather than only how it is spelled, and
+      whether `Microsoft.EntityFrameworkCore.EFExtensions` is even public was unverified. It is:
+      the build is the proof, and both hosts now sit in `BuiltInOperationHosts` beside `Regex`.
+      `RelationalOperationHostNames`, `IsRelationalOperationHost` and its clause in the membership
+      test are all gone.
+
+      **THE SET IS STRICTLY NARROWER, WHICH IS THE SAFE DIRECTION AND IS NOT NEUTRAL.** A
+      name-and-assembly match admits ANY type presenting that full name out of ANY assembly whose
+      simple name is `Microsoft.EntityFrameworkCore.Relational`. `typeof` admits exactly the two
+      types this assembly was compiled against. **The suite is what turns "nothing legitimate is
+      lost" from a claim into a measurement**: 29,516 tests, no fix and no break, so every query in
+      the suite that needs `EF.Functions.Collate` or `EF.MultipleParameters` still resolves its
+      host. A rename in EF is a build error now rather than a silent refusal, which is the direction
+      R133 moved every other string in this repository.
+
+      **`docs/security-review.md` §4b is amended, not just the code comment**, because it was the
+      authority carrying the claim: it read that neither class "can be written as `typeof`" and that
+      both are matched by full name and assembly name. That paragraph would have outlived the code
+      by exactly the mechanism Y12 was about.
+
+      **The two seams are deleted rather than left as empty extension points.**
+      `InfoCarrierTier.AddClientServices` existed so the relational tier could call
+      `AddInfoCarrierRelationalClient()`; `InfoCarrierBackendTestStore.AddStoreSpecificServices`
+      existed so the SQLite store could call `AddInfoCarrierRelational()`. R135 deleted both calls,
+      `find_references` confirmed nothing overrode either, and Y12 corrected their comments to say
+      so. **An abstraction nothing implements reads as a decision somebody made, and this one had
+      been reversed**, so the honest end state is no seam rather than a documented hole.
+
+      **The build gate earned its keep for the third time this phase.** Deleting
+      `AddClientServices` left `using Microsoft.Extensions.DependencyInjection;` unnecessary in
+      `InfoCarrierTier.cs`, which `IDE0005` failed under `CI=true` before it could reach the server.

@@ -52,16 +52,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         {
             services = services.AddInfoCarrierArbitrarySqlExecution();
 
-            // Whatever else the store needs on the SERVER once raw SQL is granted.
-            //
-            // NOTHING OVERRIDES THIS TODAY (corrected 2026-09-09). The comment here said the
-            // SQLite store registers `AddInfoCarrierRelational()`, "which is how the server learns
-            // to REBUILD a raw-SQL query root (#97)", and that this class could not name the call
-            // because it is shared with Tier A. R135 deleted the method: `ServerQueryExecutor`
-            // falls back to the one shipped `InfoCarrierRelationalQueryRoots`, so a server needs to
-            // register nothing to rebuild a root it is permitted to execute. The seam is kept
-            // because a future store may need it, and it is a candidate for deletion if none does.
-            services = AddStoreSpecificServices(services);
+            // THERE IS NO PER-STORE SERVER SEAM EITHER, deleted 2026-09-09 with its sibling.
+            // `AddStoreSpecificServices` existed so the SQLite store could register
+            // `AddInfoCarrierRelational()`, which is how a server used to learn to REBUILD a
+            // raw-SQL query root (#97). R135 deleted that call and `ServerQueryExecutor` falls back
+            // to the one shipped `InfoCarrierRelationalQueryRoots`, so a server registers nothing
+            // to rebuild a root it is permitted to execute. No store ever overrode it.
 
             // A raw-SQL argument may BE a `DbParameter`, which is a provider type, and the type
             // allowlist refuses one by default exactly as ADR-008 constraint 2 requires. R85's seam
@@ -261,19 +257,6 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     default that costs a wrong answer must be the one you ask for.
     /// </remarks>
     public virtual bool ServerStoreIsRelational => true;
-
-    /// <summary>
-    ///     The store's own additions to the <em>server's</em> services, once the fixture has
-    ///     granted raw SQL execution.
-    /// </summary>
-    /// <remarks>
-    ///     Nothing by default, and called only inside that grant, because everything a store adds
-    ///     here today exists to serve a raw-SQL payload. Same seam as
-    ///     <see cref="StoreParameterType" /> above and for the same reason: the store names what
-    ///     this class may not.
-    /// </remarks>
-    protected virtual IServiceCollection AddStoreSpecificServices(IServiceCollection services)
-        => services;
 
     /// <summary>
     ///     An <b>unopened</b> connection carrying the backing store's connection string, for

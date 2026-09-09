@@ -202,10 +202,20 @@ changing the semantics of a query — the class of thing ADR-006 exists to preve
 classes that actually declare the markers a caller writes:
 `Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions` (`EF.Functions.Collate`, `Least`,
 `Greatest`) and `Microsoft.EntityFrameworkCore.EFExtensions` (`EF.Constant`, `EF.Parameter`,
-`EF.MultipleParameters`). Both live in `EFCore.Relational`, which `InfoCarrier.Core` does not
-reference (M9), so neither can be written as `typeof`. They are matched by **full name and assembly
-name** instead, the same by-name route `ServerBoundaryAnalyzer` takes for
-`FromSqlQueryRootExpression`.
+`EF.MultipleParameters`). Both live in `EFCore.Relational`, and both are now named with `typeof`
+in `BuiltInOperationHosts` beside `Regex`.
+
+**AMENDED 2026-09-09, and the amendment NARROWS the set.** This paragraph read that
+`InfoCarrier.Core` does not reference `EFCore.Relational` "so neither can be written as `typeof`",
+and that the two are matched by **full name and assembly name** instead. The reference came back on
+2026-09-03, so the by-name route and its `IsRelationalOperationHost` predicate are deleted.
+
+The security consequence is in the safe direction and is worth stating plainly. A name-and-assembly
+match admits **any** type presenting that full name out of **any** assembly whose simple name is
+`Microsoft.EntityFrameworkCore.Relational`; `typeof` admits exactly the two types this assembly was
+compiled against. Nothing legitimate is lost, because both halves of a deployment resolve the same
+EF assembly, and the specification suite is what measures that. A rename in EF is now a build error
+rather than a silent refusal.
 
 **Why the refusal was wrong.** The server is an ordinary relational provider and translates all six
 markers. Refusing them at the client boundary made this provider disagree with every reference

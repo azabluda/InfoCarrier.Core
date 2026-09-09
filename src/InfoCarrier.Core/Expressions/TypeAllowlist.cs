@@ -82,50 +82,44 @@ public sealed class TypeAllowlist
         // of service, not code execution, and `security-review.md` §4 records it with the
         // deployer's mitigation. `RegexOptions` needs no entry — every enum is already admitted.
         typeof(System.Text.RegularExpressions.Regex),
-    ];
 
-    // Operation hosts that live in `EFCore.Relational`. Matched by full name AND assembly rather
-    // than by `typeof`.
-    //
-    // THE REASON RECORDED HERE HAS EXPIRED (corrected 2026-09-09). It read "which this assembly
-    // does not reference (M9), so they cannot be named with `typeof`". The reference came back on
-    // 2026-09-03 and both classes CAN be named now. The by-name match is left as it is on purpose:
-    // this is a security allowlist, so `typeof` would change what the set contains rather than
-    // only how it is spelled, and that is a measured change and not a sweep's business. It is the
-    // one place the 2026-09-09 sweep found where naming EF's type is now possible and was not
-    // done.
-    //
-    //   RelationalDbFunctionsExtensions -> EF.Functions.Collate / Least / Greatest
-    //   EFExtensions                    -> EF.Constant / EF.Parameter / EF.MultipleParameters
-    //
-    // WHY THEY WERE MISSING, and it was not deliberate. `EF` and `DbFunctions` are both admitted
-    // above, and so is the *core* `DbFunctionsExtensions` -- but the markers a caller actually
-    // writes are declared on these two relational classes, so every `EF.Functions.Collate` and
-    // every `EF.MultipleParameters` was refused at the client boundary and raised EF's own
-    // `TranslationFailed`. The server could translate all of them: it is an ordinary relational
-    // provider. This is the shape M9 J20 reversed for `Regex` -- a refusal that made this provider
-    // disagree with every reference implementation -- and it cost six reds in
-    // `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` alone.
-    //
-    // WHY THIS DOES NOT BREAK `security-review.md` §2's CONJUNCTION. That bound is over the
-    // reflection *invocation* surface -- `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`,
-    // `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. Neither class is on it, neither
-    // derives from anything on it, and neither constructs anything on it. Their parameters are
-    // `DbFunctions`, scalars, `string` and arrays. The generic ones (`EF.Constant<T>` and
-    // friends) are bounded by §2's own mechanism rather than by luck: `ResolveMethod` resolves
-    // every parameter type through this same allowlist, so a `T` bound to an unadmitted type
-    // fails the signature lookup before the method is found. Naming a host permits the type to be
-    // named; a method still has to resolve by signature.
-    private static readonly HashSet<string> RelationalOperationHostNames =
-    [
-        "Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions",
-        "Microsoft.EntityFrameworkCore.EFExtensions",
+        // THE TWO RELATIONAL OPERATION HOSTS, NAMED WITH `typeof` SINCE 2026-09-09.
+        //
+        //   RelationalDbFunctionsExtensions -> EF.Functions.Collate / Least / Greatest
+        //   EFExtensions                    -> EF.Constant / EF.Parameter / EF.MultipleParameters
+        //
+        // They were matched by full name AND assembly until then, through a private
+        // `IsRelationalOperationHost`, because `InfoCarrier.Core` could not reference
+        // `EFCore.Relational`. It has since 2026-09-03, so a rename in EF is a build error now
+        // rather than a silent refusal, which is the direction every other string in this
+        // repository has moved (R133).
+        //
+        // **THE SET IS NARROWER FOR IT, WHICH IS THE SAFE DIRECTION.** A name-and-assembly match
+        // admits ANY type presenting that full name out of any assembly whose simple name is
+        // `Microsoft.EntityFrameworkCore.Relational`; `typeof` admits exactly the type this
+        // assembly was compiled against. Nothing legitimate is lost, because both halves of a
+        // deployment resolve the same EF assembly, and that is what the spec suite measures.
+        //
+        // WHY THEY ARE ADMITTED AT ALL, and it was not deliberate that they were missing. `EF` and
+        // `DbFunctions` are both admitted above, and so is the *core* `DbFunctionsExtensions` --
+        // but the markers a caller actually writes are declared on these two relational classes,
+        // so every `EF.Functions.Collate` and every `EF.MultipleParameters` was refused at the
+        // client boundary and raised EF's own `TranslationFailed`. The server could translate all
+        // of them: it is an ordinary relational provider. Same shape as `Regex` above, and it cost
+        // six reds in `NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest` alone.
+        //
+        // WHY THIS DOES NOT BREAK `security-review.md` §2's CONJUNCTION. That bound is over the
+        // reflection *invocation* surface -- `Binder`, `MethodBase`, `MethodInfo`,
+        // `ConstructorInfo`, `PropertyInfo`, `Activator`, `Assembly`, `AppDomain`. Neither class is
+        // on it, neither derives from anything on it, and neither constructs anything on it. Their
+        // parameters are `DbFunctions`, scalars, `string` and arrays. The generic ones
+        // (`EF.Constant<T>` and friends) are bounded by §2's own mechanism rather than by luck:
+        // `ResolveMethod` resolves every parameter type through this same allowlist, so a `T` bound
+        // to an unadmitted type fails the signature lookup before the method is found. Naming a
+        // host permits the type to be named; a method still has to resolve by signature.
+        typeof(Microsoft.EntityFrameworkCore.RelationalDbFunctionsExtensions),
+        typeof(Microsoft.EntityFrameworkCore.EFExtensions),
     ];
-
-    private static bool IsRelationalOperationHost(Type type)
-        => type.FullName is { } name
-            && RelationalOperationHostNames.Contains(name)
-            && type.Assembly.GetName().Name == "Microsoft.EntityFrameworkCore.Relational";
 
     private static readonly HashSet<Type> BuiltInGenericDefinitions =
     [
@@ -551,7 +545,7 @@ public sealed class TypeAllowlist
         }
 
         if (BuiltInTypes.Contains(type) || BuiltInOperationHosts.Contains(type)
-            || IsRelationalOperationHost(type) || _allowed.Contains(type))
+            || _allowed.Contains(type))
         {
             return true;
         }
