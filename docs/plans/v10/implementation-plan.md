@@ -6402,3 +6402,84 @@ owner asked for, the user-facing pages, and the release notes.
       links in 61 files, `mkdocs build --strict` clean. **The prose read of the pages this phase did
       NOT touch is still outstanding** and is the honest remainder: 20 pages have had a mechanical
       pass and no reading this time.
+
+- [x] **Y8. The four stale reasons on the relational compliance ignore list, re-derived; one base
+      adopted and reverted.** `test/` only. `failed` and `total` unchanged at 19 / 29516, names
+      byte-identical, `REASONS: unchanged`.
+
+      **Found while verifying #60 for closure, which is the part worth keeping.** An ignore list
+      whose entries nobody re-derives is the same failure mode as a doc comment nobody re-reads,
+      and three of these entries argued from "M9 removed the relational model from the client".
+
+      **`CompiledModelRelationalTestBase` was ADOPTED AND MEASURED, not reasoned about.** Its entry
+      said it asserts `GetTableName()` on the client's compiled model and that M9 removed the
+      relational model, so the boundary was the reason. The client has built a relational model
+      since V5 and `GetTableName()` answers, so that sentence had expired. Adopted bare on Tier B:
+      **13 of 14 red**, and the real blocker is one layer down and is a STORE TYPE rather than a
+      model:
+
+          The store type 'null' specified for JSON column 'ManyOwned' in table 'PrincipalBase' is
+          not supported by the current provider. JSON columns require a provider-specific JSON
+          store type.
+
+      The client's relational model carries EF's NEUTRAL store type names and names no database,
+      which is exactly what makes it sound (D3's V5 amendment). This base wants the backing
+      provider's. **Same boundary as `JsonTypesRelationalTestBase`**, and the two entries now say so
+      in the same words. `Sequences` fails differently and is noted so nobody re-derives it: an
+      annotation comparison whose two sides print identically, the C64 shape.
+
+      **The other three reasons were corrected without a build**, because each is a reading.
+      `RelationalServiceCollectionExtensionsTestBase` said the package references nothing relational
+      and registers none of EF's relational services, and both halves are false since 2026-09-03:
+      the ignore stands on `EntityFrameworkRelationalServicesBuilder`, which brings a connection, a
+      migrator and a SQL generator, not on the reference. `AdHocQuerySplittingQueryTestBase` said
+      its subject is moot because `SplitHintStrippingVisitor` removes `AsSplitQuery`; R149 carries
+      the hint on the request and the server honours it, so the subject is live and the required
+      surface is still the blocker.
+
+- [x] **Y9. The document-mapping seam checked and KEPT, and two doc comments corrected.** `src/`
+      change, so both gates plus pack. `failed` and `total` unchanged at 19 / 29516, reasons
+      unchanged, trim `ours` 90 <= 90, pack clean, release build `5 Warning(s), 0 Error(s)`.
+
+      **The owner asked whether `IInfoCarrierDocumentMapping` still earns its place now the
+      relational reference is back. It does, and the first reason is not a judgement call:** both it
+      and `AnnotationDocumentMapping` shipped in `10.0.0`, and `InfoCarrierDatabase`'s public
+      primary constructor takes the interface, so removing any of it is a binary break package
+      validation refuses against the `10.0.1` baseline.
+
+      **The second reason is the seam's own, and it would survive even if the API were free to
+      move.** The question is store-shaped: a document store recognises an ordinal key by the
+      property's SHAPE rather than by this annotation, so a Cosmos-style backend answers both
+      members differently. That is #51's dependency, and dissolving the seam now would have to be
+      undone to get there.
+
+      **What was actually wrong was the prose.** `AnnotationDocumentMapping` still argued that
+      naming EF's constant "would drag the relational package back into a provider whose client is
+      never a relational context", so the names were spelled as strings and pinned by a test. R133
+      reversed exactly that: the two names below that comment ARE EF's constants and the 268-line
+      pin test is deleted. `IInfoCarrierDocumentMapping` still opened "this provider is not
+      relational and its client is never a relational context", which R135 ended.
+
+- [x] **Y10. The release prose read, all 25 consumer documents.** Documents only. The mechanical
+      half ran in Y4; this is the reading, and it is what Y4 recorded as outstanding.
+
+      **Five pages carried something false, and one of them is a security fact.**
+      `multi-tenancy.md` recommends a server-side query interceptor as the fine-grained control and
+      says "the client cannot reach it". **A granted `FromSql` goes around it**, because such a
+      query never passes through `OnModelCreating`, so no filter is in it and an uncomposed one
+      reaches the database unchanged. The page was silent on raw SQL entirely, and `10.1` is the
+      release in which a server can grant it at all. It now says so, and the test checklist gains a
+      fifth item: grep for `AddInfoCarrierArbitrarySqlExecution`.
+
+      The other four are wrong facts rather than gaps. `blazor-webassembly.md` told a reader that
+      `Relational:TableName` on a client model is the tell that a compiled model came from the
+      server; since V5 every client model carries table names, so the tell is a false positive now,
+      and the page names a provider-specific annotation or a store type instead.
+      `installation.md` and `upgrading-from-3-1.md` both said the client package adds ONE
+      dependency, and it adds two. `upgrading-from-3-1.md` also warned that `3.1.1` is still the
+      newest stable on nuget.org, two stable releases after that stopped being true, and pinned
+      `10.0.0` in three places. `release-notes/10.0.md` opened by calling `10.0.1` the current
+      release.
+
+      **Two budgets moved and both are recorded with the fact that moved them.** The twenty pages
+      this phase had not touched are now read, so Y4's stated remainder is closed.

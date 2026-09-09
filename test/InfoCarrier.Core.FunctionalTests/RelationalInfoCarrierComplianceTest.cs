@@ -144,7 +144,14 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
         typeof(UpdateSqlGeneratorTestBase),
 
         // Asserts that EntityFrameworkRelationalServicesBuilder.RelationalServices are registered.
-        // InfoCarrier.Core stopped referencing EFCore.Relational in M9 and registers none of them.
+        // REASON CORRECTED 2026-09-09: it read "InfoCarrier.Core stopped referencing
+        // EFCore.Relational in M9 and registers none of them", and both halves of that are now
+        // false. The reference came back on 2026-09-03 and `AddEntityFrameworkInfoCarrier`
+        // registers ten relational services by hand. What it does NOT do is go through
+        // `EntityFrameworkRelationalServicesBuilder`, which is what this base asserts, and it
+        // cannot: that builder brings a connection, a migrator, a SQL generator and a database
+        // creator, none of which a client without a database can supply. The ignore stands on the
+        // builder, not on the reference.
         typeof(RelationalServiceCollectionExtensionsTestBase),
 
         // Interception of DbCommand, DbConnection and DbTransaction. The client holds no ADO.NET
@@ -187,13 +194,31 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
         // GenerateCreateScript is relational-only, and every test routes through it.
         typeof(ModelBuilding101RelationalTestBase),
 
-        // Asserts GetTableName() on the compiled model, which here is the *client's*. Its eleven
-        // tests build models with ToTable, SplitToTable, sprocs, sequences and check constraints.
-        // M9 removed the relational model from the client; this is that boundary, not a gap.
+        // ADOPTED AND REVERTED 2026-09-09, and the reason it carried until then had expired.
+        // It read "asserts GetTableName() on the compiled model, which here is the *client's* ...
+        // M9 removed the relational model from the client; this is that boundary, not a gap."
+        // The client has built a relational model since V5 and `GetTableName()` answers, so that
+        // sentence stopped being true and nobody re-derived it. **Measured rather than reasoned:
+        // adopted bare on Tier B, 13 of 14 red.** The real blocker is one layer down and it is a
+        // STORE TYPE, not a model:
+        //
+        //     The store type 'null' specified for JSON column 'ManyOwned' in table
+        //     'PrincipalBase' is not supported by the current provider. JSON columns require a
+        //     provider-specific JSON store type.
+        //
+        // The client's relational model carries EF's NEUTRAL store type names and names no
+        // database, which is exactly what makes it sound (D3's V5 amendment). This base wants the
+        // backing provider's, and the client cannot honestly have them. Same boundary as
+        // `JsonTypesRelationalTestBase` below, and the two entries now say so in the same words.
+        //
+        // `Sequences` fails differently and is worth knowing before anyone tries again: an
+        // annotation comparison whose two sides PRINT IDENTICALLY and do not compare equal, the
+        // same shape as C64. That one is not evidence of anything on this side.
         typeof(CompiledModelRelationalTestBase),
 
-        // Same boundary. AssertElementFacets asserts FindRelationalTypeMapping(), IsFixedLength()
-        // and GetStoreType() on the client's model, and the store types it expects are the backing
+        // Same boundary, and the entry above now carries the measurement that confirms it.
+        // AssertElementFacets asserts FindRelationalTypeMapping(), IsFixedLength() and
+        // GetStoreType() on the client's model, and the store types it expects are the backing
         // provider's. R23 measured 104 red of 576 on exactly that assumption and reverted.
         typeof(JsonTypesRelationalTestBase),
 
@@ -233,8 +258,13 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
         // **The reason recorded until now was narrower and wrong.** ADR-013's R77 amendment said
         // this base "calls CloseConnection() on the cast store", which is true of exactly one test
         // of ten and would have cost a test rather than the base under R14's rule. The blocker is
-        // the required surface, not that one call. Its subject is moot here as well:
-        // `QuerySplitter`'s `SplitHintStrippingVisitor` removes `AsSplitQuery` on purpose.
+        // the required surface, not that one call.
+        //
+        // **AND THE SENTENCE THAT FOLLOWED IT IS NOW WRONG TOO (corrected 2026-09-09).** It said
+        // the subject is moot here because `SplitHintStrippingVisitor` removes `AsSplitQuery` on
+        // purpose. R149 strips it from the TREE and carries the answer on the request instead, as
+        // `QueryDataRequest.SplitQueryBehavior`, and the server honours it. The subject is not
+        // moot; the required surface is still the blocker.
         typeof(AdHocQuerySplittingQueryTestBase),
 
         // Stored procedures, which SQLite does not have. EF's list carries the same entry.

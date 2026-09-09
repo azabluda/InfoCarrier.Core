@@ -1,4 +1,4 @@
-# Upgrading from 3.1
+﻿# Upgrading from 3.1
 
 InfoCarrier.Core 10 is a rewrite. It shares its name and its idea with the 1.0 to 3.1 line and
 almost nothing else: the expression serializer, the wire format, the client/server split and the
@@ -14,9 +14,9 @@ shapes, so an old implementation fails to build rather than building and misbeha
     Framework; this generation targets `net10.0` only. If your client is a .NET Framework
     application, this upgrade is a port of the client first.
 
-    `3.1.1` is still the newest stable release on nuget.org, so an unversioned
-    `dotnet add package` keeps giving you the old line. See
-    [Installation](installation.md#installing).
+    Read [Limitations](../limitations.md) before you commit to the port. It lists every
+    scenario that behaves differently here from another EF Core provider, and it is shorter to
+    read now than to discover later.
 
 ## What did not change
 
@@ -33,14 +33,15 @@ and `SaveChanges` as a unit of work.
 <PackageReference Include="InfoCarrier.Core" Version="3.1.1" />
 
 <!-- after: the client and the shared model project -->
-<PackageReference Include="InfoCarrier.Core" Version="10.0.0" />
+<PackageReference Include="InfoCarrier.Core" Version="10.1.0" />
 
 <!-- after: the ASP.NET Core server, in addition to the above -->
-<PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.0.0" />
+<PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.1.0" />
 ```
 
-`Remote.Linq` and `Aqua` are gone, and the only remaining dependency is
-`Microsoft.EntityFrameworkCore`. If you referenced either package directly, remove it.
+`Remote.Linq` and `Aqua` are gone. What remains is `Microsoft.EntityFrameworkCore` and
+`Microsoft.EntityFrameworkCore.Relational`, neither of which brings a database driver. If you
+referenced `Remote.Linq` or `Aqua` directly, remove it.
 
 ### 2. `UseInfoCarrierClient` became `UseInfoCarrier`
 
@@ -115,7 +116,7 @@ type. Full detail in [Configuring the server](../configuration/server.md).
 Implement these only if you are doing something unusual. Most applications now use the shipped
 implementations and touch none of them.
 
-| Interface | `3.1.1` | `10.0.0` |
+| Interface | `3.1.1` | `10.x` |
 |---|---|---|
 | `IInfoCarrierClient` | `ServerUrl`, plus sync and async pairs of `QueryData`, `SaveChanges` and the three transaction commands | nine `…Async` methods, no sync half, savepoints included |
 | `IInfoCarrierServer` | `QueryData` / `SaveChanges` (+ async), each taking a `Func<DbContext>` | the same nine `…Async` operations as the client; the `DbContext` comes from your service provider |
@@ -131,7 +132,7 @@ See [Value mappers](../configuration/value-mappers.md).
 
 ## Namespaces, at a glance
 
-| `3.1.1` | `10.0.0` |
+| `3.1.1` | `10.x` |
 |---|---|
 | `InfoCarrier.Core.Client` | `InfoCarrier.Core` |
 | `InfoCarrier.Core.Server` | `InfoCarrier.Core` |
@@ -142,7 +143,7 @@ See [Value mappers](../configuration/value-mappers.md).
 ## A checklist
 
 1. Confirm the client can target `net10.0`.
-2. Pin `10.0.0` on both packages.
+2. Pin `10.1.0` on both packages.
 3. Drop any direct `Remote.Linq` or `Aqua` reference.
 4. `UseInfoCarrierClient` becomes `UseInfoCarrier`, and build the client from the three shipped
    objects.

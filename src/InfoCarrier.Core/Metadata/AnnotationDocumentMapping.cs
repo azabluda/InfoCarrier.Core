@@ -14,12 +14,23 @@ namespace InfoCarrier.Core.Metadata;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The string is the whole cost of M9's J5, and it was accepted deliberately.</b>
-///         Naming the constant would be type-safe and would drag the relational package back into
-///         a provider whose client is never a relational context. Naming the string means an EF
-///         rename becomes a silent behaviour change rather than a build error — so the strings
-///         below are pinned by a test that asserts them equal to EF's own constants, and the test
-///         project is where the relational reference belongs.
+///         <b>The two names below are EF's own constants, and the paragraph that used to stand
+///         here argued for the opposite (corrected 2026-09-09).</b> It said naming the constant
+///         "would drag the relational package back into a provider whose client is never a
+///         relational context", so the names were spelled as strings and pinned by a test. R133
+///         reversed that once the reference came back: an EF rename is a build error now, and the
+///         268-line pin test is deleted.
+///     </para>
+///     <para>
+///         <b>Why the seam stays, asked and answered 2026-09-09.</b> With the reference back, this
+///         class could call <c>GetContainerColumnName()</c> directly and the interface could go.
+///         It does not go, for two reasons. It is <em>published API</em>: both types shipped in
+///         <c>10.0.0</c> and <see cref="InfoCarrierDatabase" />'s public constructor takes the
+///         interface, so removing any of it is a binary break package validation refuses. And the
+///         question is still store-shaped, which is the whole argument in
+///         <see cref="IInfoCarrierDocumentMapping" />'s own remarks: a document store answers it
+///         by the property's shape rather than by this annotation, and that is the seam's reason
+///         for existing rather than an artefact of the missing reference.
 ///     </para>
 ///     <para>
 ///         <b>The walk is EF's, reproduced rather than approximated.</b>

@@ -11,10 +11,9 @@ namespace InfoCarrier.Core.Metadata;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why this is a seam at all (M9, D3 answer (c)).</b> This provider is not relational
-///         and its client is never a relational context (ADR-013) — yet two components have to
-///         reach the same answer the <em>backing store</em> reaches, or the two models disagree
-///         silently. B12 is the worked example and its symptom was wrong data with no exception:
+///         <b>Why this is a seam at all (M9, D3 answer (c)).</b> Two components have to reach the
+///         same answer the <em>backing store</em> reaches, or the two models disagree silently.
+///         B12 is the worked example and its symptom was wrong data with no exception:
 ///         a JSON document carries no key for its array elements, every store synthesizes an
 ///         ordinal, and a client that kept the CLR <c>Id</c> instead gave every element the same
 ///         key.

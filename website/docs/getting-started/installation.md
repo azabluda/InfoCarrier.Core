@@ -7,8 +7,10 @@
 | `InfoCarrier.Core` | your client, and your server |
 | `InfoCarrier.Core.AspNetCore` | your server only |
 
-A client references `InfoCarrier.Core` alone. It adds one dependency,
-`Microsoft.EntityFrameworkCore`, and the HTTP transport is inside it. The server endpoint is a
+A client references `InfoCarrier.Core` alone. It adds two dependencies,
+`Microsoft.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Relational`, and the HTTP
+transport is inside it. The second is what lets the client model answer relational questions such
+as `GetTableName()`; it brings no database driver and no connection. The server endpoint is a
 second package because it carries a framework reference to `Microsoft.AspNetCore.App`, which a WPF,
 MAUI or WebAssembly client should not have to satisfy to restore a data-access library.
 

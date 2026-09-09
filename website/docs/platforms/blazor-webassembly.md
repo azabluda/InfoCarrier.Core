@@ -55,11 +55,14 @@ The second reason to skip it is better. The tooling needs a startup project it c
 Blazor WebAssembly project emits no `deps.json`, so your server becomes the startup project. EF then
 takes its configuration from the server's service provider and ignores an
 `IDesignTimeDbContextFactory` in the client. What you get is a client compiled model annotated with
-the server's table names and proxy settings, and the browser runs on the wrong model while appearing
+the server's store types and proxy settings, and the browser runs on the wrong model while appearing
 to work.
 
 Build the model at start-up instead. If you do use a compiled model, check which context it came
-from first: an annotation such as `Relational:TableName` on a client model is the tell.
+from first. A table name is not the tell: your client model carries those too, from the same
+`[Table]` attributes and `DbSet` names the server compiles. Look for something only the server's
+provider writes, such as a `SqlServer:` or `Sqlite:` annotation, or a store type that names a
+database. Your client's own mappings carry EF Core's neutral type names and name no store.
 
 ## Trimming
 

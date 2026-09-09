@@ -32,7 +32,11 @@ BUDGET = {
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
     "website/docs/getting-started/upgrading-from-3-1.md": 700,
-    "website/docs/release-notes/10.0.md": 700,
+    # 740 on 2026-09-09. The page opened "the current release of this line is 10.0.1", which a
+    # reader lands on and reads as "the current release". 10.1.0 is, so the page now says which
+    # line it describes and points forward, including at the one section a reader must read before
+    # upgrading. A release-notes page that misreports which release is current is worse than long.
+    "website/docs/release-notes/10.0.md": 740,
     "website/docs/platforms/blazor-webassembly.md": 700,
 
     # 800 on 2026-09-09, when the page was written. A release-notes page is one subject per
@@ -73,7 +77,12 @@ BUDGET = {
     # honour query filters, which turned one clause about writes into two paragraphs because the
     # two kinds of write now follow different rules. The signposting sentence the addition
     # introduced was cut first, which is the order doc-style.md fixes; that recovered 10 of 45.
-    "website/docs/multi-tenancy.md": 700,
+    # 760 on 2026-09-09, during the release prose read, and this one is a security fact rather
+    # than a tidy-up. The page recommends a server-side query interceptor as the fine-grained
+    # control and says "the client cannot reach it". Raw SQL goes around it: a FromSql query does
+    # not pass through OnModelCreating, so no filter is in it. The page was silent on that, and
+    # 10.1 is the release where a server can grant raw SQL at all.
+    "website/docs/multi-tenancy.md": 760,
 
     # Added to the 750 tier 2026-09-04, when server-side log forwarding shipped. The page went
     # over because it gained a fact it did not have: a server may now send the log events it

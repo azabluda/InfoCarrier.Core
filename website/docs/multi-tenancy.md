@@ -22,6 +22,12 @@ its own query provider, so EF's pipeline runs there in full and an `IQueryExpres
 registered on the server's context sees the tree before it is translated. Re-apply the tenant
 predicate there, whatever the incoming tree says. The client cannot reach it.
 
+**Raw SQL goes around both, so a multi-tenant server should not grant it.** A `FromSql` query does
+not pass through `OnModelCreating`, so no filter is in it, and an uncomposed one reaches the
+database unchanged. Your server grants this only by calling
+`AddInfoCarrierArbitrarySqlExecution()`, and it is off until you do. If you have a reason to grant
+it, the rights of the database account in your connection string are the control that is left.
+
 ## Writes
 
 `SaveChanges` is not a query, so no filter stands in its way and a client can submit a row whose key
@@ -81,6 +87,7 @@ captured once when the model is first built and then cached with it.
 3. A client sends `ExecuteDelete` over another tenant's rows. Nothing is deleted.
 4. Two tenants querying at once. Neither sees the other's rows, and the second tenant's query is
    filtered by its own tenant, not by the first one's.
+5. Your server does not call `AddInfoCarrierArbitrarySqlExecution()`. Grep for it.
 
 The fourth catches both mistakes above: a filter reading the wrong tenant, or a model cached with
 the first tenant's value, looks correct until a second tenant arrives. A single-tenant run never
