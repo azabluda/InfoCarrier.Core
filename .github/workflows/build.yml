@@ -298,17 +298,40 @@ jobs:
           work=$(mktemp -d)
           git clone --depth 1 --branch badges \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$work"
-
-          printf '{"schemaVersion":1,"label":"spec suite","message":"%s / %s passing","color":"%s"}\n' \
-            "$(comma "$passed")" "$(comma "$total")" "$COLOR" > "$work/spec-suite.json"
-
           cd "$work"
-          git add spec-suite.json
-          if git diff --staged --quiet; then
-            echo "Badge unchanged; nothing to push."
-            exit 0
-          fi
-          git -c user.name='github-actions[bot]' \
-              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-              commit -m "Spec suite: ${passed} / ${total} passing"
-          git push
+
+          # RETRIED, BECAUSE TWO PUSHES TO `main` MINUTES APART RACE FOR THIS BRANCH. On
+          # 2026-09-10 two runs reached here 55 seconds apart; the first won and the second was
+          # rejected with `cannot lock ref 'refs/heads/badges'`. Every gate in that run had
+          # passed and the badge already held the right numbers, so the only casualty was a red
+          # X on a green commit, which is the kind of failure that teaches people to ignore red.
+          #
+          # LAST WRITER WINS ON PURPOSE. Each attempt rewrites the file from THIS run's counters
+          # before committing, so whichever run finishes last leaves its own numbers. That is the
+          # same rule a single writer would follow, and it keeps the badge honest about the most
+          # recent measurement rather than the most recent push attempt.
+          for attempt in 1 2 3; do
+            printf '{"schemaVersion":1,"label":"spec suite","message":"%s / %s passing","color":"%s"}\n' \
+              "$(comma "$passed")" "$(comma "$total")" "$COLOR" > spec-suite.json
+
+            git add spec-suite.json
+            if git diff --staged --quiet; then
+              echo "Badge unchanged; nothing to push."
+              exit 0
+            fi
+
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m "Spec suite: ${passed} / ${total} passing"
+
+            if git push; then
+              exit 0
+            fi
+
+            echo "::notice::The badges branch moved under this push; retrying ($attempt of 3)."
+            git fetch origin badges
+            git reset --hard FETCH_HEAD
+          done
+
+          echo "::error::Could not publish the spec-suite badge after three attempts."
+          exit 1
