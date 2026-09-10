@@ -197,6 +197,10 @@
       before the gate can use it, so it moves after the publish job succeeds rather than with the
       tag.
 
+      10.1.1 on 2026-09-10, the last step of that release, and the first time this line has
+      done it in the right order: the gate downloads the baseline, `10.1.1` answered HTTP 200 on
+      nuget.org, and only then did this move.
+
       A RELEASE BRANCH CUT FROM THE TAG MISSES THAT RAISE, AND `release/10.1` CARRIED THE WRONG
       BASELINE UNTIL 2026-09-09. It follows from the rule above rather than contradicting it: the
       raise lands on `main` after the tag, so a branch cut AT the tag inherits the PREVIOUS value.
@@ -207,7 +211,7 @@
       BRANCH.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>10.1.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>10.1.1</PackageValidationBaselineVersion>
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>
