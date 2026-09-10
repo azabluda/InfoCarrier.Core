@@ -153,6 +153,30 @@ tenant claim behave differently under a token refresh.
 
 Nothing changes on the wire, so an existing client needs no rebuild.
 
+## Saying the store is a document store
+
+MongoDB, Cosmos DB and anything else whose unit of write is a whole record keep an owned type
+inside its owner. There is no partial write. Changing a customer's name rewrites the customer
+document, so an address the change set never mentioned is written out of existence: the save
+reports success and the next read fails on a field that is gone.
+
+```csharp
+builder.Services.AddInfoCarrierServerDocumentStore();
+```
+
+The server then reads the stored document and puts back whatever the change set left out.
+**Off until you call this.** Do not call it for a relational store, where an owned type is columns
+of the owner's row or a row of its own, and neither can go missing.
+
+The client has a switch of its own, `UseNonRelationalServerStore()`, which sends the whole document
+and saves the server that read. **Set both, and rely on this one.** A client can only send what its
+change tracker holds, so a stub it attached carries a bare root even with the switch on, and a
+deployment that never set the switch carries one always.
+
+The read happens only where something could be missing. A change set that names every owned
+navigation the model declares is written as it stands, and an insert or a delete is never read at
+all.
+
 ## Where the checks go
 
 A global query filter on the server's model applies to every query by default, which is what you

@@ -114,6 +114,19 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         => _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
 
     /// <summary>
+    ///     Whether this server's store writes an owned type inside its owner's record
+    ///     (<see cref="IInfoCarrierServerDocumentStore" />, #102).
+    /// </summary>
+    /// <remarks>
+    ///     From the root provider, like the others, and absent unless the application registered
+    ///     it. When present, <see cref="ServerSaveChangesExecutor" /> reads back whatever part of a
+    ///     document the change set did not mention, so a client that sent a bare root does not
+    ///     erase the rest of it.
+    /// </remarks>
+    private bool ServerStoreIsDocument
+        => _serviceProvider.GetService<IInfoCarrierServerDocumentStore>() is not null;
+
+    /// <summary>
     ///     How this server rebuilds EF's relational raw-SQL query roots
     ///     (<see cref="Metadata.IInfoCarrierRelationalQueryRoots" />, #97).
     /// </summary>
@@ -229,7 +242,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         {
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
             var executor = new ServerSaveChangesExecutor(
-                lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper);
+                lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper, ServerStoreIsDocument);
 
             using ServerLogCapture.Scope? capture = BeginLogCapture();
             SaveChangesResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
