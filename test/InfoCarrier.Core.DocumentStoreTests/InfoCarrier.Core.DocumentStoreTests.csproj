@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ADR-009 TIER D: the spec suite's fourth backing store, and the only one that is not a database
+    of tables. It exists to prove a NEGATIVE, that this provider is not relational-only, which the
+    other three tiers can only assert by implication.
+
+    A PROJECT OF ITS OWN, AND THE REASON IS NOT THE ONE THAT SPLIT THE SUITE BEFORE. R136 merged
+    the spec projects back together because the split existed to keep a package off Tier A's
+    compile line and that package was gone. This split has a live reason instead:
+    `MongoDB.EntityFrameworkCore` requires Entity Framework Core >= 10.0.11, and `src/` compiles
+    against a 10.0.1 floor on purpose. Putting them in one project makes central package management
+    refuse the graph (NU1109), and forcing it would drag the whole 29,000-test suite onto a
+    different EF Core patch than the product is built against.
+
+    Keeping it apart also means the EF version the tier runs on is a property of this file rather
+    than of the whole repository, which is exactly what a tier pinning a non-relational store wants.
+
+    NO SPECIFICATION BASES LIVE HERE, so none of EF's spec-test packages are referenced. That is
+    the design and not an omission: Tiers B and C adopt bases to GAIN coverage, and this one owns a
+    small, deliberate set of tests whose green means something no relational store can mean. If a
+    compliance test ever appears here demanding every base be adopted against a document store, it
+    has misread the tier.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      ABOVE THE FLOOR `src/` COMPILES AGAINST, DELIBERATELY. The Mongo provider requires >= 10.0.11
+      and this repository ships against >= 10.0.1, so this project runs the product on a NEWER EF
+      Core than it was built with. That is the configuration a consumer is really in, and the one
+      that would have caught the defect 10.1.1 fixed.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" VersionOverride="10.0.11" />
+
+    <!--
+      THE EF BUMP CASCADES, and this is the whole cost of running one project above the repository
+      floor. EF Core 10.0.11 reaches Microsoft.Extensions.Logging 10.0.11, which floors
+      Microsoft.Extensions.DependencyInjection at 10.0.11, above the 10.0.9 pinned centrally. The
+      override is local to this project, so `src/` and the main suite keep the versions they ship
+      against.
+    -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="10.0.11" />
+    <PackageReference Include="Mongo2Go" />
+    <PackageReference Include="MongoDB.EntityFrameworkCore" />
+
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -85,6 +85,22 @@ longer about whether the client is relational**; this file and `architecture.md`
 until R135, and `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R135)** with the
 measurement.
 
+**TIER D IS AN EMBEDDED MONGODB SINCE 2026-09-10, IN A PROJECT OF ITS OWN
+(`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS NO SPEC BASES.** It exists to prove a
+negative that no relational tier can: that this provider is not relational-only (#51). A compliance
+test here demanding every base be adopted against a document store would misread it. It is gated
+beside the transport suite rather than by the spec ratchet, for the same reason that suite is, and
+it is deliberately **absent from `eng/measure.sh`**. Its own project exists because
+`MongoDB.EntityFrameworkCore` needs EF Core >= 10.0.11 while `src/` compiles against a 10.0.1 floor,
+which also makes it the one place the product runs on a NEWER EF Core than it was built with.
+**It found #100 on its first run and the same change fixes it**: updating an entity that owns
+nested documents lost them over the wire, and a scalar update lost them silently. The fix widens
+the owner-expansion in `InfoCarrierDatabase.Expand` that C86/C87/C95 built for JSON columns, which
+was bounded by `GetContainerColumnName()` and therefore blind to a store with no columns, and adds
+the direction that case never needed: a root being written pulls its own document along. **Gated on
+`UseNonRelationalServerStore()`, so a relational deployment's payload is unchanged.** ADR-009's
+2026-09-10 amendment is the reading.
+
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
 every project in its own `projects` list and adds the figures. **That list holds the spec project
 alone, and `InfoCarrier.Core.TransportTests` is deliberately absent** — it is this repository's own

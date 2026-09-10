@@ -113,5 +113,20 @@
       test green by accident, which is the failure mode this repository treats as a defect.
     -->
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+
+    <!--
+      TIER D, TEST-ONLY, AND THE STORE ARRIVES IN THE PACKAGE. Mongo2Go embeds the mongod,
+      mongoimport and mongoexport binaries for win-x64, linux-x64/arm64 and osx-x64/arm64, so a
+      run downloads nothing and installs nothing. That is the same bar Firebird met and the reason
+      PostgreSQL did not: EphemeralMongo, the obvious package for this, FETCHES the binaries at
+      first use into local app data, which ADR-009 already rejected once.
+
+      MongoDB.EntityFrameworkCore REQUIRES EF Core >= 10.0.11, above this repository's 10.0.1
+      floor. That is deliberate rather than tolerated: it makes the test project resolve EF ABOVE
+      what src/ compiles against, which is the arrangement a consumer is really in and the one
+      that would have caught the 10.1.1 defect months earlier.
+    -->
+    <PackageVersion Include="Mongo2Go" Version="5.0.0" />
+    <PackageVersion Include="MongoDB.EntityFrameworkCore" Version="10.0.3" />
   </ItemGroup>
 </Project>

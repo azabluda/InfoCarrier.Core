@@ -47,6 +47,22 @@ public class InfoCarrierDatabase(
             .First()
             .InfoCarrierClient!;
     private readonly Metadata.IInfoCarrierDocumentMapping _documentMapping = documentMapping;
+
+    /// <summary>
+    ///     Whether the server's store writes rows rather than documents
+    ///     (<see cref="InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore" />).
+    /// </summary>
+    /// <remarks>
+    ///     <b>It decides how much of a document has to travel with a change (#100).</b> On a
+    ///     relational store an owned type is columns, or a row with a key of its own, and the
+    ///     server can write the change it was given. On a document store the owned types ARE the
+    ///     owner's document, so a change to any part of it can only be written by writing the
+    ///     whole.
+    /// </remarks>
+    private readonly bool _serverStoreIsRelational = options.Extensions
+            .OfType<InfoCarrierOptionsExtension>()
+            .First()
+            .ServerStoreIsRelational;
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly ICurrentDbContext _currentContext = currentContext;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger = updateLogger;
@@ -340,6 +356,29 @@ public class InfoCarrierDatabase(
                     }
                 }
             }
+
+            // AND THE OTHER DIRECTION, WHICH THE JSON CASE NEVER NEEDED (#100). Above, an owned
+            // entry pulls its owner along. Here a ROOT pulls its own document along, and on a
+            // document store it has to: writing a customer writes the whole customer document, so
+            // an address the client did not touch is not merely absent from the change set, it is
+            // absent from what gets written. The save then SUCCEEDS and stores a document with the
+            // address gone, which is data loss with no error, and the next read fails on the
+            // missing field rather than the write.
+            //
+            // A relational store never has this problem and never pays for this: `ToJson()` writes
+            // the container column from the owner's own values, and every other owned type is
+            // columns or a row of its own that the server can write untouched. So this is bounded
+            // by the same switch, and a relational deployment sends exactly what it sent before.
+            if (!_serverStoreIsRelational)
+            {
+                foreach (IUpdateEntry member in JsonDocumentMembers(entry))
+                {
+                    if (!sent.Contains(member) && seen.Add(member))
+                    {
+                        yield return member;
+                    }
+                }
+            }
         }
 
         foreach (IUpdateEntry entry in entries)
@@ -367,7 +406,7 @@ public class InfoCarrierDatabase(
         foreach (InternalEntityEntry candidate in ownerEntry.StateManager.Entries)
         {
             if (!ReferenceEquals(candidate, ownerEntry)
-                && _documentMapping.FindContainerName(candidate.EntityType) is not null
+                && PartOfOneDocument(candidate.EntityType)
                 && JsonColumnOwners(candidate).Any(o => ReferenceEquals(o, ownerEntry)))
             {
                 yield return candidate;
@@ -376,8 +415,30 @@ public class InfoCarrierDatabase(
     }
 
     /// <summary>
-    ///     The chain of owners above a JSON-mapped entry, nearest first, or nothing at all if the
-    ///     entry is not JSON-mapped.
+    ///     Whether this entity type is written as part of another's document rather than on its
+    ///     own.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Two ways to be part of one document, and only one of them is visible in a
+    ///         relational model.</b> A <c>ToJson()</c> type declares a container column and says so
+    ///         through <c>FindContainerName</c>. On a store that has no tables at all, EVERY owned
+    ///         type is part of its owner's document and nothing in the client's model says so,
+    ///         because the client's model is the relational one it always builds.
+    ///     </para>
+    ///     <para>
+    ///         <b>So the deployment says it, through
+    ///         <c>UseNonRelationalServerStore()</c></b>, which already exists and already means
+    ///         exactly this. Answering <see langword="true" /> for a type that is not owned costs
+    ///         nothing: the ownership walk below finds no owner and yields.
+    ///     </para>
+    /// </remarks>
+    private bool PartOfOneDocument(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
+        => !_serverStoreIsRelational || _documentMapping.FindContainerName(entityType) is not null;
+
+    /// <summary>
+    ///     The chain of owners above a document-mapped entry, nearest first, or nothing at all if
+    ///     the entry is not part of another's document.
     /// </summary>
     /// <remarks>
     ///     <c>GetContainerColumnName()</c> is the same question
@@ -388,7 +449,7 @@ public class InfoCarrierDatabase(
     /// </remarks>
     private IEnumerable<IUpdateEntry> JsonColumnOwners(IUpdateEntry entry)
     {
-        if (_documentMapping.FindContainerName(entry.EntityType) is null)
+        if (!PartOfOneDocument(entry.EntityType))
         {
             yield break;
         }

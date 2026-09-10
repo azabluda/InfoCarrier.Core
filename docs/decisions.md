@@ -307,6 +307,78 @@ something. Running a base on two tiers is duplication, not coverage.
 must never appear in `src/`. `eng/measure.sh` needs no change, because the tiers are namespaces in
 one project.
 
+### Amendment 2026-09-10 — Tier D, a document store, and it proves a negative rather than adding coverage
+
+**Tier D is MongoDB, embedded, and it exists for one claim** (#51): that this provider is not
+relational-only. Tiers B and C were added to GAIN coverage, a base needing transactions and a base
+needing a table-valued function. This one is a different kind of tier and the difference is the
+whole design.
+
+**It adopts NO specification bases and has NO compliance test, deliberately.** A
+`MongoComplianceTest` scanning the core specification assembly would demand every base be adopted
+against a document store, which is neither possible nor the point. If one ever appears here, it has
+misread the tier. What lives here instead is a small set of tests whose green means something no
+relational store can mean.
+
+**`InMemorySmokeTest` already wrote this tier's brief and called its own evidence weak, by name:**
+"WEAK EVIDENCE ON PURPOSE, and issue #51 says why: InMemory has no nested-document shape and no
+translation refusals of its own, so it disagrees with a relational store about almost nothing. A
+document-store tier is what would answer the question properly. This is the cheap half."
+
+**Mongo2Go, not EphemeralMongo, and that is the same trade Firebird won.** ADR-009 rejected
+PostgreSQL because its binaries are fetched at first run; the constraint was no installation and no
+container. EphemeralMongo is the obvious package here and fails the same test, downloading `mongod`
+into local app data. Mongo2Go carries the binaries inside its own NuGet package for win-x64,
+linux-x64/arm64 and osx-x64/arm64, which is how Firebird qualified.
+
+**A SINGLE-NODE REPLICA SET, NOT A STANDALONE.** The MongoDB EF provider wraps `SaveChanges` in a
+transaction, and MongoDB has transactions only on a replica set. `MongoDbRunner.Start()` throws on
+the first save; `MongoDbRunner.Start(singleNodeReplSet: true)` is required.
+
+**ONE SERVER PER STORE, OWNED BY THE TEST CLASS, AND THE ALTERNATIVE WAS MEASURED FIRST.** Sharing
+one `mongod` across the tier is cheaper on paper: startup is ~930 ms warm and each further database
+costs ~108 ms, flat, against ~930 ms for each further server. It was still rejected. xUnit 2.x has
+no assembly-level fixture, so sharing needs a static that is never disposed, which orphans a process
+when a run is killed, and it reintroduces the class of bug that already cost this repository a
+nine-test intermittent when a shared SQLite store's disposal raced a live one. Per-store, the class
+that started the server stops it and there is nothing to get wrong.
+
+**The cost of that choice is bounded by CONCURRENCY rather than by tier size**, which is what makes
+it safe to grow. xUnit runs test classes in parallel, so N classes start N servers at the same time:
+the wall clock is roughly one startup rather than N, and a `mongod` holding a test dataset uses
+about 150 MB, not the 7.6 GB its WiredTiger cache is configured for. Measured: 22 tests across four
+classes and four servers run in about seven seconds including every start.
+
+**A PROJECT OF ITS OWN, for a reason R136 did not have.** `MongoDB.EntityFrameworkCore` requires
+Entity Framework Core >= 10.0.11 and `src/` compiles against a 10.0.1 floor on purpose. In one
+project central package management refuses the graph (NU1109), and forcing it would drag the whole
+29,000-test suite onto a different EF Core patch than the product is built against. Keeping it apart
+also gives the tier a second, unplanned virtue: it runs the product on a NEWER EF Core than it was
+built with, which is the configuration a consumer is really in and the one that would have caught
+the defect `10.1.1` fixed.
+
+**It is gated with the transport suite and not by the spec ratchet**, for the reason that suite is:
+it is expected green and adopts no bases, so folding its count in would inflate the ratchet's total
+past what `test/known-failures.txt` was written against.
+
+**It found a defect on its first run and that defect is fixed in the same change, which is the
+argument for having built it** (#100). Updating an entity that owns nested documents lost them over
+the wire, and a scalar update lost them silently, writing a document with the nested parts gone and
+failing only on the next read. A server-side control performing the same updates directly against
+MongoDB passed throughout, so the fault was never the store's.
+
+**The same defect had already been solved once, for JSON columns** (C86, C87, C95): an owner that
+is `Unchanged` never reaches `IDatabase.SaveChanges`, so `InfoCarrierDatabase.Expand` sends it
+anyway. That machinery was bounded by `GetContainerColumnName()`, which is a RELATIONAL question,
+and a document store answers it nowhere. The fix widens the bound to any owned type when the store
+is not relational, and adds the direction the JSON case never needed: a ROOT being written pulls
+its own document along, because writing a customer writes the whole customer document.
+
+**It is gated on `UseNonRelationalServerStore()`, so a relational deployment sends exactly what it
+sent before.** That switch already states the store is not relational and already decides which
+queries the client will compose; it now decides how much of a document travels with a change. A
+client pointed at a document store must set it, which was already true for queries.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

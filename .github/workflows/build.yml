@@ -126,6 +126,19 @@ jobs:
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
           --no-build --configuration Release
 
+      # ADR-009 TIER D, and it is gated HERE rather than folded into the spec ratchet for the same
+      # reason the transport suite is: it is expected green and it adopts no specification bases,
+      # so its count would inflate the ratchet's total past what test/known-failures.txt was
+      # written against.
+      #
+      # It starts a real mongod, one per test class, from binaries Mongo2Go carries in its own
+      # package. Nothing is downloaded and no container is used, which is the bar ADR-009 set when
+      # it chose Firebird over PostgreSQL. About seven seconds including the server starts.
+      - name: Test (document store, Tier D)
+        run: >
+          dotnet test test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj
+          --no-build --configuration Release
+
       # Phase 2 of M8. Publishes the Blazor client trimmed and gates on the DIRECTION of this
       # product's IL2xxx count, not on zero — spec §9's "no warning attributable to
       # InfoCarrier.Core" is not met and eng/trim-baseline.txt records why. The script publishes
