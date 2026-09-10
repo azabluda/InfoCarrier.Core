@@ -343,11 +343,42 @@ when a run is killed, and it reintroduces the class of bug that already cost thi
 nine-test intermittent when a shared SQLite store's disposal raced a live one. Per-store, the class
 that started the server stops it and there is nothing to get wrong.
 
-**The cost of that choice is bounded by CONCURRENCY rather than by tier size**, which is what makes
-it safe to grow. xUnit runs test classes in parallel, so N classes start N servers at the same time:
-the wall clock is roughly one startup rather than N, and a `mongod` holding a test dataset uses
-about 150 MB, not the 7.6 GB its WiredTiger cache is configured for. Measured: 22 tests across four
-classes and four servers run in about seven seconds including every start.
+**AND THE PREMISE OF THAT PARAGRAPH — THAT DISPOSAL WORKS — WAS WRONG, CORRECTED 2026-09-11
+(#102).** "The class that started the server stops it, and there is nothing to get wrong" is exactly
+what did go wrong. `MongoDbRunner.Dispose()` does not reliably stop `mongod`: a run of this tier was
+measured finishing GREEN and leaving SIX live processes behind, and the next run then failed on data
+the previous run had written. So per-class servers did not remove the orphan risk that argument was
+weighing, they multiplied it by the number of classes, and the tier became intermittent the moment
+it grew from four classes to six.
+
+**The fixture now records which `mongod` its own start created and kills it if disposal did not.**
+Identifying it is why starting is serialized: the only portable way to name a process a library
+started is to diff the set before and after, and that diff means nothing while another thread is
+starting one too. The price is one startup per class in sequence rather than in parallel, which took
+this tier from about one second to about four; 13 consecutive runs then passed 28 of 28 with zero
+orphans, loaded and unloaded.
+
+**A SHARED SERVER WITH A DATABASE PER CLASS WAS TRIED FIRST AND DOES NOT ISOLATE, WHICH IS THE PART
+WORTH RECORDING BECAUSE IT LOOKS RIGHT.** It is cheaper, it needs no process bookkeeping, and it
+makes isolation a name this repository controls rather than a process it does not. Measured: six
+fixtures on one server, each with its own uniquely named database, still saw each other's rows —
+moving one class off a customer another class was writing turned a deterministic two-test failure
+green. Per-class servers do isolate. **So on this provider a database name is not a substitute for a
+process**, and the reason is not yet established; what is established is that the substitution fails.
+
+**The cost of that choice is now LINEAR in the number of classes, and that is the correction of
+2026-09-11.** This read: "bounded by CONCURRENCY rather than by tier size, which is what makes it
+safe to grow. xUnit runs test classes in parallel, so N classes start N servers at the same time:
+the wall clock is roughly one startup rather than N." That was true while starts overlapped, and
+serializing them to make disposal enforceable ended it. Six classes now cost six startups in
+sequence, about four seconds for 28 tests. **Memory is still bounded by concurrency** — a `mongod`
+holding a test dataset uses about 150 MB, not the 7.6 GB its WiredTiger cache is configured for —
+and the servers still run at the same time once started; it is only the starting that queues.
+
+**So growth has a price per class now, and the number to watch is wall clock rather than memory.**
+At roughly 600 ms a class this is affordable for a long time, and the tier is gated beside the
+transport suite rather than inside `eng/measure.sh`, so it does not slow the measurement anything
+else is judged by. Revisit if this tier ever reaches a few dozen classes.
 
 **A PROJECT OF ITS OWN, for a reason R136 did not have.** `MongoDB.EntityFrameworkCore` requires
 Entity Framework Core >= 10.0.11 and `src/` compiles against a 10.0.1 floor on purpose. In one
@@ -378,6 +409,56 @@ its own document along, because writing a customer writes the whole customer doc
 sent before.** That switch already states the store is not relational and already decides which
 queries the client will compose; it now decides how much of a document travels with a change. A
 client pointed at a document store must set it, which was already true for queries.
+
+### Amendment 2026-09-11 — the server half of #100, because the client half cannot be relied on (#102)
+
+**The paragraph above is still true and is no longer the whole answer.** Gating on
+`UseNonRelationalServerStore()` was the right bound for what the CLIENT sends. It is the wrong bound
+for whether the DOCUMENT survives, and the two were read as one thing for a day.
+
+**`Expand` can only send what the client's own change tracker holds**, which its own comment already
+said about JSON columns: "an element the client never materialized is not here and cannot be." So
+the switch is defeated two ways, and only one of them is a misconfiguration. A deployment that never
+called it sends a bare root always. **A client that DID call it sends a bare root whenever the
+application attached a stub** — `Attach(new Customer { Id = id, Name = name })` with one property
+marked modified, which is how you update one field on a relational store without reading the row.
+Both arrive at the server looking identical, and both would write a document with the nested parts
+erased.
+
+**So the repair belongs on the server, which is the half that can read the store.** A change set
+that does not mention everything the model says the document can hold is completed by a keyed query
+before the write. EF's own identity resolution is what makes that a repair rather than a clobber: a
+tracked entity is never overwritten by a query, so the client's values win wherever the client sent
+any, and a removed element stays removed because its `Deleted` entry is already in the identity map
+under the key the query returns.
+
+**The server is TOLD, through `AddInfoCarrierServerDocumentStore()`, and the alternative was
+probed rather than assumed.** No store-agnostic API answers "is an owned type written inside its
+owner's record". `Database.IsRelational()` is false for EF's in-memory provider too, and that store
+gives an owned type storage of its own, so a sniff would buy a read per modified owner across all of
+Tier A for nothing. The model says no more: dumping MongoDB's own model shows a document root
+carrying `Mongo:CollectionName` and an owned type carrying **no annotation at all**, while
+`IsOwned()` and `FindOwnership()` describe relational table splitting in exactly the same shape.
+
+**The cost is one read, and only where something could be missing.** A change set naming every owned
+navigation the model declares is written as it stands, which is what a correctly configured client
+sends; an insert has nothing to preserve and a delete has nothing to keep, so neither is read. A
+relational deployment registers nothing and is untouched, and the evidence for that is the
+specification suite: 29,000 tests across three relational tiers, none of which registers it.
+
+**And it refuses what it cannot repair**, which costs nothing because the refusal is reachable only
+after the change set is already known to be incomplete. A root whose CLR type is shared has no
+queryable set and a root whose key is not fully known has no comparison to make; neither can be read
+back, and writing anyway is the data loss this exists to prevent. Both are unreachable for anything
+shaped like a document root, which is what makes a throw safe rather than a hazard: it cannot fire
+on a change set that named the whole document.
+
+**Two test classes and a SECOND fixture**, which is the first time this tier has had one.
+`IncompleteDocumentTest` runs the incomplete change sets against a server that declares itself;
+three of its five tests fail without the registration, and the two that pass are the insert and the
+delete the repair deliberately skips. `UndeclaredDocumentStoreTest` is the second fixture and exists
+because **a repair that also hid a regression in the thing it repairs would be worse than no
+repair**: its server declares nothing, so a client that stopped expanding fails there.
 
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 

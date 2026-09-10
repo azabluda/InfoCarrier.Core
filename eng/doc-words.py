@@ -34,7 +34,11 @@ BUDGET = {
     # from the ASP.NET Core package rather than the core one, so the row has to say which package
     # it comes from as well as what it does. A reference page that omits a public member is wrong
     # rather than short, and the row was cut to the shortest sentence that carries both.
-    "website/docs/api-surface.md": 490,
+    # 520 on 2026-09-11, for one row: `AddInfoCarrierServerDocumentStore`. A reference page that
+    # omits a public member is wrong rather than short. The row is one sentence longer than the
+    # others because the member's name says where it goes and not what it prevents, and a reader
+    # scanning this table has to be able to tell whether it applies to them.
+    "website/docs/api-surface.md": 520,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
@@ -127,7 +131,21 @@ BUDGET = {
     # THIS PAGE IS NOW THE LONGEST ON THE SITE AND THAT IS A SIGNAL ABOUT ITS STRUCTURE. It is a
     # reference for every server-side decision, and there are six of them now. Revisit whether the
     # grants want a page of their own before raising this again.
-    "website/docs/configuration/server.md": 1090,
+    # 1300 on 2026-09-11, for #102: a FIFTH server-side grant, and the one that prevents silent
+    # data loss rather than a refusal. The section carries four facts a reader acts on -- that a
+    # document store has no partial write and therefore erases what a change set does not mention,
+    # the registration, that a relational store must NOT call it, and that the client's own switch
+    # does not make this one unnecessary because a client can only send what its change tracker
+    # holds. The fourth is the one that may not be dropped: a deployment that reads only the client
+    # page will believe it is covered.
+    #
+    # THIS PAGE WAS ALREADY THE LONGEST ON THE SITE AND IS NOW A THIRD LONGER THAN THE NEXT. The
+    # note above said to revisit whether the grants want a page of their own before raising this
+    # again. That is still the answer and it is still not this change: it is a page move, it
+    # touches every inbound link, and it belongs to the documentation read before a release rather
+    # than to the change that added the fifth grant. Do not raise this a sixth time without doing
+    # it.
+    "website/docs/configuration/server.md": 1300,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to
@@ -162,7 +180,11 @@ BUDGET = {
     # 900 on 2026-09-09, for the second `UseInfoCarrier` argument. The three calls it carries are
     # the only client-side configuration this provider has beyond the transport, and each of them
     # states a fact about the server that the client cannot work out for itself.
-    "website/docs/configuration/client.md": 900,
+    # 910 on 2026-09-11, for #102: one row gains the sentence that sends a reader to the SERVER
+    # registration. A client page that describes `UseNonRelationalServerStore()` without saying the
+    # server needs its own is the exact mistake this change exists to catch, because a deployment
+    # that reads only this page will believe it is covered and lose nested data anyway.
+    "website/docs/configuration/client.md": 910,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

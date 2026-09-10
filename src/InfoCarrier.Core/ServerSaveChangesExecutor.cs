@@ -1,5 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Linq.Expressions;
+using System.Reflection;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Update;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -39,8 +42,42 @@ namespace InfoCarrier.Core;
 /// </remarks>
 public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper)
 {
+    /// <summary>
+    ///     <c>EF.Property&lt;T&gt;</c>, for a key property that has no CLR member.
+    /// </summary>
+    /// <remarks>
+    ///     Taken from a delegate rather than by name. <c>GetMethod("Property")</c> is invisible to
+    ///     the trimmer and costs its own diagnostics; a delegate is an ordinary reference that the
+    ///     trimmer sees, which is the lesson R149 recorded in <c>eng/trim-baseline.txt</c>.
+    /// </remarks>
+    private static readonly MethodInfo EfPropertyMethod =
+        ((Func<object, string, object>)EF.Property<object>).Method.GetGenericMethodDefinition();
+
+    /// <summary>
+    ///     <see cref="LoadDocumentAsync{TEntity}" />, whose type argument only the model knows.
+    /// </summary>
+    private static readonly MethodInfo LoadDocumentMethod =
+        ((Func<DbContext, LambdaExpression, CancellationToken, Task>)LoadDocumentAsync<object>)
+            .Method.GetGenericMethodDefinition();
+
     private readonly DbContext _context = context;
     private readonly DynamicValueMapper _mapper = mapper;
+    private readonly bool _documentStore;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ServerSaveChangesExecutor" /> class for a
+    ///     server that has said what kind of store it writes to.
+    /// </summary>
+    /// <param name="context">The server's context.</param>
+    /// <param name="mapper">The value mapper for this request.</param>
+    /// <param name="documentStore">
+    ///     <see langword="true" /> when this store writes an owned type inside its owner's record,
+    ///     so that a change set which does not mention part of a document must be completed from
+    ///     the store before it is written (<see cref="IInfoCarrierServerDocumentStore" />, #102).
+    /// </param>
+    public ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper, bool documentStore)
+        : this(context, mapper)
+        => _documentStore = documentStore;
 
     /// <summary>
     ///     Applies the request and returns the store-generated values.
@@ -581,6 +618,13 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
             tracked.Add((replay.Change.CorrelationId, entry, replay.EntityType, state));
         }
 
+        // Everything the client sent is now tracked. On a store with no partial write, that is not
+        // yet everything the write needs (#102).
+        if (_documentStore)
+        {
+            await CompleteDocumentsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         int count;
         try
         {
@@ -620,6 +664,340 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
+    }
+
+    /// <summary>
+    ///     Supplies, from the store, whatever part of a document this change set never mentioned
+    ///     (#102).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A document store has no partial write.</b> Changing a customer's name writes the
+    ///         whole customer document, so an address the change set did not mention is not merely
+    ///         left alone — it is written out of existence, the save reports success, and the next
+    ///         read fails on a field that is gone. That is #100 seen from this side of the wire.
+    ///     </para>
+    ///     <para>
+    ///         <b>The client half of #100 cannot close it, which is why this exists.</b>
+    ///         <c>InfoCarrierDatabase.Expand</c> sends the whole document, and it can only send
+    ///         what the client's own change tracker holds. A deployment that never called
+    ///         <c>UseNonRelationalServerStore()</c> sends a bare root; so does a client that
+    ///         attached a stub to update one field without reading the row, which is the ordinary
+    ///         relational way to do it and stays ordinary with the switch on. Both arrive here
+    ///         looking the same, and both are repaired the same way.
+    ///     </para>
+    ///     <para>
+    ///         <b>The repair is a query, and EF's own identity resolution is what makes it a
+    ///         repair rather than a clobber.</b> A tracked entity is never overwritten by a query,
+    ///         so the client's values win wherever the client sent any, and the store fills in
+    ///         only what nobody is holding. A removed element stays removed: its <c>Deleted</c>
+    ///         entry is already in the identity map under the key the query returns.
+    ///     </para>
+    ///     <para>
+    ///         <b>It reads only where something could actually be missing.</b> A root whose change
+    ///         set mentions every owned navigation the model declares is written as it stands, and
+    ///         that is what a correctly configured client sends. A root being inserted has nothing
+    ///         in the store to preserve and a root being deleted has nothing to keep, so neither
+    ///         is read. A model with no owned types never reaches the query at all.
+    ///     </para>
+    ///     <para>
+    ///         <b>What it reads is the document as it stands now</b>, not as the client saw it. So
+    ///         a nested change another writer made in between survives this write instead of being
+    ///         reverted by a client that never knew about it. The client's own concurrency token,
+    ///         where the model has one, is unaffected: it is compared against the original value
+    ///         the client sent, which this does not touch.
+    ///     </para>
+    /// </remarks>
+    private async Task CompleteDocumentsAsync(CancellationToken cancellationToken)
+    {
+        var stateManager = _context.GetService<IStateManager>();
+
+        // Materialized first: loading a document tracks new entries, and the collection cannot be
+        // enumerated across that.
+        List<InternalEntityEntry> entries = [.. stateManager.Entries];
+
+        var documents = new Dictionary<(IEntityType Type, object?[] Key), Document>(DocumentKeyComparer.Instance);
+
+        foreach (InternalEntityEntry entry in entries)
+        {
+            if (DocumentRootOf(entry) is not { } root || !OwnedTypesUnder(root.Type).Any())
+            {
+                continue;
+            }
+
+            if (!documents.TryGetValue(root, out Document? document))
+            {
+                documents[root] = document = new Document();
+            }
+
+            if (entry.EntityType.IsOwned())
+            {
+                document.Present.Add(entry.EntityType);
+            }
+            else
+            {
+                document.RootState = entry.EntityState;
+            }
+        }
+
+        foreach (((IEntityType type, object?[] key), Document document) in documents)
+        {
+            if (document.RootState is EntityState.Added or EntityState.Deleted or EntityState.Detached)
+            {
+                continue;
+            }
+
+            if (OwnedTypesUnder(type).All(document.Present.Contains))
+            {
+                // The change set names every part the model says this document can hold, so
+                // nothing can go missing by writing it as it stands.
+                continue;
+            }
+
+            await LoadDocumentAsync(type, key, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Reads one document into the change tracker, so that whatever the change set left out is
+    ///     back on the root before the store writes it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Find</c> cannot do this: it answers from the identity map when the root is
+    ///         already tracked, which is exactly the case that needs the read. So this is an
+    ///         ordinary keyed query, and the owned navigations come with it because EF always
+    ///         loads an owned type with its owner.
+    ///     </para>
+    ///     <para>
+    ///         <b>What the write reads is the root's NAVIGATIONS, not the tracked entries</b>, and
+    ///         that is worth knowing before anyone optimizes this. EF hands
+    ///         <c>IDatabase.SaveChanges</c> only the entries that changed, so the owned parts this
+    ///         loads — <see cref="EntityState.Unchanged" />, because that is what they are — never
+    ///         reach the store as entries at all. They reach it because EF's fixup puts them back
+    ///         on the tracked root, and a document store serializes the object.
+    ///     </para>
+    ///     <para>
+    ///         <b>The key travels as an array element rather than as a constant</b>, so that the
+    ///         tree has one shape per entity type instead of one per key value. EF parameterizes an
+    ///         evaluatable subtree and leaves a bare <c>ConstantExpression</c> alone, and a
+    ///         constant key would put an entry in the compiled-query cache for every row a server
+    ///         ever writes.
+    ///     </para>
+    /// </remarks>
+    private Task LoadDocumentAsync(IEntityType entityType, object?[] keyValues, CancellationToken cancellationToken)
+    {
+        // REFUSE WHAT CANNOT BE REPAIRED, because by the time this runs the change set is already
+        // known to be incomplete and writing it would erase the rest of the document. A shared-type
+        // entity type has no `Set<T>()` to query and a null key value has no comparison to make, so
+        // neither can be read back. Both are unreachable for anything shaped like a document root,
+        // which is exactly why a throw is safe here: it cannot fire on a change set that named the
+        // whole document, and the alternative to a throw is silent data loss.
+        if (entityType.HasSharedClrType || Array.Exists(keyValues, v => v is null))
+        {
+            throw new InvalidOperationException(
+                $"The change set does not contain every owned type that '{entityType.DisplayName()}' "
+                + "holds in its document, and this server cannot read the stored document back to "
+                + "complete it: "
+                + (entityType.HasSharedClrType
+                    ? "the entity type shares its CLR type and has no queryable set."
+                    : "its key is not fully known.")
+                + " Writing it would lose the parts the change set did not name. Send the whole "
+                + "document from the client instead, with UseNonRelationalServerStore().");
+        }
+
+        IReadOnlyList<IProperty> keyProperties = entityType.FindPrimaryKey()!.Properties;
+        ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "e");
+        ConstantExpression keys = Expression.Constant(keyValues, typeof(object?[]));
+        Expression? body = null;
+
+        for (int i = 0; i < keyProperties.Count; i++)
+        {
+            Expression member = keyProperties[i].PropertyInfo is { } clrProperty
+                ? Expression.Property(parameter, clrProperty)
+                : Expression.Call(
+                    EfPropertyMethod.MakeGenericMethod(keyProperties[i].ClrType),
+                    parameter,
+                    Expression.Constant(keyProperties[i].Name));
+
+            Expression comparison = Expression.Equal(
+                member,
+                Expression.Convert(
+                    Expression.ArrayIndex(keys, Expression.Constant(i)), keyProperties[i].ClrType));
+
+            body = body is null ? comparison : Expression.AndAlso(body, comparison);
+        }
+
+        return (Task)LoadDocumentMethod
+            .MakeGenericMethod(entityType.ClrType)
+            .Invoke(null, [_context, Expression.Lambda(body!, parameter), cancellationToken])!;
+    }
+
+    /// <remarks>
+    ///     <para>
+    ///         <b><c>TEntity</c> repeats EF's own annotation, and that is the difference between
+    ///         one new trim diagnostic and two.</b> <c>DbContext.Set&lt;TEntity&gt;()</c> declares
+    ///         <c>[DynamicallyAccessedMembers(IEntityType.DynamicallyAccessedMemberTypes)]</c>, and
+    ///         a type parameter that does not say the same thing is an IL2091 on the way in.
+    ///     </para>
+    ///     <para>
+    ///         <b>Spelled out because EF's constant is <c>internal</c></b>
+    ///         (<c>subrepos/efcore/src/EFCore/Metadata/IEntityType.cs</c>), so it cannot be named
+    ///         from here. These are its seven flags, copied. If EF ever widens what it needs, this
+    ///         does not follow on its own and IL2091 comes back, which the trim ratchet catches.
+    ///     </para>
+    ///     <para>
+    ///         The IL2060 on the caller stays. Only the caller's model knows the type, and
+    ///         <c>eng/trim-baseline.txt</c> has described that premise since it was written.
+    ///     </para>
+    /// </remarks>
+    private static Task LoadDocumentAsync<
+        [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
+            System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicConstructors
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicProperties
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicFields
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] TEntity>(
+        DbContext context,
+        LambdaExpression predicate,
+        CancellationToken cancellationToken)
+        where TEntity : class
+        => context.Set<TEntity>()
+            .Where((Expression<Func<TEntity, bool>>)predicate)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>
+    ///     The document root this entry belongs to, and the key values the store knows it by.
+    /// </summary>
+    /// <remarks>
+    ///     Derived level by level from the entry's own values rather than looked up in the change
+    ///     tracker, because the owner is exactly the thing that may be absent. An owned type's key
+    ///     carries its owner's, so each step reads the owner's key out of the level below it.
+    ///     Anything that does not decompose that way — an ownership onto an alternate key, a
+    ///     keyless type — returns <see langword="null" /> and is left alone.
+    /// </remarks>
+    private static (IEntityType Type, object?[] Key)? DocumentRootOf(IUpdateEntry entry)
+    {
+        IEntityType type = entry.EntityType;
+        if (type.FindPrimaryKey() is not { } primaryKey)
+        {
+            return null;
+        }
+
+        var values = new Dictionary<IProperty, object?>();
+        foreach (IProperty property in primaryKey.Properties)
+        {
+            values[property] = entry.GetCurrentValue(property);
+        }
+
+        while (type.FindOwnership() is { } ownership)
+        {
+            IEntityType owner = ownership.PrincipalEntityType;
+            if (owner.FindPrimaryKey() is not { } ownerKey)
+            {
+                return null;
+            }
+
+            var ownerValues = new Dictionary<IProperty, object?>();
+            foreach (IProperty ownerProperty in ownerKey.Properties)
+            {
+                int at = -1;
+                for (int i = 0; i < ownership.PrincipalKey.Properties.Count; i++)
+                {
+                    if (ownership.PrincipalKey.Properties[i] == ownerProperty)
+                    {
+                        at = i;
+                        break;
+                    }
+                }
+
+                if (at < 0 || !values.TryGetValue(ownership.Properties[at], out object? value))
+                {
+                    return null;
+                }
+
+                ownerValues[ownerProperty] = value;
+            }
+
+            type = owner;
+            values = ownerValues;
+        }
+
+        return (type, [.. type.FindPrimaryKey()!.Properties.Select(p => values[p])]);
+    }
+
+    /// <summary>
+    ///     Every owned type written inside <paramref name="type" />'s document, however deeply
+    ///     nested.
+    /// </summary>
+    private static IEnumerable<IEntityType> OwnedTypesUnder(IEntityType type)
+    {
+        var seen = new HashSet<IEntityType>();
+        var stack = new Stack<IEntityType>();
+        stack.Push(type);
+
+        while (stack.Count > 0)
+        {
+            foreach (INavigation navigation in stack.Pop().GetNavigations())
+            {
+                if (navigation.TargetEntityType.IsOwned() && seen.Add(navigation.TargetEntityType))
+                {
+                    stack.Push(navigation.TargetEntityType);
+                    yield return navigation.TargetEntityType;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     What one document's change set holds: the root's state, if the root is in it at all, and
+    ///     which of its owned types are.
+    /// </summary>
+    private sealed class Document
+    {
+        public EntityState? RootState { get; set; }
+
+        public HashSet<IEntityType> Present { get; } = [];
+    }
+
+    /// <summary>
+    ///     Identity for a document: the root's entity type and its primary key values.
+    /// </summary>
+    private sealed class DocumentKeyComparer : IEqualityComparer<(IEntityType Type, object?[] Key)>
+    {
+        public static readonly DocumentKeyComparer Instance = new();
+
+        public bool Equals((IEntityType Type, object?[] Key) x, (IEntityType Type, object?[] Key) y)
+        {
+            if (x.Type != y.Type || x.Key.Length != y.Key.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < x.Key.Length; i++)
+            {
+                if (!Equals(x.Key[i], y.Key[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public int GetHashCode((IEntityType Type, object?[] Key) obj)
+        {
+            var hash = new HashCode();
+            hash.Add(obj.Type);
+            foreach (object? value in obj.Key)
+            {
+                hash.Add(value);
+            }
+
+            return hash.ToHashCode();
+        }
     }
 
     /// <summary>
