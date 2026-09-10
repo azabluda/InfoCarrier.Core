@@ -4299,5 +4299,21 @@
 # this total. No spec test moved either way, which is the result that matters, because the change
 # adds a check to `Open`, the lookup every request naming a token passes through.
 
+# 2026-09-10 (10.1.1) — total 29516 -> 29522, and `failed` is unmoved at 19 with the names
+# BYTE-IDENTICAL to known-failures.names.txt. The rise is not this repository's: moving the EF
+# family from 10.0.0 to 10.0.1 moves `Microsoft.EntityFrameworkCore.Specification.Tests`, and the
+# suite is inherited from that package, so six test cases arrived with it and all six pass.
+#
+# THEY ARE CASES ON EXISTING BASES RATHER THAN A NEW BASE, which the compliance tests establish
+# rather than an assumption: `All_test_bases_must_be_implemented` would fail if EF had added a base
+# this repository does not implement, and it is green. The six are not enumerated by name here,
+# because that would need a listing of both package versions and they are passing additions.
+
+# 2026-09-10 (merge of release/10.1) — total 29558, MEASURED on the merged tree rather than added
+# up from the two branches. Neither branch's number was right here: `main` carried 29552 for the
+# three #54 steps on EF Core 10.0.0, and the release line carried 29522 for the EF move without
+# those steps. 29552 + 6 happens to be the answer, and deriving it would still have been the wrong
+# method, because this file has carried a figure got by arithmetic before.
+
 failed=19
-total=29552
+total=29558

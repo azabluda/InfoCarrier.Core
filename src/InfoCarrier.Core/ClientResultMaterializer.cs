@@ -632,7 +632,20 @@ public class ClientResultMaterializer(
                                 key.EntityType,
                                 "instance",
                                 key.EntityType.ClrType,
-                                key.TrackingBehavior),
+
+                                // NAMED, NOT POSITIONAL, AND THAT IS THE WHOLE LESSON OF 10.1.1.
+                                // EF INSERTED `IsNullable` INTO THIS CONSTRUCTOR IN 10.0.1, a
+                                // patch, and a positional call bound to the old arity kept
+                                // compiling and threw `MissingMethodException` at runtime against
+                                // every EF Core 10 except the one it was built on. Named arguments
+                                // turn the next insertion into a compile error instead.
+                                //
+                                // `false` because this materializes a top-level ENTITY, and EF
+                                // documents the parameter as "whether the type being materialized
+                                // is nullable", which is a question about an optional complex
+                                // type rather than about a row.
+                                IsNullable: false,
+                                QueryTrackingBehavior: key.TrackingBehavior),
                             contextParameter),
                         contextParameter)
                     .Compile();

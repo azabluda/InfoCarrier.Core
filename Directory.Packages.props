@@ -25,14 +25,14 @@
       raise it to chase a patch; raise it only when this provider needs a fix that shipped in one.
       .github/dependabot.yml ignores this family for exactly that reason.
     -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="[10.0.0,11.0.0)" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="[10.0.1,11.0.0)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="10.0.1" />
 
     <!--
       ADR-009 Tier C: Firebird, and it is TEST-ONLY. No shipped project references any of these
