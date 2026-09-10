@@ -4280,5 +4280,15 @@
 # differs because EF prints the node above the failure after running its own normalizer. Both would
 # need this provider to run the pipeline it refuses in front of (ADR-006).
 
+# 2026-09-10 (10.1.1) — total 29516 -> 29522, and `failed` is unmoved at 19 with the names
+# BYTE-IDENTICAL to known-failures.names.txt. The rise is not this repository's: moving the EF
+# family from 10.0.0 to 10.0.1 moves `Microsoft.EntityFrameworkCore.Specification.Tests`, and the
+# suite is inherited from that package, so six test cases arrived with it and all six pass.
+#
+# THEY ARE CASES ON EXISTING BASES RATHER THAN A NEW BASE, which the compliance tests establish
+# rather than an assumption: `All_test_bases_must_be_implemented` would fail if EF had added a base
+# this repository does not implement, and it is green. The six are not enumerated by name here,
+# because that would need a listing of both package versions and they are passing additions.
+
 failed=19
-total=29516
+total=29522
