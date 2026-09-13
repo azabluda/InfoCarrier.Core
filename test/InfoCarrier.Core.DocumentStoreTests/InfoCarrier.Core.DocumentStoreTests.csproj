@@ -46,6 +46,28 @@
       against.
     -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="10.0.11" />
+
+    <!--
+      THE HARNESS BRINGS THIS, AND THE OVERRIDE KEEPS IT ON THE SAME EF CORE AS EVERYTHING ELSE
+      HERE. InfoCarrier.Core.TestUtilities references the spec-test package at the repository floor,
+      so without this line the transitive pin would put 10.0.1 in this tier's output beside EF Core
+      10.0.11. That resolves — the 10.0.1 package asks only for EF >= 10.0.1 — but it would make
+      this the one project running two EF Core patches at once for no reason. The package publishes
+      the whole 10.0.x band, so the tier can name its own.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" VersionOverride="10.0.11" />
+
+    <!--
+      AND THE SPEC-TEST PACKAGE CASCADES IN TURN. It reaches Microsoft.EntityFrameworkCore.Proxies
+      directly and Microsoft.EntityFrameworkCore.Relational through EF's design package, both at
+      10.0.11, and central transitive pinning would hold them at 10.0.1 — which NuGet reports as a
+      downgrade (NU1109) rather than resolving quietly. Naming them here is the whole cost of this
+      tier running above the repository floor, and the errors say exactly which packages to name,
+      so this list does not have to be guessed.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" VersionOverride="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" VersionOverride="10.0.11" />
+
     <PackageReference Include="Mongo2Go" />
     <PackageReference Include="MongoDB.EntityFrameworkCore" />
 
@@ -56,6 +78,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <!--
+      THE SECOND CONSUMER OF THE SHARED HARNESS, AND THE REASON IT IS A PROJECT AGAIN. It is built
+      at the repository's 10.0.1 floor and runs here on 10.0.11, which is the same compile-low /
+      run-high arrangement this tier already has with `src/InfoCarrier.Core` itself.
+    -->
+    <ProjectReference Include="..\InfoCarrier.Core.TestUtilities\InfoCarrier.Core.TestUtilities.csproj" />
   </ItemGroup>
 
 </Project>
