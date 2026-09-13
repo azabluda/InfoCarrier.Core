@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 // The document-mapping seam is [Obsolete] as of 10.1.0 and is still registered by default, so
 // this provider goes on using it until the major that removes it. Suppressed per FILE, which is
@@ -111,7 +111,8 @@ public class InfoCarrierDatabase(
             .MakeGenericMethod(elementType)
             .CreateDelegate<Func<QueryContext, Expression, IInfoCarrierClient, IExpressionSerializer, bool, bool, object>>();
 
-        // The client comes from the context being queried, not from this instance. EF caches
+        // NEITHER THE CLIENT NOR THE SERIALIZER MAY BE CAPTURED FROM THIS INSTANCE, and the second
+        // half of that was missed when the first half was fixed. EF caches
         // what `CompileQuery` returns in `ICompiledQueryCache`, a singleton of the *internal*
         // service provider — and that provider is shared by every context with the same options
         // shape, exactly as it is for EF's own providers, whose `GetServiceProviderHashCode` is
@@ -120,8 +121,20 @@ public class InfoCarrierDatabase(
         // context running the same query shipped it to *that* server while its SaveChanges went
         // to its own. Two contexts against two servers is the ordinary case this provider exists
         // for; it showed up as one concurrency test reading another's data.
+        //
+        // `_expressionSerializer` is the same mistake and was left behind by that fix. It is
+        // SCOPED, so every context has one of its own -- measured, 600 contexts and 600 distinct
+        // instances -- and the cached delegate handed all 600 of them the one belonging to whoever
+        // compiled first. That serializer's `ExpressionToNodeTranslator` keeps a translation's
+        // state in INSTANCE fields (`_result`, `_depth`, `_parameterIds`), so concurrent contexts
+        // running one query shape trampled each other: `InvalidOperationException: Translation
+        // produced no node.` when one cleared `_result` under another, and a change tracker holding
+        // the wrong entities when the shared `TypeNodeResolver` and `DynamicValueMapper` answered
+        // for the wrong context. A save then sent nothing and reported success.
+        //
+        // `ConcurrentContextTrackingTest` is the reproduction and carries its own control.
         return queryContext => (TResult)executeQuery(
-            queryContext, query, ClientFor(queryContext), _expressionSerializer, async, singleResult);
+            queryContext, query, ClientFor(queryContext), SerializerFor(queryContext), async, singleResult);
     }
 
     /// <summary>
@@ -142,6 +155,18 @@ public class InfoCarrierDatabase(
     ///     The <see cref="IInfoCarrierClient" /> configured on the context a query is running
     ///     against.
     /// </summary>
+    /// <summary>
+    ///     The <see cref="IExpressionSerializer" /> of the context a query is running against.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Resolved per execution for the same reason <see cref="ClientFor" /> is</b>: the
+    ///     delegate that calls this is cached by EF across every context sharing an options shape,
+    ///     so anything captured from the compiling context's scope is handed to all the others. See
+    ///     the comment in <c>CompileQuery</c>.
+    /// </remarks>
+    private static IExpressionSerializer SerializerFor(QueryContext queryContext)
+        => queryContext.Context.GetService<IExpressionSerializer>();
+
     private static IInfoCarrierClient ClientFor(QueryContext queryContext)
         => queryContext.Context.GetService<IDbContextOptions>()
             .Extensions

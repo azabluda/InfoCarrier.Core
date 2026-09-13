@@ -1,4 +1,4 @@
-﻿# Findings, v10
+# Findings, v10
 
 How each part of the provider was made to work, and what it cost to learn. This is the long form
 of what `CLAUDE.md` states as rules. Nothing here is an instruction; the instructions are in
@@ -226,6 +226,75 @@ over many runs, which is expensive here.
 
 **What must not happen is that this is forgotten.** `CLAUDE.md` said there was no known intermittent,
 and that sentence is now wrong. It has been corrected rather than left standing.
+
+## The fourth intermittent was a product defect, and three experiments proved nothing first (2026-09-13)
+
+**Tier D failed about one run in ten, always on customer `bob`, and it was not Tier D's.**
+`InfoCarrierDatabase.CompileQuery` captured `_expressionSerializer` into the delegate EF caches in
+`ICompiledQueryCache` -- a singleton shared by every context with the same options shape. The
+serializer is `Scoped`, so every context has one of its own; the cached delegate handed all of them
+the one belonging to whoever compiled the query first. Its `ExpressionToNodeTranslator` keeps a
+translation's state in instance fields, so two contexts running one query shape trampled each other.
+
+**The same mistake had already been fixed once, for the client**, and the comment above the capture
+explains the hazard at length. `ClientFor(queryContext)` is that fix; `_expressionSerializer` was
+left behind by it. **When a fix moves one captured field out of a cached delegate, check the others
+in the same expression.**
+
+**Two symptoms, one cause.** `InvalidOperationException: Translation produced no node.` is one thread
+clearing `_result` under another. A change tracker holding the wrong entities is the shared
+`TypeNodeResolver` and `DynamicValueMapper` answering for the wrong context -- and when it left the
+tracker EMPTY the save sent nothing and reported success, which is silent data loss rather than an
+error.
+
+**IT LOOKED LIKE A DOCUMENT-STORE PROBLEM FOR HOURS.** Tier D is the only tier whose classes run in
+parallel against per-class servers, so it is the first place two clients raced on one cached query.
+**The control is what moved it**: 600 iterations of plain EF Core against the same MongoDB store,
+zero corruption. Before that, three hypotheses had been killed by measurement -- orphaned `mongod`
+(zero after every run), shared servers (six fixtures, six distinct ports), and cross-fixture traffic
+(impossible, the transport captures one server in a closure).
+
+**RUN COUNTING PROVED NOTHING, THREE TIMES.** At a one-in-ten rate, ten clean runs happen by chance
+about one time in six and fifteen about one in five. Ten runs with a per-fixture internal service
+provider, ten on unmodified `main`, and fifteen with parallelism disabled all came back clean, and
+the first and third were arms of experiments that turned out to be irrelevant. **The first of those
+was nearly reported as a fix.** The control that killed it was running the same ten on unmodified
+`main`.
+
+**What closed it was reproducing the signature**, which is R76's route.
+`ConcurrentContextTrackingTest` runs three workers against SQLite, fails in two seconds without the
+fix and passes with it, and carries its own control in the same file. Three runs fail without the
+fix and five pass with it: proof by construction, not by repetition.
+
+**An identity probe killed the leading theory and pointed at the real one.** `GetServiceProviderHashCode()`
+is `0`, so one internal service provider serves every context, and that looked like the answer.
+Measuring said 600 contexts, 600 translators, 600 serializers -- scoping was correct. Each context
+*had* its own pipeline; the question was whether it *used* it, and the cached delegate was the answer.
+
+**A NEW DI CONTAINER DOES NOT GIVE YOU A NEW CACHE, AND EF MEANS IT TO BE THAT WAY.** The obvious
+reading is that each test builds its own `ServiceCollection`, so each gets its own singletons. That
+is true of the APPLICATION container and irrelevant: EF puts none of its own services there. Unless
+`UseInternalServiceProvider` is called, EF builds an INTERNAL provider and caches it in a
+process-wide static, keyed by the options extensions' `GetServiceProviderHashCode()`. Measured here:
+two independently built harnesses, three contexts between them, one `ICompiledQueryCache` instance.
+
+**That key is not an identity, and returning `0` is correct.** EF's own contract says the hash is
+over *"any options that would cause a new `IServiceProvider` to be needed ... most extensions do not
+have any such options and should return zero"*, and `RelationalOptionsExtension` returns `0` too --
+two SQL Server contexts on different connection strings share one provider and one query cache. The
+internal provider is where the built model lives, and a provider per context would rebuild the model
+per context, which is the most expensive part of creating one.
+
+**So the contract on a provider is the one this defect broke**: anything per-context travels on the
+options or the query context and is NEVER captured from a scope into something that gets cached.
+`CompileQuery` returns a lambda, capturing a scoped field in it is ordinary-looking C#, and it works
+perfectly until two contexts run the same query shape. That is why the symptom needed concurrency
+*and* a repeated query, and why it surfaced first in the one tier that runs classes in parallel.
+
+**The diagnostic that named it had been there all along.** C38's replay dump lists every entry in a
+rejected request, and it showed the root twice, one collection element twice and an owned reference
+marked `Deleted`. It was missed for a while because a `grep` truncated its output to six lines.
+**Read the whole of a diagnostic that exists to be read.**
 
 ## The boundary analyzer does not consult the client model for member mappability (R138, 2026-09-03)
 
