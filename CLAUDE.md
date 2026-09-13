@@ -98,8 +98,18 @@ nested documents lost them over the wire, and a scalar update lost them silently
 the owner-expansion in `InfoCarrierDatabase.Expand` that C86/C87/C95 built for JSON columns, which
 was bounded by `GetContainerColumnName()` and therefore blind to a store with no columns, and adds
 the direction that case never needed: a root being written pulls its own document along. **Gated on
-`UseNonRelationalServerStore()`, so a relational deployment's payload is unchanged.** ADR-009's
-2026-09-10 amendment is the reading.
+`UseNonRelationalServerStore()`, so a relational deployment's payload is unchanged.**
+
+**AND THAT CLIENT GATE IS NOT THE WHOLE FIX, WHICH TOOK A SECOND CHANGE TO SEE (#102).** `Expand`
+can only send what the client's change tracker holds, so a client that ATTACHED A STUB sends a bare
+root even with the switch on, and a deployment that never set the switch sends one always. The
+server half, `AddInfoCarrierServerDocumentStore()`, completes an incomplete change set with a keyed
+query before the write; EF's identity resolution makes that a repair rather than a clobber, because
+a tracked entity is never overwritten by a query. **The server is TOLD rather than sniffing**:
+`IsRelational()` is false for InMemory too and that store nests nothing, and MongoDB's own model
+marks a root with `Mongo:CollectionName` while marking an owned type with nothing. It reads only
+where the change set omits an owned navigation the model declares, and never for an insert or a
+delete. ADR-009's 2026-09-10 and 2026-09-11 amendments are the reading.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
 every project in its own `projects` list and adds the figures. **That list holds the spec project

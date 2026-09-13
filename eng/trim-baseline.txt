@@ -130,5 +130,27 @@
 # `total` is unchanged at 1134. It buys eight specification tests: SQLite refuses `APPLY`, and a
 # real split query never asks for it.
 
-ours=90
-total=1134
+# 2026-09-11 (#102) -- 90 -> 91, A DELIBERATE RISE OF ONE, and it is the same premise this file has
+# described since it was written. `AddInfoCarrierServerDocumentStore()` makes the server read back a
+# document whose change set did not name all of it, and the read is an ordinary keyed query over
+# `DbContext.Set<TEntity>()`. Only the caller's model knows what `TEntity` is, so the dispatch goes
+# through `MakeGenericMethod`: IL2060, one unique diagnostic, in the same shape as the three that
+# precede it here.
+#
+# IT COST TWO AND COSTS ONE, WHICH IS THE PART WORTH KEEPING, and it is R149's lesson applied
+# rather than rediscovered. The second was an IL2091: `DbContext.Set<TEntity>()` declares
+# `[DynamicallyAccessedMembers(IEntityType.DynamicallyAccessedMemberTypes)]` and a type parameter
+# that does not repeat it fails to satisfy the target. Repeating it costs nothing and removes the
+# diagnostic. **EF's constant is `internal`**, so the seven flags are spelled out at the call site
+# with a comment saying where they came from; if EF widens what it needs, IL2091 returns and this
+# ratchet is what says so.
+#
+# The two `MethodInfo`s it needs are taken from delegates rather than from `GetMethod(name)`, which
+# is the other half of R149's lesson: a name lookup is invisible to the trimmer and worth its own
+# diagnostics, and a delegate is an ordinary reference the trimmer says nothing about.
+#
+# `total` rises 1134 -> 1137 and the other two are not ours: EFCore is unchanged at 864 and the
+# movement is in `other` and `FluentUI`.
+
+ours=91
+total=1137

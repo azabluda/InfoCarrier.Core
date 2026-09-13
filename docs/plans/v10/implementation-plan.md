@@ -6889,3 +6889,103 @@ The issue is milestoned `10.2.0`.
       server-side decisions. The budget moved to 1090 with the reason recorded, and the comment
       says what the number cannot: revisit whether the grants want a page of their own before
       raising it again.
+
+## Phase X — the document store's server half, and the tier defect it uncovered (#102)
+
+**Not a milestone.** #100 fixed the client half of a document store's write: a client told
+`UseNonRelationalServerStore()` sends the whole document with any change to part of it. This phase
+closes the half that does not depend on the client being configured correctly, and fixes the Tier D
+intermittent that adding tests for it exposed.
+
+The letter is X because Q, R, S, T, U, V, Y and Z are taken and X was the one left free when Z was
+chosen; it does not mean this comes before Y.
+
+- [x] **X1. `AddInfoCarrierServerDocumentStore()`, and the read that only happens when it is
+      needed.** Tier D **Passed: 28, Failed: 0, Total: 28**, and 13 consecutive runs of it green
+      with zero orphaned processes, loaded and unloaded.
+      `InfoCarrier.Core.TransportTests` **Passed: 26, Failed: 0, Total: 26**.
+      Full suite `compensate2` against `fix100`: **FAILING 19, TOTAL 29558**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build 5 warnings 0 errors, both changed projects
+      shown rebuilding. `trim-ratchet.sh` OK at 91 <= 91, raised from 90 with the reason recorded.
+      `dotnet pack` clean against the `10.1.1` baseline.
+
+      **The client half cannot close #100, and that is the whole argument for this one.**
+      `InfoCarrierDatabase.Expand` can only send what the client's own change tracker holds — its
+      own comment said so about JSON columns: "an element the client never materialized is not here
+      and cannot be." So it is defeated two ways, and only one of them is a misconfiguration. A
+      deployment that never called `UseNonRelationalServerStore()` sends a bare root always. **A
+      client that DID call it sends a bare root whenever the application attached a stub**, which is
+      the ordinary relational way to update one field without reading the row and stays ordinary
+      here. Both arrive looking identical and both would write a document with the nested parts
+      erased, reporting success.
+
+      **The repair is a keyed query, and EF's identity resolution is what makes it a repair.** A
+      tracked entity is never overwritten by a query, so the client's values win wherever the client
+      sent any, and a removed element stays removed because its `Deleted` entry is already in the
+      identity map under the key the query returns. What the write then reads is the root's
+      NAVIGATIONS rather than the tracked entries — EF hands `IDatabase.SaveChanges` only what
+      changed, so the loaded parts reach the store because fixup put them back on the root and a
+      document store serializes the object. That is written at the method, because it is the fact
+      that would make a later optimisation wrong.
+
+      **It reads only where something could be missing**: a change set naming every owned navigation
+      the model declares is written as it stands, an insert has nothing to preserve, a delete has
+      nothing to keep. **And it refuses what it cannot repair** — a shared CLR type has no queryable
+      set, a partly unknown key has no comparison — which is safe precisely because that throw is
+      reachable only after the change set is already known to be incomplete.
+
+      **The server is TOLD rather than left to work it out, and the alternative was probed rather
+      than assumed.** No store-agnostic API answers "is an owned type written inside its owner's
+      record". `Database.IsRelational()` is false for EF's in-memory provider too, and that store
+      gives an owned type storage of its own, so a sniff would buy a read per modified owner across
+      all of Tier A for nothing. The model says no more: MongoDB marks a document root with
+      `Mongo:CollectionName` and an owned type with **no annotation at all**, while `IsOwned()` and
+      `FindOwnership()` describe relational table splitting in exactly the same shape.
+
+      **Three of the five new tests fail without the registration**, and the two that pass are the
+      insert and the delete the repair deliberately skips — which is the check that the narrowing is
+      real rather than asserted. `UndeclaredDocumentStoreTest` is a second fixture whose server
+      declares nothing, because **a repair that also hid a regression in the thing it repairs would
+      be worse than no repair**.
+
+      **The trim cost was two diagnostics and is one**, which is R149's lesson applied rather than
+      rediscovered. The avoidable one was an IL2091: `DbContext.Set<TEntity>()` declares
+      `[DynamicallyAccessedMembers(IEntityType.DynamicallyAccessedMemberTypes)]` and a type
+      parameter that does not repeat it fails to satisfy the target. EF's constant is `internal`, so
+      the seven flags are spelled out with a comment saying where they came from.
+
+- [x] **X2. Tier D orphaned a `mongod` per class, and that is what made it intermittent.**
+      Found because X1's two new test classes took the tier from four servers to six and it began
+      failing about one run in three under load, always on the seeded rows two classes share.
+
+      **The compensation was not the cause and that was established first**, by running with the
+      server declaration off — main's exact behaviour — and seeing the same identity conflict. Main's
+      four-class shape was 6 of 6 green under identical load. Ruled out in turn: Mongo2Go port
+      collisions (six distinct ports, probed), a shared database name (unique names did not help),
+      and any crossing between two clients pointed at two servers (six fixtures, ten concurrent
+      write-and-read rounds, clean).
+
+      **`MongoDbRunner.Dispose()` does not reliably stop `mongod`.** A run was measured finishing
+      GREEN and leaving SIX live processes behind; the next run then failed on data the previous run
+      had written. ADR-009 chose one server per class on the argument that "the class that started
+      the server stops it, and there is nothing to get wrong" — the premise was that disposal works,
+      and per-class servers therefore multiplied the orphan risk by the number of classes rather
+      than removing it.
+
+      **The fixture now records which `mongod` its own start created and kills it if disposal did
+      not.** Starting is serialized because that is what makes "which one is mine" answerable: the
+      only portable way to name a process a library started is to diff the set before and after, and
+      that diff means nothing while another thread is starting one too. The price is one startup per
+      class in sequence, about one second to about four for 28 tests.
+
+      **A shared server with a database per class was tried first and does NOT isolate**, which is
+      worth recording because it looks right. Six fixtures on one server, each with its own uniquely
+      named database, still saw each other's rows; moving one class off a customer another class was
+      writing turned a deterministic two-test failure green. Per-class servers do isolate. **So on
+      this provider a database name is not a substitute for a process**, and why is not established
+      — only that the substitution fails.
+
+      **Two ADR-009 claims are corrected in the same change**, per the rule that a reversal is the
+      moment to sweep the prose that argued for it: the disposal premise above, and "the cost is
+      bounded by CONCURRENCY rather than by tier size", which serializing the starts ended. Growth
+      now costs about 600 ms per class in wall clock; memory is still bounded by concurrency.

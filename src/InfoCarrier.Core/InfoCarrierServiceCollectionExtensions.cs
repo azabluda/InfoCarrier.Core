@@ -248,6 +248,51 @@ public static class InfoCarrierServiceCollectionExtensions
     }
 
     /// <summary>
+    ///     Tells a <em>server</em> that its store writes an owned type inside its owner's record,
+    ///     so that a change set which leaves part of a document out does not erase that part
+    ///     (#102).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Call it when the server's store is a document store</b> - MongoDB, Cosmos DB, or
+    ///         anything else whose unit of write is a whole record with the owned data nested in
+    ///         it. Do not call it for a relational store, where an owned type is columns of the
+    ///         owner's row or a row of its own and neither can go missing.
+    ///     </para>
+    ///     <para>
+    ///         <b>It is the server half of a pair, and the two halves fail differently.</b> The
+    ///         client half,
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore" />, makes
+    ///         the client send the whole document, which saves the read this one otherwise does.
+    ///         It cannot be relied on for correctness: a client can only send what its own change
+    ///         tracker holds, so an attached stub carries a bare root even with the switch on, and
+    ///         a deployment that never called it carries one always. This half reads the stored
+    ///         document and fills in what the change set did not mention, whatever the client did.
+    ///         <b>Register both.</b>
+    ///     </para>
+    ///     <para>
+    ///         <b>The cost is one read per document root whose change set looks incomplete</b>,
+    ///         and none at all for one that mentions every owned navigation the model declares.
+    ///         Inserts and deletes never read. <see cref="IInfoCarrierServerDocumentStore" />
+    ///         carries the rest, including why the server is told rather than left to work it out.
+    ///     </para>
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierServerDocumentStore(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IInfoCarrierServerDocumentStore, ServerDocumentStore>();
+
+        return services;
+    }
+
+    private sealed class ServerDocumentStore : IInfoCarrierServerDocumentStore
+    {
+    }
+
+    /// <summary>
     ///     Grants a <em>server</em> permission to send the log events it raises while executing a
     ///     request back to the client, and installs the capture that reads them (#97, R172).
     /// </summary>
