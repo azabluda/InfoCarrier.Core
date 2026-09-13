@@ -76,6 +76,50 @@ public class ServerSideControlTest(DocumentStoreFixture fixture) : IClassFixture
         }
     }
 
+    /// <summary>
+    ///     The control for <c>DocumentWriteTest.Changing_one_element_of_a_nested_array_persists</c>,
+    ///     which fails over the wire.
+    /// </summary>
+    /// <remarks>
+    ///     The fork this class exists to answer. If this passes, changing one element of an owned
+    ///     collection in place is something the store does and the wire breaks; if it fails the
+    ///     same way, the behaviour is below us.
+    /// </remarks>
+    [Fact]
+    public async Task Server_side_nested_array_element_update_persists()
+    {
+        using (IServiceScope scope = fixture.ServerProvider.CreateScope())
+        {
+            ShopServerContext db = Server(scope);
+            db.Customers.Add(new Customer
+            {
+                Id = "judy",
+                Name = "Judy",
+                Country = "IE",
+                Address = new Address { City = "Cork", Postcode = "T12" },
+                Lines = [new OrderLine { Sku = "book", Quantity = 1 }, new OrderLine { Sku = "lamp", Quantity = 2 }],
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (IServiceScope scope = fixture.ServerProvider.CreateScope())
+        {
+            ShopServerContext db = Server(scope);
+            Customer judy = await db.Customers.SingleAsync(c => c.Id == "judy");
+            judy.Lines.Single(l => l.Sku == "book").Quantity = 9;
+            await db.SaveChangesAsync();
+        }
+
+        using (IServiceScope scope = fixture.ServerProvider.CreateScope())
+        {
+            ShopServerContext db = Server(scope);
+            Customer judy = await db.Customers.SingleAsync(c => c.Id == "judy");
+
+            Assert.Equal(9, judy.Lines.Single(l => l.Sku == "book").Quantity);
+            Assert.Equal(2, judy.Lines.Single(l => l.Sku == "lamp").Quantity);
+        }
+    }
+
     [Fact]
     public async Task Server_side_nested_array_append_persists()
     {
