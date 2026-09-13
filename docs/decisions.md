@@ -820,6 +820,17 @@ fixture may want the first without the second.
 on the cast store, so it needs a live connection. What it tests — a connection dropping mid
 split-query — has no meaning across this wire, and a green there would be manufactured.
 
+**Amended 2026-09-13 — the grant reaches the shared harness, and only its core half does.**
+`test/InfoCarrier.Core.TestUtilities` exists again and references
+`Microsoft.EntityFrameworkCore.Specification.Tests`, because `TestStore`, `ITestStoreFactory`,
+`ListLoggerFactory` and `TestHelpers` are what make it a harness rather than a helper library. A
+reference is transitive, so ADR-009's Tier D now has that package too. **That is the intended
+reach and it is the limit of it**: `EFCore.Relational.Specification.Tests` stays on the spec project
+alone, where the relational tiers and `RelationalInfoCarrierTestStore` are, and nothing in the
+shared harness names a type from it. The R136 sentence below — *"It is `TestUtilities/` now"* —
+was true from 2026-09-03 until this date, and the half of that folder which names no store is a
+project again. ADR-009's 2026-09-13 amendment says why.
+
 **Amended 2026-09-03 (R136) — the two spec projects are one again, and the grant is unconditional.**
 `test/InfoCarrier.Core.FunctionalTests` holds both tiers, `InMemory/` and `Sqlite/`. The R122
 amendment below is superseded in its enforcement and unchanged in its substance: what it protected
