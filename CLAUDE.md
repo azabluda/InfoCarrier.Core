@@ -587,8 +587,30 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**There is no known intermittent. Three have been closed, and by three different routes.** The
-third was closed on 2026-09-04 **by reading the source it came from**, which is the cheapest route of
+**There is no known intermittent. FOUR have been closed, and the fourth was a PRODUCT DEFECT rather
+than a test one** (2026-09-13). Tier D failed about one run in ten, always on the same customer, and
+it was not Tier D's: **`InfoCarrierDatabase.CompileQuery` captured `_expressionSerializer` into the
+delegate EF caches in `ICompiledQueryCache`**, a singleton shared by every context with the same
+options shape. Every context has a serializer of its own — measured, 600 contexts and 600 distinct
+instances — and the cached delegate handed all of them the one belonging to whoever compiled first.
+Its `ExpressionToNodeTranslator` keeps a translation's state in instance fields, so two contexts
+running one query shape trampled each other: `Translation produced no node.` when one cleared
+`_result` under another, and a change tracker holding the wrong entities — sometimes NONE, so the
+save sent nothing and reported success. **The same mistake had already been fixed once for the
+client**, which is what `ClientFor(queryContext)` is; the serializer was left behind by that fix and
+`SerializerFor(queryContext)` is its twin.
+
+**Four things about the hunt are worth carrying.** It presented as a document-store problem and cost
+hours there; **the tell that it was not was a control** — 600 iterations of plain EF Core against the
+same MongoDB store, zero corruption. **Run counting proved nothing at a one-in-ten rate**: three
+separate ten-and-fifteen-run batches came back clean and two of them were arms of experiments that
+turned out to be irrelevant, which is a one-in-five to one-in-six coincidence each. What closed it
+was **reproducing the signature** — `ConcurrentContextTrackingTest`, three workers on SQLite, fails
+in two seconds without the fix and passes with it, with its control in the same file. And **the
+existing C38 replay diagnostic named the defect the first time it fired**; it was missed for a while
+because a `grep` truncated its output to six lines.
+
+**The third was closed on 2026-09-04 by reading the source it came from**, which is the cheapest route of
 the three and the one to try first. A SQLite store failed once inside `SqliteConnection.Open()` with
 `ObjectDisposedException: SQLitePCL.sqlite3`. EF's `SqliteDatabaseCreator.Delete` answers a
 file-backed database with **`SqliteConnection.ClearAllPools()`, which is process-wide**, and every

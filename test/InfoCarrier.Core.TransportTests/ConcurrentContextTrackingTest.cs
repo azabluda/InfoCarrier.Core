@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -59,6 +58,7 @@ public class ConcurrentContextTrackingTest
     private static async Task<List<string>> RunAsync(Func<ShopContext> createContext)
     {
         var wrong = new List<string>();
+        var identities = new List<(int Context, int Translator, int Serializer)>();
         var gate = new Lock();
 
         await Task.WhenAll(Enumerable.Range(0, Workers).Select(worker => Task.Run(async () =>
@@ -108,6 +108,15 @@ public class ConcurrentContextTrackingTest
                 }
             }
         })));
+
+        System.IO.File.WriteAllLines(
+            System.IO.Path.Combine(AppContext.BaseDirectory, "identities.txt"),
+            [
+                $"contexts={identities.Select(x => x.Context).Distinct().Count()} "
+                + $"translators={identities.Select(x => x.Translator).Distinct().Count()} "
+                + $"serializers={identities.Select(x => x.Serializer).Distinct().Count()} "
+                + $"samples={identities.Count}",
+            ]);
 
         return wrong;
     }
