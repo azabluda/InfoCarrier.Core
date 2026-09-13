@@ -45,17 +45,26 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
-dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 22 tests, separate project, NOT in measure.sh
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 26 tests, separate project, NOT in measure.sh
 ```
 
 **THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it was two between R122 and R136.**
 `test/InfoCarrier.Core.FunctionalTests` holds every ADR-009 tier: `InMemory/` is Tier A,
-`Sqlite/` is Tier B, `Firebird/` is Tier C since R153, and `TestUtilities/` is the harness they
-share. It was
-`test/InfoCarrier.Core.TestUtilities`, a project of its own, until R137 folded it in; by then it had
-one consumer. The split existed to keep the `InfoCarrier.Core.Relational` package off Tier A's
-compile line, and there is no such package any more. **The tiers are a namespace now, not a
+`Sqlite/` is Tier B, `Firebird/` is Tier C since R153. **The tiers are a namespace now, not a
 project**, so a run of one tier is a `--filter` and the suite's number is one project's.
+
+**THE HARNESS IS A PROJECT AGAIN SINCE 2026-09-13, AND ONLY THE STORE-NEUTRAL HALF OF IT.**
+`test/InfoCarrier.Core.TestUtilities` holds the client and server shells, the store factory, the
+fixture properties, the in-process transport, the geometry mapper, the server SQL log and the
+culture pin. R137 had folded these into the spec project because by then they had one consumer;
+**Tier D is the second, and it cannot be in the spec project because it runs on a newer EF Core
+patch** — one project has one package graph. **The harness sits at the repository's 10.0.1 floor
+and carries no `VersionOverride`**, because .NET binds an assembly by name and a higher version
+satisfies a lower reference: compile-low/run-high works and the reverse does not. `src/` already
+worked this way for Tier D. **Anything that names a store stayed in
+`FunctionalTests/TestUtilities/`** — the three tier classes, their backend stores, the Northwind
+contexts, the relational client shell — because moving one would put its provider package on every
+consumer's compile line. ADR-009's 2026-09-13 amendment is the reading.
 
 **TIER C IS EMBEDDED FIREBIRD SINCE R153, AND IT EXISTS FOR ONE CAPABILITY.** SQLite has no
 table-valued function and cannot be given one, and no `APPLY`; together those are the whole of
