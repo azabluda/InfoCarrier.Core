@@ -1279,6 +1279,32 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                 ? property.ValueGenerated is ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate
                 : property.ValueGenerated is ValueGenerated.OnUpdate or ValueGenerated.OnAddOrUpdate;
 
+            // A KEY NEVER COMES BACK FOR A ROW THAT ALREADY EXISTS, WHATEVER THE SERVER'S MODEL
+            // SAYS ABOUT IT (#107). The client's key is what the server used to FIND the row, so
+            // the two cannot disagree about it and a value returned for it can only overwrite a
+            // correct answer with another one.
+            //
+            // **The two halves disagree about `ValueGenerated` here, and that is the defect rather
+            // than a quirk of one store.** The doc comment on `InfoCarrierDatabase.ApplyGeneratedValues`
+            // already states the asymmetry in the other direction: `ValueGenerated` is inferred by
+            // a convention, the server's provider runs conventions this one does not, so the two
+            // models answer differently for the same property. MongoDB's owned-collection ordinal
+            // is `OnAddOrUpdate` on the server and `OnAdd` on the client, which put it through the
+            // `else` branch above on every modified element.
+            //
+            // What that costs is not a wrong number, it is a thrown save: applying the server's
+            // ordinal to one tracked element gives it the key of its sibling, and EF refuses with
+            // "another instance with the same key value is already being tracked". A nested array
+            // of two, with one element changed in place, is the whole repro.
+            //
+            // **Added is the case this must not touch**, and the block below is why it exists: a
+            // row being inserted has no key yet worth keeping, the store decides it, and the
+            // client held a placeholder.
+            if (generated && state != EntityState.Added && property.IsKey())
+            {
+                continue;
+            }
+
             // A store decides a value indirectly as well as directly. A foreign key onto a
             // store-generated principal key is `ValueGenerated.Never` — nothing generates it —
             // and yet it holds a number only the store knows, put there by EF's propagation.
