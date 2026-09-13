@@ -95,9 +95,15 @@ until R135, and `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R1
 measurement.
 
 **TIER D IS AN EMBEDDED MONGODB SINCE 2026-09-10, IN A PROJECT OF ITS OWN
-(`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS NO SPEC BASES.** It exists to prove a
-negative that no relational tier can: that this provider is not relational-only (#51). A compliance
-test here demanding every base be adopted against a document store would misread it. It is gated
+(`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS SPEC BASES SINCE 2026-09-14.** This
+paragraph read *"AND IT ADOPTS NO SPEC BASES"* until then, and the first one is
+`OwnedNavigationsCollectionTestBase`. **The reason that sentence was written is unchanged and is
+what still governs which bases come here**: this tier exists to prove a negative that no relational
+tier can, that this provider is not relational-only (#51), and a compliance test demanding every
+base be adopted against a document store would misread it. What changed is that "no compliance
+test" never meant "no bases" — a base whose tests mostly RUN on the store earns its place, and one
+that is mostly overridden into "not supported" teaches nothing about the wire. ADR-009's 2026-09-13
+amendment carries that selection rule and its 2026-09-14 one carries the adoption. It is gated
 beside the transport suite rather than by the spec ratchet, for the same reason that suite is, and
 it is deliberately **absent from `eng/measure.sh`**. Its own project exists because
 `MongoDB.EntityFrameworkCore` needs EF Core >= 10.0.11 while `src/` compiles against a 10.0.1 floor,
@@ -587,8 +593,24 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**There is no known intermittent. FOUR have been closed, and the fourth was a PRODUCT DEFECT rather
-than a test one** (2026-09-13). Tier D failed about one run in ten, always on the same customer, and
+**There is no known intermittent. FIVE have been closed, and the FIFTH IS THE ONE THAT HID BEHIND
+THE FOURTH** (2026-09-14). Fixing the product defect below did NOT make a whole-tier Tier D run
+stable: it still failed 5, then 15, then 9, and the reading "it failed before because of that bug"
+was wrong. **Two causes wore one symptom.** The second is a harness defect and the evidence
+separates them cleanly: every failure said `An existing connection was forcibly closed by the remote
+host` and classes untouched by the work in hand were among the casualties, so the store's PROCESS
+was dying rather than the wire lying. **`EmbeddedMongo` was extracted from `DocumentStoreFixture`
+and the original was left in place, so the tier had two `StartGate` semaphores.** Each family
+serialized against itself and not against the other; the before-and-after process diff that names
+"my `mongod`" then picked up a neighbour's server, and teardown killed one whose tests were running.
+**A semaphore serializes the callers that share it, and a gate spelt twice is not a gate.** The rule
+that transfers is broader than the semaphore: **when an extraction says a duplicate is dangerous,
+check in the same commit that the duplicate is gone** — that type's own comment read "two copies of
+process bookkeeping is two places to get the reaping wrong" while the second copy compiled beside it.
+Four consecutive whole-tier runs of 53 of 53 closed it, and the run time fell from 2m32s to 6s
+because the old duration was almost entirely 30-second connection timeouts.
+
+**The FOURTH was a PRODUCT DEFECT rather than a test one** (2026-09-13). Tier D failed about one run in ten, always on the same customer, and
 it was not Tier D's: **`InfoCarrierDatabase.CompileQuery` captured `_expressionSerializer` into the
 delegate EF caches in `ICompiledQueryCache`**, a singleton shared by every context with the same
 options shape. Every context has a serializer of its own — measured, 600 contexts and 600 distinct

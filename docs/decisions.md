@@ -523,6 +523,46 @@ intermittent leaks". They can hold a static server because a container owns its 
 cannot, which is what the per-class server and the process reaping are for. Their shape trades wall
 clock for bookkeeping and would also work; ours has 13 consecutive green runs behind it and stays.
 
+### Amendment 2026-09-14 — Tier D adopts its first base, and the tier's own harness was the second cause
+
+**The 2026-09-10 amendment said this tier adopts no specification bases. That is superseded.**
+`OwnedNavigationsCollectionTestBase` is adopted, by the rule the 2026-09-13 amendment set: a base
+earns a place here by the fraction of its tests that actually RUN on the store. Fifteen tests, ten
+green untouched, five that the store itself refuses or answers wrongly — measured against the
+server's own `DbContext` by `OwnedNavigationsServerSideControlTest`, not assumed. **The refusal of a
+DEMANDING compliance test is untouched**, and so is the reason for it: this tier exists to prove
+that the provider is not relational-only, and a scan insisting every core base be adopted against a
+document store would misread that.
+
+**A control has to assert what the base asserts.** The first version of that control asserted only
+that the query did not throw. A store defect that returned three roots where the base expects five
+then looked like this provider's, and nearly landed as one.
+
+**THE ADOPTION SAT UNPUSHED FOR A DAY BEHIND A WHOLE-TIER INTERMITTENT THAT HAD TWO CAUSES, AND
+FIXING THE FIRST DID NOT FIX THE RUN.** The first was a product defect, closed by #109. With it
+merged the tier still failed 5, then 15, then 9. **The reading "it failed before because of that
+bug" was wrong, and it was wrong in the cheap direction**: a fix that is genuinely correct can still
+leave the symptom standing, so the run is the evidence and the explanation is not.
+
+**The second cause was this tier's own process bookkeeping.** Tier D names the `mongod` it started
+by diffing the process list before and after, which is sound only while nothing else is starting
+one — hence a semaphore. `EmbeddedMongo` was extracted from `DocumentStoreFixture` on 2026-09-13 and
+the original was left behind, giving the tier **two** gates. Each family serialized against itself
+and not the other, a fixture's diff claimed a neighbour's server, and teardown killed a `mongod`
+whose tests were still running. The signature is unambiguous once read: `An existing connection was
+forcibly closed by the remote host`, with classes untouched by the new work among the casualties.
+
+**A semaphore serializes the callers that share it.** `EmbeddedMongo` is now the only caller of
+`MongoDbRunner.Start` in the tier, and its comment says so with the measurement. Four consecutive
+whole-tier runs of 53 of 53, zero orphan processes, and the run time fell from 2m32s to 6s because
+the old duration was almost entirely 30-second connection timeouts.
+
+**The rule that generalises, and it is not about semaphores.** When an extraction's own comment
+argues that a duplicate is dangerous, check in that commit that the duplicate is gone. This one read
+*"two copies of process bookkeeping is two places to get the reaping wrong"* while the second copy
+compiled twenty lines away. CLAUDE.md already requires a sweep when a decision is REVERSED; this is
+the same failure at the moment a decision is CENTRALISED, and the sweep is the same.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot
