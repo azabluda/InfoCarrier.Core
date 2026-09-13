@@ -17,6 +17,18 @@ namespace InfoCarrier.Core.DocumentStoreTests.TestUtilities;
 ///         reaping wrong.
 ///     </para>
 ///     <para>
+///         <b>THAT EXTRACTION LEFT THE ORIGINAL IN PLACE FOR A DAY, AND THE DAY COST A WHOLE-TIER
+///         INTERMITTENT.</b> <see cref="DocumentStoreFixture" /> kept its own copy of the gate and
+///         the reaping until 2026-09-14, so the two families of fixture serialized against
+///         themselves and not against each other. The measurement is the point: three whole-tier
+///         runs failed 5, then 15, then 9 tests, every one of them a connection to a server that
+///         another fixture had killed, and classes untouched by the new work were among the
+///         casualties. <b>So this type is the ONLY caller of <c>MongoDbRunner.Start</c> in the
+///         tier, and a second one would reopen the defect.</b> The general rule it is an instance
+///         of: a semaphore serializes the callers that share it, and a gate spelt twice is not a
+///         gate.
+///     </para>
+///     <para>
 ///         <b>STARTING IS SERIALIZED AND STOPPING IS ENFORCED, BECAUSE
 ///         <c>MongoDbRunner.Dispose()</c> DOES NOT RELIABLY STOP <c>mongod</c> (#102).</b> A run of
 ///         this tier was measured finishing green and leaving SIX live processes behind; the next
