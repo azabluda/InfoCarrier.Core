@@ -34,7 +34,7 @@ public class SeedingInfoCarrierTest : SeedingTestBase
     /// <inheritdoc />
     protected override TestStore TestStore
         => _testStore ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InMemoryInfoCarrierTier.Instance,
                 typeof(SeedingInfoCarrierOptionsContext),
                 onModelCreating: null)
             .GetOrCreate("SeedingInfoCarrierTest");

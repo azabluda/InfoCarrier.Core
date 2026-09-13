@@ -41,7 +41,7 @@ public class F1InfoCarrierFixture : F1FixtureBase<byte[]>
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.InMemory,
+            InMemoryInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             onAddOptions: b => b

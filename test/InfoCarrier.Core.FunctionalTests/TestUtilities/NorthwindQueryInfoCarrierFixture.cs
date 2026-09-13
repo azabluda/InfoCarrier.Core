@@ -41,7 +41,7 @@ public class NorthwindQueryInfoCarrierFixture<TModelCustomizer> : NorthwindQuery
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _infoCarrierTestStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.InMemory,
+            InMemoryInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             copyDbContextParameters: (client, server) =>

@@ -38,7 +38,7 @@ public class MonsterFixupInfoCarrierTest(MonsterFixupInfoCarrierTest.MonsterFixu
         /// </remarks>
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InMemoryInfoCarrierTier.Instance,
                 typeof(SnapshotMonsterContext),
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);

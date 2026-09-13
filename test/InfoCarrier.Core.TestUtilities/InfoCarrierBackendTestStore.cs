@@ -265,9 +265,10 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     /// <remarks>
     ///     <b>Only a relational store has one, so the base throws rather than inventing one.</b>
     ///     It used to return a bare <c>SqliteConnection</c> from this class, which named a
-    ///     relational provider in the store-neutral half of the harness. Nothing on the Tier A path
-    ///     calls this: the only caller is <c>RelationalInfoCarrierTestStore</c>, which exists in
-    ///     the relational test project alone.
+    ///     relational provider in the store-neutral half of the harness. The only caller is
+    ///     <c>RelationalInfoCarrierTestStore</c>, which lives in the spec project beside the
+    ///     relational tiers rather than here — so a store with no connection, Tier A's and Tier
+    ///     D's alike, inherits a member nothing reaches.
     /// </remarks>
     public virtual DbConnection CreateStoreConnection()
         => throw new InvalidOperationException(

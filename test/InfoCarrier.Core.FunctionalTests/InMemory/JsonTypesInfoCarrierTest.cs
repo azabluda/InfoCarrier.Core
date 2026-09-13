@@ -37,7 +37,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 /// </remarks>
 public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(InMemoryInfoCarrierTier.Instance);
 
     // The eight below are EF's `JsonTypesInMemoryTest` overrides verbatim: no built-in JSON
     // support exists for a spatial type on a non-relational provider, so the round-trip

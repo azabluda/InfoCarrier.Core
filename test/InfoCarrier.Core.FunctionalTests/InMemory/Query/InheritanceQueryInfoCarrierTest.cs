@@ -85,7 +85,7 @@ public class InheritanceQueryInfoCarrierFixture : InheritanceQueryFixtureBase
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            InfoCarrierTestStoreFactory.InMemory,
+            InMemoryInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             // The keyless `AnimalQuery` is produced by an InMemory defining query, which is how

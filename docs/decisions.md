@@ -460,6 +460,69 @@ delete the repair deliberately skips. `UndeclaredDocumentStoreTest` is the secon
 because **a repair that also hid a regression in the thing it repairs would be worse than no
 repair**: its server declares nothing, so a client that stopped expanding fails there.
 
+### Amendment 2026-09-13 — the harness is a shared project, and what MongoDB's own suite says about this tier
+
+**The store-neutral half of `TestUtilities/` is `test/InfoCarrier.Core.TestUtilities` again.** R137
+deleted that project because by then it had exactly one consumer, and a boundary that separates
+nothing is ceremony. It has two: the spec suite and this tier. **That is R137's own criterion being
+met rather than reversed**, and the older reasons for the split stay dead — there is no
+`InfoCarrier.Core.Relational` package to keep off a compile line, and "nothing relational may be
+named here" is a convention rather than a boundary.
+
+**A shared PROJECT solves the version split; extracting it into one does not move the problem, and
+the reason is worth stating because the opposite was argued first.** One project has one package
+graph, so the harness compiles against one version of `Microsoft.EntityFrameworkCore.Specification.Tests`
+— and it does not need two. It sits at the repository floor with no `VersionOverride`, and each
+consumer runs it on whatever it resolves for itself. **.NET binds an assembly by name and a higher
+version satisfies a lower reference, so compile-low/run-high works and the reverse does not**: built
+at 10.0.11 the harness could not load in the 10.0.1 suite. The arrangement is not new here, which is
+what settles it — `src/InfoCarrier.Core` is built at the floor and this tier already runs it at
+10.0.11. **The floor is therefore a rule on that project and not a default.**
+
+**Anything naming a store stays out.** The three tier classes and their backend stores, the
+Northwind contexts and the relational client shell keep their homes, because moving one would put
+its provider package on every consumer's compile line. That is the one piece of the pre-R137
+reasoning that still holds, and it holds on cost rather than on principle.
+
+**THE OFFICIAL MONGODB PROVIDER ADOPTS ZERO WRITE BASES, AND THAT IS THE STRONGEST EVIDENCE
+AVAILABLE FOR HOW THIS TIER SHOULD GROW.** `mongodb/mongo-efcore-provider` has a specification-tests
+project with folders for Extensions, Mapping, Metadata, Query and ValueGeneration. There is no
+`Update` folder. Its whole write coverage is eleven hand-written files in
+`FunctionalTests/Update/`, the largest of which is `OwnedNavigationPropertyCrudTests.cs` — nested
+documents, which is exactly where #100 and #102 lived. **EF's own nested-document bases are all
+reads**: every `OwnedNavigations` base sits under `Query/Associations/`. So hand-written write tests
+here are not a shortcut taken for speed; they are what the reference implementation also had to do.
+
+**Their adopted bases are large but they are MQL-assertion tests, and that purpose does not
+transfer.** Their `AGENTS.md` states the pattern: override the upstream test, call it, then assert
+the emitted pipeline with `AssertMql(...)` against a generated baseline. That is why
+`NorthwindMiscellaneousQueryMongoTest.cs` is 187 KB. This provider emits an expression tree that
+somebody else's provider translates, so there is no MQL to assert; the question Tier D asks is
+whether the wire changed the answer.
+
+**So the rule for picking a base here is the fraction of its tests that actually RUN on the store**,
+not whether Microsoft ships it. A base whose tests are mostly overridden into "not supported"
+teaches nothing about the wire.
+
+**And the refusal of a compliance test above is NARROWED rather than reversed.** The 2026-09-10
+amendment reads: *"It adopts NO specification bases and has NO compliance test, deliberately. A
+`MongoComplianceTest` scanning the core specification assembly would demand every base be adopted
+against a document store, which is neither possible nor the point."* The demanding kind is still
+refused and that sentence is still right about it. **A compliance test with a named `IgnoredTestBases`
+list is not the demanding kind**, and MongoDB's own `MongoComplianceTest` is the precedent: it names
+every base it has not done, so the suite reports a denominator and a future EF base turns it red
+until somebody classifies it. **If one is added here its ignore list means "not this tier's job"
+where MongoDB's means "not yet done", and the comment must say so** — the mechanism is shared and
+the vocabulary is not.
+
+**Their isolation model is the opposite of this tier's, and it is the alternative we did not take.**
+One process-wide server, parallelism disabled assembly-wide, a unique database per fixture and a
+collection per test method from `[CallerMemberName]`, no teardown. Their own pitfall list names this
+tier's #102 exactly: a fixed collection name collides across the suite and "the failure mode is
+intermittent leaks". They can hold a static server because a container owns its lifetime; this tier
+cannot, which is what the per-class server and the process reaping are for. Their shape trades wall
+clock for bookkeeping and would also work; ours has 13 consecutive green runs behind it and stays.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot
@@ -756,6 +819,17 @@ fixture may want the first without the second.
 **One base it must not be pointed at.** `AdHocQuerySplittingQueryTestBase` calls `CloseConnection()`
 on the cast store, so it needs a live connection. What it tests — a connection dropping mid
 split-query — has no meaning across this wire, and a green there would be manufactured.
+
+**Amended 2026-09-13 — the grant reaches the shared harness, and only its core half does.**
+`test/InfoCarrier.Core.TestUtilities` exists again and references
+`Microsoft.EntityFrameworkCore.Specification.Tests`, because `TestStore`, `ITestStoreFactory`,
+`ListLoggerFactory` and `TestHelpers` are what make it a harness rather than a helper library. A
+reference is transitive, so ADR-009's Tier D now has that package too. **That is the intended
+reach and it is the limit of it**: `EFCore.Relational.Specification.Tests` stays on the spec project
+alone, where the relational tiers and `RelationalInfoCarrierTestStore` are, and nothing in the
+shared harness names a type from it. The R136 sentence below — *"It is `TestUtilities/` now"* —
+was true from 2026-09-03 until this date, and the half of that folder which names no store is a
+project again. ADR-009's 2026-09-13 amendment says why.
 
 **Amended 2026-09-03 (R136) — the two spec projects are one again, and the grant is unconditional.**
 `test/InfoCarrier.Core.FunctionalTests` holds both tiers, `InMemory/` and `Sqlite/`. The R122
