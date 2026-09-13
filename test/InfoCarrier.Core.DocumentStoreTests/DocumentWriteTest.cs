@@ -168,16 +168,35 @@ public class DocumentWriteTest(DocumentStoreFixture fixture) : IClassFixture<Doc
         Assert.Equal(2, survivor.Quantity);
     }
 
-    // CHANGING ONE ELEMENT OF A NESTED ARRAY IN PLACE IS THE SIXTH TEST OF THIS SET AND IT IS NOT
-    // HERE, BECAUSE IT FAILS (#107). `ApplyGeneratedValues` writes the server's ordinal back onto an
-    // owned collection entry, the ordinal differs from the one the client tracks, and the entry
-    // collides with its sibling in the identity map. The server-side control passes — see
-    // `ServerSideControlTest.Server_side_nested_array_element_update_persists` — so the store does
-    // this and the wire breaks it.
-    //
-    // It is held out of the tree rather than committed red because this tier is gated as expected
-    // green beside the transport suite, and it lands with its fix, which is how #100 and #102 went
-    // in. The test is written out in full on the issue.
+    /// <summary>
+    ///     Changing one element of a nested array in place leaves its neighbour alone (#107).
+    /// </summary>
+    /// <remarks>
+    ///     <b>This threw rather than losing data, and what it threw on was the server returning a
+    ///     KEY for a row that already existed.</b> MongoDB marks an owned collection's ordinal
+    ///     <c>OnAddOrUpdate</c> and this client marks it <c>OnAdd</c>, so the server sent it back
+    ///     for every modified element and applying it gave one element the key of its sibling.
+    ///     <c>ServerSideControlTest.Server_side_nested_array_element_update_persists</c> is the
+    ///     control that placed the fault on this side of the wire.
+    /// </remarks>
+    [Fact]
+    public async Task Changing_one_element_of_a_nested_array_persists()
+    {
+        await Given("heidi", [new OrderLine { Sku = "book", Quantity = 1 }, new OrderLine { Sku = "lamp", Quantity = 2 }]);
+
+        await using (ShopClientContext write = fixture.CreateNonRelationalClient())
+        {
+            Customer heidi = await write.Customers.SingleAsync(c => c.Id == "heidi");
+            heidi.Lines.Single(l => l.Sku == "book").Quantity = 9;
+            await write.SaveChangesAsync();
+        }
+
+        await using ShopClientContext read = fixture.CreateNonRelationalClient();
+        Customer reloaded = await read.Customers.SingleAsync(c => c.Id == "heidi");
+
+        Assert.Equal(9, reloaded.Lines.Single(l => l.Sku == "book").Quantity);
+        Assert.Equal(2, reloaded.Lines.Single(l => l.Sku == "lamp").Quantity);
+    }
 
     /// <summary>
     ///     Setting an optional nested document to null must persist as absent (#102).
