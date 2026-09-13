@@ -13,17 +13,13 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </summary>
 public class InfoCarrierTestStoreFactory : ITestStoreFactory
 {
-    /// <summary>
-    ///     ADR-009 Tier A: EF's InMemory provider, which is not a relational store.
-    /// </summary>
-    /// <remarks>
-    ///     Tier B is <c>SqliteInfoCarrierTier</c>, which lives beside the <c>Sqlite/</c> tests it
-    ///     serves and is named there. It used to be a second static on this class, which meant this
-    ///     store-neutral project referenced a relational provider and so did everything referencing
-    ///     it. See <see cref="InfoCarrierTier" />.
-    /// </remarks>
-    public static InfoCarrierTier InMemory { get; } = new InMemoryInfoCarrierTier();
-
+    // NO TIER IS NAMED HERE, AND TIER A WAS THE LAST ONE THAT WAS. This class carried
+    // `public static InfoCarrierTier InMemory`, which meant the store-neutral harness named EF's
+    // InMemory provider and so did everything referencing it. Tier B and Tier C had already moved
+    // to an `Instance` static on their own tier class for exactly that reason; Tier A was the
+    // leftover asymmetry, and it became a cost rather than an untidiness when this harness became
+    // a project two tiers share. `InMemoryInfoCarrierTier.Instance` is where it lives now
+    // (2026-09-13), beside `SqliteInfoCarrierTier.Instance` and `FirebirdInfoCarrierTier.Instance`.
     private readonly Func<SharedTestStoreProperties> _props;
     private readonly InfoCarrierTier _tier;
     private readonly bool _relationalClientStore;

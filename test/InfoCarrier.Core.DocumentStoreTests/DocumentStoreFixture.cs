@@ -1,7 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Diagnostics;
-using InfoCarrier.Core.Common;
+using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Mongo2Go;
@@ -131,7 +131,11 @@ public class DocumentStoreFixture : IAsyncLifetime
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var envelopeServer = new InfoCarrierEnvelopeServer(
             new InProcessInfoCarrierServer(_serverProvider), serializer);
-        var transport = new WireTransport(envelopeServer, serializer);
+        // The spec suite's transport, not a copy of it (2026-09-13). This fixture had its own
+        // three-line `WireTransport` doing the same double round trip, written because the harness
+        // was inside the spec project and out of reach. It is a project now, and one transport
+        // means a wire-format defect surfaces the same way on every tier.
+        var transport = new InProcessInfoCarrierTransport(envelopeServer.DispatchAsync, serializer);
 
         ClientOptions = new DbContextOptionsBuilder<ShopClientContext>()
             .UseInfoCarrier(new TransportInfoCarrierClient(transport, serializer))
@@ -236,23 +240,6 @@ public class DocumentStoreFixture : IAsyncLifetime
                 Lines = [],
             },
         ];
-
-    /// <summary>
-    ///     Round-trips every envelope through real serialization, so a wire-format failure surfaces
-    ///     here exactly as it would over a network.
-    /// </summary>
-    private sealed class WireTransport(InfoCarrierEnvelopeServer server, IInfoCarrierSerializer serializer)
-        : IInfoCarrierTransport
-    {
-        public async Task<InfoCarrierEnvelope> SendAsync(
-            InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
-        {
-            InfoCarrierEnvelope onTheWire =
-                serializer.Deserialize<InfoCarrierEnvelope>(serializer.Serialize(request))!;
-            InfoCarrierEnvelope response = await server.DispatchAsync(onTheWire, cancellationToken);
-            return serializer.Deserialize<InfoCarrierEnvelope>(serializer.Serialize(response))!;
-        }
-    }
 }
 
 /// <summary>

@@ -24,7 +24,7 @@ public class QueryFilterFuncletizationInfoCarrierTest(QueryFilterFuncletizationI
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InMemoryInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 copyDbContextParameters: (client, server) => Copy(

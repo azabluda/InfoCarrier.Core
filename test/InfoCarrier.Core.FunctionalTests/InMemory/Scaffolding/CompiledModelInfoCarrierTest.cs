@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory.Scaffolding;
 /// </remarks>
 public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledModelTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(InMemoryInfoCarrierTier.Instance);
 
     private Action<ModelBuilder>? _lastOnModelCreating;
 

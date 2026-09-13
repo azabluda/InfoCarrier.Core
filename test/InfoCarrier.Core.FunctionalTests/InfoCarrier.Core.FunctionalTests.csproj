@@ -59,6 +59,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <!--
+      The store-neutral half of TestUtilities/ moved out on 2026-09-13, because Tier D needs it too
+      and cannot be in this project: it runs on a newer EF Core patch. What is left in
+      TestUtilities/ here is the part that names a store — the three tiers and their backend
+      stores, the Northwind contexts and the relational client shell.
+    -->
+    <ProjectReference Include="..\InfoCarrier.Core.TestUtilities\InfoCarrier.Core.TestUtilities.csproj" />
   </ItemGroup>
 
   <ItemGroup>

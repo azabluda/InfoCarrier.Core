@@ -34,7 +34,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         context type. One backend per test costs time and is the only thing that can be correct.
 ///     </para>
 /// </remarks>
-/// <param name="backend">The tier, usually <c>InfoCarrierTestStoreFactory.InMemory</c>.</param>
+/// <param name="backend">The tier, usually <c>InMemoryInfoCarrierTier.Instance</c>.</param>
 /// <param name="relationalClientStore">
 ///     Whether the client shell must be a <c>RelationalTestStore</c> - see
 ///     <see cref="RelationalInfoCarrierTestStore" />. Per adopting class, as it is per fixture

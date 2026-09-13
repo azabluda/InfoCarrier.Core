@@ -21,7 +21,7 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture)
     : MaterializationInterceptionTestBase<MaterializationInterceptionInfoCarrierTest.InfoCarrierLibraryContext>(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InfoCarrierTestStoreFactory.InMemory);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(InMemoryInfoCarrierTier.Instance);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
