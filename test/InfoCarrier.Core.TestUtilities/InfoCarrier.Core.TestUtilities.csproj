@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    THE HARNESS BOTH TEST PROJECTS SHARE: the store-neutral half of what was
+    InfoCarrier.Core.FunctionalTests/TestUtilities/.
+
+    IT WAS A PROJECT BEFORE, IT WAS FOLDED IN BY R137, AND THIS IS R137'S OWN CRITERION BEING MET
+    RATHER THAN REVERSED. R137 deleted InfoCarrier.Core.TestUtilities because by then it had
+    exactly one consumer, and a project boundary that separates nothing is ceremony. It has two
+    again: the spec suite (Tiers A, B and C) and InfoCarrier.Core.DocumentStoreTests (Tier D). The
+    earlier reasons for the split are still dead — there is no InfoCarrier.Core.Relational package
+    to keep off a compile line, and "nothing relational may be named here" is a convention rather
+    than a boundary — so neither is why this exists. The two consumers are.
+
+    THE REASON THE TWO CONSUMERS CANNOT BE ONE PROJECT IS A PACKAGE VERSION.
+    MongoDB.EntityFrameworkCore requires EF Core >= 10.0.11, src/ compiles against a 10.0.1 floor,
+    and one project has one package graph. See InfoCarrier.Core.DocumentStoreTests.csproj.
+
+    THIS PROJECT SITS AT THE FLOOR, AND THAT IS A RULE RATHER THAN A DEFAULT. It carries no
+    VersionOverride, so it compiles against the versions pinned in Directory.Packages.props, and
+    each consumer then RUNS it on whatever it resolves for itself. .NET binds an assembly by name
+    and a higher version satisfies a lower reference, so compile-low/run-high works and the
+    reverse does not: built at 10.0.11 this could not load in the 10.0.1 suite. The pattern is not
+    new here — src/InfoCarrier.Core is built at the floor and Tier D already runs it at 10.0.11.
+
+    WHAT IS IN: the types neither tier owns — the client/server shells, the store factory, the
+    fixture properties they carry, the in-process transport and the culture pin.
+    WHAT IS OUT: anything that names a store. InMemoryInfoCarrierTier, SqliteInfoCarrierTier and
+    FirebirdInfoCarrierTier stay beside the tests they serve, with their backend stores, because
+    moving one here would put its provider package on every consumer's compile line. That is the
+    one piece of the old reasoning that still holds, and it holds on cost rather than on principle.
+  -->
+  <PropertyGroup>
+    <Description>The test harness shared by the spec suite and the document-store tier.</Description>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>InfoCarrier.Core.FunctionalTests.TestUtilities</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!--
+      NOT A TEST PROJECT. It holds no tests and must not carry Microsoft.NET.Test.Sdk: a project
+      the runner recognises is a project eng/measure.sh would have to count, and there is nothing
+      here to count.
+    -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Microsoft.EntityFrameworkCore.Specification.Tests is what makes this a harness rather than a
+      helper library: TestStore, ITestStoreFactory, ListLoggerFactory and TestHelpers all come
+      from it, and so does NetTopologySuite, which InfoCarrierNetTopologySuiteValueMapper needs.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -57,7 +57,7 @@ public class RelationalClientTierPinTest
     [ConditionalFact]
     public void Tier_A_registers_them_as_well()
     {
-        IServiceCollection services = ProviderServicesFor(InfoCarrierTestStoreFactory.InMemory);
+        IServiceCollection services = ProviderServicesFor(InMemoryInfoCarrierTier.Instance);
 
         Assert.Contains(services, d => d.ServiceType == typeof(IRelationalDatabaseFacadeDependencies));
     }
@@ -84,7 +84,7 @@ public class RelationalClientTierPinTest
     public void One_convention_set_builder_and_it_is_the_relational_one(bool relationalTier)
     {
         IServiceCollection services = ProviderServicesFor(
-            relationalTier ? SqliteInfoCarrierTier.Instance : InfoCarrierTestStoreFactory.InMemory);
+            relationalTier ? SqliteInfoCarrierTier.Instance : InMemoryInfoCarrierTier.Instance);
 
         ServiceDescriptor descriptor = Assert.Single(
             services, d => d.ServiceType == typeof(IProviderConventionSetBuilder));

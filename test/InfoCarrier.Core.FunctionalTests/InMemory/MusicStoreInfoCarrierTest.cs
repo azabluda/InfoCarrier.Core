@@ -31,7 +31,7 @@ public class MusicStoreInfoCarrierTest(MusicStoreInfoCarrierTest.MusicStoreInfoC
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InMemoryInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);

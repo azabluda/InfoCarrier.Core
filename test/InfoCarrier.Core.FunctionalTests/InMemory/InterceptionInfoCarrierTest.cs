@@ -76,7 +76,7 @@ public abstract class QueryExpressionInterceptionInfoCarrierTestBase(
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InMemoryInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
@@ -168,7 +168,7 @@ public abstract class SaveChangesInterceptionInfoCarrierTestBase(
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InfoCarrierTestStoreFactory.InMemory,
+                InMemoryInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
