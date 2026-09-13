@@ -34,6 +34,18 @@ public class Customer
     /// <summary>A document inside a document.</summary>
     public Address Address { get; set; } = null!;
 
+    /// <summary>
+    ///     A document inside a document that may be absent.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Optional where <see cref="Address" /> is required, and the difference is the whole
+    ///     reason it exists.</b> Setting a required owned reference to null is refused by EF before
+    ///     anything reaches the store, so the question "does removing a nested document persist, or
+    ///     does the old one come back" cannot be asked of <see cref="Address" /> at all. It can be
+    ///     asked here. The seed leaves it null, so its absence is the ordinary case too.
+    /// </remarks>
+    public Address? BillingAddress { get; set; }
+
     /// <summary>An array inside a document.</summary>
     public List<OrderLine> Lines { get; set; } = [];
 }
@@ -55,6 +67,37 @@ public class OrderLine
 }
 
 /// <summary>
+///     A second root, carrying a concurrency token beside a nested array.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>A root of its own rather than a token on <see cref="Customer" />, because a token
+///         there would change every other test in this tier.</b> A concurrency token makes the
+///         ORIGINAL value part of the write, and <c>IncompleteDocumentTest</c> attaches stubs whose
+///         original values are whatever the CLR defaults are — so a token on <see cref="Customer" />
+///         would turn those tests into concurrency failures and hide what they are for.
+///     </para>
+///     <para>
+///         <b>The token is set by the test rather than by the store</b>, which is the point: it
+///         makes the wire the only thing under examination. The question a document store raises is
+///         whether the original value travels at all, because a store that rewrites the whole
+///         document has to filter the write on a value the client never sent back.
+///     </para>
+/// </remarks>
+public class Warehouse
+{
+    public string Id { get; set; } = null!;
+
+    public string Name { get; set; } = null!;
+
+    /// <summary>The concurrency token. Bumped by whoever writes.</summary>
+    public int Version { get; set; }
+
+    /// <summary>An array inside a document, so the token is tested on a document rather than a row.</summary>
+    public List<OrderLine> Lines { get; set; } = [];
+}
+
+/// <summary>
 ///     The SERVER's model, which knows it is MongoDB.
 /// </summary>
 /// <remarks>
@@ -66,11 +109,18 @@ public class ShopServerContext(DbContextOptions<ShopServerContext> options) : Db
 {
     public DbSet<Customer> Customers => Set<Customer>();
 
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Customer>().ToCollection("customers");
         modelBuilder.Entity<Customer>().OwnsOne(c => c.Address);
+        modelBuilder.Entity<Customer>().OwnsOne(c => c.BillingAddress);
         modelBuilder.Entity<Customer>().OwnsMany(c => c.Lines);
+
+        modelBuilder.Entity<Warehouse>().ToCollection("warehouses");
+        modelBuilder.Entity<Warehouse>().OwnsMany(w => w.Lines);
+        modelBuilder.Entity<Warehouse>().Property(w => w.Version).IsConcurrencyToken();
     }
 }
 
@@ -81,9 +131,15 @@ public class ShopClientContext(DbContextOptions<ShopClientContext> options) : Db
 {
     public DbSet<Customer> Customers => Set<Customer>();
 
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Customer>().OwnsOne(c => c.Address);
+        modelBuilder.Entity<Customer>().OwnsOne(c => c.BillingAddress);
         modelBuilder.Entity<Customer>().OwnsMany(c => c.Lines);
+
+        modelBuilder.Entity<Warehouse>().OwnsMany(w => w.Lines);
+        modelBuilder.Entity<Warehouse>().Property(w => w.Version).IsConcurrencyToken();
     }
 }
