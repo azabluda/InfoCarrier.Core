@@ -126,10 +126,18 @@ jobs:
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
           --no-build --configuration Release
 
-      # ADR-009 TIER D, and it is gated HERE rather than folded into the spec ratchet for the same
-      # reason the transport suite is: it is expected green and it adopts no specification bases,
-      # so its count would inflate the ratchet's total past what test/known-failures.txt was
-      # written against.
+      # ADR-009 TIER D, and it is gated HERE rather than folded into the spec ratchet because its
+      # count would inflate the ratchet's total past what test/known-failures.txt was written
+      # against. That is the same reason the transport suite above is gated here.
+      #
+      # THE SECOND REASON EXPIRED ON 2026-09-14 AND IS RECORDED RATHER THAN DELETED. This comment
+      # read "it is expected green and it adopts no specification bases". It adopts them now, so
+      # only the first half stands. A tier of hand-written tests is expected green by
+      # construction; an adopted base can go red on a STORE limitation, which is what a ratchet
+      # exists to track. It is still expected green here because every such case carries an
+      # override asserting what the store actually does, with a server-side control proving the
+      # behaviour is the store's. If that ever stops being true this step wants a baseline of its
+      # own rather than a bare `dotnet test`. ADR-009's 2026-09-14 amendment is the reading.
       #
       # It starts a real mongod, one per test class, from binaries Mongo2Go carries in its own
       # package. Nothing is downloaded and no container is used, which is the bar ADR-009 set when
