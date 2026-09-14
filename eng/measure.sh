@@ -49,8 +49,23 @@ reasons="$out/$label.reasons.txt"
 # repository's own HTTP-transport tests, it is expected to be green, and folding it in would
 # inflate `total` past what test/known-failures.txt was written against. CLAUDE.md says the same
 # thing about pointing a hand run at the .slnx.
+#
+# INFOCARRIER.CORE.DOCUMENTSTORETESTS IS PRESENT SINCE 2026-09-14, AND IT WAS ABSENT BEFORE THAT
+# FOR A REASON THAT EXPIRED. ADR-009 Tier D adopted no specification bases when it was written, so
+# it was gated as a plain `dotnet test` beside the transport suite. It adopts six now. A tier whose
+# reds cannot be recorded is a tier under pressure to override them, which is the failure mode
+# CLAUDE.md's oldest guardrail names, so Tier D is measured and ratcheted like every other tier.
+#
+# ONE BASELINE STILL, NOT ONE PER PROJECT, and this tier is the case that argues for it rather than
+# against: OwnedNavigationsCollectionTestBase is adopted in BOTH projects today, so a decision to
+# host that family on one tier alone would MOVE tests between them. That is exactly the "fix in one,
+# break in the other" that eng/ratchet.sh keeps a single baseline to catch.
+#
+# It starts a real mongod per test class from binaries Mongo2Go carries in its own package, so a
+# local run of this script now needs no installation but does need those few seconds.
 projects=(
     "$root/test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj"
+    "$root/test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj"
 )
 
 dotnet build "$root/InfoCarrier.Core.slnx" -v q --nologo > "$out/$label.build.log" 2>&1 || {

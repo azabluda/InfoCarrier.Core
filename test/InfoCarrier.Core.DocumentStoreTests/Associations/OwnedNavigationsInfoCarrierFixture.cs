@@ -2,9 +2,6 @@
 
 using InfoCarrier.Core.DocumentStoreTests.TestUtilities;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Query.Associations;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
@@ -31,10 +28,20 @@ namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 ///         with and without the wire is not this repository's.
 ///     </para>
 ///     <para>
-///         <b><c>RootReferencingEntity</c> is ignored, exactly as the Cosmos fixture ignores it.</b>
-///         It exists to hold a navigation from one root to another, and a document store has no
-///         join to resolve one with. EF's own base anticipates this and ignores
-///         <c>MappedEntityTypeIgnoredWarning</c> for it.
+///         <b><c>RootReferencingEntity</c> IS MAPPED, AND IT WAS IGNORED UNTIL 2026-09-14 FOR A
+///         REASON BORROWED FROM THE WRONG STORE.</b> This paragraph read <i>"ignored, exactly as
+///         the Cosmos fixture ignores it"</i>, and that was the whole argument: EF's Cosmos suite
+///         drops the type, so this one did too. <b>Cosmos is not MongoDB.</b> They are both
+///         document stores and they are different products, with different providers written by
+///         different teams, and nothing about a decision taken for one is evidence about the other.
+///     </para>
+///     <para>
+///         <b>Measured instead, and the ignore was buying nothing.</b> With the type mapped the
+///         failing test NAMES are byte-identical - same 38, none added, none removed. What changes
+///         is what the two tests that need it REPORT: EF's real message about tracking an owned
+///         entity without its owner, and a real <c>NullReferenceException</c>, in place of
+///         <c>Cannot create a DbSet for 'RootReferencingEntity'</c>, which only ever described a
+///         type this fixture had removed. A red that describes our own model teaches nothing.
 ///     </para>
 ///     <para>
 ///         <b>Nothing here names a MongoDB-only API, and that is a constraint of the harness rather
@@ -57,26 +64,11 @@ public class OwnedNavigationsInfoCarrierFixture : OwnedNavigationsFixtureBase
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             onAddServices: services => services.AddInfoCarrierServerDocumentStore());
 
-    /// <inheritdoc />
-    /// <remarks>
-    ///     <see cref="RootReferencingEntity" /> carries a navigation between two roots, which this
-    ///     store cannot answer. The Cosmos fixture drops it for the same reason.
-    /// </remarks>
-    protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
-    {
-        base.OnModelCreating(modelBuilder, context);
-
-        modelBuilder.Ignore<RootReferencingEntity>();
-    }
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     The client half of this suite has no database, so a warning about a navigation the
-    ///     server's store cannot map is raised on both halves and is expected on both.
-    /// </remarks>
-    public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-        => base.AddOptions(builder)
-            .ConfigureWarnings(w => w.Ignore(CoreEventId.MappedEntityTypeIgnoredWarning));
+    // NO OnModelCreating AND NO AddOptions OVERRIDE, AND BOTH EXISTED UNTIL 2026-09-14. One
+    // ignored RootReferencingEntity and the other suppressed the MappedEntityTypeIgnoredWarning
+    // that ignoring it raised -- a suppression that existed only to serve the ignore. Removing the
+    // pair leaves the failing test names byte-identical, so the model this tier measures is now
+    // EF's own, unedited, and there is nothing here to explain to the next reader.
 }
 
 /// <summary>

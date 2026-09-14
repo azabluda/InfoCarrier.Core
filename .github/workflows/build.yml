@@ -22,11 +22,15 @@ env:
   DOTNET_VERSION: '10.0.x'
   SOLUTION: InfoCarrier.Core.slnx
 
-  # THE SPEC SUITE IS ONE PROJECT AGAIN SINCE R136, and it holds both ADR-009 tiers: InMemory
-  # under InMemory/ and SQLite under Sqlite/. It is named here rather than run through the
-  # solution because the solution also holds InfoCarrier.Core.TransportTests, which is not a spec
-  # project and is gated by the fast job. eng/ratchet.sh still takes several TRX and eng/measure.sh
-  # still takes several projects; both keep that shape because a second store would need it again.
+  # THIS IS TIERS A TO C IN ONE PROJECT SINCE R136 — InMemory/, Sqlite/ and Firebird/. It is named
+  # here rather than run through the solution because the solution also holds
+  # InfoCarrier.Core.TransportTests, which is not a spec project and is gated by the fast job.
+  #
+  # "eng/ratchet.sh still takes several TRX and eng/measure.sh still takes several projects; both
+  # keep that shape because a second store would need it again." That is what this comment said
+  # until 2026-09-14, and the second store arrived: ADR-009 Tier D is a project of its own, because
+  # MongoDB.EntityFrameworkCore needs a newer EF Core patch than src/ compiles against and one
+  # project has one package graph. Both shapes are now in use rather than merely kept.
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
   # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
@@ -126,26 +130,13 @@ jobs:
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
           --no-build --configuration Release
 
-      # ADR-009 TIER D, and it is gated HERE rather than folded into the spec ratchet because its
-      # count would inflate the ratchet's total past what test/known-failures.txt was written
-      # against. That is the same reason the transport suite above is gated here.
-      #
-      # THE SECOND REASON EXPIRED ON 2026-09-14 AND IS RECORDED RATHER THAN DELETED. This comment
-      # read "it is expected green and it adopts no specification bases". It adopts them now, so
-      # only the first half stands. A tier of hand-written tests is expected green by
-      # construction; an adopted base can go red on a STORE limitation, which is what a ratchet
-      # exists to track. It is still expected green here because every such case carries an
-      # override asserting what the store actually does, with a server-side control proving the
-      # behaviour is the store's. If that ever stops being true this step wants a baseline of its
-      # own rather than a bare `dotnet test`. ADR-009's 2026-09-14 amendment is the reading.
-      #
-      # It starts a real mongod, one per test class, from binaries Mongo2Go carries in its own
-      # package. Nothing is downloaded and no container is used, which is the bar ADR-009 set when
-      # it chose Firebird over PostgreSQL. About seven seconds including the server starts.
-      - name: Test (document store, Tier D)
-        run: >
-          dotnet test test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj
-          --no-build --configuration Release
+      # ADR-009 TIER D RAN HERE AND MOVED TO THE SPEC-RATCHET JOB ON 2026-09-14. The step is not
+      # removed silently, because the reason it sat here is worth knowing: it adopted no
+      # specification bases, so it was green by construction and a bare `dotnet test` said
+      # everything there was to say. It adopts six bases now and its reds are real. A tier whose
+      # reds cannot be RECORDED is a tier under pressure to override them, which is the one thing
+      # CLAUDE.md's oldest guardrail forbids, so it is ratcheted against the single baseline with
+      # every other tier. ADR-009's 2026-09-14 amendment is the reading.
 
       # Phase 2 of M8. Publishes the Blazor client trimmed and gates on the DIRECTION of this
       # product's IL2xxx count, not on zero — spec §9's "no warning attributable to
@@ -194,23 +185,42 @@ jobs:
       #
       # ~15 minutes locally at 22312 tests, so allow generously rather than have a slow runner
       # look like a regression.
-      # ONE TRX SINCE R136, because the two tiers are one project again. eng/ratchet.sh still
-      # accepts several and unions them into one counter set and one sorted name list against the
-      # single baseline pair; that shape stays for the next backing store rather than being
-      # unwound. Named explicitly and not run through the solution: the solution also holds
+      # TWO TRX SINCE 2026-09-14, and it was one from R136 until then. eng/ratchet.sh has always
+      # accepted several and unioned them into one counter set and one sorted name list against the
+      # single baseline pair; that shape was kept "for the next backing store", and Tier D is it.
+      # Named explicitly and not run through the solution: the solution also holds
       # InfoCarrier.Core.TransportTests, which is not part of this number.
-      - name: Test (full suite, both tiers)
+      - name: Test (full suite, Tiers A-C)
         continue-on-error: true
         timeout-minutes: 90
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
+      # ADR-009 TIER D, RATCHETED HERE SINCE 2026-09-14 RATHER THAN GATED IN THE FAST JOB. It ran
+      # there as a bare `dotnet test` while it adopted no specification bases and was therefore
+      # green by construction. It adopts six bases now and 38 of its tests are red, every one of
+      # them classified in test/known-failures.txt. A tier whose reds cannot be recorded is a tier
+      # under pressure to override them, and overriding a spec test to force green is what
+      # CLAUDE.md's oldest guardrail forbids.
+      #
+      # It starts a real mongod per test class from binaries Mongo2Go carries in its own package.
+      # Nothing is downloaded and no container is used, which is the bar ADR-009 set when it chose
+      # Firebird over PostgreSQL.
+      - name: Test (document store, Tier D)
+        continue-on-error: true
+        timeout-minutes: 30
+        run: >
+          dotnet test test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj
+          --no-build --configuration Release
+          --logger "trx;LogFileName=tierd.trx" --results-directory artifacts/test-results
+
       - name: Ratchet
         id: ratchet
         run: >
           ./eng/ratchet.sh
           artifacts/test-results/results.trx
+          artifacts/test-results/tierd.trx
           test/known-failures.txt
 
       - name: Upload results

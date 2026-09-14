@@ -96,16 +96,36 @@ measurement.
 
 **TIER D IS AN EMBEDDED MONGODB SINCE 2026-09-10, IN A PROJECT OF ITS OWN
 (`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS SPEC BASES SINCE 2026-09-14.** This
-paragraph read *"AND IT ADOPTS NO SPEC BASES"* until then, and the first one is
-`OwnedNavigationsCollectionTestBase`. **The reason that sentence was written is unchanged and is
-what still governs which bases come here**: this tier exists to prove a negative that no relational
-tier can, that this provider is not relational-only (#51), and a compliance test demanding every
-base be adopted against a document store would misread it. What changed is that "no compliance
-test" never meant "no bases" — a base whose tests mostly RUN on the store earns its place, and one
-that is mostly overridden into "not supported" teaches nothing about the wire. ADR-009's 2026-09-13
-amendment carries that selection rule and its 2026-09-14 one carries the adoption. It is gated
-beside the transport suite rather than by the spec ratchet, for the same reason that suite is, and
-it is deliberately **absent from `eng/measure.sh`**. Its own project exists because
+paragraph read *"AND IT ADOPTS NO SPEC BASES"* until then, and it adopts the whole
+`OwnedNavigations` family — six classes, **132 tests of which 38 are RED**. **The reason that
+sentence was written is unchanged and is what still governs which bases come here**: this tier
+exists to prove a negative that no relational tier can, that this provider is not relational-only
+(#51), and a compliance test demanding every base be adopted against a document store would misread
+it. What changed is that "no compliance test" never meant "no bases" — a base whose tests mostly RUN
+on the store earns its place, and one that is mostly overridden into "not supported" teaches nothing
+about the wire. ADR-009's 2026-09-13 amendment carries that selection rule and its 2026-09-14 one
+carries the adoption.
+
+**IT IS RATCHETED AND MEASURED LIKE EVERY OTHER TIER SINCE 2026-09-14, AND THE PARAGRAPH ABOVE SAID
+THE OPPOSITE UNTIL THEN** — *"gated beside the transport suite rather than by the spec ratchet"*
+and *"deliberately absent from `eng/measure.sh`"*. Both were right while it adopted no bases, when
+it was green by construction and a bare `dotnet test` said everything. **A tier whose reds cannot be
+RECORDED is a tier under pressure to override them**, which is the one thing the guardrail below
+forbids, and this tier proved it: four overrides were written asserting what the store does, one of
+them blessing a count of three where five is correct. Tier D's TRX now joins the spec suite's in one
+`ratchet.sh` call against the one baseline, and its project is in `measure.sh`'s list. **One
+baseline and not one per project, and Tier D is the case that argues for it rather than against**:
+`OwnedNavigationsCollectionTestBase` is adopted in Tier B *and* Tier D today, so a decision to host
+that family on one tier alone would MOVE tests between projects — exactly the "fix in one, break in
+the other" a single baseline exists to catch.
+
+**AN OVERRIDE HERE IS LEGITIMATE ONLY IF IT ADOPTS ONE THE REFERENCE PROVIDER ALREADY SHIPS**, which
+is the same rule this file states for SQLite, and it must cite it. MongoDB's own `MongoComplianceTest`
+lists all six `OwnedNavigations` bases in `IgnoredTestBases` under *"Test bases added in EF10+"*,
+which means "we have not run this base", NOT "the store cannot do this" — so there is nothing to
+adopt and all 38 stand red. **`OwnedNavigationsServerSideControlTest` answers WHOSE defect each one
+is; it never decides whether a red is allowed**, and conflating those two is what produced the
+overrides. Its own project exists because
 `MongoDB.EntityFrameworkCore` needs EF Core >= 10.0.11 while `src/` compiles against a 10.0.1 floor,
 which also makes it the one place the product runs on a NEWER EF Core than it was built with.
 **It found #100 on its first run and the same change fixes it**: updating an entity that owns
@@ -127,10 +147,13 @@ where the change set omits an owned navigation the model declares, and never for
 delete. ADR-009's 2026-09-10 and 2026-09-11 amendments are the reading.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
-every project in its own `projects` list and adds the figures. **That list holds the spec project
-alone, and `InfoCarrier.Core.TransportTests` is deliberately absent** — it is this repository's own
+every project in its own `projects` list and adds the figures. **That list holds TWO projects since
+2026-09-14 — the spec project and ADR-009 Tier D — and it held the spec project alone before that.**
+`InfoCarrier.Core.TransportTests` is still deliberately absent: it is this repository's own
 HTTP-transport suite, expected green, and folding it in would inflate `Total` past what
-`test/known-failures.txt` was written against, which is also why a solution-wide run is wrong. **So
+`test/known-failures.txt` was written against, which is also why a solution-wide run is wrong.
+**Tier D was absent for that reason too and is not any more**, because it adopts specification bases
+now and its reds have to be recordable rather than overridden. **So
 a `src/` change needs the transport line above as well as `measure.sh`**; the script says so in its
 own comment. **A run of one tier alone is not comparable to the baseline either**, because the
 baseline covers every tier.
@@ -480,8 +503,13 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238`** (2026-09-07, `v12`).
-**All four figures come out of the run's own summary block, and none of them is arithmetic** — a
+**`FAILING: 57  TOTAL: 29693`** (2026-09-14, `tierd-joins`), across the two projects `measure.sh`
+now runs: **19 of 29558** in the spec project and **38 of 135** in ADR-009 Tier D. This line read
+`Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238` (2026-09-07, `v12`) until then, and
+was three measurements stale — the badge had moved to 29,558 while it still said 29,516.
+**Tiers A-C are unmoved at 19**; the whole rise is Tier D joining the baseline, and the name diff
+says so exactly: 38 added, 0 removed.
+**Every figure comes out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
 the one deliberate lowering, in C94, where two skipped theories turned 4 tests into 2.

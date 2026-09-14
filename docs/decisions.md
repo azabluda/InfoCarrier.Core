@@ -563,6 +563,70 @@ argues that a duplicate is dangerous, check in that commit that the duplicate is
 compiled twenty lines away. CLAUDE.md already requires a sweep when a decision is REVERSED; this is
 the same failure at the moment a decision is CENTRALISED, and the sweep is the same.
 
+### Amendment 2026-09-14 (second) — the whole family, and Tier D stops being exceptional in CI
+
+**The amendment above adopted one base and kept four overrides. Both halves are superseded the same
+day.** All six `OwnedNavigations` classes are adopted, the tier is 132 tests with 38 red, and there
+are no overrides at all.
+
+**RED IS INFORMATION HERE TOO, AND NOTHING ABOUT THIS TIER MAKES IT AN EXCEPTION.** That is ADR-004
+and the oldest guardrail in CLAUDE.md, and it is not conditional on the backing store. The earlier
+reading treated "Tier D is always green" as a policy when it was only an OBSERVATION — true while
+the tier was hand-written tests, and untested the moment it adopted a specification base. The four
+overrides are what the untested premise produced: each asserted what the store does, and one of them
+asserted a count of three where the base says five, so the suite reported green over a wrong answer.
+
+**A CONTROL ANSWERS WHOSE DEFECT IT IS. IT NEVER DECIDED WHETHER A RED IS ALLOWED.** Conflating
+those two is the whole error, and it is easy to make because the control is real evidence and does
+real work. `OwnedNavigationsServerSideControlTest` reproduces every one of the 38 against the
+server's own `DbContext` with InfoCarrier out of the picture. That establishes the failures are
+`MongoDB.EntityFrameworkCore`'s rather than this repository's — which is worth knowing and is not a
+licence to make them green.
+
+**AN OVERRIDE IS LEGITIMATE ONLY WHEN IT ADOPTS ONE THE REFERENCE PROVIDER ALREADY SHIPS, AND IT
+MUST CITE IT.** CLAUDE.md already states this for SQLite: if EF overrides a test with
+`ApplyNotSupported`, adopting that override is convergence with the reference provider. The Cosmos
+argument used above does not reach, and the difference is worth stating because it looks like a
+counter-example. Cosmos is EF's OWN provider and its suite is the place where that store's
+capabilities are described. This tier describes no store; ADR-009 says it exists to answer whether
+the WIRE changed the answer.
+
+**THE UPSTREAM POSITION WAS CHECKED RATHER THAN ASSUMED.** MongoDB's `MongoComplianceTest` lists all
+six `OwnedNavigations*TestBase` classes in `IgnoredTestBases`, under the comment *"Test bases added
+in EF10+"*. **An ignore is not an override.** Theirs means "we have not run this base"; an override
+would mean "we ran it and the store does X". So there is nothing to adopt, all 38 stand, and this
+tier is running these tests against MongoDB when the official provider's own suite never has.
+
+**TIER D IS RATCHETED AND MEASURED WITH EVERY OTHER TIER.** Its TRX joins the spec suite's in one
+`eng/ratchet.sh` call and its project is in `eng/measure.sh`'s list; the step moved out of the fast
+gate into the spec-ratchet job. `ratchet.sh` needed no change — it has taken several TRX since it
+was written, against one baseline pair, and the comment saying that shape was kept "for the next
+backing store" was describing this.
+
+**ONE BASELINE, AND TIER D IS THE CASE THAT ARGUES FOR IT.** A separate `tier-d-known-failures.txt`
+was considered and rejected. The argument for it was that a Tier D test cannot move into the spec
+project, which is false in the way that matters: `OwnedNavigationsCollectionTestBase` is adopted in
+Tier B *and* Tier D today, so deciding to host that family on one tier alone would move tests
+between projects — precisely the "fix in one, break in the other" that `ratchet.sh` keeps a single
+baseline to catch. The second argument, that the README badge would then depend on a `mongod`
+starting, is weaker than it looked: a store that will not start is information, and the badge step's
+own comment already says a badge frozen on the last green run is a badge that lies.
+
+**WHAT THE 38 ARE, BECAUSE A COUNT IS NOT A CLASSIFICATION.** 31 are the store refusing a query.
+2 are this tier's FIXTURE rather than the store — `RootReferencingEntity` is ignored because a
+document store has no join for a root-to-root navigation, as EF's Cosmos fixture also does, and two
+projection tests need that type. The remaining 5 are differences rather than refusals and are the
+ones worth watching: a silent wrong count (three roots where five are correct, unreported and
+belonging in `upstream-defects.md`), two `NullReferenceException`s projecting through a null
+optional associate, and two where the store ANSWERS a query EF's own base wraps in
+`Assert.ThrowsAsync` for EF issue #36400 — the control confirms that answer is correct, so those two
+reds record EF's limitation rather than the store's or ours.
+
+**The general rule, and it is not about MongoDB.** A gate that cannot express red creates pressure
+to override, and the pressure is hardest to see when a principled-looking mechanism is already to
+hand. Four overrides with a control behind each one looked like rigour. Give every tier a way to
+record a red before giving it a way to adopt a base.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

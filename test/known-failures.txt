@@ -4315,5 +4315,58 @@
 # those steps. 29552 + 6 happens to be the answer, and deriving it would still have been the wrong
 # method, because this file has carried a figure got by arithmetic before.
 
-failed=19
-total=29558
+# 2026-09-14 — ADR-009 TIER D JOINS THIS BASELINE. total 29558 -> 29693, failed 19 -> 50. Neither
+# rise is a regression: test/InfoCarrier.Core.DocumentStoreTests is now measured by eng/measure.sh
+# and ratcheted by CI, having been gated as a bare `dotnet test` while it adopted no specification
+# bases. Tiers A-C are UNMOVED at 19 of 29558. The precedent for this entry is 2026-08-02, when
+# Tier B arrived with 406 tests and 24 known failures.
+#
+# Tier D adopts all six OwnedNavigations bases: 135 tests, 104 passing, 31 red.
+#
+# WHEN AN OVERRIDE IS ALLOWED HERE, AND WHY ONLY 4 METHODS QUALIFIED. A red has to say something
+# about THIS provider. If the backing store refuses a query then this provider cannot answer it
+# either, so the red restates the obvious and is noise. That argument is only as good as the
+# evidence the store really does refuse it, and the evidence must be the STORE'S OWN: a citation to
+# its suite declaring the feature unsupported. Without one, "the store cannot do this" is our
+# assertion about somebody else's code, and the test stays red.
+#
+# THE FOUR THAT CLEARED THE BAR (7 test cases), all citing
+# MongoDB.EntityFrameworkCore's FunctionalTests/Query/UnsupportedQueryTests.cs:
+#   - SelectMany over an owned collection, x3 methods x2 tracking arms. That file declares
+#     SelectMany over a non-primitive collection unsupported with the same
+#     InvalidOperationException, on an EMBEDDED array, which is our shape.
+#   - GroupBy inside a document. Declared there, and their NorthwindGroupByQueryMongoTest overrides
+#     ~200 tests against tracked issue EF-149 asserting the same ExpressionNotSupportedException.
+#
+# WHY SO FEW, AND THIS IS THE FINDING RATHER THAN THE FOOTNOTE. Their SPECIFICATION suite maps
+# Northwind as separate COLLECTIONS and contains no owned or embedded collection anywhere. So its
+# tracked issues -- EF-X001 "subquery selection", EF-216 cross-document navigation, EF-X020
+# cross-collection joins -- are about $lookup joins and are NOT evidence about nested documents.
+# Matching on an operator NAME would be a false match: SelectMany across collections is a join,
+# SelectMany within a document is an $unwind. A first pass did exactly that and would have
+# suppressed 29 tests on citations that do not cover their shape.
+#
+# SO TIER D IS MEASURING NESTED-DOCUMENT QUERY SUPPORT THAT THE STORE'S OWN SPECIFICATION SUITE HAS
+# NEVER MEASURED. That is the strongest result #51 has produced. Several of the 31 are plausibly
+# unimplemented rather than impossible.
+#
+# THE 31, AND NONE IS THIS REPOSITORY'S. OwnedNavigationsServerSideControlTest runs the shapes
+# directly against the server's own DbContext and reproduces them with the wire removed.
+#   - 6  Concat over an owned collection. Upstream declares Except and Intersect unsupported, NOT
+#        Concat, so there is no citation and these stay red.
+#   - 6  subquery FirstOrDefault in a projection. EF-X001 is cross-collection; no citation.
+#   - 7  structural equality over owned entities. Untested upstream in any shape.
+#   - 3  Distinct over an owned collection. Untested upstream.
+#   - 2  Select_unmapped_associate_scalar_property.
+#   - 1  Distinct_over_projected_filtered_nested_collection: returns 3 roots where 5 are correct. A
+#        SILENT WRONG ANSWER in somebody else's provider, unreported. docs/upstream-defects.md.
+#   - 4  NullReferenceException projecting through a null optional associate. A crash, not a
+#        refusal: a store that means "no" says so. Candidate upstream defect.
+#   - 1  "Field 'OptionalAssociate' required but not present in BsonDocument". Also a crash, and
+#        their own OwnedEntityTests projects owned collections successfully, so this is not a
+#        declared limit.
+#   - 1  "An item with the same key has already been added. Key: o0" -- an alias collision inside
+#        their translator's own subquery naming. Candidate upstream defect.
+
+failed=50
+total=29693

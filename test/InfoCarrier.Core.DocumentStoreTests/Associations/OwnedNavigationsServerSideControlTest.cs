@@ -8,8 +8,8 @@ using Xunit;
 namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 
 /// <summary>
-///     The four query shapes <see cref="OwnedNavigationsCollectionInfoCarrierTest" /> has to
-///     override, run directly against the server with InfoCarrier out of the picture.
+///     The four query shapes that fail in <see cref="OwnedNavigationsCollectionInfoCarrierTest" />,
+///     run directly against the server with InfoCarrier out of the picture.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -23,7 +23,16 @@ namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 ///     <para>
 ///         <b>Read it as a fork.</b> A query that behaves the same here as over the wire is the
 ///         store's business; one that passes here and fails over the wire is ours. All four below
-///         are the first kind, which is why the class above overrides rather than reports.
+///         are the first kind, which is what <c>test/known-failures.txt</c> records against those
+///         five red tests.
+///     </para>
+///     <para>
+///         <b>A CONTROL ANSWERS WHOSE DEFECT IT IS. IT NEVER DECIDED WHETHER A RED IS ALLOWED, AND
+///         THAT CONFLATION COST FOUR OVERRIDES (2026-09-14).</b> The class above used to assert
+///         these same outcomes on the specification tests themselves, which turned the suite green
+///         while the store returned three roots where five are correct. The control is unchanged by
+///         that correction, because it was never the part that was wrong: it is a hand-written test
+///         about the store, not a specification test about the wire.
 ///     </para>
 ///     <para>
 ///         <b>THESE ASSERTIONS RECORD WHAT THE STORE DOES; THEY DO NOT SAY IT IS RIGHT.</b> Three
@@ -107,5 +116,84 @@ public class OwnedNavigationsServerSideControlTest(OwnedNavigationsControlFixtur
                 .ToListAsync());
 
         Assert.Contains("same key has already been added", thrown.Message);
+    }
+
+    /// <summary>
+    ///     Projecting a nested associate THROUGH an optional associate that is null on some rows.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The specification test fails with <c>NullReferenceException</c>, which is the shape a
+    ///     WIRE defect takes</b> - a materializer reaching through a null owned reference. That is
+    ///     why this is a control rather than an assumption: it runs the identical projection with
+    ///     InfoCarrier out of the picture.
+    /// </remarks>
+    [Fact]
+    public async Task Server_side_Select_required_nested_on_optional_associate()
+    {
+        using DbContext db = Server();
+
+        Exception? thrown = await Record.ExceptionAsync(
+            () => db.Set<RootEntity>()
+                .AsNoTracking()
+                .Select(x => x.OptionalAssociate!.RequiredNestedAssociate)
+                .ToListAsync());
+
+        Assert.Equal("NullReferenceException", thrown?.GetType().Name);
+    }
+
+    /// <inheritdoc cref="Server_side_Select_required_nested_on_optional_associate" />
+    [Fact]
+    public async Task Server_side_Select_optional_nested_on_optional_associate()
+    {
+        using DbContext db = Server();
+
+        Exception? thrown = await Record.ExceptionAsync(
+            () => db.Set<RootEntity>()
+                .AsNoTracking()
+                .Select(x => x.OptionalAssociate!.OptionalNestedAssociate)
+                .ToListAsync());
+
+        Assert.Equal("NullReferenceException", thrown?.GetType().Name);
+    }
+
+    /// <summary>
+    ///     Structural equality against an inline nested owned associate, which EF's own base says
+    ///     must throw (EF #36400) and this store answers instead.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A STORE MORE CAPABLE THAN THE SPECIFICATION IS STILL A DIFFERENCE, AND THE ANSWER
+    ///         HAS TO BE CHECKED.</b> <c>OwnedNavigationsStructuralEqualityTestBase</c> wraps this
+    ///         in <c>Assert.ThrowsAsync&lt;InvalidOperationException&gt;</c>, so when nothing
+    ///         throws the base never compares the rows and nobody learns whether the answer was
+    ///         right. That is the identical trap
+    ///         <c>Distinct_over_projected_filtered_nested_collection</c> laid, where the store
+    ///         quietly returned three rows in place of five.
+    ///     </para>
+    ///     <para>
+    ///         So this control asserts the count the base's own seed data implies. If the store
+    ///         answers differently, or starts refusing as EF expects, it goes red and is read.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task Server_side_Nested_associate_with_inline()
+    {
+        using DbContext db = Server();
+
+        List<RootEntity> result = await db.Set<RootEntity>()
+            .AsNoTracking()
+            .Where(e => e.RequiredAssociate.RequiredNestedAssociate
+                == new NestedAssociateType
+                {
+                    Id = 1000,
+                    Name = "Root1_RequiredAssociate_RequiredNestedAssociate",
+                    Int = 8,
+                    String = "foo",
+                    // Not a collection expression: an expression tree may not contain one (CS9175).
+                    Ints = new List<int> { 1, 2, 3 },
+                })
+            .ToListAsync();
+
+        Assert.Single(result);
     }
 }
