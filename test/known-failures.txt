@@ -4315,58 +4315,72 @@
 # those steps. 29552 + 6 happens to be the answer, and deriving it would still have been the wrong
 # method, because this file has carried a figure got by arithmetic before.
 
-# 2026-09-14 — ADR-009 TIER D JOINS THIS BASELINE. total 29558 -> 29693, failed 19 -> 50. Neither
-# rise is a regression: test/InfoCarrier.Core.DocumentStoreTests is now measured by eng/measure.sh
-# and ratcheted by CI, having been gated as a bare `dotnet test` while it adopted no specification
-# bases. Tiers A-C are UNMOVED at 19 of 29558. The precedent for this entry is 2026-08-02, when
-# Tier B arrived with 406 tests and 24 known failures.
+# 2026-09-14 — ADR-009 TIER D JOINS THIS BASELINE. total 29558 -> 29788, failed 19 -> 73. Neither
+# rise is a regression. Tiers A-C are UNMOVED at 19 of 29558; the whole movement is Tier D becoming
+# measured by eng/measure.sh and ratcheted by CI, having been gated as a bare `dotnet test` while it
+# adopted no specification bases. The precedent is 2026-08-02, when Tier B arrived with 406 tests
+# and 24 known failures.
 #
-# Tier D adopts all six OwnedNavigations bases: 135 tests, 104 passing, 31 red.
+# TIER D IS 230 TESTS IN TWO HALVES, AND THE FAILURE LIST HAS TO BE READ THAT WAY.
+#   136 run EF's six OwnedNavigations bases over the wire            -> 14 red
+#    94 run the SAME bases with InfoCarrier REMOVED (the `Direct*`
+#       classes: plain EF Core on the same embedded MongoDB)         -> 40 red
 #
-# WHEN AN OVERRIDE IS ALLOWED HERE, AND WHY ONLY 4 METHODS QUALIFIED. A red has to say something
-# about THIS provider. If the backing store refuses a query then this provider cannot answer it
-# either, so the red restates the obvious and is noise. That argument is only as good as the
-# evidence the store really does refuse it, and the evidence must be the STORE'S OWN: a citation to
-# its suite declaring the feature unsupported. Without one, "the store cannot do this" is our
-# assertion about somebody else's code, and the test stays red.
+# THE CONTROL'S 40 REDS ARE THE POINT, NOT NOISE. They are what MongoDB cannot do, measured rather
+# than asserted, and they are the citation behind every override on the wire side. A control whose
+# result is hidden is an assertion; one whose result is in the failure list is a measurement.
 #
-# THE FOUR THAT CLEARED THE BAR (7 test cases), all citing
-# MongoDB.EntityFrameworkCore's FunctionalTests/Query/UnsupportedQueryTests.cs:
-#   - SelectMany over an owned collection, x3 methods x2 tracking arms. That file declares
-#     SelectMany over a non-primitive collection unsupported with the same
-#     InvalidOperationException, on an EMBEDDED array, which is our shape.
-#   - GroupBy inside a document. Declared there, and their NorthwindGroupByQueryMongoTest overrides
-#     ~200 tests against tracked issue EF-149 asserting the same ExpressionNotSupportedException.
+# WHEN A TEST MAY BE OVERRIDDEN HERE. A red has to say something about THIS provider. If the store
+# refuses a query then this provider cannot answer it either, so the red restates the obvious. That
+# argument is only as good as the evidence the store really does refuse, so every override is listed
+# in test/tier-d-overrides.txt with a citation, and eng/tier-d-control.py gates the list BOTH ways:
+# an override the control PASSES is a real failure hidden behind a citation, and a control failure on
+# a test the wire passes means the control is misconfigured. That second direction exists because the
+# control is a conflict of interest -- the worse it is wired, the more it fails, and the more of this
+# tier's reds are attributed to the store rather than to us.
 #
-# WHY SO FEW, AND THIS IS THE FINDING RATHER THAN THE FOOTNOTE. Their SPECIFICATION suite maps
-# Northwind as separate COLLECTIONS and contains no owned or embedded collection anywhere. So its
-# tracked issues -- EF-X001 "subquery selection", EF-216 cross-document navigation, EF-X020
-# cross-collection joins -- are about $lookup joins and are NOT evidence about nested documents.
-# Matching on an operator NAME would be a false match: SelectMany across collections is a join,
-# SelectMany within a document is an $unwind. A first pass did exactly that and would have
-# suppressed 29 tests on citations that do not cover their shape.
+# 24 OVERRIDES, IN THREE CLASSES OF EVIDENCE, AND THE WEAKER ONES SAY SO.
+#   7  UPSTREAM. MongoDB.EntityFrameworkCore's own FunctionalTests/Query/UnsupportedQueryTests.cs
+#      declares SelectMany over a non-primitive collection unsupported, on an EMBEDDED array, and
+#      declares GroupBy unsupported -- the latter also carrying their tracked issue EF-149 and ~200
+#      overrides in NorthwindGroupByQueryMongoTest.
+#  13  CONTROL. Our own wire-free run reproduces the identical refusal. Upstream is silent on these
+#      shapes: their specification suite maps Northwind as separate COLLECTIONS and exercises no
+#      owned collection anywhere, so EF-X001 "subquery selection", EF-216 and EF-X020 describe
+#      $lookup joins and are not evidence about a nested document. Matching on an operator NAME
+#      would be a false match -- SelectMany across collections is a join, SelectMany within a
+#      document is an $unwind -- and a first pass did exactly that.
+#   4  REWRITTEN rather than suppressed. EF's base already catches the store's outcome and compares
+#      it, so what escapes is xUnit's own assertion failure; asserting THAT would stay green whether
+#      the store refused, answered rightly or answered wrongly. Each asserts the real outcome
+#      instead, including two where this store ANSWERS a query EF's base expects it to refuse
+#      (EF #36400) and the answer is correct.
 #
-# SO TIER D IS MEASURING NESTED-DOCUMENT QUERY SUPPORT THAT THE STORE'S OWN SPECIFICATION SUITE HAS
-# NEVER MEASURED. That is the strongest result #51 has produced. Several of the 31 are plausibly
-# unimplemented rather than impossible.
+# NINE MORE COULD HAVE BEEN OVERRIDDEN AND WERE LEFT RED, WHICH IS THE SAME REASONING IN THE OTHER
+# DIRECTION. They are mostly TrackAll arms where the base catches the exception and compares its
+# message. There is no real outcome to assert because the query never runs, so an override would
+# watch nothing. A baseline name-diff is the stronger signal.
 #
-# THE 31, AND NONE IS THIS REPOSITORY'S. OwnedNavigationsServerSideControlTest runs the shapes
-# directly against the server's own DbContext and reproduces them with the wire removed.
-#   - 6  Concat over an owned collection. Upstream declares Except and Intersect unsupported, NOT
-#        Concat, so there is no citation and these stay red.
-#   - 6  subquery FirstOrDefault in a projection. EF-X001 is cross-collection; no citation.
-#   - 7  structural equality over owned entities. Untested upstream in any shape.
-#   - 3  Distinct over an owned collection. Untested upstream.
-#   - 2  Select_unmapped_associate_scalar_property.
-#   - 1  Distinct_over_projected_filtered_nested_collection: returns 3 roots where 5 are correct. A
-#        SILENT WRONG ANSWER in somebody else's provider, unreported. docs/upstream-defects.md.
-#   - 4  NullReferenceException projecting through a null optional associate. A crash, not a
-#        refusal: a store that means "no" says so. Candidate upstream defect.
-#   - 1  "Field 'OptionalAssociate' required but not present in BsonDocument". Also a crash, and
-#        their own OwnedEntityTests projects owned collections successfully, so this is not a
-#        declared limit.
-#   - 1  "An item with the same key has already been added. Key: o0" -- an alias collision inside
-#        their translator's own subquery naming. Candidate upstream defect.
+# THE 14 TIER D REDS, AND NOT ONE IS THIS REPOSITORY'S. The control reproduces every one with the
+# wire removed, and the gate proves there is no failure in the other direction.
+#   5  crashes rather than refusals -- four NullReferenceException projecting through a null optional
+#      associate, and "Field 'OptionalAssociate' required but not present in BsonDocument". A store
+#      that means "no" says so. Candidate upstream defects.
+#   1  Distinct_over_projected_filtered_nested_collection returns 3 roots where 5 are correct. A
+#      SILENT WRONG ANSWER in somebody else's provider, unreported.
+#   1  "An item with the same key has already been added. Key: o0" -- an alias collision inside the
+#      store's own subquery naming. Candidate upstream defect.
+#   1  Over_different_collection_properties: "The argument to $size must be an array".
+#   6  TrackAll arms and one Distinct arm whose failure is the base's own assertion (see above).
+#
+# AND THE CONTROL FOUND NO DEFECT IN THIS PROVIDER, WHICH IS A CLAIM WITH A LIMIT WORTH STATING.
+# Zero tests fail over the wire that pass without it. But the control is blind wherever the store
+# refuses: it cannot say whether this provider would have carried those queries correctly had the
+# store supported them. Those reds mean "we cannot tell", not "this provider is fine". What the
+# control did find is two CAPABILITY GAINS -- Select_untranslatable_method_on_associate_scalar_property
+# fails on raw MongoDB and passes over the wire, because the projection split evaluates the
+# untranslatable method on the client. ProjectionPayloadTest checks that is a real push-down and not
+# whole documents crossing behind a green test.
 
-failed=50
-total=29693
+failed=73
+total=29788

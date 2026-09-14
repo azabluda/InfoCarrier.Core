@@ -1,0 +1,59 @@
+# ADR-009 TIER D: every specification test this tier OVERRIDES, and the citation for each.
+#
+# A test listed here is green because we assert what the store does, not because the query works.
+# The list is data rather than prose so that eng/tier-d-control.py can check it BOTH WAYS:
+#
+#   1. A test here that the wire-free control PASSES is a suppression of something the store can
+#      actually do. That is the worst failure this tier can have and the gate refuses it.
+#   2. A test the control fails while Tier D passes must be here, or be a named capability gain in
+#      test/tier-d-control-allowances.txt. Otherwise the control is misconfigured, or a red is
+#      being hidden.
+#
+# THE CITATION IS THE POINT. "The store cannot do this" is our assertion about somebody else's code
+# unless the store's own suite says so. Upstream citations are first-best evidence; the wire-free
+# control is second-best, because we wrote it and it is a conflict of interest.
+#
+# Format:  <Family>.<Method>(<theory args>)   # citation
+
+Collection.GroupBy   # UPSTREAM: MongoDB.EntityFrameworkCore FunctionalTests/Query/UnsupportedQueryTests.cs declares GroupBy unsupported; NorthwindGroupByQueryMongoTest overrides ~200 tests against tracked issue EF-149 asserting the same ExpressionNotSupportedException.
+Projection.SelectMany_associate_collection(queryTrackingBehavior: NoTracking)   # UPSTREAM: UnsupportedQueryTests.cs declares SelectMany over a non-primitive collection unsupported, with the same InvalidOperationException, on an EMBEDDED array.
+Projection.SelectMany_associate_collection(queryTrackingBehavior: TrackAll)   # UPSTREAM: as above. The store refuses before EF reaches its own tracking rule, so the base's EqualException is what escapes.
+Projection.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior: NoTracking)   # UPSTREAM: as above.
+Projection.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior: TrackAll)   # UPSTREAM: as above.
+Projection.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior: NoTracking)   # UPSTREAM: as above.
+Projection.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior: TrackAll)   # UPSTREAM: as above.
+
+# --- CITED TO THIS REPOSITORY'S OWN CONTROL, WHICH IS WEAKER EVIDENCE AND IS MARKED AS SUCH. ----
+# Upstream says nothing about these shapes: MongoDB.EntityFrameworkCore's specification suite maps
+# Northwind as separate COLLECTIONS and exercises no owned collection anywhere, so EF-X001 and the
+# rest are about cross-collection joins. The evidence here is OwnedNavigationsDirectStoreFixture
+# reproducing the identical refusal with the wire removed, which eng/tier-d-control.py verifies.
+#
+# ONLY CLEAN REFUSALS ARE HERE. Where the store CRASHES (NullReferenceException, a missing
+# BsonDocument field, an alias collision) or answers WRONGLY, the test stays red: a store that means
+# "no" says so, and suppressing a crash buries somebody's defect.
+
+Collection.Distinct_projected(queryTrackingBehavior: NoTracking)   # CONTROL: ArgumentException, 'List<AssociateType>' cannot be used for an IQueryable parameter of Distinct. TrackAll arm stays red.
+Projection.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior: NoTracking)   # CONTROL: InvalidOperationException, could not be translated. TrackAll arm stays red.
+Projection.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior: NoTracking)   # CONTROL: as above.
+Projection.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior: NoTracking)   # CONTROL: as above.
+Projection.Select_unmapped_associate_scalar_property(queryTrackingBehavior: NoTracking)   # CONTROL: ExpressionNotSupportedException from the driver. TrackAll arm stays red.
+Projection.Select_required_associate_via_optional_navigation(queryTrackingBehavior: TrackAll)   # CONTROL: EF's own rule about tracking an owned entity without its owner stops the query. The NoTracking arm is a NullReferenceException and stays red.
+SetOperations.Over_associate_collection_projected(queryTrackingBehavior: NoTracking)   # CONTROL: InvalidOperationException. Concat over an owned collection; upstream declares Except/Intersect only, and for cross-collection shapes.
+SetOperations.Over_associate_collection_projected(queryTrackingBehavior: TrackAll)   # CONTROL: as above.
+SetOperations.Over_assocate_collection_Select_nested_with_aggregates_projected(queryTrackingBehavior: NoTracking)   # CONTROL: as above.
+SetOperations.Over_assocate_collection_Select_nested_with_aggregates_projected(queryTrackingBehavior: TrackAll)   # CONTROL: as above.
+StructuralEquality.Two_associates   # CONTROL: ExpressionNotSupportedException. Whole-entity comparison of owned types is untested upstream in any shape.
+StructuralEquality.Two_nested_associates   # CONTROL: as above.
+StructuralEquality.Not_equals   # CONTROL: as above.
+
+# --- REWRITTEN RATHER THAN SUPPRESSED. --------------------------------------------------------
+# These four do not assert "something failed". EF's base already catches the store's outcome and
+# compares it, so the failure that escapes is xUnit's own and catching THAT would stay green
+# whether the store refused, answered rightly, or answered wrongly. Each is rewritten to assert the
+# real outcome, so it goes red the day the store changes.
+
+StructuralEquality.Nested_associate_with_inline   # CONTROL: EF's base expects a refusal (EF #36400); this store ANSWERS and the answer is correct. Asserts the one row the seed implies.
+StructuralEquality.Nested_associate_with_parameter   # CONTROL: as above, through a captured variable.
+StructuralEquality.Nested_collection_with_inline   # CONTROL: the store refuses a whole-collection comparison with NotSupportedException, where EF's base expects InvalidOperationException. Asserts the store's own exception.
+StructuralEquality.Nested_collection_with_parameter   # CONTROL: as above.

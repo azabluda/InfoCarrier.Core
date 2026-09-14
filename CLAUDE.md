@@ -97,7 +97,11 @@ measurement.
 **TIER D IS AN EMBEDDED MONGODB SINCE 2026-09-10, IN A PROJECT OF ITS OWN
 (`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS SPEC BASES SINCE 2026-09-14.** This
 paragraph read *"AND IT ADOPTS NO SPEC BASES"* until then, and it adopts the whole
-`OwnedNavigations` family — six classes, **132 tests of which 38 are RED**. **The reason that
+`OwnedNavigations` family. **The tier is 230 tests in two halves and the failure list has to be read
+that way**: 136 run the six bases over the wire (14 red), and 94 run the SAME bases with InfoCarrier
+REMOVED — the `Direct*` classes, plain EF Core on the same embedded MongoDB (40 red). **The
+control's reds are the point rather than noise**: they are what MongoDB cannot do, measured rather
+than asserted, and they are the citation behind every override on the wire side. **The reason that
 sentence was written is unchanged and is what still governs which bases come here**: this tier
 exists to prove a negative that no relational tier can, that this provider is not relational-only
 (#51), and a compliance test demanding every base be adopted against a document store would misread
@@ -118,6 +122,25 @@ baseline and not one per project, and Tier D is the case that argues for it rath
 `OwnedNavigationsCollectionTestBase` is adopted in Tier B *and* Tier D today, so a decision to host
 that family on one tier alone would MOVE tests between projects — exactly the "fix in one, break in
 the other" a single baseline exists to catch.
+
+**A RED MUST SAY SOMETHING ABOUT THIS PROVIDER, WHICH IS WHAT "a red test is information" MEANS.**
+If the backing store refuses a query then this provider cannot answer it either, so the red restates
+the obvious and is noise in the failure list. **That argument is only as good as the evidence the
+store really does refuse**, so every Tier D override is listed in `test/tier-d-overrides.txt` with a
+citation and gated by `eng/tier-d-control.py`. Three classes of evidence, and the weaker ones say so:
+**UPSTREAM** (MongoDB's own suite declares the feature unsupported — 7), **CONTROL** (our wire-free
+run reproduces the refusal — 13), and **REWRITTEN** (EF's base has already caught the outcome, so
+the test asserts the real result instead of the assertion failure — 4). **A crash or a wrong answer
+is never overridden**: a store that means "no" says so, and suppressing a crash buries somebody's
+defect.
+
+**AND THE CONTROL IS A CONFLICT OF INTEREST, WHICH IS WHY IT IS GATED RATHER THAN TRUSTED.** A
+worse-wired control fails more, so more of this tier's reds are attributed to the store and this
+provider looks cleaner; no bad intent is needed and the failure mode is silent. `tier-d-control.py`
+checks both directions and has fired on three real mistakes. **Nine reds that COULD have been
+overridden were left red** on the same reasoning read backwards: their failure is the base's own
+assertion, so an override would watch nothing and stay green even if the store began returning wrong
+rows.
 
 **AN OVERRIDE HERE IS LEGITIMATE ONLY IF IT ADOPTS ONE THE REFERENCE PROVIDER ALREADY SHIPS**, which
 is the same rule this file states for SQLite, and it must cite it. MongoDB's own `MongoComplianceTest`
@@ -169,6 +192,7 @@ estimate a count, and never derive one figure from the others.
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
 | `eng/ratchet.sh <results.trx> [more.trx ...] <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. **It gates on the failing test NAMES as well**, read by `eng/trx-failures.py` and diffed against `test/known-failures.names.txt`: a change that fixes four tests and breaks four others leaves the count untouched. It publishes that delta to `$GITHUB_STEP_SUMMARY`, which the test report action cannot do because it does not know the baseline. **It takes several TRX and the LAST argument is the baseline**: counters are summed and names unioned into one list, gated against the one baseline pair. One baseline and not one per project, because a test that MOVES between projects would otherwise read as a fix in one and a break in the other. |
 | `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. What `test/known-failures.names.txt` holds and what `ratchet.sh` diffs. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
+| `eng/tier-d-control.py <results.trx>` | **Gates the integrity of ADR-009 Tier D's wire-free control**, and CI runs it before the ratchet. Tier D overrides a specification test when the same base fails with InfoCarrier REMOVED, and that evidence is generated by this repository about its own product: **a worse-wired control fails more, so more of Tier D's reds are attributed to the store and this provider looks cleaner.** No bad intent is needed and the failure mode is silent, because a misconfigured control looks exactly like a less capable store. It checks BOTH directions against `test/tier-d-overrides.txt` and `test/tier-d-control-allowances.txt`: the control may not fail what Tier D passes (it is misconfigured, or a red is being hidden), and it may not PASS what Tier D overrides (a real failure wearing a citation). It has fired on three real mistakes so far. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
@@ -503,8 +527,9 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 57  TOTAL: 29693`** (2026-09-14, `tierd-joins`), across the two projects `measure.sh`
-now runs: **19 of 29558** in the spec project and **38 of 135** in ADR-009 Tier D. This line read
+**`FAILING: 73  TOTAL: 29788`** (2026-09-14), across the two projects `measure.sh` now runs:
+**19 of 29558** in the spec project and **54 of 230** in ADR-009 Tier D — of which 14 are the wire's
+and 40 are its wire-free control's. This line read
 `Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238` (2026-09-07, `v12`) until then, and
 was three measurements stale — the badge had moved to 29,558 while it still said 29,516.
 **Tiers A-C are unmoved at 19**; the whole rise is Tier D joining the baseline, and the name diff

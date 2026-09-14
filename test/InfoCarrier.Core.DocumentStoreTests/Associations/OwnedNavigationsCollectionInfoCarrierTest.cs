@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
 using Xunit;
 
@@ -78,4 +79,30 @@ public class OwnedNavigationsCollectionInfoCarrierTest(OwnedNavigationsInfoCarri
 
         Assert.Equal("ExpressionNotSupportedException", thrown.GetType().Name);
     }
+
+    /// <summary>
+    ///     <c>Distinct</c> over a projected owned collection: the store's own translator refuses it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>CITED TO THE CONTROL, NOT UPSTREAM.</b> <c>Distinct</c> over an owned collection
+    ///         appears nowhere in <c>MongoDB.EntityFrameworkCore</c>'s tests, so the only evidence
+    ///         is our own: the wire-free control raises the identical <c>ArgumentException</c> —
+    ///         <c>Expression of type 'List&lt;AssociateType&gt;' cannot be used for parameter of
+    ///         type 'IQueryable&lt;AssociateType&gt;' of method 'Distinct'</c> — with InfoCarrier
+    ///         out of the picture.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only the untracked arm.</b> Under <c>TrackAll</c> the base has already caught the
+    ///         exception and is asserting its type, so what escapes is xUnit's assertion failure
+    ///         rather than the store's refusal; overriding that would assert nothing worth having.
+    ///         That arm stays red.
+    ///     </para>
+    /// </remarks>
+    public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? base.Distinct_projected(queryTrackingBehavior)
+            : StoreBehaviour.Refuses(
+                () => base.Distinct_projected(queryTrackingBehavior),
+                nameof(ArgumentException));
 }
