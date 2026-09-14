@@ -253,12 +253,52 @@ translate. Those two tests pass over the wire and fail without it — the only s
 recorded in `test/tier-d-control-allowances.txt`. `ProjectionPayloadTest` proves it is a genuine
 push-down rather than whole documents crossing behind a green test.
 
-**WHERE THESE GO IF THEY ARE REPORTED.** Not GitHub: issues are disabled on
-`mongodb/mongo-efcore-provider`. Their `CONTRIBUTING.md` sends bugs to the **Jira `EF` project**
-(<https://jira.mongodb.org/projects/EF/issues/>), which is where the `EF-149` and `EF-X001` numbers
-their own suite cites come from. **Search there before filing**: none of the five above has been
-checked against their tracker, and this file's whole reason for existing is that a diagnosis is not a
-report.
+### Their tracker, searched 2026-09-14, and what it changes
+
+**Not GitHub: issues are disabled on `mongodb/mongo-efcore-provider`.** Their `CONTRIBUTING.md` sends
+bugs to the **Jira `EF` project** (<https://jira.mongodb.org/projects/EF/issues/>), which is public
+and readable through its REST API without credentials. 427 issues at the time of searching.
+
+**NOTHING ABOVE HAS BEEN FILED AND NOTHING WILL BE WITHOUT THE OWNER ASKING.** What follows is a
+search result, not a report.
+
+**`EF-X001` AND ITS SIBLINGS ARE NOT ISSUE NUMBERS.** `EF-430` — *"Replace the EF-X001-EF-X020
+placeholder keys in spec-test Fails tags with real JIRA issues"* — says they are placeholders their
+own suite is still carrying. So the `EF-X001 "subquery selection"` tag that appears throughout
+`NorthwindSelectQueryMongoTest` cites nothing, and a Tier D override must not cite it either.
+
+**THE PROVIDER IS BEING REBUILT UNDERNEATH ALL OF THIS.** `EF-322`, *"Native LINQ query provider
+(ground-up rebuild)"*, is In Progress, and the issues around it run to `EF-453`. Several entries
+above may be answered wholesale rather than one at a time, which is a reason to re-measure this tier
+against each release rather than to price a route around any of them.
+
+| Ours | Closest on their tracker | State |
+|---|---|---|
+| 1.6 null optional owned reference | `EF-358` *a missing or explicitly-null embedded array materializes as null instead of an empty collection* | In Code Review |
+| 1.7 `Distinct` returns 3 of 5 | **nothing found** | — |
+| 1.8 alias collision `Key: o0` | `EF-357` *bare embedded-collection `.Count` projection throws `ArgumentException`* | In Code Review |
+| 1.9 `$size` on a non-array | `EF-359` *filtered `Count(pred)` in a projection throws `InvalidOperationException`* — and its quoted message is the same `The LINQ expression 'o' could not be translated` four of our reds carry | In Code Review |
+| 1.10 client-evaluable projection refused | `EF-250` *allow client evaluation in the final projection* | **Closed, Fixed** |
+
+**1.10 IS THE ONE WORTH READING TWICE.** `EF-250` is marked fixed in provider versions `10.0.3`,
+`9.1.3` and `8.4.3` — **and this tier measures `10.0.3`, the latest published.** So either the fix
+does not reach this shape or it regressed. Their example is an instance method on a mapped scalar
+(`string.ToArray`); ours is a user static method wrapping a property reached THROUGH an owned
+reference, `UntranslatableMethod(e.RequiredAssociate.Int)`. The owned hop is the plausible
+difference and it is **not measured** — establishing it means running the same method against a
+mapped scalar with no hop, which is one test.
+
+**1.7 IS THE ONE NOBODY APPEARS TO HAVE.** No issue in 427 matches a `Distinct` over a projected
+filtered nested collection returning the wrong rows. They clearly do care about the class of defect
+— `EF-356`, `EF-366` and `EF-367` are all silent-wrong-data issues, and `EF-367` is theirs finding
+exactly what this repository found on 2026-09-14: *"Include specification suites mask wrong-data
+failures behind a bare-catch AssertTranslationFailed"*. **An override that swallows a wrong answer is
+a mistake both projects made independently**, which is the strongest argument yet for the rule that a
+crash or a wrong answer is never overridden here.
+
+**The matches above are CLOSEST, not CONFIRMED.** None was verified by reading their fix or
+reproducing their exact shape, so no entry has moved to §2. Doing that verification is the work that
+would turn any of these into a report, and it is the owner's call whether it is worth it.
 
 ## 2. Already reported
 
