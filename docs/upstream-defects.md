@@ -237,11 +237,31 @@ with a REQUIRED second operand first.
 
 **Site.** Not located; see 1.6.
 
-**Symptom.** `Select(e => UntranslatableMethod(e.RequiredAssociate.Int))` raises
-`ExpressionNotSupportedException: Expression not supported: UntranslatableMethod(Field(r, "RequiredAssociate", …).Int)`.
-EF Core evaluates an untranslatable FINAL projection on the client rather than refusing it, and EF's
-Cosmos provider does exactly that for this test — emitting `SELECT VALUE c["RequiredAssociate"]["Int"]`
-and applying the method afterwards. This provider tries to translate the method itself.
+**Symptom.** A **user-defined static** method in the final projection is refused:
+`Select(c => Scramble(c.Name))` raises `ExpressionNotSupportedException: Expression not supported:
+Scramble(c.Name)`. EF Core evaluates an untranslatable final projection on the client rather than
+refusing it, and EF's Cosmos provider does exactly that.
+
+**NARROWED BY MEASUREMENT, AND THE FIRST HYPOTHESIS WAS WRONG.** This entry first said the trigger
+was the OWNED-REFERENCE HOP, because Tier D only ever meets the shape as
+`UntranslatableMethod(e.RequiredAssociate.Int)`. `ClientEvaluatedProjectionTest` settles it with
+three assertions on one row:
+
+| Projection | Result |
+|---|---|
+| `c.Name.ToArray()` — a BCL **instance** method, and `EF-250`'s own example | **evaluated on the client, query succeeds** |
+| `Scramble(c.Name)` — a user **static** method, no hop | **refused** |
+| `Scramble(c.Address.Postcode)` — a user **static** method, owned hop | **refused** |
+
+**So the hop is ruled out and the kind of method is the trigger.** The middle row is what does it:
+same value, same row, no owned reference anywhere, still refused.
+
+**AND THEIR FIX IS REAL — IT IS THE TITLE THAT IS BROADER THAN THE BEHAVIOUR.** `EF-250`, *"Allow
+client evaluation in the final projection"*, is Closed / Fixed in provider `10.0.3`, `9.1.3` and
+`8.4.3`. This tier measures **`10.0.3`**, and the shape the issue used passes. What does not reach is
+a user-defined static method. There is no setting that would change it: `10.0.3` exposes no
+query-mode option, checked by inspecting the shipped assembly rather than assumed — `MongoQueryMode`
+appears in their tracker and not in the package, so it belongs to the `EF-322` rebuild.
 
 **Evidence.** `DirectProjectionTest.Select_untranslatable_method_on_associate_scalar_property`, both
 tracking arms.
@@ -258,6 +278,12 @@ push-down rather than whole documents crossing behind a green test.
 **Not GitHub: issues are disabled on `mongodb/mongo-efcore-provider`.** Their `CONTRIBUTING.md` sends
 bugs to the **Jira `EF` project** (<https://jira.mongodb.org/projects/EF/issues/>), which is public
 and readable through its REST API without credentials. 427 issues at the time of searching.
+
+**That it is the right project was verified rather than inferred from the link.** Project `EF` is
+named *"Entity Framework"* on MongoDB's own Jira, and its version list is the decisive part: `10.0.3`,
+`9.1.3` and `8.4.3` published, `10.0.4`, `9.1.4` and `8.4.4` still open — **exactly the provider's
+three NuGet release lines**, and exactly the `fixVersions` set on `EF-250`. A newer provider is
+therefore already in preparation, which is where the three In Code Review entries below would land.
 
 **NOTHING ABOVE HAS BEEN FILED AND NOTHING WILL BE WITHOUT THE OWNER ASKING.** What follows is a
 search result, not a report.
@@ -278,15 +304,14 @@ against each release rather than to price a route around any of them.
 | 1.7 `Distinct` returns 3 of 5 | **nothing found** | — |
 | 1.8 alias collision `Key: o0` | `EF-357` *bare embedded-collection `.Count` projection throws `ArgumentException`* | In Code Review |
 | 1.9 `$size` on a non-array | `EF-359` *filtered `Count(pred)` in a projection throws `InvalidOperationException`* — and its quoted message is the same `The LINQ expression 'o' could not be translated` four of our reds carry | In Code Review |
-| 1.10 client-evaluable projection refused | `EF-250` *allow client evaluation in the final projection* | **Closed, Fixed** |
+| 1.10 client-evaluable projection refused | `EF-250` *allow client evaluation in the final projection* | **Closed, Fixed in 10.0.3 — and 10.0.3 still refuses a user static method.** See 1.10. |
 
-**1.10 IS THE ONE WORTH READING TWICE.** `EF-250` is marked fixed in provider versions `10.0.3`,
-`9.1.3` and `8.4.3` — **and this tier measures `10.0.3`, the latest published.** So either the fix
-does not reach this shape or it regressed. Their example is an instance method on a mapped scalar
-(`string.ToArray`); ours is a user static method wrapping a property reached THROUGH an owned
-reference, `UntranslatableMethod(e.RequiredAssociate.Int)`. The owned hop is the plausible
-difference and it is **not measured** — establishing it means running the same method against a
-mapped scalar with no hop, which is one test.
+**1.10 WAS THE ONE WORTH READING TWICE, AND IT HAS NOW BEEN MEASURED.** The paragraph here guessed
+that the owned-reference hop was the trigger and said so as a hypothesis. It is not: a user static
+method over a plain root scalar is refused just the same, while `EF-250`'s own instance-method
+example passes on the same version. **The kind of method is the trigger and the hop is irrelevant.**
+Three assertions in `ClientEvaluatedProjectionTest` cost less than the paragraph that guessed, and
+the guess was wrong — which is the argument for writing the test rather than the sentence.
 
 **1.7 IS THE ONE NOBODY APPEARS TO HAVE.** No issue in 427 matches a `Distinct` over a projected
 filtered nested collection returning the wrong rows. They clearly do care about the class of defect

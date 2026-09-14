@@ -4315,14 +4315,15 @@
 # those steps. 29552 + 6 happens to be the answer, and deriving it would still have been the wrong
 # method, because this file has carried a figure got by arithmetic before.
 
-# 2026-09-14 — ADR-009 TIER D JOINS THIS BASELINE. total 29558 -> 29788, failed 19 -> 73. Neither
+# 2026-09-14 — ADR-009 TIER D JOINS THIS BASELINE. total 29558 -> 29791, failed 19 -> 73. Neither
 # rise is a regression. Tiers A-C are UNMOVED at 19 of 29558; the whole movement is Tier D becoming
 # measured by eng/measure.sh and ratcheted by CI, having been gated as a bare `dotnet test` while it
 # adopted no specification bases. The precedent is 2026-08-02, when Tier B arrived with 406 tests
 # and 24 known failures.
 #
 # TIER D IS 230 TESTS IN TWO HALVES, AND THE FAILURE LIST HAS TO BE READ THAT WAY.
-#   136 run EF's six OwnedNavigations bases over the wire            -> 14 red
+#   139 run EF's six OwnedNavigations bases over the wire, plus this
+#       tier's own hand-written classes                              -> 14 red
 #    94 run the SAME bases with InfoCarrier REMOVED (the `Direct*`
 #       classes: plain EF Core on the same embedded MongoDB)         -> 40 red
 #
@@ -4383,4 +4384,4 @@
 # whole documents crossing behind a green test.
 
 failed=73
-total=29788
+total=29791
