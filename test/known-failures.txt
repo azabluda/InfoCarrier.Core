@@ -4383,5 +4383,18 @@
 # untranslatable method on the client. ProjectionPayloadTest checks that is a real push-down and not
 # whole documents crossing behind a green test.
 
-failed=73
+# 2026-09-15 - THE CONTROL NOW DOCUMENTS THE STORE INSTEAD OF FAILING. failed 73 -> 48, total
+# unchanged at 29791. 25 of the control's 40 failures are overridden to assert what MongoDB does,
+# each carrying a label from docs/plans/v10/test-overhaul.md: LIMIT for a store design limit,
+# DEFECT for a crash or a wrong answer, ISSUE for an entry on their own tracker. A control that
+# asserts the exception says what happened; a bare failure says only that something did not work.
+#
+# THE REMAINING 15 CONTROL FAILURES NEED A HAND-WRITTEN QUERY EACH. They fail inside the
+# specification base's own assertion rather than raising the store's exception, so there is no
+# exception to name. Asserting "the base's assertion failed" would stay green even if the store
+# began returning wrong rows, so they stay red until somebody writes the query out.
+#
+# Tier D is now 233 tests, 204 passing, 29 red: 14 on the wire and 15 in the control.
+
+failed=48
 total=29791

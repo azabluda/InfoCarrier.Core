@@ -27,21 +27,28 @@ a query the raw store cannot, which is a capability gain rather than a control d
 
 Sloppiness in the control now breaks the build instead of flattering the product.
 
-IT CHECKS BOTH DIRECTIONS, AND THE SECOND ONE MATTERS MORE.
+THE CONTROL DOCUMENTS THE STORE, SO IT MUST BE GREEN.
 
-    1. The control fails a test Tier D passes. Either the control is misconfigured, or this
-       provider genuinely answers what the raw store cannot -- a capability gain, named in
-       test/tier-d-control-allowances.txt with its reason.
+Until 2026-09-15 the control simply ran and failed, and this script compared raw outcomes. The
+control now OVERRIDES each failure to assert what MongoDB actually does, so it is green by design
+and a raw comparison says nothing. The protection moved rather than disappeared:
 
-    2. The control PASSES a test Tier D overrides. That is a suppression of something the store can
-       actually do, which is the worst failure this tier can have: a real defect wearing a citation.
-       test/tier-d-overrides.txt is the manifest of what is suppressed and why.
+    the control asserts "the store refuses this with exception X".
+    If the store stops refusing, THAT ASSERTION FAILS and the control goes red.
 
-The override manifest is deliberately NOT part of the allowance list. Allowances are claims that
-this provider beats the store; overrides are claims that the store cannot do something. Keeping them
-in one file would let the gate weaken itself every time something new was suppressed.
+So "we suppressed something the store can actually do" is now caught by the control test itself,
+which is a stronger place for it than this script: the assertion names the exception, and a raw
+outcome comparison never could.
 
-Usage:  eng/tier-d-control.py <results.trx> [allowances-file] [overrides-file]
+    1. A control test that FAILS must be named in test/tier-d-control-pending.txt. That file is the
+       list of control tests nobody has written a real assertion for yet. It must shrink and must
+       never grow. Any other control failure means the store's behaviour changed, and every override
+       that cites it has to be read again.
+
+    2. Every override in test/tier-d-overrides.txt must have a control test present in the run. An
+       override whose control is missing cites evidence that does not exist.
+
+Usage:  eng/tier-d-control.py <results.trx> [overrides-file] [pending-file]
 
 Exit 1 on either violation.
 """
@@ -109,26 +116,25 @@ def main(argv):
         return 2
 
     trx = argv[1]
-    allowances_path = argv[2] if len(argv) > 2 else "test/tier-d-control-allowances.txt"
-    overrides_path = argv[3] if len(argv) > 3 else "test/tier-d-overrides.txt"
+    overrides_path = argv[2] if len(argv) > 2 else "test/tier-d-overrides.txt"
+    pending_path = argv[3] if len(argv) > 3 else "test/tier-d-control-pending.txt"
 
     if not os.path.exists(trx):
         print(f"tier-d-control: no TRX at '{trx}'.", file=sys.stderr)
         return 1
 
     results = outcomes(trx)
-    allowed = read_allowances(allowances_path)
     overridden = read_allowances(overrides_path)
+    pending = read_allowances(pending_path)
 
     # Index by (class, method-with-args).
     indexed = {}
     for (cls, test_name), outcome in results.items():
         indexed[(cls, method_of(test_name))] = outcome
 
-    violations = []
-    suppressed_but_supported = []
-    used_allowances = set()
-    used_overrides = set()
+    unexpected_control_failures = []
+    missing_controls = []
+    used_pending = set()
     paired = 0
 
     for family, (control_cls, wire_cls) in FAMILIES.items():
@@ -140,84 +146,67 @@ def main(argv):
                 file=sys.stderr,
             )
             return 1
+
         for method in sorted(methods):
-            wire = indexed.get((wire_cls, method))
-            if wire is None:
-                continue
-            paired += 1
-            control = indexed[(control_cls, method)]
             key = f"{family}.{method}"
+            control = indexed[(control_cls, method)]
 
-            if key in overridden:
-                used_overrides.add(key)
-                # DIRECTION 2: we assert the store cannot do this, and the control just did it.
-                if control == "Passed":
-                    suppressed_but_supported.append(key)
-                continue
-
-            # DIRECTION 1: the control is weaker than the wire it is supposed to underpin.
-            if control == "Failed" and wire == "Passed":
-                if key in allowed:
-                    used_allowances.add(key)
+            # RULE 1: a control failure is only allowed while nobody has written its assertion.
+            if control == "Failed":
+                if key in pending:
+                    used_pending.add(key)
                 else:
-                    violations.append(key)
+                    unexpected_control_failures.append(key)
+
+            if indexed.get((wire_cls, method)) is not None:
+                paired += 1
+
+    # RULE 2: an override must cite a control that exists.
+    for key in sorted(overridden):
+        family, _, method = key.partition(".")
+        control_cls = FAMILIES.get(family, (None, None))[0]
+        if control_cls is None or (control_cls, method) not in indexed:
+            missing_controls.append(key)
 
     print(f"tier-d-control: {paired} paired tests across {len(FAMILIES)} families.")
+    print(f"tier-d-control: {len(overridden)} override(s), each citing a control test.")
 
-    stale = sorted(set(allowed) - used_allowances)
-    if stale:
-        # A stale allowance is a claim that stopped being true, and leaving it costs the next
-        # reader the same investigation. It is reported, not fatal: the direction that matters is
-        # a control failing MORE than it should.
-        print(f"tier-d-control: {len(stale)} allowance(s) no longer needed: {', '.join(stale)}")
-
-    if used_allowances:
-        print(f"tier-d-control: {len(used_allowances)} allowed capability gain(s): "
-              f"{', '.join(sorted(used_allowances))}")
-
-    stale_overrides = sorted(set(overridden) - used_overrides)
-    if stale_overrides:
-        print(f"tier-d-control: {len(stale_overrides)} override(s) in the manifest ran no test: "
-              f"{', '.join(stale_overrides)}", file=sys.stderr)
-        return 1
-
-    if used_overrides:
-        print(f"tier-d-control: {len(used_overrides)} override(s) checked against the control.")
-
-    if suppressed_but_supported:
-        print(file=sys.stderr)
+    stale_pending = sorted(set(pending) - used_pending)
+    if stale_pending:
         print(
-            "tier-d-control: A TEST IS OVERRIDDEN AS UNSUPPORTED AND THE STORE ANSWERS IT. That is "
-            "a real failure hidden behind a citation, and it is the worst outcome this tier has.",
+            f"tier-d-control: {len(stale_pending)} pending entr(y/ies) now pass. Remove them from "
+            f"{pending_path}: {', '.join(stale_pending)}",
             file=sys.stderr,
         )
-        for key in suppressed_but_supported:
+        return 1
+
+    if used_pending:
+        print(f"tier-d-control: {len(used_pending)} control test(s) still await a real assertion.")
+
+    if missing_controls:
+        print(file=sys.stderr)
+        print(
+            "tier-d-control: AN OVERRIDE CITES A CONTROL TEST THAT DID NOT RUN. The evidence for "
+            "the suppression does not exist.",
+            file=sys.stderr,
+        )
+        for key in missing_controls:
             print(f"  {key}", file=sys.stderr)
-        print(file=sys.stderr)
-        print("Delete the override and let the test run, or explain why the wire cannot do what "
-              "the store demonstrably can.", file=sys.stderr)
         return 1
 
-    if violations:
+    if unexpected_control_failures:
         print(file=sys.stderr)
         print(
-            "tier-d-control: THE CONTROL FAILED TESTS THAT TIER D PASSES, which is the direction "
-            "that biases every suppression built on it.",
+            "tier-d-control: A CONTROL TEST FAILED THAT IS NOT PENDING. The control asserts what "
+            "the store does, so a failure means the store now does something else. Every override "
+            "citing it must be read again.",
             file=sys.stderr,
         )
-        for key in violations:
+        for key in unexpected_control_failures:
             print(f"  {key}", file=sys.stderr)
-        print(file=sys.stderr)
-        print(
-            "Either the control is misconfigured -- check that it is given the SAME model, store "
-            "and options Tier D uses -- or this provider genuinely answers a query the raw store "
-            "cannot, in which case add the test to "
-            f"{allowances_path} with the reason.",
-            file=sys.stderr,
-        )
         return 1
 
-    print("tier-d-control: the control fails nothing Tier D passes.")
+    print("tier-d-control: the control documents the store, and every override cites it.")
     return 0
 
 

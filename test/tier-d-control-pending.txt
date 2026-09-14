@@ -1,0 +1,25 @@
+# ADR-009 TIER D: control tests that still fail, because nobody has written a real assertion yet.
+#
+# These fail INSIDE the specification base's own assertion rather than raising the store's
+# exception, so there is no exception to name. Asserting 'the base's assertion failed' would stay
+# green even if the store began returning wrong rows. Each needs its query written out by hand,
+# as the four rewritten structural-equality tests already are.
+#
+# THIS LIST MUST SHRINK AND MUST NEVER GROW. eng/tier-d-control.py fails the build on any control
+# failure that is not listed here, and also on an entry here that has started to pass.
+
+Collection.Distinct_over_projected_filtered_nested_collection
+Collection.Distinct_projected(queryTrackingBehavior: TrackAll)
+Projection.SelectMany_associate_collection(queryTrackingBehavior: TrackAll)
+Projection.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior: TrackAll)
+Projection.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior: TrackAll)
+Projection.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior: TrackAll)
+Projection.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior: TrackAll)
+Projection.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior: TrackAll)
+Projection.Select_unmapped_associate_scalar_property(queryTrackingBehavior: TrackAll)
+Projection.Select_value_type_property_on_null_associate_throws(queryTrackingBehavior: NoTracking)
+Projection.Select_value_type_property_on_null_associate_throws(queryTrackingBehavior: TrackAll)
+StructuralEquality.Nested_associate_with_inline
+StructuralEquality.Nested_associate_with_parameter
+StructuralEquality.Nested_collection_with_inline
+StructuralEquality.Nested_collection_with_parameter
