@@ -232,6 +232,22 @@ public partial class ServerParameterizationTest
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
 
     /// <summary>
+    ///     An inline collection the caller writes out of captured values.
+    /// </summary>
+    /// <remarks>
+    ///     EF's own client sends <c>new[] { first, second }.Contains(b.Id)</c> as
+    ///     <c>IN (@first, @second)</c>. Until 2026-09-15 each element crossed as a plain constant and
+    ///     reached the store as <c>IN (1, 3)</c>, a new statement for every pair of values. A parameter
+    ///     replaced by its literal values is a defect, whatever it buys; <c>Substitute</c> records
+    ///     what it bought.
+    /// </remarks>
+    [ConditionalFact]
+    public Task An_inline_collection_of_parameters_matches_the_direct_query()
+        => AssertSameStatement(
+            (First: 1, Second: 3),
+            static (blogs, ids) => blogs.Where(b => new[] { ids.First, ids.Second }.Contains(b.Id)));
+
+    /// <summary>
     ///     An entity compared as a whole, category 2 of issue #62.
     /// </summary>
     /// <remarks>

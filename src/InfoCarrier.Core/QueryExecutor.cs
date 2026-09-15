@@ -616,50 +616,6 @@ internal sealed class QueryExecutor<TElement>
                     ? Substitute(WithoutNullEntities(value, queryParameter.Type), queryParameter.Type)
                     : base.VisitExtension(node);
 
-        /// <summary>
-        ///     Whether the visit is inside an inline collection the caller wrote out — a
-        ///     <c>new[] { i, j }</c> or a <c>new List&lt;int&gt; { i, j }</c>.
-        /// </summary>
-        /// <remarks>
-        ///     <para>
-        ///         A scalar inside one stays a plain constant, and this is issue #59's one
-        ///         exception. Boxing makes every element an evaluatable member read, so EF's
-        ///         funcletizer folds the <em>whole array</em> into a single parameter and the
-        ///         inline-collection shape is gone. `Column_collection_equality_inline_collection_with_parameters`
-        ///         is the test that says so: `c.Ints == new[] { i, j }` then reaches SQL as a
-        ///         column compared to one array parameter, which nothing translates.
-        ///     </para>
-        ///     <para>
-        ///         This is §6's 2026-08-02 amendment seen from the other side. That one spelled a
-        ///         collection <em>out</em> so relational EF would recognise the shape; this one
-        ///         declines to take the shape apart for the same reason. EF keeps the shape for
-        ///         itself because its elements are real <c>QueryParameterExpression</c>s, which
-        ///         this side cannot produce — the client captures downstream of them (ADR-006).
-        ///     </para>
-        /// </remarks>
-        private bool _insideInlineCollection;
-
-        protected override Expression VisitNewArray(NewArrayExpression node)
-            => VisitInlineCollection(node, base.VisitNewArray);
-
-        protected override Expression VisitListInit(ListInitExpression node)
-            => VisitInlineCollection(node, base.VisitListInit);
-
-        private Expression VisitInlineCollection<TNode>(TNode node, Func<TNode, Expression> visit)
-            where TNode : Expression
-        {
-            bool outer = _insideInlineCollection;
-            _insideInlineCollection = true;
-            try
-            {
-                return visit(node);
-            }
-            finally
-            {
-                _insideInlineCollection = outer;
-            }
-        }
-
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (node.Method.DeclaringType != typeof(EF))
@@ -861,6 +817,19 @@ internal sealed class QueryExecutor<TElement>
             // `EF.Constant` is excluded one level up by `_insideEFCall`. So the box restores the
             // decision the wire discarded.
             //
+            // **A scalar inside an inline collection is boxed too, since 2026-09-15, and that reverses
+            // what this method called "issue #59's one exception".** Until then an
+            // `_insideInlineCollection` guard kept each element of a `new[] { i, j }` or a
+            // `new List<int> { i, j }` a plain constant, so that `c.Ints == new[] { i, j }` answered.
+            // The price was the store's plan: `new[] { i, j }.Contains(p.Id)` reached SQLite as
+            // `IN (2, 999)` with `[Parameters=[]]`, where EF's own client sends `IN (@i, @j)`,
+            // measured by logging the server's commands. A parameter replaced by its literal values is
+            // a defect (the owner, 2026-09-15), whatever it buys. Boxed, the elements stay separate
+            // parameters, `IN (@Value, @Value0)`, and `c.Ints == new[] { i, j }` is refused with EF's
+            // own "new array expression with non-constant elements", which is what EF's relational
+            // specification base asserts. The guard said EF would fold a boxed array into ONE
+            // parameter; measured, it does not, and the refusal it saw was EF's, for EF's own reason.
+            //
             // The J21 clauses below are kept as they were, and each still excludes a type the box
             // cannot carry: `object` (whose real type differs per value), an entity type (which EF
             // expands to a key comparison itself), and anything the model does not store as a
@@ -920,8 +889,7 @@ internal sealed class QueryExecutor<TElement>
             // node type. The J21 comment's caution that "re-typing the box to the runtime type
             // would change what `CreateEqualsExpression` is given" is answered by the conversion:
             // the node handed to EF is still typed `object`.
-            if (!_insideInlineCollection
-                && parameterType == typeof(object)
+            if (parameterType == typeof(object)
                 && value is not null
                 && !PrimitiveCoercion.IsWirePrimitive(value.GetType())
                 && IsMappedPropertyType(_queryContext.Context.Model, value.GetType()))
@@ -957,8 +925,7 @@ internal sealed class QueryExecutor<TElement>
                 ? null
                 : _queryContext.Context.Model.FindRuntimeEntityType(parameterType);
 
-            if (!_insideInlineCollection
-                && (PrimitiveCoercion.IsWirePrimitive(parameterType)
+            if ((PrimitiveCoercion.IsWirePrimitive(parameterType)
                     || (parameterType == typeof(object)
                         && value is not null
                         && PrimitiveCoercion.IsWirePrimitive(value.GetType()))

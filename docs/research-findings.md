@@ -187,6 +187,14 @@ never produces): Block/Loop/Try/Goto/Switch/Label/DebugInfo/Throw/Dynamic. EF ex
 > amendment seen from the other side**: that one spelled a collection out so relational EF would
 > see the shape, this one declines to take the shape apart.
 >
+> **The guard was removed on 2026-09-15, and the reading above was wrong in both halves.** Measured
+> with the server's SQL log, it sent `new[] { i, j }.Contains(p.Id)` as `IN (2, 999)` with no
+> parameters, where EF's own client sends `IN (@i, @j)`: a parameter replaced by its literal values,
+> which the owner ruled a defect whatever it buys. Boxed, the elements do NOT fold into one parameter;
+> they stay `IN (@Value, @Value0)`. And `c.Ints == new[] { i, j }` is refused with EF's own "new array
+> expression with non-constant elements", which is what EF's relational specification base asserts,
+> so the test the guard was written for passes without it.
+>
 > **0 fixed, 0 broken, 9 failures unchanged across 22,666** (`issue59-v2`). The suite could not
 > have found this, because it compares answers and the answers were always right.
 > `ServerParameterizationTest` is the differential test that can: same query over the wire and

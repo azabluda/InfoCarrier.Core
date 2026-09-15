@@ -103,7 +103,12 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
     ///     reaches the translator before anything rejects it. Here it never gets that far: C73
     ///     states the refusal on the query's result element type, which is what the test name asks
     ///     for, and the projection split raises it before the request crosses the wire.
+    ///     <b>So the test carries both reasons</b> (2026-09-15): the store's, which is why EF's own
+    ///     expectation changed, and this provider's, which is why ours differs from EF's.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 26, 30,
+        Justification = Upstream.GaveNoReason)]
     [InfoCarrierDesign(
         10,
         Justification = ComplexNavigationsQueryInfoCarrierTest.QueryableElementRefused,
