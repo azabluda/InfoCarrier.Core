@@ -19,7 +19,8 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         <see cref="StoreLimitAttribute" />, <see cref="StoreDefectAttribute" /> and
 ///         <see cref="StoreIssueAttribute" /> describe the store.
 ///         <see cref="InfoCarrierDefectAttribute" /> describes this provider, and is the last
-///         resort after a fix.
+///         resort after a fix. <see cref="InfoCarrierDesignAttribute" /> describes this provider too,
+///         where it differs on purpose.
 ///     </para>
 ///     <para>
 ///         <b><see cref="Case" /> exists because one test method can hold two different store
@@ -178,6 +179,54 @@ public sealed class InfoCarrierDefectAttribute(string issue) : OverrideReasonAtt
 }
 
 /// <summary>
+///     <c>DESIGN</c>: this provider behaves differently from the store ON PURPOSE, as a recorded
+///     decision says. Neither a store behaviour nor a defect.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>Added when the relational tiers were converted (2026-09-15), for the overrides the four
+///         other labels could not describe.</b> A client that refuses to evaluate a filter it cannot
+///         send, or that answers a projection the store's own provider refuses, fails EF's SQLite
+///         test on the same store. The store is not the reason, and nothing is broken.
+///     </para>
+///     <para>
+///         <b>The reference is the decision</b>, as <c>ADR-nnn</c>, and <see cref="OverrideAudit" />
+///         checks that <c>docs/decisions.md</c> has that heading. <see cref="Justification" /> says
+///         which part of the decision applies. A skip still needs <see cref="UpstreamTest" />, for the
+///         same reason as a store label: only upstream's own choice justifies asserting nothing.
+///     </para>
+/// </remarks>
+public sealed class InfoCarrierDesignAttribute(string decision) : OverrideReasonAttribute
+{
+    /// <summary>The recorded decision, such as <c>"ADR-010"</c>.</summary>
+    public string Decision { get; } = decision;
+
+    /// <summary>Which part of the decision makes this test behave differently. Required.</summary>
+    public string? Justification { get; set; }
+
+    /// <summary>An upstream test that makes the same choice, required only with <see cref="Skip" />.</summary>
+    public string? UpstreamTest { get; set; }
+
+    /// <summary>The override asserts nothing. Requires <see cref="UpstreamTest" />.</summary>
+    public bool Skip { get; set; }
+}
+
+/// <summary>Values for <see cref="OverrideReasonAttribute.Deviation" /> that recur across many overrides.</summary>
+public static class Deviations
+{
+    /// <summary>The upstream override also asserts SQL, which this client never emits.</summary>
+    public const string SqlNotAsserted =
+        "EF's own override also asserts the SQL the store received. This client emits no SQL, because the "
+        + "server's provider writes it, so the SQL assertion is omitted and the rest is the same.";
+
+    /// <summary>The upstream override asserts the store's own exception, which cannot cross the wire as itself.</summary>
+    public const string StoreExceptionCrossesAsData =
+        "EF's own override asserts the store's exception type. Over the wire that exception arrives as "
+        + "InfoCarrierServerException, carrying the store exception's type name and message, and those are "
+        + "asserted instead.";
+}
+
+/// <summary>
 ///     Marks a class that runs specification bases with InfoCarrier REMOVED, so that its overrides
 ///     are the store's behaviour measured directly, and are evidence rather than claims.
 /// </summary>
@@ -188,9 +237,15 @@ public sealed class InfoCarrierDefectAttribute(string issue) : OverrideReasonAtt
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class WireFreeControlAttribute : Attribute;
 
-/// <summary>Values for <see cref="StoreBehaviourAttribute.Justification" />.</summary>
+/// <summary>Values for <see cref="StoreBehaviourAttribute.Justification" /> and the upstream links.</summary>
 public static class Upstream
 {
+    /// <summary>
+    ///     EF Core's repository at the <c>v10.0.1</c> tag, which <c>subrepos/efcore</c> is checked out
+    ///     at and the specification packages are built from. A link is this plus a path and a line.
+    /// </summary>
+    public const string EfCore = "https://github.com/dotnet/efcore/blob/a6217e3438ca1fb430079f2626056c1a11581927/";
+
     /// <summary>Upstream overrides the test and says nothing about why, which the audit counts.</summary>
     public const string GaveNoReason = "(upstream gives no reason)";
 }

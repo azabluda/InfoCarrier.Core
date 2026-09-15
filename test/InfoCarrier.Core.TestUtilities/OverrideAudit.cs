@@ -40,12 +40,16 @@ public static class OverrideAudit
         @"^https://github\.com/azabluda/InfoCarrier\.Core/issues/\d+$",
         RegexOptions.Compiled);
 
+    private static readonly Regex DecisionId = new(@"^ADR-\d{3}$", RegexOptions.Compiled);
+
     /// <summary>Audits every override of a specification test in <paramref name="testAssembly" />.</summary>
     /// <param name="testAssembly">The test project's assembly.</param>
     /// <param name="upstreamDefectsPath">The path of <c>docs/upstream-defects.md</c>, whose sections a DEFECT names.</param>
-    public static OverrideAuditResult Run(Assembly testAssembly, string upstreamDefectsPath)
+    /// <param name="decisionsPath">The path of <c>docs/decisions.md</c>, whose headings a DESIGN names.</param>
+    public static OverrideAuditResult Run(Assembly testAssembly, string upstreamDefectsPath, string decisionsPath)
     {
         string defects = File.ReadAllText(upstreamDefectsPath);
+        string decisions = File.ReadAllText(decisionsPath);
         var violations = new List<string>();
         var audited = new List<(string At, OverrideReasonAttribute Reason)>();
 
@@ -83,7 +87,7 @@ public static class OverrideAudit
                 foreach (OverrideReasonAttribute reason in reasons)
                 {
                     string at = reason.Case is null ? where : $"{where} [{reason.Case}]";
-                    Check(reason, at, isControl, defects, violations);
+                    Check(reason, at, isControl, defects, decisions, violations);
                     audited.Add((at, reason));
                 }
             }
@@ -124,6 +128,7 @@ public static class OverrideAudit
         string at,
         bool isControl,
         string defects,
+        string decisions,
         List<string> violations)
     {
         switch (reason)
@@ -137,6 +142,35 @@ public static class OverrideAudit
                 if (!RepositoryIssue.IsMatch(own.Issue))
                 {
                     violations.Add($"{at}: '{own.Issue}' is not an issue of this repository.");
+                }
+
+                break;
+
+            case InfoCarrierDesignAttribute design:
+                if (isControl)
+                {
+                    violations.Add($"{at}: a wire-free control has no InfoCarrier in it, so it has no InfoCarrier design.");
+                }
+
+                if (!DecisionId.IsMatch(design.Decision)
+                    || !decisions.Contains($"\n## {design.Decision} ", StringComparison.Ordinal))
+                {
+                    violations.Add($"{at}: docs/decisions.md has no decision '{design.Decision}'.");
+                }
+
+                if (string.IsNullOrWhiteSpace(design.Justification))
+                {
+                    violations.Add($"{at}: names a decision and not which part of it applies.");
+                }
+
+                if (design.UpstreamTest is not null && !UpstreamLink.IsMatch(design.UpstreamTest))
+                {
+                    violations.Add($"{at}: '{design.UpstreamTest}' is not a link with a 40-character commit and a line anchor.");
+                }
+
+                if (design.Skip && design.UpstreamTest is null)
+                {
+                    violations.Add($"{at}: a skip needs an upstream reference, because only upstream's own choice justifies asserting nothing.");
                 }
 
                 break;
@@ -253,13 +287,15 @@ public static class OverrideAudit
         int defects = audited.Count(a => a.Reason is StoreDefectAttribute);
         int issues = audited.Count(a => a.Reason is StoreIssueAttribute);
         int own = audited.Count(a => a.Reason is InfoCarrierDefectAttribute);
-        int skips = audited.Count(a => a.Reason is StoreBehaviourAttribute { Skip: true });
+        int designs = audited.Count(a => a.Reason is InfoCarrierDesignAttribute);
+        int skips = audited.Count(a => IsSkip(a.Reason));
         int deviations = audited.Count(a => !string.IsNullOrWhiteSpace(a.Reason.Deviation));
         int silent = audited.Count(a => a.Reason is StoreBehaviourAttribute { Justification: Upstream.GaveNoReason });
 
         text.AppendLine(
             $"Override audit: {audited.Count} reasons. LIMIT {limits}, DEFECT {defects}, ISSUE {issues}, "
-            + $"INFOCARRIER DEFECT {own}. Skips {skips}. Deviations {deviations}. Upstream gave no reason {silent}.");
+            + $"INFOCARRIER DEFECT {own}, DESIGN {designs}. Skips {skips}. Deviations {deviations}. "
+            + $"Upstream gave no reason {silent}.");
         text.AppendLine("| Override | Label | Reference | Skip | Deviation |");
         text.AppendLine("|---|---|---|---|---|");
 
@@ -278,6 +314,7 @@ public static class OverrideAudit
             StoreDefectAttribute d => $"DEFECT {d.Section}",
             StoreIssueAttribute i => $"ISSUE {i.Key}",
             InfoCarrierDefectAttribute => "INFOCARRIER DEFECT",
+            InfoCarrierDesignAttribute d => $"DESIGN {d.Decision}",
             _ => "?",
         };
 
@@ -285,11 +322,16 @@ public static class OverrideAudit
         => reason switch
         {
             InfoCarrierDefectAttribute own => own.Issue,
+            InfoCarrierDesignAttribute { UpstreamTest: { } link } => link,
+            InfoCarrierDesignAttribute d => $"docs/decisions.md {d.Decision}",
             StoreBehaviourAttribute { UpstreamTest: { } link } => link,
             StoreBehaviourAttribute { ControlType: { } type } store => $"{type.Name}.{store.ControlTest}",
             _ => "(this control)",
         };
 
+    private static bool IsSkip(OverrideReasonAttribute reason)
+        => reason is StoreBehaviourAttribute { Skip: true } or InfoCarrierDesignAttribute { Skip: true };
+
     private static string Skip(OverrideReasonAttribute reason)
-        => reason is StoreBehaviourAttribute { Skip: true } ? "yes" : "no";
+        => IsSkip(reason) ? "yes" : "no";
 }
