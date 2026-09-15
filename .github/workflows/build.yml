@@ -182,9 +182,14 @@ jobs:
 
       # Named explicitly and not run through the solution: the solution also holds
       # InfoCarrier.Core.TransportTests, which is not part of this number.
+      #
+      # INFOCARRIER_OVERRIDE_REASONS makes OverrideAuditTest write the reason of every override beside
+      # the TRX, which eng/suite-summary.sh joins with the results for the EF parity badge.
       - name: Test (full suite, Tiers A-C)
         id: tiers-a-c
         timeout-minutes: 90
+        env:
+          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
@@ -199,13 +204,15 @@ jobs:
         id: tier-d
         if: success() || failure()
         timeout-minutes: 30
+        env:
+          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
         run: >
           dotnet test test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj
           --no-build --configuration Release
           --logger "trx;LogFileName=tierd.trx" --results-directory artifacts/test-results
 
-      # Reports and decides nothing: the counters for the badge and the failing names for the run
-      # summary. `always()`, because a red run still has numbers worth publishing.
+      # Reports and decides nothing: EF parity for the badge, and the counters and the failing names
+      # for the run summary. `always()`, because a red run still has numbers worth publishing.
       - name: Summary
         if: always()
         run: >
@@ -287,9 +294,16 @@ jobs:
           fail-on-error: 'false'
           fail-on-empty: 'true'
 
-      # Publishes the suite's numbers to the `badges` branch, where shields.io reads them for
-      # README.md's spec-suite badge. The figures come from the counters file eng/suite-summary.sh
-      # writes, so the TRX is parsed once and by one parser.
+      # Publishes EF parity to the `badges` branch, where shields.io reads it for README.md's
+      # spec-suite badge. The figures come from the counters file eng/suite-summary.sh writes, so
+      # the TRX is parsed once and by one parser.
+      #
+      # THE BADGE SHOWED "passed / total passing" UNTIL 2026-09-15. The suite went green that day,
+      # which made that figure a constant. It shows EF parity now, eng/spec-parity.py's share of the
+      # test cases that ran through InfoCarrier on which it behaves as EF's own provider, and the
+      # colour carries the rest: red when a test step failed, yellow while an InfoCarrier defect is
+      # tracked by an [InfoCarrierDefect] override, green otherwise (the owner's decision, the same
+      # day; docs/plans/v10/test-overhaul.md). The file keeps its name, so README.md is unchanged.
       #
       # `always()`, because a red run still has numbers and the badge should show them, in red. A
       # badge frozen on the last green run is a badge that lies.
@@ -304,13 +318,18 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COLOR: ${{ steps.tiers-a-c.outcome == 'success' && steps.tier-d.outcome == 'success' && 'green' || 'red' }}
+          TESTS_PASSED: ${{ steps.tiers-a-c.outcome == 'success' && steps.tier-d.outcome == 'success' }}
         run: |
           set -euo pipefail
           . artifacts/test-results/counters.env
 
-          # 22658 -> 22,658. Five digits are hard to read in a badge without the separators.
-          comma() { echo "$1" | sed -E ':a;s/([0-9])([0-9]{3})($|,)/\1,\2\3/;ta'; }
+          if [ "$TESTS_PASSED" != "true" ]; then
+            COLOR=red
+          elif [ "$infocarrier_defects" -gt 0 ]; then
+            COLOR=yellow
+          else
+            COLOR=green
+          fi
 
           work=$(mktemp -d)
           git clone --depth 1 --branch badges \
@@ -328,8 +347,8 @@ jobs:
           # same rule a single writer would follow, and it keeps the badge honest about the most
           # recent measurement rather than the most recent push attempt.
           for attempt in 1 2 3; do
-            printf '{"schemaVersion":1,"label":"spec suite","message":"%s / %s passing","color":"%s"}\n' \
-              "$(comma "$passed")" "$(comma "$total")" "$COLOR" > spec-suite.json
+            printf '{"schemaVersion":1,"label":"EF parity","message":"%s%%","color":"%s"}\n' \
+              "$parity" "$COLOR" > spec-suite.json
 
             git add spec-suite.json
             if git diff --staged --quiet; then
@@ -339,7 +358,7 @@ jobs:
 
             git -c user.name='github-actions[bot]' \
                 -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-                commit -m "Spec suite: ${passed} / ${total} passing"
+                commit -m "EF parity: ${parity}% (${parity_infocarrier} of ${parity_ran} cases differ)"
 
             if git push; then
               exit 0

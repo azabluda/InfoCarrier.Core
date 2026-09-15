@@ -130,6 +130,11 @@ carries an attribute whose TYPE is the label and whose ARGUMENTS are the referen
 - `[InfoCarrierDefect(n)]` is the last resort for a defect of ours that cannot be fixed yet, and
   **only the owner files its issue.**
 
+**A test can carry a store reason and InfoCarrier reasons together** (the owner, 2026-09-15): the
+store one says what EF's own provider test does, the InfoCarrier ones why this test differs from it.
+`AnswerNotRefusal` and `RefusedEarlier` are legal only on an InfoCarrier reason, and
+`StoreExceptionAsData` is mechanical, because one decision covers every server error.
+
 **A skip is permitted only with an upstream reference**, because only upstream's own choice
 justifies asserting nothing, and it copies upstream's justification text. **A crash or a wrong
 answer is never `LIMIT`**: a store that means "no" says so. `Justification` is upstream's words or
@@ -191,7 +196,8 @@ estimate a count, and never derive one figure from the others.
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. **It runs every spec test project in its own `projects` list and adds the figures**, so a project missing from that list is missing from every measurement; add one there in the same commit that creates it. |
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
-| `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: reads the spec suite's TRX files, sums their counters into `counters.env` for the README badge, and lists the failing names in the run summary. **It decides nothing**; `dotnet test`'s own exit code is the gate since the ratchet went on 2026-09-15. It replaced `eng/ratchet.sh`, which gated the direction of the failure count against `test/known-failures.txt`; both files are deleted, and git history keeps them. |
+| `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: reads the spec suite's TRX files, sums their counters into `counters.env`, lists the failing names in the run summary, and runs `eng/spec-parity.py` for the README badge. **It decides nothing**; `dotnet test`'s own exit code is the gate since the ratchet went on 2026-09-15. It replaced `eng/ratchet.sh`, which gated the direction of the failure count against `test/known-failures.txt`; both files are deleted, and git history keeps them. |
+| `eng/spec-parity.py <reasons.tsv ...> -- <results.trx ...>` | **EF parity, the README badge since 2026-09-15**: the share of test cases that ran through InfoCarrier on which no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason applies. It joins each TRX result with the `*.override-reasons.tsv` that `OverrideAudit` writes when `INFOCARRIER_OVERRIDE_REASONS` names a directory, which CI sets for both test steps. The badge showed `passed / total` until the suite went green and made that a constant. |
 | `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
@@ -529,9 +535,10 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29792`** (2026-09-15), across the two projects `measure.sh` runs: **0 of
-29558** in the spec project (`Passed: 29320, Skipped: 238`) and **0 of 234** in ADR-009 Tier D. It
-read `FAILING: 19  TOTAL: 29792` earlier the same day, and the nineteen went by the override rule
+**`FAILING: 0  TOTAL: 29793`** (2026-09-15, `parity-sides`), across the two projects `measure.sh`
+runs: **0 of 29559** in the spec project (`Passed: 29321, Skipped: 238`) and **0 of 234** in ADR-009
+Tier D. The one new test is `ServerParameterizationTest`'s inline collection of parameters. It read
+`FAILING: 19  TOTAL: 29792` earlier the same day, and the nineteen went by the override rule
 above, each with an exact assertion and its reason, not by a skip. **Every figure comes out of the
 run's own summary block, and none of them is arithmetic** — a `c10b` entry once carried `Skipped`
 over from an earlier run and derived `Passed` from it.
