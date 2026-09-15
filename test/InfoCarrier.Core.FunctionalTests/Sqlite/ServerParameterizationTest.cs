@@ -29,7 +29,10 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         A parameter reaches the server inside a <c>ParameterBox&lt;T&gt;</c>, so EF names it
 ///         after the box's property and the caller's local variable name never crosses the wire.
 ///         <c>@Value</c> against <c>@title</c> is the expected difference; <c>'beta'</c> against
-///         <c>@title</c> is the defect.
+///         <c>@title</c> is a defect, and so is <c>@Value</c> where the direct query has
+///         <c>'beta'</c>. Either direction changes the plan the caller asked for (the owner,
+///         2026-09-15): a literal is parsed again for every value, and a parameter hides the value
+///         from the optimizer.
 ///     </para>
 ///     <para>
 ///         The SQL is captured from the <b>server</b> context, through the
@@ -246,6 +249,25 @@ public partial class ServerParameterizationTest
         => AssertSameStatement(
             (First: 1, Second: 3),
             static (blogs, ids) => blogs.Where(b => new[] { ids.First, ids.Second }.Contains(b.Id)));
+
+    /// <summary>
+    ///     A predicate built from captured values alone, with no column in it.
+    /// </summary>
+    /// <remarks>
+    ///     EF evaluates the whole predicate on its own client and sends one boolean parameter. The
+    ///     server ran <c>WHERE @Value</c> for
+    ///     <c>NorthwindMiscellaneousQueryTestBase.Contains_over_concatenated_parameter_and_constant</c>,
+    ///     and EF's SQLite suite asserts no SQL for that test, so this is where it is compared.
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_predicate_of_captured_values_matches_the_direct_query()
+        => AssertSameStatement(
+            "alpha",
+            static (blogs, title) =>
+            {
+                string[] data = ["alpha" + "!", "beta" + "!"];
+                return blogs.Where(b => ((IEnumerable<string>)data).Contains(title + "!"));
+            });
 
     /// <summary>
     ///     An entity compared as a whole, category 2 of issue #62.
