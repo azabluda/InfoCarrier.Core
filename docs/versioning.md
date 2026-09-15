@@ -406,7 +406,8 @@ something to know.
 Everything except the irreversible step, which stopped by itself. Budget about **twelve minutes**
 from pushing the tag to the approval gate; the real `v10.1.0` release took eleven.
 
-- CI on the release line: all four jobs green (docs gates, fast gate, spec suite, spec ratchet).
+- CI on the release line: all four checks green (docs gates, fast gate, spec suite, spec tests; the
+  last was named spec ratchet until 2026-09-15).
 - `packages.yml` did NOT publish a candidate, and reported success anyway. That is the defect
   above, found only by reading the push step's own output rather than the job's conclusion.
   **Rehearsed a second time after the fix, against this document rather than from memory.** The

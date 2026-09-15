@@ -113,7 +113,8 @@ carries the adoption.
 **IT IS MEASURED LIKE EVERY OTHER TIER SINCE 2026-09-14, AND IT WAS RATCHETED LIKE THEM UNTIL THE
 RATCHET WENT ON 2026-09-15.** This paragraph read *"gated beside the transport suite rather than by
 the spec ratchet"* before 2026-09-14, which was right while the tier adopted no bases. Its project is
-in `measure.sh`'s list, and CI runs it in the spec-suite job.
+in `measure.sh`'s list, and CI runs it in the `Spec tests` job, a required check that was named
+`Spec ratchet` until the same day. ADR-004 carries the amendment for the whole change.
 
 **THE WHOLE SUITE IS GREEN AND THERE IS NO RATCHET SINCE 2026-09-15** (`docs/plans/v10/test-overhaul.md`).
 This is Microsoft's approach for EF Core's own providers, made stricter in traceability: **every

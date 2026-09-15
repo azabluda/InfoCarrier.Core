@@ -2,7 +2,8 @@
 
 **Status: done, 2026-09-15.** Every tier is converted, the suite is green (`FAILING: 0  TOTAL:
 29792`), and the ratchet is gone: `eng/ratchet.sh` and both baseline files are deleted, and
-`eng/suite-summary.sh` reports the counts in CI. **ADR-004 is still to be amended by the owner.**
+`eng/suite-summary.sh` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
+and the ruleset's required check are renamed from `Spec ratchet` to `Spec tests`.
 
 This replaces the first version of this file from the same day.
 That version kept the ratchet; this one drops it and adds a reference to every override. **The labels
@@ -338,10 +339,9 @@ correct while client and server share one model.
   changes no expected behaviour, so it is not what a label describes. Tier D has none, so the trial
   does not need the answer.
 - **Then remove the ratchet**: `eng/ratchet.sh`, both baseline files, and the direction gate in CI.
-  Done 2026-09-15. The CI job keeps the name `Spec ratchet` only because the `main` ruleset requires a
-  check of that name.
+  Done 2026-09-15, and the job is `Spec tests` in the workflow and the `main` ruleset alike.
 
-**This reverses a LOCKED guardrail.** CLAUDE.md says *"Never `[Skip]`, delete, or override a spec
-test to make the suite green"*, and ADR-004 says a red test is information. The reversal needs a
-dated supersession of ADR-004, and the same commit must sweep every comment that argued for the
-ratchet.
+**This reverses a LOCKED guardrail.** CLAUDE.md said *"Never `[Skip]`, delete, or override a spec
+test to make the suite green"*, and the rule behind ADR-004 was that a red test is information. ADR-004
+carries the dated amendment since 2026-09-15, and the comments that argued for the ratchet were swept
+in the commit that removed it.

@@ -659,7 +659,8 @@ without this a renamed heading breaks inbound links and the build stays green.
 **Enforcement, since 2026-08-26.** Until that date none of this was enforced: `main` had no
 protection and the one ruleset was disabled and targeted no refs, so the ratchet computed the right
 verdict and nothing acted on it. A repository ruleset on the default branch now requires a pull
-request with one approving review, requires `Docs gates`, `Fast gate` and `Spec ratchet` to pass,
+request with one approving review, requires `Docs gates`, `Fast gate` and `Spec ratchet` to pass
+(`Spec tests` since 2026-09-15, when the ratchet went),
 and blocks force-pushes and deletion of `main`. **`Spec suite` is deliberately not required**, for
 the reason above: it is green unconditionally, so requiring it would require nothing.
 
